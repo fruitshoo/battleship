@@ -1,0 +1,35 @@
+[gd_scene load_steps=9 format=3 uid="uid://wake_trail_scene"]
+
+[ext_resource type="Shader" path="res://resources/effects/ripple_shader.gdshader" id="1_shader"]
+
+[sub_resource type="Curve" id="Curve_scale"]
+_data = [Vector2(0, 0.5), 0.0, 2.0, 0, 0, Vector2(1, 2.0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wake"]
+emission_shape = 3
+emission_box_extents = Vector3(1, 0.2, 1)
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_scale")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ripple"]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/ripple_color = Color(1, 1, 1, 0.5)
+shader_parameter/thickness = 0.05
+
+[sub_resource type="QuadMesh" id="QuadMesh_wake"]
+material = SubResource("ShaderMaterial_ripple")
+size = Vector2(2, 2)
+orientation = 1
+
+[node name="WakeTrail" type="GPUParticles3D"]
+amount = 15
+lifetime = 1.5
+fixed_fps = 60
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_wake")
+draw_pass_1 = SubResource("QuadMesh_wake")

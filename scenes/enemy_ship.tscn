@@ -1,0 +1,111 @@
+[gd_scene load_steps=18 format=3 uid="uid://enemy_ship_scene_uid"]
+
+[ext_resource type="Script" path="res://scripts/entities/chaser_ship.gd" id="1_chaser"]
+[ext_resource type="PackedScene" path="res://scenes/soldier.tscn" id="2_soldier"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_hull"]
+size = Vector3(3, 1, 8)
+
+[sub_resource type="StandardMaterial3D" id="Material_wood"]
+albedo_color = Color(0.3, 0.1, 0.1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bow"]
+size = Vector3(2, 0.8, 1.5)
+
+[sub_resource type="StandardMaterial3D" id="Material_bow"]
+albedo_color = Color(0.4, 0.0, 0.0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sail"]
+size = Vector3(4, 6, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="Material_sail"]
+albedo_color = Color(0.7, 0.1, 0.1, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_arrow_shaft"]
+top_radius = 0.1
+bottom_radius = 0.1
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Material_arrow"]
+albedo_color = Color(1, 0.8, 0.2, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_arrow_head"]
+top_radius = 0.0
+bottom_radius = 0.2
+height = 0.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_rudder"]
+size = Vector3(0.2, 1.5, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="Material_rudder"]
+albedo_color = Color(0.5, 0.1, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape_collision"]
+size = Vector3(3, 2, 8)
+
+[node name="EnemyShip" type="Area3D" groups=["enemy"]]
+collision_layer = 4
+collision_mask = 2
+script = ExtResource("1_chaser")
+soldier_scene = ExtResource("2_soldier")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape_collision")
+
+[node name="Hull" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_hull")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="Bow" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, -4.5)
+mesh = SubResource("BoxMesh_bow")
+surface_material_override/0 = SubResource("Material_bow")
+
+[node name="SailVisual" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+
+[node name="SailMesh" type="MeshInstance3D" parent="SailVisual"]
+mesh = SubResource("BoxMesh_sail")
+surface_material_override/0 = SubResource("Material_sail")
+
+[node name="DirectionArrow" type="Node3D" parent="SailVisual"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0.2)
+visible = false
+
+[node name="ArrowShaft" type="MeshInstance3D" parent="SailVisual/DirectionArrow"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("CylinderMesh_arrow_shaft")
+surface_material_override/0 = SubResource("Material_arrow")
+
+[node name="ArrowHead" type="MeshInstance3D" parent="SailVisual/DirectionArrow"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+mesh = SubResource("CylinderMesh_arrow_head")
+surface_material_override/0 = SubResource("Material_arrow")
+
+[node name="RudderVisual" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.5)
+
+[node name="RudderMesh" type="MeshInstance3D" parent="RudderVisual"]
+mesh = SubResource("BoxMesh_rudder")
+surface_material_override/0 = SubResource("Material_rudder")
+
+[node name="Soldiers" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="Archer1" parent="Soldiers" instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+team = "enemy"
+is_stationary = true
+
+[node name="Archer2" parent="Soldiers" instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+team = "enemy"
+is_stationary = true
+
+[node name="Archer3" parent="Soldiers" instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+team = "enemy"
+is_stationary = true
+
+[connection signal="area_entered" from="." to="." method="_on_area_entered"]
+[connection signal="body_entered" from="." to="." method="_on_body_entered"]
