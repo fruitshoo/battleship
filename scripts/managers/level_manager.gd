@@ -161,27 +161,30 @@ func _set_level(new_level: int) -> void:
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("level_up")
 	
-	_show_upgrade_ui()
+	_show_upgrade_ui(3) # 일반 레벨업은 3개 선택지
 
 
-func _show_upgrade_ui() -> void:
+func _show_upgrade_ui(choice_count: int = 3) -> void:
 	if not is_instance_valid(UpgradeManager):
 		return
 	
-	var choices = UpgradeManager.get_random_choices(3)
+	var choices = UpgradeManager.get_random_choices(choice_count)
 	if choices.is_empty():
 		return
 	
-	# 게임 일시정지
+	# 게임 일시정지 (이미 일시정지 중일 수 있음 - 상자 획득 시)
 	get_tree().paused = true
 	
-	# UI 생성
+	# UI 생성 (기존 UI가 있다면 제거)
+	if is_instance_valid(_upgrade_ui_instance):
+		_upgrade_ui_instance.queue_free()
+		
 	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
 	add_child(_upgrade_ui_instance)
 	_upgrade_ui_instance.upgrade_chosen.connect(_on_upgrade_chosen)
 	_upgrade_ui_instance.reroll_requested.connect(_on_reroll_requested)
 	
-	# 카드 표시
+	# 상자 보상인 경우 리롤권을 더 줄 수 있음 (현재는 레벨업 로직과 동일하게 1개 유지 확인)
 	_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
 
 

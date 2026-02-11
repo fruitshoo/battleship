@@ -42,18 +42,23 @@ func _setup_weapons() -> void:
 		cl.position = Vector3(-2.5, 0.8, z_pos)
 		cl.rotation.y = deg_to_rad(90)
 		cl.team = "enemy"
+		cl.detection_range = 45.0
+		cl.detection_arc = 40.0
 		# 우측 대포
 		var cr = cannon_scene.instantiate()
 		cannons_node.add_child(cr)
 		cr.position = Vector3(2.5, 0.8, z_pos)
 		cr.rotation.y = deg_to_rad(-90)
 		cr.team = "enemy"
+		cr.detection_range = 45.0
+		cr.detection_arc = 40.0
 		
 	# 전방 신기전 배치
 	var singigeon = singigeon_scene.instantiate()
 	add_child(singigeon)
 	singigeon.position = Vector3(0, 1.0, -5.0)
 	singigeon.team = "enemy"
+	singigeon.detection_range = 45.0
 	if singigeon.has_method("upgrade_to_level"):
 		singigeon.upgrade_to_level(3) # 최고 레벨 신기전
 

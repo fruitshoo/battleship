@@ -15,15 +15,11 @@ var cooldown_timer: float = 0.0
 
 
 func _process(delta: float) -> void:
-	var um = UpgradeManager if is_instance_valid(UpgradeManager) else null
-	var current_cooldown = fire_cooldown
-	if um:
-		var train_lv = um.current_levels.get("training", 0)
-		current_cooldown *= (1.0 - 0.1 * train_lv)
-	
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
 		return
+	
+	var current_cooldown = _get_current_cooldown()
 	
 	# 직접 적 탐지 (Area3D 사용 안 함 — 동적 인스턴스에서도 확실히 작동)
 	var nearest_enemy: Node3D = null
@@ -53,6 +49,15 @@ func _process(delta: float) -> void:
 		fire(nearest_enemy)
 
 
+func _get_current_cooldown() -> float:
+	var um = UpgradeManager if is_instance_valid(UpgradeManager) else null
+	var cd = fire_cooldown
+	if um:
+		var train_lv = um.current_levels.get("training", 0)
+		cd *= (1.0 - 0.1 * train_lv)
+	return cd
+
+
 func fire(target_enemy: Node3D) -> void:
 	if not cannonball_scene: return
 	
@@ -61,7 +66,7 @@ func fire(target_enemy: Node3D) -> void:
 		AudioManager.play_sfx("cannon_fire", global_position)
 	
 	# 쿨타임 시작
-	cooldown_timer = fire_cooldown # Changed from current_cooldown = fire_interval to match existing variable names
+	cooldown_timer = _get_current_cooldown()
 	
 	var ball = cannonball_scene.instantiate()
 	get_tree().root.add_child(ball)

@@ -20,6 +20,7 @@ var timer: float = 0.0
 var reposition_timer: float = 0.0
 var player: Node3D = null
 var boss_spawned: bool = false
+var elite_spawn_timer: float = 180.0 # 3분 주기
 var regular_spawn_stopped: bool = false
 
 
@@ -75,8 +76,18 @@ func _process(delta: float) -> void:
 		
 	# 1. 적 생성 주기 관리
 	var enemies = get_tree().get_nodes_in_group("enemy")
+	var elite_count = get_tree().get_nodes_in_group("elite").size()
+	
 	if not regular_spawn_stopped:
-		if enemies.size() < max_enemies:
+		# 1-1. 엘리트 소환 주기 체크
+		elite_spawn_timer -= delta
+		if elite_spawn_timer <= 0:
+			elite_spawn_timer = 180.0
+			_spawn_elite_ship()
+		
+		# 1-2. 일반 적 스폰 (엘리트가 있으면 최대 적 수 제한을 낮춰서 긴장감 조절)
+		var effective_max = max_enemies if elite_count == 0 else int(max_enemies * 0.6)
+		if enemies.size() < effective_max:
 			timer -= delta
 			if timer <= 0:
 				timer = compute_next_interval()
@@ -153,3 +164,25 @@ func _get_biased_spawn_position() -> Vector3:
 	var spawn_pos = player.global_position + offset
 	spawn_pos.y = 0 # 배는 물 위에
 	return spawn_pos
+
+
+func _spawn_elite_ship() -> void:
+	if not enemy_scene: return
+	
+	# 엘리트는 일반 적 베이스지만 elite_ship.gd 스크립트를 동적으로 붙이거나 
+	# (여유가 있다면) 전용 씬을 사용. 여기서는 일반 적을 인스턴스화 후 스크립트 교체 방식 사용.
+	var enemy = enemy_scene.instantiate()
+	
+	# 수동으로 스크립트 설정 (elite_ship.gd는 chaser_ship.gd를 확장함)
+	var elite_script = load("res://scripts/entities/elite_ship.gd")
+	enemy.set_script(elite_script)
+	
+	# 스폰 위치 (전방 먼 곳)
+	var spawn_pos = _get_biased_spawn_position()
+	enemy.position = spawn_pos
+	
+	get_parent().add_child(enemy)
+	enemy.look_at(player.global_position, Vector3.UP)
+	
+	# 엘리트 전용 메타데이터 (필요 시)
+	print("🚨 엘리트 함선(중간보스) 출현!")
