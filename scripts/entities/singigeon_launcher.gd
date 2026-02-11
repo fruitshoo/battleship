@@ -57,6 +57,10 @@ func fire(target: Node3D) -> void:
 		get_tree().root.add_child(rocket)
 		rocket.global_position = spawn_pos
 		
+		# 발사 사운드
+		if is_instance_valid(AudioManager):
+			AudioManager.play_sfx("rocket_launch", global_position)
+		
 		# 연사 간격 (0.12초)
 		await get_tree().create_timer(0.12).timeout
 

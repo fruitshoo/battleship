@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+AudioManager="*res://scripts/managers/audio_manager.gd"
 WindManager="*res://scripts/managers/wind_manager.gd"
 UpgradeManager="*res://scripts/managers/upgrade_manager.gd"
 SaveManager="*res://scripts/managers/save_manager.gd"

@@ -4,6 +4,7 @@ extends CanvasLayer
 ## 레벨업 시 3개의 카드를 표시, 플레이어가 하나를 선택
 
 signal upgrade_chosen(upgrade_id: String)
+signal reroll_requested()
 
 @onready var background: ColorRect = $Background
 @onready var title_label: Label = $VBox/TitleLabel
@@ -11,6 +12,7 @@ signal upgrade_chosen(upgrade_id: String)
 
 var card_buttons: Array = []
 var card_ids: Array[String] = []
+var reroll_button: Button = null
 
 
 func _ready() -> void:
@@ -18,7 +20,7 @@ func _ready() -> void:
 	visible = false
 
 
-func show_upgrades(choices: Array) -> void:
+func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	card_ids = []
 	
 	# 기존 카드 제거
@@ -34,6 +36,9 @@ func show_upgrades(choices: Array) -> void:
 		var card = _create_card(upgrade_id, i)
 		cards_container.add_child(card)
 		card_buttons.append(card)
+	
+	# 리롤 버튼 관리
+	_update_reroll_button(rerolls)
 	
 	visible = true
 	
@@ -120,7 +125,7 @@ func _create_card(upgrade_id: String, index: int) -> PanelContainer:
 	button.text = "선택"
 	button.custom_minimum_size = Vector2(0, 40)
 	button.add_theme_font_size_override("font_size", 18)
-	button.pressed.connect(_on_card_pressed.bind(upgrade_id))
+	button.pressed.connect(_on_choice_pressed.bind(upgrade_id))
 	vbox.add_child(button)
 	
 	# 호버 효과용 마우스 이벤트
@@ -130,14 +135,20 @@ func _create_card(upgrade_id: String, index: int) -> PanelContainer:
 	return card
 
 
-func _on_card_pressed(upgrade_id: String) -> void:
+func _on_choice_pressed(upgrade_id: String) -> void:
+	# 사운드 재생
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("ui_click")
+	
+	# 시그널 발생
+	upgrade_chosen.emit(upgrade_id)
+	
 	# 페이드아웃
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(background, "modulate:a", 0.0, 0.2)
 	tween.tween_property($VBox, "modulate:a", 0.0, 0.2)
 	tween.chain().tween_callback(func():
 		visible = false
-		upgrade_chosen.emit(upgrade_id)
 	)
 
 
@@ -154,3 +165,38 @@ func _on_card_unhover(card: PanelContainer, style: StyleBoxFlat, color: Color) -
 	style.border_color = color
 	var tween = create_tween()
 	tween.tween_property(card, "scale", Vector2(1.0, 1.0), 0.1)
+
+
+func _update_reroll_button(count: int) -> void:
+	if not reroll_button:
+		reroll_button = Button.new()
+		reroll_button.custom_minimum_size = Vector2(180, 50)
+		reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		
+		# 스타일 설정 (강조색)
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = Color(0.4, 0.2, 0.6, 0.9)
+		style_normal.corner_radius_top_left = 8
+		style_normal.corner_radius_top_right = 8
+		style_normal.corner_radius_bottom_left = 8
+		style_normal.corner_radius_bottom_right = 8
+		reroll_button.add_theme_stylebox_override("normal", style_normal)
+		
+		var style_hover = style_normal.duplicate()
+		style_hover.bg_color = Color(0.5, 0.3, 0.7, 1.0)
+		reroll_button.add_theme_stylebox_override("hover", style_hover)
+		
+		reroll_button.pressed.connect(_on_reroll_pressed)
+		$VBox.add_child(reroll_button)
+	
+	reroll_button.text = "🎲 Reroll (%d)" % count
+	reroll_button.disabled = count <= 0
+	reroll_button.visible = true
+
+
+func _on_reroll_pressed() -> void:
+	# 사운드
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("ui_click")
+	
+	reroll_requested.emit()

@@ -35,9 +35,12 @@ var attack_timer: float = 0.0
 var shoot_timer: float = 0.0
 var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
+var decision_timer: float = 0.0 # 의사결정 스로틀링용
 
-# 소속 배 참조
+# 소속 배 및 매니저 참조
 var owned_ship: Node3D = null
+var _cached_level_manager: Node = null
+var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용
 
 
 # 노드 참조
@@ -60,6 +63,8 @@ func _ready() -> void:
 		owned_ship = parent.get_parent()
 	elif parent and parent.has_method("get_wind_strength"): # Ship 스크립트 체크
 		owned_ship = parent
+	
+	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
 	
 	# 무기(검) 절차적 생성
 	if not has_node("WeaponPivot"):
@@ -117,13 +122,20 @@ func _physics_process(delta: float) -> void:
 		_check_ranged_combat()
 		return
 	
+	# 의사결정 스로틀링 (0.2초마다 고비용 로직 수행)
+	decision_timer -= delta
+	var run_heavy_logic = false
+	if decision_timer <= 0:
+		decision_timer = 0.2 + randf_range(0.0, 0.1) # 약간의 오프셋으로 부하 분산
+		run_heavy_logic = true
+	
 	match current_state:
 		State.IDLE:
-			_state_idle(delta)
+			_state_idle(delta, run_heavy_logic)
 		State.WANDER:
-			_state_wander(delta)
+			_state_wander(delta, run_heavy_logic)
 		State.MOVE:
-			_state_move(delta)
+			_state_move(delta, run_heavy_logic)
 		State.ATTACK:
 			_state_attack(delta)
 		State.DEAD:
@@ -133,24 +145,24 @@ func _physics_process(delta: float) -> void:
 	if attack_timer > 0: attack_timer -= delta
 	if shoot_timer > 0: shoot_timer -= delta
 	
-	# 원거리 사격 체크
-	if current_state != State.ATTACK and current_state != State.DEAD:
+	# 원거리 사격 체크 (스로틀링)
+	if run_heavy_logic and current_state != State.ATTACK and current_state != State.DEAD:
 		_check_ranged_combat()
 
 
 ## IDLE 상태: 잠시 대기하다가 다시 배회
-func _state_idle(delta: float) -> void:
-	# 적 탐색
-	var enemy = find_nearest_enemy()
-	if enemy:
-		if is_stationary:
-			# 고정형은 MOVE로 가지 않고 IDLE 유지 (사격은 _physics_process에서 함)
+func _state_idle(delta: float, run_heavy_logic: bool) -> void:
+	# 적 탐색 (스로틀링 적용)
+	if run_heavy_logic:
+		var enemy = find_nearest_enemy()
+		if enemy:
+			if is_stationary:
+				current_target = enemy
+				return
+				
 			current_target = enemy
+			_change_state(State.MOVE)
 			return
-			
-		current_target = enemy
-		_change_state(State.MOVE)
-		return
 
 	# 배회 타이머 체크
 	if wander_timer > 0:
@@ -160,20 +172,21 @@ func _state_idle(delta: float) -> void:
 
 
 ## WANDER 상태: 배 위를 랜덤하게 돌아다님 (움직이는 배 대응)
-func _state_wander(_delta: float) -> void:
-	# 적 탐색
-	var enemy = find_nearest_enemy()
-	if enemy:
-		if is_stationary:
-			current_target = enemy
-			_change_state(State.IDLE)
-			return
-			
-		var dist = global_position.distance_to(enemy.global_position)
-		if dist < 8.0:
-			current_target = enemy
-			_change_state(State.MOVE)
-			return
+func _state_wander(_delta: float, run_heavy_logic: bool) -> void:
+	# 적 탐색 (스로틀링 적용)
+	if run_heavy_logic:
+		var enemy = find_nearest_enemy()
+		if enemy:
+			if is_stationary:
+				current_target = enemy
+				_change_state(State.IDLE)
+				return
+				
+			var dist = global_position.distance_to(enemy.global_position)
+			if dist < 8.0:
+				current_target = enemy
+				_change_state(State.MOVE)
+				return
 	
 	if not is_instance_valid(owned_ship):
 		_change_state(State.IDLE)
@@ -184,7 +197,10 @@ func _state_wander(_delta: float) -> void:
 	
 	# 2. 이동 로직
 	if nav_agent:
-		nav_agent.target_position = current_global_target
+		# 부하 경감을 위해 목표가 크게 바뀌었을 때만 경로 갱신 (또는 주기적으로)
+		if current_global_target.distance_to(last_nav_target_pos) > 0.5:
+			nav_agent.target_position = current_global_target
+			last_nav_target_pos = current_global_target
 		
 		if nav_agent.is_navigation_finished():
 			# 도착했으면 IDLE로 전환하여 잠시 대기
@@ -222,7 +238,7 @@ func _start_wander() -> void:
 
 
 ## MOVE 상태 (적 추적)
-func _state_move(_delta: float) -> void:
+func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
 	# 고정형 병사는 이동하지 않음 (적 배 위에서 사격만 함)
 	if is_stationary:
 		_change_state(State.IDLE)
@@ -253,7 +269,10 @@ func _state_move(_delta: float) -> void:
 	
 	# NavMesh를 통한 이동
 	if nav_agent:
-		nav_agent.target_position = current_target.global_position
+		var target_pos = current_target.global_position
+		if target_pos.distance_to(last_nav_target_pos) > 1.0:
+			nav_agent.target_position = target_pos
+			last_nav_target_pos = target_pos
 		
 		if not nav_agent.is_navigation_finished():
 			var next_pos = nav_agent.get_next_path_position()
@@ -305,6 +324,10 @@ func _perform_attack() -> void:
 	var is_crit = randf() < crit_chance
 	if is_crit:
 		final_damage *= crit_multiplier
+	
+	# 사운드 재생
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("sword_swing", global_position)
 	
 	if current_target.has_method("take_damage"):
 		current_target.take_damage(final_damage)
@@ -364,6 +387,10 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	var final_damage = maxf(amount - defense, 1.0)
 	current_health -= final_damage
 	
+	# 피격 사운드
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("soldier_hit", global_position)
+	
 	if current_health <= 0:
 		_die()
 
@@ -374,11 +401,14 @@ func _die() -> void:
 	
 	# XP 부여 (적군일 경우에만)
 	if team == "enemy":
-		var lm = get_tree().root.find_child("LevelManager", true, false)
-		if lm and lm.has_method("add_xp"):
-			lm.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
+		if _cached_level_manager and _cached_level_manager.has_method("add_xp"):
+			_cached_level_manager.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
 	
-	# 비활성화 및 그룹에서 제거 (타겟팅 방지)
+	# 사망 사운드
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("soldier_die", global_position)
+	
+	# 비활성화 및 그룹에서 제거 (타켓팅 방지)
 	set_physics_process(false)
 	remove_from_group("soldiers")
 	
@@ -456,5 +486,9 @@ func _perform_range_attack(target: Node3D) -> void:
 	# 거리에 따른 곡선 높이 조절
 	var dist = arrow.start_pos.distance_to(arrow.target_pos)
 	arrow.arc_height = clamp(dist * 0.3, 1.0, 5.0)
+	
+	# 발사 사운드
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("bow_shoot", global_position)
 	
 	get_tree().root.add_child(arrow)

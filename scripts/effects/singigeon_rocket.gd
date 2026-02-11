@@ -130,20 +130,20 @@ func _explode() -> void:
 		
 		shared_exp_process_mat = ParticleProcessMaterial.new()
 		shared_exp_process_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-		shared_exp_process_mat.emission_sphere_radius = 0.5
+		shared_exp_process_mat.emission_sphere_radius = 0.3 # 약간 더 집중된 폭발 (0.5 -> 0.3)
 		shared_exp_process_mat.spread = 180.0
-		shared_exp_process_mat.initial_velocity_min = 5.0
-		shared_exp_process_mat.initial_velocity_max = 10.0
+		shared_exp_process_mat.initial_velocity_min = 4.0
+		shared_exp_process_mat.initial_velocity_max = 7.0 # 가볍게 튀도록 하향 (10.0 -> 7.0)
 		shared_exp_process_mat.gravity = Vector3(0, -2, 0)
-		shared_exp_process_mat.scale_min = 0.5
-		shared_exp_process_mat.scale_max = 2.0
+		shared_exp_process_mat.scale_min = 0.4
+		shared_exp_process_mat.scale_max = 1.2 # 크기 대폭 하향 (2.0 -> 1.2)
 		shared_exp_process_mat.color = Color(1.0, 0.6, 0.2, 1.0)
 
 	var exp_node = GPUParticles3D.new()
 	get_tree().root.add_child(exp_node)
 	exp_node.global_position = global_position
 	exp_node.process_material = shared_exp_process_mat
-	exp_node.amount = 50
+	exp_node.amount = 25 # 파티클 수 하향 (50 -> 25)
 	exp_node.one_shot = true
 	exp_node.explosiveness = 1.0
 	exp_node.draw_pass_1 = shared_exp_mesh

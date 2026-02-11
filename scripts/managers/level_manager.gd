@@ -14,12 +14,14 @@ signal enemy_destroyed_count(count: int)
 var current_level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 0
+var xp_multiplier: float = 1.0 # 업그레이드로 강화 가능
 var game_difficulty: int = 1 # 적 난이도 레벨
 
 var current_score: int = 0
 var current_time: float = 0.0
 var enemies_killed: int = 0
 var _boss_triggered: bool = false
+var rerolls_available: int = 0
 
 # 레벨별 난이도 설정 (밸런스 조정)
 # spawn_interval: 적 생성 간격 (초)
@@ -49,12 +51,14 @@ var level_data = {
 @export var enemy_spawner: Node = null
 
 func _ready() -> void:
+	add_to_group("level_manager")
 	_calculate_next_level_xp()
 	
 	# 초기 HUD 업데이트
 	if hud:
 		hud.update_level(current_level)
 		hud.update_score(current_score)
+		hud.update_xp(current_xp, xp_to_next_level)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -111,10 +115,10 @@ func add_score(points: int) -> void:
 
 ## XP 획득 및 레벨업 처리
 func add_xp(amount: int) -> void:
-	current_xp += amount
+	current_xp += int(amount * xp_multiplier)
 	
-	# TODO: HUD에 XP 진행도 표시 기능 있으면 좋음
-	# if hud.has_method("update_xp"): hud.update_xp(current_xp, xp_to_next_level)
+	if hud and hud.has_method("update_xp"):
+		hud.update_xp(current_xp, xp_to_next_level)
 	
 	if current_xp >= xp_to_next_level:
 		current_xp -= xp_to_next_level
@@ -122,9 +126,9 @@ func add_xp(amount: int) -> void:
 
 
 func _calculate_next_level_xp() -> void:
-	# 레벨업 공식: 60 * (level ^ 1.35)
-	# 초반 성장을 빠르게 하고, 후반부 정체를 완화함
-	xp_to_next_level = int(60.0 * pow(current_level, 1.35))
+	# 레벨업 공식: 25 * (level ^ 1.1)
+	# 훨씬 시원시원하게 레벨업 되도록 대폭 상향 조정
+	xp_to_next_level = int(25.0 * pow(current_level, 1.1))
 
 var upgrade_ui_scene: PackedScene = preload("res://scenes/ui/upgrade_ui.tscn")
 var meta_upgrade_ui_scene: PackedScene = preload("res://scenes/ui/meta_upgrade_ui.tscn")
@@ -139,6 +143,23 @@ func _set_level(new_level: int) -> void:
 		hud.update_level(current_level)
 	
 	print("⚔️ Level Up! Lv.%d (Next XP: %d)" % [current_level, xp_to_next_level])
+	
+	# === 레벨업 보상 ===
+	# 1. 골드 보상
+	add_score(5) # 점수 겸 골드 +5
+	
+	# 2. 선체 강화 (+10 Max HP)
+	var ship = UpgradeManager._get_player_ship()
+	if ship:
+		ship.max_hull_hp += 10.0
+		ship.hull_hp = minf(ship.hull_hp + 10.0, ship.max_hull_hp)
+		if hud: hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
+	
+	# 3. 리롤권 지급 (레벨당 1회)
+	rerolls_available = 1
+	
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("level_up")
 	
 	_show_upgrade_ui()
 
@@ -158,9 +179,20 @@ func _show_upgrade_ui() -> void:
 	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
 	add_child(_upgrade_ui_instance)
 	_upgrade_ui_instance.upgrade_chosen.connect(_on_upgrade_chosen)
+	_upgrade_ui_instance.reroll_requested.connect(_on_reroll_requested)
 	
 	# 카드 표시
-	_upgrade_ui_instance.show_upgrades(choices)
+	_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
+
+
+func _on_reroll_requested() -> void:
+	if rerolls_available > 0:
+		rerolls_available -= 1
+		
+		var choices = UpgradeManager.get_random_choices(3)
+		if _upgrade_ui_instance:
+			_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
+			print("🎲 Reroll 사용! (남은 횟수: %d)" % rerolls_available)
 
 
 func _on_upgrade_chosen(upgrade_id: String) -> void:

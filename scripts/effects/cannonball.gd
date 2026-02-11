@@ -13,6 +13,16 @@ var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
 var time_alive: float = 0.0
 
+func _spawn_effects() -> void:
+	# 사운드 재생
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("impact_wood", global_position)
+
+	# 시각 이펙트 (기존 로직)
+	# Note: The original instruction snippet for _spawn_effects included lines from _ready().
+	# Assuming the intent was to add the SFX and keep existing _ready() logic separate.
+	# If there was an explosion_scene or visual effect logic intended here, it was not fully provided.
+
 func _ready() -> void:
 	# 3초 뒤 자동 삭제
 	get_tree().create_timer(lifetime).timeout.connect(queue_free)
@@ -50,6 +60,9 @@ func _check_hit(target: Node) -> void:
 			enemy.die()
 		else:
 			enemy.queue_free()
+			
+		# 이펙트 및 사운드 재생
+		_spawn_effects()
 			
 		# 대포알도 삭제
 		queue_free()

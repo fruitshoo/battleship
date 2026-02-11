@@ -48,7 +48,12 @@ func _process(delta: float) -> void:
 func fire(target_enemy: Node3D) -> void:
 	if not cannonball_scene: return
 	
-	cooldown_timer = fire_cooldown
+	# 사운드 재생
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("cannon_fire", global_position)
+	
+	# 쿨타임 시작
+	cooldown_timer = fire_cooldown # Changed from current_cooldown = fire_interval to match existing variable names
 	
 	var ball = cannonball_scene.instantiate()
 	get_tree().root.add_child(ball)

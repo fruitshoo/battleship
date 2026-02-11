@@ -4,10 +4,11 @@ extends Area3D
 ## 느리지만 고데미지 통나무 미사일. 범위 피해.
 
 @export var speed: float = 25.0
-@export var damage: float = 60.0 # 대폭 상향 (치명적 단일 피해)
+@export var damage: float = 12.0 # 즉발 데미지 대폭 하향 (60 -> 12)
+@export var dot_damage: float = 4.0 # 누수 데미지 (초당 4.0)
 @export var speed_debuff: float = 0.7 # 속도 30% 감소
 @export var turn_debuff: float = 0.6 # 선회 40% 감소
-@export var stick_duration: float = 10.0 # 박혀있는 시간
+@export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
 @export var arc_height: float = 8.0
 
@@ -16,6 +17,7 @@ var target_pos: Vector3 = Vector3.ZERO
 var progress: float = 0.0
 var duration: float = 1.0
 var is_stuck: bool = false
+var is_sinking: bool = false
 var target_ship: Node3D = null
 
 func _ready() -> void:
@@ -29,7 +31,7 @@ func _ready() -> void:
 	body_entered.connect(_on_hit)
 
 func _physics_process(delta: float) -> void:
-	if is_stuck: return
+	if is_stuck or is_sinking: return
 	
 	progress += delta / duration
 	
@@ -79,7 +81,10 @@ func _stick_to_ship(ship: Node3D) -> void:
 	if ship.has_method("add_stuck_object"):
 		ship.add_stuck_object(self, speed_debuff, turn_debuff)
 	
-	print("🪵 장군전이 함선에 박혔습니다! (데미지: %.0f)" % damage)
+	if ship.has_method("add_leak"):
+		ship.add_leak(dot_damage)
+	
+	print("🪵 장군전이 함선에 박혔습니다! (즉발:%.0f, 누수:%.1f/s)" % [damage, dot_damage])
 	
 	# 일정 시간 후 제거
 	get_tree().create_timer(stick_duration).timeout.connect(_unstick)
@@ -87,14 +92,20 @@ func _stick_to_ship(ship: Node3D) -> void:
 func _unstick() -> void:
 	if is_instance_valid(target_ship) and target_ship.has_method("remove_stuck_object"):
 		target_ship.remove_stuck_object(self, speed_debuff, turn_debuff)
+	
+	if is_instance_valid(target_ship) and target_ship.has_method("remove_leak"):
+		target_ship.remove_leak(dot_damage)
+	
 	queue_free()
 
 static var shared_exp_mesh: Mesh
 static var shared_exp_process_mat: ParticleProcessMaterial
 
 func _splash_and_sink() -> void:
+	if is_sinking: return
+	is_sinking = true
+	
 	# 물보라 효과 (나중에 리소소 공유 적용 가능)
-	print("🌊 장군전이 바다에 빠졌습니다.")
 	var tween = create_tween()
 	tween.tween_property(self, "position:y", position.y - 2.0, 1.0)
 	tween.tween_callback(queue_free)

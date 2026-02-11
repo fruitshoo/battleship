@@ -12,7 +12,8 @@ extends CanvasLayer
 @onready var wind_label: Label = $SidePanel/VBox/WindLabel
 @onready var speed_label: Label = $SidePanel/VBox/SpeedLabel
 @onready var hull_label: Label = $SidePanel/VBox/HullLabel
-@onready var xp_label: Label = $SidePanel/VBox/XPLabel # 새로운 XP 라벨 필요
+@onready var xp_label: Label = $SidePanel/VBox/XPLabel
+var xp_bar: ProgressBar = null
 @onready var gust_warning: Label = $GustWarning
 @onready var game_over_label: Label = $GameOverLabel
 @onready var victory_label: Label = $VictoryLabel
@@ -29,6 +30,9 @@ func _ready() -> void:
 	update_score(0)
 	update_enemy_count(0)
 	update_crew_status(4)
+	_setup_top_xp_bar()
+	
+	if xp_label: xp_label.visible = false # 기존 라벨 숨김
 	
 	# WindManager 돌풍 시그널 연결
 	if is_instance_valid(WindManager):
@@ -36,6 +40,37 @@ func _ready() -> void:
 			WindManager.gust_started.connect(_on_gust_started)
 		if WindManager.has_signal("gust_ended"):
 			WindManager.gust_ended.connect(_on_gust_ended)
+
+func _setup_top_xp_bar() -> void:
+	xp_bar = ProgressBar.new()
+	xp_bar.name = "TopXPBar"
+	add_child(xp_bar)
+	
+	# 상단 가득 차게 설정
+	xp_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	xp_bar.custom_minimum_size.y = 4.0 # 더 얇게 (6 -> 4)
+	xp_bar.show_percentage = false
+	xp_bar.z_index = 10 # 가장 위에 표시
+	
+	# 스타일 설정 (Cyan/Blue 계열)
+	var sb_bg = StyleBoxFlat.new()
+	sb_bg.bg_color = Color(0, 0, 0, 0.3) # 반투명 배경
+	xp_bar.add_theme_stylebox_override("background", sb_bg)
+	
+	var sb_fg = StyleBoxFlat.new()
+	sb_fg.bg_color = Color(0.2, 0.7, 1.0, 0.9) # 밝은 사이언
+	sb_fg.set_border_width_all(0) # 얇은 바에서는 테두리 제거가 더 깔끔
+	xp_bar.add_theme_stylebox_override("fill", sb_fg)
+	
+	# 다른 UI들이 XP바와 겹치지 않도록 TopPanel 위치 조정
+	var top_panel = get_node_or_null("TopPanel")
+	if top_panel:
+		top_panel.offset_top = 14.0 # XP바(4px) + 여유공간(10px) = 14px
+	
+	# SidePanel도 약간 내림
+	var side_panel = get_node_or_null("SidePanel")
+	if side_panel:
+		side_panel.offset_top = 264.0 # 기존 260 -> 264
 
 
 func _process(delta: float) -> void:
@@ -181,7 +216,7 @@ func update_hull_hp(current: float, maximum: float) -> void:
 	if hull_label:
 		var ratio = current / maximum
 		var bar_length = 10
-		var filled = int(ratio * bar_length)
+		var filled = clamp(int(ratio * bar_length), 0, bar_length)
 		var bar = "█".repeat(filled) + "░".repeat(bar_length - filled)
 		hull_label.text = "🛡 %s %.0f" % [bar, current]
 		
@@ -197,12 +232,13 @@ func update_hull_hp(current: float, maximum: float) -> void:
 ## === XP 진행도 ===
 
 func update_xp(current: int, maximum: int) -> void:
+	if xp_bar:
+		xp_bar.max_value = maximum
+		xp_bar.value = current
+	
 	if xp_label:
-		var ratio = float(current) / float(maximum)
-		var bar_length = 10
-		var filled = int(ratio * bar_length)
-		var bar = "■".repeat(filled) + "□".repeat(bar_length - filled)
-		xp_label.text = "✨ XP %s %d/%d" % [bar, current, maximum]
+		# 기존 라벨도 혹시 모르니 데이터는 유지 (숨겨진 상태)
+		xp_label.text = "✨ XP %d/%d" % [current, maximum]
 
 
 func _update_xp_display() -> void:

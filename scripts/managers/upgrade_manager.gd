@@ -81,6 +81,12 @@ var UPGRADES = {
 		"description": "점수 +50",
 		"max_level": 99,
 		"color": Color(1.0, 0.85, 0.3)
+	},
+	"wisdom": {
+		"name": "📖 지혜",
+		"description": "경험치 획득량 +20%",
+		"max_level": 5,
+		"color": Color(0.9, 0.7, 1.0)
 	}
 }
 
@@ -167,6 +173,8 @@ func apply_upgrade(upgrade_id: String) -> void:
 			_apply_maintenance(player_ship)
 		"gold":
 			_apply_gold()
+		"wisdom":
+			_apply_wisdom()
 	
 	upgrade_applied.emit(upgrade_id, new_level)
 	print("⬆️ 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
@@ -200,6 +208,11 @@ func get_next_description(upgrade_id: String) -> String:
 				if current_lv < 5:
 					extra = "\n(자동 회복 %.1f → %.1f/s)" % [ship.hull_regen_rate, ship.hull_regen_rate + 0.5]
 				return "줄어든 병사 즉시 완충 / 선체 보수" + extra
+		"wisdom":
+			var level_mgr = get_tree().get_first_node_in_group("level_manager")
+			if level_mgr:
+				var cur = level_mgr.xp_multiplier
+				return "경험치 획득량 영구 강화\n(획득량 %.0f%% → %.0f%%)" % [cur * 100, (cur + 0.2) * 100]
 
 	if next_level > 1 and upgrade_id not in ["supply", "gold", "maintenance"]:
 		return data["description"] + " (Lv.%d)" % next_level
@@ -344,6 +357,13 @@ func _apply_gold() -> void:
 	print("💰 전리품! 점수 +50")
 
 
+func _apply_wisdom() -> void:
+	var level_mgr = get_tree().get_first_node_in_group("level_manager")
+	if level_mgr and "xp_multiplier" in level_mgr:
+		level_mgr.xp_multiplier += 0.2
+		print("📖 지혜 업그레이드! 경험치 배율: %.1f" % level_mgr.xp_multiplier)
+
+
 func _get_player_ship() -> Node3D:
 	var players = get_tree().get_nodes_in_group("player")
 	if players.size() > 0:
@@ -393,4 +413,4 @@ func _apply_maintenance(ship: Node3D) -> void:
 		if hud and hud.has_method("update_hull_hp"):
 			hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	
-	print("🔧 보수 완료! 현재 자동 회복율 %.1f/s" % ship.get("hull_regen_rate", 0.0))
+	print("🔧 보수 완료! 현재 자동 회복율 %.1f/s" % ship.get("hull_regen_rate"))

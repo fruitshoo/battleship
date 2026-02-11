@@ -51,6 +51,8 @@ var is_sinking: bool = false
 @onready var rudder_visual: Node3D = $RudderVisual if has_node("RudderVisual") else null
 
 var hull_defense: float = 0.0 # 영구 업그레이드로 상승
+var _cached_level_manager: Node = null
+var _cached_hud: Node = null
 
 
 func _ready() -> void:
@@ -66,6 +68,14 @@ func _ready() -> void:
 	hull_hp = max_hull_hp
 	if is_player_controlled:
 		add_to_group("player")
+	
+	_cache_references()
+
+
+func _cache_references() -> void:
+	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
+	if _cached_level_manager and "hud" in _cached_level_manager:
+		_cached_hud = _cached_level_manager.hud
 
 
 func _process(_delta: float) -> void:
@@ -96,9 +106,8 @@ func _update_hull_regeneration(delta: float) -> void:
 		hull_hp = move_toward(hull_hp, max_hull_hp, hull_regen_rate * delta)
 		# 60프레임마다 HUD 업데이트 (최적화)
 		if Engine.get_physics_frames() % 60 == 0:
-			var hud = _find_hud()
-			if hud and hud.has_method("update_hull_hp"):
-				hud.update_hull_hp(hull_hp, max_hull_hp)
+			if _cached_hud and _cached_hud.has_method("update_hull_hp"):
+				_cached_hud.update_hull_hp(hull_hp, max_hull_hp)
 
 
 ## 키보드 입력 처리
@@ -320,9 +329,8 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 		splinter.rotation.y = randf() * TAU
 	
 	# HUD 업데이트
-	var hud = _find_hud()
-	if hud and hud.has_method("update_hull_hp"):
-		hud.update_hull_hp(hull_hp, max_hull_hp)
+	if _cached_hud and _cached_hud.has_method("update_hull_hp"):
+		_cached_hud.update_hull_hp(hull_hp, max_hull_hp)
 	
 	print("🚢 선체 피격! HP: %.0f / %.0f (데미지: %.0f)" % [hull_hp, max_hull_hp, amount])
 	
@@ -366,14 +374,12 @@ func _game_over() -> void:
 	sink_tween.tween_property(self, "rotation:x", deg_to_rad(10.0), 4.0).set_ease(Tween.EASE_IN)
 	
 	# HUD에 게임 오버 표시
-	var hud = _find_hud()
-	if hud and hud.has_method("show_game_over"):
-		hud.show_game_over()
+	if _cached_hud and _cached_hud.has_method("show_game_over"):
+		_cached_hud.show_game_over()
 	
 	# 실시간 저장이므로 여기서는 메시지만 처리
-	var lm = get_tree().root.find_child("LevelManager", true, false)
-	if lm and lm.get("current_score") != null:
-		print("💀 침몰! 현재 판에서 %d 골드 획득" % lm.current_score)
+	if _cached_level_manager and _cached_level_manager.get("current_score") != null:
+		print("💀 침몰! 현재 판에서 %d 골드 획득" % _cached_level_manager.current_score)
 
 
 func _find_hud() -> Node:
@@ -397,9 +403,8 @@ func add_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 		print("📦 배에 물체가 박힘! (현재 속도 배율: %.2f, 선회 배율: %.2f, 기울기: %.1f)" % [speed_mult, turn_mult, rad_to_deg(tilt_offset)])
 		
 		# HUD 알림 (선택 사항)
-		var hud = _find_hud()
-		if hud and hud.has_method("show_message"):
-			hud.show_message("⚠️ 기동성 저하 기동성 저하!", 2.0)
+		if _cached_hud and _cached_hud.has_method("show_message"):
+			_cached_hud.show_message("⚠️ 기동성 저하 기동성 저하!", 2.0)
 
 func remove_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 	if obj in stuck_objects:

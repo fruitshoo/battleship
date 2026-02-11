@@ -82,22 +82,24 @@ func _process(delta: float) -> void:
 				timer = compute_next_interval()
 				_spawn_enemy()
 	
-	# 2. 너무 멀어진 적 재배치 (Tension 유지)
-	reposition_timer -= delta
-	if reposition_timer <= 0:
-		reposition_timer = reposition_check_interval
-		_check_enemy_reposition(enemies)
+	# 2. 너무 멀어진 적 재배치 (Tension 유지) - 부하 분산을 위해 매 프레임 조금씩 체크
+	if not enemies.is_empty():
+		_check_enemy_reposition_incremental(enemies)
 
-func _check_enemy_reposition(enemies: Array) -> void:
-	for enemy in enemies:
-		if not is_instance_valid(enemy): continue
+func _check_enemy_reposition_incremental(enemies: Array) -> void:
+	# 한 프레임에 최대 3개까지만 체크
+	var check_count = min(3, enemies.size())
+	for i in range(check_count):
+		# 랜덤하게 하나 골라 체크 (순차적으로 하려면 index 관리가 필요하므로 간단히 랜덤 선택)
+		var enemy = enemies.pick_random()
+		if not is_instance_valid(enemy) or enemy.get("is_dying"): continue
 		
 		var dist = enemy.global_position.distance_to(player.global_position)
 		if dist > max_distance_limit:
-			# 플레이어 전방에 재배치 (도망 방지)
 			var spawn_pos = _get_biased_spawn_position()
 			enemy.global_position = spawn_pos
-			enemy.look_at(player.global_position, Vector3.UP)
+			if enemy.has_method("look_at"):
+				enemy.look_at(player.global_position, Vector3.UP)
 
 
 func compute_next_interval() -> float:

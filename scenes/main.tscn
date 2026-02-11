@@ -2,8 +2,8 @@
 
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ship.tscn" id="1"]
 [ext_resource type="Environment" uid="uid://d3wyl5ks17fd8" path="res://resources/environment/world_environment.tres" id="1_h2yge"]
-[ext_resource type="PackedScene" path="res://ui/ship_control_panel.tscn" id="3"]
-[ext_resource type="Theme" uid="uid://vloxxb0s8llf" path="res://ui/theme.tres" id="4_1bvp3"]
+[ext_resource type="PackedScene" path="res://scenes/ui/ship_control_panel.tscn" id="3"]
+[ext_resource type="Theme" uid="uid://vloxxb0s8llf" path="res://resources/ui/theme.tres" id="4_1bvp3"]
 [ext_resource type="Script" uid="uid://c1jpt1wfonqye" path="res://scripts/camera/camera_controller.gd" id="4_o6xl0"]
 [ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="5_attributes"]
 [ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="5_spawner"]
@@ -40,6 +40,8 @@ script = ExtResource("5_spawner")
 
 [node name="LevelManager" type="Node" parent="." unique_id=789013057 node_paths=PackedStringArray("hud", "enemy_spawner")]
 script = ExtResource("8_level_manager")
+level_duration = null
+max_level = null
 hud = NodePath("../GameHUD")
 enemy_spawner = NodePath("../EnemySpawner")
 
