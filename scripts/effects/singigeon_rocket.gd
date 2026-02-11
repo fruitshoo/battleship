@@ -149,22 +149,37 @@ func _explode() -> void:
 	exp_node.draw_pass_1 = shared_exp_mesh
 	exp_node.emitting = true
 	
+	# 시너지 데이터 가져오기
+	var blast_mult = 1.0
+	var fire_lv = 0
+	if is_instance_valid(UpgradeManager):
+		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+		blast_mult += (0.2 * powder_lv)
+		fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
+
 	# 데미지 처리
 	var all_enemies = get_tree().get_nodes_in_group("enemy")
 	var all_players = get_tree().get_nodes_in_group("player")
 	var targets = all_enemies + all_players
 	
+	var final_radius = blast_radius * blast_mult
+	
 	for e in targets:
 		if is_instance_valid(e):
 			var dist = global_position.distance_to(e.global_position)
-			if dist <= blast_radius:
+			if dist <= final_radius:
 				if e.has_method("take_damage"):
 					var final_damage = damage
-					# 병사(CharacterBody3D)인 경우 데미지 증폭
 					if e is CharacterBody3D or e.is_in_group("soldiers"):
 						final_damage *= personnel_damage_mult
 					
 					e.take_damage(final_damage, global_position)
+					
+					# 불화살 시너지 (DOT)
+					if fire_lv > 0 and e.has_method("add_leak"): # 함선의 경우 누수와 비슷한 화상 데미지
+						e.add_leak(fire_lv * 2.0)
+					elif fire_lv > 0 and e.is_in_group("soldiers"): # 병사의 경우 직접 소지 변수가 없으면 일단 skip 하거나 추후 보완
+						pass
 				elif e.has_method("die"):
 					e.die()
 	

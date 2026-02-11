@@ -7,6 +7,7 @@ extends Node3D
 @export var fire_cooldown: float = 2.0
 @export var detection_range: float = 25.0
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
+@export var team: String = "player" # "player" or "enemy"
 
 @onready var muzzle: Marker3D = $Muzzle
 
@@ -14,6 +15,12 @@ var cooldown_timer: float = 0.0
 
 
 func _process(delta: float) -> void:
+	var um = UpgradeManager if is_instance_valid(UpgradeManager) else null
+	var current_cooldown = fire_cooldown
+	if um:
+		var train_lv = um.current_levels.get("training", 0)
+		current_cooldown *= (1.0 - 0.1 * train_lv)
+	
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
 		return
@@ -22,7 +29,8 @@ func _process(delta: float) -> void:
 	var nearest_enemy: Node3D = null
 	var min_dist: float = detection_range
 	
-	var enemies = get_tree().get_nodes_in_group("enemy")
+	var enemy_group = "enemy" if team == "player" else "player"
+	var enemies = get_tree().get_nodes_in_group(enemy_group)
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
@@ -59,6 +67,13 @@ func fire(target_enemy: Node3D) -> void:
 	get_tree().root.add_child(ball)
 	
 	ball.global_position = muzzle.global_position
+	
+	# 데미지 계산 (속성 반영)
+	var base_dmg = 25.0 # 대포알 기본 데미지 상향
+	if is_instance_valid(UpgradeManager):
+		var iron_lv = UpgradeManager.current_levels.get("iron_armor", 0)
+		base_dmg *= (1.0 + 0.25 * iron_lv)
+	ball.damage = base_dmg
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(target_enemy.global_position)

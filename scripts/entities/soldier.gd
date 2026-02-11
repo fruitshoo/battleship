@@ -143,7 +143,13 @@ func _physics_process(delta: float) -> void:
 	
 	# 공격 쿨다운
 	if attack_timer > 0: attack_timer -= delta
-	if shoot_timer > 0: shoot_timer -= delta
+	
+	var current_shoot_cooldown_mult = 1.0
+	if is_instance_valid(UpgradeManager):
+		var train_lv = UpgradeManager.current_levels.get("training", 0)
+		current_shoot_cooldown_mult = (1.0 - 0.1 * train_lv)
+	
+	if shoot_timer > 0: shoot_timer -= delta * (1.0 / current_shoot_cooldown_mult)
 	
 	# 원거리 사격 체크 (스로틀링)
 	if run_heavy_logic and current_state != State.ATTACK and current_state != State.DEAD:
@@ -482,6 +488,13 @@ func _perform_range_attack(target: Node3D) -> void:
 	# 적군 병사면 가슴 높이, 배면 갑판 높이 조준
 	arrow.target_pos = target.global_position + Vector3(0, 0.8, 0)
 	arrow.team = team
+	
+	# 시너지 반영: 불화살
+	if is_instance_valid(UpgradeManager):
+		var fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
+		if fire_lv > 0:
+			arrow.is_fire_arrow = true
+			arrow.fire_damage = fire_lv * 1.5
 	
 	# 거리에 따른 곡선 높이 조절
 	var dist = arrow.start_pos.distance_to(arrow.target_pos)

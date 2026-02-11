@@ -85,6 +85,16 @@ func _create_card(upgrade_id: String, index: int) -> PanelContainer:
 	vbox.add_theme_constant_override("separation", 12)
 	card.add_child(vbox)
 	
+	# 카테고리 라벨
+	var cat_label = Label.new()
+	var cat_name = UpgradeManager.Category.keys()[data["category"]]
+	cat_label.text = "[" + cat_name.replace("_", " ") + "]"
+	cat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cat_label.add_theme_font_size_override("font_size", 12)
+	var cat_color = color.lerp(Color.WHITE, 0.4)
+	cat_label.add_theme_color_override("font_color", cat_color)
+	vbox.add_child(cat_label)
+	
 	# 이름 라벨
 	var name_label = Label.new()
 	name_label.text = data["name"]

@@ -21,6 +21,8 @@ extends Node3D
 @export var bobbing_amplitude: float = 0.3
 @export var bobbing_speed: float = 1.0
 @export var rocking_amplitude: float = 0.05
+@export var rudder_turn_speed: float = 120.0 # Seamanship에 의해 강화됨
+@export var has_sextant: bool = false # Sextant 아이템 소지 여부
 
 # === 노 젓기 ===
 @export var is_rowing: bool = false
@@ -145,6 +147,34 @@ func steer(direction: float, delta: float) -> void:
 	else:
 		# 입력이 없으면 러더 자동 복귀
 		rudder_angle = move_toward(rudder_angle, 0.0, rudder_return_speed * delta)
+	
+	# 육분의: 자동 돛 조절
+	if has_sextant:
+		_auto_adjust_sail(delta)
+
+func _auto_adjust_sail(delta: float) -> void:
+	if not is_instance_valid(WindManager): return
+	var wind_dir = WindManager.get_wind_direction()
+	
+	# WindManager: Clockwise (0=N, 90=E)
+	# rotation.y: Counter-clockwise (0=N, -90=E)
+	var wind_angle = rad_to_deg(atan2(wind_dir.x, -wind_dir.y))
+	var ship_angle_ccw = rad_to_deg(rotation.y)
+	
+	# 선체 기준 상대 바람 각도 계산 (둘 다 시계방향 시스템으로 통일)
+	# ship_angle_cw = -ship_angle_ccw
+	# rel_wind_cw = wind_angle_cw - ship_angle_cw = wind_angle + ship_angle_ccw
+	var rel_wind_angle = wrapf(wind_angle + ship_angle_ccw, -180, 180)
+	
+	# 이등분선(Bisector) 로직: 돛의 각도를 (상대 바람 각도 / 2)로 설정할 때 
+	# 추력(dot(wind, sail) * dot(sail, ship_forward))이 최대가 됨
+	var target_sail_angle = rel_wind_angle / 2.0
+	
+	# 돛 가동 범위 제한 (-90 ~ 90)
+	target_sail_angle = clamp(target_sail_angle, -90, 90)
+	
+	# 부드럽게 조절 (회전 속도 상향)
+	sail_angle = move_toward(sail_angle, target_sail_angle, 90.0 * delta)
 
 
 ## 이동 업데이트
@@ -424,12 +454,15 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node or not soldier_scene: return
 	
-	# 현재 살아있는 병사 수 체크
+	# 현재 살아있는 아군 병사 수 체크
 	var alive_count = 0
 	for child in soldiers_node.get_children():
-		if child.get("current_state") != 4: # 4 = DEAD
+		var is_alive = child.get("current_state") != 4
+		var is_player = child.get("team") == "player"
+		
+		if is_alive and is_player:
 			alive_count += 1
-		else:
+		elif not is_alive:
 			# 죽은 병사 시체는 제거 (새로 뽑기 위해)
 			child.queue_free()
 	

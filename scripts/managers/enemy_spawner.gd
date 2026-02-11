@@ -47,8 +47,8 @@ func _spawn_boss() -> void:
 	var spawn_pos = player.global_position + (player_forward * 50.0)
 	spawn_pos.y = 0
 	
-	boss.global_position = spawn_pos
 	get_parent().add_child(boss)
+	boss.global_position = spawn_pos
 	boss.look_at(player.global_position, Vector3.UP)
 	print("👑 최종 보스 소환 완료!")
 

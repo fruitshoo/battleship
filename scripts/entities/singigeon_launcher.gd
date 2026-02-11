@@ -8,11 +8,18 @@ extends Node3D
 @export var detection_range: float = 30.0
 @export var shot_count: int = 1 # 레벨에 따라 1/3/5
 @export var spread_angle: float = 0.0 # 레벨에 따라 0/8/12
+@export var team: String = "player" # "player" or "enemy"
 
 var cooldown_timer: float = 0.0
 
 
 func _process(delta: float) -> void:
+	var um = UpgradeManager if is_instance_valid(UpgradeManager) else null
+	var current_cooldown = fire_cooldown
+	if um:
+		var train_lv = um.current_levels.get("training", 0)
+		current_cooldown = fire_cooldown * (1.0 - 0.1 * train_lv)
+		
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
 		return
@@ -24,7 +31,8 @@ func _process(delta: float) -> void:
 
 
 func _find_nearest_enemy() -> Node3D:
-	var enemies = get_tree().get_nodes_in_group("enemy")
+	var enemy_group = "enemy" if team == "player" else "player"
+	var enemies = get_tree().get_nodes_in_group(enemy_group)
 	var nearest: Node3D = null
 	var min_dist: float = detection_range
 	

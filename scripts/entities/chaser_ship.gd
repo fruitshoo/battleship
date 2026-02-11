@@ -28,8 +28,10 @@ var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
 # 도선 로직 변수
 var is_boarding: bool = false
 var boarding_timer: float = 0.0
-var boarding_interval: float = 0.5
+var boarding_interval: float = 1.0
 var boarding_target: Node3D = null
+var max_boarding_distance: float = 6.0 # 이 거리 이내여야 도선 진행
+var boarding_break_distance: float = 10.0 # 이 거리 이상 벌어지면 도선 포기 및 추격 재개
 var has_rammed: bool = false # 중복 데미지 방지
 
 func _ready() -> void:
@@ -196,10 +198,19 @@ func _process_boarding(delta: float) -> void:
 	rotation.y = lerp_angle(rotation.y, target_rot, delta * 2.0)
 	
 	# 타이머 기반 병사 전이
-	boarding_timer += delta
-	if boarding_timer >= boarding_interval:
+	# 배가 충분히 가까울 때만 타이머 진행 (날아다니는 현상 방지)
+	if dist <= max_boarding_distance:
+		boarding_timer += delta
+		if boarding_timer >= boarding_interval:
+			boarding_timer = 0.0
+			_transfer_one_soldier()
+	
+	# 너무 멀어지면 도선 포기 및 추격 상태로 복귀
+	if dist > boarding_break_distance:
+		print("📡 거리가 너무 멀어 도선 중단. 추격 재개.")
+		is_boarding = false
 		boarding_timer = 0.0
-		_transfer_one_soldier()
+		# target은 이미 boarding_target이었으므로 그대로 유지됨
 
 func _transfer_one_soldier() -> void:
 	if not is_instance_valid(boarding_target): return

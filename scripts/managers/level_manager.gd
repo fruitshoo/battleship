@@ -126,9 +126,9 @@ func add_xp(amount: int) -> void:
 
 
 func _calculate_next_level_xp() -> void:
-	# 레벨업 공식: 25 * (level ^ 1.1)
-	# 훨씬 시원시원하게 레벨업 되도록 대폭 상향 조정
-	xp_to_next_level = int(25.0 * pow(current_level, 1.1))
+	# 레벨업 공식: 16 * (level ^ 1.2)
+	# 훨씬 시원시원하게 레벨업 되도록 대폭 상향 조정 (25 -> 16)
+	xp_to_next_level = int(16.0 * pow(current_level, 1.2))
 
 var upgrade_ui_scene: PackedScene = preload("res://scenes/ui/upgrade_ui.tscn")
 var meta_upgrade_ui_scene: PackedScene = preload("res://scenes/ui/meta_upgrade_ui.tscn")

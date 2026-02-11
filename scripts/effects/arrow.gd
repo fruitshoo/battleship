@@ -10,6 +10,8 @@ extends Area3D
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
 var team: String = "player"
+var is_fire_arrow: bool = false
+var fire_damage: float = 0.0
 
 var progress: float = 0.0
 var duration: float = 1.0
@@ -64,6 +66,7 @@ func _check_hit(target: Node) -> void:
 		# 적군 병사 피격
 		if target.has_method("take_damage"):
 			target.take_damage(damage)
+			# 불화살 이펙트 소환 등 가능
 			queue_free()
 	
 	# 적 배 피격 (배는 Soldier가 아닌 enemy/player 그룹)
@@ -74,6 +77,8 @@ func _check_hit(target: Node) -> void:
 		if potential_ship.is_in_group(enemy_team):
 			if potential_ship.has_method("take_damage"):
 				potential_ship.take_damage(2.0) # 배에는 미미한 데미지
+				if is_fire_arrow and potential_ship.has_method("add_leak"):
+					potential_ship.add_leak(fire_damage)
 			elif potential_ship.has_method("die") and randf() < 0.1: # 아주 낮은 확률로 파괴 (또는 HP가 1인 경우)
 				# 밸런스상 배 HP가 1이면 화살로는 잘 안터지게 하거나 logic 필요
 				pass

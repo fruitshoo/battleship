@@ -169,7 +169,8 @@ func _update_crew_count() -> void:
 		var alive_count = 0
 		for soldier in soldiers_node.get_children():
 			if soldier.get("current_state") != null and soldier.current_state != 4: # 4 = DEAD
-				alive_count += 1
+				if soldier.get("team") == "player":
+					alive_count += 1
 		
 		var max_val = player_ship.get("max_crew_count") if player_ship.get("max_crew_count") != null else 4
 		update_crew_status(alive_count, max_val)

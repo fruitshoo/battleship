@@ -40,8 +40,6 @@ script = ExtResource("5_spawner")
 
 [node name="LevelManager" type="Node" parent="." unique_id=789013057 node_paths=PackedStringArray("hud", "enemy_spawner")]
 script = ExtResource("8_level_manager")
-level_duration = null
-max_level = null
 hud = NodePath("../GameHUD")
 enemy_spawner = NodePath("../EnemySpawner")
 
