@@ -7,46 +7,85 @@ signal level_up(new_level: int)
 signal score_changed(new_score: int)
 signal enemy_destroyed_count(count: int)
 
-@export var level_duration: float = 30.0 # 레벨업 간격 (초)
-@export var max_level: int = 10
+@export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
+@export var max_level: int = 15
 @export var hud: CanvasLayer = null
 
 var current_level: int = 1
+var current_xp: int = 0
+var xp_to_next_level: int = 0
+var game_difficulty: int = 1 # 적 난이도 레벨
+
 var current_score: int = 0
 var current_time: float = 0.0
+var enemies_killed: int = 0
+var _boss_triggered: bool = false
 
-# 레벨별 난이도 설정
+# 레벨별 난이도 설정 (밸런스 조정)
+# spawn_interval: 적 생성 간격 (초)
+# max_enemies: 동시 최대 적 수
+# enemy_speed: 적 이동 속도
+# enemy_hp: 적 체력
+# boarders: 도선 병사 수
 var level_data = {
-	1: {"spawn_interval": 5.0, "max_enemies": 3, "enemy_speed": 3.5},
-	2: {"spawn_interval": 4.5, "max_enemies": 5, "enemy_speed": 3.7},
-	3: {"spawn_interval": 4.0, "max_enemies": 8, "enemy_speed": 4.0},
-	4: {"spawn_interval": 3.5, "max_enemies": 12, "enemy_speed": 4.3},
-	5: {"spawn_interval": 3.0, "max_enemies": 15, "enemy_speed": 4.6},
-	6: {"spawn_interval": 2.5, "max_enemies": 20, "enemy_speed": 5.0},
-	7: {"spawn_interval": 2.0, "max_enemies": 25, "enemy_speed": 5.5},
-	8: {"spawn_interval": 1.5, "max_enemies": 30, "enemy_speed": 6.0},
-	9: {"spawn_interval": 1.0, "max_enemies": 40, "enemy_speed": 7.0},
-	10: {"spawn_interval": 0.5, "max_enemies": 50, "enemy_speed": 8.0}
+	1: {"spawn_interval": 6.0, "max_enemies": 2, "enemy_speed": 3.0, "enemy_hp": 3.0, "boarders": 1},
+	2: {"spawn_interval": 5.5, "max_enemies": 3, "enemy_speed": 3.2, "enemy_hp": 4.0, "boarders": 1},
+	3: {"spawn_interval": 5.0, "max_enemies": 4, "enemy_speed": 3.5, "enemy_hp": 5.0, "boarders": 2},
+	4: {"spawn_interval": 4.5, "max_enemies": 5, "enemy_speed": 3.5, "enemy_hp": 5.0, "boarders": 2},
+	5: {"spawn_interval": 4.0, "max_enemies": 6, "enemy_speed": 3.8, "enemy_hp": 6.0, "boarders": 2},
+	6: {"spawn_interval": 3.5, "max_enemies": 7, "enemy_speed": 3.8, "enemy_hp": 7.0, "boarders": 3},
+	7: {"spawn_interval": 3.5, "max_enemies": 8, "enemy_speed": 4.0, "enemy_hp": 8.0, "boarders": 3},
+	8: {"spawn_interval": 3.0, "max_enemies": 10, "enemy_speed": 4.0, "enemy_hp": 8.0, "boarders": 3},
+	9: {"spawn_interval": 3.0, "max_enemies": 10, "enemy_speed": 4.2, "enemy_hp": 9.0, "boarders": 3},
+	10: {"spawn_interval": 2.5, "max_enemies": 12, "enemy_speed": 4.5, "enemy_hp": 10.0, "boarders": 4},
+	11: {"spawn_interval": 2.5, "max_enemies": 12, "enemy_speed": 4.5, "enemy_hp": 12.0, "boarders": 4},
+	12: {"spawn_interval": 2.0, "max_enemies": 15, "enemy_speed": 4.8, "enemy_hp": 14.0, "boarders": 4},
+	13: {"spawn_interval": 2.0, "max_enemies": 15, "enemy_speed": 5.0, "enemy_hp": 16.0, "boarders": 5},
+	14: {"spawn_interval": 1.5, "max_enemies": 18, "enemy_speed": 5.2, "enemy_hp": 18.0, "boarders": 5},
+	15: {"spawn_interval": 1.5, "max_enemies": 20, "enemy_speed": 5.5, "enemy_hp": 20.0, "boarders": 6},
 }
 
 # 참조
 @export var enemy_spawner: Node = null
 
 func _ready() -> void:
+	_calculate_next_level_xp()
+	
 	# 초기 HUD 업데이트
 	if hud:
 		hud.update_level(current_level)
 		hud.update_score(current_score)
 
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_F1: # 강제 레벨업
+				print("🐞 DEBUG: 강제 레벨업!")
+				_set_level(current_level + 1)
+			KEY_F2: # 대포 디버그
+				_debug_cannons()
+			KEY_M: # 메타 업그레이드 상점 (테스트용)
+				show_meta_shop()
+
+
 func _process(delta: float) -> void:
 	current_time += delta
 	
-	# 레벨업 체크
-	var calculated_level = int(current_time / level_duration) + 1
-	calculated_level = min(calculated_level, max_level)
+	# 보스 등장 체크 (10분 = 600초)
+	if current_time >= 600.0 and not _boss_triggered:
+		_boss_triggered = true
+		if enemy_spawner:
+			enemy_spawner.trigger_boss_event()
 	
-	if calculated_level > current_level:
-		_set_level(calculated_level)
+	# 난이도 자동 증가 (시간 기반)
+	var new_difficulty = int(current_time / level_duration) + 1
+	new_difficulty = min(new_difficulty, max_level)
+	
+	if new_difficulty > game_difficulty:
+		game_difficulty = new_difficulty
+		_update_difficulty()
+		print("🔥 난이도 상승! Level %d (적 강화)" % game_difficulty)
 	
 	# 주기적으로 적 수 체크 (HUD용)
 	if Engine.get_process_frames() % 30 == 0:
@@ -59,32 +98,158 @@ func _update_enemy_count_ui() -> void:
 
 func add_score(points: int) -> void:
 	current_score += points
+	enemies_killed += 1
 	score_changed.emit(current_score)
+	
+	# 실시간 골드 저장
+	if is_instance_valid(SaveManager):
+		SaveManager.add_gold(points)
+	
 	if hud:
 		hud.update_score(current_score)
 
+
+## XP 획득 및 레벨업 처리
+func add_xp(amount: int) -> void:
+	current_xp += amount
+	
+	# TODO: HUD에 XP 진행도 표시 기능 있으면 좋음
+	# if hud.has_method("update_xp"): hud.update_xp(current_xp, xp_to_next_level)
+	
+	if current_xp >= xp_to_next_level:
+		current_xp -= xp_to_next_level
+		_set_level(current_level + 1)
+
+
+func _calculate_next_level_xp() -> void:
+	# 레벨업 공식: 60 * (level ^ 1.35)
+	# 초반 성장을 빠르게 하고, 후반부 정체를 완화함
+	xp_to_next_level = int(60.0 * pow(current_level, 1.35))
+
+var upgrade_ui_scene: PackedScene = preload("res://scenes/ui/upgrade_ui.tscn")
+var meta_upgrade_ui_scene: PackedScene = preload("res://scenes/ui/meta_upgrade_ui.tscn")
+var _upgrade_ui_instance: CanvasLayer = null
+
 func _set_level(new_level: int) -> void:
-	current_level = new_level
+	current_level = new_level # 플레이어 레벨은 제한 없음 (보급/돈 무한 가능)
+	_calculate_next_level_xp()
+	
 	level_up.emit(current_level)
 	if hud:
 		hud.update_level(current_level)
-	print("Level Up! Current Level: %d" % current_level)
 	
-	_update_difficulty()
+	print("⚔️ Level Up! Lv.%d (Next XP: %d)" % [current_level, xp_to_next_level])
+	
+	_show_upgrade_ui()
+
+
+func _show_upgrade_ui() -> void:
+	if not is_instance_valid(UpgradeManager):
+		return
+	
+	var choices = UpgradeManager.get_random_choices(3)
+	if choices.is_empty():
+		return
+	
+	# 게임 일시정지
+	get_tree().paused = true
+	
+	# UI 생성
+	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
+	add_child(_upgrade_ui_instance)
+	_upgrade_ui_instance.upgrade_chosen.connect(_on_upgrade_chosen)
+	
+	# 카드 표시
+	_upgrade_ui_instance.show_upgrades(choices)
+
+
+func _on_upgrade_chosen(upgrade_id: String) -> void:
+	# 업그레이드 적용
+	UpgradeManager.apply_upgrade(upgrade_id)
+	
+	# UI 제거
+	if is_instance_valid(_upgrade_ui_instance):
+		_upgrade_ui_instance.queue_free()
+		_upgrade_ui_instance = null
+	
+	# 게임 재개
+	get_tree().paused = false
 
 
 func _update_difficulty() -> void:
 	if not enemy_spawner:
 		return
 		
-	var data = level_data.get(current_level, level_data[max_level])
+	# 난이도는 game_difficulty를 따름
+	var data = level_data.get(game_difficulty, level_data[max_level])
 	
 	# 스포너 설정 업데이트
 	if enemy_spawner.has_method("set_difficulty"):
-		enemy_spawner.set_difficulty(data["spawn_interval"], data["max_enemies"], data["enemy_speed"])
-	else:
-		# 직접 프로퍼티 수정 (fallback)
-		enemy_spawner.spawn_interval = data["spawn_interval"]
-		enemy_spawner.max_enemies = data["max_enemies"]
-		if "enemy_speed" in enemy_spawner:
-			enemy_spawner.enemy_speed = data["enemy_speed"]
+		enemy_spawner.set_difficulty(
+			data["spawn_interval"],
+			data["max_enemies"],
+			data["enemy_speed"],
+			data.get("enemy_hp", 5.0),
+			data.get("boarders", 2)
+		)
+
+
+func _debug_cannons() -> void:
+	var ship = get_tree().get_nodes_in_group("player")
+	if ship.is_empty():
+		print("🐞 플레이어 배 없음!")
+		return
+	
+	var cannons_node = ship[0].get_node_or_null("Cannons")
+	if not cannons_node:
+		print("🐞 Cannons 노드 없음!")
+		return
+	
+	print("🐞 ============ CANNON DEBUG ============")
+	print("🐞 총 대포 수: %d" % cannons_node.get_child_count())
+	
+	for cannon in cannons_node.get_children():
+		var det_area = cannon.get_node_or_null("DetectionArea")
+		var muzzle = cannon.get_node_or_null("Muzzle")
+		var overlaps = 0
+		var monitoring = false
+		if det_area:
+			monitoring = det_area.monitoring
+			overlaps = det_area.get_overlapping_areas().size() + det_area.get_overlapping_bodies().size()
+		
+		print("🐞 [%s] pos=%s rot_y=%.1f° monitoring=%s overlaps=%d" % [
+			cannon.name,
+			cannon.position,
+			rad_to_deg(cannon.rotation.y),
+			monitoring,
+			overlaps
+		])
+	
+	# 적 수도 출력
+	var enemies = get_tree().get_nodes_in_group("enemy")
+	print("🐞 적 수: %d" % enemies.size())
+	for e in enemies:
+		print("🐞   적 [%s] pos=%s" % [e.name, e.global_position])
+	print("🐞 ========================================")
+
+
+func update_boss_hp(current: float, maximum: float) -> void:
+	if hud and hud.has_method("update_boss_hp"):
+		hud.update_boss_hp(current, maximum)
+
+
+func show_victory() -> void:
+	# 실시간 저장이므로 여기서는 메시지만 처리
+	print("💰 승리! 현재 판에서 %d 골드 획득" % current_score)
+	
+	if hud and hud.has_method("show_victory"):
+		hud.show_victory()
+
+
+func show_meta_shop() -> void:
+	if not meta_upgrade_ui_scene: return
+	
+	get_tree().paused = true
+	var shop = meta_upgrade_ui_scene.instantiate()
+	add_child(shop)
+	shop.closed.connect(func(): get_tree().paused = false)

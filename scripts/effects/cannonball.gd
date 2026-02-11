@@ -6,8 +6,8 @@ extends Area3D
 @export var speed: float = 100.0 # Increased speed from 80.0 to 100.0
 @export var lifetime: float = 3.0 # 사거리 대신 시간으로 제한
 @export var damage: float = 1.0
-@export var homing_strength: float = 0.5 # 유도 강도
-@export var homing_duration: float = 0.1 # 사실상 제거 수준 (0.3 -> 0.1)
+@export var homing_strength: float = 0.0 # 유도 제거
+@export var homing_duration: float = 0.0 # 유도 제거
 
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
@@ -43,8 +43,10 @@ func _check_hit(target: Node) -> void:
 	if target.is_in_group("enemy") or (target.get_parent() and target.get_parent().is_in_group("enemy")):
 		var enemy = target if target.is_in_group("enemy") else target.get_parent()
 		
-		# 적 파괴!
-		if enemy.has_method("die"):
+		# 적 파괴 로직 수정: take_damage 우선 호출 (충돌 위치 전달)
+		if enemy.has_method("take_damage"):
+			enemy.take_damage(damage, global_position)
+		elif enemy.has_method("die"):
 			enemy.die()
 		else:
 			enemy.queue_free()

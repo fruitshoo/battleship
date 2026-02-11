@@ -4,23 +4,61 @@ extends Node
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
 
 @export var enemy_scene: PackedScene = preload("res://scenes/enemy_ship.tscn")
-@export var spawn_interval: float = 5.0 # 생성 주기 (초)
+@export var spawn_interval: float = 6.0 # 생성 주기 (초)
 @export var min_spawn_distance: float = 40.0 # 최소 생성 거리
 @export var max_spawn_distance: float = 60.0 # 최대 생성 거리
 @export var max_enemies: int = 20 # 최대 적 수
-@export var current_enemy_speed: float = 3.5 # 레벨에 따른 적 속도
-@export var max_distance_limit: float = 120.0 # 이 거리보다 멀어지면 텔레포트 (Vampire Survivors 스타일)
+@export var current_enemy_speed: float = 3.0 # 레벨에 따른 적 속도
+@export var current_enemy_hp: float = 3.0 # 레벨에 따른 적 체력
+@export var current_boarders: int = 1 # 레벨에 따른 도선 병사 수
+@export var max_distance_limit: float = 120.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
+
+@export var boss_scene: PackedScene = preload("res://scenes/entities/boss_ship.tscn")
 
 var timer: float = 0.0
 var reposition_timer: float = 0.0
 var player: Node3D = null
+var boss_spawned: bool = false
+var regular_spawn_stopped: bool = false
 
-## 외부(LevelManager)에서 난이도 조절용
-func set_difficulty(new_interval: float, new_max: int, new_speed: float) -> void:
+
+func trigger_boss_event() -> void:
+	regular_spawn_stopped = true
+	print("🚨 보스 등장 이벤트 시작! 일반 적 스폰 중단")
+	
+	# 모든 일반 적 제거 (선택사항 - 더 극적인 연출을 위해)
+	var enemies = get_tree().get_nodes_in_group("enemy")
+	for enemy in enemies:
+		if not enemy.is_in_group("boss") and enemy.has_method("die"):
+			enemy.die()
+	
+	# 보스 소환
+	_spawn_boss()
+
+
+func _spawn_boss() -> void:
+	if not boss_scene or boss_spawned: return
+	boss_spawned = true
+	
+	var boss = boss_scene.instantiate()
+	# 플레이어 전방 50m 지점에 소환
+	var player_forward = - player.global_transform.basis.z
+	var spawn_pos = player.global_position + (player_forward * 50.0)
+	spawn_pos.y = 0
+	
+	boss.global_position = spawn_pos
+	get_parent().add_child(boss)
+	boss.look_at(player.global_position, Vector3.UP)
+	print("👑 최종 보스 소환 완료!")
+
+
+func set_difficulty(new_interval: float, new_max: int, new_speed: float, new_hp: float = 5.0, new_boarders: int = 2) -> void:
 	spawn_interval = new_interval
 	max_enemies = new_max
 	current_enemy_speed = new_speed
+	current_enemy_hp = new_hp
+	current_boarders = new_boarders
 	# timer가 너무 길게 남았으면 즉시 단축
 	if timer > spawn_interval:
 		timer = spawn_interval
@@ -37,11 +75,12 @@ func _process(delta: float) -> void:
 		
 	# 1. 적 생성 주기 관리
 	var enemies = get_tree().get_nodes_in_group("enemy")
-	if enemies.size() < max_enemies:
-		timer -= delta
-		if timer <= 0:
-			timer = compute_next_interval()
-			_spawn_enemy()
+	if not regular_spawn_stopped:
+		if enemies.size() < max_enemies:
+			timer -= delta
+			if timer <= 0:
+				timer = compute_next_interval()
+				_spawn_enemy()
 	
 	# 2. 너무 멀어진 적 재배치 (Tension 유지)
 	reposition_timer -= delta
@@ -55,20 +94,15 @@ func _check_enemy_reposition(enemies: Array) -> void:
 		
 		var dist = enemy.global_position.distance_to(player.global_position)
 		if dist > max_distance_limit:
-			# 플레이어 주변 랜덤 위치로 텔레포트
-			var angle = randf() * TAU
-			var distance = randf_range(min_spawn_distance + 10.0, max_spawn_distance + 10.0) # 약간 더 멀리서 나타나게
-			var offset = Vector3(cos(angle), 0, sin(angle)) * distance
-			
-			enemy.global_position = player.global_position + offset
+			# 플레이어 전방에 재배치 (도망 방지)
+			var spawn_pos = _get_biased_spawn_position()
+			enemy.global_position = spawn_pos
 			enemy.look_at(player.global_position, Vector3.UP)
-			# print("Enemy repositioned: ", enemy.name)
 
 
 func compute_next_interval() -> float:
-	# 시간이 지날수록(또는 적이 많을수록) 빨라지게 할 수도 있음
-	# 일단 고정
-	return spawn_interval
+	# 약간의 랜덤성 추가 (±20%)
+	return spawn_interval * randf_range(0.8, 1.2)
 
 func _find_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
@@ -81,22 +115,39 @@ func _spawn_enemy() -> void:
 		
 	var enemy = enemy_scene.instantiate()
 	
-	# 랜덤 위치 계산 (플레이어 주변 원형)
-	var angle = randf() * TAU # 0 ~ 2PI
-	var distance = randf_range(min_spawn_distance, max_spawn_distance)
-	
-	var offset = Vector3(cos(angle), 0, sin(angle)) * distance
-	var spawn_pos = player.global_position + offset
-	spawn_pos.y = 0 # 배는 물 위에
-	
+	# 스폰 위치 계산 (전방 편향)
+	var spawn_pos = _get_biased_spawn_position()
 	enemy.position = spawn_pos
 	
-	# Main 씬(이 노드의 부모)에 추가
+	# Main 씬에 추가
 	get_parent().add_child(enemy)
 	
 	# 초기 회전: 플레이어를 바라보게
 	enemy.look_at(player.global_position, Vector3.UP)
 	
-	# 레벨 기반 속도 설정
+	# 레벨 기반 스탯 설정
 	if "move_speed" in enemy:
 		enemy.move_speed = current_enemy_speed
+	if "hp" in enemy:
+		enemy.hp = current_enemy_hp
+	if "boarders_count" in enemy:
+		enemy.boarders_count = current_boarders
+
+
+## 스폰 위치 계산 (플레이어 전방 70% 편향)
+func _get_biased_spawn_position() -> Vector3:
+	var angle: float
+	
+	if randf() < 0.7:
+		# 70% 확률: 플레이어 전방 ±60도 범위
+		var player_heading = player.rotation.y
+		angle = player_heading + randf_range(-deg_to_rad(60), deg_to_rad(60))
+	else:
+		# 30% 확률: 완전 랜덤
+		angle = randf() * TAU
+	
+	var distance = randf_range(min_spawn_distance, max_spawn_distance)
+	var offset = Vector3(cos(angle), 0, sin(angle)) * distance
+	var spawn_pos = player.global_position + offset
+	spawn_pos.y = 0 # 배는 물 위에
+	return spawn_pos

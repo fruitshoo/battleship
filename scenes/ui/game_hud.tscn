@@ -1,17 +1,17 @@
-[gd_scene load_steps=3 format=3 uid="uid://game_hud_scene"]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game_hud.gd" id="1"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0, 0, 0, 0.4)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
-expand_margin_left = 10.0
-expand_margin_top = 5.0
-expand_margin_right = 10.0
-expand_margin_bottom = 5.0
+bg_color = Color(0.05, 0.08, 0.15, 0.75)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
 
 [node name="GameHUD" type="CanvasLayer"]
 script = ExtResource("1")
@@ -20,47 +20,163 @@ script = ExtResource("1")
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -150.0
-offset_top = 20.0
-offset_right = 150.0
-offset_bottom = 60.0
+offset_left = -200.0
+offset_top = 10.0
+offset_right = 200.0
+offset_bottom = 50.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="HBox" type="HBoxContainer" parent="TopPanel"]
 layout_mode = 2
-theme_override_constants/separation = 40
+theme_override_constants/separation = 30
 alignment = 1
 
 [node name="LevelLabel" type="Label" parent="TopPanel/HBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "LEVEL: 1"
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+text = "⚔️ Lv.1"
+
+[node name="DifficultyLabel" type="Label" parent="TopPanel/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+text = "🔥 난이도 1"
 
 [node name="ScoreLabel" type="Label" parent="TopPanel/HBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "SCORE: 0"
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "💰 0"
+
+[node name="TimerLabel" type="Label" parent="TopPanel/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.7, 0.85, 1, 1)
+text = "⏱ 0:00"
 
 [node name="SidePanel" type="PanelContainer" parent="."]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -200.0
-offset_top = 100.0
-offset_right = -20.0
-offset_bottom = 180.0
+offset_left = -220.0
+offset_top = 260.0
+offset_right = -10.0
+offset_bottom = 430.0
 grow_horizontal = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="VBox" type="VBoxContainer" parent="SidePanel"]
 layout_mode = 2
-alignment = 1
+theme_override_constants/separation = 6
 
 [node name="EnemyCountLabel" type="Label" parent="SidePanel/VBox"]
 layout_mode = 2
-text = "ENEMIES: 0"
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 0.5, 0.5, 1)
+text = "🚢 적: 0"
 
 [node name="CrewLabel" type="Label" parent="SidePanel/VBox"]
 layout_mode = 2
-text = "CREW: 4 / 4"
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+text = "👥 선원: 4/4"
+
+[node name="WindLabel" type="Label" parent="SidePanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.8, 1, 0.8, 1)
+text = "🌬️ 바람: N 0.7"
+
+[node name="SpeedLabel" type="Label" parent="SidePanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+text = "⛵ 속도: 0.0"
+
+[node name="HullLabel" type="Label" parent="SidePanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.4, 1, 0.4, 1)
+text = "🛡 ██████████ 100"
+
+[node name="XPLabel" type="Label" parent="SidePanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.7, 0.7, 1, 1)
+text = "✨ XP □□□□□□□□□□ 0/100"
+
+[node name="GustWarning" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 60.0
+offset_right = 150.0
+offset_bottom = 90.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(1, 0.7, 0.2, 1)
+horizontal_alignment = 1
+text = ""
+
+[node name="GameOverLabel" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -40.0
+offset_right = 200.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = ""
+visible = false
+
+[node name="VictoryLabel" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -40.0
+offset_right = 200.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.4, 1, 0.4, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = ""
+visible = false
+
+[node name="BossHPPanel" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 100.0
+offset_right = 250.0
+offset_bottom = 140.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="VBox" type="VBoxContainer" parent="BossHPPanel"]
+layout_mode = 2
+
+[node name="BossHPLabel" type="Label" parent="BossHPPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+horizontal_alignment = 1
+text = "👑 BOSS ██████████ 1000/1000"

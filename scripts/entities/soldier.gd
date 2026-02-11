@@ -14,9 +14,13 @@ enum State {
 @export var max_health: float = 100.0
 @export var attack_damage: float = 10.0
 @export var attack_range: float = 1.5
+@export var detection_range: float = 15.0 # 적 탐지 범위 (이 밖의 적은 무시)
 @export var range_attack_limit: float = 20.0 # 화살 사거리
 @export var attack_cooldown: float = 1.0
 @export var shoot_cooldown: float = 2.0 # 활 쏘기 쿨다운
+@export var crit_chance: float = 0.1 # 크리티컬 확률 (10%)
+@export var crit_multiplier: float = 2.0 # 크리티컬 데미지 배율
+@export var defense: float = 0.0 # 방어력 (피해 감소)
 
 @export var move_speed: float = 3.0
 @export var team: String = "player" # "player" or "enemy"
@@ -41,6 +45,12 @@ var owned_ship: Node3D = null
 
 
 func _ready() -> void:
+	# 영구 업그레이드 보너스 적용 (아군 전용)
+	if team == "player":
+		var mult = MetaManager.get_crew_stat_multiplier()
+		max_health *= mult
+		attack_damage *= mult
+	
 	current_health = max_health
 	
 	# 부모 노드 구조에 따라 배 참조 찾기
@@ -96,6 +106,17 @@ func _update_team_color() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# 바다에 빠지면 사망 (글로벌 Y < -5)
+	if global_position.y < -5.0:
+		_die()
+		return
+	
+	# 고정형(is_stationary) 병사는 AI 로직 실행하지 않음 — 사격만 함
+	if is_stationary:
+		if shoot_timer > 0: shoot_timer -= delta
+		_check_ranged_combat()
+		return
+	
 	match current_state:
 		State.IDLE:
 			_state_idle(delta)
@@ -106,7 +127,7 @@ func _physics_process(delta: float) -> void:
 		State.ATTACK:
 			_state_attack(delta)
 		State.DEAD:
-			pass # 죽은 상태
+			pass
 	
 	# 공격 쿨다운
 	if attack_timer > 0: attack_timer -= delta
@@ -202,6 +223,11 @@ func _start_wander() -> void:
 
 ## MOVE 상태 (적 추적)
 func _state_move(_delta: float) -> void:
+	# 고정형 병사는 이동하지 않음 (적 배 위에서 사격만 함)
+	if is_stationary:
+		_change_state(State.IDLE)
+		return
+	
 	if not is_instance_valid(current_target):
 		_change_state(State.IDLE)
 		return
@@ -214,6 +240,12 @@ func _state_move(_delta: float) -> void:
 	
 	# 목표까지 거리 확인
 	var distance = global_position.distance_to(current_target.global_position)
+	
+	# 탐지 범위 밖이면 포기 (다른 배의 적 추적 방지)
+	if distance > detection_range:
+		current_target = null
+		_change_state(State.IDLE)
+		return
 	
 	if distance <= attack_range:
 		_change_state(State.ATTACK)
@@ -229,11 +261,9 @@ func _state_move(_delta: float) -> void:
 			velocity = direction * move_speed
 			move_and_slide()
 			
-			# 이동 방향을 향해 회전
-			# look_at 안전 처리: 목표 지점이 현재 위치와 너무 가까우면 회전하지 않음
 			if direction.length_squared() > 0.01:
 				var target_look = global_position + direction
-				target_look.y = global_position.y # Y축 평면 유지
+				target_look.y = global_position.y
 				if not global_position.is_equal_approx(target_look):
 					look_at(target_look, Vector3.UP)
 
@@ -270,8 +300,14 @@ func _state_attack(_delta: float) -> void:
 func _perform_attack() -> void:
 	if not is_instance_valid(current_target): return
 	
+	# 크리티컬 히트 판정
+	var final_damage = attack_damage
+	var is_crit = randf() < crit_chance
+	if is_crit:
+		final_damage *= crit_multiplier
+	
 	if current_target.has_method("take_damage"):
-		current_target.take_damage(attack_damage)
+		current_target.take_damage(final_damage)
 		
 		# 시각적 피드백: 런지(Lunge) 애니메이션
 		# 현재 바라보는 방향(Forward)으로 몸체를 잠깐 밈
@@ -288,7 +324,7 @@ func _perform_attack() -> void:
 			w_tween.tween_property(weapon_pivot, "rotation:x", 0.0, 0.2)
 
 
-## 가장 가까운 적 찾기
+## 가장 가까운 적 찾기 (탐지 범위 제한)
 func find_nearest_enemy() -> Node3D:
 	var all_soldiers = get_tree().get_nodes_in_group("soldiers")
 	var nearest: Node3D = null
@@ -306,11 +342,12 @@ func find_nearest_enemy() -> Node3D:
 		if other.get("team") == team:
 			continue
 		
-		# 예외: owned_ship이 같은 경우 (혹시나 같은 배에 다른 팀이 있을 수 있으므로 team 체크가 우선이지만, 안전장치)
-		# 하지만 도선 전투에서는 "같은 배 위에서 적과 싸우는" 상황이므로 배가 같다고 무시하면 안됨! 
-		# 따라서 owned_ship 체크는 제거하거나, 팀 체크로 대체.
-		
 		var distance = global_position.distance_to(other.global_position)
+		
+		# 탐지 범위 밖의 적은 무시 (다른 배의 적을 쫓아가지 않음)
+		if distance > detection_range:
+			continue
+		
 		if distance < nearest_distance:
 			nearest_distance = distance
 			nearest = other
@@ -319,12 +356,13 @@ func find_nearest_enemy() -> Node3D:
 
 
 ## 데미지 받기
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if current_state == State.DEAD:
 		return
 	
-	current_health -= amount
-	# print("%s가 %.1f 데미지를 받음! (남은 체력: %.1f)" % [name, amount, current_health])
+	# 방어력 적용 (최소 1 데미지)
+	var final_damage = maxf(amount - defense, 1.0)
+	current_health -= final_damage
 	
 	if current_health <= 0:
 		_die()
@@ -334,13 +372,19 @@ func take_damage(amount: float) -> void:
 func _die() -> void:
 	current_state = State.DEAD
 	
+	# XP 부여 (적군일 경우에만)
+	if team == "enemy":
+		var lm = get_tree().root.find_child("LevelManager", true, false)
+		if lm and lm.has_method("add_xp"):
+			lm.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
+	
 	# 비활성화 및 그룹에서 제거 (타겟팅 방지)
 	set_physics_process(false)
 	remove_from_group("soldiers")
 	
-	# 충돌 비활성화
+	# 충돌 비활성화 (물리 처리 중이므로 set_deferred 사용)
 	if has_node("CollisionShape3D"):
-		$CollisionShape3D.disabled = true
+		$CollisionShape3D.set_deferred("disabled", true)
 	
 	visible = false
 	# queue_free()
