@@ -73,7 +73,7 @@ var UPGRADES = {
 	"maintenance": {
 		"name": "🔧 보수 및 정비",
 		"description": "줄어든 병사 즉시 완충\nPassive: 선체 자동 회복 +0.5/s",
-		"max_level": 5,
+		"max_level": 99, # 항시 병사 보충용으로 개방
 		"color": Color(0.7, 0.5, 0.9)
 	},
 	"gold": {
@@ -117,10 +117,14 @@ func get_random_choices(count: int = 3) -> Array:
 	var fallbacks = ["supply", "gold", "maintenance"]
 	while choices.size() < count:
 		var fb = fallbacks[choices.size() % fallbacks.size()]
+		# 이미 선택된 것이거나, (혹시나) 정비가 만렙이면서 병사가 풀이면 패스 (일단은 무조건 허용)
 		if fb not in choices:
 			choices.append(fb)
 		else:
-			break
+			# 더 이상 추가할 fallback이 없으면 중단
+			if choices.size() >= fallbacks.size(): break
+			# 다음 fallback 시도
+			continue
 	
 	return choices
 
@@ -171,12 +175,33 @@ func apply_upgrade(upgrade_id: String) -> void:
 ## 현재 레벨의 설명 가져오기 (다음 레벨 기준)
 func get_next_description(upgrade_id: String) -> String:
 	var data = UPGRADES[upgrade_id]
-	var next_level = current_levels[upgrade_id] + 1
+	var current_lv = current_levels[upgrade_id]
+	var next_level = current_lv + 1
+	var ship = _get_player_ship()
 	
 	if "level_desc" in data and next_level in data["level_desc"]:
 		return data["level_desc"][next_level]
 	
-	if next_level > 1:
+	# 동적 설명 생성
+	match upgrade_id:
+		"crew":
+			if ship:
+				return "아군 병사 정원 증설\n(현재 %d명 → %d명)" % [ship.max_crew_count, ship.max_crew_count + 1]
+		"supply":
+			if ship:
+				return "선체 수리 및 강화\n(Max HP %d → %d)" % [ship.max_hull_hp, ship.max_hull_hp + 20]
+		"defense_up":
+			return "병사 방어력 영구 강화\n(방어력 +3, 현재 Lv.%d)" % next_level
+		"crit_up":
+			return "병사 치명타 영구 강화\n(확률 +5%%, 배율 +25%%)"
+		"maintenance":
+			if ship:
+				var extra = ""
+				if current_lv < 5:
+					extra = "\n(자동 회복 %.1f → %.1f/s)" % [ship.hull_regen_rate, ship.hull_regen_rate + 0.5]
+				return "줄어든 병사 즉시 완충 / 선체 보수" + extra
+
+	if next_level > 1 and upgrade_id not in ["supply", "gold", "maintenance"]:
 		return data["description"] + " (Lv.%d)" % next_level
 	
 	return data["description"]
@@ -195,9 +220,24 @@ func _apply_crew(ship: Node3D) -> void:
 	var offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
 	soldier.position = offset
 	
+	# 기존 업그레이드 스탯 적용 (중요!)
+	_apply_current_stats_to_soldier(soldier)
+	
 	# 함선의 병사 정원 증가
 	if "max_crew_count" in ship:
 		ship.max_crew_count += 1
+
+func _apply_current_stats_to_soldier(soldier: Node) -> void:
+	# Crit Up 반영
+	var crit_lv = current_levels.get("crit_up", 0)
+	if crit_lv > 0:
+		soldier.crit_chance = minf(soldier.crit_chance + (0.05 * crit_lv), 0.5)
+		soldier.crit_multiplier += (0.25 * crit_lv)
+	
+	# Defense Up 반영
+	var def_lv = current_levels.get("defense_up", 0)
+	if def_lv > 0:
+		soldier.defense += (3.0 * def_lv)
 
 
 func _apply_cannon(ship: Node3D, level: int) -> void:
@@ -341,9 +381,10 @@ func _apply_maintenance(ship: Node3D) -> void:
 	if ship.has_method("replenish_crew"):
 		ship.replenish_crew(soldier_scene)
 	
-	# 2. 자동 회복 기능 추가/강화
-	if "hull_regen_rate" in ship:
-		ship.hull_regen_rate += 0.5 # 레벨당 초당 0.5씩 회복 증가
+	# 2. 자동 회복 기능 추가/강화 (최대 5레벨까지만 패시브 강화)
+	if current_levels["maintenance"] <= 5:
+		if "hull_regen_rate" in ship:
+			ship.hull_regen_rate += 0.5
 	
 	# 3. 체력도 일부 즉시 회복 (보너스)
 	if "hull_hp" in ship:
@@ -352,4 +393,4 @@ func _apply_maintenance(ship: Node3D) -> void:
 		if hud and hud.has_method("update_hull_hp"):
 			hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	
-	print("🔧 보수 완료! 병사 완충 및 자동 회복율 %.1f/s" % ship.get("hull_regen_rate"))
+	print("🔧 보수 완료! 현재 자동 회복율 %.1f/s" % ship.get("hull_regen_rate", 0.0))

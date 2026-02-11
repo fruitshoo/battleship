@@ -3,8 +3,9 @@ extends Area3D
 ## 신기전 로켓 (Singigeon Rocket)
 ## 빠르게 직선 비행, 적 충돌 시 범위 피해 및 화약 연기 효과
 
-@export var speed: float = 70.0 # 속도 약간 상향
-@export var damage: float = 4.0 # 데미지 약간 상향
+@export var speed: float = 70.0
+@export var damage: float = 0.5 # 함선 기본 데미지 (대폭 하향)
+@export var personnel_damage_mult: float = 25.0 # 병사에게는 25배 데미지 (약 12.5)
 @export var lifetime: float = 3.0
 @export var blast_radius: float = 3.5
 
@@ -150,12 +151,20 @@ func _explode() -> void:
 	
 	# 데미지 처리
 	var all_enemies = get_tree().get_nodes_in_group("enemy")
-	for e in all_enemies:
+	var all_players = get_tree().get_nodes_in_group("player")
+	var targets = all_enemies + all_players
+	
+	for e in targets:
 		if is_instance_valid(e):
 			var dist = global_position.distance_to(e.global_position)
 			if dist <= blast_radius:
 				if e.has_method("take_damage"):
-					e.take_damage(damage, global_position)
+					var final_damage = damage
+					# 병사(CharacterBody3D)인 경우 데미지 증폭
+					if e is CharacterBody3D or e.is_in_group("soldiers"):
+						final_damage *= personnel_damage_mult
+					
+					e.take_damage(final_damage, global_position)
 				elif e.has_method("die"):
 					e.die()
 	

@@ -429,12 +429,17 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 			child.queue_free()
 	
 	# 부족한 만큼 생성
-	var to_add = max_crew_count - alive_count
+	var to_add = max_crew_count - alive_count # 부족한 만큼 생성
 	for i in range(to_add):
 		var s = soldier_scene.instantiate()
 		soldiers_node.add_child(s)
 		s.set_team("player")
 		var offset = Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.5, 2.5))
 		s.position = offset
+		
+		# 업그레이드 매니저 통해서 현재 스탯 적용
+		var um = get_tree().root.find_child("UpgradeManager", true, false)
+		if um and um.has_method("_apply_current_stats_to_soldier"):
+			um._apply_current_stats_to_soldier(s)
 	
 	print("🗡️ 병사 보충 완료! (현재: %d/%d)" % [max_crew_count, max_crew_count])
