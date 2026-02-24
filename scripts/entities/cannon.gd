@@ -13,13 +13,26 @@ extends Node3D
 
 var cooldown_timer: float = 0.0
 
+var is_preparing: bool = false
+var prepare_timer: float = 0.0
+@export var prepare_time: float = 0.15 # 0.8에서 타격감을 위해 0.15초로 단축
+var current_target: Node3D = null
+
 
 func _process(delta: float) -> void:
+	if is_preparing:
+		prepare_timer -= delta
+		if prepare_timer <= 0:
+			_execute_fire()
+		return
+		
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
+		if cooldown_timer <= 0:
+			# 장전 완료 사운드 (금속 철컥/쿵 소리)
+			if is_instance_valid(AudioManager):
+				AudioManager.play_sfx("cannon_reload", global_position, randf_range(0.9, 1.1))
 		return
-	
-	var current_cooldown = _get_current_cooldown()
 	
 	# 직접 적 탐지 (Area3D 사용 안 함 — 동적 인스턴스에서도 확실히 작동)
 	var nearest_enemy: Node3D = null
@@ -61,9 +74,30 @@ func _get_current_cooldown() -> float:
 func fire(target_enemy: Node3D) -> void:
 	if not cannonball_scene: return
 	
+	# 발사 준비(도화선) 시작
+	is_preparing = true
+	prepare_timer = prepare_time
+	current_target = target_enemy
+	
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("cannon_fuse", global_position)
+
+
+func _execute_fire() -> void:
+	is_preparing = false
+	
+	if not is_instance_valid(current_target) or current_target.get("is_dead") == true:
+		return # 타겟이 그동안 죽거나 사라졌다면 발사 취소
+		
 	# 사운드 재생
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("cannon_fire", global_position)
+		AudioManager.play_sfx("cannon_fire", global_position, randf_range(0.9, 1.1))
+		
+	# 화면 흔들림 (Screen Shake) - 플레이어 대포일 경우만 (오래봐도 안 피로하게 아주 약하게)
+	if team == "player":
+		var cam = get_viewport().get_camera_3d()
+		if cam and cam.has_method("shake"):
+			cam.shake(0.15, 0.1) # 진동 세기 0.15, 지속시간 0.1초 (기존 0.5/0.25에서 대폭 완화)
 	
 	# 쿨타임 시작
 	cooldown_timer = _get_current_cooldown()
@@ -81,15 +115,20 @@ func fire(target_enemy: Node3D) -> void:
 	ball.damage = base_dmg
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
-	var dist = global_position.distance_to(target_enemy.global_position)
+	var dist = global_position.distance_to(current_target.global_position)
+	
+	# 거리 기반 자동 포도탄(Grapeshot) 전환 (15m 이내)
+	if dist <= 15.0:
+		ball.is_grapeshot = true
+	
 	var time_to_hit = dist / 100.0
 	
 	var enemy_speed = 3.5
-	if "move_speed" in target_enemy: enemy_speed = target_enemy.move_speed
-	var enemy_dir = - target_enemy.global_transform.basis.z
+	if "move_speed" in current_target: enemy_speed = current_target.move_speed
+	var enemy_dir = - current_target.global_transform.basis.z
 	var enemy_velocity = enemy_dir * enemy_speed
 	
-	var predicted_pos = target_enemy.global_position + enemy_velocity * time_to_hit
+	var predicted_pos = current_target.global_position + enemy_velocity * time_to_hit
 	ball.direction = (predicted_pos - muzzle.global_position).normalized()
-	ball.target_node = target_enemy
+	ball.target_node = current_target
 	ball.look_at(ball.global_position + ball.direction, Vector3.UP)

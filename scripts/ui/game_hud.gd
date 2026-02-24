@@ -23,6 +23,14 @@ var xp_bar: ProgressBar = null
 var game_time: float = 0.0
 var _gust_warning_timer: float = 0.0
 var player_ship: Node3D = null
+var cached_lm: Node = null
+
+# 캐싱 변수들 (텍스트 할당을 줄여 프레임 드랍을 막기 위함)
+var _last_timer_str: String = ""
+var _last_wind_str: String = ""
+var _last_speed_str: String = ""
+var _last_xp_text: String = ""
+var _last_difficulty_text: String = ""
 
 
 func _ready() -> void:
@@ -40,6 +48,12 @@ func _ready() -> void:
 			WindManager.gust_started.connect(_on_gust_started)
 		if WindManager.has_signal("gust_ended"):
 			WindManager.gust_ended.connect(_on_gust_ended)
+			
+	# 레벨매니저 캐싱
+	cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	if not cached_lm:
+		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
+		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 
 func _setup_top_xp_bar() -> void:
 	xp_bar = ProgressBar.new()
@@ -104,7 +118,10 @@ func update_score(val: int) -> void:
 
 func update_difficulty_ui(val: int) -> void:
 	if difficulty_label:
-		difficulty_label.text = "🔥 난이도 %d" % val
+		var new_text = "🔥 난이도 %d" % val
+		if _last_difficulty_text != new_text:
+			_last_difficulty_text = new_text
+			difficulty_label.text = new_text
 
 func update_enemy_count(val: int) -> void:
 	if enemy_count_label:
@@ -119,7 +136,10 @@ func _update_timer() -> void:
 	if timer_label:
 		var minutes = int(game_time) / 60
 		var seconds = int(game_time) % 60
-		timer_label.text = "⏱ %d:%02d" % [minutes, seconds]
+		var new_str = "⏱ %d:%02d" % [minutes, seconds]
+		if _last_timer_str != new_str:
+			_last_timer_str = new_str
+			timer_label.text = new_str
 
 
 func _update_wind_display() -> void:
@@ -131,12 +151,20 @@ func _update_wind_display() -> void:
 	var direction_name = _angle_to_compass(angle)
 	
 	# 돌풍 중이면 색상 변경
+	var wind_text = ""
+	var wind_color = Color.WHITE
+	
 	if WindManager._gust_blend > 0.1:
-		wind_label.add_theme_color_override("font_color", Color(1, 0.6, 0.2, 1))
-		wind_label.text = "🌬️ 돌풍! %s %.1f" % [direction_name, strength]
+		wind_color = Color(1, 0.6, 0.2, 1)
+		wind_text = "🌬️ 돌풍! %s %.1f" % [direction_name, strength]
 	else:
-		wind_label.add_theme_color_override("font_color", Color(0.8, 1, 0.8, 1))
-		wind_label.text = "🌬️ %s %.1f" % [direction_name, strength]
+		wind_color = Color(0.8, 1, 0.8, 1)
+		wind_text = "🌬️ %s %.1f" % [direction_name, strength]
+		
+	if _last_wind_str != wind_text:
+		_last_wind_str = wind_text
+		wind_label.text = wind_text
+		wind_label.add_theme_color_override("font_color", wind_color)
 
 
 func _update_speed_display() -> void:
@@ -152,7 +180,11 @@ func _update_speed_display() -> void:
 	if is_instance_valid(player_ship) and player_ship.get("current_speed") != null:
 		var speed = player_ship.current_speed
 		var mode = "🚣" if player_ship.get("is_rowing") else "⛵"
-		speed_label.text = "%s %.1f" % [mode, speed]
+		var speed_text = "%s %.1f" % [mode, speed]
+		
+		if _last_speed_str != speed_text:
+			_last_speed_str = speed_text
+			speed_label.text = speed_text
 
 
 func _update_crew_count() -> void:
@@ -239,7 +271,10 @@ func update_xp(current: int, maximum: int) -> void:
 	
 	if xp_label:
 		# 기존 라벨도 혹시 모르니 데이터는 유지 (숨겨진 상태)
-		xp_label.text = "✨ XP %d/%d" % [current, maximum]
+		var new_text = "✨ XP %d/%d" % [current, maximum]
+		if _last_xp_text != new_text:
+			_last_xp_text = new_text
+			xp_label.text = new_text
 
 
 func _update_xp_display() -> void:
@@ -247,12 +282,11 @@ func _update_xp_display() -> void:
 	if Engine.get_process_frames() % 15 != 0:
 		return
 		
-	var lm = get_tree().root.find_child("LevelManager", true, false)
-	if lm:
-		if lm.get("current_xp") != null:
-			update_xp(lm.current_xp, lm.xp_to_next_level)
-		if lm.get("game_difficulty") != null:
-			update_difficulty_ui(lm.game_difficulty)
+	if is_instance_valid(cached_lm):
+		if cached_lm.get("current_xp") != null:
+			update_xp(cached_lm.current_xp, cached_lm.xp_to_next_level)
+		if cached_lm.get("game_difficulty") != null:
+			update_difficulty_ui(cached_lm.game_difficulty)
 
 
 func _update_hull_display() -> void:

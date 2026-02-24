@@ -55,7 +55,14 @@ var is_sinking: bool = false
 var hull_defense: float = 0.0 # 영구 업그레이드로 상승
 var _cached_level_manager: Node = null
 var _cached_hud: Node = null
+var _cached_um: Node = null
 
+# 부착된 선원(병사) 정보 (동적)
+var current_crew_count: int = 4
+
+var _flap_timer: float = 0.0
+var _wave_timer: float = 2.0
+var _oars_timer: float = 0.0
 
 func _ready() -> void:
 	base_y = position.y
@@ -67,23 +74,33 @@ func _ready() -> void:
 		hull_defense = MetaManager.get_hull_defense_bonus()
 		print("🚢 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f)" % [max_hull_hp, max_speed, hull_defense])
 	
+	
+	if is_instance_valid(WindManager) and WindManager.has_signal("gust_started"):
+		WindManager.gust_started.connect(_on_gust_started)
+		
 	hull_hp = max_hull_hp
 	if is_player_controlled:
 		add_to_group("player")
 	
 	_cache_references()
 
+func _on_gust_started(_angle_offset: float) -> void:
+	# 돌풍 시작 시 펄럭임 효과음 (플레이어 배만)
+	if is_player_controlled and is_instance_valid(AudioManager):
+		AudioManager.play_sfx("sail_flap", global_position, randf_range(0.9, 1.2))
+
 
 func _cache_references() -> void:
 	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
 	if _cached_level_manager and "hud" in _cached_level_manager:
 		_cached_hud = _cached_level_manager.hud
+		
+	_cached_um = get_tree().root.find_child("UpgradeManager", true, false)
 
 
 func _process(_delta: float) -> void:
 	if is_sinking:
 		return
-	_apply_bobbing_effect()
 	_update_sail_visual()
 	_update_rudder_visual()
 
@@ -93,6 +110,18 @@ func _process(_delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if not is_sinking:
+		_apply_bobbing_effect()
+	if _flap_timer > 0:
+		_flap_timer -= delta
+		
+	if current_speed > 2.5:
+		_wave_timer -= delta
+		if _wave_timer <= 0:
+			if is_instance_valid(AudioManager):
+				AudioManager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
+			_wave_timer = randf_range(1.5, 3.5) / (current_speed / 5.0)
+		
 	if is_sinking:
 		return
 	if is_player_controlled:
@@ -101,6 +130,17 @@ func _physics_process(delta: float) -> void:
 	_update_steering(delta)
 	_update_rowing_stamina(delta)
 	_update_hull_regeneration(delta)
+	
+	# 노 젓기 사운드 재생 (주기적)
+	if is_rowing and rowing_stamina > 0:
+		if _oars_timer <= 0:
+			if is_instance_valid(AudioManager):
+				AudioManager.play_sfx("oars_rowing", global_position, randf_range(0.95, 1.05))
+			_oars_timer = 1.3 # 1.3초마다 노젓기 소리 재생
+		else:
+			_oars_timer -= delta
+	else:
+		_oars_timer = 0.0 # 노 젓기 중단 시 바로 재생 가능하도록 초기화
 
 func _update_hull_regeneration(delta: float) -> void:
 	if is_sinking or hull_regen_rate <= 0: return
@@ -276,11 +316,14 @@ func _calculate_sail_speed() -> float:
 	return thrust * max_speed * wind_str
 
 
-## 둥실둥실 시각 효과
+## 둥실둥실 시각 효과 (반드시 _physics_process에서 호출할 것)
 func _apply_bobbing_effect() -> void:
 	var time = Time.get_ticks_msec() * 0.001
 	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude
+	
+	# 물리 충돌(Jitter)을 방지하기 위해 반드시 _physics_process에서 position.y를 직접 갱신
 	position.y = base_y + bob_offset
+	
 	# 기본 요동 + 장군전 등에 의한 기울기(tilt_offset)
 	rotation.z = (sin(time * bobbing_speed * 0.8) * rocking_amplitude) + tilt_offset
 
@@ -319,6 +362,11 @@ func set_sail_angle(angle: float) -> void:
 
 ## 돛 각도 조정
 func adjust_sail_angle(delta_angle: float) -> void:
+	if abs(delta_angle) > 0.0 and _flap_timer <= 0:
+		if is_instance_valid(AudioManager):
+			AudioManager.play_sfx("sail_flap", global_position, randf_range(0.8, 1.2))
+		_flap_timer = randf_range(1.5, 3.0)
+		
 	set_sail_angle(sail_angle + delta_angle)
 
 
@@ -413,9 +461,9 @@ func _game_over() -> void:
 
 
 func _find_hud() -> Node:
-	var lm = get_tree().root.find_child("LevelManager", true, false)
-	if lm and lm.get("hud"):
-		return lm.hud
+	if _cached_hud: return _cached_hud
+	if _cached_level_manager and _cached_level_manager.get("hud"):
+		return _cached_level_manager.hud
 	return null
 
 
@@ -449,6 +497,41 @@ func remove_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 		if stuck_objects.is_empty():
 			tilt_offset = 0.0
 
+## 폐선 나포 (Capture Derelict Ship) 보상 처리
+func capture_derelict_ship() -> void:
+	print("⚓ 폐선 나포 성공! 보상을 획득합니다.")
+	# 1. 아군 전원 체력 회복
+	var soldiers_node = get_node_or_null("Soldiers")
+	if soldiers_node:
+		for child in soldiers_node.get_children():
+			if child.has_method("heal_full") and child.get("current_state") != 4: # 4 = DEAD
+				child.heal_full()
+	
+	# 2. 병사 1명 보충 (최대치 초과 안하게)
+	# ship.gd에는 soldier_scene이 export 되어있지 않으므로, LevelManager나 임시 캐싱본 활용 필수
+	# 기존 replenish_crew()에서 주입받는 구조이므로 여기선 LevelManager를 통해 Instantiate 시도
+	var alive_count = 0
+	if soldiers_node:
+		for child in soldiers_node.get_children():
+			if child.get("current_state") != 4: alive_count += 1
+		
+		if alive_count < max_crew_count and is_instance_valid(_cached_level_manager) and _cached_level_manager.has_node("LevelLogic"):
+			# 약간의 하드코딩 우회 (보통 GameManager/LevelManager 등에 soldier_scene이 있음)
+			# 또는 chaser_ship.gd처럼 load("res://scenes/soldier.tscn") 사용
+			var fallback_scene = preload("res://scenes/soldier.tscn")
+			var s = fallback_scene.instantiate()
+			soldiers_node.add_child(s)
+			s.set_team("player")
+			var offset = Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.5, 2.5))
+			s.position = offset
+			if is_instance_valid(_cached_um) and _cached_um.has_method("_apply_current_stats_to_soldier"):
+				_cached_um._apply_current_stats_to_soldier(s)
+			print("💂 포로 구출! 아군 병사 1명 합류.")
+			
+	# 3. 사운드 및 피드백 재생
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("treasure_collect", global_position) # 획득음 재활용
+
 ## 병사 보충 (Maintenance 전용)
 func replenish_crew(soldier_scene: PackedScene) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
@@ -476,8 +559,7 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 		s.position = offset
 		
 		# 업그레이드 매니저 통해서 현재 스탯 적용
-		var um = get_tree().root.find_child("UpgradeManager", true, false)
-		if um and um.has_method("_apply_current_stats_to_soldier"):
-			um._apply_current_stats_to_soldier(s)
+		if is_instance_valid(_cached_um) and _cached_um.has_method("_apply_current_stats_to_soldier"):
+			_cached_um._apply_current_stats_to_soldier(s)
 	
 	print("🗡️ 병사 보충 완료! (현재: %d/%d)" % [max_crew_count, max_crew_count])

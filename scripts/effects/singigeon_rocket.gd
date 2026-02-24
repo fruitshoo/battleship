@@ -17,6 +17,7 @@ var duration: float = 1.0
 
 var smoke_particles: GPUParticles3D
 var fire_particles: GPUParticles3D
+var has_exploded: bool = false
 
 func _ready() -> void:
 	# 거리 기반 비행 시간 계산
@@ -89,7 +90,8 @@ func _physics_process(delta: float) -> void:
 	progress += delta / duration
 	
 	if progress >= 1.0:
-		_explode()
+		if not has_exploded:
+			_explode()
 		queue_free()
 		return
 	
@@ -111,13 +113,15 @@ func _on_hit(target: Node) -> void:
 	if not (enemy and enemy.is_in_group("enemy")):
 		return
 	
-	_explode()
+	if not has_exploded:
+		_explode()
 	queue_free()
 
 static var shared_exp_mesh: Mesh
 static var shared_exp_process_mat: ParticleProcessMaterial
 
 func _explode() -> void:
+	has_exploded = true
 	# 폭발 리소스 초기화 (최초 1회)
 	if not shared_exp_mesh:
 		shared_exp_mesh = SphereMesh.new()

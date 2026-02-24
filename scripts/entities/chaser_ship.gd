@@ -12,21 +12,27 @@ extends Node3D
 
 var max_hp: float = 10.0
 var target: Node3D = null
+
+# 상태 (State)
 var is_dying: bool = false
+var is_boarding: bool = false
+var is_derelict: bool = false # 병사 전멸 시 무력화(폐선) 상태
 
 # 누수(Leaking) 시스템 변수
 var leaking_rate: float = 0.0 # 초당 피해량
+
+# Boarding Action Variables
 var current_sink_offset: float = 0.0 # 가라앉은 깊이
 var current_tilt_angle: float = 0.0 # 기울어진 각도
 @onready var wake_trail: GPUParticles3D = $WakeTrail if has_node("WakeTrail") else null
 
 # 최적화 변수
+var cached_lm: Node = null
 var separation_force: Vector3 = Vector3.ZERO
 var separation_timer: float = 0.0
 var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
 
 # 도선 로직 변수
-var is_boarding: bool = false
 var boarding_timer: float = 0.0
 var boarding_interval: float = 1.0
 var boarding_target: Node3D = null
@@ -34,9 +40,41 @@ var max_boarding_distance: float = 6.0 # 이 거리 이내여야 도선 진행
 var boarding_break_distance: float = 10.0 # 이 거리 이상 벌어지면 도선 포기 및 추격 재개
 var has_rammed: bool = false # 중복 데미지 방지
 
+func get_radius() -> float:
+	return 2.5 # 대략적인 선체 반경 (상황에 맞게 조정)
+
+func _become_derelict() -> void:
+	is_derelict = true
+	is_boarding = false
+	if wake_trail: wake_trail.emitting = false
+	
+	print("🏴 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
+	
+	# 파티클 하나 띄워줄 수 있다면 좋음 (검은 연기 등)
+	# 돛을 내리거나 색상을 어둡게 하는 등의 시각적 처리도 연출 가능
+	
+	# 임시로 시각적 피드백: 약간 기울어지고 가라앉음 (반파 효과)
+	var tilt_tween = create_tween()
+	tilt_tween.tween_property(self, "rotation_degrees:z", 5.0, 2.0).set_ease(Tween.EASE_OUT)
+	tilt_tween.set_parallel(true)
+	tilt_tween.tween_property(self, "global_position:y", global_position.y - 0.2, 2.0).set_ease(Tween.EASE_OUT)
+	
+	# 도선 방지를 위해 이동 및 회전 정지
+	move_speed = 0.0
+	
+	cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	if not cached_lm:
+		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
+		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
+
 func _ready() -> void:
 	max_hp = hp
 	_find_player()
+	
+	cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	if not cached_lm:
+		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
+		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 
 # 데미지 처리 (hit_position 추가됨)
 func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
@@ -63,12 +101,11 @@ func die() -> void:
 	is_dying = true
 	
 	# 점수 및 XP 추가
-	var lm = get_tree().root.find_child("LevelManager", true, false)
-	if lm:
-		if lm.has_method("add_score"):
-			lm.add_score(100)
-		if lm.has_method("add_xp"):
-			lm.add_xp(30)
+	if is_instance_valid(cached_lm):
+		if cached_lm.has_method("add_score"):
+			cached_lm.add_score(100)
+		if cached_lm.has_method("add_xp"):
+			cached_lm.add_xp(30)
 	
 	# 물리 및 충돌 비활성화 (Area3D 대응)
 	set_deferred("monitoring", false)
@@ -102,6 +139,25 @@ func _process(_delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if is_dying: return
 	
+	# === 폐선(Derelict) 빙의 로직 ===
+	if not is_derelict:
+		# 살아있는 병사 체크
+		var alive_soldiers = 0
+		if has_node("Soldiers"):
+			for child in $Soldiers.get_children():
+				if child.get("current_state") != 4: # NOT DEAD
+					alive_soldiers += 1
+		
+		# 병사 전멸 시 무력화
+		if alive_soldiers == 0:
+			_become_derelict()
+			return
+	else:
+		# 폐선 상태면 둥둥 떠있기만 함 (로직 정지)
+		# 물결에 흔들리는 연출 등 추가 가능
+		if wake_trail: wake_trail.emitting = false
+		return
+
 	# 도선(Boarding) 상태 로직
 	if is_boarding:
 		_process_boarding(delta)
@@ -257,13 +313,19 @@ func _transfer_one_soldier() -> void:
 
 ## 주변 적함들로부터 멀어지려는 힘 계산
 func _calculate_separation() -> Vector3:
+	# separation 타이머 사용하여 빈도 더 줄일 수도 있음
 	var force = Vector3.ZERO
+	# Engine.get_main_loop().get_nodes_in_group 대신 SceneTree의 매개인스턴스 사용
 	var neighbors = get_tree().get_nodes_in_group("enemy")
 	var count = 0
 	var separation_dist = 5.0 # 함선 간 최소 유지 거리 (반경)
 	
-	for other in neighbors:
-		if other == self or other.get("is_dying"):
+	# 최대 비교 개수 제한하여 극단적인 프레임 드랍 방지 (예: 10척만)
+	var max_checks = min(neighbors.size(), 15)
+	
+	for i in range(max_checks):
+		var other = neighbors[i]
+		if other == self or not is_instance_valid(other) or other.get("is_dying"):
 			continue
 			
 		var dist = global_position.distance_to(other.global_position)
@@ -310,6 +372,15 @@ func _board_ship(target_ship: Node3D) -> void:
 		ship_node = target_ship.get_parent()
 		if not (ship_node and ship_node.is_in_group("player")):
 			return
+
+	# === 무력화(폐선) 상태일 경우 나포 판정 ===
+	if is_derelict:
+		print("📦 플레이어가 폐선에 접근! 나포 성공.")
+		if ship_node.has_method("capture_derelict_ship"):
+			ship_node.capture_derelict_ship()
+		# 달달하게 보상 주고 배는 가라앉음
+		die()
+		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
 	if not has_rammed:

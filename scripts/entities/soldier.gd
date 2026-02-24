@@ -340,7 +340,7 @@ func _perform_attack() -> void:
 		
 		# 시각적 피드백: 런지(Lunge) 애니메이션
 		# 현재 바라보는 방향(Forward)으로 몸체를 잠깐 밈
-		var original_transform = $MeshInstance3D.transform
+		var _original_transform = $MeshInstance3D.transform
 		var tween = create_tween()
 		tween.tween_property($MeshInstance3D, "position:z", -0.5, 0.1).as_relative()
 		tween.tween_property($MeshInstance3D, "position:z", 0.5, 0.1).as_relative()
@@ -385,7 +385,7 @@ func find_nearest_enemy() -> Node3D:
 
 
 ## 데미지 받기
-func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
+func take_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO) -> void:
 	if current_state == State.DEAD:
 		return
 	
@@ -400,6 +400,11 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if current_health <= 0:
 		_die()
 
+## 체력 100% 회복 (나포 보상 등)
+func heal_full() -> void:
+	if current_state != State.DEAD:
+		current_health = max_health
+		# (추후 힐링 파티클 이펙트를 여기에 추가할 수 있습니다)
 
 ## 사망 처리
 func _die() -> void:
@@ -502,6 +507,6 @@ func _perform_range_attack(target: Node3D) -> void:
 	
 	# 발사 사운드
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("bow_shoot", global_position)
+		AudioManager.play_sfx("musket_fire", global_position)
 	
 	get_tree().root.add_child(arrow)

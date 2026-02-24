@@ -18,6 +18,10 @@ var target: Node3D = null
 var current_zoom: float = 0.0
 var _cam_rotation: Vector2 = Vector2.ZERO
 
+var shake_intensity: float = 0.0
+var shake_timer: float = 0.0
+var shake_duration: float = 0.0
+
 func _ready() -> void:
 	print("=== Camera Controller Ready ===")
 	print("Target Path: ", target_path)
@@ -76,3 +80,19 @@ func _process(delta: float) -> void:
 	
 	# 4. 항상 타겟 바라보기
 	look_at(target_pos, Vector3.UP)
+	
+	# 5. 화면 흔들림 (Screen Shake)
+	if shake_timer > 0:
+		shake_timer -= delta
+		var damping = shake_timer / max(0.001, shake_duration)
+		var shake_offset = Vector3(
+			randf_range(-1.0, 1.0),
+			randf_range(-1.0, 1.0),
+			randf_range(-1.0, 1.0)
+		) * shake_intensity * damping
+		global_position += shake_offset
+
+func shake(intensity: float, duration: float) -> void:
+	shake_intensity = intensity
+	shake_duration = duration
+	shake_timer = duration

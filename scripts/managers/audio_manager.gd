@@ -8,16 +8,49 @@ extends Node
 # 실제 파일이 없으므로, 나중에 리소스 경로만 바꾸면 작동하도록 설정
 # preload는 컴파일 타임에 파일이 있어야 하므로, 안전을 위해 load() 사용
 var sfx_streams = {
-	"cannon_fire": "res://resources/audio/sfx_cannon_fire.tres",
-	"impact_wood": "res://resources/audio/sfx_impact_wood.tres",
+	"cannon_fire": [
+		"res://assets/audio/sfx/sfx_cannon_fire.wav",
+		"res://assets/audio/sfx/sfx_cannon_fire_02.wav"
+	],
+	"cannon_fuse": [
+		"res://assets/audio/sfx/sfx_match_sizzle.wav",
+		"res://assets/audio/sfx/sfx_steam_hiss.wav"
+	],
+	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.wav", # 나무 부러지는/부딪히는 소리
 	"ui_click": "res://resources/audio/sfx_ui_click.tres",
 	"level_up": "res://resources/audio/sfx_level_up.tres",
-	"rocket_launch": "res://resources/audio/sfx_rocket_launch.tres",
-	"wood_break": null,
-	"sword_swing": null,
-	"bow_shoot": null,
-	"soldier_hit": null,
+	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.wav", # 로켓/폭발음
+	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.wav",
+	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.wav",
+	"sword_swing": [
+		"res://assets/audio/sfx/sfx_sword_swing_1.wav",
+		"res://assets/audio/sfx/sfx_sword_swing_2.wav",
+		"res://assets/audio/sfx/sfx_sword_swing_3.wav",
+		"res://assets/audio/sfx/sfx_sword_swing_4.wav"
+	],
+	"musket_fire": [
+		"res://assets/audio/sfx/sfx_musket_fire.wav",
+		"res://assets/audio/sfx/sfx_musket_fire_02.wav"
+	],
+	"soldier_hit": [
+		"res://assets/audio/sfx/sfx_sword_ting_1.wav",
+		"res://assets/audio/sfx/sfx_sword_ting_2.wav",
+		"res://assets/audio/sfx/sfx_sword_ting_3.wav",
+		"res://assets/audio/sfx/sfx_sword_ting_4.wav"
+	],
+	"wave_splash": [
+		"res://assets/audio/sfx/sfx_wave_01.wav",
+		"res://assets/audio/sfx/sfx_wave_02.wav",
+		"res://assets/audio/sfx/sfx_wave_03.wav"
+	],
+	"treasure_collect": [
+		"res://assets/audio/sfx/sfx_pickup_1.wav",
+		"res://assets/audio/sfx/sfx_pickup_2.wav",
+		"res://assets/audio/sfx/sfx_pickup_3.wav"
+	],
 	"soldier_die": null,
+	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
+	"oars_rowing": "res://assets/audio/sfx/sfx_oars.wav",
 }
 
 # 캐시된 스트림
@@ -26,7 +59,7 @@ var _cached_streams = {}
 # 플레이스홀더 사운드 생성기 (리소스 없을 때 사용)
 var placeholder_stream: AudioStreamGenerator
 var placeholder_playback: AudioStreamGeneratorPlayback
-var _use_placeholder: bool = true
+var _use_placeholder: bool = false
 
 # 풀링 설정
 var sfx_pool_size: int = 16
@@ -88,10 +121,22 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0) ->
 	var stream = null
 	
 	if _cached_streams.has(stream_name):
-		stream = _cached_streams[stream_name]
+		var cached = _cached_streams[stream_name]
+		if cached is Array:
+			if cached.size() > 0: stream = cached.pick_random()
+		else:
+			stream = cached
 	elif sfx_streams.has(stream_name):
 		var path = sfx_streams[stream_name]
-		if path is String and ResourceLoader.exists(path):
+		if path is Array:
+			var loaded_arr = []
+			for p in path:
+				if p is String and ResourceLoader.exists(p):
+					loaded_arr.append(load(p))
+			if loaded_arr.size() > 0:
+				_cached_streams[stream_name] = loaded_arr
+				stream = loaded_arr.pick_random()
+		elif path is String and ResourceLoader.exists(path):
 			stream = load(path)
 			_cached_streams[stream_name] = stream
 		elif path is AudioStream: # 이미 리소스인 경우 (코드에서 직접 넣었을 때)

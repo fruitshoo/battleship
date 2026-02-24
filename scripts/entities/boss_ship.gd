@@ -21,11 +21,19 @@ var leaking_rate: float = 0.0 # 초당 피해량
 var current_sink_offset: float = 0.0 # 가라앉은 깊이
 var current_tilt_angle: float = 0.0 # 기울어진 각도
 
+var cached_lm: Node = null
+
 func _ready() -> void:
 	hp = max_p
 	add_to_group("enemy")
 	add_to_group("boss")
 	_find_player()
+	
+	cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	if not cached_lm:
+		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
+		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
+		
 	_setup_weapons()
 
 func _setup_weapons() -> void:
@@ -123,9 +131,8 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	hp -= amount
 	
 	# HUD에 보스 체력 업데이트 (LevelManager를 통해)
-	var lm = get_tree().root.find_child("LevelManager", true, false)
-	if lm and lm.has_method("update_boss_hp"):
-		lm.update_boss_hp(hp, max_p)
+	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
+		cached_lm.update_boss_hp(hp, max_p)
 		
 	if hp <= 0:
 		_die()
@@ -142,8 +149,8 @@ func _die() -> void:
 	tween.tween_property(self, "rotation:z", deg_to_rad(25.0), 3.0)
 	
 	tween.chain().tween_callback(func():
-		var lm = get_tree().root.find_child("LevelManager", true, false)
-		if lm: lm.show_victory()
+		if is_instance_valid(cached_lm) and cached_lm.has_method("show_victory"):
+			cached_lm.show_victory()
 	)
 	
 	# 삭제 지연
