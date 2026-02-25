@@ -8,7 +8,9 @@ signal score_changed(new_score: int)
 signal enemy_destroyed_count(count: int)
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
+@export var boss_spawn_time: float = 600.0 # 보스 등장 시간 (초, 기본 10분)
 @export var max_level: int = 15
+@export var max_hull_hp_cap: float = 400.0 # 레벨업 HP 보너스 상한 (Phase 3 밸런싱)
 @export var hud: CanvasLayer = null
 
 var current_level: int = 1
@@ -62,6 +64,7 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build(): return # 이 디버그 키들은 릴리즈 빌드에서는 작동하지 않음
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_F1: # 강제 레벨업
@@ -77,7 +80,7 @@ func _process(delta: float) -> void:
 	current_time += delta
 	
 	# 보스 등장 체크 (10분 = 600초)
-	if current_time >= 600.0 and not _boss_triggered:
+	if current_time >= boss_spawn_time and not _boss_triggered:
 		_boss_triggered = true
 		if enemy_spawner:
 			enemy_spawner.trigger_boss_event()
@@ -148,10 +151,10 @@ func _set_level(new_level: int) -> void:
 	# 1. 골드 보상
 	add_score(5) # 점수 겸 골드 +5
 	
-	# 2. 선체 강화 (+10 Max HP)
+	# 2. 선체 강화 (+10 Max HP, 최대 상한 적용)
 	var ship = UpgradeManager._get_player_ship()
 	if ship:
-		ship.max_hull_hp += 10.0
+		ship.max_hull_hp = minf(ship.max_hull_hp + 10.0, max_hull_hp_cap)
 		ship.hull_hp = minf(ship.hull_hp + 10.0, ship.max_hull_hp)
 		if hud: hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	
@@ -245,7 +248,7 @@ func _debug_cannons() -> void:
 	
 	for cannon in cannons_node.get_children():
 		var det_area = cannon.get_node_or_null("DetectionArea")
-		var muzzle = cannon.get_node_or_null("Muzzle")
+		var _muzzle = cannon.get_node_or_null("Muzzle") # 현재 사용되지 않으나 디버그용 노드 참조 (TODO: 추후 삭제 검토)
 		var overlaps = 0
 		var monitoring = false
 		if det_area:

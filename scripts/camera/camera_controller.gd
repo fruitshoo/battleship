@@ -21,6 +21,7 @@ var _cam_rotation: Vector2 = Vector2.ZERO
 var shake_intensity: float = 0.0
 var shake_timer: float = 0.0
 var shake_duration: float = 0.0
+var _last_zoom: float = -1.0 # 마지막으로 포그가 업데이트된 줌 레벨
 
 func _ready() -> void:
 	print("=== Camera Controller Ready ===")
@@ -58,7 +59,7 @@ func _input(event: InputEvent) -> void:
 		_cam_rotation.y -= event.relative.y * rotation_sensitivity
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0) # 땅 밑으로 안 가게 제한
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target):
 		return
 		
@@ -81,7 +82,10 @@ func _process(delta: float) -> void:
 	# 4. 항상 타겟 바라보기
 	look_at(target_pos, Vector3.UP)
 	
-	# 5. 화면 흔들림 (Screen Shake)
+	# 5. 동적 포그 조절 (줌에 따라 안개 거리 조정)
+	_update_dynamic_fog()
+	
+	# 6. 화면 흔들림 (Screen Shake)
 	if shake_timer > 0:
 		shake_timer -= delta
 		var damping = shake_timer / max(0.001, shake_duration)
@@ -96,3 +100,15 @@ func shake(intensity: float, duration: float) -> void:
 	shake_intensity = intensity
 	shake_duration = duration
 	shake_timer = duration
+
+## 줌 레벨에 따라 안개 시작/끝 거리를 동적으로 조절합니다.
+func _update_dynamic_fog() -> void:
+	if not environment: return
+	# 줌 변화가 없으면 실행 건너뜀: GPU re-upload 방지
+	if abs(current_zoom - _last_zoom) < 0.5: return
+	_last_zoom = current_zoom
+	
+	# 안개가 항상 플레이어(타겟) 주변에는 끼지 않도록 줌 거리보다 약간 뒤에서 시작하게 설정
+	# 줌이 멀어질수록 안개가 시작되는 지점도 멀어지게 하여 가시성을 확보함.
+	environment.fog_depth_begin = current_zoom * 1.5
+	environment.fog_depth_end = current_zoom * 4.5

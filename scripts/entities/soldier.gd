@@ -415,13 +415,21 @@ func _die() -> void:
 		if _cached_level_manager and _cached_level_manager.has_method("add_xp"):
 			_cached_level_manager.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
 	
-	# 사망 사운드
+	# 사망 사운드 및 바다로 떨어지는 물보라 소리
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("soldier_die", global_position)
+		# 데드 후 약간의 시간 차를 두고 물보라(풍덩) 소리 재생
+		get_tree().create_timer(randf_range(0.3, 0.6)).timeout.connect(func():
+			if is_instance_valid(AudioManager):
+				AudioManager.play_sfx("water_splash_small", global_position, randf_range(0.8, 1.2))
+		)
 	
 	# 비활성화 및 그룹에서 제거 (타켓팅 방지)
 	set_physics_process(false)
-	remove_from_group("soldiers")
+	if is_in_group("soldiers"):
+		remove_from_group("soldiers")
+	if is_in_group("enemy"):
+		remove_from_group("enemy")
 	
 	# 충돌 비활성화 (물리 처리 중이므로 set_deferred 사용)
 	if has_node("CollisionShape3D"):
@@ -494,8 +502,8 @@ func _perform_range_attack(target: Node3D) -> void:
 	arrow.target_pos = target.global_position + Vector3(0, 0.8, 0)
 	arrow.team = team
 	
-	# 시너지 반영: 불화살
-	if is_instance_valid(UpgradeManager):
+	# 시너지 반영: 불화살 (플레이어 진영 전용)
+	if team == "player" and is_instance_valid(UpgradeManager):
 		var fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
 		if fire_lv > 0:
 			arrow.is_fire_arrow = true
@@ -507,6 +515,6 @@ func _perform_range_attack(target: Node3D) -> void:
 	
 	# 발사 사운드
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("musket_fire", global_position)
+		AudioManager.play_sfx("bow_shoot", global_position)
 	
 	get_tree().root.add_child(arrow)

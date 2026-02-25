@@ -9,6 +9,9 @@ extends Node3D
 
 @export var hp: float = 10.0 # 체력 조정 (장군전 DoT 대응을 위해 상향)
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
+@export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
+@export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
+var _fire_instance: GPUParticles3D = null
 
 var max_hp: float = 10.0
 var target: Node3D = null
@@ -17,9 +20,34 @@ var target: Node3D = null
 var is_dying: bool = false
 var is_boarding: bool = false
 var is_derelict: bool = false # 병사 전멸 시 무력화(폐선) 상태
+var is_burning: bool = false
+var burn_timer: float = 0.0
 
 # 누수(Leaking) 시스템 변수
 var leaking_rate: float = 0.0 # 초당 피해량
+var _last_splinter_time: float = 0.0 # 파편 생성 쿨다운용
+var _visual_children: Array = [] # 침몰 연출용 시각 노드 캐시
+
+func get_hull_ratio() -> float:
+	if max_hp <= 0.0:
+		return 1.0
+	return hp / max_hp
+
+func _update_fire_effect() -> void:
+	# HP 40% 이하일 때 자동 발화 로직을 제거하고, is_burning 또는 폐선 상태일 때 연기 발생
+	if (is_burning or is_derelict) and not is_dying:
+		if not is_instance_valid(_fire_instance):
+			# 인스턴스 생성 시에만 amount 결정
+			_fire_instance = fire_effect_scene.instantiate() as GPUParticles3D
+			_fire_instance.amount = 30 # 폐선/화염 시 고정된 양의 농밀한 연기
+			add_child(_fire_instance)
+			_fire_instance.position = Vector3(0, 1.5, 0.0) # 배 중심 상단
+		
+		if not _fire_instance.emitting:
+			_fire_instance.emitting = true
+	else:
+		if is_instance_valid(_fire_instance) and _fire_instance.emitting:
+			_fire_instance.emitting = false
 
 # Boarding Action Variables
 var current_sink_offset: float = 0.0 # 가라앉은 깊이
@@ -81,8 +109,10 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if is_dying: return
 	hp -= amount
 	
-	# 피격 이펙트 (파편)
-	if wood_splinter_scene:
+	# 피격 이펙트 (파편) - 무차별 포격 시 파티클 폭발(렉) 방지 및 시각적 분리 현상 방지
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if wood_splinter_scene and (current_time - _last_splinter_time > 0.2):
+		_last_splinter_time = current_time
 		var splinter = wood_splinter_scene.instantiate()
 		get_tree().root.add_child(splinter)
 		
@@ -92,6 +122,8 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 			var offset = Vector3(randf_range(-0.5, 0.5), 1.5, randf_range(-0.5, 0.5))
 			splinter.global_position = global_position + offset
 		splinter.rotation.y = randf() * TAU
+		if splinter.has_method("set_amount_by_damage"):
+			splinter.set_amount_by_damage(amount)
 	
 	if hp <= 0:
 		die()
@@ -99,6 +131,10 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 func die() -> void:
 	if is_dying: return
 	is_dying = true
+	
+	# 침몰 시작 시 타겟 그룹에서 제외 (대포가 시체를 쏘지 않게 함)
+	if is_in_group("enemy"):
+		remove_from_group("enemy")
 	
 	# 점수 및 XP 추가
 	if is_instance_valid(cached_lm):
@@ -111,11 +147,14 @@ func die() -> void:
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)
 	
+	if get_node_or_null("CollisionShape3D"):
+		get_node("CollisionShape3D").set_deferred("disabled", true)
+		
 	# 항적 끄기
 	if wake_trail:
 		wake_trail.emitting = false
-	
-	# 침몰 애니메이션 (기울어지며 가라앉음)
+		
+	# 가라앉는 연출 (침몰 애니메이션)
 	var sink_tween = create_tween()
 	sink_tween.set_parallel(true)
 	
@@ -126,32 +165,72 @@ func die() -> void:
 	sink_tween.tween_property(self, "rotation_degrees:z", tilt_z, 3.0).set_ease(Tween.EASE_OUT)
 	
 	# 아래로 가라앉음
-	sink_tween.tween_property(self, "global_position:y", global_position.y - 5.0, 3.5).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self, "global_position:y", global_position.y - 10.0, 5.0).set_ease(Tween.EASE_IN)
 	
 	leaking_rate = 0.0 # 사망 시 누수 중단
+	
+	_drop_floating_loot()
 	
 	sink_tween.set_parallel(false)
 	sink_tween.tween_callback(queue_free)
 
-func _process(_delta: float) -> void:
-	pass
+## 화염 데미지 및 상태 이상
+func take_fire_damage(dps: float, duration: float) -> void:
+	if is_dying: return
+	is_burning = true
+	burn_timer = max(burn_timer, duration)
+	leaking_rate += dps # 적 배의 leaking_rate에 dps(초당 데미지)를 추가로 누적
+
+func _update_burning_status(delta: float) -> void:
+	if is_burning:
+		burn_timer -= delta
+		if burn_timer <= 0:
+			is_burning = false
+			# 화재가 꺼지면 누수 수치(leaking_rate) 등을 원상복구 하거나 놔둘 수 있음.
+			# 현재 설계상 화염 틱 데미지가 끝날 때 일정량 깎아주는 로직이 별도로 필요할 수 있지만 임시 유지.
+
+func _drop_floating_loot() -> void:
+	if not loot_scene: return
+	
+	# 1~3개의 부유물 드랍
+	var loot_count = randi_range(1, 3)
+	for i in range(loot_count):
+		var loot = loot_scene.instantiate()
+		get_tree().root.add_child.call_deferred(loot)
+		
+		# 랜덤 오프셋 (수면 위 Y=0 근처 둥둥)
+		var offset_x = randf_range(-2.0, 2.0)
+		var offset_z = randf_range(-2.0, 2.0)
+		
+		# 콜백으로 위치 설정 (충돌 안전)
+		var spawn_pos = Vector3(global_position.x + offset_x, 0.5, global_position.z + offset_z)
+		loot.set_deferred("global_position", spawn_pos)
+
+func _process(delta: float) -> void:
+	if is_dying: return
+	
+	_update_fire_effect()
+	_update_burning_status(delta)
+	
+	if is_derelict:
+		leaking_rate += 0.2 * delta
 
 func _physics_process(delta: float) -> void:
 	if is_dying: return
 	
 	# === 폐선(Derelict) 빙의 로직 ===
 	if not is_derelict:
-		# 살아있는 병사 체크
-		var alive_soldiers = 0
-		if has_node("Soldiers"):
-			for child in $Soldiers.get_children():
-				if child.get("current_state") != 4: # NOT DEAD
-					alive_soldiers += 1
-		
-		# 병사 전멸 시 무력화
-		if alive_soldiers == 0:
-			_become_derelict()
-			return
+		# 쏼 나서 빌지 판단은 스로틸링(감속 티머에 연동)
+		# 검사는 로직 타이머가 매번 실행될 때만 (0.2초마다)
+		if logic_timer <= 0:
+			var alive_soldiers = 0
+			if has_node("Soldiers"):
+				for child in $Soldiers.get_children():
+					if child.get("current_state") != 4:
+						alive_soldiers += 1
+			if alive_soldiers == 0:
+				_become_derelict()
+				return
 	else:
 		# 폐선 상태면 둥둥 떠있기만 함 (로직 정지)
 		# 물결에 흔들리는 연출 등 추가 가능
@@ -216,11 +295,19 @@ func _physics_process(delta: float) -> void:
 		# Node3D의 자식들이 있다면 그 자식들의 transform을 조정하는 것이 안전함
 		# 시각적 반영 (Mesh 등 시각 노드만 오프셋)
 		# Soldiers나 CollisionShape 등을 같이 이동시키면 물리/전투 로직이 꼬이므로 제외
-		for child in get_children():
-			if child.name == "Soldiers" or child is CollisionShape3D or child is Area3D: continue
-			if child is MeshInstance3D or (child is Node3D and not child is GPUParticles3D):
-				child.position.y = - current_sink_offset
-				child.rotation_degrees.z = current_tilt_angle
+		# 싱크 비주얼: 자식 노드 이니셜 쿨스 (1회만 실행)
+		if _visual_children.is_empty():
+			for child in get_children():
+				if child.name == "Soldiers" or child is CollisionShape3D or child is Area3D: continue
+				if child is MeshInstance3D or (child is Node3D and not child is GPUParticles3D):
+					child.set_meta("init_y", child.position.y)
+					child.set_meta("init_rot_z", child.rotation_degrees.z)
+					_visual_children.append(child)
+		
+		for child in _visual_children:
+			if not is_instance_valid(child): continue
+			child.position.y = child.get_meta("init_y") - current_sink_offset
+			child.rotation_degrees.z = child.get_meta("init_rot_z") + current_tilt_angle
 	
 	# 항적 제어
 	if wake_trail:
@@ -284,7 +371,7 @@ func _transfer_one_soldier() -> void:
 	
 	if s:
 		# 월선 실행 (Jump Animation 포함)
-		var start_global = s.global_position
+		var _start_global = s.global_position
 		s.call_deferred("reparent", target_soldiers_node)
 		
 		# 점프 효과 (Tween)

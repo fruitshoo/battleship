@@ -1,32 +1,59 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/effects/clean_particles.gd" id="1_clean"]
+[ext_resource type="Script" path="res://scripts/effects/wood_splinter.gd" id="1_dcmit"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
-albedo_color = Color(0.65, 0.5, 0.35, 1)
-roughness = 0.8
-
-[sub_resource type="BoxMesh" id="BoxMesh_splinter"]
-material = SubResource("StandardMaterial3D_wood")
-size = Vector3(0.15, 0.15, 0.6)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splinter"]
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_q41r5"]
+angle_max = 360.0
 direction = Vector3(0, 1, 0)
 spread = 50.0
-initial_velocity_min = 6.0
 initial_velocity_max = 12.0
 angular_velocity_min = -360.0
 angular_velocity_max = 360.0
+gravity = Vector3(0, -25, 0)
+scale_min = 0.5
+scale_max = 1.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l1qbe"]
+albedo_color = Color(0.5, 0.35, 0.2, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_1wkn6"]
+material = SubResource("StandardMaterial3D_l1qbe")
+size = Vector3(0.4, 0.4, 0.4)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_fw0c5"]
+particle_flag_align_y = true
+angle_max = 360.0
+direction = Vector3(0, 1, 0)
+spread = 50.0
+initial_velocity_max = 12.0
+angular_velocity_min = -90.0
+angular_velocity_max = 90.0
+gravity = Vector3(0, -25, 0)
 scale_min = 0.5
 scale_max = 1.5
-gravity = Vector3(0, -25, 0)
 
-[node name="WoodSplinter" type="GPUParticles3D"]
+[sub_resource type="BoxMesh" id="BoxMesh_xwfbq"]
+material = SubResource("StandardMaterial3D_l1qbe")
+size = Vector3(0.25, 0.25, 0.8)
+
+[node name="WoodSplinter" type="Node3D" unique_id=771065934]
+script = ExtResource("1_dcmit")
+
+[node name="Cubes" type="GPUParticles3D" parent="." unique_id=406869152]
 emitting = false
-amount = 30
+amount = 24
 lifetime = 1.2
 one_shot = true
 explosiveness = 0.95
-process_material = SubResource("ParticleProcessMaterial_splinter")
-draw_pass_1 = SubResource("BoxMesh_splinter")
-script = ExtResource("1_clean")
+process_material = SubResource("ParticleProcessMaterial_q41r5")
+draw_pass_1 = SubResource("BoxMesh_1wkn6")
+
+[node name="Planks" type="GPUParticles3D" parent="." unique_id=1760835775]
+emitting = false
+amount = 6
+lifetime = 1.2
+one_shot = true
+explosiveness = 0.85
+process_material = SubResource("ParticleProcessMaterial_fw0c5")
+draw_pass_1 = SubResource("BoxMesh_xwfbq")

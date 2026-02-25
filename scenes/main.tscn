@@ -7,14 +7,8 @@
 [ext_resource type="Script" uid="uid://c1jpt1wfonqye" path="res://scripts/camera/camera_controller.gd" id="4_o6xl0"]
 [ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="5_attributes"]
 [ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="5_spawner"]
-[ext_resource type="Compositor" uid="uid://d2l8n4m6lax1" path="res://resources/environment/compositor.tres" id="6_compositor"]
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
-
-[sub_resource type="FogMaterial" id="FogMaterial_sea"]
-density = 0.5
-albedo = Color(0.1, 0.3, 0.5, 1)
-emission = Color(0.01, 0.02, 0.05, 1)
 
 [node name="Main" type="Node3D" unique_id=1911711204]
 
@@ -29,7 +23,6 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 0.642788, 0.766044, 0, -0.766044, 0.642788, 0, 35, 45)
 environment = ExtResource("1_h2yge")
 attributes = ExtResource("5_attributes")
-compositor = ExtResource("6_compositor")
 script = ExtResource("4_o6xl0")
 target_path = NodePath("../PlayerShip")
 
@@ -42,12 +35,6 @@ script = ExtResource("5_spawner")
 script = ExtResource("8_level_manager")
 hud = NodePath("../GameHUD")
 enemy_spawner = NodePath("../EnemySpawner")
-
-[node name="FogSea" type="FogVolume" parent="." unique_id=20240211]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -50.1, 0)
-size = Vector3(2000, 100, 2000)
-shape = 0
-material = SubResource("FogMaterial_sea")
 
 [node name="PlayerShip" parent="." unique_id=894322639 instance=ExtResource("1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, 0)

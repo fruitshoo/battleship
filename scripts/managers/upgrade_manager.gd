@@ -364,13 +364,6 @@ func _apply_gold() -> void:
 	print("💰 전리품! 점수 +50")
 
 
-func _apply_wisdom() -> void:
-	var level_mgr = get_tree().get_first_node_in_group("level_manager")
-	if level_mgr and "xp_multiplier" in level_mgr:
-		level_mgr.xp_multiplier += 0.2
-		print("📖 지혜 업그레이드! 경험치 배율: %.1f" % level_mgr.xp_multiplier)
-
-
 func _get_player_ship() -> Node3D:
 	var players = get_tree().get_nodes_in_group("player")
 	if players.size() > 0:
@@ -411,8 +404,3 @@ func _get_player_soldiers(ship: Node3D) -> Array:
 		if child.has_method("take_damage") and child.get("current_state") != null:
 			result.append(child)
 	return result
-
-func _apply_maintenance(ship: Node3D) -> void:
-	# 이전 maintenance 로직은 사라졌으나, 필요한 경우 supply나 carpentry로 분산됨
-	# 여기서는 호환성을 위해 빈 함수로 두거나 삭제 가능 (이미 match에서 제거함)
-	pass

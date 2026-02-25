@@ -77,8 +77,8 @@ func _check_hit(target: Node) -> void:
 		if potential_ship.is_in_group(enemy_team):
 			if potential_ship.has_method("take_damage"):
 				potential_ship.take_damage(2.0) # 배에는 미미한 데미지
-				if is_fire_arrow and potential_ship.has_method("add_leak"):
-					potential_ship.add_leak(fire_damage)
+				if is_fire_arrow and potential_ship.has_method("take_fire_damage"):
+					potential_ship.take_fire_damage(fire_damage, 5.0) # 5초간 화상
 			elif potential_ship.has_method("die") and randf() < 0.1: # 아주 낮은 확률로 파괴 (또는 HP가 1인 경우)
 				# 밸런스상 배 HP가 1이면 화살로는 잘 안터지게 하거나 logic 필요
 				pass

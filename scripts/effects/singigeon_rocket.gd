@@ -9,6 +9,8 @@ extends Area3D
 @export var lifetime: float = 3.0
 @export var blast_radius: float = 3.5
 
+var team: String = "player" # 발사 주체 (아군 오폭 방지)
+
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
 var progress: float = 0.0
@@ -161,10 +163,14 @@ func _explode() -> void:
 		blast_mult += (0.2 * powder_lv)
 		fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
 
-	# 데미지 처리
-	var all_enemies = get_tree().get_nodes_in_group("enemy")
-	var all_players = get_tree().get_nodes_in_group("player")
-	var targets = all_enemies + all_players
+	# 데미지 처리 (오폭 방지 적용)
+	var target_group = "enemy" if team == "player" else "player"
+	var targets = get_tree().get_nodes_in_group(target_group)
+	
+	# 병사들 중 적군 필터링
+	for s in get_tree().get_nodes_in_group("soldiers"):
+		if is_instance_valid(s) and s.get("team") == target_group:
+			targets.append(s)
 	
 	var final_radius = blast_radius * blast_mult
 	
@@ -180,8 +186,8 @@ func _explode() -> void:
 					e.take_damage(final_damage, global_position)
 					
 					# 불화살 시너지 (DOT)
-					if fire_lv > 0 and e.has_method("add_leak"): # 함선의 경우 누수와 비슷한 화상 데미지
-						e.add_leak(fire_lv * 2.0)
+					if fire_lv > 0 and e.has_method("take_fire_damage"):
+						e.take_fire_damage(fire_lv * 2.0, 5.0) # 화염 레벨 비례 틱뎀, 5초 유지
 					elif fire_lv > 0 and e.is_in_group("soldiers"): # 병사의 경우 직접 소지 변수가 없으면 일단 skip 하거나 추후 보완
 						pass
 				elif e.has_method("die"):

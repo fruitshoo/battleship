@@ -17,8 +17,14 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_steam_hiss.wav"
 	],
 	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.wav", # 나무 부러지는/부딪히는 소리
-	"ui_click": "res://resources/audio/sfx_ui_click.tres",
-	"level_up": "res://resources/audio/sfx_level_up.tres",
+	"ui_click": [
+		"res://assets/audio/sfx/sfx_ui_click_1.wav",
+		"res://assets/audio/sfx/sfx_ui_click_2.wav",
+		"res://assets/audio/sfx/sfx_ui_click_3.wav",
+		"res://assets/audio/sfx/sfx_ui_click_4.wav",
+		"res://assets/audio/sfx/sfx_ui_click_5.wav",
+	],
+	"level_up": "res://assets/audio/sfx/sfx_levelup.wav",
 	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.wav", # 로켓/폭발음
 	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.wav",
 	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.wav",
@@ -27,6 +33,10 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_sword_swing_2.wav",
 		"res://assets/audio/sfx/sfx_sword_swing_3.wav",
 		"res://assets/audio/sfx/sfx_sword_swing_4.wav"
+	],
+	"bow_shoot": [
+		"res://assets/audio/sfx/sfx_bow_01.wav",
+		"res://assets/audio/sfx/sfx_bow_02.wav"
 	],
 	"musket_fire": [
 		"res://assets/audio/sfx/sfx_musket_fire.wav",
@@ -48,7 +58,24 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_pickup_2.wav",
 		"res://assets/audio/sfx/sfx_pickup_3.wav"
 	],
-	"soldier_die": null,
+	"soldier_die": [
+		"res://assets/audio/sfx/sfx_soldier_die_1.wav",
+		"res://assets/audio/sfx/sfx_soldier_die_2.wav",
+		"res://assets/audio/sfx/sfx_soldier_die_3.wav",
+		"res://assets/audio/sfx/sfx_soldier_die_4.wav",
+		"res://assets/audio/sfx/sfx_soldier_die_5.wav",
+		"res://assets/audio/sfx/sfx_soldier_die_6.wav",
+	],
+	"water_splash_large": [
+		"res://assets/audio/sfx/sfx_water_splash_large_1.wav",
+		"res://assets/audio/sfx/sfx_water_splash_large_2.wav",
+		"res://assets/audio/sfx/sfx_water_splash_large_3.wav",
+	],
+	"water_splash_small": [
+		"res://assets/audio/sfx/sfx_water_splash_small_1.wav",
+		"res://assets/audio/sfx/sfx_water_splash_small_2.wav",
+		"res://assets/audio/sfx/sfx_water_splash_small_3.wav",
+	],
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.wav",
 }
@@ -169,7 +196,7 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0) ->
 		current_2d_index = (current_2d_index + 1) % sfx_2d_pool.size()
 
 ## 배경음 재생
-func play_bgm(stream_name: String, fade_duration: float = 1.0) -> void:
+func play_bgm(stream_name: String, _fade_duration: float = 1.0) -> void:
 	if current_bgm_name == stream_name: return
 	current_bgm_name = stream_name
 	

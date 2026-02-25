@@ -10,6 +10,7 @@ signal boss_died
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
+@export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 
 var hp: float = 1000.0
 var target: Node3D = null
@@ -118,8 +119,12 @@ func _process(delta: float) -> void:
 		for child in get_children():
 			if child.name in ["Cannons", "SingijeonLauncher"]: continue
 			if child is MeshInstance3D or (child is Node3D and not child is GPUParticles3D):
-				child.position.y = - current_sink_offset
-				child.rotation_degrees.z = current_tilt_angle
+				if not child.has_meta("init_y"):
+					child.set_meta("init_y", child.position.y)
+					child.set_meta("init_rot_z", child.rotation_degrees.z)
+				
+				child.position.y = child.get_meta("init_y") - current_sink_offset
+				child.rotation_degrees.z = child.get_meta("init_rot_z") + current_tilt_angle
 
 func _find_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
@@ -130,6 +135,20 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if is_dead: return
 	hp -= amount
 	
+	# 피격 이펙트 (파편)
+	if wood_splinter_scene:
+		var splinter = wood_splinter_scene.instantiate()
+		get_tree().root.add_child(splinter)
+		
+		if hit_position != Vector3.ZERO:
+			splinter.global_position = hit_position + Vector3(0, 1.0, 0)
+		else:
+			var offset = Vector3(randf_range(-1.5, 1.5), 2.5, randf_range(-1.5, 1.5))
+			splinter.global_position = global_position + offset
+		splinter.rotation.y = randf() * TAU
+		if splinter.has_method("set_amount_by_damage"):
+			splinter.set_amount_by_damage(amount)
+	
 	# HUD에 보스 체력 업데이트 (LevelManager를 통해)
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
 		cached_lm.update_boss_hp(hp, max_p)
@@ -139,6 +158,11 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 
 func _die() -> void:
 	is_dead = true
+	
+	# 침몰 시작 시 타겟 그룹에서 제외
+	if is_in_group("enemy"):
+		remove_from_group("enemy")
+	
 	boss_died.emit()
 	print("🏆 보스 격침!")
 	

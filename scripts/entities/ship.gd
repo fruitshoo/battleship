@@ -25,7 +25,7 @@ extends Node3D
 @export var has_sextant: bool = false # Sextant 아이템 소지 여부
 
 # === 노 젓기 ===
-@export var is_rowing: bool = false
+var is_rowing: bool = false
 @export var rowing_stamina: float = 100.0
 @export var stamina_drain_rate: float = 15.0 # 노 젓기 시 스태미나 소모 속도
 @export var stamina_recovery_rate: float = 5.0
@@ -40,13 +40,17 @@ var turn_mult: float = 1.0
 var tilt_offset: float = 0.0
 var stuck_objects: Array[Node3D] = []
 
-# === 선체 내구도 ===
+	# === 선체 내구도 ===
 @export var max_hull_hp: float = 100.0
 var hull_hp: float = 100.0
 @export var hull_regen_rate: float = 0.0 # 초당 HP 회복량
 var is_sinking: bool = false
+var is_burning: bool = false
+var burn_timer: float = 0.0
 @export var max_crew_count: int = 4 # 아군 병사 정원
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
+@export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
+var _fire_instance: GPUParticles3D = null
 
 # 노드 참조
 @onready var sail_visual: Node3D = $SailVisual if has_node("SailVisual") else null
@@ -57,15 +61,33 @@ var _cached_level_manager: Node = null
 var _cached_hud: Node = null
 var _cached_um: Node = null
 
+# 뱃노래(길군악) 재생용 오디오 플레이어
+var _gilgunak_player: AudioStreamPlayer
+
 # 부착된 선원(병사) 정보 (동적)
 var current_crew_count: int = 4
 
 var _flap_timer: float = 0.0
 var _wave_timer: float = 2.0
 var _oars_timer: float = 0.0
+var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
 
 func _ready() -> void:
 	base_y = position.y
+	
+	# 길군악 오디오 버스 배정 (Master로 직접 라우팅하여 명확히 들리게 설정)
+	var bus_name = "Master"
+		
+	_gilgunak_player = AudioStreamPlayer.new()
+	var stream = load("res://assets/audio/sfx/sfx_gilgunak.wav") as AudioStream
+	if stream:
+		_gilgunak_player.stream = stream
+		_gilgunak_player.volume_db = 2.0 # 볼륨 증폭
+		_gilgunak_player.bus = bus_name
+		# 루프 설정: AudioStreamWAV는 직접 loop_mode 지정
+		if stream is AudioStreamWAV:
+			(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+	add_child(_gilgunak_player)
 	
 	# 영구 업그레이드 보너스 적용
 	if is_in_group("player") or is_player_controlled:
@@ -103,6 +125,23 @@ func _process(_delta: float) -> void:
 		return
 	_update_sail_visual()
 	_update_rudder_visual()
+	_update_fire_effect()
+
+func _update_fire_effect() -> void:
+	# HP 기반 자동 발화 제거, is_burning 상태일 때만 화재 파티클 발생
+	if is_burning and not is_sinking:
+		if not is_instance_valid(_fire_instance):
+			# 인스턴스 생성 시에만 amount를 결정
+			_fire_instance = fire_effect_scene.instantiate() as GPUParticles3D
+			_fire_instance.amount = 30 # 화염 지속 상태이므로 고정된 양의 연기
+			add_child(_fire_instance)
+			_fire_instance.position = Vector3(0, 1.5, 0.5) # 배 중심에서 약간 위, 뒤
+		
+		if not _fire_instance.emitting:
+			_fire_instance.emitting = true
+	else:
+		if is_instance_valid(_fire_instance) and _fire_instance.emitting:
+			_fire_instance.emitting = false
 
 
 # === 제어 관련 ===
@@ -130,6 +169,7 @@ func _physics_process(delta: float) -> void:
 	_update_steering(delta)
 	_update_rowing_stamina(delta)
 	_update_hull_regeneration(delta)
+	_update_burning_status(delta)
 	
 	# 노 젓기 사운드 재생 (주기적)
 	if is_rowing and rowing_stamina > 0:
@@ -139,9 +179,15 @@ func _physics_process(delta: float) -> void:
 			_oars_timer = 1.3 # 1.3초마다 노젓기 소리 재생
 		else:
 			_oars_timer -= delta
+			
+		if not _gilgunak_player.playing:
+			print("▶️ 노 젓기 노동요(길군악) 재생 시작!")
+			_gilgunak_player.play()
+		_gilgunak_player.stream_paused = false
 	else:
 		_oars_timer = 0.0 # 노 젓기 중단 시 바로 재생 가능하도록 초기화
-
+		if _gilgunak_player.playing and not _gilgunak_player.stream_paused:
+			_gilgunak_player.stream_paused = true
 func _update_hull_regeneration(delta: float) -> void:
 	if is_sinking or hull_regen_rate <= 0: return
 	if hull_hp < max_hull_hp:
@@ -170,11 +216,15 @@ func _handle_input(delta: float) -> void:
 	
 	steer(steer_input, delta)
 	
-	# W: 노 젓기 활성화, S: 비활성화
+	# W: 노 젓기 활성화, S: 비활성화 (꾹 누르고 있을 때만)
 	if Input.is_action_pressed("row_forward"):
 		set_rowing(true)
 	elif Input.is_action_pressed("row_backward"):
-		set_rowing(false)
+		set_rowing(true) # S를 눌러도 후진 노젓기이므로 활성화. 단 애니메이션이나 속도는 다르게 할 수 있음 (우선 동일하게 활성화)
+		# 만약 S가 제동/후진이라면 별도 상태를 주거나, 지금은 단순히 'rowing'을 활성화하되 speed 등을 S에서 처리해야 함. 배가 후진을 안 하므로 멈추는 용도라면 false로 둠.
+	else:
+		if is_rowing:
+			set_rowing(false)
 
 
 ## 러더 조향 입력 처리
@@ -238,10 +288,6 @@ func _update_movement(delta: float) -> void:
 	var forward = Vector3(-sin(rotation.y), 0, -cos(rotation.y))
 	position += forward * current_speed * delta
 	
-	# 디버그: 배 움직임 확인 (5초마다)
-	if Engine.get_physics_frames() % 300 == 0 and current_speed > 0.1:
-		print("🚢 Ship Position: ", position, " Speed: ", current_speed)
-		
 	# 웨이크 트레일 제어
 	var wake_trail = $WakeTrail
 	if wake_trail:
@@ -324,8 +370,16 @@ func _apply_bobbing_effect() -> void:
 	# 물리 충돌(Jitter)을 방지하기 위해 반드시 _physics_process에서 position.y를 직접 갱신
 	position.y = base_y + bob_offset
 	
-	# 기본 요동 + 장군전 등에 의한 기울기(tilt_offset)
-	rotation.z = (sin(time * bobbing_speed * 0.8) * rocking_amplitude) + tilt_offset
+	# 원심력에 의한 기울기 (회전 방향의 반대로 기움)
+	var turn_factor = rudder_angle / 45.0
+	var speed_ratio = clamp(current_speed / max_speed, 0.0, 1.0)
+	var target_centrifugal = deg_to_rad(-turn_factor * speed_ratio * 12.0) # 최대 12도 기울어짐
+	
+	var dt = get_physics_process_delta_time()
+	_centrifugal_tilt = lerp(_centrifugal_tilt, target_centrifugal, 2.5 * dt)
+	
+	# 기본 요동 + 장군전 등에 의한 기울기(tilt_offset) + 원심력 회전 기울기
+	rotation.z = (sin(time * bobbing_speed * 0.8) * rocking_amplitude) + tilt_offset + _centrifugal_tilt
 
 
 ## 돛 시각화 업데이트
@@ -405,20 +459,50 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 			var offset = Vector3(randf_range(-1, 1), 1.5, randf_range(-1, 1))
 			splinter.global_position = global_position + offset
 		splinter.rotation.y = randf() * TAU
+		if splinter.has_method("set_amount_by_damage"):
+			splinter.set_amount_by_damage(final_damage)
 	
 	# HUD 업데이트
 	if _cached_hud and _cached_hud.has_method("update_hull_hp"):
 		_cached_hud.update_hull_hp(hull_hp, max_hull_hp)
 	
-	print("🚢 선체 피격! HP: %.0f / %.0f (데미지: %.0f)" % [hull_hp, max_hull_hp, amount])
-	
 	# 피격 플래시 (빨간 깜빡임)
 	_flash_damage()
 	
-	# 게임 오버 체크
 	if hull_hp <= 0:
 		_game_over()
+	
+## 누수(DoT) 추가 및 제거
+func add_leak(amount: float) -> void:
+	# 아군 배는 기본 regen이 있으므로, 화재 도트데미지를 regen 감소분이나 별도 데미지로 처리 가능. 임시로 regen 깎는 형태로 도입하거나 직접 데미지를 가함.
+	# 지금은 별도 leaking 변수 없이, 주기적으로 데미지를 주어야 하지만 임시로 무시하거나 틱 데미지 구현 (필요시 추가)
+	pass
 
+func remove_leak(amount: float) -> void:
+	pass
+
+## 화염 데미지 및 상태 이상 (Fire Status Effect)
+func take_fire_damage(dps: float, duration: float) -> void:
+	is_burning = true
+	burn_timer = max(burn_timer, duration) # 기존 시간보다 길면 갱신
+	# TODO: 아군 배의 실제 DoT 로직 필요시 추가. (현재는 화상 스태이터스만 부여)
+
+func _update_burning_status(delta: float) -> void:
+	if is_burning:
+		# 화상 중일 때 체력을 조금씩 깎습니다.
+		hull_hp = move_toward(hull_hp, 0, 2.0 * delta)
+		
+		# 60프레임마다 HUD 업데이트 (최적화)
+		if Engine.get_physics_frames() % 60 == 0:
+			if _cached_hud and _cached_hud.has_method("update_hull_hp"):
+				_cached_hud.update_hull_hp(hull_hp, max_hull_hp)
+				
+		if hull_hp <= 0:
+			_game_over()
+				
+		burn_timer -= delta
+		if burn_timer <= 0:
+			is_burning = false
 
 ## 선체 HP 비율 반환
 func get_hull_ratio() -> float:

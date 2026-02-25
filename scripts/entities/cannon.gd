@@ -4,6 +4,7 @@ extends Node3D
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/effects/cannonball.tscn")
+@export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
 @export var fire_cooldown: float = 2.0
 @export var detection_range: float = 25.0
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
@@ -132,3 +133,13 @@ func _execute_fire() -> void:
 	ball.direction = (predicted_pos - muzzle.global_position).normalized()
 	ball.target_node = current_target
 	ball.look_at(ball.global_position + ball.direction, Vector3.UP)
+
+	# 머즐 플래시(발포 화염) 이펙트 생성 (ball.direction이 계산된 후 생성)
+	if muzzle_flash_scene:
+		var flash = muzzle_flash_scene.instantiate()
+		get_tree().root.add_child(flash)
+		# 위치는 즉시 적용
+		flash.global_position = muzzle.global_position
+		# 발사 방향(월드 좌표)을 파티클에 직접 주입 — 100% 안 뒤집힘 보장
+		if flash.has_method("set_fire_direction"):
+			flash.set_fire_direction(ball.direction)

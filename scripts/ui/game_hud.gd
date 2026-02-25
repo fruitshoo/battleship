@@ -134,8 +134,9 @@ func update_crew_status(count: int, max_count: int = 4) -> void:
 
 func _update_timer() -> void:
 	if timer_label:
-		var minutes = int(game_time) / 60
-		var seconds = int(game_time) % 60
+		var total_seconds: int = int(game_time)
+		var minutes: int = total_seconds / 60
+		var seconds: int = total_seconds % 60
 		var new_str = "⏱ %d:%02d" % [minutes, seconds]
 		if _last_timer_str != new_str:
 			_last_timer_str = new_str

@@ -27,7 +27,7 @@ func _process(delta: float) -> void:
 	# 가장 가까운 적 찾기
 	var nearest = _find_nearest_enemy()
 	if nearest:
-		fire(nearest)
+		fire(nearest, current_cooldown)
 
 
 func _find_nearest_enemy() -> Node3D:
@@ -46,9 +46,9 @@ func _find_nearest_enemy() -> Node3D:
 	return nearest
 
 
-func fire(target: Node3D) -> void:
+func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 	if not rocket_scene: return
-	cooldown_timer = fire_cooldown
+	cooldown_timer = cooldown_override if cooldown_override > 0 else fire_cooldown
 	
 	# MLRS 스타일: 연사 (Sequential Fire)
 	for i in range(shot_count):
@@ -61,6 +61,10 @@ func fire(target: Node3D) -> void:
 		# 포물선 비행을 위해 위치 데이터 전달
 		rocket.start_pos = spawn_pos
 		rocket.target_pos = target.global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))
+		
+		# 발사 주체 (팀) 전달
+		if "team" in rocket:
+			rocket.team = self.team
 		
 		get_tree().root.add_child(rocket)
 		rocket.global_position = spawn_pos

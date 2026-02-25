@@ -106,8 +106,13 @@ func _ready() -> void:
 	if is_grapeshot:
 		_setup_grapeshot_visuals()
 		
-	# 3초 뒤 자동 삭제
-	get_tree().create_timer(lifetime).timeout.connect(queue_free)
+	# 3초 뒤 자동 삭제 (바다에 빠짐)
+	get_tree().create_timer(lifetime).timeout.connect(_on_timeout)
+
+func _on_timeout() -> void:
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
+	queue_free()
 	
 	# 신호 연결
 	area_entered.connect(_on_area_entered)
@@ -121,7 +126,24 @@ func _physics_process(delta: float) -> void:
 		direction = direction.lerp(to_target, homing_strength * delta).normalized()
 		look_at(global_position + direction, Vector3.UP)
 		
-	global_position += direction * speed * delta
+	var move_vec = direction * speed * delta
+	var next_pos = global_position + move_vec
+	
+	# CCD (Continuous Collision Detection, 고속 이동체 터널링 방지)
+	var space_state = get_world_3d().direct_space_state
+	# 자기 자신의 collision_mask(4)를 그대로 사용
+	var query = PhysicsRayQueryParameters3D.create(global_position, next_pos, collision_mask)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	
+	var result = space_state.intersect_ray(query)
+	if result:
+		# 대상에 명중
+		global_position = result.position
+		_check_hit(result.collider)
+		return # 명중 시 자체 삭제(queue_free)되므로 이후 이동 로직 스킵
+		
+	global_position = next_pos
 
 
 func _on_area_entered(area: Area3D) -> void:
