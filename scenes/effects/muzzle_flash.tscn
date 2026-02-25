@@ -1,6 +1,7 @@
-[gd_scene format=3]
+[gd_scene load_steps=6 format=3 uid="uid://cyh7n6q6b3x7u"]
 
-[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/muzzle_05_a.png" id="1_u6mxp"]
+[ext_resource type="Script" uid="uid://cx6m2u8v8v8m8" path="res://scripts/effects/muzzle_flash.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/muzzle_05_a.png" id="2_u6mxp"]
 
 [sub_resource type="Gradient" id="Gradient_tmmjm"]
 offsets = PackedFloat32Array(0, 1, 0, 0.5, 1)
@@ -32,7 +33,7 @@ blend_mode = 1
 cull_mode = 2
 shading_mode = 0
 albedo_color = Color(2, 1, 0.5, 1)
-albedo_texture = ExtResource("1_u6mxp")
+albedo_texture = ExtResource("2_u6mxp")
 billboard_mode = 3
 billboard_keep_scale = true
 particles_anim_h_frames = 1
@@ -44,6 +45,7 @@ material = SubResource("StandardMaterial3D_mdxtv")
 size = Vector2(3, 3)
 
 [node name="MuzzleFlash" type="GPUParticles3D" unique_id=1687492572]
+script = ExtResource("1_script")
 amount = 2
 lifetime = 0.15
 one_shot = true

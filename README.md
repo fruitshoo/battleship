@@ -24,10 +24,22 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
   - Rescues a prisoner who joins your crew (up to the maximum ship capacity).
 - **Ramming & Melee Boarding:** If the enemy crew is still alive, ramming them will initiate brutal melee combat. Your soldiers will automatically cross over and fight. The surviving crew takes over the ship.
 
-### 4. Dynamic AI & Crew Management
-- **Soldiers & NavMesh:** Friendly and enemy soldiers use `NavigationAgent3D` to dynamically patrol the decks, seek out enemies, and engage in sword fights or musket fire.
-- **Ship Regeneration:** Your ship slowly repairs its hull over time passively.
-- **Gold & Upgrades:** Destroying enemy ships grants Gold based on their size, which can be spent on meta-progression upgrades like Hull Armor, Cannon Damage, and Crew Training.
+### 4. VFX & Immersive Combat Feedback ✨
+- **Soldier Feedback:**
+  - **Hit Flashes & Particles:** Enemies and allies flash on impact with unique particle bursts.
+  - **Knockback:** Tactical physical feedback when taking damage.
+  - **Slash Trail Effects:** Sword swings are visually represented with dynamic "twirl" arcs.
+- **Heavy Weaponry Visuals:**
+  - **Atmospheric Shockwaves:** Cannon fire and explosions create subtle, randomized shockwaves that ripple through the air.
+  - **Muzzle Smoke:** Realistic dark charcoal smoke bursts upon firing.
+  - **Explosive Wood Debris:** Ships shatter into structural planks and fine sawdust (Alpha-masked particles) when hit.
+
+### 5. Dynamic Environment & Performance
+- **Cloud Shadows:** Real-time noise-based cloud shadows move across the ocean and ships using Decals.
+- **Ocean Plane Mechanics:** A performance-optimized ocean mesh that dynamic follows the player, enabling beautiful shadows and submerged visibility.
+- **Fog Optimization:** Adaptive fog depth scales with camera zoom, ensuring high performance even in complex naval battles.
+- **AI & Crew:** Friendly and enemy soldiers use `NavigationAgent3D` for dynamic deck patrols and combat.
+- **Meta-Progression:** Earn Gold from victories to upgrade Hull Armor, Cannon Damage, and Crew Training.
 
 ## ⚙️ Built With
 - **Godot Engine 4.6** (GDScript)

@@ -5,6 +5,8 @@ extends Node3D
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/effects/cannonball.tscn")
 @export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
+@export var shockwave_scene: PackedScene = preload("res://scenes/effects/shockwave.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 @export var fire_cooldown: float = 2.0
 @export var detection_range: float = 25.0
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
@@ -143,3 +145,20 @@ func _execute_fire() -> void:
 		# 발사 방향(월드 좌표)을 파티클에 직접 주입 — 100% 안 뒤집힘 보장
 		if flash.has_method("set_fire_direction"):
 			flash.set_fire_direction(ball.direction)
+			
+	# 머즐 쇼크웨이브 생성
+	if shockwave_scene:
+		var wave = shockwave_scene.instantiate()
+		get_tree().root.add_child(wave)
+		wave.global_position = muzzle.global_position
+		# 총구 방향으로 비스듬히 눕히기
+		wave.look_at(wave.global_position + ball.direction, Vector3.UP)
+		
+	# 머즐 연기 생성
+	if muzzle_smoke_scene:
+		var smoke = muzzle_smoke_scene.instantiate()
+		get_tree().root.add_child(smoke)
+		smoke.global_position = muzzle.global_position
+		smoke.look_at(smoke.global_position + ball.direction, Vector3.UP)
+		if smoke is GPUParticles3D:
+			smoke.emitting = true

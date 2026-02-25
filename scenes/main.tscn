@@ -8,12 +8,21 @@
 [ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="5_attributes"]
 [ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="5_spawner"]
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
+[ext_resource type="PackedScene" path="res://scenes/effects/cloud_shadows.tscn" id="9_clouds"]
+[ext_resource type="PackedScene" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 
 [node name="Main" type="Node3D" unique_id=1911711204]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1490688369]
 environment = ExtResource("1_h2yge")
+
+[node name="CloudShadows" parent="." unique_id=745814848 instance=ExtResource("9_clouds")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+
+[node name="OceanPlane" parent="." unique_id=14914605 instance=ExtResource("10_ocean")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+follow_target_path = NodePath("../PlayerShip")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1440746174]
 transform = Transform3D(0.866, -0.433, 0.25, 0, 0.5, 0.866, -0.5, -0.75, 0.433, 0, 20, 0)

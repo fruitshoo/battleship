@@ -26,6 +26,8 @@ enum State {
 @export var team: String = "player" # "player" or "enemy"
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
 @export var arrow_scene: PackedScene = preload("res://scenes/effects/arrow.tscn")
+@export var hit_effect_scene: PackedScene = preload("res://scenes/effects/hit_effect.tscn")
+@export var slash_effect_scene: PackedScene = preload("res://scenes/effects/slash_effect.tscn")
 
 # === 내부 상태 ===
 var current_health: float = 100.0
@@ -349,8 +351,19 @@ func _perform_attack() -> void:
 		var weapon_pivot = get_node_or_null("WeaponPivot")
 		if weapon_pivot:
 			var w_tween = create_tween()
-			w_tween.tween_property(weapon_pivot, "rotation:x", -deg_to_rad(45), 0.1) # 내려치기
+			w_tween.set_parallel(true)
+			w_tween.tween_property(weapon_pivot, "rotation:x", -deg_to_rad(60), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			w_tween.tween_property(weapon_pivot, "scale", Vector3(1.2, 1.2, 1.2), 0.1)
+			
+			w_tween.chain().set_parallel(true)
 			w_tween.tween_property(weapon_pivot, "rotation:x", 0.0, 0.2)
+			w_tween.tween_property(weapon_pivot, "scale", Vector3.ONE, 0.2)
+		
+		# 슬래시(휘두르기) 이펙트 생성
+		_spawn_slash_effect()
+
+
+## 하얀색으로 깜빡임
 
 
 ## 가장 가까운 적 찾기 (탐지 범위 제한)
@@ -385,7 +398,7 @@ func find_nearest_enemy() -> Node3D:
 
 
 ## 데미지 받기
-func take_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO) -> void:
+func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if current_state == State.DEAD:
 		return
 	
@@ -395,10 +408,61 @@ func take_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO) -> void:
 	
 	# 피격 사운드
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("soldier_hit", global_position)
+		AudioManager.play_sfx("soldier_hit", global_position, randf_range(0.9, 1.1))
+	
+	# 시각적 피드백
+	_flash_hit()
+	_spawn_hit_effect(hit_position)
+	
+	# 물리적 피드백: 넉백
+	if hit_position != Vector3.ZERO:
+		var knockback_dir = (global_position - hit_position).normalized()
+		knockback_dir.y = 0
+		velocity += knockback_dir * 3.0
 	
 	if current_health <= 0:
 		_die()
+
+
+## 피격 시 하얀색으로 깜빡임
+func _flash_hit() -> void:
+	var mesh = $MeshInstance3D
+	if not mesh: return
+	
+	var tween = create_tween()
+	# 하얀색으로 블렌딩 (StandardMaterial3D의 emission을 활용하거나 albedo 조절)
+	
+	mesh.material_override.emission_enabled = true
+	mesh.material_override.emission = Color.WHITE
+	mesh.material_override.emission_energy_multiplier = 2.0
+	
+	tween.tween_property(mesh.material_override, "emission_energy_multiplier", 0.0, 0.1)
+	tween.finished.connect(func(): if mesh.material_override: mesh.material_override.emission_enabled = false)
+
+## 피격 파티클 생성
+func _spawn_hit_effect(hit_pos: Vector3) -> void:
+	if not hit_effect_scene: return
+	var effect = hit_effect_scene.instantiate()
+	get_tree().root.add_child(effect)
+	
+	if hit_pos == Vector3.ZERO:
+		effect.global_position = global_position + Vector3(0, 1.0, 0)
+	else:
+		effect.global_position = hit_pos
+
+## 휘두르기 이펙트 생성
+func _spawn_slash_effect() -> void:
+	if not slash_effect_scene: return
+	var effect = slash_effect_scene.instantiate()
+	get_tree().root.add_child(effect)
+	
+	# 병사 앞쪽에 생성
+	var forward = - global_transform.basis.z
+	effect.global_position = global_position + forward * 0.8 + Vector3(0, 1.0, 0)
+	
+	# 방향 맞추기
+	if current_target:
+		effect.look_at(current_target.global_position + Vector3(0, 1.0, 0), Vector3.UP)
 
 ## 체력 100% 회복 (나포 보상 등)
 func heal_full() -> void:

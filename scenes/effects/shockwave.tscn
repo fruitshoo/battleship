@@ -1,0 +1,107 @@
+[gd_scene format=3 uid="uid://dg7t7r7r7r7r"]
+
+[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/circle_01_a.png" id="1_circle"]
+[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/effect_01_a.png" id="2_effect"]
+[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/spark_01_a.png" id="3_spark"]
+[ext_resource type="Script" path="res://scripts/effects/shockwave.gd" id="4_script"]
+
+[sub_resource type="Curve" id="Curve_shock"]
+_data = [Vector2(0, 0.2), 0.0, 0.0, 0, 0, Vector2(0.3, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_shock"]
+curve = SubResource("Curve_shock")
+
+[sub_resource type="Curve" id="Curve_spark"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 0.6), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_spark"]
+curve = SubResource("Curve_spark")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ring"]
+gravity = Vector3(0, 0, 0)
+scale_min = 2.0
+scale_max = 3.0
+scale_curve = SubResource("CurveTexture_shock")
+color = Color(1, 0.9, 0.7, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring"]
+transparency = 1
+
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_circle")
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="QuadMesh_ring"]
+material = SubResource("StandardMaterial3D_ring")
+size = Vector2(4, 4)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wave"]
+gravity = Vector3(0, 0, 0)
+scale_min = 3.0
+scale_max = 5.0
+scale_curve = SubResource("CurveTexture_shock")
+color = Color(1, 0.8, 0.4, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wave"]
+transparency = 1
+
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_effect")
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="QuadMesh_wave"]
+material = SubResource("StandardMaterial3D_wave")
+size = Vector2(6, 6)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.8
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_spark")
+color = Color(1, 0.8, 0.3, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spark"]
+transparency = 1
+
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_spark")
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+material = SubResource("StandardMaterial3D_spark")
+size = Vector2(1.5, 1.5)
+
+[node name="Shockwave" type="GPUParticles3D"]
+emitting = false
+amount = 1
+lifetime = 0.3
+one_shot = true
+process_material = SubResource("ParticleProcessMaterial_ring")
+draw_pass_1 = SubResource("QuadMesh_ring")
+script = ExtResource("4_script")
+
+[node name="InnerWave" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.4
+one_shot = true
+process_material = SubResource("ParticleProcessMaterial_wave")
+draw_pass_1 = SubResource("QuadMesh_wave")
+
+[node name="SparkLayer" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 5
+lifetime = 0.5
+one_shot = true
+explosiveness = 0.9
+process_material = SubResource("ParticleProcessMaterial_spark")
+draw_pass_1 = SubResource("QuadMesh_spark")

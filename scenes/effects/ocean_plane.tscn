@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://bx5h2f3mwak2a"]
+
+[ext_resource type="Script" uid="uid://doqp5k1k5mxhn" path="res://scripts/effects/ocean_plane.gd" id="1_script"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ocean"]
+size = Vector2(350, 350)
+subdivide_width = 0
+subdivide_depth = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ocean"]
+transparency = 1
+albedo_color = Color(0.09, 0.25, 0.42, 0.82)
+roughness = 0.15
+metallic = 0.35
+metallic_specular = 0.6
+
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_ocean"]
+
+[node name="OceanPlane" type="MeshInstance3D"]
+mesh = SubResource("PlaneMesh_ocean")
+surface_material_override/0 = SubResource("StandardMaterial3D_ocean")
+script = ExtResource("1_script")
+update_interval = 0.1

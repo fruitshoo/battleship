@@ -2,9 +2,9 @@
 extends SceneTree
 
 func _init():
-	var root = Node3D.new()
-	root.name = "WoodSplinter"
-	root.set_script(load("res://scripts/effects/wood_splinter.gd"))
+	var vfx_root = Node3D.new()
+	vfx_root.name = "WoodSplinter"
+	vfx_root.set_script(load("res://scripts/effects/wood_splinter.gd"))
 	
 	var material = StandardMaterial3D.new()
 	material.albedo_color = Color(0.5, 0.35, 0.2, 1.0) # 덜 붉고 짙은 통나무 색상
@@ -37,8 +37,8 @@ func _init():
 	cube_mesh.material = material
 	cubes.draw_pass_1 = cube_mesh
 	
-	root.add_child(cubes)
-	cubes.owner = root
+	vfx_root.add_child(cubes)
+	cubes.owner = vfx_root
 	
 	# Process Material for Planks
 	var proc_planks = ParticleProcessMaterial.new()
@@ -69,11 +69,50 @@ func _init():
 	plank_mesh.material = material
 	planks.draw_pass_1 = plank_mesh
 	
-	root.add_child(planks)
-	planks.owner = root
+	vfx_root.add_child(planks)
+	planks.owner = vfx_root
+	
+	# === Dust Puff (플립북 연기/먼지 구름) ===
+	var proc_dust = ParticleProcessMaterial.new()
+	proc_dust.direction = Vector3(0, 1, 0)
+	proc_dust.spread = 45.0
+	proc_dust.initial_velocity_min = 0.5
+	proc_dust.initial_velocity_max = 1.5
+	proc_dust.gravity = Vector3(0, 0.3, 0) # 살짝 위로 떠오름
+	proc_dust.scale_min = 1.5
+	proc_dust.scale_max = 3.0
+	
+	var dust = GPUParticles3D.new()
+	dust.name = "DustPuff"
+	dust.emitting = false
+	dust.amount = 3 # 플립북은 소수만 써도 충분
+	dust.lifetime = 0.7
+	dust.one_shot = true
+	dust.explosiveness = 1.0
+	dust.process_material = proc_dust
+	
+	var dust_mat = StandardMaterial3D.new()
+	dust_mat.transparency = 1
+	dust_mat.shading_mode = 0
+	dust_mat.vertex_color_use_as_albedo = true
+	dust_mat.albedo_color = Color(0.55, 0.45, 0.35, 0.6) # 나무 먼지 갈색
+	dust_mat.albedo_texture = load("res://assets/vfx/flipbooks/explosion_smoke_01_8x8.tga")
+	dust_mat.billboard_mode = 3
+	dust_mat.billboard_keep_scale = true
+	dust_mat.particles_anim_h_frames = 8
+	dust_mat.particles_anim_v_frames = 8
+	dust_mat.particles_anim_loop = false
+	
+	var dust_mesh = QuadMesh.new()
+	dust_mesh.size = Vector2(2.5, 2.5)
+	dust_mesh.material = dust_mat
+	dust.draw_pass_1 = dust_mesh
+	
+	vfx_root.add_child(dust)
+	dust.owner = vfx_root
 
 	var packed_scene = PackedScene.new()
-	packed_scene.pack(root)
+	packed_scene.pack(vfx_root)
 	ResourceSaver.save(packed_scene, "res://scenes/effects/wood_splinter.tscn")
 	
 	print("Successfully generated res://scenes/effects/wood_splinter.tscn with mixed particles!")

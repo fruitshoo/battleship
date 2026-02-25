@@ -20,6 +20,8 @@ var time_alive: float = 0.0
 var grapeshot_splash_radius: float = 4.0
 var grapeshot_pellet_damage: float = 25.0
 
+@export var shockwave_scene: PackedScene = preload("res://scenes/effects/shockwave.tscn")
+
 func _spawn_effects(_is_crit: bool = false) -> void:
 	if not is_instance_valid(AudioManager): return
 	
@@ -30,8 +32,14 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 		# 포도탄 피격 파티클 연출 (핏빛/나무 파편)
 		_spawn_grapeshot_impact()
 	else:
-		# 일반탄 사운드 믹스: 나무 부서지는 소리만 남김 (폭발음 너무 시끄러움 방지)
+		# 일반탄 사운드 믹스: 나무 부서지는 소리만 남김
 		AudioManager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
+	
+	# 쇼크웨이브 생성
+	if shockwave_scene:
+		var wave = shockwave_scene.instantiate()
+		get_tree().root.add_child(wave)
+		wave.global_position = global_position
 
 # ==================== 포도탄 시각 효과 초기화 리소스 ====================
 static var shared_grape_trail_mesh: Mesh
