@@ -500,7 +500,17 @@ func _board_ship(target_ship: Node3D) -> void:
 			ship_node.take_damage(ram_damage, global_position)
 		# 자신도 시각적 파편 효과를 위해 데미지 (죽지는 않을 정도)
 		take_damage(1.0, global_position)
-		print("💥 충돌 발생! 도선 시작.")
+		
+		# 충격 피드백 강화 (화면 흔들림 및 묵직한 사운드)
+		if is_instance_valid(AudioManager):
+			AudioManager.play_sfx("impact_wood", global_position, randf_range(0.6, 0.8)) # 더 낮고 묵직한 피치
+		
+		var cam = get_viewport().get_camera_3d()
+		if cam and cam.has_method("shake"):
+			# 대포보다는 길고 묵직한 진동 (세기 0.4, 시간 0.3초)
+			cam.shake(0.4, 0.3)
+			
+		print("💥 충격적 충돌 발생! 도선 시작.")
 
 	# 2. 도선 상태 진입
 	is_boarding = true
