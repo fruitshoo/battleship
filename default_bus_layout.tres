@@ -1,9 +1,8 @@
-[gd_resource type="AudioBusLayout" format=3 uid="uid://c51w4v8f04kxg"]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://bpo32lmmchk31"]
 
 [sub_resource type="AudioEffectLowPassFilter" id="AudioEffectLowPassFilter_1"]
 resource_name = "LowPassFilter"
 cutoff_hz = 1000.0
-resonance = 0.5
 
 [resource]
 bus/1/name = &"Music"
