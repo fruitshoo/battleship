@@ -77,18 +77,22 @@ var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
 func _ready() -> void:
 	base_y = position.y
 	
-	# 길군악 오디오 버스 배정 (Master로 직접 라우팅하여 명확히 들리게 설정)
-	var bus_name = "Master"
+	# 길군악 오디오 버스 배정 (Music 버스를 사용하여 BGM 볼륨 설정을 따름)
+	var bus_name = "Music"
 		
 	_gilgunak_player = AudioStreamPlayer.new()
+	_gilgunak_player.name = "GilgunakPlayer"
 	var stream = load("res://assets/audio/sfx/sfx_gilgunak.wav") as AudioStream
 	if stream:
 		_gilgunak_player.stream = stream
-		_gilgunak_player.volume_db = 2.0 # 볼륨 증폭
+		_gilgunak_player.volume_db = 6.0 # 볼륨 상향 (2.0 -> 6.0)
 		_gilgunak_player.bus = bus_name
 		# 루프 설정: AudioStreamWAV는 직접 loop_mode 지정
 		if stream is AudioStreamWAV:
 			(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+	else:
+		print("⚠️ [Ship] 길군악 사운드 파일을 찾을 수 없습니다: res://assets/audio/sfx/sfx_gilgunak.wav")
+		
 	add_child(_gilgunak_player)
 	
 	# 영구 업그레이드 보너스 적용
@@ -189,10 +193,11 @@ func _physics_process(delta: float) -> void:
 		else:
 			_oars_timer -= delta
 			
-		if not _gilgunak_player.playing:
-			print("▶️ 노 젓기 노동요(길군악) 재생 시작!")
-			_gilgunak_player.play()
-		_gilgunak_player.stream_paused = false
+		# 노동요(길군악) 관리
+		if _gilgunak_player.stream:
+			if not _gilgunak_player.playing:
+				_gilgunak_player.play()
+			_gilgunak_player.stream_paused = false
 	else:
 		_oars_timer = 0.0 # 노 젓기 중단 시 바로 재생 가능하도록 초기화
 		if _gilgunak_player.playing and not _gilgunak_player.stream_paused:
