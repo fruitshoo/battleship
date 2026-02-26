@@ -78,6 +78,7 @@ var sfx_streams = {
 	],
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.wav",
+	"gilgunak": "res://assets/audio/sfx/sfx_gilgunak.wav",
 }
 
 # 캐시된 스트림
@@ -223,3 +224,45 @@ func _play_placeholder_beep() -> void:
 			phase += increment
 			
 		placeholder_playback.push_buffer(buffer)
+
+
+## === 길군악(노동요) 전용 재생 시스템 ===
+var _gilgunak_player: AudioStreamPlayer = null
+
+func _setup_gilgunak() -> void:
+	_gilgunak_player = AudioStreamPlayer.new()
+	_gilgunak_player.name = "GilgunakPlayer"
+	_gilgunak_player.bus = "Master" # 버스 문제를 배제하기 위해 Master로 고정
+	_gilgunak_player.volume_db = 10.0 # 확실히 들리게 상향
+	
+	var stream = load("res://assets/audio/sfx/sfx_gilgunak.wav") as AudioStream
+	if stream:
+		_gilgunak_player.stream = stream
+		if stream is AudioStreamWAV:
+			(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+		print("✅ [AudioManager] 길군악 플레이어 준비 완료 (Bus: Master, Vol: 10dB)")
+	else:
+		print("⚠️ [AudioManager] 길군악 파일 로드 실패 (경로 확인 필요)")
+	
+	add_child(_gilgunak_player)
+
+
+## 길군악 재생/정지 토글
+func play_gilgunak(active: bool) -> void:
+	if not _gilgunak_player:
+		_setup_gilgunak()
+	
+	# 버스 음소거 체크 (디버그용)
+	var bus_idx = AudioServer.get_bus_index(_gilgunak_player.bus)
+	if AudioServer.is_bus_mute(bus_idx):
+		print("⚠️ [AudioManager] 주의: %s 버스가 현재 음소거 상태입니다!" % _gilgunak_player.bus)
+
+	if active:
+		if not _gilgunak_player.playing:
+			_gilgunak_player.play()
+			print("🎶 [AudioManager] 길군악 재생 시작")
+		_gilgunak_player.stream_paused = false
+	else:
+		if _gilgunak_player.playing:
+			_gilgunak_player.stream_paused = true
+			print("⏸️ [AudioManager] 길군악 일시정지")

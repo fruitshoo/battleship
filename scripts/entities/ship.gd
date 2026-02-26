@@ -63,8 +63,8 @@ var _cached_level_manager: Node = null
 var _cached_hud: Node = null
 var _cached_um: Node = null
 
-# 뱃노래(길군악) 재생용 오디오 플레이어
-var _gilgunak_player: AudioStreamPlayer
+# 길군악(노동요) 재생 상태
+var _gilgunak_playing: bool = false
 
 # 부착된 선원(병사) 정보 (동적)
 var current_crew_count: int = 4
@@ -77,23 +77,6 @@ var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
 func _ready() -> void:
 	base_y = position.y
 	
-	# 길군악 오디오 버스 배정 (Music 버스를 사용하여 BGM 볼륨 설정을 따름)
-	var bus_name = "Music"
-		
-	_gilgunak_player = AudioStreamPlayer.new()
-	_gilgunak_player.name = "GilgunakPlayer"
-	var stream = load("res://assets/audio/sfx/sfx_gilgunak.wav") as AudioStream
-	if stream:
-		_gilgunak_player.stream = stream
-		_gilgunak_player.volume_db = 6.0 # 볼륨 상향 (2.0 -> 6.0)
-		_gilgunak_player.bus = bus_name
-		# 루프 설정: AudioStreamWAV는 직접 loop_mode 지정
-		if stream is AudioStreamWAV:
-			(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
-	else:
-		print("⚠️ [Ship] 길군악 사운드 파일을 찾을 수 없습니다: res://assets/audio/sfx/sfx_gilgunak.wav")
-		
-	add_child(_gilgunak_player)
 	
 	# 영구 업그레이드 보너스 적용
 	if is_in_group("player") or is_player_controlled:
@@ -189,19 +172,22 @@ func _physics_process(delta: float) -> void:
 		if _oars_timer <= 0:
 			if is_instance_valid(AudioManager):
 				AudioManager.play_sfx("oars_rowing", global_position, randf_range(0.95, 1.05))
-			_oars_timer = 1.3 # 1.3초마다 노젓기 소리 재생
+			_oars_timer = 1.3
 		else:
 			_oars_timer -= delta
-			
-		# 노동요(길군악) 관리
-		if _gilgunak_player.stream:
-			if not _gilgunak_player.playing:
-				_gilgunak_player.play()
-			_gilgunak_player.stream_paused = false
+		
+		# 길군악(노동요) 시작 (스태미나가 아주 조금이라도 있으면 재생)
+		if rowing_stamina > 0.1 and not _gilgunak_playing:
+			_gilgunak_playing = true
+			if is_instance_valid(AudioManager):
+				AudioManager.play_gilgunak(true)
 	else:
-		_oars_timer = 0.0 # 노 젓기 중단 시 바로 재생 가능하도록 초기화
-		if _gilgunak_player.playing and not _gilgunak_player.stream_paused:
-			_gilgunak_player.stream_paused = true
+		_oars_timer = 0.0
+		# 길군악 정지
+		if _gilgunak_playing:
+			_gilgunak_playing = false
+			if is_instance_valid(AudioManager):
+				AudioManager.play_gilgunak(false)
 func _update_hull_regeneration(delta: float) -> void:
 	if is_sinking or hull_regen_rate <= 0: return
 	if hull_hp < max_hull_hp:
