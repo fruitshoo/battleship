@@ -475,19 +475,19 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if _cached_hud and _cached_hud.has_method("update_hull_hp"):
 		_cached_hud.update_hull_hp(hull_hp, max_hull_hp)
 	
-	# 피격 플래시 (빨간 깜빡임)
-	_flash_damage()
+	# 피격 플래시 (빨간 깜빡임) 및 흔들림
+	_flash_damage(final_damage)
 	
 	if hull_hp <= 0:
 		_game_over()
 	
 ## 누수(DoT) 추가 및 제거
-func add_leak(amount: float) -> void:
+func add_leak(_amount: float) -> void:
 	# 아군 배는 기본 regen이 있으므로, 화재 도트데미지를 regen 감소분이나 별도 데미지로 처리 가능. 임시로 regen 깎는 형태로 도입하거나 직접 데미지를 가함.
 	# 지금은 별도 leaking 변수 없이, 주기적으로 데미지를 주어야 하지만 임시로 무시하거나 틱 데미지 구현 (필요시 추가)
 	pass
 
-func remove_leak(amount: float) -> void:
+func remove_leak(_amount: float) -> void:
 	pass
 
 ## 화염 데미지 및 상태 이상 (Fire Status Effect)
@@ -532,12 +532,15 @@ func get_hull_ratio() -> float:
 	return hull_hp / max_hull_hp
 
 
-## 피격 시 빨간 깜빡임
-func _flash_damage() -> void:
-	# 배 기울기 충격 효과 (흔들림)
+## 피격 시 빨간 깜빡임 및 흔들림
+func _flash_damage(amount: float = 10.0) -> void:
+	# 배 기울기 충격 효과 (데미지량에 비례하여 강도 조절)
+	# 10.0 데미지를 기준으로 배율 계산 (최소 0.15배 ~ 최대 2.0배)
+	var shake_mult = clamp(amount / 10.0, 0.15, 2.0)
+	
 	var shake_tween = create_tween()
-	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * 3.0, 0.1)
-	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * 2.0, 0.1)
+	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * 3.0 * shake_mult, 0.1)
+	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * 2.0 * shake_mult, 0.1)
 	shake_tween.tween_property(self , "rotation:z", 0.0, 0.2)
 
 
