@@ -63,10 +63,9 @@ var _cached_level_manager: Node = null
 var _cached_hud: Node = null
 var _cached_um: Node = null
 
-# 길군악(노동요) 재생 상태
-var _gilgunak_playing: bool = false
 
-# 부착된 선원(병사) 정보 (동적)
+# 부착된 선원(병사) 정보 (동적)# 길군악(노동요) 재생 상태
+var _gilgunak_playing: bool = false
 var current_crew_count: int = 4
 
 var _flap_timer: float = 0.0
@@ -176,7 +175,7 @@ func _physics_process(delta: float) -> void:
 		else:
 			_oars_timer -= delta
 		
-		# 길군악(노동요) 시작 (스태미나가 아주 조금이라도 있으면 재생)
+		# 길군악(노동요) 시작
 		if rowing_stamina > 0.1 and not _gilgunak_playing:
 			_gilgunak_playing = true
 			if is_instance_valid(AudioManager):
