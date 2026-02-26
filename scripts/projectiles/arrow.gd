@@ -65,7 +65,7 @@ func _check_hit(target: Node) -> void:
 		
 		# 적군 병사 피격
 		if target.has_method("take_damage"):
-			target.take_damage(damage)
+			target.take_damage(damage, global_position)
 			# 불화살 이펙트 소환 등 가능
 			queue_free()
 	
@@ -76,7 +76,7 @@ func _check_hit(target: Node) -> void:
 		var enemy_team = "enemy" if team == "player" else "player"
 		if potential_ship.is_in_group(enemy_team):
 			if potential_ship.has_method("take_damage"):
-				potential_ship.take_damage(2.0) # 배에는 미미한 데미지
+				potential_ship.take_damage(1.0, global_position) # 배에는 미미한 데미지
 				if is_fire_arrow and potential_ship.has_method("take_fire_damage"):
 					potential_ship.take_fire_damage(fire_damage, 5.0) # 5초간 화상
 			elif potential_ship.has_method("die") and randf() < 0.1: # 아주 낮은 확률로 파괴 (또는 HP가 1인 경우)

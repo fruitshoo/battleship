@@ -32,21 +32,21 @@ var rerolls_available: int = 0
 # enemy_hp: 적 체력
 # boarders: 도선 병사 수
 var level_data = {
-	1: {"spawn_interval": 6.0, "max_enemies": 2, "enemy_speed": 3.0, "enemy_hp": 3.0, "boarders": 1},
-	2: {"spawn_interval": 5.5, "max_enemies": 3, "enemy_speed": 3.2, "enemy_hp": 4.0, "boarders": 1},
-	3: {"spawn_interval": 5.0, "max_enemies": 4, "enemy_speed": 3.5, "enemy_hp": 5.0, "boarders": 2},
-	4: {"spawn_interval": 4.5, "max_enemies": 5, "enemy_speed": 3.5, "enemy_hp": 5.0, "boarders": 2},
-	5: {"spawn_interval": 4.0, "max_enemies": 6, "enemy_speed": 3.8, "enemy_hp": 6.0, "boarders": 2},
-	6: {"spawn_interval": 3.5, "max_enemies": 7, "enemy_speed": 3.8, "enemy_hp": 7.0, "boarders": 3},
-	7: {"spawn_interval": 3.5, "max_enemies": 8, "enemy_speed": 4.0, "enemy_hp": 8.0, "boarders": 3},
-	8: {"spawn_interval": 3.0, "max_enemies": 10, "enemy_speed": 4.0, "enemy_hp": 8.0, "boarders": 3},
-	9: {"spawn_interval": 3.0, "max_enemies": 10, "enemy_speed": 4.2, "enemy_hp": 9.0, "boarders": 3},
-	10: {"spawn_interval": 2.5, "max_enemies": 12, "enemy_speed": 4.5, "enemy_hp": 10.0, "boarders": 4},
-	11: {"spawn_interval": 2.5, "max_enemies": 12, "enemy_speed": 4.5, "enemy_hp": 12.0, "boarders": 4},
-	12: {"spawn_interval": 2.0, "max_enemies": 15, "enemy_speed": 4.8, "enemy_hp": 14.0, "boarders": 4},
-	13: {"spawn_interval": 2.0, "max_enemies": 15, "enemy_speed": 5.0, "enemy_hp": 16.0, "boarders": 5},
-	14: {"spawn_interval": 1.5, "max_enemies": 18, "enemy_speed": 5.2, "enemy_hp": 18.0, "boarders": 5},
-	15: {"spawn_interval": 1.5, "max_enemies": 20, "enemy_speed": 5.5, "enemy_hp": 20.0, "boarders": 6},
+	1: {"spawn_interval": 6.0, "max_enemies": 2, "enemy_speed": 3.0, "enemy_hp": 30.0, "boarders": 1},
+	2: {"spawn_interval": 5.5, "max_enemies": 3, "enemy_speed": 3.2, "enemy_hp": 40.0, "boarders": 1},
+	3: {"spawn_interval": 5.0, "max_enemies": 4, "enemy_speed": 3.5, "enemy_hp": 50.0, "boarders": 2},
+	4: {"spawn_interval": 4.5, "max_enemies": 5, "enemy_speed": 3.5, "enemy_hp": 60.0, "boarders": 2},
+	5: {"spawn_interval": 4.0, "max_enemies": 6, "enemy_speed": 3.8, "enemy_hp": 75.0, "boarders": 2},
+	6: {"spawn_interval": 3.5, "max_enemies": 7, "enemy_speed": 3.8, "enemy_hp": 90.0, "boarders": 3},
+	7: {"spawn_interval": 3.5, "max_enemies": 8, "enemy_speed": 4.0, "enemy_hp": 110.0, "boarders": 3},
+	8: {"spawn_interval": 3.0, "max_enemies": 10, "enemy_speed": 4.0, "enemy_hp": 130.0, "boarders": 3},
+	9: {"spawn_interval": 3.0, "max_enemies": 10, "enemy_speed": 4.2, "enemy_hp": 150.0, "boarders": 3},
+	10: {"spawn_interval": 2.5, "max_enemies": 12, "enemy_speed": 4.5, "enemy_hp": 180.0, "boarders": 4},
+	11: {"spawn_interval": 2.5, "max_enemies": 12, "enemy_speed": 4.5, "enemy_hp": 220.0, "boarders": 4},
+	12: {"spawn_interval": 2.0, "max_enemies": 15, "enemy_speed": 4.8, "enemy_hp": 260.0, "boarders": 4},
+	13: {"spawn_interval": 2.0, "max_enemies": 15, "enemy_speed": 5.0, "enemy_hp": 310.0, "boarders": 5},
+	14: {"spawn_interval": 1.5, "max_enemies": 18, "enemy_speed": 5.2, "enemy_hp": 360.0, "boarders": 5},
+	15: {"spawn_interval": 1.5, "max_enemies": 20, "enemy_speed": 5.5, "enemy_hp": 420.0, "boarders": 6},
 }
 
 # 참조
@@ -56,7 +56,8 @@ func _ready() -> void:
 	add_to_group("level_manager")
 	_calculate_next_level_xp()
 	
-	# 초기 HUD 업데이트
+	# 초기 HUD 및 난이도(Spawner) 업데이트
+	_update_difficulty()
 	if hud:
 		hud.update_level(current_level)
 		hud.update_score(current_score)

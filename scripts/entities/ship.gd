@@ -3,10 +3,10 @@ extends Node3D
 ## 배 핵심 로직: 실제 범선 물리, 러더 조향, 둥실둥실 효과
 
 # === 이동 관련 ===
-@export var max_speed: float = 12.0 # 최대 속도 (실제 계수 적용 시 약 8.4)
-@export var rowing_speed: float = 4.0 # 노 젓기 부스트 속도 (2.0 -> 4.0 상향)
-@export var acceleration: float = 2.0 # 가속도
-@export var deceleration: float = 1.5 # 감속도
+@export var max_speed: float = 10.0 # 최대 속도 하향 (12.0 -> 10.0)
+@export var rowing_speed: float = 3.0 # 노 젓기 부스트 하향 (4.0 -> 3.0)
+@export var acceleration: float = 1.5 # 가속도 하향 (2.0 -> 1.5)
+@export var deceleration: float = 1.2 # 감속도 하향 (1.5 -> 1.2)
 
 # === 돛 관련 ===
 @export var sail_angle: float = 0.0 # 돛 각도 (-90 ~ 90도, 배 기준)
@@ -47,10 +47,12 @@ var hull_hp: float = 100.0
 var is_sinking: bool = false
 var is_burning: bool = false
 var burn_timer: float = 0.0
+var fire_build_up: float = 0.0 # 화재 누적 수치 (0 ~ 100)
+var fire_threshold: float = 100.0 # 화재 발생 임계치
 @export var max_crew_count: int = 4 # 아군 병사 정원
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
-var _fire_instance: GPUParticles3D = null
+var _fire_instance: Node3D = null
 
 # 노드 참조
 @onready var sail_visual: Node3D = $SailVisual if has_node("SailVisual") else null
@@ -128,20 +130,27 @@ func _process(_delta: float) -> void:
 	_update_fire_effect()
 
 func _update_fire_effect() -> void:
-	# HP 기반 자동 발화 제거, is_burning 상태일 때만 화재 파티클 발생
+	# is_burning 상태일 때만 화재 파티클 발생 (불꽃 + 연기 분리형)
 	if is_burning and not is_sinking:
 		if not is_instance_valid(_fire_instance):
-			# 인스턴스 생성 시에만 amount를 결정
-			_fire_instance = fire_effect_scene.instantiate() as GPUParticles3D
-			_fire_instance.amount = 30 # 화염 지속 상태이므로 고정된 양의 연기
+			_fire_instance = fire_effect_scene.instantiate() as Node3D
 			add_child(_fire_instance)
-			_fire_instance.position = Vector3(0, 1.5, 0.5) # 배 중심에서 약간 위, 뒤
-		
-		if not _fire_instance.emitting:
-			_fire_instance.emitting = true
+			_fire_instance.position = Vector3(0, 1.0, 0.0)
+			_set_fire_emitting(true)
+		else:
+			_set_fire_emitting(true)
 	else:
-		if is_instance_valid(_fire_instance) and _fire_instance.emitting:
-			_fire_instance.emitting = false
+		if is_instance_valid(_fire_instance):
+			_set_fire_emitting(false)
+
+func _set_fire_emitting(active: bool) -> void:
+	if not is_instance_valid(_fire_instance):
+		return
+	var flame = _fire_instance.get_node_or_null("FlameParticles") as GPUParticles3D
+	var smoke = _fire_instance.get_node_or_null("SmokeParticles") as GPUParticles3D
+	
+	if flame: flame.emitting = active
+	if smoke: smoke.emitting = active
 
 
 # === 제어 관련 ===
@@ -483,9 +492,18 @@ func remove_leak(amount: float) -> void:
 
 ## 화염 데미지 및 상태 이상 (Fire Status Effect)
 func take_fire_damage(dps: float, duration: float) -> void:
-	is_burning = true
-	burn_timer = max(burn_timer, duration) # 기존 시간보다 길면 갱신
-	# TODO: 아군 배의 실제 DoT 로직 필요시 추가. (현재는 화상 스태이터스만 부여)
+	if is_burning:
+		burn_timer = max(burn_timer, duration)
+		return
+		
+	# 누적 수치 증가 (데미지와 지속 시간에 비례)
+	fire_build_up += duration * 6.0 # 화살 한 대당 약 30 누적 (약 4발 정도면 점화)
+	
+	if fire_build_up >= fire_threshold:
+		is_burning = true
+		fire_build_up = fire_threshold
+		burn_timer = duration
+		print("🔥 배에 불이 붙었습니다!")
 
 func _update_burning_status(delta: float) -> void:
 	if is_burning:
@@ -503,6 +521,11 @@ func _update_burning_status(delta: float) -> void:
 		burn_timer -= delta
 		if burn_timer <= 0:
 			is_burning = false
+			fire_build_up = 0.0 # 불이 꺼지면 누적치 초기화
+	else:
+		# 불이 붙지 않은 상태라면 누적 수치 서서히 감소 (자연 소화/냉각)
+		if fire_build_up > 0:
+			fire_build_up = move_toward(fire_build_up, 0, 15.0 * delta)
 
 ## 선체 HP 비율 반환
 func get_hull_ratio() -> float:
@@ -513,9 +536,9 @@ func get_hull_ratio() -> float:
 func _flash_damage() -> void:
 	# 배 기울기 충격 효과 (흔들림)
 	var shake_tween = create_tween()
-	shake_tween.tween_property(self, "rotation:z", rocking_amplitude * 3.0, 0.1)
-	shake_tween.tween_property(self, "rotation:z", -rocking_amplitude * 2.0, 0.1)
-	shake_tween.tween_property(self, "rotation:z", 0.0, 0.2)
+	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * 3.0, 0.1)
+	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * 2.0, 0.1)
+	shake_tween.tween_property(self , "rotation:z", 0.0, 0.2)
 
 
 ## 게임 오버 (침몰)
@@ -531,9 +554,9 @@ func _game_over() -> void:
 	# 침몰 애니메이션 (기울어지면서 가라앉음)
 	var sink_tween = create_tween()
 	sink_tween.set_parallel(true)
-	sink_tween.tween_property(self, "position:y", position.y - 5.0, 4.0).set_ease(Tween.EASE_IN)
-	sink_tween.tween_property(self, "rotation:z", deg_to_rad(25.0), 4.0).set_ease(Tween.EASE_IN)
-	sink_tween.tween_property(self, "rotation:x", deg_to_rad(10.0), 4.0).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self , "position:y", position.y - 5.0, 4.0).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self , "rotation:z", deg_to_rad(25.0), 4.0).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self , "rotation:x", deg_to_rad(10.0), 4.0).set_ease(Tween.EASE_IN)
 	
 	# HUD에 게임 오버 표시
 	if _cached_hud and _cached_hud.has_method("show_game_over"):

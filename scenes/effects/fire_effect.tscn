@@ -1,62 +1,125 @@
-[gd_scene format=3]
+[gd_scene load_steps=16 format=3]
 
-[ext_resource type="Texture2D" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="1_40177"]
+[ext_resource type="Texture2D" uid="uid://flame01flip" path="res://assets/vfx/flipbooks/flame_01_16x4.tga" id="1_flame01"]
+[ext_resource type="Texture2D" uid="uid://smoke01flip" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="2_smoke01"]
 
-[sub_resource type="Gradient" id="Gradient_ks5ne"]
-offsets = PackedFloat32Array(0, 1, 0, 0.7, 1)
-colors = PackedColorArray(0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0)
+; ── 불꽃 파티클용 리소스 ────────────────────────────
+[sub_resource type="Gradient" id="Gradient_flame"]
+offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
+colors = PackedColorArray(1, 0.9, 0.2, 1,  1, 0.4, 0.05, 1,  0.6, 0.1, 0.0, 0.6,  0.1, 0.0, 0.0, 0)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_23p8b"]
-gradient = SubResource("Gradient_ks5ne")
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_flame"]
+gradient = SubResource("Gradient_flame")
 
-[sub_resource type="Curve" id="Curve_u1b2c"]
-_data = [Vector2(0, 0.5), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+[sub_resource type="Curve" id="Curve_flame"]
+_data = [Vector2(0, 0.3), 0.0, 0.0, 0, 0, Vector2(0.4, 1.0), 0.0, 0.0, 0, 0, Vector2(1, 0.1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_flame"]
+curve = SubResource("Curve_flame")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flame"]
+emission_shape = 3
+emission_box_extents = Vector3(0.3, 0.1, 0.3)
+direction = Vector3(0, 1, 0)
+spread = 8.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.5
+angular_velocity_min = -15.0
+angular_velocity_max = 15.0
+gravity = Vector3(0, 0.5, 0)
+scale_min = 1.0
+scale_max = 1.8
+scale_curve = SubResource("CurveTexture_flame")
+color_ramp = SubResource("GradientTexture1D_flame")
+anim_speed_min = 1.0
+anim_speed_max = 1.5
+anim_offset_min = 0.0
+anim_offset_max = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_flame01")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 16
+particles_anim_v_frames = 4
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_flame"]
+material = SubResource("StandardMaterial3D_flame")
+size = Vector2(3.5, 3.5)
+
+; ── 연기 파티클용 리소스 ────────────────────────────
+[sub_resource type="Gradient" id="Gradient_smoke"]
+offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
+colors = PackedColorArray(0.15, 0.15, 0.15, 0,  0.2, 0.2, 0.2, 0.55,  0.12, 0.12, 0.12, 0.35,  0.05, 0.05, 0.05, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="Curve" id="Curve_smoke"]
+_data = [Vector2(0, 0.4), 0.0, 0.0, 0, 0, Vector2(1, 2.5), 0.0, 0.0, 0, 0]
 point_count = 2
 
-[sub_resource type="CurveTexture" id="CurveTexture_1myg4"]
-curve = SubResource("Curve_u1b2c")
+[sub_resource type="CurveTexture" id="CurveTexture_smoke"]
+curve = SubResource("Curve_smoke")
 
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_x16h7"]
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
 emission_shape = 3
-emission_box_extents = Vector3(1, 0.2, 1)
-angle_max = 360.0
+emission_box_extents = Vector3(0.6, 0.1, 0.6)
 direction = Vector3(0, 1, 0)
 spread = 20.0
-initial_velocity_min = 1.0
-initial_velocity_max = 3.0
-gravity = Vector3(0, 0.5, 0)
-scale_min = 0.8
-scale_max = 1.5
-scale_curve = SubResource("CurveTexture_1myg4")
-color_ramp = SubResource("GradientTexture1D_23p8b")
-anim_speed_min = 1.0
+initial_velocity_min = 1.8
+initial_velocity_max = 3.5
+angular_velocity_min = -12.0
+angular_velocity_max = 12.0
+gravity = Vector3(0, 0.2, 0)
+scale_min = 1.0
+scale_max = 1.8
+scale_curve = SubResource("CurveTexture_smoke")
+color_ramp = SubResource("GradientTexture1D_smoke")
+anim_speed_min = 0.6
 anim_speed_max = 1.0
+anim_offset_min = 0.0
+anim_offset_max = 1.0
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wpkp0"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
 transparency = 1
 cull_mode = 2
 shading_mode = 0
-albedo_color = Color(0.3, 0.3, 0.3, 0.8)
-albedo_texture = ExtResource("1_40177")
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_smoke01")
 billboard_mode = 3
 billboard_keep_scale = true
 particles_anim_h_frames = 8
 particles_anim_v_frames = 8
 particles_anim_loop = false
 
-[sub_resource type="QuadMesh" id="QuadMesh_wdgkc"]
-material = SubResource("StandardMaterial3D_wpkp0")
-size = Vector2(2.5, 2.5)
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(2.8, 2.8)
 
-[node name="FireEffect" type="GPUParticles3D" unique_id=1856889917]
-amount = 12
-lifetime = 2.0
-randomness = 0.3
-process_material = SubResource("ParticleProcessMaterial_x16h7")
-draw_pass_1 = SubResource("QuadMesh_wdgkc")
+; ── 씬 트리 ────────────────────────────
+[node name="FireEffect" type="Node3D"]
 
-[node name="FireLight" type="OmniLight3D" parent="." unique_id=1692534042]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-light_color = Color(1, 0.5, 0.1, 1)
-light_energy = 2.0
-omni_range = 10.0
+[node name="FlameParticles" type="GPUParticles3D" parent="."]
+amount = 8
+lifetime = 1.2
+randomness = 0.4
+process_material = SubResource("ParticleProcessMaterial_flame")
+draw_pass_1 = SubResource("QuadMesh_flame")
+
+[node name="SmokeParticles" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+amount = 10
+lifetime = 3.0
+randomness = 0.6
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+
+

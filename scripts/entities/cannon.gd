@@ -3,7 +3,7 @@ extends Node3D
 ## 함포 (Cannon)
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
 
-@export var cannonball_scene: PackedScene = preload("res://scenes/effects/cannonball.tscn")
+@export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 @export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
 @export var shockwave_scene: PackedScene = preload("res://scenes/effects/shockwave.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
@@ -111,7 +111,7 @@ func _execute_fire() -> void:
 	ball.global_position = muzzle.global_position
 	
 	# 데미지 계산 (속성 반영)
-	var base_dmg = 25.0 # 대포알 기본 데미지 상향
+	var base_dmg = 10.0 # 대포알 기본 데미지
 	if is_instance_valid(UpgradeManager):
 		var iron_lv = UpgradeManager.current_levels.get("iron_armor", 0)
 		base_dmg *= (1.0 + 0.25 * iron_lv)
@@ -120,11 +120,9 @@ func _execute_fire() -> void:
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(current_target.global_position)
 	
-	# 거리 기반 자동 포도탄(Grapeshot) 전환 (15m 이내)
-	if dist <= 15.0:
-		ball.is_grapeshot = true
+	# 거리 기반 자동 포도탄(Grapeshot) 전환 (제거됨 - 일반탄 고정)
 	
-	var time_to_hit = dist / 100.0
+	var time_to_hit = dist / 80.0
 	
 	var enemy_speed = 3.5
 	if "move_speed" in current_target: enemy_speed = current_target.move_speed

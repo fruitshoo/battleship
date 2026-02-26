@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://cannonball_scene"]
 
-[ext_resource type="Script" path="res://scripts/effects/cannonball.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/projectiles/cannonball.gd" id="1"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ball"]
 radius = 0.2
@@ -58,4 +58,3 @@ scale_amount_curve = SubResource("Curve_trail")
 color = Color(0.8, 0.8, 0.8, 0.4)
 mesh = SubResource("SphereMesh_trail")
 draw_order = 2
-

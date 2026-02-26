@@ -1,0 +1,130 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Texture2D" uid="uid://exp01flip" path="res://assets/vfx/flipbooks/explosion_01_8x8.tga" id="1_exp01"]
+[ext_resource type="Texture2D" uid="uid://expsmk01flip" path="res://assets/vfx/flipbooks/explosion_smoke_01_8x8.tga" id="2_expsmoke"]
+[ext_resource type="Script" path="res://scripts/effects/one_shot_particle.gd" id="3_script"]
+
+; ── 폭발 화염 ────────────────────────────
+[sub_resource type="Gradient" id="Gradient_exp"]
+offsets = PackedFloat32Array(0, 0.4, 1)
+colors = PackedColorArray(1, 0.9, 0.4, 0.9,  1, 0.4, 0.05, 0.6,  0.2, 0.0, 0.0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_exp"]
+gradient = SubResource("Gradient_exp")
+
+[sub_resource type="Curve" id="Curve_exp"]
+_data = [Vector2(0, 0.3), 0.0, 0.0, 0, 0, Vector2(0.15, 1.0), 0.0, 0.0, 0, 0, Vector2(1, 0.0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_exp"]
+curve = SubResource("Curve_exp")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_exp"]
+emission_shape = 1
+emission_sphere_radius = 0.2
+direction = Vector3(0, 1, 0)
+spread = 120.0
+initial_velocity_min = 1.0
+initial_velocity_max = 3.0
+gravity = Vector3(0, -0.5, 0)
+scale_min = 0.6
+scale_max = 1.0
+scale_curve = SubResource("CurveTexture_exp")
+color_ramp = SubResource("GradientTexture1D_exp")
+anim_speed_min = 1.5
+anim_speed_max = 2.5
+anim_offset_min = 0.0
+anim_offset_max = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_exp"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_exp01")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_exp"]
+material = SubResource("StandardMaterial3D_exp")
+size = Vector2(2.5, 2.5)
+
+; ── 폭발 연기 ────────────────────────────
+[sub_resource type="Gradient" id="Gradient_expsmk"]
+offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
+colors = PackedColorArray(0.3, 0.25, 0.2, 0,  0.2, 0.18, 0.15, 0.3,  0.12, 0.1, 0.08, 0.2,  0.05, 0.05, 0.05, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_expsmk"]
+gradient = SubResource("Gradient_expsmk")
+
+[sub_resource type="Curve" id="Curve_expsmk"]
+_data = [Vector2(0, 0.4), 0.0, 0.0, 0, 0, Vector2(0.4, 1.0), 0.0, 0.0, 0, 0, Vector2(1, 1.8), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_expsmk"]
+curve = SubResource("Curve_expsmk")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expsmk"]
+emission_shape = 1
+emission_sphere_radius = 0.3
+direction = Vector3(0, 1, 0)
+spread = 40.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.5
+angular_velocity_min = -10.0
+angular_velocity_max = 10.0
+gravity = Vector3(0, 0.3, 0)
+scale_min = 0.5
+scale_max = 1.0
+scale_curve = SubResource("CurveTexture_expsmk")
+color_ramp = SubResource("GradientTexture1D_expsmk")
+anim_speed_min = 0.8
+anim_speed_max = 1.2
+anim_offset_min = 0.0
+anim_offset_max = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expsmk"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_expsmoke")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_expsmk"]
+material = SubResource("StandardMaterial3D_expsmk")
+size = Vector2(2.0, 2.0)
+
+; ── 씬 트리 ────────────────────────────
+[node name="RocketExplosion" type="GPUParticles3D"]
+emitting = false
+amount = 3
+lifetime = 0.5
+one_shot = true
+explosiveness = 0.95
+randomness = 0.3
+process_material = SubResource("ParticleProcessMaterial_exp")
+draw_pass_1 = SubResource("QuadMesh_exp")
+script = ExtResource("3_script")
+
+[node name="SmokeCloud" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 4
+lifetime = 1.2
+one_shot = true
+explosiveness = 0.85
+randomness = 0.5
+process_material = SubResource("ParticleProcessMaterial_expsmk")
+draw_pass_1 = SubResource("QuadMesh_expsmk")
+
+
+

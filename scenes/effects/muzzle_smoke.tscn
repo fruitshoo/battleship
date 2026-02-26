@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cyh7n6q6b3x7w"]
 
 [ext_resource type="Texture2D" uid="uid://smoke04" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_smoke"]
-[ext_resource type="Script" path="res://scripts/effects/hit_effect.gd" id="2_script"]
+[ext_resource type="Script" path="res://scripts/effects/one_shot_particle.gd" id="2_script"]
 
 [sub_resource type="Curve" id="Curve_smoke_scale"]
 _data = [Vector2(0, 0.2), 0.0, 0.0, 0, 0, Vector2(0.2, 1), 0.0, 0.0, 0, 0, Vector2(1, 1.5), 0.0, 0.0, 0, 0]

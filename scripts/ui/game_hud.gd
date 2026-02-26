@@ -151,21 +151,40 @@ func _update_wind_display() -> void:
 	var strength = WindManager.get_wind_strength()
 	var direction_name = _angle_to_compass(angle)
 	
+	# 카메라 기준 상대 풍향 화살표 계산
+	var screen_arrow = _get_screen_wind_arrow(angle)
+	
 	# 돌풍 중이면 색상 변경
 	var wind_text = ""
 	var wind_color = Color.WHITE
 	
 	if WindManager._gust_blend > 0.1:
 		wind_color = Color(1, 0.6, 0.2, 1)
-		wind_text = "🌬️ 돌풍! %s %.1f" % [direction_name, strength]
+		wind_text = "🌬️ 돌풍! %s %s %.1f" % [screen_arrow, direction_name, strength]
 	else:
 		wind_color = Color(0.8, 1, 0.8, 1)
-		wind_text = "🌬️ %s %.1f" % [direction_name, strength]
+		wind_text = "🌬️ %s %s %.1f" % [screen_arrow, direction_name, strength]
 		
 	if _last_wind_str != wind_text:
 		_last_wind_str = wind_text
 		wind_label.text = wind_text
 		wind_label.add_theme_color_override("font_color", wind_color)
+
+
+## 카메라 회전을 고려하여 화면 기준 풍향 화살표 반환
+func _get_screen_wind_arrow(wind_angle_deg: float) -> String:
+	var cam = get_viewport().get_camera_3d()
+	var cam_yaw_deg = 0.0
+	if cam and cam.get("_cam_rotation"):
+		cam_yaw_deg = rad_to_deg(cam._cam_rotation.x)
+	
+	# 풍향에서 카메라 수평 회전을 빼면 화면 기준 상대 각도
+	var relative = fmod(wind_angle_deg - cam_yaw_deg + 720.0, 360.0)
+	
+	# 8방위 화살표 (화면 기준: 0=위)
+	const ARROWS = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"]
+	var idx = int((relative + 22.5) / 45.0) % 8
+	return ARROWS[idx]
 
 
 func _update_speed_display() -> void:

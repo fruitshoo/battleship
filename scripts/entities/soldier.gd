@@ -13,7 +13,7 @@ enum State {
 # === 기본 속성 ===
 @export var max_health: float = 100.0
 @export var attack_damage: float = 10.0
-@export var attack_range: float = 1.5
+@export var attack_range: float = 1.2
 @export var detection_range: float = 15.0 # 적 탐지 범위 (이 밖의 적은 무시)
 @export var range_attack_limit: float = 20.0 # 화살 사거리
 @export var attack_cooldown: float = 1.0
@@ -25,7 +25,7 @@ enum State {
 @export var move_speed: float = 3.0
 @export var team: String = "player" # "player" or "enemy"
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
-@export var arrow_scene: PackedScene = preload("res://scenes/effects/arrow.tscn")
+@export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var hit_effect_scene: PackedScene = preload("res://scenes/effects/hit_effect.tscn")
 @export var slash_effect_scene: PackedScene = preload("res://scenes/effects/slash_effect.tscn")
 
@@ -73,7 +73,7 @@ func _ready() -> void:
 		var pivot = Node3D.new()
 		pivot.name = "WeaponPivot"
 		# 캐릭터 오른손 위치 대략 잡기
-		pivot.position = Vector3(0.4, 1.0, -0.2)
+		pivot.position = Vector3(0.3, 0.7, -0.15)
 		add_child(pivot)
 		
 		# 검 모델 (BoxMesh)
@@ -241,7 +241,7 @@ func _start_wander() -> void:
 	var random_x = randf_range(-1.0, 1.0)
 	var random_z = randf_range(-3.0, 3.0)
 	
-	wander_target_local = Vector3(random_x, 0.5, random_z) # Y=0.5 (갑판 위)
+	wander_target_local = Vector3(random_x, 0.0, random_z) # Y=0.0 (갑판 지면)
 	_change_state(State.WANDER)
 
 
@@ -338,7 +338,7 @@ func _perform_attack() -> void:
 		AudioManager.play_sfx("sword_swing", global_position)
 	
 	if current_target.has_method("take_damage"):
-		current_target.take_damage(final_damage)
+		current_target.take_damage(final_damage, global_position)
 		
 		# 시각적 피드백: 런지(Lunge) 애니메이션
 		# 현재 바라보는 방향(Forward)으로 몸체를 잠깐 밈
@@ -446,9 +446,14 @@ func _spawn_hit_effect(hit_pos: Vector3) -> void:
 	get_tree().root.add_child(effect)
 	
 	if hit_pos == Vector3.ZERO:
-		effect.global_position = global_position + Vector3(0, 1.0, 0)
+		effect.global_position = global_position + Vector3(0, 0.8, 0)
 	else:
-		effect.global_position = hit_pos
+		# 피격 위치에서 약간 띄움 (바닥 뚫림 방지) + 미세 랜덤 오프셋
+		var rand_offset = Vector3(randf_range(-0.1, 0.1), 0.2, randf_range(-0.1, 0.1))
+		effect.global_position = hit_pos + rand_offset
+	
+	if effect is GPUParticles3D:
+		effect.emitting = true
 
 ## 휘두르기 이펙트 생성
 func _spawn_slash_effect() -> void:
@@ -458,7 +463,7 @@ func _spawn_slash_effect() -> void:
 	
 	# 병사 앞쪽에 생성
 	var forward = - global_transform.basis.z
-	effect.global_position = global_position + forward * 0.8 + Vector3(0, 1.0, 0)
+	effect.global_position = global_position + forward * 0.8 + Vector3(0, 0.7, 0)
 	
 	# 방향 맞추기
 	if current_target:
@@ -561,9 +566,9 @@ func _perform_range_attack(target: Node3D) -> void:
 	var arrow = arrow_scene.instantiate()
 	
 	# 데이터 설정 (SceneTree에 추가하기 전에 설정하여 _ready에서 사용 가능하게 함)
-	arrow.start_pos = global_position + Vector3(0, 1.2, 0)
+	arrow.start_pos = global_position + Vector3(0, 0.8, 0)
 	# 적군 병사면 가슴 높이, 배면 갑판 높이 조준
-	arrow.target_pos = target.global_position + Vector3(0, 0.8, 0)
+	arrow.target_pos = target.global_position + Vector3(0, 0.5, 0)
 	arrow.team = team
 	
 	# 시너지 반영: 불화살 (플레이어 진영 전용)

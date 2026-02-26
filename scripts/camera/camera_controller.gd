@@ -53,6 +53,17 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			current_zoom = clamp(current_zoom + zoom_speed, min_zoom, max_zoom)
 	
+	# 트랙패드 핀치로 줌 (Mac)
+	if event is InputEventMagnifyGesture:
+		var pinch_zoom_speed = zoom_speed * 5.0
+		current_zoom = clamp(current_zoom - (event.factor - 1.0) * pinch_zoom_speed, min_zoom, max_zoom)
+	
+	# 트랙패드 두 손가락 팬으로 orbit 회전 (Mac)
+	if event is InputEventPanGesture:
+		_cam_rotation.x -= event.delta.x * rotation_sensitivity * 0.5
+		_cam_rotation.y -= event.delta.y * rotation_sensitivity * 0.5
+		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
+	
 	# 우클릭 드래그로 회전
 	if event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		_cam_rotation.x -= event.relative.x * rotation_sensitivity

@@ -1,7 +1,6 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/effects/wood_splinter.gd" id="1_q41r5"]
-[ext_resource type="Texture2D" path="res://assets/vfx/flipbooks/explosion_smoke_01_8x8.tga" id="2_l1qbe"]
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_1wkn6"]
 angle_max = 360.0
@@ -38,30 +37,6 @@ scale_max = 1.5
 material = SubResource("StandardMaterial3D_fw0c5")
 size = Vector3(0.25, 0.25, 0.8)
 
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_l7uua"]
-direction = Vector3(0, 1, 0)
-initial_velocity_min = 0.5
-initial_velocity_max = 1.5
-gravity = Vector3(0, 0.3, 0)
-scale_min = 1.5
-scale_max = 3.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k7ww2"]
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.55, 0.45, 0.35, 0.6)
-albedo_texture = ExtResource("2_l1qbe")
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 8
-particles_anim_v_frames = 8
-particles_anim_loop = false
-
-[sub_resource type="QuadMesh" id="QuadMesh_2ysey"]
-material = SubResource("StandardMaterial3D_k7ww2")
-size = Vector2(2.5, 2.5)
-
 [node name="WoodSplinter" type="Node3D" unique_id=717346941]
 script = ExtResource("1_q41r5")
 
@@ -82,12 +57,3 @@ one_shot = true
 explosiveness = 0.85
 process_material = SubResource("ParticleProcessMaterial_mqlsy")
 draw_pass_1 = SubResource("BoxMesh_f6m57")
-
-[node name="DustPuff" type="GPUParticles3D" parent="." unique_id=2057484942]
-emitting = false
-amount = 3
-lifetime = 0.7
-one_shot = true
-explosiveness = 1.0
-process_material = SubResource("ParticleProcessMaterial_l7uua")
-draw_pass_1 = SubResource("QuadMesh_2ysey")

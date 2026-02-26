@@ -3,7 +3,7 @@ extends Node3D
 ## 장군전 발사기 (Janggun Launcher)
 ## 통나무 미사일을 발사. 고데미지, 긴 쿨다운.
 
-@export var missile_scene: PackedScene = preload("res://scenes/effects/janggun_missile.tscn")
+@export var missile_scene: PackedScene = preload("res://scenes/projectiles/janggun_missile.tscn")
 @export var fire_cooldown: float = 12.0
 @export var detection_range: float = 35.0
 @export var damage: float = 10.0

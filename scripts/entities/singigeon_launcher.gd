@@ -3,7 +3,7 @@ extends Node3D
 ## 신기전 발사기 (Singigeon Launcher)
 ## 로켓 화살을 전방으로 발사. 레벨에 따라 발수 증가.
 
-@export var rocket_scene: PackedScene = preload("res://scenes/effects/singigeon_rocket.tscn")
+@export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
 @export var fire_cooldown: float = 4.0
 @export var detection_range: float = 30.0
 @export var shot_count: int = 1 # 레벨에 따라 1/3/5

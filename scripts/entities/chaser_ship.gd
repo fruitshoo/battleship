@@ -7,13 +7,13 @@ extends Node3D
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
 @export var boarders_count: int = 2 # 도선시킬 병사 수
 
-@export var hp: float = 10.0 # 체력 조정 (장군전 DoT 대응을 위해 상향)
+@export var hp: float = 60.0 # 기본 HP 상향 (대포 일제사격 2회 정도 버팀)
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 @export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
-var _fire_instance: GPUParticles3D = null
+var _fire_instance: Node3D = null
 
-var max_hp: float = 10.0
+var max_hp: float = 60.0
 var target: Node3D = null
 
 # 상태 (State)
@@ -22,6 +22,8 @@ var is_boarding: bool = false
 var is_derelict: bool = false # 병사 전멸 시 무력화(폐선) 상태
 var is_burning: bool = false
 var burn_timer: float = 0.0
+var fire_build_up: float = 0.0 # 화재 누적 수치
+var fire_threshold: float = 100.0 # 화재 임계치
 
 # 누수(Leaking) 시스템 변수
 var leaking_rate: float = 0.0 # 초당 피해량
@@ -34,20 +36,27 @@ func get_hull_ratio() -> float:
 	return hp / max_hp
 
 func _update_fire_effect() -> void:
-	# HP 40% 이하일 때 자동 발화 로직을 제거하고, is_burning 또는 폐선 상태일 때 연기 발생
+	# is_burning 또는 폐선 상태일 때 화재 파티클 발생 (불꽃 + 연기 분리형)
 	if (is_burning or is_derelict) and not is_dying:
 		if not is_instance_valid(_fire_instance):
-			# 인스턴스 생성 시에만 amount 결정
-			_fire_instance = fire_effect_scene.instantiate() as GPUParticles3D
-			_fire_instance.amount = 30 # 폐선/화염 시 고정된 양의 농밀한 연기
+			_fire_instance = fire_effect_scene.instantiate() as Node3D
 			add_child(_fire_instance)
-			_fire_instance.position = Vector3(0, 1.5, 0.0) # 배 중심 상단
-		
-		if not _fire_instance.emitting:
-			_fire_instance.emitting = true
+			_fire_instance.position = Vector3(0, 1.5, 0.0)
+			_set_fire_emitting(true)
+		else:
+			_set_fire_emitting(true)
 	else:
-		if is_instance_valid(_fire_instance) and _fire_instance.emitting:
-			_fire_instance.emitting = false
+		if is_instance_valid(_fire_instance):
+			_set_fire_emitting(false)
+
+func _set_fire_emitting(active: bool) -> void:
+	if not is_instance_valid(_fire_instance):
+		return
+	var flame = _fire_instance.get_node_or_null("FlameParticles") as GPUParticles3D
+	var smoke = _fire_instance.get_node_or_null("SmokeParticles") as GPUParticles3D
+	
+	if flame: flame.emitting = active
+	if smoke: smoke.emitting = active
 
 # Boarding Action Variables
 var current_sink_offset: float = 0.0 # 가라앉은 깊이
@@ -83,9 +92,9 @@ func _become_derelict() -> void:
 	
 	# 임시로 시각적 피드백: 약간 기울어지고 가라앉음 (반파 효과)
 	var tilt_tween = create_tween()
-	tilt_tween.tween_property(self, "rotation_degrees:z", 5.0, 2.0).set_ease(Tween.EASE_OUT)
+	tilt_tween.tween_property(self , "rotation_degrees:z", 5.0, 2.0).set_ease(Tween.EASE_OUT)
 	tilt_tween.set_parallel(true)
-	tilt_tween.tween_property(self, "global_position:y", global_position.y - 0.2, 2.0).set_ease(Tween.EASE_OUT)
+	tilt_tween.tween_property(self , "global_position:y", global_position.y - 0.2, 2.0).set_ease(Tween.EASE_OUT)
 	
 	# 도선 방지를 위해 이동 및 회전 정지
 	move_speed = 0.0
@@ -161,11 +170,11 @@ func die() -> void:
 	# 무작위 기울기
 	var tilt_x = randf_range(-15.0, 15.0)
 	var tilt_z = randf_range(-10.0, 10.0)
-	sink_tween.tween_property(self, "rotation_degrees:x", tilt_x, 3.0).set_ease(Tween.EASE_OUT)
-	sink_tween.tween_property(self, "rotation_degrees:z", tilt_z, 3.0).set_ease(Tween.EASE_OUT)
+	sink_tween.tween_property(self , "rotation_degrees:x", tilt_x, 3.0).set_ease(Tween.EASE_OUT)
+	sink_tween.tween_property(self , "rotation_degrees:z", tilt_z, 3.0).set_ease(Tween.EASE_OUT)
 	
 	# 아래로 가라앉음
-	sink_tween.tween_property(self, "global_position:y", global_position.y - 10.0, 5.0).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self , "global_position:y", global_position.y - 10.0, 5.0).set_ease(Tween.EASE_IN)
 	
 	leaking_rate = 0.0 # 사망 시 누수 중단
 	
@@ -177,17 +186,31 @@ func die() -> void:
 ## 화염 데미지 및 상태 이상
 func take_fire_damage(dps: float, duration: float) -> void:
 	if is_dying: return
-	is_burning = true
-	burn_timer = max(burn_timer, duration)
-	leaking_rate += dps # 적 배의 leaking_rate에 dps(초당 데미지)를 추가로 누적
+	
+	if is_burning:
+		burn_timer = max(burn_timer, duration)
+		leaking_rate += dps * 0.5 # 이미 불타고 있으면 추가 데미지 약화
+		return
+
+	# 화재 누적
+	fire_build_up += duration * 8.0 # 적 배는 약 2.5 ~ 3발 정도에 점화
+	
+	if fire_build_up >= fire_threshold:
+		is_burning = true
+		fire_build_up = fire_threshold
+		burn_timer = duration
+		leaking_rate += dps
 
 func _update_burning_status(delta: float) -> void:
 	if is_burning:
 		burn_timer -= delta
 		if burn_timer <= 0:
 			is_burning = false
-			# 화재가 꺼지면 누수 수치(leaking_rate) 등을 원상복구 하거나 놔둘 수 있음.
-			# 현재 설계상 화염 틱 데미지가 끝날 때 일정량 깎아주는 로직이 별도로 필요할 수 있지만 임시 유지.
+			fire_build_up = 0.0
+	else:
+		# 미발화 시 누적치 감소
+		if fire_build_up > 0:
+			fire_build_up = move_toward(fire_build_up, 0, 20.0 * delta)
 
 func _drop_floating_loot() -> void:
 	if not loot_scene: return
@@ -385,7 +408,7 @@ func _transfer_one_soldier() -> void:
 		tween.tween_property(s, "global_position:z", end_global.z, 0.4)
 		# Y축은 포물선
 		s.global_position.y += 1.5 # 순간적으로 높임
-		tween.tween_property(s, "global_position:y", end_global.y + 0.8, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(s, "global_position:y", end_global.y, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		
 		# 상태 설정
 		if s.has_method("set_team"): s.set_team("enemy")

@@ -9,7 +9,7 @@ extends Node
 @export var max_spawn_distance: float = 60.0 # 최대 생성 거리
 @export var max_enemies: int = 20 # 최대 적 수
 @export var current_enemy_speed: float = 3.0 # 레벨에 따른 적 속도
-@export var current_enemy_hp: float = 3.0 # 레벨에 따른 적 체력
+@export var current_enemy_hp: float = 30.0 # 기본 HP를 Level 1(30.0)에 맞춤
 @export var current_boarders: int = 1 # 레벨에 따른 도선 병사 수
 @export var max_distance_limit: float = 120.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
@@ -143,6 +143,8 @@ func _spawn_enemy() -> void:
 		enemy.move_speed = current_enemy_speed
 	if "hp" in enemy:
 		enemy.hp = current_enemy_hp
+		if "max_hp" in enemy:
+			enemy.max_hp = current_enemy_hp
 	if "boarders_count" in enemy:
 		enemy.boarders_count = current_boarders
 
