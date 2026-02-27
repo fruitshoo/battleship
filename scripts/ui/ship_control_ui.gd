@@ -23,6 +23,29 @@ func _ready() -> void:
 	if has_node(controlled_ship):
 		ship = get_node(controlled_ship)
 	
+	# 불필요한 패널들의 부모 컨테이너(VBoxContainer) 전체를 숨겨서 배경 박스까지 완전히 제거
+	var vbox = get_node_or_null("VBoxContainer")
+	if vbox:
+		vbox.visible = false
+		
+	# 나침반의 사각형 배경(WindPanel)을 투명하게 만들고 상단 라벨 숨기기
+	var wind_panel = get_node_or_null("WindPanel")
+	if wind_panel:
+		wind_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		var wind_label_title = wind_panel.get_node_or_null("VBox/Label")
+		if wind_label_title:
+			wind_label_title.visible = false
+	
+	# 안전을 위해 개별 버튼들도 숨김 처리 유지
+	if sail_left_btn: sail_left_btn.visible = false
+	if sail_right_btn: sail_right_btn.visible = false
+	if rowing_btn: rowing_btn.visible = false
+	
+	if sail_angle_label: sail_angle_label.visible = false
+	if speed_label: speed_label.visible = false
+	if stamina_bar: stamina_bar.visible = false
+	
+	# 버튼 연결은 기능 유지를 위해 놔둠 (나중에 모바일 대응 등을 위해)
 	if sail_left_btn:
 		sail_left_btn.pressed.connect(_on_sail_left_pressed)
 	if sail_right_btn:
