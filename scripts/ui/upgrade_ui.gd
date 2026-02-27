@@ -48,7 +48,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _update_focus() -> void:
 	# 사운드 재생 (이동음)
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("ui_click", null, 1.2) # 피치를 높여서 가벼운 소리로 전환
+		AudioManager.play_sfx("ui_click", null, 1.2, -6.0) # 피치를 높이고 볼륨을 더 줄임
 		
 	for i in range(card_buttons.size()):
 		var card = card_buttons[i]
@@ -206,9 +206,8 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 
 
 func _on_choice_pressed(upgrade_id: String) -> void:
-	# 사운드 재생
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("ui_click")
+		AudioManager.play_sfx("ui_click", null, 1.0, -4.0)
 	
 	# 시그널 발생
 	upgrade_chosen.emit(upgrade_id)
@@ -274,6 +273,6 @@ func _update_reroll_button(count: int) -> void:
 func _on_reroll_pressed() -> void:
 	# 사운드
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("ui_click")
+		AudioManager.play_sfx("ui_click", null, 1.1, -4.0)
 	
 	reroll_requested.emit()

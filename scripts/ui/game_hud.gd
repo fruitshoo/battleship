@@ -113,7 +113,7 @@ func _setup_new_layout() -> void:
 	var legacy_side = get_node_or_null("SidePanel")
 	if legacy_side: legacy_side.visible = false
 	
-	# === 좌측 상단 (진행도) ===
+	# === 좌측 상단 (진행도 및 재화) ===
 	if not top_left_container:
 		top_left_container = VBoxContainer.new()
 		add_child(top_left_container)
@@ -121,47 +121,38 @@ func _setup_new_layout() -> void:
 		top_left_container.offset_left = 24
 		top_left_container.offset_top = 24
 		
-		# 기존 라벨들 이동
+		# 레벨 라벨
 		if level_label and level_label.get_parent():
 			level_label.get_parent().remove_child(level_label)
 			top_left_container.add_child(level_label)
 			level_label.add_theme_font_size_override("font_size", 18)
 		
+		# 골드(점수) 라벨 - 우상단에서 좌상단으로 이동
+		if score_label and score_label.get_parent():
+			score_label.get_parent().remove_child(score_label)
+			top_left_container.add_child(score_label)
+			score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			score_label.add_theme_font_size_override("font_size", 18)
+			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+
+		# 타이머 라벨
 		if timer_label and timer_label.get_parent():
 			timer_label.get_parent().remove_child(timer_label)
 			top_left_container.add_child(timer_label)
 			timer_label.add_theme_font_size_override("font_size", 14)
 			timer_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-
-	# === 우측 상단 (보상) ===
-	if not top_right_container:
-		top_right_container = VBoxContainer.new()
-		add_child(top_right_container)
-		top_right_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		top_right_container.offset_right = -24
-		top_right_container.offset_top = 24
-		top_right_container.alignment = BoxContainer.ALIGNMENT_END
-		top_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		
-		if score_label and score_label.get_parent():
-			score_label.get_parent().remove_child(score_label)
-			top_right_container.add_child(score_label)
-			score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			score_label.add_theme_font_size_override("font_size", 18)
-			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
 			
-		if enemy_count_label and enemy_count_label.get_parent():
-			enemy_count_label.get_parent().remove_child(enemy_count_label)
-			top_right_container.add_child(enemy_count_label)
-			enemy_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			enemy_count_label.add_theme_font_size_override("font_size", 14)
-			
+		# 난이도 라벨 - 우상단에서 좌상단으로 이동
 		if difficulty_label and difficulty_label.get_parent():
 			difficulty_label.get_parent().remove_child(difficulty_label)
-			top_right_container.add_child(difficulty_label)
-			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			top_left_container.add_child(difficulty_label)
+			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 			difficulty_label.add_theme_font_size_override("font_size", 12)
 			difficulty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+
+	# 에너미 숫자는 표시하지 않음 (나침반과 겹침 및 불필요)
+	if enemy_count_label:
+		enemy_count_label.visible = false
 
 	# === 좌측 하단 (플레이어 상태) ===
 	if not bottom_left_container:
@@ -172,11 +163,16 @@ func _setup_new_layout() -> void:
 		bottom_left_container.offset_bottom = -24
 		bottom_left_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		
-		# 기존 크루 라벨 이동
+		# 기존 크루 라벨 이동 및 폰트 설정
 		if crew_label and crew_label.get_parent():
 			crew_label.get_parent().remove_child(crew_label)
 			bottom_left_container.add_child(crew_label)
-			crew_label.add_theme_font_size_override("font_size", 14)
+			crew_label.add_theme_font_size_override("font_size", 18) # 아이콘이므로 조금 더 크게
+			
+			# Material Symbols 폰트 적용
+			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+			if icon_font:
+				crew_label.add_theme_font_override("font", icon_font)
 		
 		# 플레이어 HP 바 생성
 		hp_bar = ProgressBar.new()
@@ -312,7 +308,13 @@ func update_enemy_count(val: int) -> void:
 
 func update_crew_status(count: int, max_count: int = 4) -> void:
 	if crew_label:
-		crew_label.text = "[Crew] %d/%d" % [count, max_count]
+		var icons = char(0xe7ef) + " " # group 아이콘
+		for i in range(max_count):
+			if i < count:
+				icons += char(0xe061) # filled capsule/circle
+			else:
+				icons += char(0xe836) # empty capsule/circle
+		crew_label.text = icons
 
 
 func _update_timer() -> void:

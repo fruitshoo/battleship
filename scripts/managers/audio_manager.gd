@@ -118,7 +118,7 @@ func _ready() -> void:
 	for i in range(8):
 		var p = AudioStreamPlayer.new()
 		p.name = "SFX_Player_2D_%d" % i
-		p.bus = "SFX"
+		p.bus = "UI" # UI 전용 버스 사용
 		add_child(p)
 		sfx_2d_pool.append(p)
 		
@@ -168,7 +168,7 @@ func _print_bus_status() -> void:
 
 ## 효과음 재생 (3D 위치)
 ## position이 null이면 2D로 재생
-func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0) -> void:
+func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
 	# 1. 리소스 확인 및 동적 로드
 	var stream = null
 	
@@ -207,6 +207,7 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0) ->
 		player.stream = stream
 		player.global_position = position
 		player.pitch_scale = pitch_scale + randf_range(-0.1, 0.1) # 약간의 피치 변동으로 자연스럽게
+		player.volume_db = volume_db
 		player.play()
 		
 		# 인덱스 순환
@@ -216,6 +217,7 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0) ->
 		var player = sfx_2d_pool[current_2d_index]
 		player.stream = stream
 		player.pitch_scale = pitch_scale
+		player.volume_db = volume_db
 		player.play()
 		
 		current_2d_index = (current_2d_index + 1) % sfx_2d_pool.size()
