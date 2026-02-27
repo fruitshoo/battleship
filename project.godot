@@ -31,6 +31,10 @@ UpgradeManager="*res://scripts/managers/upgrade_manager.gd"
 SaveManager="*res://scripts/managers/save_manager.gd"
 MetaManager="*res://scripts/managers/meta_manager.gd"
 
+[gui]
+
+theme/custom_font="uid://bnh5c3ww655lq"
+
 [input]
 
 sail_left={
