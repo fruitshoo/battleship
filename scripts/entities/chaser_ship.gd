@@ -43,6 +43,26 @@ static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정
 
 var formation_spacing: float = 12.0 # 선박 간 간격
 
+# === 성능 최적화용 캐싱 (성능 저하 방지) ===
+static var _cached_minion_list: Array = []
+static var _last_minion_cache_frame: int = -1
+static var _cached_ships_list: Array = []
+static var _last_ships_cache_frame: int = -1
+
+static func get_minions_cached(tree: SceneTree) -> Array:
+	var current_frame = Engine.get_physics_frames()
+	if current_frame != _last_minion_cache_frame:
+		_cached_minion_list = tree.get_nodes_in_group("captured_minion")
+		_last_minion_cache_frame = current_frame
+	return _cached_minion_list
+
+static func get_ships_cached(tree: SceneTree) -> Array:
+	var current_frame = Engine.get_physics_frames()
+	if current_frame != _last_ships_cache_frame:
+		_cached_ships_list = tree.get_nodes_in_group("ships")
+		_last_ships_cache_frame = current_frame
+	return _cached_ships_list
+
 func get_hull_ratio() -> float:
 	if max_hp <= 0.0:
 		return 1.0
@@ -400,7 +420,7 @@ func _update_logic_throttled() -> void:
 ## 주변 함선들로부터 멀어지려는 힘 계산
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
-	var neighbors = get_tree().get_nodes_in_group("ships")
+	var neighbors = get_ships_cached(get_tree())
 	var count = 0
 	var separation_dist = 6.0 # 함선 폭/길이 고려한 간격
 	
@@ -634,8 +654,8 @@ func _process_minion_ai(delta: float) -> void:
 		_find_player()
 		return
 		
-	# 1. 내 순번(Index) 확인
-	var minions = get_tree().get_nodes_in_group("captured_minion")
+	# 1. 내 순번(Index) 확인 (캐시 사용으로 성능 최적화)
+	var minions = get_minions_cached(get_tree())
 	var my_index = minions.find(self )
 	if my_index == -1: my_index = 0
 	

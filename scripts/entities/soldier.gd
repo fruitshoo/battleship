@@ -45,6 +45,34 @@ var home_ship: Node3D = null # 최초 소속된 플레이어 배 (나포함 침�
 var _cached_level_manager: Node = null
 var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용
 
+# === 성능 최적화용 캐싱 (성능 저하 방지) ===
+static var _cached_soldiers: Array = []
+static var _last_soldier_cache_frame: int = -1
+static var _cached_player_ships: Array = []
+static var _last_player_cache_frame: int = -1
+static var _cached_enemy_ships: Array = []
+static var _last_enemy_cache_frame: int = -1
+
+static func get_soldiers_cached(tree: SceneTree) -> Array:
+	var f = Engine.get_physics_frames()
+	if f != _last_soldier_cache_frame:
+		_cached_soldiers = tree.get_nodes_in_group("soldiers")
+		_last_soldier_cache_frame = f
+	return _cached_soldiers
+
+static func get_ships_cached(tree: SceneTree, team_name: String) -> Array:
+	var f = Engine.get_physics_frames()
+	if team_name == "player":
+		if f != _last_player_cache_frame:
+			_cached_player_ships = tree.get_nodes_in_group("player")
+			_last_player_cache_frame = f
+		return _cached_player_ships
+	else:
+		if f != _last_enemy_cache_frame:
+			_cached_enemy_ships = tree.get_nodes_in_group("enemy")
+			_last_enemy_cache_frame = f
+		return _cached_enemy_ships
+
 
 # 노드 참조
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D if has_node("NavigationAgent3D") else null
@@ -383,7 +411,7 @@ func _perform_attack() -> void:
 
 ## 가장 가까운 적 찾기 (탐지 범위 제한)
 func find_nearest_enemy() -> Node3D:
-	var all_soldiers = get_tree().get_nodes_in_group("soldiers")
+	var all_soldiers = get_soldiers_cached(get_tree())
 	var nearest: Node3D = null
 	var nearest_distance: float = INF
 	
@@ -437,7 +465,7 @@ func _check_ship_capture_opportunity() -> void:
 
 	# 상황 2: 본선 혹은 아군 함선에 있으면서, 주변의 비어있는 적선(폐선) 탐색하여 뛰어들기
 	if owned_ship.is_in_group("player"):
-		var enemy_ships = get_tree().get_nodes_in_group("enemy")
+		var enemy_ships = get_ships_cached(get_tree(), "enemy")
 		for ship in enemy_ships:
 			# 폐선 상태이고 나포되지 않은 배인 경우
 			if ship.get("is_derelict") == true and not ship.is_in_group("player"):
@@ -654,8 +682,8 @@ func _check_ranged_combat() -> void:
 		shoot_timer = shoot_cooldown
 
 func _find_ranged_target() -> Node3D:
-	# 1. 적군 병사 탐색
-	var soldiers = get_tree().get_nodes_in_group("soldiers")
+	# 1. 적군 병사 탐색 (캐시 사용으로 성능 최적화)
+	var soldiers = get_soldiers_cached(get_tree())
 	for s in soldiers:
 		if s.get("team") != team and s.get("current_state") != State.DEAD:
 			var dist = global_position.distance_to(s.global_position)
@@ -664,7 +692,7 @@ func _find_ranged_target() -> Node3D:
 	
 	# 2. 적군 함선 탐색
 	var enemy_team = "enemy" if team == "player" else "player"
-	var ships = get_tree().get_nodes_in_group(enemy_team)
+	var ships = get_ships_cached(get_tree(), enemy_team)
 	
 	# 함대 정원 체크 (나포 가능 여부)
 	var minions = get_tree().get_nodes_in_group("captured_minion")

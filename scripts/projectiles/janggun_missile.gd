@@ -11,6 +11,8 @@ extends Area3D
 @export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
 @export var arc_height: float = 8.0
+@export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -27,22 +29,31 @@ func _ready() -> void:
 	
 	global_position = start_pos
 	
+	# 발사 연출 (Screen Shake + Muzzle Effects)
+	_play_launch_vfx()
+	
 	area_entered.connect(_on_hit)
 	body_entered.connect(_on_hit)
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
 	if is_stuck or is_sinking: return
 	
-	progress += delta / duration
+	progress += _delta / duration
+	# 비선형 가속 연출 (Ease-In: 초반엔 육중하게 출발)
+	# progress 0.0 -> 1.0 을 곡선형으로 변환
+	var t = progress * progress # Quadratic Ease-In
 	
-	if progress >= 1.0:
-		# 바다에 빠짐
-		_splash_and_sink()
-		return
-	
-	var current_pos = start_pos.lerp(target_pos, progress)
-	var y_offset = sin(PI * progress) * arc_height
+	var current_pos = start_pos.lerp(target_pos, t)
+	var y_offset = sin(PI * t) * arc_height
 	current_pos.y += y_offset
+	
+	# 육중함 표현을 위한 미세한 진동 (Wobble)
+	var wobble = Vector3(
+		sin(progress * 40.0) * 0.05,
+		cos(progress * 35.0) * 0.05,
+		0
+	)
+	current_pos += global_transform.basis * wobble
 	
 	if (current_pos - global_position).length_squared() > 0.001:
 		look_at(current_pos, Vector3.UP)
@@ -61,6 +72,11 @@ func _on_hit(target: Node) -> void:
 	if ship:
 		_play_impact_vfx() # 임팩트 이펙트 재생
 		_stick_to_ship(ship)
+		
+		# 충돌 화면 흔들림 (강력)
+		var cam = get_viewport().get_camera_3d()
+		if cam and cam.has_method("shake"):
+			cam.shake(0.5, 0.25)
 
 func _stick_to_ship(ship: Node3D) -> void:
 	is_stuck = true
@@ -118,8 +134,31 @@ func _play_impact_vfx() -> void:
 		if splinter.has_method("set_amount_by_damage"):
 			splinter.set_amount_by_damage(damage)
 	
-	# 쇼크웨이브 제거 (파편과 사운드만 유지)
-	
 	# 피격 사운드 (장군전 전용 중타격음)
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("heavy_missle_impact", global_position, randf_range(0.8, 1.0))
+
+func _play_launch_vfx() -> void:
+	# 화면 흔들림
+	var cam = get_viewport().get_camera_3d()
+	if cam and cam.has_method("shake"):
+		cam.shake(0.6, 0.3)
+	
+	var launch_dir = (target_pos - start_pos).normalized()
+	
+	# 머즐 플래시
+	if muzzle_flash_scene:
+		var flash = muzzle_flash_scene.instantiate()
+		get_tree().root.add_child(flash)
+		flash.global_position = global_position
+		if flash.has_method("set_fire_direction"):
+			flash.set_fire_direction(launch_dir)
+			
+	# 머즐 연기
+	if muzzle_smoke_scene:
+		var smoke = muzzle_smoke_scene.instantiate()
+		get_tree().root.add_child(smoke)
+		smoke.global_position = global_position
+		smoke.look_at(global_position + launch_dir, Vector3.UP)
+		if smoke is GPUParticles3D:
+			smoke.emitting = true

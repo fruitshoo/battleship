@@ -17,12 +17,14 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
   - **Close Quarters (<=15m):** Automatically switches to **Grapeshot**. Fires a spread of pellets that deals intense AoE damage to the enemy crew while preserving the hull!
 - **Critical Hits:** Cannonballs have a 20% chance to score a devastating critical hit, triggering massive explosions and dealing double damage.
 
-### 3. Derelict Ship Capture & Boarding ⚔️
-- **The "Ghost Ship" Mechanic:** If you successfully kill all the enemy soldiers on a ship without sinking it (highly effective with Grapeshot), the ship loses control and becomes completely **Derelict**.
-- **Reward System (Looting):** Ram your ship into a Derelict vessel to effortlessly capture it!
-  - Instantly heals all your existing crew members to 100%.
-  - Rescues a prisoner who joins your crew (up to the maximum ship capacity).
-- **Ramming & Melee Boarding:** If the enemy crew is still alive, ramming them will initiate brutal melee combat. Your soldiers will automatically cross over and fight. The surviving crew takes over the ship.
+### 3. Derelict Ship Capture & Fleet Formations ⚔️🚩
+- **The "Ghost Ship" Mechanic:** If you successfully kill all the enemy soldiers on a ship without sinking it, the ship becomes **Derelict** (White flag).
+- **Autonomous Capture AI:** Your soldiers will automatically spot nearby empty ships (within 12m) and jump onto them to capture!
+- **Fleet Formation System:** Captured ships don't just follow blindly—they maintain a disciplined formation.
+  - **`F` Key Toggle:** Switch between **Column (Line)** and **Wing (V-Shape)** formations in real-time.
+- **Immediate Armament:** Captured ships are instantly fitted with 3 cannons (Front, Left, Right) to fight alongside you.
+- **Grappling Hooks:** Visual ropes tether ships during boarding, ensuring they stay close for the action.
+- **Ramming & Melee Boarding:** Ramming initiated combat where soldiers jump across. If a ship sinks, your boarders will dive into the sea and become **Survivors** for you to rescue!
 
 ### 4. VFX & Immersive Combat Feedback ✨
 - **Soldier Feedback:**
@@ -30,9 +32,9 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
   - **Knockback:** Tactical physical feedback when taking damage.
   - **Slash Trail Effects:** Sword swings are visually represented with dynamic "twirl" arcs.
 - **Heavy Weaponry Visuals:**
-  - **Atmospheric Shockwaves:** Cannon fire and explosions create subtle, randomized shockwaves that ripple through the air.
-  - **Muzzle Smoke:** Realistic dark charcoal smoke bursts upon firing.
-  - **Explosive Wood Debris:** Ships shatter into structural planks and fine sawdust (Alpha-masked particles) when hit.
+  - **Janggun-jeon (Great General's Arrow) 🪵:** A massive log-missile with visceral feedback. It features **nonlinear acceleration (Ease-In)**, flight wobble, muzzle smoke, and heavy camera shake on impact.
+  - **Atmospheric Effects:** Cannon fire and explosions create randomized shockwaves and charcoal muzzle smoke.
+  - **Explosive Wood Debris:** Ships shatter into structural planks and sawdust when hit.
 
 ### 5. Dynamic Environment & Performance
 - **Cloud Shadows:** Real-time noise-based cloud shadows move across the ocean and ships using Decals.
@@ -52,8 +54,15 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
 - **`W`**: Row (Speed Boost / Consumes Stamina)
 - **`S`**: Stop Rowing
 - **`Spacebar`**: Fire Cannons at the nearest enemy
+- **`F`**: Toggle Fleet Formation (Column / Wing)
 - **`Right Click` (Hold)**: Pan Camera
 - **`Mouse Wheel`**: Zoom In/Out
+
+## 🌐 Play on Web (GitHub Pages)
+If you are playing the web version, please ensure your browser supports **WebGL 2.0**.
+- **Renderer:** Compatibility (OpenGL)
+- **Controls:** Same as desktop.
+- **Link:** `https://fruitshoo.github.io/battleship/` (Required Setup in GitHub Settings)
 
 ---
 *Take the helm, captain! The sea awaits.* ⚓
