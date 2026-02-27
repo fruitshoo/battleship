@@ -59,6 +59,10 @@ func _physics_process(_delta: float) -> void:
 		look_at(current_pos, Vector3.UP)
 		
 	global_position = current_pos
+	
+	# 타겟 지점을 지나쳤는데도 아무것도 안 맞았다면 바다로 추락
+	if progress > 1.1:
+		_splash_and_sink()
 
 func _on_hit(target: Node) -> void:
 	if is_stuck: return

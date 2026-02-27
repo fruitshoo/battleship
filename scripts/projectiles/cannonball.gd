@@ -74,7 +74,10 @@ func _on_body_entered(body: Node3D) -> void:
 func _check_hit(target: Node) -> void:
 	if has_hit: return
 	
-	# 적 그룹 확인
+	# 일단 무언가에 부딪혔으므로 삭제 준비
+	has_hit = true
+	
+	# 적/아군 함선 그룹 확인
 	var enemy = null
 	if target.is_in_group("enemy") or (target.get_parent() and target.get_parent().is_in_group("enemy")):
 		enemy = target if target.is_in_group("enemy") else target.get_parent()
@@ -82,9 +85,7 @@ func _check_hit(target: Node) -> void:
 		enemy = target if target.is_in_group("player") else target.get_parent()
 	
 	if enemy:
-		has_hit = true
-		
-		# 크리티컬 계산
+		# 함선 적중 시 데미지 처리
 		var is_crit = randf() < crit_chance
 		var final_damage = damage * (crit_multiplier if is_crit else 1.0)
 		
@@ -96,4 +97,10 @@ func _check_hit(target: Node) -> void:
 			enemy.queue_free()
 		
 		_spawn_effects(is_crit)
-		queue_free()
+	else:
+		# 함선 외의 물체에 부딪혔을 때 (물보라 소리와 함께 삭제)
+		if is_instance_valid(AudioManager):
+			AudioManager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
+	
+	# 어떤 경우든 부딪히면 삭제
+	queue_free()
