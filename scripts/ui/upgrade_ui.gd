@@ -14,11 +14,64 @@ var card_buttons: Array = []
 var card_ids: Array[String] = []
 var reroll_button: Button = null
 
+var _focused_index: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 작동
 	visible = false
 
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or card_ids.is_empty():
+		return
+		
+	# A, D, Left, Right 화살표로 포커스 이동
+	if event.is_action_pressed("ui_left") or (event is InputEventKey and event.keycode == KEY_A and event.pressed):
+		_focused_index = maxi(0, _focused_index - 1)
+		_update_focus()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_right") or (event is InputEventKey and event.keycode == KEY_D and event.pressed):
+		var max_index = card_ids.size() - 1
+		if reroll_button and not reroll_button.disabled:
+			max_index += 1 # 리롤 버튼 포함
+		_focused_index = mini(max_index, _focused_index + 1)
+		_update_focus()
+		get_viewport().set_input_as_handled()
+		
+	# Space나 Enter로 선택
+	elif event.is_action_pressed("ui_accept") or (event is InputEventKey and event.keycode == KEY_SPACE and event.pressed):
+		if _focused_index < card_ids.size():
+			_on_choice_pressed(card_ids[_focused_index])
+		elif _focused_index == card_ids.size() and reroll_button and not reroll_button.disabled:
+			_on_reroll_pressed()
+		get_viewport().set_input_as_handled()
+
+func _update_focus() -> void:
+	# 사운드 재생 (이동음)
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("ui_click", null, 1.2) # 피치를 높여서 가벼운 소리로 전환
+		
+	for i in range(card_buttons.size()):
+		var card = card_buttons[i]
+		var style = card.get_theme_stylebox("panel") as StyleBoxFlat
+		var upgrade_id = card_ids[i]
+		var color = UpgradeManager.UPGRADES[upgrade_id].get("color", Color.WHITE)
+		
+		# 선택된 카드와 아닌 카드의 비주얼 업데이트 (기존 hover 함수 재활용)
+		if i == _focused_index:
+			_on_card_hover(card, style, color)
+		else:
+			_on_card_unhover(card, style, color)
+			
+	# 리롤 버튼 포커스 처리
+	if reroll_button:
+		var style = reroll_button.get_theme_stylebox("normal") as StyleBoxFlat
+		if _focused_index == card_ids.size():
+			# 리롤 버튼 호버 효과 (임시)
+			reroll_button.add_theme_stylebox_override("normal", reroll_button.get_theme_stylebox("hover"))
+			reroll_button.scale = Vector2(1.05, 1.05)
+		else:
+			reroll_button.add_theme_stylebox_override("normal", style)
+			reroll_button.scale = Vector2(1.0, 1.0)
 
 func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	card_ids = []
@@ -40,6 +93,9 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	# 리롤 버튼 관리
 	_update_reroll_button(rerolls)
 	
+	_focused_index = 0
+	_update_focus()
+	
 	visible = true
 	
 	# 등장 애니메이션 (background + vbox 페이드인)
@@ -50,7 +106,7 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	tween.tween_property($VBox, "modulate:a", 1.0, 0.3)
 
 
-func _create_card(upgrade_id: String, index: int) -> PanelContainer:
+func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	var data = UpgradeManager.UPGRADES[upgrade_id]
 	var current_lv = UpgradeManager.current_levels[upgrade_id]
 	var next_lv = current_lv + 1
@@ -138,9 +194,13 @@ func _create_card(upgrade_id: String, index: int) -> PanelContainer:
 	button.pressed.connect(_on_choice_pressed.bind(upgrade_id))
 	vbox.add_child(button)
 	
-	# 호버 효과용 마우스 이벤트
-	card.mouse_entered.connect(func(): _on_card_hover(card, style, color))
-	card.mouse_exited.connect(func(): _on_card_unhover(card, style, color))
+	# 호버 효과용 마우스 이벤트 (마우스 작동도 유지)
+	card.mouse_entered.connect(func():
+		var idx = card_ids.find(upgrade_id)
+		if idx != -1:
+			_focused_index = idx
+			_update_focus()
+	)
 	
 	return card
 
@@ -197,6 +257,13 @@ func _update_reroll_button(count: int) -> void:
 		reroll_button.add_theme_stylebox_override("hover", style_hover)
 		
 		reroll_button.pressed.connect(_on_reroll_pressed)
+		
+		# 마우스 호버 지원
+		reroll_button.mouse_entered.connect(func():
+			_focused_index = card_ids.size()
+			_update_focus()
+		)
+		
 		$VBox.add_child(reroll_button)
 	
 	reroll_button.text = "Reroll (%d)" % count

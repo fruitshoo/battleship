@@ -15,6 +15,9 @@ var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
 var time_alive: float = 0.0
 
+func set_lifetime_multiplier(mult: float) -> void:
+	lifetime *= mult
+
 func _spawn_effects(_is_crit: bool = false) -> void:
 	if not is_instance_valid(AudioManager): return
 	

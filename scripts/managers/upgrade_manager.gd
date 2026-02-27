@@ -7,7 +7,7 @@ signal upgrade_applied(upgrade_id: String, new_level: int)
 
 # 업그레이드 정의
 # 업그레이드 카테고리
-enum Category {ANTI_SHIP, ANTI_PERSONNEL, HULL, NAVIGATION, SPECIAL}
+enum Category {ANTI_SHIP, ANTI_PERSONNEL, HULL, NAVIGATION, SPECIAL, FLEET}
 
 # 업그레이드 정의
 var UPGRADES = {
@@ -54,7 +54,7 @@ var UPGRADES = {
 	"black_powder": {
 		"name": "화약 숙련",
 		"category": Category.ANTI_SHIP,
-		"description": "[범위 시너지] 대포/신기전 폭발 반경 +20%",
+		"description": "[사거리 시너지] 대포 탐지 거리(사거리) +15%",
 		"max_level": 5,
 		"color": Color(0.3, 0.3, 0.3)
 	},
@@ -110,6 +110,29 @@ var UPGRADES = {
 		"description": "점수 +50",
 		"max_level": 99,
 		"color": Color(1.0, 0.85, 0.3)
+	},
+	
+	# --- Fleet Upgrades (Captured Ships) ---
+	"fleet_hull": {
+		"name": "함대 장갑강화",
+		"category": Category.FLEET,
+		"description": "나포한 배들의 최대 체력 +40, 방어력 +1",
+		"max_level": 5,
+		"color": Color(0.3, 0.5, 0.8)
+	},
+	"fleet_regen": {
+		"name": "함대 긴급수리",
+		"category": Category.FLEET,
+		"description": "나포한 배들의 자동 수리 속도 +0.8/s",
+		"max_level": 3,
+		"color": Color(0.2, 0.8, 0.6)
+	},
+	"fleet_training": {
+		"name": "함대 포술훈련",
+		"category": Category.FLEET,
+		"description": "나포한 배들의 무기 데미지 +30%, 쿨다운 -15%",
+		"max_level": 4,
+		"color": Color(0.8, 0.3, 0.2)
 	}
 }
 
@@ -197,6 +220,8 @@ func apply_upgrade(upgrade_id: String) -> void:
 			_apply_supply(player_ship)
 		"gold":
 			_apply_gold()
+		"fleet_hull", "fleet_regen", "fleet_training":
+			_apply_fleet_upgrade(upgrade_id)
 	
 	upgrade_applied.emit(upgrade_id, new_level)
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
@@ -404,3 +429,42 @@ func _get_player_soldiers(ship: Node3D) -> Array:
 		if child.has_method("take_damage") and child.get("current_state") != null:
 			result.append(child)
 	return result
+
+func _apply_fleet_upgrade(upgrade_id: String) -> void:
+	var minions = get_tree().get_nodes_in_group("captured_minion")
+	for m in minions:
+		apply_fleet_stats_to_minion(m)
+	print("[Fleet] 함대 업그레이드 적용 완료: %s (현재 함선 수: %d)" % [upgrade_id, minions.size()])
+
+## 나포한 배에 현재 함대 업그레이드 스탯을 적용
+func apply_fleet_stats_to_minion(minion: Node3D) -> void:
+	if not is_instance_valid(minion) or minion.get("is_dying"):
+		return
+	
+	# 1. 체력 및 방어력 (fleet_hull)
+	var hull_lv = current_levels.get("fleet_hull", 0)
+	if hull_lv > 0:
+		var base_hp = 60.0 # ChaserShip 기본 HP
+		minion.max_hp = base_hp + (hull_lv * 40.0)
+		minion.hull_defense = hull_lv * 1.0
+		# 처음 적용 시 현재 체력도 증가분만큼 보정
+		minion.hp = minf(minion.hp + 40.0, minion.max_hp)
+	
+	# 2. 자동 수리 (fleet_regen)
+	var regen_lv = current_levels.get("fleet_regen", 0)
+	if regen_lv > 0:
+		minion.hull_regen_rate = regen_lv * 0.8
+		
+	# 3. 무기 공격력 (fleet_training)
+	var train_lv = current_levels.get("fleet_training", 0)
+	if train_lv > 0:
+		# 자식 노드 중 대포(Cannon)들을 찾아 스탯 반영
+		for child in minion.get_children():
+			if child.is_in_group("cannons") or child.name.contains("Cannon"):
+				# 대포 스크립트에 데미지 배율 변수가 있다면 적용 (없다면 직접 주입)
+				# 현재 cannon.gd는 UpgradeManager를 실시간 참조하므로 
+				# 대포 자체에 'fleet_bonus' 같은 변수를 두어 보정하게 하거나
+				# 대포 내부 로직에서 apply_fleet_stats 여부를 체크하게 함.
+				# 일단은 나포함의 대포임을 표시
+				if child.has_method("set_fleet_bonus"):
+					child.set_fleet_bonus(1.0 + (train_lv * 0.3), 1.0 - (train_lv * 0.15))

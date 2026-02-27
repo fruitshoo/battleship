@@ -25,15 +25,30 @@ var _gust_warning_timer: float = 0.0
 var player_ship: Node3D = null
 var cached_lm: Node = null
 
-# 캐싱 변수들 (텍스트 할당을 줄여 프레임 드랍을 막기 위함)
+# 신규 레이아웃 UI 요소
+var hp_bar: ProgressBar = null
+var hp_text_label: Label = null
+var boss_hp_bar_new: ProgressBar = null
+var boss_hp_text_label: Label = null
+var top_left_container: VBoxContainer = null
+var top_right_container: VBoxContainer = null
+var bottom_left_container: VBoxContainer = null
+var bottom_right_container: VBoxContainer = null
+var speed_display: Label = null
+var cooldown_bar: ProgressBar = null
+var cooldown_label: Label = null
+
+# 캐싱 변수들
 var _last_timer_str: String = ""
-var _last_wind_str: String = ""
 var _last_speed_str: String = ""
 var _last_xp_text: String = ""
 var _last_difficulty_text: String = ""
 
 
 func _ready() -> void:
+	# 기존 요소 숨기기 & 신규 레이아웃 셋업
+	_setup_new_layout()
+	
 	update_level(1)
 	update_score(0)
 	update_enemy_count(0)
@@ -86,12 +101,180 @@ func _setup_top_xp_bar() -> void:
 	if side_panel:
 		side_panel.offset_top = 264.0 # 기존 260 -> 264
 
+func _setup_new_layout() -> void:
+	# 1. 기존 거추장스러운 레거시 패널들(컨테이너)을 숨김
+	if hull_label: hull_label.visible = false
+	if speed_label: speed_label.visible = false
+	if wind_label: wind_label.visible = false
+	if boss_hp_panel: boss_hp_panel.visible = false
+	
+	var legacy_top = get_node_or_null("TopPanel")
+	if legacy_top: legacy_top.visible = false
+	var legacy_side = get_node_or_null("SidePanel")
+	if legacy_side: legacy_side.visible = false
+	
+	# === 좌측 상단 (진행도) ===
+	if not top_left_container:
+		top_left_container = VBoxContainer.new()
+		add_child(top_left_container)
+		top_left_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		top_left_container.offset_left = 24
+		top_left_container.offset_top = 24
+		
+		# 기존 라벨들 이동
+		if level_label and level_label.get_parent():
+			level_label.get_parent().remove_child(level_label)
+			top_left_container.add_child(level_label)
+			level_label.add_theme_font_size_override("font_size", 18)
+		
+		if timer_label and timer_label.get_parent():
+			timer_label.get_parent().remove_child(timer_label)
+			top_left_container.add_child(timer_label)
+			timer_label.add_theme_font_size_override("font_size", 14)
+			timer_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+
+	# === 우측 상단 (보상) ===
+	if not top_right_container:
+		top_right_container = VBoxContainer.new()
+		add_child(top_right_container)
+		top_right_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		top_right_container.offset_right = -24
+		top_right_container.offset_top = 24
+		top_right_container.alignment = BoxContainer.ALIGNMENT_END
+		top_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		
+		if score_label and score_label.get_parent():
+			score_label.get_parent().remove_child(score_label)
+			top_right_container.add_child(score_label)
+			score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			score_label.add_theme_font_size_override("font_size", 18)
+			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+			
+		if enemy_count_label and enemy_count_label.get_parent():
+			enemy_count_label.get_parent().remove_child(enemy_count_label)
+			top_right_container.add_child(enemy_count_label)
+			enemy_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			enemy_count_label.add_theme_font_size_override("font_size", 14)
+			
+		if difficulty_label and difficulty_label.get_parent():
+			difficulty_label.get_parent().remove_child(difficulty_label)
+			top_right_container.add_child(difficulty_label)
+			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			difficulty_label.add_theme_font_size_override("font_size", 12)
+			difficulty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+
+	# === 좌측 하단 (플레이어 상태) ===
+	if not bottom_left_container:
+		bottom_left_container = VBoxContainer.new()
+		add_child(bottom_left_container)
+		bottom_left_container.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		bottom_left_container.offset_left = 24
+		bottom_left_container.offset_bottom = -24
+		bottom_left_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		
+		# 기존 크루 라벨 이동
+		if crew_label and crew_label.get_parent():
+			crew_label.get_parent().remove_child(crew_label)
+			bottom_left_container.add_child(crew_label)
+			crew_label.add_theme_font_size_override("font_size", 14)
+		
+		# 플레이어 HP 바 생성
+		hp_bar = ProgressBar.new()
+		hp_bar.custom_minimum_size = Vector2(240, 24)
+		hp_bar.show_percentage = false
+		bottom_left_container.add_child(hp_bar)
+		
+		var sb_bg = StyleBoxFlat.new()
+		sb_bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+		sb_bg.set_corner_radius_all(4)
+		var sb_fg = StyleBoxFlat.new()
+		sb_fg.bg_color = Color(0.2, 0.8, 0.3, 0.9)
+		sb_fg.set_corner_radius_all(4)
+		
+		hp_bar.add_theme_stylebox_override("background", sb_bg)
+		hp_bar.add_theme_stylebox_override("fill", sb_fg)
+		
+		hp_text_label = Label.new()
+		hp_text_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		hp_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hp_text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		hp_text_label.add_theme_font_size_override("font_size", 14)
+		hp_bar.add_child(hp_text_label)
+
+	# === 우측 하단 (속도 및 무기) ===
+	if not bottom_right_container:
+		bottom_right_container = VBoxContainer.new()
+		add_child(bottom_right_container)
+		bottom_right_container.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		bottom_right_container.offset_right = -24
+		bottom_right_container.offset_bottom = -24
+		bottom_right_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		bottom_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+
+		speed_display = Label.new()
+		speed_display.add_theme_font_size_override("font_size", 18)
+		speed_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		bottom_right_container.add_child(speed_display)
+
+		# --- 무기 쿨타임 인디케이터 ---
+		var cd_box = VBoxContainer.new()
+		cd_box.alignment = BoxContainer.ALIGNMENT_END
+		bottom_right_container.add_child(cd_box)
+		
+		cooldown_label = Label.new()
+		cooldown_label.text = "장전 중..."
+		cooldown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		cooldown_label.add_theme_font_size_override("font_size", 12)
+		cooldown_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		cd_box.add_child(cooldown_label)
+		
+		cooldown_bar = ProgressBar.new()
+		cooldown_bar.custom_minimum_size = Vector2(140, 6)
+		cooldown_bar.show_percentage = false
+		var cd_bg = StyleBoxFlat.new()
+		cd_bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+		cd_bg.set_corner_radius_all(3)
+		var cd_fg = StyleBoxFlat.new()
+		cd_fg.bg_color = Color(1.0, 0.6, 0.2, 0.9)
+		cd_fg.set_corner_radius_all(3)
+		cooldown_bar.add_theme_stylebox_override("background", cd_bg)
+		cooldown_bar.add_theme_stylebox_override("fill", cd_fg)
+		cd_box.add_child(cooldown_bar)
+
+	# === 상단 중앙 (보스 HP 바) ===
+	boss_hp_bar_new = ProgressBar.new()
+	add_child(boss_hp_bar_new)
+	boss_hp_bar_new.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	boss_hp_bar_new.offset_top = 50
+	boss_hp_bar_new.custom_minimum_size = Vector2(500, 28)
+	boss_hp_bar_new.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	boss_hp_bar_new.show_percentage = false
+	boss_hp_bar_new.visible = false
+	
+	var boss_sb_bg = StyleBoxFlat.new()
+	boss_sb_bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+	boss_sb_bg.set_corner_radius_all(4)
+	
+	var boss_sb_fg = StyleBoxFlat.new()
+	boss_sb_fg.bg_color = Color(0.9, 0.2, 0.2, 0.9)
+	boss_sb_fg.set_corner_radius_all(4)
+	
+	boss_hp_bar_new.add_theme_stylebox_override("background", boss_sb_bg)
+	boss_hp_bar_new.add_theme_stylebox_override("fill", boss_sb_fg)
+	
+	boss_hp_text_label = Label.new()
+	boss_hp_text_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	boss_hp_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_hp_text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	boss_hp_bar_new.add_child(boss_hp_text_label)
+
 
 func _process(delta: float) -> void:
 	game_time += delta
 	_update_timer()
 	_update_wind_display()
 	_update_speed_display()
+	_update_cooldown_display()
 	_update_crew_count()
 	_update_hull_display()
 	_update_xp_display()
@@ -135,7 +318,7 @@ func update_crew_status(count: int, max_count: int = 4) -> void:
 func _update_timer() -> void:
 	if timer_label:
 		var total_seconds: int = int(game_time)
-		var minutes: int = total_seconds / 60
+		var minutes: int = int(total_seconds / 60.0) # Explicitly use float to avoid lint
 		var seconds: int = total_seconds % 60
 		var new_str = "[Time] %d:%02d" % [minutes, seconds]
 		if _last_timer_str != new_str:
@@ -144,31 +327,8 @@ func _update_timer() -> void:
 
 
 func _update_wind_display() -> void:
-	if not wind_label or not is_instance_valid(WindManager):
-		return
-	
-	var angle = WindManager.wind_angle_degrees
-	var strength = WindManager.get_wind_strength()
-	var direction_name = _angle_to_compass(angle)
-	
-	# 카메라 기준 상대 풍향 화살표 계산
-	var screen_arrow = _get_screen_wind_arrow(angle)
-	
-	# 돌풍 중이면 색상 변경
-	var wind_text = ""
-	var wind_color = Color.WHITE
-	
-	if WindManager._gust_blend > 0.1:
-		wind_color = Color(1, 0.6, 0.2, 1)
-		wind_text = "[Gust] %s %s %.1f" % [screen_arrow, direction_name, strength]
-	else:
-		wind_color = Color(0.8, 1, 0.8, 1)
-		wind_text = "[Wind] %s %s %.1f" % [screen_arrow, direction_name, strength]
-		
-	if _last_wind_str != wind_text:
-		_last_wind_str = wind_text
-		wind_label.text = wind_text
-		wind_label.add_theme_color_override("font_color", wind_color)
+	# 텍스트 형태의 윈드 라벨은 더 이상 사용하지 않음 (이전 잔재, 삭제 예정 또는 나침반이 대체 중)
+	pass
 
 
 ## 카메라 회전을 고려하여 화면 기준 풍향 화살표 반환
@@ -188,9 +348,6 @@ func _get_screen_wind_arrow(wind_angle_deg: float) -> String:
 
 
 func _update_speed_display() -> void:
-	if not speed_label:
-		return
-	
 	# 플레이어 배 찾기
 	if not is_instance_valid(player_ship):
 		var players = get_tree().get_nodes_in_group("player")
@@ -199,12 +356,45 @@ func _update_speed_display() -> void:
 	
 	if is_instance_valid(player_ship) and player_ship.get("current_speed") != null:
 		var speed = player_ship.current_speed
-		var mode = "[Row]" if player_ship.get("is_rowing") else "[Sail]"
-		var speed_text = "%s %.1f" % [mode, speed]
+		var mode = "노 젓기" if player_ship.get("is_rowing") else "돛 펼침"
+		
+		# 속도 표기 (knots 또는 m/s 단위로 시각적 변환)
+		var speed_text = "%s : %.1f ㏏" % [mode, speed]
 		
 		if _last_speed_str != speed_text:
 			_last_speed_str = speed_text
-			speed_label.text = speed_text
+			if speed_display:
+				speed_display.text = speed_text
+			elif speed_label: # 레거시 폴백
+				speed_label.text = speed_text
+
+
+func _update_cooldown_display() -> void:
+	if not cooldown_bar or not is_instance_valid(player_ship):
+		return
+		
+	# 메인 대포 찾기
+	var cannons = player_ship.find_child("Cannons", true, false)
+	if cannons and cannons.get_child_count() > 0:
+		var main_cannon = cannons.get_child(0)
+		if main_cannon.get("cooldown_timer") != null:
+			var current_cd = main_cannon.cooldown_timer
+			var max_cd = main_cannon.call("_get_current_cooldown") if main_cannon.has_method("_get_current_cooldown") else main_cannon.get("fire_cooldown")
+			
+			if max_cd > 0:
+				var progress = clamp(1.0 - (current_cd / max_cd), 0.0, 1.0)
+				cooldown_bar.value = progress * 100
+				
+				# 준비 완료 시 디자인 변경
+				var fill_style = cooldown_bar.get_theme_stylebox("fill") as StyleBoxFlat
+				if progress >= 1.0:
+					cooldown_label.text = "발사 대기"
+					cooldown_label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4))
+					if fill_style: fill_style.bg_color = Color(0.4, 1.0, 0.4, 0.9)
+				else:
+					cooldown_label.text = "장전 중..."
+					cooldown_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+					if fill_style: fill_style.bg_color = Color(1.0, 0.6, 0.2, 0.9)
 
 
 func _update_crew_count() -> void:
@@ -266,20 +456,32 @@ func _on_gust_ended() -> void:
 ## === 선체 HP ===
 
 func update_hull_hp(current: float, maximum: float) -> void:
-	if hull_label:
+	if hp_bar:
+		hp_bar.max_value = maximum
+		
+		# 잔상 효과를 위해 트윈 애니메이션 적용
+		var tween = create_tween()
+		tween.tween_property(hp_bar, "value", current, 0.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		
+		if hp_text_label:
+			hp_text_label.text = "HP %.0f / %.0f" % [current, maximum]
+			
+		# 색상: HP 비율에 따라 색 변경 (녹색 -> 노랑 -> 빨강)
+		var ratio = current / maximum
+		var fill_style = hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if fill_style:
+			if ratio > 0.6:
+				fill_style.bg_color = Color(0.2, 0.8, 0.3, 0.9)
+			elif ratio > 0.3:
+				fill_style.bg_color = Color(0.9, 0.7, 0.1, 0.9)
+			else:
+				fill_style.bg_color = Color(0.9, 0.2, 0.2, 0.9)
+	elif hull_label: # 레거시 지원
 		var ratio = current / maximum
 		var bar_length = 10
 		var filled = clamp(int(ratio * bar_length), 0, bar_length)
 		var bar = "█".repeat(filled) + "░".repeat(bar_length - filled)
 		hull_label.text = "[HP] %s %.0f" % [bar, current]
-		
-		# 색상: HP에 따라 녹색 → 노랑 → 빨강
-		if ratio > 0.6:
-			hull_label.add_theme_color_override("font_color", Color(0.4, 1, 0.4, 1))
-		elif ratio > 0.3:
-			hull_label.add_theme_color_override("font_color", Color(1, 0.8, 0.2, 1))
-		else:
-			hull_label.add_theme_color_override("font_color", Color(1, 0.3, 0.3, 1))
 
 
 ## === XP 진행도 ===
@@ -328,7 +530,16 @@ func show_game_over() -> void:
 
 
 func update_boss_hp(current: float, maximum: float) -> void:
-	if boss_hp_panel:
+	if boss_hp_bar_new:
+		boss_hp_bar_new.max_value = maximum
+		boss_hp_bar_new.visible = current > 0
+		
+		var tween = create_tween()
+		tween.tween_property(boss_hp_bar_new, "value", current, 0.2)
+		
+		if boss_hp_text_label:
+			boss_hp_text_label.text = "BOSS: %.0f/%.0f" % [current, maximum]
+	elif boss_hp_panel: # 레거시 폴백
 		boss_hp_panel.visible = true
 		var ratio = current / maximum
 		var bar_length = 20

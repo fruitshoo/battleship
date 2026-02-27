@@ -35,10 +35,10 @@ func _ready() -> void:
 	area_entered.connect(_on_hit)
 	body_entered.connect(_on_hit)
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if is_stuck or is_sinking: return
 	
-	progress += _delta / duration
+	progress += delta / duration
 	# 비선형 가속 연출 (Ease-In: 초반엔 육중하게 출발)
 	# progress 0.0 -> 1.0 을 곡선형으로 변환
 	var t = progress * progress # Quadratic Ease-In

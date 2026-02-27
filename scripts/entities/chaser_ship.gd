@@ -31,6 +31,8 @@ var fire_threshold: float = 100.0 # 화재 임계치
 
 # 누수(Leaking) 시스템 변수
 var leaking_rate: float = 0.0 # 초당 피해량
+var hull_regen_rate: float = 0.0 # 초당 HP 회복량 (나포함도 수리 가능하게)
+var hull_defense: float = 0.0 # 피격 데미지 감소량
 var _last_splinter_time: float = 0.0 # 파편 생성 쿨다운용
 
 @export var max_minion_crew: int = 3
@@ -172,7 +174,11 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 			splinter.global_position = global_position + offset
 		splinter.rotation.y = randf() * TAU
 		if splinter.has_method("set_amount_by_damage"):
-			splinter.set_amount_by_damage(amount)
+			# 방어력 적용된 수치로 파편 양 계산
+			splinter.set_amount_by_damage(maxf(amount - hull_defense, 1.0))
+	
+	var final_damage = maxf(amount - hull_defense, 1.0)
+	hp -= final_damage
 	
 	if hp <= 0:
 		die()
@@ -316,6 +322,7 @@ func _process(delta: float) -> void:
 	
 	_update_fire_effect()
 	_update_burning_status(delta)
+	_update_hull_regeneration(delta)
 	
 	if is_derelict:
 		leaking_rate += 0.2 * delta
@@ -326,6 +333,13 @@ func _process(delta: float) -> void:
 		
 	if team == "player":
 		_update_minion_respawn(delta)
+
+func _update_hull_regeneration(delta: float) -> void:
+	if is_dying or hull_regen_rate <= 0: return
+	
+	# 데미지를 입었을 때만 회복
+	if hp < max_hp:
+		hp = move_toward(hp, max_hp, hull_regen_rate * delta)
 
 func _physics_process(delta: float) -> void:
 	if is_dying: return
@@ -586,6 +600,10 @@ func capture_ship() -> void:
 	if is_instance_valid(cached_lm) and cached_lm.has_method("show_message"):
 		cached_lm.show_message("적군 함선을 나포했습니다!", 3.0)
 	
+	# 플레이어 업그레이드 스탯 적용 (수리 등)
+	if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("apply_fleet_stats_to_minion"):
+		UpgradeManager.apply_fleet_stats_to_minion(self )
+	
 	# 나포 직후 플레이어를 찾아 즉시 따라가기 시작
 	target = null
 	_find_player()
@@ -754,6 +772,10 @@ func _board_ship(target_ship: Node3D) -> void:
 		ship_node = target_ship.get_parent()
 		if not (ship_node and ship_node.is_in_group("player")):
 			return
+			
+	# === 아군 체크 (동일 팀이면 도선 무시) ===
+	if ship_node.get("team") == team:
+		return
 
 	# === 무력화(폐선) 상태일 경우 나포 판정 ===
 	if is_derelict:

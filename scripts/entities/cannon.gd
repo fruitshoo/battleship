@@ -22,6 +22,15 @@ var prepare_timer: float = 0.0
 var current_target: Node3D = null
 var _search_tick: int = 0
 
+# 함대 업그레이드 보너스 (나포함 전용)
+var fleet_damage_mult: float = 1.0
+var fleet_cooldown_mult: float = 1.0
+
+func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
+	fleet_damage_mult = dmg_mult
+	fleet_cooldown_mult = cd_mult
+	print("[Cannon] 함대 보너스 설정: 데미지x%.1f, 쿨다운x%.1f" % [dmg_mult, cd_mult])
+
 
 func _process(delta: float) -> void:
 	if is_preparing:
@@ -51,9 +60,17 @@ func _process(delta: float) -> void:
 		else:
 			fire(current_target)
 
+func _get_current_range() -> float:
+	var current_range = detection_range
+	if is_instance_valid(UpgradeManager):
+		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+		current_range *= (1.0 + 0.15 * powder_lv)
+	return current_range
+
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
-	var min_dist_sq: float = detection_range * detection_range
+	var current_range = _get_current_range()
+	var min_dist_sq: float = current_range * current_range
 	
 	var enemy_group = "enemy" if team == "player" else "player"
 	var enemies = get_tree().get_nodes_in_group(enemy_group)
@@ -79,7 +96,8 @@ func _update_target() -> void:
 
 func _is_target_valid(target: Node3D) -> bool:
 	if not is_instance_valid(target): return false
-	if global_position.distance_squared_to(target.global_position) > detection_range * detection_range: return false
+	var current_range = _get_current_range()
+	if global_position.distance_squared_to(target.global_position) > current_range * current_range: return false
 	if not _is_within_arc(target): return false
 	if _is_ship_occupied_by_friendly(target): return false
 	return true
@@ -110,6 +128,9 @@ func _get_current_cooldown() -> float:
 	if um:
 		var train_lv = um.current_levels.get("training", 0)
 		cd *= (1.0 - 0.1 * train_lv)
+	
+	# 함대 보너스 적용 (곱연산)
+	cd *= fleet_cooldown_mult
 	return cd
 
 
@@ -151,10 +172,20 @@ func _execute_fire() -> void:
 	
 	# 데미지 계산 (속성 반영)
 	var base_dmg = 10.0 # 대포알 기본 데미지
+	var range_mult = 1.0 # 사거리/수명 배율
 	if is_instance_valid(UpgradeManager):
 		var iron_lv = UpgradeManager.current_levels.get("iron_armor", 0)
 		base_dmg *= (1.0 + 0.25 * iron_lv)
+		
+		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+		range_mult = 1.0 + 0.15 * powder_lv
+	
+	# 함대 보너스 적용 (곱연산)
+	base_dmg *= fleet_damage_mult
 	ball.damage = base_dmg
+	
+	if ball.has_method("set_lifetime_multiplier"):
+		ball.set_lifetime_multiplier(range_mult)
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(current_target.global_position)

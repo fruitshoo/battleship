@@ -18,7 +18,7 @@ func _ready() -> void:
 	var rot_tween = create_tween().set_loops()
 	rot_tween.tween_property(self , "rotation:y", rotation.y + TAU, 4.0)
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if _is_collected: return
 	
 	# 플레이어 탐지 (Area3D가 없으므로 거리 체크)
