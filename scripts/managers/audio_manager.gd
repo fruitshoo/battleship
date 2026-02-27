@@ -150,7 +150,7 @@ func _ready() -> void:
 
 ## 오디오 버스 상태 진단 로직
 func _print_bus_status() -> void:
-	print("--- 🔊 Audio Bus Diagnostic Report ---")
+	print("--- Audio Bus Diagnostic Report ---")
 	var bus_count = AudioServer.bus_count
 	for i in range(bus_count):
 		var b_name = AudioServer.get_bus_name(i)
@@ -226,7 +226,7 @@ func play_bgm(stream_name: String, _fade_duration: float = 1.0) -> void:
 	current_bgm_name = stream_name
 	
 	# TODO: BGM 리소스가 있으면 여기서 재생 및 페이드인/아웃 구현
-	print("🎵 [Audio] Play BGM: %s" % stream_name)
+	print("[Audio] Play BGM: %s" % stream_name)
 ## === 길군악(노동요) 전용 재생 시스템 ===
 var _gilgunak_player: AudioStreamPlayer = null
 
@@ -241,9 +241,9 @@ func _setup_gilgunak() -> void:
 		_gilgunak_player.stream = stream
 		if stream is AudioStreamWAV:
 			(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
-		print("✅ [AudioManager] 44.1kHz 길군악 플레이어 준비 완료")
+		print("[AudioManager] 44.1kHz 길군악 플레이어 준비 완료")
 	else:
-		print("⚠️ [AudioManager] 길군악 파일 로드 실패")
+		print("!! [AudioManager] 길군악 파일 로드 실패")
 	
 	add_child(_gilgunak_player)
 

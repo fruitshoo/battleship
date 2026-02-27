@@ -201,7 +201,7 @@ func _die() -> void:
 		remove_from_group("enemy")
 	
 	boss_died.emit()
-	print("🏆 보스 격침!")
+	print("[Boss] 보스 격침!")
 	
 	# 침몰 효과 (회전하며 가라앉음)
 	var tween = create_tween()
@@ -249,14 +249,14 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 			converted_count += 1
 	
 	if converted_count > 0:
-		print("🏊 보함 침몰! 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
+		print("[Critical] 보함 침몰! 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
 
 
 # 누수 추가/제거
 func add_leak(amount: float) -> void:
 	leaking_rate += amount
-	print("💧 보스 함선에 누수 발생! 초당 데미지: %.1f" % leaking_rate)
+	print("[Status] 보스 함선에 누수 발생! 초당 데미지: %.1f" % leaking_rate)
 
 func remove_leak(amount: float) -> void:
 	leaking_rate = maxf(0.0, leaking_rate - amount)
-	print("🩹 보스 누수 완화. 남은 누수율: %.1f" % leaking_rate)
+	print("[Status] 보스 누수 완화. 남은 누수율: %.1f" % leaking_rate)

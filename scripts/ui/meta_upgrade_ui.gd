@@ -15,7 +15,7 @@ func _ready() -> void:
 
 func update_ui() -> void:
 	# 골드 표시
-	gold_label.text = "💰 보유 골드: %d" % SaveManager.gold
+	gold_label.text = "보유 골드: %d" % SaveManager.gold
 	
 	# 리스트 초기화
 	for child in upgrade_list.get_children():

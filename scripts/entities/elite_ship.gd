@@ -47,4 +47,4 @@ func _drop_treasure_chest() -> void:
 	chest.global_position = global_position
 	chest.global_position.y = 0 # 해수면
 	
-	print("💎 엘리트 격침! 보물 상자 드랍.")
+	print("[Elite] 엘리트 격침! 보물 상자 드랍.")

@@ -1,8 +1,8 @@
-# Battleship 🏴‍☠️
+# Battleship
 
 A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**. Navigate the high seas, manage your crew, engage in strategic ship-to-ship combat, and capture enemy vessels!
 
-## 🌊 Core Gameplay Mechanics
+## Core Gameplay Mechanics
 
 ### 1. Realistic Ship Navigation & Physics
 - **Wind & Sail Physics:** Utilize the wind direction to your advantage. Adjust the sail angle (`Q` / `E`) to catch the wind and maximize thrust.
@@ -12,12 +12,12 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
 
 ### 2. Artillery Combat & Grapeshot System
 - **Broadside Cannons:** Fire upon enemy vessels using the port, starboard, or front cannons (`Spacebar`).
-- **Distance-based Auto Grapeshot 🍇:**
+- **Distance-based Auto Grapeshot:**
   - **Long Range (>15m):** Fires a standard destructive Round Shot to smash the enemy hull.
   - **Close Quarters (<=15m):** Automatically switches to **Grapeshot**. Fires a spread of pellets that deals intense AoE damage to the enemy crew while preserving the hull!
 - **Critical Hits:** Cannonballs have a 20% chance to score a devastating critical hit, triggering massive explosions and dealing double damage.
 
-### 3. Derelict Ship Capture & Fleet Formations ⚔️🚩
+### 3. Derelict Ship Capture & Fleet Formations
 - **The "Ghost Ship" Mechanic:** If you successfully kill all the enemy soldiers on a ship without sinking it, the ship becomes **Derelict** (White flag).
 - **Autonomous Capture AI:** Your soldiers will automatically spot nearby empty ships (within 12m) and jump onto them to capture!
 - **Fleet Formation System:** Captured ships don't just follow blindly—they maintain a disciplined formation.
@@ -43,12 +43,12 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
 - **AI & Crew:** Friendly and enemy soldiers use `NavigationAgent3D` for dynamic deck patrols and combat.
 - **Meta-Progression:** Earn Gold from victories to upgrade Hull Armor, Cannon Damage, and Crew Training.
 
-## ⚙️ Built With
+## Built With
 - **Godot Engine 4.6** (GDScript)
 - Custom 3D meshes and Particle Systems (`GPUParticles3D`)
 - Advanced Audio System (`AudioManager` Singleton) for adaptive SFX.
 
-## 🛠️ Controls
+## Controls
 - **`A` / `D`**: Steer Rudder Left/Right
 - **`Q` / `E`**: Adjust Sail Angle (Catch the wind)
 - **`W`**: Row (Speed Boost / Consumes Stamina)
@@ -58,11 +58,11 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
 - **`Right Click` (Hold)**: Pan Camera
 - **`Mouse Wheel`**: Zoom In/Out
 
-## 🌐 Play on Web (GitHub Pages)
+## Play on Web (GitHub Pages)
 If you are playing the web version, please ensure your browser supports **WebGL 2.0**.
 - **Renderer:** Compatibility (OpenGL)
 - **Controls:** Same as desktop.
 - **Link:** `https://fruitshoo.github.io/battleship/` (Required Setup in GitHub Settings)
 
 ---
-*Take the helm, captain! The sea awaits.* ⚓
+*Take the helm, captain! The sea awaits.*

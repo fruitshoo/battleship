@@ -109,27 +109,27 @@ func _process(delta: float) -> void:
 
 func update_level(val: int) -> void:
 	if level_label:
-		level_label.text = "⚔️ Lv.%d" % val
+		level_label.text = "[Lv] %d" % val
 
 func update_score(val: int) -> void:
 	if score_label:
 		var total_gold = SaveManager.gold if is_instance_valid(SaveManager) else val
-		score_label.text = "💰 %d (Total %d)" % [val, total_gold]
+		score_label.text = "[Gold] %d (Total %d)" % [val, total_gold]
 
 func update_difficulty_ui(val: int) -> void:
 	if difficulty_label:
-		var new_text = "🔥 난이도 %d" % val
+		var new_text = "[Diff] %d" % val
 		if _last_difficulty_text != new_text:
 			_last_difficulty_text = new_text
 			difficulty_label.text = new_text
 
 func update_enemy_count(val: int) -> void:
 	if enemy_count_label:
-		enemy_count_label.text = "🚢 적: %d" % val
+		enemy_count_label.text = "[Enemy] %d" % val
 
 func update_crew_status(count: int, max_count: int = 4) -> void:
 	if crew_label:
-		crew_label.text = "👥 선원: %d/%d" % [count, max_count]
+		crew_label.text = "[Crew] %d/%d" % [count, max_count]
 
 
 func _update_timer() -> void:
@@ -137,7 +137,7 @@ func _update_timer() -> void:
 		var total_seconds: int = int(game_time)
 		var minutes: int = total_seconds / 60
 		var seconds: int = total_seconds % 60
-		var new_str = "⏱ %d:%02d" % [minutes, seconds]
+		var new_str = "[Time] %d:%02d" % [minutes, seconds]
 		if _last_timer_str != new_str:
 			_last_timer_str = new_str
 			timer_label.text = new_str
@@ -160,10 +160,10 @@ func _update_wind_display() -> void:
 	
 	if WindManager._gust_blend > 0.1:
 		wind_color = Color(1, 0.6, 0.2, 1)
-		wind_text = "🌬️ 돌풍! %s %s %.1f" % [screen_arrow, direction_name, strength]
+		wind_text = "[Gust] %s %s %.1f" % [screen_arrow, direction_name, strength]
 	else:
 		wind_color = Color(0.8, 1, 0.8, 1)
-		wind_text = "🌬️ %s %s %.1f" % [screen_arrow, direction_name, strength]
+		wind_text = "[Wind] %s %s %.1f" % [screen_arrow, direction_name, strength]
 		
 	if _last_wind_str != wind_text:
 		_last_wind_str = wind_text
@@ -199,7 +199,7 @@ func _update_speed_display() -> void:
 	
 	if is_instance_valid(player_ship) and player_ship.get("current_speed") != null:
 		var speed = player_ship.current_speed
-		var mode = "🚣" if player_ship.get("is_rowing") else "⛵"
+		var mode = "[Row]" if player_ship.get("is_rowing") else "[Sail]"
 		var speed_text = "%s %.1f" % [mode, speed]
 		
 		if _last_speed_str != speed_text:
@@ -252,7 +252,7 @@ func _angle_to_compass(angle_deg: float) -> String:
 func _on_gust_started(angle_offset: float) -> void:
 	if gust_warning:
 		var dir = "→" if angle_offset > 0 else "←"
-		gust_warning.text = "⚡ 돌풍 %s ⚡" % dir
+		gust_warning.text = "!! [GUST] %s !!" % dir
 		gust_warning.visible = true
 		_gust_warning_timer = 3.5
 
@@ -271,7 +271,7 @@ func update_hull_hp(current: float, maximum: float) -> void:
 		var bar_length = 10
 		var filled = clamp(int(ratio * bar_length), 0, bar_length)
 		var bar = "█".repeat(filled) + "░".repeat(bar_length - filled)
-		hull_label.text = "🛡 %s %.0f" % [bar, current]
+		hull_label.text = "[HP] %s %.0f" % [bar, current]
 		
 		# 색상: HP에 따라 녹색 → 노랑 → 빨강
 		if ratio > 0.6:
@@ -291,7 +291,7 @@ func update_xp(current: int, maximum: int) -> void:
 	
 	if xp_label:
 		# 기존 라벨도 혹시 모르니 데이터는 유지 (숨겨진 상태)
-		var new_text = "✨ XP %d/%d" % [current, maximum]
+		var new_text = "[XP] %d/%d" % [current, maximum]
 		if _last_xp_text != new_text:
 			_last_xp_text = new_text
 			xp_label.text = new_text
@@ -319,7 +319,7 @@ func _update_hull_display() -> void:
 
 func show_game_over() -> void:
 	if game_over_label:
-		game_over_label.text = "💀 SHIP DESTROYED 💀"
+		game_over_label.text = "!!! SHIP DESTROYED !!!"
 		game_over_label.visible = true
 		# 페이드인
 		var tween = create_tween()
@@ -334,7 +334,7 @@ func update_boss_hp(current: float, maximum: float) -> void:
 		var bar_length = 20
 		var filled = int(ratio * bar_length)
 		var bar = "█".repeat(filled) + "░".repeat(bar_length - filled)
-		boss_hp_label.text = "👑 BOSS: %s %.0f/%.0f" % [bar, current, maximum]
+		boss_hp_label.text = "[BOSS] %s %.0f/%.0f" % [bar, current, maximum]
 		
 		if current <= 0:
 			boss_hp_panel.visible = false
@@ -342,7 +342,7 @@ func update_boss_hp(current: float, maximum: float) -> void:
 
 func show_victory() -> void:
 	if victory_label:
-		victory_label.text = "🚩 VICTORY 🚩"
+		victory_label.text = "[!] VICTORY [!]"
 		victory_label.visible = true
 		var tween = create_tween()
 		victory_label.modulate.a = 0.0

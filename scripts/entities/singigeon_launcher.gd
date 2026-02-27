@@ -89,4 +89,4 @@ func upgrade_to_level(level: int) -> void:
 		3:
 			shot_count = 5
 			spread_angle = 12.0
-	print("🚀 신기전 Lv.%d (%d발, ±%.0f°)" % [level, shot_count, spread_angle])
+	print("[Launcher] 신기전 Lv.%d (%d발, ±%.0f°)" % [level, shot_count, spread_angle])

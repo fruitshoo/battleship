@@ -100,7 +100,7 @@ func _stick_to_ship(ship: Node3D) -> void:
 	if ship.has_method("add_leak"):
 		ship.add_leak(dot_damage)
 	
-	print("🪵 장군전이 함선에 박혔습니다! (즉발:%.0f, 누수:%.1f/s)" % [damage, dot_damage])
+	print("[Impact] 장군전이 함선에 박혔습니다! (즉발:%.0f, 누수:%.1f/s)" % [damage, dot_damage])
 	
 	# 일정 시간 후 제거
 	get_tree().create_timer(stick_duration).timeout.connect(_unstick)

@@ -20,7 +20,7 @@ func save_game() -> void:
 	if err != OK:
 		push_error("SaveManager: 저장 실패 (error code: %d)" % err)
 	else:
-		print("💾 게임 저장 완료 (Gold: %d)" % gold)
+		print("[Save] 게임 저장 완료 (Gold: %d)" % gold)
 
 func load_game() -> void:
 	var config = ConfigFile.new()
@@ -29,9 +29,9 @@ func load_game() -> void:
 	if err == OK:
 		gold = config.get_value("player", "gold", 0)
 		meta_upgrades = config.get_value("player", "meta_upgrades", {})
-		print("📂 게임 로드 완료 (Gold: %d)" % gold)
+		print("[Load] 게임 로드 완료 (Gold: %d)" % gold)
 	else:
-		print("📂 저장된 파일이 없습니다. 초기 상태로 시작합니다.")
+		print("[Load] 저장된 파일이 없습니다. 초기 상태로 시작합니다.")
 		gold = 0
 		meta_upgrades = {}
 

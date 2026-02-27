@@ -487,7 +487,7 @@ func _check_ship_capture_opportunity() -> void:
 					if p_count == 0:
 						# 나포 결정!
 						ship.set_meta("being_boarded", true)
-						print("🚀 빈 배 발견! 나포를 위해 뛰어듭니다.")
+						print("[Action] 빈 배 발견! 나포를 위해 뛰어듭니다.")
 						_jump_to_ship(ship, true) # 나포용 점프
 						return # 한 번에 한 척만 타겟팅
 
@@ -530,7 +530,7 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 		)
 	
 	if not is_capture_attempt:
-		print("⚓ 함선 침몰! 플레이어 본선으로 긴급 복귀합니다.")
+		print("[Critical] 함선 침몰! 플레이어 본선으로 긴급 복귀합니다.")
 
 func _teleport_to_ship(_target_ship: Node3D) -> void:
 	# 텔레포트 대신 → Survivor(생존자)로 변환하여 바다에 떠있게 함
@@ -541,7 +541,7 @@ func _teleport_to_ship(_target_ship: Node3D) -> void:
 		var spawn_pos = global_position
 		spawn_pos.y = 0.5 # 수면 높이
 		survivor.set_deferred("global_position", spawn_pos)
-		print("🏊 병사가 바다에 빠져 생존자가 되었습니다!")
+		print("[Rescue] 병사가 바다에 빠져 생존자가 되었습니다!")
 	queue_free()
 
 ## 데미지 받기

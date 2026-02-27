@@ -38,14 +38,14 @@ theme_override_constants/separation = 15
 [node name="Title" type="Label" parent="Panel/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-text = "🏛 포구 영구 강화"
+text = "[업그레이드] 포구 영구 강화"
 horizontal_alignment = 1
 
 [node name="GoldLabel" type="Label" parent="Panel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
 theme_override_font_sizes/font_size = 18
-text = "💰 보유 골드: 0"
+text = "보유 골드: 0"
 horizontal_alignment = 1
 
 [node name="ScrollContainer" type="ScrollContainer" parent="Panel/VBox"]

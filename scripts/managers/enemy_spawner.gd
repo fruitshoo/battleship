@@ -26,7 +26,7 @@ var regular_spawn_stopped: bool = false
 
 func trigger_boss_event() -> void:
 	regular_spawn_stopped = true
-	print("🚨 보스 등장 이벤트 시작! 일반 적 스폰 중단")
+	print("[Warning] 보스 등장 이벤트 시작! 일반 적 스폰 중단")
 	
 	# 모든 일반 적 제거 (선택사항 - 더 극적인 연출을 위해)
 	var enemies = get_tree().get_nodes_in_group("enemy")
@@ -51,7 +51,7 @@ func _spawn_boss() -> void:
 	get_parent().add_child(boss)
 	boss.global_position = spawn_pos
 	boss.look_at(player.global_position, Vector3.UP)
-	print("👑 최종 보스 소환 완료!")
+	print("[Boss] 최종 보스 소환 완료!")
 
 
 func set_difficulty(new_interval: float, new_max: int, new_speed: float, new_hp: float = 5.0, new_boarders: int = 2) -> void:
@@ -187,4 +187,4 @@ func _spawn_elite_ship() -> void:
 	enemy.look_at(player.global_position, Vector3.UP)
 	
 	# 엘리트 전용 메타데이터 (필요 시)
-	print("🚨 엘리트 함선(중간보스) 출현!")
+	print("[Event] 엘리트 함선(중간보스) 출현!")

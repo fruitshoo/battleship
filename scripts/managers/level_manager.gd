@@ -69,7 +69,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_F1: # 강제 레벨업
-				print("🐞 DEBUG: 강제 레벨업!")
+				print("[DEBUG] 강제 레벨업!")
 				_set_level(current_level + 1)
 			KEY_F2: # 대포 디버그
 				_debug_cannons()
@@ -93,7 +93,7 @@ func _process(delta: float) -> void:
 	if new_difficulty > game_difficulty:
 		game_difficulty = new_difficulty
 		_update_difficulty()
-		print("🔥 난이도 상승! Level %d (적 강화)" % game_difficulty)
+		print("[Difficulty] 난이도 상승! Level %d (적 강화)" % game_difficulty)
 	
 	# 주기적으로 적 수 체크 (HUD용)
 	if Engine.get_process_frames() % 30 == 0:
@@ -146,7 +146,7 @@ func _set_level(new_level: int) -> void:
 	if hud:
 		hud.update_level(current_level)
 	
-	print("⚔️ Level Up! Lv.%d (Next XP: %d)" % [current_level, xp_to_next_level])
+	print("[LevelUp] Level Up! Lv.%d (Next XP: %d)" % [current_level, xp_to_next_level])
 	
 	# === 레벨업 보상 ===
 	# 1. 골드 보상
@@ -199,7 +199,7 @@ func _on_reroll_requested() -> void:
 		var choices = UpgradeManager.get_random_choices(3)
 		if _upgrade_ui_instance:
 			_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
-			print("🎲 Reroll 사용! (남은 횟수: %d)" % rerolls_available)
+			print("[Reroll] Reroll 사용! (남은 횟수: %d)" % rerolls_available)
 
 
 func _on_upgrade_chosen(upgrade_id: String) -> void:
@@ -236,16 +236,16 @@ func _update_difficulty() -> void:
 func _debug_cannons() -> void:
 	var ship = get_tree().get_nodes_in_group("player")
 	if ship.is_empty():
-		print("🐞 플레이어 배 없음!")
+		print("[DEBUG] 플레이어 배 없음!")
 		return
 	
 	var cannons_node = ship[0].get_node_or_null("Cannons")
 	if not cannons_node:
-		print("🐞 Cannons 노드 없음!")
+		print("[DEBUG] Cannons 노드 없음!")
 		return
 	
-	print("🐞 ============ CANNON DEBUG ============")
-	print("🐞 총 대포 수: %d" % cannons_node.get_child_count())
+	print("[DEBUG] ============ CANNON DEBUG ============")
+	print("[DEBUG] 총 대포 수: %d" % cannons_node.get_child_count())
 	
 	for cannon in cannons_node.get_children():
 		var det_area = cannon.get_node_or_null("DetectionArea")
@@ -256,7 +256,7 @@ func _debug_cannons() -> void:
 			monitoring = det_area.monitoring
 			overlaps = det_area.get_overlapping_areas().size() + det_area.get_overlapping_bodies().size()
 		
-		print("🐞 [%s] pos=%s rot_y=%.1f° monitoring=%s overlaps=%d" % [
+		print("[DEBUG] [%s] pos=%s rot_y=%.1f° monitoring=%s overlaps=%d" % [
 			cannon.name,
 			cannon.position,
 			rad_to_deg(cannon.rotation.y),
@@ -266,10 +266,10 @@ func _debug_cannons() -> void:
 	
 	# 적 수도 출력
 	var enemies = get_tree().get_nodes_in_group("enemy")
-	print("🐞 적 수: %d" % enemies.size())
+	print("[DEBUG] 적 수: %d" % enemies.size())
 	for e in enemies:
-		print("🐞   적 [%s] pos=%s" % [e.name, e.global_position])
-	print("🐞 ========================================")
+		print("[DEBUG]   적 [%s] pos=%s" % [e.name, e.global_position])
+	print("[DEBUG] ========================================")
 
 
 func update_boss_hp(current: float, maximum: float) -> void:
@@ -279,7 +279,7 @@ func update_boss_hp(current: float, maximum: float) -> void:
 
 func show_victory() -> void:
 	# 실시간 저장이므로 여기서는 메시지만 처리
-	print("💰 승리! 현재 판에서 %d 골드 획득" % current_score)
+	print("[Win] 승리! 현재 판에서 %d 골드 획득" % current_score)
 	
 	if hud and hud.has_method("show_victory"):
 		hud.show_victory()

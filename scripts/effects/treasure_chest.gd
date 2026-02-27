@@ -11,12 +11,12 @@ func _ready() -> void:
 	add_to_group("treasure_chest")
 	# 부유 효과 (Tween)
 	var tween = create_tween().set_loops()
-	tween.tween_property(self, "position:y", 0.5, 1.5).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(self, "position:y", 0.0, 1.5).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(self , "position:y", 0.5, 1.5).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(self , "position:y", 0.0, 1.5).set_trans(Tween.TRANS_SINE)
 	
 	# 회전 효과
 	var rot_tween = create_tween().set_loops()
-	rot_tween.tween_property(self, "rotation:y", rotation.y + TAU, 4.0)
+	rot_tween.tween_property(self , "rotation:y", rotation.y + TAU, 4.0)
 
 func _process(delta: float) -> void:
 	if _is_collected: return
@@ -32,7 +32,7 @@ func _collect() -> void:
 	_is_collected = true
 	
 	# 시스템 알림
-	print("🎁 보물 상자 획득!")
+	print("[Treasure] 보물 상자 획득!")
 	
 	# 사운드
 	if is_instance_valid(AudioManager):

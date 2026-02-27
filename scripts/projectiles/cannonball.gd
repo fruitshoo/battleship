@@ -184,7 +184,7 @@ func _check_hit(target: Node) -> void:
 						if s.has_method("take_damage"):
 							s.take_damage(grapeshot_pellet_damage, global_position)
 							hit_count += 1
-			print("🍇 포도탄 명중! 적 병사 %d명 학살" % hit_count)
+			print("[Damage] 포도탄 명중! 적 병사 %d명 학살" % hit_count)
 			
 		else:
 			# === 일반탄(Round Shot) 적중 로직 ===

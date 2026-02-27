@@ -199,7 +199,7 @@ func _update_reroll_button(count: int) -> void:
 		reroll_button.pressed.connect(_on_reroll_pressed)
 		$VBox.add_child(reroll_button)
 	
-	reroll_button.text = "🎲 Reroll (%d)" % count
+	reroll_button.text = "Reroll (%d)" % count
 	reroll_button.disabled = count <= 0
 	reroll_button.visible = true
 

@@ -156,4 +156,4 @@ func _start_gust() -> void:
 	_gust_angle_offset = randf_range(30.0, 90.0) * (1.0 if randf() > 0.5 else -1.0)
 	_gust_blend = 0.0
 	gust_started.emit(_gust_angle_offset)
-	print("🌬️ 돌풍! 방향 오프셋: %.1f°, 지속: %.1f초" % [_gust_angle_offset, gust_duration])
+	print("[Wind] 돌풍! 방향 오프셋: %.1f°, 지속: %.1f초" % [_gust_angle_offset, gust_duration])

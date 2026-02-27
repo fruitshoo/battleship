@@ -88,7 +88,7 @@ func _ready() -> void:
 		max_hull_hp += MetaManager.get_hull_hp_bonus()
 		max_speed *= MetaManager.get_sail_speed_multiplier()
 		hull_defense = MetaManager.get_hull_defense_bonus()
-		print("🚢 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f)" % [max_hull_hp, max_speed, hull_defense])
+		print("[Ship] 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f)" % [max_hull_hp, max_speed, hull_defense])
 	
 	
 	if is_instance_valid(WindManager) and WindManager.has_signal("gust_started"):
@@ -212,7 +212,7 @@ func _update_crew_respawn(delta: float) -> void:
 		if crew_respawn_timer >= crew_respawn_interval:
 			crew_respawn_timer = 0.0
 			add_survivor() # 기존의 add_survivor 로직 재사용 (HUD 메시지 포함됨)
-			print("💂 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
+			print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
 	else:
 		crew_respawn_timer = 0.0 # 정원이 차면 타이머 초기화
 
@@ -260,10 +260,10 @@ func _handle_input(delta: float) -> void:
 func _toggle_fleet_formation() -> void:
 	if CHASER_SHIP_SCRIPT.fleet_formation == CHASER_SHIP_SCRIPT.Formation.COLUMN:
 		CHASER_SHIP_SCRIPT.fleet_formation = CHASER_SHIP_SCRIPT.Formation.WING
-		if _cached_level_manager: _cached_level_manager.show_message("🚩 함대 진형: 학익진 (Wing)", 2.0)
+		if _cached_level_manager: _cached_level_manager.show_message("함대 진형: 학익진 (Wing)", 2.0)
 	else:
 		CHASER_SHIP_SCRIPT.fleet_formation = CHASER_SHIP_SCRIPT.Formation.COLUMN
-		if _cached_level_manager: _cached_level_manager.show_message("🚩 함대 진형: 장사진 (Column)", 2.0)
+		if _cached_level_manager: _cached_level_manager.show_message("함대 진형: 장사진 (Column)", 2.0)
 
 
 ## 러더 조향 입력 처리
@@ -559,7 +559,7 @@ func take_fire_damage(_dps: float, duration: float) -> void:
 		is_burning = true
 		fire_build_up = fire_threshold
 		burn_timer = duration
-		print("🔥 배에 불이 붙었습니다!")
+		print("[Status] 배에 불이 붙었습니다!")
 
 func _update_burning_status(delta: float) -> void:
 	if is_burning:
@@ -608,7 +608,7 @@ func _game_over() -> void:
 	is_player_controlled = false
 	current_speed = 0.0
 	
-	print("💀 배가 침몰합니다!")
+	print("[Critical] 배가 침몰합니다!")
 	
 	# 침몰 애니메이션 (기울어지면서 가라앉음)
 	var sink_tween = create_tween()
@@ -623,7 +623,7 @@ func _game_over() -> void:
 	
 	# 실시간 저장이므로 여기서는 메시지만 처리
 	if _cached_level_manager and _cached_level_manager.get("current_score") != null:
-		print("💀 침몰! 현재 판에서 %d 골드 획득" % _cached_level_manager.current_score)
+		print("[GameOver] 침몰! 현재 판에서 %d 골드 획득" % _cached_level_manager.current_score)
 
 
 func _find_hud() -> Node:
@@ -644,11 +644,11 @@ func add_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 		var tilt_dir = 1.0 if obj.global_position.x > global_position.x else -1.0
 		tilt_offset += deg_to_rad(randf_range(5.0, 10.0)) * tilt_dir
 		
-		print("📦 배에 물체가 박힘! (현재 속도 배율: %.2f, 선회 배율: %.2f, 기울기: %.1f)" % [speed_mult, turn_mult, rad_to_deg(tilt_offset)])
+		print("[Impact] 배에 물체가 박힘! (현재 속도 배율: %.2f, 선회 배율: %.2f, 기울기: %.1f)" % [speed_mult, turn_mult, rad_to_deg(tilt_offset)])
 		
 		# HUD 알림 (선택 사항)
 		if _cached_hud and _cached_hud.has_method("show_message"):
-			_cached_hud.show_message("⚠️ 기동성 저하 기동성 저하!", 2.0)
+			_cached_hud.show_message("!! 기동성 저하 기동성 저하 !!", 2.0)
 
 func remove_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 	if obj in stuck_objects:
@@ -665,7 +665,7 @@ func remove_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 
 ## 폐선 나포 (Capture Derelict Ship) 보상 처리
 func capture_derelict_ship() -> void:
-	print("⚓ 폐선 나포 성공! 보상을 획득합니다.")
+	print("[Capture] 폐선 나포 성공! 보상을 획득합니다.")
 	# 1. 아군 전원 체력 회복
 	var soldiers_node = get_node_or_null("Soldiers")
 	if soldiers_node:
@@ -692,7 +692,7 @@ func capture_derelict_ship() -> void:
 			s.position = offset
 			if is_instance_valid(_cached_um) and _cached_um.has_method("_apply_current_stats_to_soldier"):
 				_cached_um._apply_current_stats_to_soldier(s)
-			print("💂 포로 구출! 아군 병사 1명 합류.")
+			print("[Crew] 포로 구출! 아군 병사 1명 합류.")
 			
 	# 3. 사운드 및 피드백 재생
 	if is_instance_valid(AudioManager):
@@ -728,7 +728,7 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 		if is_instance_valid(_cached_um) and _cached_um.has_method("_apply_current_stats_to_soldier"):
 			_cached_um._apply_current_stats_to_soldier(s)
 	
-	print("🗡️ 병사 보충 완료! (현재: %d/%d)" % [max_crew_count, max_crew_count])
+	print("[Crew] 병사 보충 완료! (현재: %d/%d)" % [max_crew_count, max_crew_count])
 
 ## 생존자 구조 및 병사 합류 처리
 func add_survivor() -> bool:
@@ -745,7 +745,7 @@ func add_survivor() -> bool:
 			child.queue_free()
 			
 	if alive_count >= max_crew_count:
-		print("💂 정원 초과 합류! (현재 인원: %d/%d)" % [alive_count + 1, max_crew_count])
+		print("[Crew] 정원 초과 합류! (현재 인원: %d/%d)" % [alive_count + 1, max_crew_count])
 		# 정원 초과 시에도 합류는 허용하되 메시지만 다르게 표시 가능
 		
 	# 병사 생성
@@ -762,11 +762,11 @@ func add_survivor() -> bool:
 	if is_instance_valid(_cached_um) and _cached_um.has_method("_apply_current_stats_to_soldier"):
 		_cached_um._apply_current_stats_to_soldier(s)
 		
-	print("💂 생존자 구조 성공! 아군 병사 1명 합류. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
+	print("[Rescue] 생존자 구조 성공! 아군 병사 1명 합류. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
 	
 	# HUD 메시지 표시
 	if _cached_hud and _cached_hud.has_method("show_message"):
-		_cached_hud.show_message("💂 생존자 구조 완료!", 2.0)
+		_cached_hud.show_message("생존자 구조 완료!", 2.0)
 	
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("soldier_hit", global_position, 1.5) # 약간 높은 피치로 구조음 대용

@@ -13,21 +13,21 @@ enum Category {ANTI_SHIP, ANTI_PERSONNEL, HULL, NAVIGATION, SPECIAL}
 var UPGRADES = {
 	# --- Primary Weapons (Active) ---
 	"crew": {
-		"name": "🗡 병사 충원",
+		"name": "병사 충원",
 		"category": Category.ANTI_PERSONNEL,
 		"description": "아군 병사 정원 +1",
 		"max_level": 8,
 		"color": Color(0.4, 0.8, 1.0)
 	},
 	"cannon": {
-		"name": "💥 대포 추가",
+		"name": "대포 추가",
 		"category": Category.ANTI_SHIP,
 		"description": "대포 +1 (교대 배치)",
 		"max_level": 6,
 		"color": Color(1.0, 0.5, 0.2)
 	},
 	"singigeon": {
-		"name": "🚀 신기전",
+		"name": "신기전",
 		"category": Category.ANTI_PERSONNEL,
 		"description": "로켓 화살 발사기",
 		"max_level": 3,
@@ -35,7 +35,7 @@ var UPGRADES = {
 		"level_desc": {1: "1발", 2: "3발", 3: "5발"}
 	},
 	"janggun": {
-		"name": "🪵 장군전",
+		"name": "장군전",
 		"category": Category.ANTI_SHIP,
 		"description": "통나무 미사일 발사기",
 		"max_level": 2,
@@ -45,42 +45,42 @@ var UPGRADES = {
 	
 	# --- Passive Attributes (Synergies) ---
 	"iron_armor": {
-		"name": "🛡️ 철갑 강화",
+		"name": "철갑 강화",
 		"category": Category.ANTI_SHIP,
 		"description": "[대함 시너지] 대포/장군전 데미지 +25%",
 		"max_level": 5,
 		"color": Color(0.7, 0.7, 0.8)
 	},
 	"black_powder": {
-		"name": "🧨 화약 숙련",
+		"name": "화약 숙련",
 		"category": Category.ANTI_SHIP,
 		"description": "[범위 시너지] 대포/신기전 폭발 반경 +20%",
 		"max_level": 5,
 		"color": Color(0.3, 0.3, 0.3)
 	},
 	"fire_arrows": {
-		"name": "🔥 불타는 화살",
+		"name": "불타는 화살",
 		"category": Category.ANTI_PERSONNEL,
 		"description": "[도트 시너지] 화살/신기전 화상 피해 추가",
 		"max_level": 3,
 		"color": Color(1.0, 0.6, 0.0)
 	},
 	"training": {
-		"name": "🏃 전투 훈련",
+		"name": "전투 훈련",
 		"category": Category.SPECIAL,
 		"description": "[공통 시너지] 모든 무기 쿨다운 -10%, 병사 속도 +15%",
 		"max_level": 5,
 		"color": Color(0.8, 0.8, 0.2)
 	},
 	"seamanship": {
-		"name": "⛵ 항해술",
+		"name": "항해술",
 		"category": Category.NAVIGATION,
 		"description": "[기동 시너지] 선회력 +20%, 노 젓기 효율 +15%",
 		"max_level": 5,
 		"color": Color(0.4, 1.0, 0.4)
 	},
 	"carpentry": {
-		"name": "🔧 조선술",
+		"name": "조선술",
 		"category": Category.HULL,
 		"description": "[함선 시너지] 최대 체력 +30, 자동 수리 +0.5/s",
 		"max_level": 5,
@@ -89,7 +89,7 @@ var UPGRADES = {
 	
 	# --- Special / Rare Items ---
 	"sextant": {
-		"name": "🧭 육분의",
+		"name": "육분의",
 		"category": Category.SPECIAL,
 		"description": "[자동화] 바람 방향에 맞춰 돛 자동 최적화",
 		"max_level": 1,
@@ -98,14 +98,14 @@ var UPGRADES = {
 	
 	# --- Consumables / Instant ---
 	"supply": {
-		"name": "📦 보급물자",
+		"name": "보급물자",
 		"category": Category.HULL,
 		"description": "체력 즉시 회복 및 최대 HP +20",
 		"max_level": 99,
 		"color": Color(0.5, 1.0, 0.5)
 	},
 	"gold": {
-		"name": "💰 전리품",
+		"name": "전리품",
 		"category": Category.SPECIAL,
 		"description": "점수 +50",
 		"max_level": 99,
@@ -199,7 +199,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 			_apply_gold()
 	
 	upgrade_applied.emit(upgrade_id, new_level)
-	print("⬆️ 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
+	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 
 
 ## 현재 레벨의 설명 가져오기 (다음 레벨 기준)
@@ -290,7 +290,7 @@ func _apply_cannon(ship: Node3D, level: int) -> void:
 		# 우측(x>0)이면 -90도(우향), 좌측(x<0)이면 90도(좌향)
 		var rot_y = -90.0 if pos.x > 0 else 90.0
 		cannon.rotation.y = deg_to_rad(rot_y)
-		print("💥 대포 추가! (Lv.%d, 위치: %s)" % [level, pos])
+		print("[Cannon] 대포 추가! (Lv.%d, 위치: %s)" % [level, pos])
 	else:
 		# 예외 처리: 혹시 더 추가된다면 기존 방식대로 뒤쪽으로 나열
 		var side = 1 if level % 2 == 1 else -1
@@ -335,7 +335,7 @@ func _apply_seamanship(ship: Node3D) -> void:
 		ship.rudder_turn_speed *= 1.2
 	if "stamina_drain_rate" in ship:
 		ship.stamina_drain_rate *= 0.85
-	print("⛵ 항해술 강화! 선회 속도 및 효율 증가.")
+	print("[Skill] 항해술 강화! 선회 속도 및 효율 증가.")
 
 
 func _apply_supply(ship: Node3D) -> void:
@@ -343,7 +343,7 @@ func _apply_supply(ship: Node3D) -> void:
 		ship.max_hull_hp += 20.0
 	if "hull_hp" in ship:
 		ship.hull_hp = ship.max_hull_hp
-	print("📦 보급! HP: %.0f / %.0f" % [ship.hull_hp, ship.max_hull_hp])
+	print("[Supply] 보급! HP: %.0f / %.0f" % [ship.hull_hp, ship.max_hull_hp])
 	
 	# HUD 업데이트
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
@@ -361,7 +361,7 @@ func _apply_gold() -> void:
 			if node.has_method("add_score"):
 				node.add_score(50)
 				break
-	print("💰 전리품! 점수 +50")
+	print("[Gold] 전리품! 점수 +50")
 
 
 func _get_player_ship() -> Node3D:
@@ -387,12 +387,12 @@ func _apply_carpentry(ship: Node3D) -> void:
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
 	if hud and hud.has_method("update_hull_hp"):
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
-	print("🔧 조선술 업그레이드! 선체 내구도 및 수리 능력 강화.")
+	print("[Skill] 조선술 업그레이드! 선체 내구도 및 수리 능력 강화.")
 
 func _apply_sextant(ship: Node3D) -> void:
 	if "has_sextant" in ship:
 		ship.has_sextant = true
-	print("🧭 육분의 장착! 이제 돛이 자동으로 조절됩니다.")
+	print("[Item] 육분의 장착! 이제 돛이 자동으로 조절됩니다.")
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:

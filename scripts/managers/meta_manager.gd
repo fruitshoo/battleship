@@ -8,28 +8,28 @@ signal meta_upgraded(id: String, new_level: int)
 # 영구 업그레이드 정의
 var UPGRADES = {
 	"hull_hp": {
-		"name": "🛡️ 선체 강화",
+		"name": "선체 강화",
 		"description": "기본 체력 +20",
 		"base_cost": 500,
 		"cost_multiplier": 1.5,
 		"max_level": 5
 	},
 	"hull_defense": {
-		"name": "🧱 견고한 보루",
+		"name": "견고한 보루",
 		"description": "배의 방어력 (피해 감소) +2",
 		"base_cost": 800,
 		"cost_multiplier": 1.8,
 		"max_level": 5
 	},
 	"sail_speed": {
-		"name": "🎐 순풍 숙련",
+		"name": "순풍 숙련",
 		"description": "기본 추진력 +10%",
 		"base_cost": 600,
 		"cost_multiplier": 1.6,
 		"max_level": 5
 	},
 	"crew_power": {
-		"name": "🔥 정예병 훈련",
+		"name": "정예병 훈련",
 		"description": "병사 공격력/체력 +15%",
 		"base_cost": 700,
 		"cost_multiplier": 1.7,

@@ -117,7 +117,7 @@ func _become_derelict() -> void:
 	is_boarding = false
 	if wake_trail: wake_trail.emitting = false
 	
-	print("🏴 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
+	print("[Status] 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
 	
 	# 파티클 하나 띄워줄 수 있다면 좋음 (검은 연기 등)
 	# 돛을 내리거나 색상을 어둡게 하는 등의 시각적 처리도 연출 가능
@@ -285,7 +285,7 @@ func _drop_floating_loot() -> void:
 		get_tree().root.add_child.call_deferred(survivor)
 		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
 		survivor.set_deferred("global_position", global_position + s_offset)
-		print("💂 구출 가능한 생존자가 발생했습니다!")
+		print("[Rescue] 구출 가능한 생존자가 발생했습니다!")
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:
@@ -309,7 +309,7 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 			converted_count += 1
 	
 	if converted_count > 0:
-		print("🏊 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
+		print("[Critical] 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
 
 func _process(delta: float) -> void:
 	if is_dying: return
@@ -470,7 +470,7 @@ func _process_boarding(delta: float) -> void:
 	
 	# 너무 멀어지면 도선 포기 및 추격 상태로 복귀
 	if dist > boarding_break_distance:
-		print("📡 밧줄이 팽팽해지다가 끊어졌습니다! 도선 중단.")
+		print("[Boarding] 밧줄이 팽팽해지다가 끊어졌습니다! 도선 중단.")
 		_clear_ropes()
 		is_boarding = false
 		boarding_timer = 0.0
@@ -522,10 +522,10 @@ func _transfer_one_soldier() -> void:
 			s.set_team(team)
 		if s.get("is_stationary"): s.set("is_stationary", false)
 		
-		print("🏃 병사 1명 월선! (팀: %s)" % team)
+		print("[Action] 병사 1명 월선! (팀: %s)" % team)
 	else:
 		# 더 이상 넘길 병사가 없으면 임무 조기 종료 (폐선 상태로 전환)
-		print("🏴 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
+		print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
 		_become_derelict()
 
 
@@ -557,7 +557,7 @@ func capture_ship() -> void:
 	var minions = get_tree().get_nodes_in_group("captured_minion")
 	if minions.size() >= 2:
 		# ✅ 정원 초과 시 나포 대신 배를 파괴함
-		print("🚢 함대 정원 초과! 적함을 파괴합니다.")
+		print("[Limitation] 함대 정원 초과! 적함을 파괴합니다.")
 		die()
 		return
 			
@@ -584,7 +584,7 @@ func capture_ship() -> void:
 	_apply_minion_visuals()
 	
 	if is_instance_valid(cached_lm) and cached_lm.has_method("show_message"):
-		cached_lm.show_message("🚩 적군 함선을 나포했습니다!", 3.0)
+		cached_lm.show_message("적군 함선을 나포했습니다!", 3.0)
 	
 	# 나포 직후 플레이어를 찾아 즉시 따라가기 시작
 	target = null
@@ -593,7 +593,7 @@ func capture_ship() -> void:
 	# ✅ 나포함 무장 자동 장착 (전방, 좌, 우)
 	_equip_minion_cannons()
 	
-	print("🚩 나포 성공! 함대에 합류합니다. (target: %s)" % str(target))
+	print("[Capture] 나포 성공! 함대에 합류합니다. (target: %s)" % str(target))
 
 func _equip_minion_cannons() -> void:
 	if not cannon_scene: return
@@ -729,7 +729,7 @@ func _respawn_minion_soldier() -> void:
 	s.owned_ship = self
 	var offset = Vector3(randf_range(-1.0, 1.0), 0, randf_range(-2.0, 2.0))
 	s.position = offset
-	print("⚓ 나포함 병사 자생적 보충 완료.")
+	print("[Crew] 나포함 병사 자생적 보충 완료.")
 
 
 ## 충돌 감지 (Area3D signal 연결 필요)
@@ -757,7 +757,7 @@ func _board_ship(target_ship: Node3D) -> void:
 
 	# === 무력화(폐선) 상태일 경우 나포 판정 ===
 	if is_derelict:
-		print("📦 플레이어가 폐선에 접근! 나포 성공.")
+		print("[Capture] 플레이어가 폐선에 접근! 나포 성공.")
 		if ship_node.has_method("capture_derelict_ship"):
 			ship_node.capture_derelict_ship()
 		# 달달하게 보상 주고 배는 가라앉음
@@ -782,7 +782,7 @@ func _board_ship(target_ship: Node3D) -> void:
 			# 대포보다는 길고 묵직한 진동 (세기 0.4, 시간 0.3초)
 			cam.shake(0.4, 0.3)
 			
-		print("💥 충격적 충돌 발생! 도선 시작.")
+		print("[Impact] 충격적 충돌 발생! 도선 시작.")
 
 	# 2. 도선 상태 진입
 	is_boarding = true
@@ -853,10 +853,10 @@ func _update_ropes() -> void:
 		
 		# 밧줄의 중심이 중간에 오도록 위치 보정 (또는 Cylinder Mesh의 중심 이동)
 		# Cylinder의 피봇은 중앙이므로, 시작점에서 타겟 방향으로 절반만큼 이동시킨 위치에 놓아야 함
-		var dir = (target_center - start_pos).normalized()
 		# rope.global_position은 이미 고정된 offset 위치이므로 
 		# 로컬 스케일은 중앙 기준이라, 배에 붙은 지점을 한쪽 끝으로 만들려면 추가 오프셋 필요
 		# CylinderMesh의 길이를 2로 하고 피봇을 한끝으로 옮기거나, 위치를 매 프레임 재계산
+		var dir = (target_center - start_pos).normalized()
 		rope.global_position = start_pos + dir * dist * 0.5
 
 func _clear_ropes() -> void:
@@ -869,8 +869,8 @@ func _clear_ropes() -> void:
 # 누수 추가/제거
 func add_leak(amount: float) -> void:
 	leaking_rate += amount
-	print("💧 누수 발생! 초당 데미지: %.1f" % leaking_rate)
+	print("[Status] 누수 발생! 초당 데미지: %.1f" % leaking_rate)
 
 func remove_leak(amount: float) -> void:
 	leaking_rate = maxf(0.0, leaking_rate - amount)
-	print("🩹 누수 완화. 남은 누수율: %.1f" % leaking_rate)
+	print("[Status] 누수 완화. 남은 누수율: %.1f" % leaking_rate)
