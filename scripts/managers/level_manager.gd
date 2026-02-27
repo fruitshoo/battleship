@@ -62,6 +62,38 @@ func _ready() -> void:
 		hud.update_level(current_level)
 		hud.update_score(current_score)
 		hud.update_xp(current_xp, xp_to_next_level)
+		
+	# 쉐이더 예열 (Shader Pre-warming / Web stutter fix)
+	_prewarm_shaders()
+
+func _prewarm_shaders() -> void:
+	# 웹 빌드에서 처음 파티클이나 이펙트가 나올 때 멈칫하는 현상을 방지하기 위해 
+	# 시작 시 주요 씬들을 한 번씩 인스턴스화했다가 삭제합니다.
+	var scenes_to_warm = [
+		preload("res://scenes/projectiles/cannonball.tscn"),
+		preload("res://scenes/effects/muzzle_flash.tscn"),
+		preload("res://scenes/effects/muzzle_smoke.tscn"),
+		preload("res://scenes/effects/shockwave.tscn"),
+		preload("res://scenes/effects/hit_effect.tscn"),
+		preload("res://scenes/effects/wood_splinter.tscn")
+	]
+	
+	var container = Node3D.new()
+	container.name = "ShaderPrewarmer"
+	add_child(container)
+	container.position = Vector3(0, -100, 0) # 화면 밖 아래쪽
+	
+	for scene in scenes_to_warm:
+		if scene:
+			var inst = scene.instantiate()
+			container.add_child(inst)
+			if inst is GPUParticles3D:
+				inst.emitting = true
+				
+	# 한 프레임 뒤에 삭제 (브라우저가 렌더링 파이프라인을 준비할 시간 제공)
+	await get_tree().process_frame
+	container.queue_free()
+	print("[Resource] 쉐이더 예열 완료 (Shader pre-warming complete)")
 
 
 func _unhandled_input(event: InputEvent) -> void:

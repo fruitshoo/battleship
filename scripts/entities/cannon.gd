@@ -20,6 +20,7 @@ var is_preparing: bool = false
 var prepare_timer: float = 0.0
 @export var prepare_time: float = 0.15 # 0.8에서 타격감을 위해 0.15초로 단축
 var current_target: Node3D = null
+var _search_tick: int = 0
 
 
 func _process(delta: float) -> void:
@@ -37,36 +38,58 @@ func _process(delta: float) -> void:
 				AudioManager.play_sfx("cannon_reload", global_position, randf_range(0.9, 1.1))
 		return
 	
-	# 직접 적 탐지 (Area3D 사용 안 함 — 동적 인스턴스에서도 확실히 작동)
+	# 10프레임마다 또는 타겟이 없을 때만 타겟 탐지 (성능 최적화)
+	_search_tick += 1
+	if _search_tick >= 10 or not is_instance_valid(current_target):
+		_search_tick = 0
+		_update_target()
+	
+	if is_instance_valid(current_target):
+		# 사거리 및 각도 재검증 (타겟이 범위를 벗어났는지 확인)
+		if not _is_target_valid(current_target):
+			current_target = null
+		else:
+			fire(current_target)
+
+func _update_target() -> void:
 	var nearest_enemy: Node3D = null
-	var min_dist: float = detection_range
+	var min_dist_sq: float = detection_range * detection_range
 	
 	var enemy_group = "enemy" if team == "player" else "player"
 	var enemies = get_tree().get_nodes_in_group(enemy_group)
+	
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
 		
-		var dist = global_position.distance_to(enemy.global_position)
-		if dist > detection_range:
+		var dist_sq = global_position.distance_squared_to(enemy.global_position)
+		if dist_sq > min_dist_sq:
 			continue
 		
-		# 대포가 바라보는 방향 기준 각도 체크
-		var to_enemy = (enemy.global_position - global_position).normalized()
-		var forward = - global_transform.basis.z
-		var dot = forward.dot(to_enemy)
-		var angle = rad_to_deg(acos(clamp(dot, -1.0, 1.0)))
-		
-		if angle < detection_arc and dist < min_dist:
-			# 추가 체크: 해당 적선에 아군 병사가 있는지 확인 (아군 오사 방지)
-			if _is_ship_occupied_by_friendly(enemy):
-				continue
+		if not _is_within_arc(enemy):
+			continue
+			
+		if _is_ship_occupied_by_friendly(enemy):
+			continue
 				
-			min_dist = dist
-			nearest_enemy = enemy
+		min_dist_sq = dist_sq
+		nearest_enemy = enemy
 	
-	if nearest_enemy:
-		fire(nearest_enemy)
+	current_target = nearest_enemy
+
+func _is_target_valid(target: Node3D) -> bool:
+	if not is_instance_valid(target): return false
+	if global_position.distance_squared_to(target.global_position) > detection_range * detection_range: return false
+	if not _is_within_arc(target): return false
+	if _is_ship_occupied_by_friendly(target): return false
+	return true
+
+func _is_within_arc(target: Node3D) -> bool:
+	var to_target = (target.global_position - global_position).normalized()
+	var forward = - global_transform.basis.z
+	var dot = forward.dot(to_target)
+	var angle = rad_to_deg(acos(clamp(dot, -1.0, 1.0)))
+	return angle < detection_arc
 
 
 ## 아군 오사 방지를 위해 배에 아군이 있는지 체크
