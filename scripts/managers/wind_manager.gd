@@ -35,7 +35,12 @@ signal gust_ended()
 
 
 func _ready() -> void:
-	_update_wind_angle()
+	# 시작 시 바람 방향 랜덤하게 설정 (180~270도 구간은 되도록 피함)
+	var initial_angle = randf_range(0.0, 360.0)
+	if initial_angle > 180.0 and initial_angle < 270.0:
+		initial_angle = wrapf(initial_angle + 90.0, 0, 360) # 불편한 구간이면 즉시 90도 회전
+	set_wind_angle(initial_angle)
+	
 	_reset_gust_timer()
 	# 시작 시 회전 방향 랜덤
 	drift_direction = 1.0 if randf() > 0.5 else -1.0
@@ -46,7 +51,12 @@ func _process(delta: float) -> void:
 	
 	# 1. 느린 회전 (Slow Drift)
 	if drift_enabled:
-		wind_angle_degrees += drift_speed * drift_direction * delta
+		var current_speed = drift_speed
+		# 남서풍 구간 (180~270도)에서는 10배 빠르게 회전하여 신속하게 통과
+		if wind_angle_degrees > 180.0 and wind_angle_degrees < 270.0:
+			current_speed *= 10.0
+			
+		wind_angle_degrees += current_speed * drift_direction * delta
 		# 360도 랩핑
 		if wind_angle_degrees > 360.0:
 			wind_angle_degrees -= 360.0

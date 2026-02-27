@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/effects/survivor.gd" id="1_surv"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_surv"]
+radius = 0.3
+height = 1.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_surv"]
+radius = 4.0
+
+[node name="Survivor" type="Area3D"]
+collision_layer = 0
+collision_mask = 15
+script = ExtResource("1_surv")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("CapsuleMesh_surv")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_surv")

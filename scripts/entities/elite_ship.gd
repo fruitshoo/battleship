@@ -17,6 +17,11 @@ func _ready() -> void:
 	# 시각적으로 크게 만듦
 	scale = Vector3(1.8, 1.8, 1.8)
 	
+	# 병사들은 원래 크기 유지 (부모 스케일의 역수를 적용하여 상쇄)
+	var soldiers_node = get_node_or_null("Soldiers")
+	if soldiers_node:
+		soldiers_node.scale = Vector3.ONE / scale
+	
 	# 색상 변경 등을 위해 메쉬 마테리얼 조정 (필요 시)
 	_apply_elite_visuals()
 

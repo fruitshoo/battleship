@@ -35,11 +35,7 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 		# 일반탄 사운드 믹스: 나무 부서지는 소리만 남김
 		AudioManager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
 	
-	# 쇼크웨이브 생성
-	if shockwave_scene:
-		var wave = shockwave_scene.instantiate()
-		get_tree().root.add_child(wave)
-		wave.global_position = global_position
+	# 사운드만 재생 (쇼크웨이브 제거)
 
 # ==================== 포도탄 시각 효과 초기화 리소스 ====================
 static var shared_grape_trail_mesh: Mesh

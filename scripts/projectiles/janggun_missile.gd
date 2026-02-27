@@ -118,12 +118,8 @@ func _play_impact_vfx() -> void:
 		if splinter.has_method("set_amount_by_damage"):
 			splinter.set_amount_by_damage(damage)
 	
-	# 충격파 이펙트
-	if shockwave_scene:
-		var wave = shockwave_scene.instantiate()
-		get_tree().root.add_child(wave)
-		wave.global_position = global_position
+	# 쇼크웨이브 제거 (파편과 사운드만 유지)
 	
-	# 피격 사운드
+	# 피격 사운드 (장군전 전용 중타격음)
 	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))
+		AudioManager.play_sfx("heavy_missle_impact", global_position, randf_range(0.8, 1.0))

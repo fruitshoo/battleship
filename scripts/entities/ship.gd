@@ -8,6 +8,8 @@ extends Node3D
 @export var acceleration: float = 1.5 # 가속도 하향 (2.0 -> 1.5)
 @export var deceleration: float = 1.2 # 감속도 하향 (1.5 -> 1.2)
 
+const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/chaser_ship.gd")
+
 # === 돛 관련 ===
 @export var sail_angle: float = 0.0 # 돛 각도 (-90 ~ 90도, 배 기준)
 
@@ -73,9 +75,13 @@ var _wave_timer: float = 2.0
 var _oars_timer: float = 0.0
 var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
 
+# === 병사 자동 보충 ===
+@export var crew_respawn_interval: float = 12.0 # 보충 주기 (초)
+var crew_respawn_timer: float = 0.0
+
 func _ready() -> void:
 	base_y = position.y
-	
+	add_to_group("ships")
 	
 	# 영구 업그레이드 보너스 적용
 	if is_in_group("player") or is_player_controlled:
@@ -165,6 +171,7 @@ func _physics_process(delta: float) -> void:
 	_update_rowing_stamina(delta)
 	_update_hull_regeneration(delta)
 	_update_burning_status(delta)
+	_update_crew_respawn(delta)
 	
 	# 노 젓기 사운드 재생 (주기적)
 	if is_rowing and rowing_stamina > 0:
@@ -187,6 +194,28 @@ func _physics_process(delta: float) -> void:
 			_gilgunak_playing = false
 			if is_instance_valid(AudioManager):
 				AudioManager.play_gilgunak(false)
+## 병사 자동 보충 로직
+func _update_crew_respawn(delta: float) -> void:
+	if is_sinking: return
+	
+	var soldiers_node = get_node_or_null("Soldiers")
+	if not soldiers_node: return
+	
+	# 현재 살아있는 아군 병사 수 체크
+	var alive_count = 0
+	for child in soldiers_node.get_children():
+		if child.get("current_state") != 4 and child.get("team") == "player": # 4 = DEAD
+			alive_count += 1
+			
+	if alive_count < max_crew_count:
+		crew_respawn_timer += delta
+		if crew_respawn_timer >= crew_respawn_interval:
+			crew_respawn_timer = 0.0
+			add_survivor() # 기존의 add_survivor 로직 재사용 (HUD 메시지 포함됨)
+			print("💂 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
+	else:
+		crew_respawn_timer = 0.0 # 정원이 차면 타이머 초기화
+
 func _update_hull_regeneration(delta: float) -> void:
 	if is_sinking or hull_regen_rate <= 0: return
 	if hull_hp < max_hull_hp:
@@ -219,11 +248,22 @@ func _handle_input(delta: float) -> void:
 	if Input.is_action_pressed("row_forward"):
 		set_rowing(true)
 	elif Input.is_action_pressed("row_backward"):
-		set_rowing(true) # S를 눌러도 후진 노젓기이므로 활성화. 단 애니메이션이나 속도는 다르게 할 수 있음 (우선 동일하게 활성화)
-		# 만약 S가 제동/후진이라면 별도 상태를 주거나, 지금은 단순히 'rowing'을 활성화하되 speed 등을 S에서 처리해야 함. 배가 후진을 안 하므로 멈추는 용도라면 false로 둠.
+		set_rowing(true) # S를 눌러도 후진 노젓기이므로 활성화.
 	else:
 		if is_rowing:
 			set_rowing(false)
+	
+	# F: 함대 진형 토글 (장사진 <-> 학익진)
+	if Input.is_key_pressed(KEY_F) and Engine.get_physics_frames() % 30 == 0: # 꾹 누름 방지
+		_toggle_fleet_formation()
+
+func _toggle_fleet_formation() -> void:
+	if CHASER_SHIP_SCRIPT.fleet_formation == CHASER_SHIP_SCRIPT.Formation.COLUMN:
+		CHASER_SHIP_SCRIPT.fleet_formation = CHASER_SHIP_SCRIPT.Formation.WING
+		if _cached_level_manager: _cached_level_manager.show_message("🚩 함대 진형: 학익진 (Wing)", 2.0)
+	else:
+		CHASER_SHIP_SCRIPT.fleet_formation = CHASER_SHIP_SCRIPT.Formation.COLUMN
+		if _cached_level_manager: _cached_level_manager.show_message("🚩 함대 진형: 장사진 (Column)", 2.0)
 
 
 ## 러더 조향 입력 처리
@@ -265,6 +305,26 @@ func _auto_adjust_sail(delta: float) -> void:
 	# 부드럽게 조절 (회전 속도 상향)
 	sail_angle = move_toward(sail_angle, target_sail_angle, 90.0 * delta)
 
+func _calculate_separation() -> Vector3:
+	var force = Vector3.ZERO
+	var neighbors = get_tree().get_nodes_in_group("ships")
+	var separation_dist = 6.0 # 함선 폭이 3, 길이가 8이므로 평균적인 안전 거리
+	
+	# 성능을 위해 주변 함선이 많을 때만 계산하거나, 최대 척수 제한
+	var max_checks = min(neighbors.size(), 10)
+	for i in range(max_checks):
+		var other = neighbors[i]
+		if other == self or not is_instance_valid(other) or other.get("is_sinking"):
+			continue
+			
+		var dist = global_position.distance_to(other.global_position)
+		if dist < separation_dist and dist > 0.1:
+			var push_dir = (global_position - other.global_position).normalized()
+			# 가까울수록 더 강하게 밀어내며, 거리에 따른 가중치 부여
+			var strength = (separation_dist - dist) / separation_dist
+			force += push_dir * strength * 5.0 # 밀어내는 강도 계수
+			
+	return force
 
 ## 이동 업데이트
 func _update_movement(delta: float) -> void:
@@ -285,12 +345,18 @@ func _update_movement(delta: float) -> void:
 	# 배의 전방 방향으로 이동 (rotation.y 기준, -Z가 전방)
 	#    Godot 좌표계 수정: Vector2(-sin, -cos) 사용
 	var forward = Vector3(-sin(rotation.y), 0, -cos(rotation.y))
-	position += forward * current_speed * delta
+	var velocity = forward * current_speed
+	
+	# === 겹침 방지 (Separation) 적용 ===
+	var sep = _calculate_separation()
+	velocity += sep
+	
+	position += velocity * delta
 	
 	# 웨이크 트레일 제어
 	var wake_trail = $WakeTrail
 	if wake_trail:
-		wake_trail.emitting = current_speed > 0.5
+		wake_trail.emitting = current_speed > 0.5 or sep.length() > 0.2
 
 
 ## 러더 기반 조향
@@ -481,7 +547,7 @@ func remove_leak(_amount: float) -> void:
 	pass
 
 ## 화염 데미지 및 상태 이상 (Fire Status Effect)
-func take_fire_damage(dps: float, duration: float) -> void:
+func take_fire_damage(_dps: float, duration: float) -> void:
 	if is_burning:
 		burn_timer = max(burn_timer, duration)
 		return
@@ -663,3 +729,46 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 			_cached_um._apply_current_stats_to_soldier(s)
 	
 	print("🗡️ 병사 보충 완료! (현재: %d/%d)" % [max_crew_count, max_crew_count])
+
+## 생존자 구조 및 병사 합류 처리
+func add_survivor() -> bool:
+	var soldiers_node = get_node_or_null("Soldiers")
+	if not soldiers_node: return false
+	
+	# 현재 살아있는 병사 수 체크
+	var alive_count = 0
+	for child in soldiers_node.get_children():
+		if child.get("current_state") != 4: # NOT DEAD
+			alive_count += 1
+		else:
+			# 죽은 병사는 미리 제거
+			child.queue_free()
+			
+	if alive_count >= max_crew_count:
+		print("💂 정원 초과 합류! (현재 인원: %d/%d)" % [alive_count + 1, max_crew_count])
+		# 정원 초과 시에도 합류는 허용하되 메시지만 다르게 표시 가능
+		
+	# 병사 생성
+	var soldier_scene = load("res://scenes/soldier.tscn")
+	var s = soldier_scene.instantiate()
+	soldiers_node.add_child(s)
+	s.set_team("player")
+	
+	# 위치 설정 (갑판 위 랜덤)
+	var offset = Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.5, 2.5))
+	s.position = offset
+	
+	# 업그레이드 스탯 적용
+	if is_instance_valid(_cached_um) and _cached_um.has_method("_apply_current_stats_to_soldier"):
+		_cached_um._apply_current_stats_to_soldier(s)
+		
+	print("💂 생존자 구조 성공! 아군 병사 1명 합류. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
+	
+	# HUD 메시지 표시
+	if _cached_hud and _cached_hud.has_method("show_message"):
+		_cached_hud.show_message("💂 생존자 구조 완료!", 2.0)
+	
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("soldier_hit", global_position, 1.5) # 약간 높은 피치로 구조음 대용
+		
+	return true

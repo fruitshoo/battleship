@@ -5,7 +5,7 @@ extends Area3D
 
 @export var speed: float = 70.0
 @export var damage: float = 5.0 # 함선 데미지
-@export var personnel_damage_mult: float = 25.0 # 병사에게는 25배 데미지
+@export var personnel_damage_mult: float = 5.0 # 병사 데미지 배수 하향 (25 -> 5)
 @export var lifetime: float = 3.0
 @export var blast_radius: float = 3.5
 @export var explosion_scene: PackedScene = preload("res://scenes/effects/rocket_explosion.tscn")
@@ -26,9 +26,13 @@ func _ready() -> void:
 	
 	global_position = start_pos
 	
-	# 발사 사운드 재생 (01 또는 02 무작위 선택)
+	# 발사 사운드 재생 (01, 02, 03 무작위 선택)
 	if is_instance_valid(AudioManager):
-		var sfx_name = "rocket_launch_01" if randf() < 0.5 else "rocket_launch_02"
+		var rand = randf()
+		var sfx_name = "rocket_launch_01"
+		if rand > 0.66: sfx_name = "rocket_launch_03"
+		elif rand > 0.33: sfx_name = "rocket_launch_02"
+		
 		AudioManager.play_sfx(sfx_name, global_position, randf_range(0.9, 1.1))
 	
 	area_entered.connect(_on_hit)
@@ -53,59 +57,53 @@ func _physics_process(delta: float) -> void:
 	global_position = current_pos
 
 func _on_hit(target: Node) -> void:
-	var enemy = target if target.is_in_group("enemy") else target.get_parent()
-	if not (enemy and enemy.is_in_group("enemy")):
-		return
+	if has_exploded: return
 	
-	if not has_exploded:
-		_explode()
+	var hit_obj = target
+	# 적군인지 확인 (함선 본체거나 병사거나)
+	if not (hit_obj.is_in_group("enemy") or hit_obj.is_in_group("player")):
+		var parent = hit_obj.get_parent()
+		if parent and (parent.is_in_group("enemy") or parent.is_in_group("player")):
+			hit_obj = parent
+	
+	# 다른 팀인지 확인
+	var target_group = "enemy" if team == "player" else "player"
+	if not hit_obj.is_in_group(target_group):
+		return
+
+	# 직접 맞은 대상에게만 데미지 적용
+	_apply_damage(hit_obj)
+	_explode()
 	queue_free()
+
+func _apply_damage(target_node: Node) -> void:
+	if not is_instance_valid(target_node): return
+	
+	# 데미지 보정 (블랙 파우더 업그레이드 등)
+	var dmg_mult = 1.0
+	var fire_lv = 0
+	if is_instance_valid(UpgradeManager):
+		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+		dmg_mult += (0.2 * powder_lv)
+		fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
+
+	if target_node.has_method("take_damage"):
+		var final_damage = damage * dmg_mult
+		if target_node is CharacterBody3D or target_node.is_in_group("soldiers"):
+			final_damage *= personnel_damage_mult
+		
+		target_node.take_damage(final_damage, global_position)
+		
+		# 점화 효과
+		if fire_lv > 0 and target_node.has_method("take_fire_damage"):
+			target_node.take_fire_damage(fire_lv * 2.0, 5.0)
+	elif target_node.has_method("die"):
+		target_node.die()
 
 func _explode() -> void:
 	has_exploded = true
 	
-	# 폭발 이펙트 생성
-	if explosion_scene:
-		var explosion = explosion_scene.instantiate()
-		get_tree().root.add_child(explosion)
-		explosion.global_position = global_position
-	
-	# 폭발 사운드
+	# 폭발 VFX(화염/연기) 제거 - 요청에 따라 나무 파편(take_damage 내에 있음)만 남김
+	# 폭발 사운드는 타격감 유지를 위해 남겨둠
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))
-	
-	# 시너지 데이터
-	var blast_mult = 1.0
-	var fire_lv = 0
-	if is_instance_valid(UpgradeManager):
-		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
-		blast_mult += (0.2 * powder_lv)
-		fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
-
-	# 데미지 처리
-	var target_group = "enemy" if team == "player" else "player"
-	var targets = get_tree().get_nodes_in_group(target_group)
-	
-	for s in get_tree().get_nodes_in_group("soldiers"):
-		if is_instance_valid(s) and s.get("team") == target_group:
-			targets.append(s)
-	
-	var final_radius = blast_radius * blast_mult
-	
-	for e in targets:
-		if is_instance_valid(e):
-			var dist = global_position.distance_to(e.global_position)
-			if dist <= final_radius:
-				if e.has_method("take_damage"):
-					var final_damage = damage
-					if e is CharacterBody3D or e.is_in_group("soldiers"):
-						final_damage *= personnel_damage_mult
-					
-					e.take_damage(final_damage, global_position)
-					
-					if fire_lv > 0 and e.has_method("take_fire_damage"):
-						e.take_fire_damage(fire_lv * 2.0, 5.0)
-					elif fire_lv > 0 and e.is_in_group("soldiers"):
-						pass
-				elif e.has_method("die"):
-					e.die()

@@ -41,6 +41,7 @@ var decision_timer: float = 0.0 # 의사결정 스로틀링용
 
 # 소속 배 및 매니저 참조
 var owned_ship: Node3D = null
+var home_ship: Node3D = null # 최초 소속된 플레이어 배 (나포함 침몰 시 복귀용)
 var _cached_level_manager: Node = null
 var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용
 
@@ -65,6 +66,9 @@ func _ready() -> void:
 		owned_ship = parent.get_parent()
 	elif parent and parent.has_method("get_wind_strength"): # Ship 스크립트 체크
 		owned_ship = parent
+		
+	if team == "player":
+		home_ship = owned_ship # 플레이어 진영일 때만 홈 저장
 	
 	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
 	
@@ -128,7 +132,13 @@ func _physics_process(delta: float) -> void:
 	decision_timer -= delta
 	var run_heavy_logic = false
 	if decision_timer <= 0:
-		decision_timer = 0.2 + randf_range(0.0, 0.1) # 약간의 오프셋으로 부하 분산
+		# ✅ 배의 체력이 낮으면 더 민감하게(빨리) 나포 기회 체크 (0.2s -> 0.1s)
+		var ship_hp_ratio = 1.0
+		if is_instance_valid(owned_ship) and owned_ship.has_method("get_hull_ratio"):
+			ship_hp_ratio = owned_ship.get_hull_ratio()
+			
+		var throttle_time = 0.2 if ship_hp_ratio > 0.2 else 0.1
+		decision_timer = throttle_time + randf_range(0.0, 0.05)
 		run_heavy_logic = true
 	
 	match current_state:
@@ -142,6 +152,10 @@ func _physics_process(delta: float) -> void:
 			_state_attack(delta)
 		State.DEAD:
 			pass
+			
+	# 탈출(Evacuation) 체크: 소속된 나포함이 가라앉고 있으면 홈으로 복귀
+	if run_heavy_logic and team == "player" and is_instance_valid(owned_ship) and owned_ship.get("is_dying") == true:
+		_try_evacuate_to_home()
 	
 	# 공격 쿨다운
 	if attack_timer > 0: attack_timer -= delta
@@ -156,6 +170,7 @@ func _physics_process(delta: float) -> void:
 	# 원거리 사격 체크 (스로틀링)
 	if run_heavy_logic and current_state != State.ATTACK and current_state != State.DEAD:
 		_check_ranged_combat()
+		_check_ship_capture_opportunity()
 
 
 ## IDLE 상태: 잠시 대기하다가 다시 배회
@@ -396,6 +411,110 @@ func find_nearest_enemy() -> Node3D:
 	
 	return nearest
 
+## 나포 기회 확인
+func _check_ship_capture_opportunity() -> void:
+	# 아군 병사가 아닐 경우 무시
+	if team != "player": return
+	if not is_instance_valid(owned_ship): return
+	
+	# 상황 1: 이미 적선 위에 올라탄 경우 (기존 나포 트리거)
+	if owned_ship.is_in_group("enemy") and not owned_ship.is_in_group("player"):
+		# 해당 배에 살아있는 적군이 있는지 확인
+		var enemy_count = 0
+		var soldiers_node = owned_ship.get_node_or_null("Soldiers")
+		if soldiers_node:
+			for child in soldiers_node.get_children():
+				if child.get("team") == "enemy" and child.get("current_state") != State.DEAD:
+					enemy_count += 1
+					
+		# 적군이 한 명도 없으면 나포 실행
+		if enemy_count == 0:
+			if owned_ship.has_method("capture_ship"):
+				owned_ship.capture_ship()
+			elif owned_ship.has_method("capture_derelict_ship"):
+				owned_ship.capture_derelict_ship()
+		return # 이미 다른 배 위이므로 아래 로직(주변 배 찾기)은 실행 않음
+
+	# 상황 2: 본선 혹은 아군 함선에 있으면서, 주변의 비어있는 적선(폐선) 탐색하여 뛰어들기
+	if owned_ship.is_in_group("player"):
+		var enemy_ships = get_tree().get_nodes_in_group("enemy")
+		for ship in enemy_ships:
+			# 폐선 상태이고 나포되지 않은 배인 경우
+			if ship.get("is_derelict") == true and not ship.is_in_group("player"):
+				var dist = global_position.distance_to(ship.global_position)
+				if dist < 12.0:
+					# 중복 방지: 이미 그 배로 뛰어드는 중인 동료가 있는지 확인
+					# (배의 메타데이터나 특정 플래그를 활용)
+					if ship.get_meta("being_boarded", false):
+						continue
+					
+					# 이미 배 위에 누군가 타고 있는지 확인
+					var p_count = 0
+					var s_node = ship.get_node_or_null("Soldiers")
+					if s_node:
+						for c in s_node.get_children():
+							if c.get("team") == "player" and c.get("current_state") != State.DEAD:
+								p_count += 1
+					
+					if p_count == 0:
+						# 나포 결정!
+						ship.set_meta("being_boarded", true)
+						print("🚀 빈 배 발견! 나포를 위해 뛰어듭니다.")
+						_jump_to_ship(ship, true) # 나포용 점프
+						return # 한 번에 한 척만 타겟팅
+
+## 홈으로 긴급 복귀 (배가 가라앉을 때)
+func _try_evacuate_to_home() -> void:
+	if not is_instance_valid(home_ship) or home_ship == owned_ship: return
+	
+	var dist = global_position.distance_to(home_ship.global_position)
+	if dist < 12.0: # 12미터 이내면 점프해서 복귀
+		_jump_to_ship(home_ship)
+	else:
+		# 너무 멀면 수영 상태는 아직 없으므로 일단 텔레포트 (긴급 구조 애니메이션)
+		_teleport_to_ship(home_ship)
+
+func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> void:
+	var target_soldiers = target_ship.get_node_or_null("Soldiers")
+	if not target_soldiers: target_soldiers = target_ship
+	
+	var start_pos = global_position
+	reparent(target_soldiers)
+	owned_ship = target_ship
+	
+	var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
+	var end_pos = target_ship.global_transform * jump_offset
+	
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(self , "global_position:x", end_pos.x, 0.6)
+	tween.tween_property(self , "global_position:z", end_pos.z, 0.6)
+	
+	var y_tween = create_tween()
+	y_tween.tween_property(self , "global_position:y", start_pos.y + 2.5, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	y_tween.tween_property(self , "global_position:y", end_pos.y, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	
+	if is_capture_attempt:
+		tween.finished.connect(func():
+			if is_instance_valid(target_ship):
+				target_ship.set_meta("being_boarded", false)
+				_check_ship_capture_opportunity() # 착지 후 즉시 나포 체크
+		)
+	
+	if not is_capture_attempt:
+		print("⚓ 함선 침몰! 플레이어 본선으로 긴급 복귀합니다.")
+
+func _teleport_to_ship(_target_ship: Node3D) -> void:
+	# 텔레포트 대신 → Survivor(생존자)로 변환하여 바다에 떠있게 함
+	var survivor_scn = load("res://scenes/effects/survivor.tscn")
+	if survivor_scn:
+		var survivor = survivor_scn.instantiate()
+		get_tree().root.add_child.call_deferred(survivor)
+		var spawn_pos = global_position
+		spawn_pos.y = 0.5 # 수면 높이
+		survivor.set_deferred("global_position", spawn_pos)
+		print("🏊 병사가 바다에 빠져 생존자가 되었습니다!")
+	queue_free()
 
 ## 데미지 받기
 func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
@@ -546,7 +665,16 @@ func _find_ranged_target() -> Node3D:
 	# 2. 적군 함선 탐색
 	var enemy_team = "enemy" if team == "player" else "player"
 	var ships = get_tree().get_nodes_in_group(enemy_team)
+	
+	# 함대 정원 체크 (나포 가능 여부)
+	var minions = get_tree().get_nodes_in_group("captured_minion")
+	var has_room = minions.size() < 2
+	
 	for ship in ships:
+		# ✅ 나포 가능하면 자기가 서 있는 배는 쏘지 않음 (나포 기회 보장)
+		if ship == owned_ship and has_room:
+			continue
+			
 		var dist = global_position.distance_to(ship.global_position)
 		if dist < range_attack_limit:
 			return ship

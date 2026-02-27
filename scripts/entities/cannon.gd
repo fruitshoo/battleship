@@ -58,11 +58,27 @@ func _process(delta: float) -> void:
 		var angle = rad_to_deg(acos(clamp(dot, -1.0, 1.0)))
 		
 		if angle < detection_arc and dist < min_dist:
+			# 추가 체크: 해당 적선에 아군 병사가 있는지 확인 (아군 오사 방지)
+			if _is_ship_occupied_by_friendly(enemy):
+				continue
+				
 			min_dist = dist
 			nearest_enemy = enemy
 	
 	if nearest_enemy:
 		fire(nearest_enemy)
+
+
+## 아군 오사 방지를 위해 배에 아군이 있는지 체크
+func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
+	var soldiers_node = target_ship.get_node_or_null("Soldiers")
+	if not soldiers_node: return false
+	
+	for child in soldiers_node.get_children():
+		# 살아있는 아군 병사가 한 명이라도 있으면 True
+		if child.get("team") == "player" and child.get("current_state") != 4: # 4 = DEAD
+			return true
+	return false
 
 
 func _get_current_cooldown() -> float:

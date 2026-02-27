@@ -41,6 +41,13 @@ size = Vector3(0.2, 1.5, 1.0)
 [sub_resource type="StandardMaterial3D" id="Material_rudder"]
 albedo_color = Color(0.5, 0.1, 0.1, 1)
 
+[sub_resource type="NavigationMesh" id="NavigationMesh_deck"]
+vertices = PackedVector3Array(-1.25, 0.0, -3.75, 1.25, 0.0, -3.75, 1.25, 0.0, 3.75, -1.25, 0.0, 3.75)
+polygons = [PackedInt32Array(0, 1, 2, 3)]
+agent_height = 1.25
+agent_radius = 0.2
+edge_connection_margin = 1.5
+
 [sub_resource type="BoxShape3D" id="BoxShape_collision"]
 size = Vector3(3, 2, 8)
 
@@ -90,23 +97,24 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.5)
 mesh = SubResource("BoxMesh_rudder")
 surface_material_override/0 = SubResource("Material_rudder")
 
+[node name="DeckNavigationRegion" type="NavigationRegion3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+navigation_mesh = SubResource("NavigationMesh_deck")
+
 [node name="Soldiers" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
 [node name="Archer1" parent="Soldiers" instance=ExtResource("2_soldier")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
 team = "enemy"
-is_stationary = true
 
 [node name="Archer2" parent="Soldiers" instance=ExtResource("2_soldier")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
 team = "enemy"
-is_stationary = true
 
 [node name="Archer3" parent="Soldiers" instance=ExtResource("2_soldier")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 team = "enemy"
-is_stationary = true
 
 [node name="WakeTrail" parent="." instance=ExtResource("3_wake_trail")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)

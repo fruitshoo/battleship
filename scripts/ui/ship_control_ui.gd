@@ -16,6 +16,7 @@ var ship: Node3D = null
 @onready var stamina_bar: ProgressBar = %StaminaBar if has_node("%StaminaBar") else null
 @onready var wind_indicator: Control = %WindIndicator if has_node("%WindIndicator") else null
 @onready var wind_arrow: Node2D = %Arrow if has_node("%Arrow") else null
+@onready var compass_wheel: Node2D = %CompassWheel if has_node("%CompassWheel") else null
 
 
 func _ready() -> void:
@@ -64,9 +65,20 @@ func _update_wind_indicator() -> void:
 	if not wind_arrow or not is_instance_valid(WindManager):
 		return
 	
-	# 바람 각도를 라디안으로 변환하여 화살표 회전
+	# 활성화된 3D 카메라 정보 가져오기
+	var cam = get_viewport().get_camera_3d()
+	var cam_yaw = 0.0
+	if is_instance_valid(cam):
+		cam_yaw = cam.global_rotation.y
+	
+	# 1. 눈금판(N, E, S, W) 회전: 카메라 시점에 맞춰 나침반 회전
+	if compass_wheel:
+		compass_wheel.rotation = cam_yaw
+	
+	# 2. 바람 화살표 회전: 카메라 시점 기준으로 상대적 바람 방향 표시
+	# 글로벌 바람 각도(deg) + 카메라 회전(rad)
 	var wind_angle_rad = deg_to_rad(WindManager.wind_angle_degrees)
-	wind_arrow.rotation = wind_angle_rad
+	wind_arrow.rotation = wind_angle_rad + cam_yaw
 
 
 func _on_sail_left_pressed() -> void:

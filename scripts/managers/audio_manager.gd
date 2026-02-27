@@ -25,7 +25,11 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_ui_click_5.wav",
 	],
 	"level_up": "res://assets/audio/sfx/sfx_levelup.wav",
-	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.wav", # 로켓/폭발음
+	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.wav",
+	"rocket_launch_01": "res://assets/audio/sfx/sfx_rocket_launch_01.wav",
+	"rocket_launch_02": "res://assets/audio/sfx/sfx_rocket_launch_02.wav",
+	"rocket_launch_03": "res://assets/audio/sfx/sfx_rocket_launch_03.wav",
+	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.wav",
 	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.wav",
 	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.wav",
 	"sword_swing": [
