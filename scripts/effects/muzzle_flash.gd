@@ -16,7 +16,7 @@ func _ready() -> void:
 	# 파티클 수명 + 약간의 여유 뒤에 자동 제거
 	get_tree().create_timer(lifetime + 0.1).timeout.connect(queue_free)
 
-## 대포에서 발사 방향을 주입받아 이펙트 회전을 맞춥니다.
 func set_fire_direction(direction: Vector3) -> void:
 	if direction.length_squared() > 0.001:
-		look_at(global_position + direction, Vector3.UP)
+		# look_at은 트리에 들어있어야 하므로, 트리에 들어가기 전에도 작동하도록 basis를 직접 설정
+		basis = Basis.looking_at(direction, Vector3.UP)

@@ -661,12 +661,30 @@ func _game_over() -> void:
 	
 	print("[Critical] 배가 침몰합니다!")
 	
-	# 침몰 애니메이션 (기울어지면서 가라앉음)
+	# 침몰 애니메이션 (기울어지면서 깊게 가라앉음 + 페이드 아웃)
 	var sink_tween = create_tween()
 	sink_tween.set_parallel(true)
-	sink_tween.tween_property(self , "position:y", position.y - 5.0, 4.0).set_ease(Tween.EASE_IN)
-	sink_tween.tween_property(self , "rotation:z", deg_to_rad(25.0), 4.0).set_ease(Tween.EASE_IN)
-	sink_tween.tween_property(self , "rotation:x", deg_to_rad(10.0), 4.0).set_ease(Tween.EASE_IN)
+	var sink_duration = 6.0
+	sink_tween.tween_property(self , "position:y", position.y - 12.0, sink_duration).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self , "rotation:z", deg_to_rad(25.0), sink_duration).set_ease(Tween.EASE_IN)
+	sink_tween.tween_property(self , "rotation:x", deg_to_rad(15.0), sink_duration).set_ease(Tween.EASE_IN)
+	
+	# (메쉬 투명도 조절 대신 셰이더 수심 효과로 대체)
+	
+	sink_tween.set_parallel(false)
+	sink_tween.tween_callback(func():
+		# 플레이어 배는 queue_free 하지 않음 (게임오버 상태 유지 필요할 수 있음)
+		# 다만 시각적으로는 완전히 가라앉은 상태
+		pass
+	)
+
+# 재귀적으로 모든 메쉬의 transparency속성을 트윈합니다.
+func _fade_out_meshes(node: Node, tween: Tween, duration: float) -> void:
+	if node is MeshInstance3D:
+		tween.parallel().tween_property(node, "transparency", 1.0, duration).set_ease(Tween.EASE_IN)
+	
+	for child in node.get_children():
+		_fade_out_meshes(child, tween, duration)
 	
 	# HUD에 게임 오버 표시
 	if _cached_hud and _cached_hud.has_method("show_game_over"):

@@ -11,7 +11,7 @@ extends Camera3D
 @export_group("Control Settings")
 @export var zoom_speed: float = 2.0
 @export var min_zoom: float = 5.0
-@export var max_zoom: float = 50.0
+@export var max_zoom: float = 150.0
 @export var rotation_sensitivity: float = 0.005
 
 var target: Node3D = null
@@ -64,8 +64,8 @@ func _input(event: InputEvent) -> void:
 		_cam_rotation.y -= event.delta.y * rotation_sensitivity * 0.5
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
 	
-	# 우클릭 드래그로 회전
-	if event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+	# 우클릭 또는 휠클릭 드래그로 회전
+	if event is InputEventMouseMotion and (Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)):
 		_cam_rotation.x -= event.relative.x * rotation_sensitivity
 		_cam_rotation.y -= event.relative.y * rotation_sensitivity
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0) # 땅 밑으로 안 가게 제한

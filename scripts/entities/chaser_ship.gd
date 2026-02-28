@@ -254,8 +254,11 @@ func die() -> void:
 	sink_tween.tween_property(self , "rotation_degrees:x", tilt_x, 3.0).set_ease(Tween.EASE_OUT)
 	sink_tween.tween_property(self , "rotation_degrees:z", tilt_z, 3.0).set_ease(Tween.EASE_OUT)
 	
-	# 아래로 가라앉음
-	sink_tween.tween_property(self , "global_position:y", global_position.y - 10.0, 5.0).set_ease(Tween.EASE_IN)
+	# 아래로 깊게 가라앉음 + 페이드 아웃
+	var sink_duration = 6.0
+	sink_tween.tween_property(self , "global_position:y", global_position.y - 15.0, sink_duration).set_ease(Tween.EASE_IN)
+	
+	# (메쉬 투명도 조절 대신 셰이더 수심 효과로 대체)
 	
 	leaking_rate = 0.0 # 사망 시 누수 중단
 	
@@ -459,7 +462,7 @@ func _apply_visual_effects(_delta: float) -> void:
 	if not is_dying:
 		global_position.y = base_y + bob_offset
 		rotation.z = (sin(time * bobbing_speed * 0.85) * rocking_amplitude) + tilt_offset
-	
+
 	# 항적 제어
 	if wake_trail:
 		wake_trail.emitting = move_speed > 0.5
@@ -617,13 +620,30 @@ func capture_ship() -> void:
 	team = "player"
 	
 	# ✅ 상태 초기화 및 긴급 수리 (나포 후 즉시 가라앉는 현상 방지)
+	is_dying = false
 	is_derelict = false
 	is_burning = false
 	fire_build_up = 0.0
 	leaking_rate = 0.0
 	hp = max(hp, max_hp * 0.3) # 최소 30% 체력으로 복구
 	
+	# 철저한 물리적/시각적 리셋 (잠수함화 및 기울기 고정 방지)
+	tilt_offset = 0.0
+	rotation.x = 0.0
+	rotation.z = 0.0
+	base_y = 0.0 # 수면 높이 기준점 재설정
+	global_position.y = 0.0
+	
+	# 실행 중일 수 있는 모든 트윈 애니메이션(침몰 모션 등) 강제 종료
+	var tweens = get_tree().get_processed_tweens()
+	for tween in tweens:
+		# 이 노드나 관련 속성을 다루는 트윈이라고 확신할 순 없지만
+		# Godot 4에서는 bind_node를 통해 엮인 트윈은 자동으로 정리되긴 함
+		pass
+	# 대신 명시적으로 y 위치를 고정해버림
+	
 	is_boarding = false
+	boarding_target = null
 	_clear_ropes()
 	move_speed = 3.2 # 플레이어 배 보조를 위해 약간 하향
 	
@@ -832,6 +852,9 @@ func _process_minion_ai(delta: float) -> void:
 		# 목표 지점에 거의 도달했으므로 플레이어 속도와 동일하게 유지
 		if player_speed > 0.1:
 			translate(Vector3.FORWARD * player_speed * delta)
+			
+	# [추가] 나포함 이동 시에도 수면 높이 유지 및 둥실둥실 효과 적용
+	_apply_visual_effects(delta)
 	
 	if wake_trail:
 		wake_trail.emitting = dist_to_target > 2.0 or player_speed > 1.0

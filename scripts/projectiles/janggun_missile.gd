@@ -11,7 +11,6 @@ extends Area3D
 @export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
 @export var arc_height: float = 8.0
-@export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 
 var start_pos: Vector3 = Vector3.ZERO
@@ -55,14 +54,6 @@ func _physics_process(delta: float) -> void:
 	var current_pos = start_pos.lerp(target_pos, t)
 	var y_offset = sin(PI * t) * arc_height
 	current_pos.y += y_offset
-	
-	# 육중함 표현을 위한 미세한 진동 (Wobble)
-	var wobble = Vector3(
-		sin(progress * 40.0) * 0.05,
-		cos(progress * 35.0) * 0.05,
-		0
-	)
-	current_pos += global_transform.basis * wobble
 	
 	if (current_pos - global_position).length_squared() > 0.0001:
 		var target_look = current_pos + (current_pos - global_position).normalized()
@@ -142,10 +133,21 @@ func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트
 	if wood_splinter_scene:
 		var splinter = wood_splinter_scene.instantiate()
-		get_tree().root.add_child(splinter)
-		splinter.global_position = global_position
+		splinter.position = global_position
+		get_tree().root.add_child.call_deferred(splinter)
 		if splinter.has_method("set_amount_by_damage"):
 			splinter.set_amount_by_damage(damage)
+			
+	# 타격 시 검은 연기 (발사 연기 재사용)
+	if muzzle_smoke_scene:
+		var smoke = muzzle_smoke_scene.instantiate()
+		smoke.position = global_position
+		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
+		var smoke_dir = Vector3.UP
+		smoke.basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
+		get_tree().root.add_child.call_deferred(smoke)
+		if smoke is GPUParticles3D:
+			smoke.emitting = true
 	
 	# 피격 사운드 (장군전 전용 중타격음)
 	if is_instance_valid(AudioManager):
@@ -159,19 +161,13 @@ func _play_launch_vfx() -> void:
 	
 	var launch_dir = (target_pos - start_pos).normalized()
 	
-	# 머즐 플래시
-	if muzzle_flash_scene:
-		var flash = muzzle_flash_scene.instantiate()
-		get_tree().root.add_child(flash)
-		flash.global_position = global_position
-		if flash.has_method("set_fire_direction"):
-			flash.set_fire_direction(launch_dir)
-			
 	# 머즐 연기
 	if muzzle_smoke_scene:
 		var smoke = muzzle_smoke_scene.instantiate()
-		get_tree().root.add_child(smoke)
-		smoke.global_position = global_position
-		smoke.look_at(global_position + launch_dir, Vector3.UP)
+		smoke.position = global_position
+		# Basis.looking_at은 타겟 벡터가 0이면 오류가 발생하므로 체크
+		var smoke_look_dir = launch_dir if not launch_dir.is_zero_approx() else Vector3.FORWARD
+		smoke.basis = Basis.looking_at(smoke_look_dir, Vector3.UP)
+		get_tree().root.add_child.call_deferred(smoke)
 		if smoke is GPUParticles3D:
 			smoke.emitting = true

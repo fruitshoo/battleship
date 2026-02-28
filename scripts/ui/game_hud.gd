@@ -118,7 +118,7 @@ func _setup_new_layout() -> void:
 		add_child(top_left_container)
 		top_left_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 		top_left_container.offset_left = 24
-		top_left_container.offset_top = 24
+		top_left_container.offset_top = 32 # XP바(4px)에서 충분히 아래로 (기존 24)
 		
 		# 레벨 라벨
 		if level_label and level_label.get_parent():
@@ -134,13 +134,6 @@ func _setup_new_layout() -> void:
 			score_label.add_theme_font_size_override("font_size", 18)
 			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
 
-		# 타이머 라벨
-		if timer_label and timer_label.get_parent():
-			timer_label.get_parent().remove_child(timer_label)
-			top_left_container.add_child(timer_label)
-			timer_label.add_theme_font_size_override("font_size", 14)
-			timer_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-			
 		# 난이도 라벨 - 우상단에서 좌상단으로 이동
 		if difficulty_label and difficulty_label.get_parent():
 			difficulty_label.get_parent().remove_child(difficulty_label)
@@ -148,6 +141,36 @@ func _setup_new_layout() -> void:
 			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 			difficulty_label.add_theme_font_size_override("font_size", 12)
 			difficulty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+
+	# === 상단 중앙 (타이머) ===
+	if timer_label:
+		var top_center_container = PanelContainer.new()
+		add_child(top_center_container)
+		top_center_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		top_center_container.offset_top = 40 # XP바 및 화면 상단에서 충분히 격리 (기존 28 -> 40)
+		top_center_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		
+		# 타이머용 반투명 어두운 배경 스타일박스
+		var time_sb = StyleBoxFlat.new()
+		time_sb.bg_color = Color(0, 0, 0, 0.35)
+		time_sb.set_corner_radius_all(12)
+		time_sb.content_margin_left = 16
+		time_sb.content_margin_right = 16
+		time_sb.content_margin_top = 4
+		time_sb.content_margin_bottom = 4
+		top_center_container.add_theme_stylebox_override("panel", time_sb)
+
+		if timer_label.get_parent():
+			timer_label.get_parent().remove_child(timer_label)
+		
+		top_center_container.add_child(timer_label)
+		timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		timer_label.add_theme_font_size_override("font_size", 22) # 큼직하게
+		timer_label.add_theme_color_override("font_color", Color(1, 1, 1, 1)) # 순백색
+		
+		# 타이머 텍스트 그림자 효과 (가독성 향상)
+		timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		timer_label.add_theme_constant_override("shadow_outline_size", 2)
 
 	# 에너미 숫자는 표시하지 않음 (나침반과 겹침 및 불필요)
 	if enemy_count_label:
@@ -256,7 +279,7 @@ func _setup_new_layout() -> void:
 	boss_hp_bar_new = ProgressBar.new()
 	add_child(boss_hp_bar_new)
 	boss_hp_bar_new.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	boss_hp_bar_new.offset_top = 50
+	boss_hp_bar_new.offset_top = 80 # 타이머 아래 충분한 보호 구역 (기존 65)
 	boss_hp_bar_new.custom_minimum_size = Vector2(500, 28)
 	boss_hp_bar_new.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	boss_hp_bar_new.show_percentage = false

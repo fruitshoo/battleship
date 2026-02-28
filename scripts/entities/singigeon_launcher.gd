@@ -72,8 +72,9 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 		if "shooter" in rocket:
 			rocket.shooter = get_parent() # 발사기가 붙어있는 배
 		
-		get_tree().root.add_child(rocket)
-		rocket.global_position = spawn_pos
+		# 위치 미리 설정 (트리 진입 전)
+		rocket.position = spawn_pos
+		get_tree().root.add_child.call_deferred(rocket)
 		
 		# 발사 사운드
 		if is_instance_valid(AudioManager):

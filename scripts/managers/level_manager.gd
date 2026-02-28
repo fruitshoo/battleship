@@ -71,7 +71,7 @@ func _prewarm_shaders() -> void:
 	# 시작 시 주요 씬들을 한 번씩 인스턴스화했다가 삭제합니다.
 	var scenes_to_warm = [
 		preload("res://scenes/projectiles/cannonball.tscn"),
-		preload("res://scenes/effects/muzzle_flash.tscn"),
+		preload("res://scenes/projectiles/janggun_missile.tscn"),
 		preload("res://scenes/effects/muzzle_smoke.tscn"),
 		preload("res://scenes/effects/hit_effect.tscn"),
 		preload("res://scenes/effects/wood_splinter.tscn")
@@ -100,6 +100,11 @@ func _prewarm_shaders() -> void:
 func _trigger_all_particles(node: Node) -> void:
 	if node is GPUParticles3D or node is CPUParticles3D:
 		node.emitting = true
+		
+	# 화면 밖(Y=-100)에 있어도 절두체 컬링(Frustum Culling)을 무시하고 강제 렌더링되게 하여
+	# 셰이더 컴파일이 확실하게 일어나도록 보장합니다.
+	if node is GeometryInstance3D:
+		node.extra_cull_margin = 16384.0
 	
 	for child in node.get_children():
 		_trigger_all_particles(child)

@@ -3,8 +3,7 @@
 [ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/chaser_ship.gd" id="1_chaser"]
 [ext_resource type="PackedScene" path="res://scenes/soldier.tscn" id="2_soldier"]
 [ext_resource type="PackedScene" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
-
-[ext_resource type="Shader" uid="uid://cm67x8u3kql1j" path="res://assets/shaders/sail.gdshader" id="4_sail_shader"]
+[ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="4_sail_shader"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_collision"]
 size = Vector3(3, 2, 8)
@@ -15,25 +14,36 @@ size = Vector3(3, 1, 8)
 [sub_resource type="StandardMaterial3D" id="Material_wood"]
 albedo_color = Color(0.3, 0.1, 0.1, 1)
 
+[sub_resource type="CylinderMesh" id="CylinderMesh_mast"]
+top_radius = 0.15
+bottom_radius = 0.2
+height = 8.0
+
+[sub_resource type="StandardMaterial3D" id="Material_mast"]
+albedo_color = Color(0.3, 0.15, 0.1, 1)
+
 [sub_resource type="BoxMesh" id="BoxMesh_bow"]
 size = Vector3(2, 0.8, 1.5)
 
 [sub_resource type="StandardMaterial3D" id="Material_bow"]
 albedo_color = Color(0.4, 0, 0, 1)
 
+[sub_resource type="CylinderMesh" id="CylinderMesh_yardarm"]
+top_radius = 0.1
+bottom_radius = 0.1
+height = 4.2
+
 [sub_resource type="PlaneMesh" id="PlaneMesh_sail"]
 size = Vector2(4, 6)
-subdivide_depth = 10
 subdivide_width = 10
+subdivide_depth = 10
 orientation = 2
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sail"]
 render_priority = 0
 shader = ExtResource("4_sail_shader")
-shader_parameter/albedo = Color(0.7, 0.1, 0.1, 1)
 shader_parameter/wave_speed = 3.0
 shader_parameter/wave_strength = 0.2
-shader_parameter/wind_strength = 1.0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_arrow_shaft"]
 top_radius = 0.1
@@ -48,24 +58,11 @@ top_radius = 0.0
 bottom_radius = 0.2
 height = 0.5
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_mast"]
-top_radius = 0.15
-bottom_radius = 0.2
-height = 8.0
-
-[sub_resource type="StandardMaterial3D" id="Material_mast"]
-albedo_color = Color(0.3, 0.15, 0.1, 1)
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_yardarm"]
-top_radius = 0.1
-bottom_radius = 0.1
-height = 4.2
-
 [sub_resource type="BoxMesh" id="BoxMesh_oar_shaft"]
-size = Vector3(0.1, 4.0, 0.1)
+size = Vector3(0.1, 4, 0.1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_oar_blade"]
-size = Vector3(0.4, 2.0, 0.05)
+size = Vector3(0.4, 2, 0.05)
 
 [sub_resource type="BoxMesh" id="BoxMesh_rudder"]
 size = Vector3(0.2, 1.5, 1)
@@ -113,36 +110,6 @@ surface_material_override/0 = SubResource("Material_mast")
 mesh = SubResource("PlaneMesh_sail")
 surface_material_override/0 = SubResource("ShaderMaterial_sail")
 
-[node name="OarBaseLeft" type="Node3D" parent="." unique_id=1948375013]
-transform = Transform3D(0.7680025, 0.10501643, -0.6317781, 0.55431855, 0.38510087, 0.7378536, 0.3207852, -0.9168797, 0.237546, -1.5, 1.25, 2.5)
-
-[node name="OarPivot" type="Node3D" parent="OarBaseLeft" unique_id=1847293847]
-
-[node name="OarShaft" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=482938475]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.0, 0)
-mesh = SubResource("BoxMesh_oar_shaft")
-surface_material_override/0 = SubResource("Material_wood")
-
-[node name="OarBlade" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=983746193]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
-mesh = SubResource("BoxMesh_oar_blade")
-surface_material_override/0 = SubResource("Material_wood")
-
-[node name="OarBaseRight" type="Node3D" parent="." unique_id=2948375013]
-transform = Transform3D(0.7680025, -0.10501643, 0.6317781, -0.55431855, 0.38510087, 0.7378536, -0.3207852, -0.9168797, 0.237546, 1.5, 1.25, 2.5)
-
-[node name="OarPivot" type="Node3D" parent="OarBaseRight" unique_id=2847293847]
-
-[node name="OarShaft" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=582938475]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.0, 0)
-mesh = SubResource("BoxMesh_oar_shaft")
-surface_material_override/0 = SubResource("Material_wood")
-
-[node name="OarBlade" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=183746193]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
-mesh = SubResource("BoxMesh_oar_blade")
-surface_material_override/0 = SubResource("Material_wood")
-
 [node name="DirectionArrow" type="Node3D" parent="SailVisual" unique_id=766990029]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0.2)
 visible = false
@@ -156,6 +123,36 @@ surface_material_override/0 = SubResource("Material_arrow")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
 mesh = SubResource("CylinderMesh_arrow_head")
 surface_material_override/0 = SubResource("Material_arrow")
+
+[node name="OarBaseLeft" type="Node3D" parent="." unique_id=1948375013]
+transform = Transform3D(0.7680025, 0.10501643, -0.6317781, 0.55431855, 0.38510087, 0.7378536, 0.3207852, -0.9168797, 0.237546, -1.5, 1.25, 2.5)
+
+[node name="OarPivot" type="Node3D" parent="OarBaseLeft" unique_id=1847293847]
+
+[node name="OarShaft" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=482938475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
+mesh = SubResource("BoxMesh_oar_shaft")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="OarBlade" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=983746193]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
+mesh = SubResource("BoxMesh_oar_blade")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="OarBaseRight" type="Node3D" parent="." unique_id=-1346592283]
+transform = Transform3D(0.7680025, -0.10501643, 0.6317781, -0.55431855, 0.38510087, 0.7378536, -0.3207852, -0.9168797, 0.237546, 1.5, 1.25, 2.5)
+
+[node name="OarPivot" type="Node3D" parent="OarBaseRight" unique_id=-1447673449]
+
+[node name="OarShaft" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=582938475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
+mesh = SubResource("BoxMesh_oar_shaft")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="OarBlade" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=183746193]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
+mesh = SubResource("BoxMesh_oar_blade")
+surface_material_override/0 = SubResource("Material_wood")
 
 [node name="RudderVisual" type="Node3D" parent="." unique_id=1755299861]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.5)

@@ -4,7 +4,6 @@ extends Node3D
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
-@export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 @export var fire_cooldown: float = 2.0
 @export var detection_range: float = 25.0
@@ -196,9 +195,8 @@ func _execute_fire() -> void:
 	cooldown_timer = _get_current_cooldown()
 	
 	var ball = cannonball_scene.instantiate()
-	get_tree().root.add_child(ball)
-	
-	ball.global_position = muzzle.global_position
+	ball.position = muzzle.global_position
+	get_tree().root.add_child.call_deferred(ball)
 	
 	# 데미지 계산 (속성 반영)
 	var base_dmg = 10.0 # 대포알 기본 데미지
@@ -229,25 +227,18 @@ func _execute_fire() -> void:
 	
 	var predicted_pos = current_target.global_position + enemy_velocity * time_to_hit
 	ball.direction = (predicted_pos - muzzle.global_position).normalized()
+	if ball.direction.is_zero_approx(): ball.direction = - global_transform.basis.z
 	ball.target_node = current_target
-	ball.look_at(ball.global_position + ball.direction, Vector3.UP)
+	# look_at() 대신 Basis 직접 계산
+	ball.basis = Basis.looking_at(ball.direction, Vector3.UP)
 
-	# 머즐 플래시(발포 화염) 이펙트 생성 (ball.direction이 계산된 후 생성)
-	if muzzle_flash_scene:
-		var flash = muzzle_flash_scene.instantiate()
-		get_tree().root.add_child(flash)
-		# 위치는 즉시 적용
-		flash.global_position = muzzle.global_position
-		# 발사 방향(월드 좌표)을 파티클에 직접 주입 — 100% 안 뒤집힘 보장
-		if flash.has_method("set_fire_direction"):
-			flash.set_fire_direction(ball.direction)
-			
-		
 	# 머즐 연기 생성
 	if muzzle_smoke_scene:
 		var smoke = muzzle_smoke_scene.instantiate()
-		get_tree().root.add_child(smoke)
-		smoke.global_position = muzzle.global_position
-		smoke.look_at(smoke.global_position + ball.direction, Vector3.UP)
+		smoke.position = muzzle.global_position
+		# Basis.looking_at 안전 가드
+		var smoke_dir = ball.direction if not ball.direction.is_zero_approx() else Vector3.FORWARD
+		smoke.basis = Basis.looking_at(smoke_dir, Vector3.UP)
+		get_tree().root.add_child.call_deferred(smoke)
 		if smoke is GPUParticles3D:
 			smoke.emitting = true

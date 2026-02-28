@@ -10,6 +10,7 @@ extends Area3D
 @export var homing_duration: float = 0.0 # 유도 제거
 @export var crit_chance: float = 0.2 # 20% 크리티컬 확률
 @export var crit_multiplier: float = 2.0 # 크리티컬 2배 데미지
+@export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
@@ -23,6 +24,16 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 	
 	# 나무 부서지는 소리 재생
 	AudioManager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
+
+	# 타격 시 검은 연기(발사 시 나오는 연기 재사용) 생성
+	if impact_smoke_scene:
+		var smoke = impact_smoke_scene.instantiate()
+		smoke.position = global_position
+		# 연기는 위쪽으로 퍼지게 (Basis 직접 설정)
+		smoke.basis = Basis.looking_at(Vector3.UP, Vector3.FORWARD)
+		get_tree().root.add_child.call_deferred(smoke)
+		if smoke is GPUParticles3D:
+			smoke.emitting = true
 
 func _ready() -> void:
 	# 충돌 시그널 연결

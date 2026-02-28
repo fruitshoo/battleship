@@ -75,13 +75,13 @@ void fragment() {
 	vec3 normal_blend = mix(n1, n2, 0.5);
 	
 	// 최종 알베도 색상 혼합 (+ 시야각 반사광)
-	vec3 final_albedo = mix(water_color, primary_color.rgb, basic_fresnel * 0.5);
-	final_albedo += basic_fresnel * 0.2; 
+	vec3 water_base = mix(water_color, primary_color.rgb, basic_fresnel * 0.5);
+	vec3 final_albedo = water_base + (basic_fresnel * 0.2);
 	
 	// 출력
 	ALBEDO = final_albedo;
-	// 깊을수록 확실히 불투명해지도록 보정 (beers_blend가 낮아질수록 ALPHA가 1.0에 수렴)
-	ALPHA = clamp(1.0 - (beers_blend * 0.8) + water_transparency, 0.0, 1.0);
+	// 깊을수록 점진적으로 불투명해짐 (0.85 배수로 표면 근처에서 물의 부피감이 느껴지게 함)
+	ALPHA = clamp(1.0 - (beers_blend * 0.85) + water_transparency, 0.0, 1.0);
 	ROUGHNESS = roughness;
 	
 	NORMAL_MAP = normal_blend;

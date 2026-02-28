@@ -457,6 +457,22 @@ func _check_ship_capture_opportunity() -> void:
 					
 		# 적군이 한 명도 없으면 나포 실행
 		if enemy_count == 0:
+			# [추가] 만약 이 배의 선원들이 다른 배(보통 플레이어 배)로 도선 중이라면, 그곳의 적들도 소탕해야 함
+			var b_target = owned_ship.get("boarding_target")
+			if is_instance_valid(b_target):
+				var target_soldiers = b_target.get_node_or_null("Soldiers")
+				var has_active_boarders = false
+				if target_soldiers:
+					for boarder in target_soldiers.get_children():
+						# 원래 적팀(enemy)이었던 병사가 타겟 배 위에 살아있는지 확인
+						if boarder.get("team") == "enemy" and boarder.get("current_state") != State.DEAD:
+							has_active_boarders = true
+							break
+				
+				if has_active_boarders:
+					# 아직 플레이어 배 위에 적이 남아있으므로 나포를 보류함
+					return
+
 			if owned_ship.has_method("capture_ship"):
 				owned_ship.capture_ship()
 			elif owned_ship.has_method("capture_derelict_ship"):
