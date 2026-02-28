@@ -3,7 +3,7 @@ extends Area3D
 ## 장군전 미사일 (Janggun Missile)
 ## 느리지만 고데미지 통나무 미사일. 범위 피해.
 
-@export var speed: float = 25.0
+@export var speed: float = 18.0
 @export var damage: float = 15.0 # 즉발 데미지 (최강 무기)
 @export var dot_damage: float = 3.0 # 누수 데미지 (초당 3.0)
 @export var speed_debuff: float = 0.7 # 속도 30% 감소
@@ -29,6 +29,10 @@ func _ready() -> void:
 	
 	global_position = start_pos
 	
+	# 즉시 목표 방향 바라보기 (초기 회전 오류 방지)
+	if start_pos.distance_squared_to(target_pos) > 0.1:
+		look_at(target_pos, Vector3.UP)
+	
 	# 발사 연출 (Screen Shake + Muzzle Effects)
 	_play_launch_vfx()
 	
@@ -39,9 +43,8 @@ func _physics_process(delta: float) -> void:
 	if is_stuck or is_sinking: return
 	
 	progress += delta / duration
-	# 비선형 가속 연출 (Ease-In: 초반엔 육중하게 출발)
-	# progress 0.0 -> 1.0 을 곡선형으로 변환
-	var t = progress * progress # Quadratic Ease-In
+	# SLBM 같은 느낌을 주는 비선형 가속(Ease-In) 제거 -> 강력한 초기 추진력 표현을 위해 선형(Linear)으로 변경
+	var t = progress
 	
 	var current_pos = start_pos.lerp(target_pos, t)
 	var y_offset = sin(PI * t) * arc_height
@@ -55,8 +58,9 @@ func _physics_process(delta: float) -> void:
 	)
 	current_pos += global_transform.basis * wobble
 	
-	if (current_pos - global_position).length_squared() > 0.001:
-		look_at(current_pos, Vector3.UP)
+	if (current_pos - global_position).length_squared() > 0.0001:
+		var target_look = current_pos + (current_pos - global_position).normalized()
+		look_at(target_look, Vector3.UP)
 		
 	global_position = current_pos
 	
@@ -119,7 +123,6 @@ func _unstick() -> void:
 	queue_free()
 
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-@export var shockwave_scene: PackedScene = preload("res://scenes/effects/shockwave.tscn")
 
 func _splash_and_sink() -> void:
 	if is_sinking: return

@@ -35,15 +35,32 @@ var hull_regen_rate: float = 0.0 # 초당 HP 회복량 (나포함도 수리 가�
 var hull_defense: float = 0.0 # 피격 데미지 감소량
 var _last_splinter_time: float = 0.0 # 파편 생성 쿨다운용
 
+# === 시각 효과 관련 ===
+var tilt_offset: float = 0.0
+var base_y: float = 0.0
+var bobbing_amplitude: float = 0.2
+var bobbing_speed: float = 1.1
+var rocking_amplitude: float = 0.04
+
+@onready var sail_visual: Node3D = $SailVisual if has_node("SailVisual") else null
+@onready var rudder_visual: Node3D = $RudderVisual if has_node("RudderVisual") else null
+@onready var oar_pivot_left: Node3D = $OarBaseLeft/OarPivot if has_node("OarBaseLeft/OarPivot") else null
+@onready var oar_pivot_right: Node3D = $OarBaseRight/OarPivot if has_node("OarBaseRight/OarPivot") else null
+var _oar_time: float = 0.0
+
 @export var max_minion_crew: int = 3
 var minion_respawn_timer: float = 0.0
 @export var minion_respawn_interval: float = 15.0 # 아군 배보다 조금 더 느림
+
+var sail_angle: float = 0.0 # 돛 각도 (시각적 피드백용)
 
 # === 함대 진형 (Formation) 관련 ===
 enum Formation {COLUMN, WING}
 static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정
 
 var formation_spacing: float = 12.0 # 선박 간 간격
+
+var _wave_timer: float = 0.0 # 물결 소리 타이머
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_minion_list: Array = []
@@ -139,7 +156,15 @@ func _become_derelict() -> void:
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 
 func _ready() -> void:
-	max_hp = hp
+	hp = max_hp
+	base_y = global_position.y
+	_find_player()
+	
+	# 초기 돛 색상 설정 (Enemy 기본: Red)
+	if sail_visual:
+		var mesh = sail_visual.get_node_or_null("SailMesh") as MeshInstance3D
+		if mesh:
+			mesh.set_instance_shader_parameter("albedo", Color(0.7, 0.1, 0.1, 1.0))
 	add_to_group("ships")
 	if team == "player":
 		add_to_group("player")
@@ -321,6 +346,9 @@ func _process(delta: float) -> void:
 	if is_dying: return
 	
 	_update_fire_effect()
+	_auto_adjust_sail(delta)
+	_update_sail_visual(delta)
+	_update_oar_visual(delta)
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
 	
@@ -343,6 +371,8 @@ func _update_hull_regeneration(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	if is_dying: return
+	
+	_update_wave_sounds(delta)
 	
 	# 0. 아군 나포함(Minion)은 전용 AI 수행 (최우선)
 	if team == "player":
@@ -417,6 +447,18 @@ func _physics_process(delta: float) -> void:
 	# === 누수(Leaking) 데미지 ===
 	if leaking_rate > 0:
 		take_damage(leaking_rate * delta)
+		
+	# === 시각적 효과 (둥실둥실 및 기울기) ===
+	_apply_visual_effects(delta)
+
+func _apply_visual_effects(_delta: float) -> void:
+	var time = Time.get_ticks_msec() * 0.001
+	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude
+	
+	# 수면 위 높이 유지 (사망 시 tween에 의해 덮어씌워짐)
+	if not is_dying:
+		global_position.y = base_y + bob_offset
+		rotation.z = (sin(time * bobbing_speed * 0.85) * rocking_amplitude) + tilt_offset
 	
 	# 항적 제어
 	if wake_trail:
@@ -543,9 +585,6 @@ func _transfer_one_soldier() -> void:
 		_become_derelict()
 
 
-# 부모 클래스의 _calculate_separation을 사용하므로 지역 구현 삭제함
-
-
 func _find_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
 	for p in players:
@@ -569,7 +608,7 @@ func capture_ship() -> void:
 	
 	# 기존 함대 수 체크
 	var minions = get_tree().get_nodes_in_group("captured_minion")
-	if minions.size() >= 2:
+	if minions.size() >= 3:
 		# ✅ 정원 초과 시 나포 대신 배를 파괴함
 		print("[Limitation] 함대 정원 초과! 적함을 파괴합니다.")
 		die()
@@ -655,16 +694,74 @@ func _recursive_set_team(node: Node, new_team: String) -> void:
 		_recursive_set_team(child, new_team)
 
 func _apply_minion_visuals() -> void:
-	# 돛이나 깃발 색상 변경 (흰색/파란색 조화)
-	var sail = get_node_or_null("SailVisual/SailMesh")
-	if sail and sail is MeshInstance3D:
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.9, 0.9, 1.0) # 밝은 하늘색/흰색
-		sail.material_override = mat
+	# 돛 색상 변경 (흰색/파란색 조화) - instance uniform 사용
+	var mesh = get_node_or_null("SailVisual/SailMesh") as MeshInstance3D
+	if mesh:
+		mesh.set_instance_shader_parameter("albedo", Color(0.9, 0.9, 1.0, 1.0)) # 밝은 하늘색/흰색
 	
 	# 연기 효과 중지 (폐선 상태에서 났던 것)
 	if is_instance_valid(_fire_instance):
 		_set_fire_emitting(false)
+
+func _update_sail_visual(_delta: float) -> void:
+	if sail_visual:
+		# 돛 물리 시각적 회전 적용
+		sail_visual.rotation.y = deg_to_rad(-sail_angle)
+
+		# 적함도 바람의 영향을 시각적으로 표현하기 위해 간단한 계산
+		var wind_intake = 1.0
+		if is_instance_valid(WindManager):
+			var wind_dir = WindManager.get_wind_direction()
+			# 돛의 정면(바람이 들어오는 쪽)은 -Z 방향
+			var sail_fwd = - sail_visual.global_transform.basis.z
+			var sail_fwd_2d = Vector2(sail_fwd.x, sail_fwd.z).normalized()
+			wind_intake = max(0.0, wind_dir.dot(sail_fwd_2d))
+			
+		var mesh = sail_visual.get_node_or_null("SailMesh") as MeshInstance3D
+		if mesh:
+			mesh.set_instance_shader_parameter("wind_strength", wind_intake)
+
+func _auto_adjust_sail(delta: float) -> void:
+	if not is_instance_valid(WindManager): return
+	var wind_dir = WindManager.get_wind_direction()
+	
+	# ship.gd의 로직과 유사하게 자동 조절
+	var ship_angle_rad = rotation.y
+	var wind_angle_rad = atan2(wind_dir.x, wind_dir.y)
+	
+	var rel_wind_angle = rad_to_deg(wrapf(wind_angle_rad - ship_angle_rad, -PI, PI))
+	var target_sail_angle = rel_wind_angle / 2.0
+	target_sail_angle = clamp(target_sail_angle, -90, 90)
+	
+	sail_angle = move_toward(sail_angle, target_sail_angle, 60.0 * delta)
+
+## 동양식 노(Ro/Yuloh) 8자 젓기 애니메이션
+func _update_oar_visual(delta: float) -> void:
+	var has_oars = oar_pivot_left or oar_pivot_right
+	if not has_oars: return
+	
+	var is_moving = not is_derelict and move_speed > 0.5 and is_instance_valid(target)
+	
+	if is_moving:
+		_oar_time += delta * 1.8 # 적함은 조금 더 느리고 장중하게 노를 저음
+		
+		# 8자 모션 (Lissajous curve 기반 Sculling)
+		var sweep_angle = sin(_oar_time) * 0.2
+		var twist_angle = sin(_oar_time * 2.0) * 0.1
+		
+		if oar_pivot_left:
+			oar_pivot_left.rotation.x = sweep_angle
+			oar_pivot_left.rotation.z = twist_angle
+		if oar_pivot_right:
+			oar_pivot_right.rotation.x = sweep_angle
+			oar_pivot_right.rotation.z = - twist_angle
+	else:
+		if oar_pivot_left:
+			oar_pivot_left.rotation.x = lerp_angle(oar_pivot_left.rotation.x, 0.0, delta * 2.0)
+			oar_pivot_left.rotation.z = lerp_angle(oar_pivot_left.rotation.z, 0.0, delta * 2.0)
+		if oar_pivot_right:
+			oar_pivot_right.rotation.x = lerp_angle(oar_pivot_right.rotation.x, 0.0, delta * 2.0)
+			oar_pivot_right.rotation.z = lerp_angle(oar_pivot_right.rotation.z, 0.0, delta * 2.0)
 
 ## 나포함 AI 로직 (플레이어 호위 및 적 탐지)
 func _process_minion_ai(delta: float) -> void:
@@ -695,34 +792,66 @@ func _process_minion_ai(delta: float) -> void:
 	var target_pos = target.to_global(offset)
 	var dist_to_target = global_position.distance_to(target_pos)
 	
+	# 플레이어의 실제 현재 속도 가져오기 (동기화 용도)
+	var player_speed = target.get("current_speed")
+	if player_speed == null: player_speed = 0.0
+	
 	# 4. 이동 및 회전 로직
 	var direction = (target_pos - global_position).normalized()
 	
-	if dist_to_target > 1.0:
+	if dist_to_target > 1.5:
 		# 목표 지점 바라보기 (부드럽게)
 		var target_rot = atan2(-direction.x, -direction.z)
-		rotation.y = lerp_angle(rotation.y, target_rot, delta * 2.0)
+		rotation.y = lerp_angle(rotation.y, target_rot, delta * 2.5)
 		
-		# 속도 결정
-		var current_move_speed = move_speed
-		if dist_to_target > 15.0:
-			current_move_speed *= 1.8 # 멀면 더 빨리 따라잡기
-		elif dist_to_target < 3.0:
-			current_move_speed *= 0.5 # 가까우면 감속
-			
+		# 속도 결정: 멀면 속도 보정, 가까우면 플레이어 속도에 수렴
+		var final_move_speed = move_speed
+		if dist_to_target > 10.0:
+			final_move_speed *= 1.5 # 추격 모드
+		elif dist_to_target < 5.0:
+			# 플레이어 속도와 동기화 시도 (플레이어가 느리면 같이 느려짐)
+			final_move_speed = max(player_speed * 1.1, 1.5)
+		
 		# 실제 이동
-		translate(Vector3.FORWARD * current_move_speed * delta)
-	else:
-		# 목표 지점에 거의 도착했을 때는 플레이어와 방향 맞추기 (Heading Alignment)
+		translate(Vector3.FORWARD * final_move_speed * delta)
+	elif dist_to_target > 0.4:
+		# 근접 정렬 단계 (천천히 속도와 방향을 맞춤)
 		var target_fwd = - target.global_transform.basis.z
-		var target_rot = atan2(-target_fwd.x, -target_fwd.z)
-		rotation.y = lerp_angle(rotation.y, target_rot, delta * 1.5)
+		var head_rot = atan2(-target_fwd.x, -target_fwd.z)
+		rotation.y = lerp_angle(rotation.y, head_rot, delta * 2.0)
 		
-		# 플레이어 속도와 동기화 (간략하게 move_speed의 일부 적용)
-		translate(Vector3.FORWARD * move_speed * 0.8 * delta)
+		# 플레이어 속도에 근접하게 이동
+		var sync_speed = lerp(move_speed * 0.5, player_speed, 0.5)
+		translate(Vector3.FORWARD * sync_speed * delta)
+	else:
+		# 정지 또는 완전 동기화 상태
+		var target_fwd = - target.global_transform.basis.z
+		var head_rot = atan2(-target_fwd.x, -target_fwd.z)
+		rotation.y = lerp_angle(rotation.y, head_rot, delta * 3.0)
 		
+		# 목표 지점에 거의 도달했으므로 플레이어 속도와 동일하게 유지
+		if player_speed > 0.1:
+			translate(Vector3.FORWARD * player_speed * delta)
+	
 	if wake_trail:
-		wake_trail.emitting = dist_to_target > 2.0
+		wake_trail.emitting = dist_to_target > 2.0 or player_speed > 1.0
+
+func _update_wave_sounds(delta: float) -> void:
+	if is_dying or is_derelict: return
+	
+	# 현재 속도 대략적 파악 (적함/나포함 공통 로직을 위해)
+	# 여기서는 move_speed와 이동 여부로 판단
+	var speed = move_speed
+	# 멈춰있을 때는 소리 안나게 (target 없거나 거리 가까워서 멈춘 경우 등)
+	if not is_instance_valid(target): speed = 0.0
+	
+	if speed > 0.5:
+		_wave_timer -= delta
+		if _wave_timer <= 0:
+			if is_instance_valid(AudioManager):
+				AudioManager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
+			var speed_mod = clamp(speed / 5.0, 0.4, 1.5)
+			_wave_timer = randf_range(2.0, 4.5) / speed_mod
 
 func _update_minion_respawn(delta: float) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
@@ -764,6 +893,10 @@ func _on_area_entered(area: Area3D) -> void:
 		_board_ship(parent)
 
 
+func remove_stuck_object(_obj: Node3D, _s_mult: float, _t_mult: float) -> void:
+	tilt_offset *= 0.5
+	if tilt_offset < 0.01: tilt_offset = 0.0
+
 func _board_ship(target_ship: Node3D) -> void:
 	if is_dying or is_boarding: return
 	
@@ -775,6 +908,11 @@ func _board_ship(target_ship: Node3D) -> void:
 			
 	# === 아군 체크 (동일 팀이면 도선 무시) ===
 	if ship_node.get("team") == team:
+		return
+		
+	# === 플레이어 팀 체크 (상대 배에 올라타는 것 제한) ===
+	# 나포(Capture) 상황이 아닌 일반 전투 중에는 아군 병사가 적선으로 넘어가지 않게 함
+	if team == "player":
 		return
 
 	# === 무력화(폐선) 상태일 경우 나포 판정 ===

@@ -9,7 +9,6 @@ extends CanvasLayer
 @onready var difficulty_label: Label = $TopPanel/HBox/DifficultyLabel
 @onready var enemy_count_label: Label = $SidePanel/VBox/EnemyCountLabel
 @onready var crew_label: Label = $SidePanel/VBox/CrewLabel
-@onready var wind_label: Label = $SidePanel/VBox/WindLabel
 @onready var speed_label: Label = $SidePanel/VBox/SpeedLabel
 @onready var hull_label: Label = $SidePanel/VBox/HullLabel
 @onready var xp_label: Label = $SidePanel/VBox/XPLabel
@@ -30,6 +29,7 @@ var hp_bar: ProgressBar = null
 var hp_text_label: Label = null
 var boss_hp_bar_new: ProgressBar = null
 var boss_hp_text_label: Label = null
+var stamina_bar: ProgressBar = null
 var top_left_container: VBoxContainer = null
 var top_right_container: VBoxContainer = null
 var bottom_left_container: VBoxContainer = null
@@ -105,7 +105,6 @@ func _setup_new_layout() -> void:
 	# 1. 기존 거추장스러운 레거시 패널들(컨테이너)을 숨김
 	if hull_label: hull_label.visible = false
 	if speed_label: speed_label.visible = false
-	if wind_label: wind_label.visible = false
 	if boss_hp_panel: boss_hp_panel.visible = false
 	
 	var legacy_top = get_node_or_null("TopPanel")
@@ -196,6 +195,22 @@ func _setup_new_layout() -> void:
 		hp_text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		hp_text_label.add_theme_font_size_override("font_size", 14)
 		hp_bar.add_child(hp_text_label)
+		
+		# 플레이어 스태미나 바 생성 (HP바 바로 아래)
+		stamina_bar = ProgressBar.new()
+		stamina_bar.custom_minimum_size = Vector2(240, 8) # HP바보다 얇게
+		stamina_bar.show_percentage = false
+		bottom_left_container.add_child(stamina_bar)
+		
+		var stam_bg = StyleBoxFlat.new()
+		stam_bg.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+		stam_bg.set_corner_radius_all(2)
+		var stam_fg = StyleBoxFlat.new()
+		stam_fg.bg_color = Color(1.0, 0.8, 0.2, 0.9) # 노란색/주황색 계열
+		stam_fg.set_corner_radius_all(2)
+		
+		stamina_bar.add_theme_stylebox_override("background", stam_bg)
+		stamina_bar.add_theme_stylebox_override("fill", stam_fg)
 
 	# === 우측 하단 (속도 및 무기) ===
 	if not bottom_right_container:
@@ -268,11 +283,13 @@ func _setup_new_layout() -> void:
 func _process(delta: float) -> void:
 	game_time += delta
 	_update_timer()
-	_update_wind_display()
+
+
 	_update_speed_display()
 	_update_cooldown_display()
 	_update_crew_count()
 	_update_hull_display()
+	_update_stamina_display()
 	_update_xp_display()
 	
 	# 돌풍 경고 깜박임
@@ -326,11 +343,6 @@ func _update_timer() -> void:
 		if _last_timer_str != new_str:
 			_last_timer_str = new_str
 			timer_label.text = new_str
-
-
-func _update_wind_display() -> void:
-	# 텍스트 형태의 윈드 라벨은 더 이상 사용하지 않음 (이전 잔재, 삭제 예정 또는 나침반이 대체 중)
-	pass
 
 
 ## 카메라 회전을 고려하여 화면 기준 풍향 화살표 반환
@@ -420,27 +432,6 @@ func _update_crew_count() -> void:
 		update_crew_status(alive_count, max_val)
 
 
-func _angle_to_compass(angle_deg: float) -> String:
-	# 8방위 변환
-	var normalized = fmod(angle_deg + 360.0, 360.0)
-	if normalized < 22.5 or normalized >= 337.5:
-		return "N"
-	elif normalized < 67.5:
-		return "NE"
-	elif normalized < 112.5:
-		return "E"
-	elif normalized < 157.5:
-		return "SE"
-	elif normalized < 202.5:
-		return "S"
-	elif normalized < 247.5:
-		return "SW"
-	elif normalized < 292.5:
-		return "W"
-	else:
-		return "NW"
-
-
 func _on_gust_started(angle_offset: float) -> void:
 	if gust_warning:
 		var dir = "→" if angle_offset > 0 else "←"
@@ -484,6 +475,20 @@ func update_hull_hp(current: float, maximum: float) -> void:
 		var filled = clamp(int(ratio * bar_length), 0, bar_length)
 		var bar = "█".repeat(filled) + "░".repeat(bar_length - filled)
 		hull_label.text = "[HP] %s %.0f" % [bar, current]
+		
+func update_stamina(current: float, maximum: float) -> void:
+	if stamina_bar:
+		stamina_bar.max_value = maximum
+		# 스태미나는 즉각적인 피드백이 중요하므로 바로 설정하거나 아주 짧은 트윈 사용
+		stamina_bar.value = current
+		
+		# 소진 시 색상 변경 (버건디/어두운 빨강)
+		var fill_style = stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if fill_style:
+			if current < 1.0:
+				fill_style.bg_color = Color(0.6, 0.1, 0.1, 0.9)
+			else:
+				fill_style.bg_color = Color(1.0, 0.8, 0.2, 0.9)
 
 
 ## === XP 진행도 ===
@@ -519,6 +524,12 @@ func _update_hull_display() -> void:
 		return
 	if is_instance_valid(player_ship) and player_ship.get("hull_hp") != null:
 		update_hull_hp(player_ship.hull_hp, player_ship.max_hull_hp)
+
+func _update_stamina_display() -> void:
+	if Engine.get_process_frames() % 5 != 0: # 스태미나는 좀 더 자주 업데이트 (60fps 기준 약 12번/초)
+		return
+	if is_instance_valid(player_ship) and player_ship.get("rowing_stamina") != null:
+		update_stamina(player_ship.rowing_stamina, 100.0) # 기본 100.0 유지
 
 
 func show_game_over() -> void:

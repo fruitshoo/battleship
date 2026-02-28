@@ -1,35 +1,56 @@
-[gd_scene load_steps=5 format=3 uid="uid://cannonball_scene"]
+[gd_scene load_steps=12 format=3 uid="uid://cannonball_scene"]
 
 [ext_resource type="Script" path="res://scripts/projectiles/cannonball.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://smoke04" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_smoke"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ball"]
 radius = 0.2
 height = 0.4
 
 [sub_resource type="StandardMaterial3D" id="Material_ball"]
-albedo_color = Color(0.1, 0.1, 0.1, 1)
+albedo_color = Color(0.05, 0.05, 0.05, 1)
 metallic = 1.0
-roughness = 0.2
-emission_enabled = true
-emission = Color(1, 0.4, 0.1, 1)
-emission_energy_multiplier = 2.0
+roughness = 0.4
+emission_enabled = false
 
 [sub_resource type="SphereShape3D" id="SphereShape_ball"]
 radius = 0.25
 
-[sub_resource type="Curve" id="Curve_trail"]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -2.0, 0.0, 0, 0]
+[sub_resource type="Curve" id="Curve_smoke_scale"]
+_data = [Vector2(0, 0.4), 0.0, 0.0, 0, 0, Vector2(1, 1.2), 0.0, 0.0, 0, 0]
 point_count = 2
 
-[sub_resource type="StandardMaterial3D" id="Material_trail"]
+[sub_resource type="CurveTexture" id="CurveTexture_smoke"]
+curve = SubResource("Curve_smoke_scale")
+
+[sub_resource type="Curve" id="Curve_smoke_alpha"]
+_data = [Vector2(0, 0.05), 0.0, 0.4, 0, 0, Vector2(0.2, 0.3), 0.0, 0.0, 0, 0, Vector2(1, 0), -0.5, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_alpha"]
+curve = SubResource("Curve_smoke_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_trail"]
+direction = Vector3(0, 0, 1)
+spread = 2.0
+gravity = Vector3(0, 0.2, 0)
+initial_velocity_min = 0.5
+initial_velocity_max = 1.0
+scale_curve = SubResource("CurveTexture_smoke")
+alpha_curve = SubResource("CurveTexture_alpha")
+color = Color(0.7, 0.7, 0.7, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trail"]
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
-albedo_color = Color(0.5, 0.5, 0.5, 0.6)
+albedo_texture = ExtResource("1_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
 
-[sub_resource type="SphereMesh" id="SphereMesh_trail"]
-radius = 0.15
-height = 0.3
+[sub_resource type="QuadMesh" id="QuadMesh_trail"]
+material = SubResource("StandardMaterial3D_trail")
+size = Vector2(0.8, 0.8)
 
 [node name="Cannonball" type="Area3D"]
 collision_layer = 4
@@ -44,17 +65,10 @@ surface_material_override/0 = SubResource("Material_ball")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("SphereShape_ball")
 
-[node name="SmokeTrail" type="CPUParticles3D" parent="."]
-amount = 20
-lifetime = 0.5
-direction = Vector3(0, 0, 1)
-spread = 10.0
-gravity = Vector3(0, 1, 0)
-initial_velocity_min = 2.0
-initial_velocity_max = 5.0
-scale_amount_min = 0.5
-scale_amount_max = 1.5
-scale_amount_curve = SubResource("Curve_trail")
-color = Color(0.8, 0.8, 0.8, 0.4)
-mesh = SubResource("SphereMesh_trail")
-draw_order = 2
+[node name="SmokeTrail" type="GPUParticles3D" parent="."]
+amount = 30
+lifetime = 0.8
+preprocess = 0.05
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_trail")
+draw_pass_1 = SubResource("QuadMesh_trail")

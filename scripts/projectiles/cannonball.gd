@@ -3,7 +3,7 @@ extends Area3D
 ## 대포알 (Cannonball)
 ## 정해진 방향으로 전진하며, 적과 충돌 시 적을 파괴함
 
-@export var speed: float = 80.0
+@export var speed: float = 50.0
 @export var lifetime: float = 2.0 # 사거리 단축 (80 * 2 = 160m)
 @export var damage: float = 1.0
 @export var homing_strength: float = 0.0 # 유도 제거

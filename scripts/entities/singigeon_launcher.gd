@@ -38,6 +38,10 @@ func _find_nearest_enemy() -> Node3D:
 	
 	for enemy in enemies:
 		if not is_instance_valid(enemy): continue
+		
+		# 자기 자신(부모 배)은 무시
+		if get_parent() == enemy: continue
+		
 		var dist = global_position.distance_to(enemy.global_position)
 		if dist < min_dist:
 			min_dist = dist
@@ -62,9 +66,11 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 		rocket.start_pos = spawn_pos
 		rocket.target_pos = target.global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))
 		
-		# 발사 주체 (팀) 전달
+		# 발사 주체 (팀/쏜 사람) 전달
 		if "team" in rocket:
 			rocket.team = self.team
+		if "shooter" in rocket:
+			rocket.shooter = get_parent() # 발사기가 붙어있는 배
 		
 		get_tree().root.add_child(rocket)
 		rocket.global_position = spawn_pos

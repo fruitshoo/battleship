@@ -1,6 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/projectiles/singigeon_rocket.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/flare_01_a.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/spark_01_a.png" id="3"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_body"]
 top_radius = 0.05
@@ -9,6 +11,51 @@ height = 0.8
 
 [sub_resource type="BoxShape3D" id="BoxShape_col"]
 size = Vector3(0.15, 0.15, 0.8)
+
+[sub_resource type="Curve" id="Curve_spark"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -2.5, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_spark")
+
+[sub_resource type="Gradient" id="Gradient_spark"]
+offsets = PackedFloat32Array(0, 0.2, 0.6, 1)
+colors = PackedColorArray(1, 0.8, 0.3, 1, 1, 0.8, 0.3, 1, 1, 0.8, 0.3, 1, 1, 0.8, 0.3, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_color"]
+gradient = SubResource("Gradient_spark")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
+direction = Vector3(0, 0, 1)
+spread = 45.0
+initial_velocity_min = 2.0
+initial_velocity_max = 5.0
+gravity = Vector3(0, -0.5, 0)
+damping_min = 1.0
+damping_max = 3.0
+scale_min = 0.05
+scale_max = 0.08
+scale_curve = SubResource("CurveTexture_scale")
+color_ramp = SubResource("GradientTexture1D_color")
+hue_variation_min = -0.05
+hue_variation_max = 0.05
+turbulence_enabled = true
+turbulence_noise_scale = 3.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spark"]
+transparency = 1
+vertex_color_use_as_albedo = true
+albedo_color = Color(1, 1, 1, 1)
+billboard_mode = 3
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+emission_enabled = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+material = SubResource("StandardMaterial3D_spark")
+size = Vector2(0.08, 0.08)
 
 [node name="SingijeonRocket" type="Area3D"]
 collision_layer = 2
@@ -21,3 +68,13 @@ mesh = SubResource("CylinderMesh_body")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("BoxShape_col")
+
+[node name="RocketTrail" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4)
+amount = 150
+lifetime = 0.5
+explosiveness = 0.05
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_spark")
+draw_pass_1 = SubResource("QuadMesh_spark")
+

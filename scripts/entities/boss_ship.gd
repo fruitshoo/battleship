@@ -22,10 +22,18 @@ var orbit_angle: float = 0.0
 # 누수(Leaking) 시스템 변수
 var leaking_rate: float = 0.0 # 초당 피해량
 
+# === 시각 효과 관련 ===
+var tilt_offset: float = 0.0 # 장군전 등에 의한 기울기
+var bobbing_amplitude: float = 0.25
+var bobbing_speed: float = 0.8
+var rocking_amplitude: float = 0.03
+var base_y: float = 0.0
+
 var cached_lm: Node = null
 
 func _ready() -> void:
 	hp = max_p
+	base_y = global_position.y
 	add_to_group("enemy")
 	add_to_group("boss")
 	add_to_group("ships")
@@ -142,6 +150,20 @@ func _process(delta: float) -> void:
 	# === 누수(Leaking) 데미지 ===
 	if leaking_rate > 0:
 		take_damage(leaking_rate * delta)
+		
+	# === 둥실둥실 및 기울기 효과 ===
+	_apply_visual_bobbing()
+
+func _apply_visual_bobbing() -> void:
+	var time = Time.get_ticks_msec() * 0.001
+	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude
+	
+	# 수직 위치 (가라앉지 않음)
+	global_position.y = base_y + bob_offset
+	
+	# 시각적 회전 (기울기 제한 포함)
+	# 보스는 덩치가 커서 원심력 기울기는 아주 작게 적용
+	rotation.z = (sin(time * bobbing_speed * 0.7) * rocking_amplitude) + tilt_offset
 
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
@@ -260,3 +282,14 @@ func add_leak(amount: float) -> void:
 func remove_leak(amount: float) -> void:
 	leaking_rate = maxf(0.0, leaking_rate - amount)
 	print("[Status] 보스 누수 완화. 남은 누수율: %.1f" % leaking_rate)
+
+# === 장군전 등 특수 피격 로직 ===
+func add_stuck_object(obj: Node3D, _s_mult: float, _t_mult: float) -> void:
+	# 보스는 속도 저하보다는 시각적 기울기만 적용
+	var tilt_dir = 1.0 if obj.global_position.x > global_position.x else -1.0
+	var new_tilt = deg_to_rad(randf_range(3.0, 6.0)) * tilt_dir # 보스는 덜 기웃거림
+	tilt_offset = clamp(tilt_offset + new_tilt, -deg_to_rad(10.0), deg_to_rad(10.0))
+
+func remove_stuck_object(_obj: Node3D, _s_mult: float, _t_mult: float) -> void:
+	tilt_offset *= 0.5
+	if tilt_offset < 0.01: tilt_offset = 0.0

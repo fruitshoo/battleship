@@ -1,8 +1,13 @@
-[gd_scene load_steps=18 format=3 uid="uid://enemy_ship_scene_uid"]
+[gd_scene format=3 uid="uid://dhgl16b2bfb5i"]
 
-[ext_resource type="Script" path="res://scripts/entities/chaser_ship.gd" id="1_chaser"]
+[ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/chaser_ship.gd" id="1_chaser"]
 [ext_resource type="PackedScene" path="res://scenes/soldier.tscn" id="2_soldier"]
 [ext_resource type="PackedScene" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
+
+[ext_resource type="Shader" uid="uid://cm67x8u3kql1j" path="res://assets/shaders/sail.gdshader" id="4_sail_shader"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_collision"]
+size = Vector3(3, 2, 8)
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(3, 1, 8)
@@ -14,13 +19,21 @@ albedo_color = Color(0.3, 0.1, 0.1, 1)
 size = Vector3(2, 0.8, 1.5)
 
 [sub_resource type="StandardMaterial3D" id="Material_bow"]
-albedo_color = Color(0.4, 0.0, 0.0, 1)
+albedo_color = Color(0.4, 0, 0, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_sail"]
-size = Vector3(4, 6, 0.2)
+[sub_resource type="PlaneMesh" id="PlaneMesh_sail"]
+size = Vector2(4, 6)
+subdivide_depth = 10
+subdivide_width = 10
+orientation = 2
 
-[sub_resource type="StandardMaterial3D" id="Material_sail"]
-albedo_color = Color(0.7, 0.1, 0.1, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sail"]
+render_priority = 0
+shader = ExtResource("4_sail_shader")
+shader_parameter/albedo = Color(0.7, 0.1, 0.1, 1)
+shader_parameter/wave_speed = 3.0
+shader_parameter/wave_strength = 0.2
+shader_parameter/wind_strength = 1.0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_arrow_shaft"]
 top_radius = 0.1
@@ -35,88 +48,141 @@ top_radius = 0.0
 bottom_radius = 0.2
 height = 0.5
 
+[sub_resource type="CylinderMesh" id="CylinderMesh_mast"]
+top_radius = 0.15
+bottom_radius = 0.2
+height = 8.0
+
+[sub_resource type="StandardMaterial3D" id="Material_mast"]
+albedo_color = Color(0.3, 0.15, 0.1, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_yardarm"]
+top_radius = 0.1
+bottom_radius = 0.1
+height = 4.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_oar_shaft"]
+size = Vector3(0.1, 4.0, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_oar_blade"]
+size = Vector3(0.4, 2.0, 0.05)
+
 [sub_resource type="BoxMesh" id="BoxMesh_rudder"]
-size = Vector3(0.2, 1.5, 1.0)
+size = Vector3(0.2, 1.5, 1)
 
 [sub_resource type="StandardMaterial3D" id="Material_rudder"]
 albedo_color = Color(0.5, 0.1, 0.1, 1)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_deck"]
-vertices = PackedVector3Array(-1.25, 0.0, -3.75, 1.25, 0.0, -3.75, 1.25, 0.0, 3.75, -1.25, 0.0, 3.75)
+vertices = PackedVector3Array(-1.25, 0, -3.75, 1.25, 0, -3.75, 1.25, 0, 3.75, -1.25, 0, 3.75)
 polygons = [PackedInt32Array(0, 1, 2, 3)]
 agent_height = 1.25
 agent_radius = 0.2
-edge_connection_margin = 1.5
 
-[sub_resource type="BoxShape3D" id="BoxShape_collision"]
-size = Vector3(3, 2, 8)
-
-[node name="EnemyShip" type="Area3D" groups=["enemy"]]
+[node name="EnemyShip" type="Area3D" unique_id=2138341481 groups=["enemy"]]
 collision_layer = 4
 collision_mask = 2
 script = ExtResource("1_chaser")
-soldier_scene = ExtResource("2_soldier")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=696808509]
 shape = SubResource("BoxShape_collision")
 
-[node name="Hull" type="MeshInstance3D" parent="."]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=790671682]
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_wood")
 
-[node name="Bow" type="MeshInstance3D" parent="."]
+[node name="Mast" type="MeshInstance3D" parent="." unique_id=1411223344]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
+mesh = SubResource("CylinderMesh_mast")
+surface_material_override/0 = SubResource("Material_mast")
+
+[node name="Bow" type="MeshInstance3D" parent="." unique_id=281090423]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, -4.5)
 mesh = SubResource("BoxMesh_bow")
 surface_material_override/0 = SubResource("Material_bow")
 
-[node name="SailVisual" type="Node3D" parent="."]
+[node name="SailVisual" type="Node3D" parent="." unique_id=1164678325]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
 
-[node name="SailMesh" type="MeshInstance3D" parent="SailVisual"]
-mesh = SubResource("BoxMesh_sail")
-surface_material_override/0 = SubResource("Material_sail")
+[node name="Yardarm" type="MeshInstance3D" parent="SailVisual" unique_id=1455667788]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 3, 0)
+mesh = SubResource("CylinderMesh_yardarm")
+surface_material_override/0 = SubResource("Material_mast")
 
-[node name="DirectionArrow" type="Node3D" parent="SailVisual"]
+[node name="SailMesh" type="MeshInstance3D" parent="SailVisual" unique_id=1132362568]
+mesh = SubResource("PlaneMesh_sail")
+surface_material_override/0 = SubResource("ShaderMaterial_sail")
+
+[node name="OarBaseLeft" type="Node3D" parent="." unique_id=1948375013]
+transform = Transform3D(0.7680025, 0.10501643, -0.6317781, 0.55431855, 0.38510087, 0.7378536, 0.3207852, -0.9168797, 0.237546, -1.5, 1.25, 2.5)
+
+[node name="OarPivot" type="Node3D" parent="OarBaseLeft" unique_id=1847293847]
+
+[node name="OarShaft" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=482938475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.0, 0)
+mesh = SubResource("BoxMesh_oar_shaft")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="OarBlade" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=983746193]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
+mesh = SubResource("BoxMesh_oar_blade")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="OarBaseRight" type="Node3D" parent="." unique_id=2948375013]
+transform = Transform3D(0.7680025, -0.10501643, 0.6317781, -0.55431855, 0.38510087, 0.7378536, -0.3207852, -0.9168797, 0.237546, 1.5, 1.25, 2.5)
+
+[node name="OarPivot" type="Node3D" parent="OarBaseRight" unique_id=2847293847]
+
+[node name="OarShaft" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=582938475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.0, 0)
+mesh = SubResource("BoxMesh_oar_shaft")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="OarBlade" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=183746193]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
+mesh = SubResource("BoxMesh_oar_blade")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="DirectionArrow" type="Node3D" parent="SailVisual" unique_id=766990029]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0.2)
 visible = false
 
-[node name="ArrowShaft" type="MeshInstance3D" parent="SailVisual/DirectionArrow"]
+[node name="ArrowShaft" type="MeshInstance3D" parent="SailVisual/DirectionArrow" unique_id=1435780232]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("CylinderMesh_arrow_shaft")
 surface_material_override/0 = SubResource("Material_arrow")
 
-[node name="ArrowHead" type="MeshInstance3D" parent="SailVisual/DirectionArrow"]
+[node name="ArrowHead" type="MeshInstance3D" parent="SailVisual/DirectionArrow" unique_id=753217642]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
 mesh = SubResource("CylinderMesh_arrow_head")
 surface_material_override/0 = SubResource("Material_arrow")
 
-[node name="RudderVisual" type="Node3D" parent="."]
+[node name="RudderVisual" type="Node3D" parent="." unique_id=1755299861]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.5)
 
-[node name="RudderMesh" type="MeshInstance3D" parent="RudderVisual"]
+[node name="RudderMesh" type="MeshInstance3D" parent="RudderVisual" unique_id=1623860287]
 mesh = SubResource("BoxMesh_rudder")
 surface_material_override/0 = SubResource("Material_rudder")
 
-[node name="DeckNavigationRegion" type="NavigationRegion3D" parent="."]
+[node name="DeckNavigationRegion" type="NavigationRegion3D" parent="." unique_id=685970758]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 navigation_mesh = SubResource("NavigationMesh_deck")
 
-[node name="Soldiers" type="Node3D" parent="."]
+[node name="Soldiers" type="Node3D" parent="." unique_id=470013572]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
-[node name="Archer1" parent="Soldiers" instance=ExtResource("2_soldier")]
+[node name="Archer1" parent="Soldiers" unique_id=438727161 instance=ExtResource("2_soldier")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
 team = "enemy"
 
-[node name="Archer2" parent="Soldiers" instance=ExtResource("2_soldier")]
+[node name="Archer2" parent="Soldiers" unique_id=1097590409 instance=ExtResource("2_soldier")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
 team = "enemy"
 
-[node name="Archer3" parent="Soldiers" instance=ExtResource("2_soldier")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+[node name="Archer3" parent="Soldiers" unique_id=2073146356 instance=ExtResource("2_soldier")]
 team = "enemy"
 
-[node name="WakeTrail" parent="." instance=ExtResource("3_wake_trail")]
+[node name="WakeTrail" parent="." unique_id=1464356147 instance=ExtResource("3_wake_trail")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
 
 [connection signal="area_entered" from="." to="." method="_on_area_entered"]

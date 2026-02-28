@@ -5,7 +5,7 @@ extends Node
 
 signal level_up(new_level: int)
 signal score_changed(new_score: int)
-signal enemy_destroyed_count(count: int)
+
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
 @export var boss_spawn_time: float = 600.0 # 보스 등장 시간 (초, 기본 10분)
@@ -73,7 +73,6 @@ func _prewarm_shaders() -> void:
 		preload("res://scenes/projectiles/cannonball.tscn"),
 		preload("res://scenes/effects/muzzle_flash.tscn"),
 		preload("res://scenes/effects/muzzle_smoke.tscn"),
-		preload("res://scenes/effects/shockwave.tscn"),
 		preload("res://scenes/effects/hit_effect.tscn"),
 		preload("res://scenes/effects/wood_splinter.tscn")
 	]
@@ -87,13 +86,23 @@ func _prewarm_shaders() -> void:
 		if scene:
 			var inst = scene.instantiate()
 			container.add_child(inst)
-			if inst is GPUParticles3D:
-				inst.emitting = true
+			
+			# 모든 하위 파티클 검색 및 작동 유도
+			_trigger_all_particles(inst)
 				
-	# 한 프레임 뒤에 삭제 (브라우저가 렌더링 파이프라인을 준비할 시간 제공)
+	# 최소 2프레임 대기 (브라우저와 드라이버가 렌더링 파이프라인을 완전히 준비할 시간 제공)
 	await get_tree().process_frame
+	await get_tree().process_frame
+	
 	container.queue_free()
 	print("[Resource] 쉐이더 예열 완료 (Shader pre-warming complete)")
+
+func _trigger_all_particles(node: Node) -> void:
+	if node is GPUParticles3D or node is CPUParticles3D:
+		node.emitting = true
+	
+	for child in node.get_children():
+		_trigger_all_particles(child)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -281,7 +290,6 @@ func _debug_cannons() -> void:
 	
 	for cannon in cannons_node.get_children():
 		var det_area = cannon.get_node_or_null("DetectionArea")
-		var _muzzle = cannon.get_node_or_null("Muzzle") # 현재 사용되지 않으나 디버그용 노드 참조 (TODO: 추후 삭제 검토)
 		var overlaps = 0
 		var monitoring = false
 		if det_area:

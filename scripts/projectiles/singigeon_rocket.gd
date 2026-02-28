@@ -3,14 +3,15 @@ extends Area3D
 ## 신기전 로켓 (Singigeon Rocket)
 ## 빠르게 직선 비행, 적 충돌 시 범위 피해 및 화약 폭발 효과
 
-@export var speed: float = 70.0
-@export var damage: float = 5.0 # 함선 데미지
+@export var speed: float = 45.0
+@export var damage: float = 2.5 # 함선 데미지 하향 (5.0 -> 2.5)
 @export var personnel_damage_mult: float = 5.0 # 병사 데미지 배수 하향 (25 -> 5)
 @export var lifetime: float = 3.0
 @export var blast_radius: float = 3.5
 @export var explosion_scene: PackedScene = preload("res://scenes/effects/rocket_explosion.tscn")
 
 var team: String = "player"
+var shooter: Node3D = null # 이 로켓을 쏜 선박 (오사 방지용)
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -70,6 +71,10 @@ func _on_hit(target: Node) -> void:
 	var target_group = "enemy" if team == "player" else "player"
 	if not hit_obj.is_in_group(target_group):
 		return
+		
+	# 자기 자신(쏜 사람)은 절대로 맞지 않음
+	if shooter and (hit_obj == shooter or hit_obj.get_parent() == shooter):
+		return
 
 	# 직접 맞은 대상에게만 데미지 적용
 	_apply_damage(hit_obj)
@@ -102,6 +107,11 @@ func _apply_damage(target_node: Node) -> void:
 
 func _explode() -> void:
 	has_exploded = true
+	
+	# 트레일 중단
+	var trail = get_node_or_null("RocketTrail")
+	if trail:
+		trail.emitting = false
 	
 	# 폭발 VFX(화염/연기) 제거 - 요청에 따라 나무 파편(take_damage 내에 있음)만 남김
 	# 폭발 사운드는 타격감 유지를 위해 남겨둠

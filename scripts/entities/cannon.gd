@@ -5,7 +5,6 @@ extends Node3D
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 @export var muzzle_flash_scene: PackedScene = preload("res://scenes/effects/muzzle_flash.tscn")
-@export var shockwave_scene: PackedScene = preload("res://scenes/effects/shockwave.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 @export var fire_cooldown: float = 2.0
 @export var detection_range: float = 25.0
@@ -33,7 +32,21 @@ func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 
 
 func _process(delta: float) -> void:
+	# 0. 부모 배의 상태 체크: 배가 침몰 중이거나 유령선(폐선)이면 발사 불가
+	var ship = get_parent()
+	if is_instance_valid(ship):
+		if ship.get("is_dying") or ship.get("is_sinking") or ship.get("is_derelict"):
+			is_preparing = false
+			current_target = null
+			return
+
 	if is_preparing:
+		# 발사 대기 중에도 타겟이 유효한지 실시간 체크
+		if not _is_target_valid(current_target):
+			is_preparing = false
+			current_target = null
+			return
+			
 		prepare_timer -= delta
 		if prepare_timer <= 0:
 			_execute_fire()
@@ -95,7 +108,22 @@ func _update_target() -> void:
 	current_target = nearest_enemy
 
 func _is_target_valid(target: Node3D) -> bool:
-	if not is_instance_valid(target): return false
+	if not is_instance_valid(target) or target.is_queued_for_deletion():
+		return false
+	
+	# 침몰 중이거나 체력이 없는 배는 타겟에서 제외
+	var is_dying = target.get("is_dying") == true
+	var is_sinking = target.get("is_sinking") == true
+	var is_dead_hp = target.get("hp") != null and target.get("hp") <= 0
+	
+	if is_dying or is_sinking or is_dead_hp:
+		return false
+		
+	# 그룹 체크 (침몰 시 그룹에서 빠짐)
+	var enemy_group = "enemy" if team == "player" else "player"
+	if not target.is_in_group(enemy_group):
+		return false
+		
 	var current_range = _get_current_range()
 	if global_position.distance_squared_to(target.global_position) > current_range * current_range: return false
 	if not _is_within_arc(target): return false
@@ -149,8 +177,10 @@ func fire(target_enemy: Node3D) -> void:
 func _execute_fire() -> void:
 	is_preparing = false
 	
-	if not is_instance_valid(current_target) or current_target.get("is_dead") == true:
-		return # 타겟이 그동안 죽거나 사라졌다면 발사 취소
+	# 최종 발사 직전 다시 한번 타겟 유효성 검증
+	if not _is_target_valid(current_target):
+		current_target = null
+		return
 		
 	# 사운드 재생
 	if is_instance_valid(AudioManager):
@@ -190,8 +220,6 @@ func _execute_fire() -> void:
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(current_target.global_position)
 	
-	# 거리 기반 자동 포도탄(Grapeshot) 전환 (제거됨 - 일반탄 고정)
-	
 	var time_to_hit = dist / 80.0
 	
 	var enemy_speed = 3.5
@@ -214,13 +242,6 @@ func _execute_fire() -> void:
 		if flash.has_method("set_fire_direction"):
 			flash.set_fire_direction(ball.direction)
 			
-	# 머즐 쇼크웨이브 생성
-	if shockwave_scene:
-		var wave = shockwave_scene.instantiate()
-		get_tree().root.add_child(wave)
-		wave.global_position = muzzle.global_position
-		# 총구 방향으로 비스듬히 눕히기
-		wave.look_at(wave.global_position + ball.direction, Vector3.UP)
 		
 	# 머즐 연기 생성
 	if muzzle_smoke_scene:

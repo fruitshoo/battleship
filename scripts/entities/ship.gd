@@ -59,6 +59,14 @@ var _fire_instance: Node3D = null
 # 노드 참조
 @onready var sail_visual: Node3D = $SailVisual if has_node("SailVisual") else null
 @onready var rudder_visual: Node3D = $RudderVisual if has_node("RudderVisual") else null
+@onready var wake_trail: GPUParticles3D = $WakeTrail if has_node("WakeTrail") else null
+
+# Oar (노) 레퍼런스 및 상태
+@onready var oar_pivot_left: Node3D = $OarBaseLeft/OarPivot if has_node("OarBaseLeft/OarPivot") else null
+@onready var oar_pivot_right: Node3D = $OarBaseRight/OarPivot if has_node("OarBaseRight/OarPivot") else null
+var _oar_time: float = 0.0
+
+@onready var ship_audio: AudioStreamPlayer3D = $ShipAudio if has_node("ShipAudio") else null
 
 var hull_defense: float = 0.0 # 영구 업그레이드로 상승
 var _cached_level_manager: Node = null
@@ -72,6 +80,7 @@ var current_crew_count: int = 4
 
 var _flap_timer: float = 0.0
 var _wave_timer: float = 2.0
+var _current_wind_intake: float = 1.0 # 0.0(쳐짐) ~ 1.0(빵빵함)
 var _oars_timer: float = 0.0
 var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
 
@@ -155,12 +164,14 @@ func _physics_process(delta: float) -> void:
 	if _flap_timer > 0:
 		_flap_timer -= delta
 		
-	if current_speed > 2.5:
+	if current_speed > 0.5:
 		_wave_timer -= delta
 		if _wave_timer <= 0:
 			if is_instance_valid(AudioManager):
 				AudioManager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
-			_wave_timer = randf_range(1.5, 3.5) / (current_speed / 5.0)
+			# 속도가 빠를수록 자주, 느릴수록 드문드문 (최소 1.5초 ~ 최대 4.5초)
+			var speed_mod = clamp(current_speed / 5.0, 0.2, 2.0)
+			_wave_timer = randf_range(1.5, 3.5) / speed_mod
 		
 	if is_sinking:
 		return
@@ -169,6 +180,7 @@ func _physics_process(delta: float) -> void:
 	_update_movement(delta)
 	_update_steering(delta)
 	_update_rowing_stamina(delta)
+	_update_oar_visual(delta)
 	_update_hull_regeneration(delta)
 	_update_burning_status(delta)
 	_update_crew_respawn(delta)
@@ -353,13 +365,11 @@ func _update_movement(delta: float) -> void:
 	
 	position += velocity * delta
 	
-	# 웨이크 트레일 제어
-	var wake_trail = $WakeTrail
+	# 물결 이펙트 (속도가 있거나 분리력이 있을 때)
 	if wake_trail:
 		wake_trail.emitting = current_speed > 0.5 or sep.length() > 0.2
-
-
-## 러더 기반 조향
+	
+	# 도선 중이거나 폐선일 때는 이동하지 않음
 func _update_steering(delta: float) -> void:
 	# 속도가 있어야 회전 가능! (실제 배처럼)
 	if current_speed < 0.1:
@@ -410,6 +420,9 @@ func _calculate_sail_speed() -> float:
 	#    forward_component가 음수면(돛이 뒤를 향함) 배가 뒤로 가진 않음 (0 처리)
 	var thrust = wind_force * max(0.0, forward_component)
 	
+	# 시각 효과를 위해 바람 받는 양 저장
+	_current_wind_intake = wind_force
+	
 	# 디버그: 물리 계산 값 확인
 	if Input.is_action_just_pressed("ui_accept"):
 		print("=== Physics Debug ===")
@@ -452,6 +465,11 @@ func _update_sail_visual() -> void:
 	if sail_visual:
 		# 시각적으로 반대로 (E키 = 시계방향)
 		sail_visual.rotation.y = deg_to_rad(-sail_angle)
+		
+		# 돛 물리 시뮬레이션 (Shader 연동) - instance uniform은 MeshInstance3D에 직접 적용
+		var mesh = sail_visual.get_node_or_null("SailMesh") as MeshInstance3D
+		if mesh:
+			mesh.set_instance_shader_parameter("wind_strength", _current_wind_intake)
 
 
 ## 러더 시각화 업데이트
@@ -459,16 +477,49 @@ func _update_rudder_visual() -> void:
 	if rudder_visual:
 		rudder_visual.rotation.y = deg_to_rad(rudder_angle)
 
+## 동양식 노(Ro/Yuloh) 8자 젓기 애니메이션
+func _update_oar_visual(delta: float) -> void:
+	var has_oars = oar_pivot_left or oar_pivot_right
+	if not has_oars: return
+	
+	# 수동으로 젓고 있거나, 배가 어느 정도 속도로 이동 중일 때 노를 저음
+	var is_actively_rowing = is_rowing and rowing_stamina > 0
+	var is_moving_fast = current_speed > 1.0
+	
+	if is_actively_rowing or is_moving_fast:
+		var row_speed = 2.2 if is_actively_rowing else 1.2 # 수동일 때 더 역동적이지만 너무 빠르지 않게
+		_oar_time += delta * row_speed
+		
+		# 8자 모션 (Lissajous curve 기반 Sculling)
+		var sweep_angle = sin(_oar_time) * 0.2 # 진폭을 0.4 -> 0.2로 줄여 얌전하게
+		var twist_angle = sin(_oar_time * 2.0) * 0.1 # 비틀기 진폭도 0.2 -> 0.1로 감소
+		
+		# 좌우(Yaw) 대신 앞뒤(Pitch - X축)로 흔들고(sweep), Z축으로 비틂(twist)
+		if oar_pivot_left:
+			oar_pivot_left.rotation.x = sweep_angle
+			oar_pivot_left.rotation.z = twist_angle
+		if oar_pivot_right:
+			# 양쪽 노가 동시에 앞뒤로 움직이도록 sweep_angle은 동일하게 적용
+			oar_pivot_right.rotation.x = sweep_angle
+			oar_pivot_right.rotation.z = - twist_angle
+	else:
+		# 노를 젓지 않을 때는 천천히 중앙으로 복귀
+		if oar_pivot_left:
+			oar_pivot_left.rotation.x = lerp_angle(oar_pivot_left.rotation.x, 0.0, delta * 2.0)
+			oar_pivot_left.rotation.z = lerp_angle(oar_pivot_left.rotation.z, 0.0, delta * 2.0)
+		if oar_pivot_right:
+			oar_pivot_right.rotation.x = lerp_angle(oar_pivot_right.rotation.x, 0.0, delta * 2.0)
+			oar_pivot_right.rotation.z = lerp_angle(oar_pivot_right.rotation.z, 0.0, delta * 2.0)
 
 ## 노 젓기 스태미나 관리
 func _update_rowing_stamina(delta: float) -> void:
 	if is_rowing and rowing_stamina > 0:
-		rowing_stamina -= stamina_drain_rate * delta
+		rowing_stamina -= 10.0 * delta # 노를 저으면 스태미나 소모 (기존 15 -> 10으로 완화)
 		rowing_stamina = max(0.0, rowing_stamina)
 		if rowing_stamina <= 0:
 			is_rowing = false
 	elif not is_rowing and rowing_stamina < 100.0:
-		rowing_stamina += stamina_recovery_rate * delta
+		rowing_stamina += 15.0 * delta # 쉬면 스태미나 회복 (기존 10 -> 15로 상향)
 		rowing_stamina = min(100.0, rowing_stamina)
 
 
@@ -642,9 +693,12 @@ func add_stuck_object(obj: Node3D, s_mult: float, t_mult: float) -> void:
 		
 		# 기울기 추가 (랜덤 방향으로 5~10도)
 		var tilt_dir = 1.0 if obj.global_position.x > global_position.x else -1.0
-		tilt_offset += deg_to_rad(randf_range(5.0, 10.0)) * tilt_dir
+		var new_tilt = deg_to_rad(randf_range(5.0, 10.0)) * tilt_dir
 		
-		print("[Impact] 배에 물체가 박힘! (현재 속도 배율: %.2f, 선회 배율: %.2f, 기울기: %.1f)" % [speed_mult, turn_mult, rad_to_deg(tilt_offset)])
+		# 전체 기울기 제한 (최대 12도 정도로 캡 적용)
+		tilt_offset = clamp(tilt_offset + new_tilt, -deg_to_rad(12.0), deg_to_rad(12.0))
+		
+		print("[Impact] 배에 물체가 박힘! (현재 속도 배율: %.2f, 선회 배율: %.2f, 최종 기울기: %.1f)" % [speed_mult, turn_mult, rad_to_deg(tilt_offset)])
 		
 		# HUD 알림 (선택 사항)
 		if _cached_hud and _cached_hud.has_method("show_message"):
