@@ -16,7 +16,7 @@
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1490688369]
 environment = ExtResource("1_h2yge")
 
-[node name="OceanPlane" parent="." unique_id=14914605 instance=ExtResource("10_ocean")]
+[node name="OceanPlane" parent="." unique_id=1674501873 instance=ExtResource("10_ocean")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1440746174]

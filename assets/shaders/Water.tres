@@ -36,5 +36,5 @@ shader_parameter/movement_direction = Vector2(0.2, 0.1)
 shader_parameter/movement_strength = 0.12
 shader_parameter/uv_scale = 150.0
 shader_parameter/depth_distance = 4.0
-shader_parameter/beers_law = 2.0
-shader_parameter/water_transparency = 0.1
+shader_parameter/beers_law = 0.8
+shader_parameter/water_transparency = 0.02

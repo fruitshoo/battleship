@@ -25,7 +25,13 @@ var target_ship: Node3D = null
 func _ready() -> void:
 	var distance = start_pos.distance_to(target_pos)
 	duration = distance / speed
-	if duration < 0.5: duration = 0.5
+	
+	# 근거리에서 채찍처럼 꽂히는 현상 방지를 위해 최소 비행 시간 확보 (0.5 -> 0.7)
+	if duration < 0.7: duration = 0.7
+	
+	# 거리에 따라 포물선 높이 조절 (근거리는 낮게, 원거리는 높게)
+	# 10m당 1m 상승, 최소 1.5m ~ 최대 8m
+	arc_height = clamp(distance * 0.12, 1.5, 8.0)
 	
 	global_position = start_pos
 	

@@ -5,9 +5,9 @@
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ocean"]
 material = ExtResource("1_wvfhj")
-size = Vector2(350, 350)
-subdivide_width = 64
-subdivide_depth = 64
+size = Vector2(600, 600)
+subdivide_width = 96
+subdivide_depth = 96
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ocean"]
 

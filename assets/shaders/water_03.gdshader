@@ -80,7 +80,8 @@ void fragment() {
 	
 	// 출력
 	ALBEDO = final_albedo;
-	ALPHA = clamp(1.0 - beers_blend + water_transparency, 0.0, 1.0);
+	// 깊을수록 확실히 불투명해지도록 보정 (beers_blend가 낮아질수록 ALPHA가 1.0에 수렴)
+	ALPHA = clamp(1.0 - (beers_blend * 0.8) + water_transparency, 0.0, 1.0);
 	ROUGHNESS = roughness;
 	
 	NORMAL_MAP = normal_blend;
