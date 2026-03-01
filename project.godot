@@ -31,6 +31,13 @@ UpgradeManager="*res://scripts/managers/upgrade_manager.gd"
 SaveManager="*res://scripts/managers/save_manager.gd"
 MetaManager="*res://scripts/managers/meta_manager.gd"
 
+[display]
+
+window/size/viewport_width=1152
+window/size/viewport_height=648
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
 [gui]
 
 theme/custom_font="uid://bnh5c3ww655lq"

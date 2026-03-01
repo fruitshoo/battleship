@@ -17,8 +17,8 @@ func _process(delta: float) -> void:
 	var um = get_node_or_null("/root/UpgradeManager")
 	var current_cooldown = fire_cooldown
 	if is_instance_valid(um) and "current_levels" in um:
-		var train_lv = um.current_levels.get("training", 0)
-		current_cooldown = fire_cooldown * (1.0 - 0.1 * train_lv)
+		var singigeon_lv = um.current_levels.get("singigeon", 0)
+		current_cooldown = fire_cooldown * maxf(0.5, 1.0 - 0.05 * singigeon_lv)
 		
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
@@ -87,14 +87,7 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 
 ## 업그레이드 시 호출
 func upgrade_to_level(level: int) -> void:
-	match level:
-		1:
-			shot_count = 1
-			spread_angle = 0.0
-		2:
-			shot_count = 3
-			spread_angle = 8.0
-		3:
-			shot_count = 5
-			spread_angle = 12.0
+	# 1~8 단계에 따른 발사 수 증가 (레벨 1, 3, 5, 7 마다 1발씩 증가)
+	shot_count = 1 + int((level - 1) / 2.0)
+	spread_angle = shot_count * 3.0
 	print("[Launcher] 신기전 Lv.%d (%d발, ±%.0f°)" % [level, shot_count, spread_angle])

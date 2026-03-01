@@ -10,7 +10,7 @@ signal score_changed(new_score: int)
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
 @export var boss_spawn_time: float = 600.0 # 보스 등장 시간 (초, 기본 10분)
 @export var max_level: int = 15
-@export var max_hull_hp_cap: float = 400.0 # 레벨업 HP 보너스 상한 (Phase 3 밸런싱)
+@export var max_hull_hp_cap: float = 800.0 # 레벨업 HP 보너스 상한 (함선 체력 상향에 맞춰 400->800)
 @export var hud: CanvasLayer = null
 
 var current_level: int = 1
@@ -65,20 +65,33 @@ func _ready() -> void:
 	_prewarm_shaders()
 
 func _prewarm_shaders() -> void:
-	# 웹 빌드에서 처음 파티클이나 이펙트가 나올 때 멈칫하는 현상을 방지하기 위해 
-	# 시작 시 주요 씬들을 한 번씩 인스턴스화했다가 삭제합니다.
+	# 1. 로딩(예열) 화면 생성 (화면 전체를 가리는 검은색 UI)
+	var loading_layer = CanvasLayer.new()
+	loading_layer.layer = 120 # 최상단
+	var bg = ColorRect.new()
+	bg.color = Color.BLACK
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading_layer.add_child(bg)
+	add_child(loading_layer)
+	
+	# 2. 쉐이더 예열 씬 목록 (누락된 씬 추가)
 	var scenes_to_warm = [
 		preload("res://scenes/projectiles/cannonball.tscn"),
 		preload("res://scenes/projectiles/janggun_missile.tscn"),
+		preload("res://scenes/projectiles/singigeon_rocket.tscn"),
+		preload("res://scenes/projectiles/arrow.tscn"),
 		preload("res://scenes/effects/muzzle_smoke.tscn"),
 		preload("res://scenes/effects/hit_effect.tscn"),
-		preload("res://scenes/effects/wood_splinter.tscn")
+		preload("res://scenes/effects/wood_splinter.tscn"),
+		preload("res://scenes/effects/rocket_explosion.tscn")
 	]
 	
+	# 카메라 뷰 안에 강제로 배치하여 Culling 방지 (보이지 않게 투명/초소형 처리)
 	var container = Node3D.new()
 	container.name = "ShaderPrewarmer"
 	add_child(container)
-	container.position = Vector3(0, -100, 0) # 화면 밖 아래쪽
+	container.position = Vector3(0, 0, 0) # 화면 중앙
+	container.scale = Vector3.ONE * 0.001
 	
 	for scene in scenes_to_warm:
 		if scene:
@@ -87,13 +100,18 @@ func _prewarm_shaders() -> void:
 			
 			# 모든 하위 파티클 검색 및 작동 유도
 			_trigger_all_particles(inst)
-				
-	# 최소 2프레임 대기 (브라우저와 드라이버가 렌더링 파이프라인을 완전히 준비할 시간 제공)
-	await get_tree().process_frame
-	await get_tree().process_frame
+			
+	# 오디오 매니저의 사전 캐싱 작업 대기 (약간의 프레임 대기)
+	for i in range(5):
+		await get_tree().process_frame
 	
+	# 3. 예열 노드 삭제 및 로딩 화면 페이드 아웃
 	container.queue_free()
-	print("[Resource] 쉐이더 예열 완료 (Shader pre-warming complete)")
+	print("[Resource] 쉐이더 예열 및 오디오 캐싱 완료")
+	
+	var tween = create_tween()
+	tween.tween_property(bg, "modulate:a", 0.0, 1.0) # 1초 동안 부드럽게 밝아짐
+	tween.tween_callback(loading_layer.queue_free)
 
 func _trigger_all_particles(node: Node) -> void:
 	if node is GPUParticles3D or node is CPUParticles3D:
@@ -196,11 +214,11 @@ func _set_level(new_level: int) -> void:
 	# 1. 골드 보상
 	add_score(5) # 점수 겸 골드 +5
 	
-	# 2. 선체 강화 (+10 Max HP, 최대 상한 적용)
+	# 2. 선체 강화 (+20 Max HP, 최대 상한 적용)
 	var ship = UpgradeManager._get_player_ship()
 	if ship:
-		ship.max_hull_hp = minf(ship.max_hull_hp + 10.0, max_hull_hp_cap)
-		ship.hull_hp = minf(ship.hull_hp + 10.0, ship.max_hull_hp)
+		ship.max_hull_hp = minf(ship.max_hull_hp + 20.0, max_hull_hp_cap)
+		ship.hull_hp = minf(ship.hull_hp + 20.0, ship.max_hull_hp)
 		if hud: hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	
 	# 3. 리롤권 지급 (레벨당 1회)

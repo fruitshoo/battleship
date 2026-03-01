@@ -3,6 +3,8 @@ extends "res://scripts/entities/base_ship.gd"
 
 ## 배 핵심 로직: 실제 범선 물리, 러더 조향, 둥실둥실 효과
 
+var team: String = "player"
+
 # === 이동 관련 ===
 @export var rowing_speed: float = 3.0 # 노 젓기 부스트 하향 (4.0 -> 3.0)
 

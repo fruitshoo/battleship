@@ -25,7 +25,7 @@ var minion_respawn_timer: float = 0.0
 
 # === 함대 진형 (Formation) 관련 ===
 enum Formation {COLUMN, WING}
-static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정
+static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정 (기본: 장사진)
 
 var formation_spacing: float = 20.0 # 선박 간 간격 상향 (12.0 -> 20.0)
 
@@ -352,7 +352,28 @@ func _physics_process(delta: float) -> void:
 	
 	# 전진 (누수율에 비례하여 속도 감소)
 	var leak_speed_mult = clamp(1.0 - (leaking_rate * 0.05), 0.3, 1.0)
-	var velocity = move_dir * move_speed * leak_speed_mult
+	
+	# === 바람 영향(Wind Force) 적용 ===
+	var wind_mult = 1.0
+	var wind_manager = get_node_or_null("/root/WindManager")
+	if is_instance_valid(wind_manager) and wind_manager.has_method("get_wind_direction"):
+		var wind_dir: Vector2 = wind_manager.get_wind_direction()
+		var wind_str: float = wind_manager.get_wind_strength()
+		
+		# 배의 전방 벡터 (2D 평면 기준)
+		var ship_forward = Vector2(move_dir.x, move_dir.z).normalized()
+		# 바람과 배 전방 방향의 내적 (1.0=순풍, -1.0=역풍)
+		var dot_prod = wind_dir.dot(ship_forward)
+		
+		# 역풍(-1) ~ 순풍(1)에 따라 0.4 ~ 1.5 배율 적용 (플레이어보다 약간 완화된 페널티)
+		# 즉, 역풍에도 최소 40%의 속도는 낼 수 있게 하여 아예 멈추지 않도록 함
+		var base_wind_influence = remap(dot_prod, -1.0, 1.0, 0.4, 1.5)
+		
+		# 바람의 세기(wind_str)가 강할수록 영향력이 커짐
+		# wind_str이 0이면 무조건 1.0(영향 없음)
+		wind_mult = lerp(1.0, base_wind_influence, wind_str)
+	
+	var velocity = move_dir * move_speed * leak_speed_mult * wind_mult
 	
 	# === 겹침 방지 (Separation) 적용 ===
 	# 이제 방향에 합치는 게 아니라, 속도에 직접 더해서 물리적으로 밀쳐내게 함
@@ -508,9 +529,15 @@ func _transfer_one_soldier() -> void:
 		if s.has_method("set_team"):
 			# 이 배의 팀을 따름 (나포된 후라면 player, 적 상태라면 enemy)
 			s.set_team(team)
+		
+		# ✅ 도선 시 현재 탑승 중인 배(owned_ship) 정보 업데이트 및 폭발 타이머 리셋
+		s.set("owned_ship", boarding_target)
+		if team == "enemy" and boarding_target.get("team") == "player":
+			s.set("boarder_explosion_timer", 8.0)
+			
 		if s.get("is_stationary"): s.set("is_stationary", false)
 		
-		print("[Action] 병사 1명 월선! (팀: %s)" % team)
+		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team, boarding_target.name])
 	else:
 		# 더 이상 넘길 병사가 없으면 임무 조기 종료 (폐선 상태로 전환)
 		print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
@@ -901,8 +928,14 @@ func _board_ship(target_ship: Node3D) -> void:
 		var ram_damage = move_speed * 4.0
 		if ship_node.has_method("take_damage"):
 			ship_node.take_damage(ram_damage, global_position)
-		# 자신도 시각적 파편 효과를 위해 데미지 (죽지는 않을 정도)
+			# 상대 배 갑판 병사들에게 광역 데미지 (충돌 위치 기준, 15 고정데미지)
+			if ship_node.has_method("apply_ramming_aoe"):
+				ship_node.apply_ramming_aoe(15.0, global_position)
+				
+		# 자신 자신에게 시각적 파편 효과를 위해 데미지 (죽지는 않을 정도)
 		take_damage(1.0, global_position)
+		# 자기 배 갑판 병사들에게도 여파 (5 데미지)
+		apply_ramming_aoe(5.0, global_position)
 		
 		# 충격 피드백 강화 (화면 흔들림 및 묵직한 사운드)
 		var audio_manager = get_node_or_null("/root/AudioManager")

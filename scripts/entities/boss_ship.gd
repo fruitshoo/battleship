@@ -90,12 +90,12 @@ func _setup_soldiers() -> void:
 	
 	for pos in spawn_points:
 		var s = soldier_scene.instantiate()
-		soldiers_node.add_child(s)
 		s.position = pos
 		s.team = "enemy"
-		# 보스 병사는 엘리트급 체력/데미지 보너스 (선택 사항)
+		# 보스 병사는 엘리트급 체력/데미지 보너스
 		s.max_health = 150.0
 		s.attack_damage = 15.0
+		soldiers_node.add_child(s)
 
 func _process(delta: float) -> void:
 	if is_dying: return
@@ -140,7 +140,22 @@ func _process(delta: float) -> void:
 		
 	# 이동 (누수율에 비례하여 속도 감소)
 	var leak_speed_mult = clamp(1.0 - (leaking_rate * 0.03), 0.4, 1.0)
-	global_position += move_dir * move_speed * leak_speed_mult * delta
+	
+	# === 바람 영향(Wind Force) 적용 ===
+	var wind_mult = 1.0
+	var wind_manager = get_node_or_null("/root/WindManager")
+	if is_instance_valid(wind_manager) and wind_manager.has_method("get_wind_direction"):
+		var wind_dir: Vector2 = wind_manager.get_wind_direction()
+		var wind_str: float = wind_manager.get_wind_strength()
+		
+		var ship_forward = Vector2(move_dir.x, move_dir.z).normalized()
+		var dot_prod = wind_dir.dot(ship_forward)
+		
+		# 보스는 덩치가 커서 바람의 영향을 조금 덜 받도록 완화 (0.6 ~ 1.3)
+		var base_wind_influence = remap(dot_prod, -1.0, 1.0, 0.6, 1.3)
+		wind_mult = lerp(1.0, base_wind_influence, wind_str)
+		
+	global_position += move_dir * move_speed * leak_speed_mult * wind_mult * delta
 	
 	# === 누수(Leaking) 데미지 ===
 	if leaking_rate > 0:

@@ -15,8 +15,15 @@ enum Shape {RECTANGLE, TRIANGLE}
 		flag_shape = v
 		_update_material()
 
-@export var pole_height: float = 2.0
-@export var flag_size: Vector2 = Vector2(1.5, 1.0)
+@export var pole_height: float = 2.0:
+	set(v):
+		pole_height = v
+		_update_dimensions()
+
+@export var flag_size: Vector2 = Vector2(1.5, 1.0):
+	set(v):
+		flag_size = v
+		_update_dimensions()
 
 @onready var pole_mesh: MeshInstance3D = $Pole
 @onready var flag_mesh: MeshInstance3D = $FlagMesh
@@ -34,16 +41,22 @@ func _ready() -> void:
 func _update_dimensions() -> void:
 	if not is_inside_tree(): return
 	
-	if pole_mesh and pole_mesh.mesh is CylinderMesh:
-		var c_mesh = pole_mesh.mesh.duplicate() as CylinderMesh
+	# @onready 변수 대신 직접 찾아서 안전하게 사용 (에디터 툴 모드 대비)
+	var p_mesh = get_node_or_null("Pole")
+	var f_mesh = get_node_or_null("FlagMesh")
+	
+	if p_mesh and p_mesh.mesh is CylinderMesh:
+		var c_mesh = p_mesh.mesh.duplicate() as CylinderMesh
 		c_mesh.height = pole_height
-		pole_mesh.mesh = c_mesh
-		pole_mesh.position.y = pole_height / 2.0
+		p_mesh.mesh = c_mesh
+		p_mesh.position.y = pole_height / 2.0
 		
-	if flag_mesh and flag_mesh.mesh is PlaneMesh:
-		var p_mesh = flag_mesh.mesh.duplicate() as PlaneMesh
-		p_mesh.size = flag_size
-		flag_mesh.mesh = p_mesh
+	if f_mesh and f_mesh.mesh is PlaneMesh:
+		var plane_mesh = f_mesh.mesh.duplicate() as PlaneMesh
+		plane_mesh.size = flag_size
+		f_mesh.mesh = plane_mesh
+		# 깃발 상단이 깃대 끝에 오도록 오프셋 적용 (-height/2)
+		f_mesh.position.y = pole_height - (flag_size.y * 0.5)
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint() or not is_instance_valid(WindManager):
@@ -60,19 +73,23 @@ func _process(_delta: float) -> void:
 		flag_mesh.global_basis = target_basis * Basis(Vector3.UP, PI / 2.0)
 		
 		# 2. 깃발 위치 고정 (깃대 꼭대기)
-		# 깃발 Mesh의 오리진이 왼쪽 끝이라면 flag_mesh.position을 조정할 필요 없음
-		# 하지만 현재 PlaneMesh는 중심이 오리진이므로, 절반만큼 밀어줌
-		flag_mesh.global_position = global_transform * Vector3(0, pole_height, 0) + wind_3d * (flag_size.x * 0.5)
+		# 깃발 Mesh의 오리진이 중심이므로, 상단이 깃대에 맞게 Y축으로 -0.5 * height 만큼 내림
+		var flag_vertical_offset = Vector3(0, -flag_size.y * 0.5, 0)
+		flag_mesh.global_position = global_transform * Vector3(0, pole_height, 0) + flag_vertical_offset + wind_3d * (flag_size.x * 0.5)
 		
 		# 3. 펄럭임 파라미터 업데이트
 		flag_mesh.set_instance_shader_parameter("wave_speed", 3.0 + wind_str * 5.0)
 		flag_mesh.set_instance_shader_parameter("wave_strength", 0.1 + wind_str * 0.3)
 
 func _update_material() -> void:
-	if not is_inside_tree() or not flag_mesh: return
+	if not is_inside_tree(): return
+	
+	var f_mesh = get_node_or_null("FlagMesh")
+	if not f_mesh: return
+	
 	# 인스턴스 셰이더 파라미터로 색상 및 모양 적용
-	flag_mesh.set_instance_shader_parameter("albedo", color)
-	flag_mesh.set_instance_shader_parameter("is_triangular", flag_shape == Shape.TRIANGLE)
+	f_mesh.set_instance_shader_parameter("albedo", color)
+	f_mesh.set_instance_shader_parameter("is_triangular", flag_shape == Shape.TRIANGLE)
 
 func set_team_color(team: String) -> void:
 	if team == "player":

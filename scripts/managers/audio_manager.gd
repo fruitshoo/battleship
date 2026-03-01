@@ -146,6 +146,33 @@ func _ready() -> void:
 	
 	# 오디오 버스 진단 보고서 출력
 	_print_bus_status()
+	
+	# 엔진 기동 시 필수 오디오 즉시 캐싱 (로딩 화면 대기 시간에 처리)
+	_preload_essential_audio()
+
+## 필수 효과음 사전 캐싱 (오디오 끊김 방지용)
+func _preload_essential_audio() -> void:
+	var essential_keys = [
+		"cannon_fire", "cannon_hit", "rocket_exploded",
+		"heavy_missle_impact", "wood_break", "soldier_hit", "bow_shoot",
+		"sword_swing", "musket_fire", "soldier_die"
+	]
+	
+	for key in essential_keys:
+		if sfx_streams.has(key):
+			var path = sfx_streams[key]
+			if path is Array:
+				var loaded_arr = []
+				for p in path:
+					if p is String and ResourceLoader.exists(p):
+						loaded_arr.append(load(p))
+				if loaded_arr.size() > 0:
+					_cached_streams[key] = loaded_arr
+			elif path is String and ResourceLoader.exists(path):
+				_cached_streams[key] = load(path)
+			elif path is AudioStream:
+				_cached_streams[key] = path
+	print("[Resource] 전투 필수 오디오 사전 로드 완료")
 
 
 ## 오디오 버스 상태 진단 로직

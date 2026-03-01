@@ -77,8 +77,9 @@ func _get_current_range() -> float:
 	var current_range = detection_range
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var powder_lv = upgrade_manager.current_levels.get("black_powder", 0)
-		current_range *= (1.0 + 0.15 * powder_lv)
+		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
+		var stat_lv = int(cannon_lv / 2)
+		current_range *= (1.0 + 0.15 * stat_lv)
 	return current_range
 
 func _update_target() -> void:
@@ -162,8 +163,9 @@ func _get_current_cooldown() -> float:
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	var cd = fire_cooldown
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var train_lv = upgrade_manager.current_levels.get("training", 0)
-		cd *= (1.0 - 0.1 * train_lv)
+		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
+		var stat_lv = int(cannon_lv / 2)
+		cd *= maxf(0.5, 1.0 - 0.1 * stat_lv)
 	
 	# 함대 보너스 적용 (곱연산)
 	cd *= fleet_cooldown_mult
@@ -210,15 +212,14 @@ func _execute_fire() -> void:
 	get_tree().root.add_child.call_deferred(ball)
 	
 	# 데미지 계산 (속성 반영)
-	var base_dmg = 10.0 # 대포알 기본 데미지
+	var base_dmg = 15.0 # 대포알 데미지 상향 (10 -> 15)
 	var range_mult = 1.0 # 사거리/수명 배율
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var iron_lv = upgrade_manager.current_levels.get("iron_armor", 0)
-		base_dmg *= (1.0 + 0.25 * iron_lv)
-		
-		var powder_lv = upgrade_manager.current_levels.get("black_powder", 0)
-		range_mult = 1.0 + 0.15 * powder_lv
+		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
+		var stat_lv = int(cannon_lv / 2)
+		base_dmg *= (1.0 + 0.25 * stat_lv)
+		range_mult = 1.0 + 0.15 * stat_lv
 	
 	# 함대 보너스 적용 (곱연산)
 	base_dmg *= fleet_damage_mult

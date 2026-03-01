@@ -22,6 +22,7 @@ var shake_intensity: float = 0.0
 var shake_timer: float = 0.0
 var shake_duration: float = 0.0
 var _last_zoom: float = -1.0 # 마지막으로 포그가 업데이트된 줌 레벨
+var audio_listener: AudioListener3D
 
 func _ready() -> void:
 	print("=== Camera Controller Ready ===")
@@ -43,6 +44,12 @@ func _ready() -> void:
 	_cam_rotation.x = rot.y
 	_cam_rotation.y = rot.x
 	print("Initial zoom: ", current_zoom)
+	
+	# 카메라 줌에 따른 오디오 볼륨 불균형 해결을 위한 독립적인 리스너 추가
+	audio_listener = AudioListener3D.new()
+	add_child(audio_listener)
+	audio_listener.make_current()
+	
 	print("================================")
 
 func _input(event: InputEvent) -> void:
@@ -95,6 +102,15 @@ func _physics_process(delta: float) -> void:
 	
 	# 5. 동적 포그 조절 (줌에 따라 안개 거리 조정)
 	_update_dynamic_fog()
+	
+	# 오디오 리스너 위치 고정 (카메라 줌에 상관없이 타겟 근처 유지하되, 약간의 거리감 허용)
+	if is_instance_valid(audio_listener):
+		# 카메라는 타겟에서 current_zoom 만큼 물러나 있으므로,
+		# 로컬 공간에서 앞으로(-Z 방향) 당겨주면 타겟 쪽으로 갑니다.
+		# 완전히 0 Z에 두면 거리감이 전혀 없으므로, 줌 아웃의 30% 정도만 거리가 멀어지게 설정합니다.
+		var listener_distance = current_zoom * 0.3
+		listener_distance = max(listener_distance, min_zoom)
+		audio_listener.position = Vector3(0, 0, -current_zoom + listener_distance)
 	
 	# 6. 화면 흔들림 (Screen Shake)
 	if shake_timer > 0:

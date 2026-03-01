@@ -90,9 +90,9 @@ func _apply_damage(target_node: Node) -> void:
 	var fire_lv = 0
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var powder_lv = upgrade_manager.current_levels.get("black_powder", 0)
-		dmg_mult += (0.2 * powder_lv)
-		fire_lv = upgrade_manager.current_levels.get("fire_arrows", 0)
+		var singigeon_lv = upgrade_manager.current_levels.get("singigeon", 0)
+		dmg_mult += (0.15 * singigeon_lv) # 레벨당 데미지 15% 증가
+		fire_lv = int(singigeon_lv / 3.0) # 3레벨마다 화염 데미지 상승
 
 	if target_node.has_method("take_damage"):
 		var final_damage = damage * dmg_mult

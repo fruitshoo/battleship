@@ -11,20 +11,34 @@ enum State {
 }
 
 # === 기본 속성 ===
-@export var max_health: float = 100.0
-@export var detection_range: float = 15.0 # 적 탐지 범위 (이 밖의 적은 무시)
+@export var max_health: float = 40.0: # 인간화 패치 (100 -> 40)
+	set(value):
+		max_health = value
+		current_health = max_health
+@export var detection_range: float = 25.0 # 적 탐지 범위 (이 밖의 적은 무시)
 @export var crit_chance: float = 0.1 # 크리티컬 확률 (10%)
 @export var crit_multiplier: float = 2.0 # 크리티컬 데미지 배율
+@export var attack_damage: float = 12.0: # 기본 공격력 (근접/원거리 공용)
+	set(value):
+		attack_damage = value
+		if is_inside_tree():
+			_update_weapon_stats()
+
 @export var defense: float = 0.0 # 방어력 (피해 감소)
 
 @export var move_speed: float = 3.0
-@export var team: String = "player" # "player" or "enemy"
+@export var team: String = "player": # "player" or "enemy"
+	set(value):
+		team = value
+		if is_inside_tree():
+			_update_team_color()
+			_update_weapon_stats()
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
-@export var weapon_switch_distance: float = 10.0 # 무기 교체 거리 (이내면 검, 밖이면 활)
+@export var weapon_switch_distance: float = 4.0 # 무기 교체 거리 (이내면 검, 밖이면 활)하향 (10 -> 4)
 @export var hit_effect_scene: PackedScene = preload("res://scenes/effects/hit_effect.tscn")
 
 # === 내부 상태 ===
-var current_health: float = 100.0
+var current_health: float = 40.0
 var current_state: State = State.IDLE
 var current_target: Node3D = null
 var current_weapon: Node3D = null
@@ -32,6 +46,7 @@ var attack_timer: float = 0.0
 var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
+var home_ground_timer: float = 0.0 # 홈그라운드 체력 재생 타이머
 
 var weapon_sword: Node3D = null
 var weapon_bow: Node3D = null
@@ -41,6 +56,12 @@ var owned_ship: Node3D = null
 var home_ship: Node3D = null # 최초 소속된 플레이어 배 (나포함 침몰 시 복귀용)
 var _cached_level_manager: Node = null
 var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용
+
+# === 도선 약탈 및 방화 (Boarding Chaos) 페널티 ===
+var is_boarder_on_player_ship: bool = false
+var chaos_duration_timer: float = 8.0 # 최대 8초간 약탈 후 도망감
+var chaos_tick_timer: float = 0.0 # 1초마다 데미지 틱
+var chaos_damage_per_tick: float = 5.0 # 상향: 초당 5의 화재 피해 (배 체력 비례)
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_soldiers: Array = []
@@ -105,27 +126,29 @@ func _ready() -> void:
 		pivot.position = Vector3(0.3, 0.7, -0.15)
 		add_child(pivot)
 		
-	# 무기 2개 모두 생성 (칼과 활)
-	var sword_scene = load("res://scenes/entities/weapons/weapon_sword.tscn")
+	# 무기 생성 (근접 무기 4종 중 랜덤 1개 + 활)
+	var melee_scenes = [
+		"res://scenes/entities/weapons/weapon_sword.tscn",
+		"res://scenes/entities/weapons/weapon_spear.tscn",
+		"res://scenes/entities/weapons/weapon_trident.tscn",
+		"res://scenes/entities/weapons/weapon_harpoon.tscn"
+	]
+	var random_melee_path = melee_scenes[randi() % melee_scenes.size()]
+	var sword_scene = load(random_melee_path)
 	var bow_scene = load("res://scenes/entities/weapons/weapon_bow.tscn")
 	
 	if sword_scene:
 		weapon_sword = sword_scene.instantiate() as Node3D
-		$HandPivot.add_child(weapon_sword)
+		# 수동 생성 노드가 아닐 경우 대비 (HandPivot이 없는 구버전 배 하위 호환)
+		var hand = get_node_or_null("HandPivot")
+		if hand:
+			hand.add_child(weapon_sword)
 	if bow_scene:
 		weapon_bow = bow_scene.instantiate() as Node3D
 		$HandPivot.add_child(weapon_bow)
 		
-	# 업그레이드 수치 적용 기능 및 기본 무기 장착
-	var meta_manager = get_node_or_null("/root/MetaManager")
-	var mult = 1.0
-	if team == "player" and is_instance_valid(meta_manager) and meta_manager.has_method("get_crew_stat_multiplier"):
-		mult = meta_manager.get_crew_stat_multiplier()
-		
-	if weapon_sword and "damage" in weapon_sword:
-		weapon_sword.damage *= mult
-	if weapon_bow and "damage" in weapon_bow:
-		weapon_bow.damage *= mult
+	# 공격력 수치 및 무기 상태 업데이트
+	_update_weapon_stats()
 		
 	# 시작은 무조건 원거리(활)로 세팅 (함선간 교전부터 시작하므로)
 	_set_active_weapon("bow")
@@ -141,6 +164,19 @@ func _ready() -> void:
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
 	add_to_group("soldiers")
+
+## 무기 공격력 수치 동기화
+func _update_weapon_stats() -> void:
+	var meta_manager = get_node_or_null("/root/MetaManager")
+	var mult = 1.0
+	if team == "player" and is_instance_valid(meta_manager) and meta_manager.has_method("get_crew_stat_multiplier"):
+		mult = meta_manager.get_crew_stat_multiplier()
+		
+	if is_instance_valid(weapon_sword):
+		# 검은 기본 공격력의 1.25배 (근접 보너스)
+		weapon_sword.damage = attack_damage * 1.25 * mult
+	if is_instance_valid(weapon_bow):
+		weapon_bow.damage = attack_damage * mult
 
 
 func _set_active_weapon(type: String) -> void:
@@ -197,6 +233,33 @@ func _physics_process(delta: float) -> void:
 		var throttle_time = 0.2 if ship_hp_ratio > 0.2 else 0.1
 		decision_timer = throttle_time + randf_range(0.0, 0.05)
 		run_heavy_logic = true
+		
+	# === 아군 홈그라운드(수비) 버프 로직 ===
+	if team == "player" and current_state != State.DEAD:
+		# 자신의 배(본선 또는 나포함)에 타고 있는지 확인
+		var is_on_home_ground = (is_instance_valid(owned_ship) and owned_ship.get("team") == "player")
+		
+		if is_on_home_ground:
+			# 1. 크리티컬 확률 상승 (기본 10% -> 25%)
+			crit_chance = 0.25
+			
+			# 2. 체력 지속 재생 (초당 3)
+			home_ground_timer -= delta
+			if home_ground_timer <= 0:
+				home_ground_timer = 1.0
+				if current_health < max_health:
+					current_health = minf(current_health + 3.0, max_health)
+					# 체력 재생 시각 효과 (초록색 십자가 등, 힐링 파티클이 있다면)
+					# 여기서는 간단히 조용히 회복만 처리하거나, 체력이 낮을 때만 회복했다고 표시
+		else:
+			# 적 배로 공격하러 갔을 때는 기본 크리티컬로 롤백
+			crit_chance = 0.1
+		
+	# === 적군 도선병 방화(Chaos) 로직 ===
+	if team == "enemy" and current_state != State.DEAD:
+		# 플레이어 배에 타고 있는지 확인
+		if is_instance_valid(owned_ship) and owned_ship.get("team") == "player":
+			_update_boarding_chaos(delta)
 	
 	match current_state:
 		State.IDLE:
@@ -218,8 +281,8 @@ func _physics_process(delta: float) -> void:
 	var current_cooldown_mult = 1.0
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var train_lv = upgrade_manager.current_levels.get("training", 0)
-		current_cooldown_mult = (1.0 - 0.1 * train_lv)
+		var quality_lv = upgrade_manager.current_levels.get("crew_quality", 0)
+		current_cooldown_mult = maxf(0.5, 1.0 - 0.1 * quality_lv)
 	
 	if attack_timer > 0:
 		# 원거리 무기면 쿨다운 감소 버프 적용
@@ -454,14 +517,17 @@ func _perform_attack() -> void:
 ## 하얀색으로 깜빡임
 
 
-## 가장 가까운 적 찾기 (탐지 범위 제한)
+## 가장 가까운 적 찾기 (탐지 범위 및 동일 함선 우선순위 적용)
 func find_nearest_enemy() -> Node3D:
 	var all_soldiers = get_soldiers_cached(get_tree())
-	var nearest: Node3D = null
-	var nearest_distance: float = INF
+	var nearest_on_ship: Node3D = null
+	var nearest_distance_on_ship: float = INF
+	
+	var nearest_global: Node3D = null
+	var nearest_distance_global: float = INF
 	
 	for other in all_soldiers:
-		if other == self:
+		if other == self or not is_instance_valid(other):
 			continue
 		
 		# 죽은 적 무시
@@ -474,15 +540,24 @@ func find_nearest_enemy() -> Node3D:
 		
 		var distance = global_position.distance_to(other.global_position)
 		
-		# 탐지 범위 밖의 적은 무시 (다른 배의 적을 쫓아가지 않음)
-		if distance > detection_range:
-			continue
+		# 1. 동일 함선(`owned_ship`)에 있는 적 체크
+		if is_instance_valid(owned_ship) and other.get("owned_ship") == owned_ship:
+			if distance < nearest_distance_on_ship:
+				nearest_distance_on_ship = distance
+				nearest_on_ship = other
 		
-		if distance < nearest_distance:
-			nearest_distance = distance
-			nearest = other
-	
-	return nearest
+		# 2. 전역 탐지 범위 체크
+		if distance <= detection_range:
+			if distance < nearest_distance_global:
+				nearest_distance_global = distance
+				nearest_global = other
+				
+	# 같은 배 위에 적이 있다면 거리와 상관없이 우선 반환 (갑판 전투 우선)
+	if nearest_on_ship:
+		return nearest_on_ship
+		
+	# 같은 배 위에 적이 없으면 가장 가까운 전역 적 반환
+	return nearest_global
 
 ## 나포 기회 확인
 func _check_ship_capture_opportunity() -> void:
@@ -594,6 +669,11 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	y_tween.tween_property(self , "position:y", start_local_y + 2.5, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	y_tween.tween_property(self , "position:y", jump_offset.y, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	
+	# 도선 시 타이머 리셋 (적군이 플레이어 배로 넘어갈 때)
+	if team == "enemy" and is_instance_valid(target_ship) and target_ship.get("team") == "player":
+		chaos_duration_timer = 8.0 # 최대 8초 생존 허용
+		chaos_tick_timer = 1.0 # 1초 후 첫 틱
+	
 	if is_capture_attempt:
 		tween.finished.connect(func():
 			if is_instance_valid(target_ship):
@@ -639,13 +719,22 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 		var knockback_dir = (global_position - hit_position).normalized()
 		knockback_dir.y = 0
 		velocity += knockback_dir * 3.0
+		
+		# 보복(Retaliation) 로직: 맞은 적을 즉시 타겟팅 시도 (현재 타겟이 없거나 먼 경우)
+		if current_state != State.DEAD and (not is_instance_valid(current_target) or randf() < 0.3):
+			# 근처의 적 병사를 탐색하여 타겟 갱신 (보복성)
+			var attacker_soldier = find_nearest_enemy() # 위에서 개편한 logic 사용
+			if attacker_soldier:
+				current_target = attacker_soldier
+				if current_state == State.IDLE or current_state == State.WANDER:
+					_change_state(State.MOVE)
 	
 	if current_health <= 0:
 		_die()
 
 
 ## 피격 시 하얀색으로 깜빡임
-func _flash_hit() -> void:
+func _flash_hit(flash_color: Color = Color.WHITE) -> void:
 	var mesh = $MeshInstance3D
 	if not mesh: return
 	
@@ -653,11 +742,47 @@ func _flash_hit() -> void:
 	# 하얀색으로 블렌딩 (StandardMaterial3D의 emission을 활용하거나 albedo 조절)
 	
 	mesh.material_override.emission_enabled = true
-	mesh.material_override.emission = Color.WHITE
+	mesh.material_override.emission = flash_color
 	mesh.material_override.emission_energy_multiplier = 2.0
 	
 	tween.tween_property(mesh.material_override, "emission_energy_multiplier", 0.0, 0.1)
 	tween.finished.connect(func(): if mesh.material_override: mesh.material_override.emission_enabled = false)
+
+## 적군 도선병 약탈 및 방화 처리 (초당 DoT 데미지)
+func _update_boarding_chaos(delta: float) -> void:
+	if not is_instance_valid(owned_ship) or not owned_ship.has_method("take_fire_damage"): return
+	
+	# 내 배에 살아있는 아군 병사가 있는지 확인
+	var has_defenders = false
+	var soldiers_node = owned_ship.get_node_or_null("Soldiers")
+	if soldiers_node:
+		for s in soldiers_node.get_children():
+			if s.get("team") == "player" and s.get("current_state") != State.DEAD:
+				has_defenders = true
+				break
+				
+	# 아군 병사가 남아있다면 방화 효과 중지 (전투 우선)
+	if has_defenders:
+		return
+		
+	# 방화 및 약탈 시작
+	chaos_duration_timer -= delta
+	chaos_tick_timer -= delta
+	
+	if chaos_tick_timer <= 0:
+		chaos_tick_timer = 1.0 # 1초마다 데미지
+		owned_ship.take_damage(chaos_damage_per_tick, global_position)
+		owned_ship.take_fire_damage(chaos_damage_per_tick, 1.0)
+		
+		# 시각/청각 피드백: 불꽃 튀는 소리 등
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("impact_wood", global_position, randf_range(1.1, 1.4), -5.0) # 작은 파괴 효과음
+			
+	# 제한 시간이 지나면 철수 (바다로 도망침)
+	if chaos_duration_timer <= 0:
+		print("[Combat] 적군이 방화를 마치고 뱃머리에서 뛰어내려 도망칩니다!")
+		_teleport_to_ship(null) # 바다(생존자)로 변환하거나 삭제 처리
 
 ## 피격 파티클 생성
 func _spawn_hit_effect(hit_pos: Vector3) -> void:
@@ -756,15 +881,14 @@ func _check_ranged_combat() -> void:
 func _find_ranged_target() -> Node3D:
 	var max_range = current_weapon.attack_range if current_weapon and "attack_range" in current_weapon else 20.0
 	
-	# 1. 적군 병사 탐색 (캐시 사용으로 성능 최적화)
-	var soldiers = get_soldiers_cached(get_tree())
-	for s in soldiers:
-		if s.get("team") != team and s.get("current_state") != State.DEAD:
-			var dist = global_position.distance_to(s.global_position)
-			if dist < max_range:
-				return s
+	# 1. 병사 탐색: find_nearest_enemy()의 개선된 로직(갑판 우선)을 그대로 활용
+	var nearest = find_nearest_enemy()
+	if is_instance_valid(nearest):
+		var dist = global_position.distance_to(nearest.global_position)
+		if dist <= max_range:
+			return nearest
 	
-	# 2. 적군 함선 탐색
+	# 2. 함선 탐색: 병사가 없을 경우에만 함선 타겟팅 (기존 로직 유지)
 	var enemy_team = "enemy" if team == "player" else "player"
 	var ships = get_ships_cached(get_tree(), enemy_team)
 	

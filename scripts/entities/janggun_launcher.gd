@@ -38,14 +38,20 @@ func _find_nearest_enemy() -> Node3D:
 
 func fire(target: Node3D) -> void:
 	if not missile_scene: return
-	cooldown_timer = fire_cooldown
+	
+	var um = get_node_or_null("/root/UpgradeManager")
+	var janggun_lv = 0
+	if is_instance_valid(um) and "current_levels" in um:
+		janggun_lv = um.current_levels.get("janggun", 0)
+		
+	cooldown_timer = maxf(5.0, fire_cooldown - janggun_lv * 0.8)
 	
 	var missile = missile_scene.instantiate()
 	missile.start_pos = global_position + Vector3(0, 1.0, 0)
 	
 	# 예측 사격 (Predictive Aiming)
 	var dist = global_position.distance_to(target.global_position)
-	var projectile_speed = 18.0 # janggun_missile.gd의 기본 속도
+	var projectile_speed = 18.0 * (1.0 + janggun_lv * 0.1) # janggun_missile.gd의 기본 속도 + 레벨 스케일링
 	var travel_time = dist / projectile_speed
 	
 	# 타겟의 속도와 방향 가져오기
@@ -62,7 +68,10 @@ func fire(target: Node3D) -> void:
 	var predicted_pos = target.global_position + (target_velocity * travel_time)
 	
 	missile.target_pos = predicted_pos
-	missile.damage = damage
+	missile.damage = damage * (1.0 + janggun_lv * 0.3)
+	missile.speed = projectile_speed
+	if "janggun_lv" in missile:
+		missile.janggun_lv = janggun_lv
 	
 	get_tree().root.add_child(missile)
 	missile.global_position = missile.start_pos

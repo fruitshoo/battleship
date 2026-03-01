@@ -11,80 +11,66 @@ enum Category {ANTI_SHIP, ANTI_PERSONNEL, HULL, NAVIGATION, SPECIAL, FLEET}
 
 # 업그레이드 정의
 var UPGRADES = {
-	# --- Primary Weapons (Active) ---
-	"crew": {
-		"name": "병사 충원",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "아군 병사 정원 +1",
-		"max_level": 8,
-		"color": Color(0.4, 0.8, 1.0)
-	},
+	# --- Primary Weapons (8 Levels) ---
 	"cannon": {
-		"name": "대포 추가",
+		"name": "대포",
 		"category": Category.ANTI_SHIP,
-		"description": "대포 +1 (교대 배치)",
-		"max_level": 6,
+		"description": "대포 1문 추가 또는 데미지/사거리 강화",
+		"max_level": 8,
 		"color": Color(1.0, 0.5, 0.2)
+	},
+	"janggun": {
+		"name": "대장군전",
+		"category": Category.ANTI_SHIP,
+		"description": "화력 강화 및 명중 시 화염/이속저하 디버프",
+		"max_level": 8,
+		"color": Color(0.6, 0.4, 0.2)
 	},
 	"singigeon": {
 		"name": "신기전",
 		"category": Category.ANTI_PERSONNEL,
-		"description": "로켓 화살 발사기",
-		"max_level": 3,
-		"color": Color(1.0, 0.3, 0.3),
-		"level_desc": {1: "1발", 2: "3발", 3: "5발"}
-	},
-	"janggun": {
-		"name": "장군전",
-		"category": Category.ANTI_SHIP,
-		"description": "통나무 미사일 발사기",
-		"max_level": 2,
-		"color": Color(0.6, 0.4, 0.2),
-		"level_desc": {1: "1기 배치", 2: "양현 배치"}
+		"description": "발사 개수 추가 및 데미지/사거리 강화",
+		"max_level": 8,
+		"color": Color(1.0, 0.3, 0.3)
 	},
 	
-	# --- Passive Attributes (Synergies) ---
-	"iron_armor": {
-		"name": "철갑 강화",
-		"category": Category.ANTI_SHIP,
-		"description": "[대함 시너지] 대포/장군전 데미지 +25%",
-		"max_level": 5,
-		"color": Color(0.7, 0.7, 0.8)
-	},
-	"black_powder": {
-		"name": "화약 숙련",
-		"category": Category.ANTI_SHIP,
-		"description": "[사거리 시너지] 대포 탐지 거리(사거리) +15%",
-		"max_level": 5,
-		"color": Color(0.3, 0.3, 0.3)
-	},
-	"fire_arrows": {
-		"name": "불타는 화살",
+	# --- Crew / Boarding (5 Levels) ---
+	"crew_numbers": {
+		"name": "병사 충원",
 		"category": Category.ANTI_PERSONNEL,
-		"description": "[도트 시너지] 화살/신기전 화상 피해 추가",
-		"max_level": 3,
-		"color": Color(1.0, 0.6, 0.0)
+		"description": "최대 정원 증가 및 리스폰 속도 단축",
+		"max_level": 5,
+		"color": Color(0.4, 0.8, 1.0)
 	},
-	"training": {
-		"name": "전투 훈련",
-		"category": Category.SPECIAL,
-		"description": "[공통 시너지] 모든 무기 쿨다운 -10%, 병사 속도 +15%",
+	"crew_quality": {
+		"name": "정예병 훈련",
+		"category": Category.ANTI_PERSONNEL,
+		"description": "병사의 체력, 방어력, 공격력 일괄 상승",
 		"max_level": 5,
 		"color": Color(0.8, 0.8, 0.2)
 	},
-	"seamanship": {
-		"name": "항해술",
+	
+	# --- Hull / Navigation (5 Levels) ---
+	"hull_defense": {
+		"name": "선체 장갑",
+		"category": Category.HULL,
+		"description": "함선의 최대 체력 및 방어력 증가",
+		"max_level": 5,
+		"color": Color(0.6, 0.3, 0.1)
+	},
+	"navigation": {
+		"name": "항해 기동",
 		"category": Category.NAVIGATION,
-		"description": "[기동 시너지] 선회력 +20%, 노 젓기 효율 +15%",
+		"description": "선회 속도 및 돛 기동력 증가",
 		"max_level": 5,
 		"color": Color(0.4, 1.0, 0.4)
 	},
-	"carpentry": {
-		"name": "조선술",
+	"supply_bonus": {
+		"name": "보급 효율",
 		"category": Category.HULL,
-		"description": "[함선 시너지] 최대 체력 +30, 자동 수리 +0.5/s",
+		"description": "해상 보급품 획득 시 회복량 대폭 증가",
 		"max_level": 5,
-		"color": Color(0.6, 0.3, 0.1)
+		"color": Color(0.3, 0.8, 0.3)
 	},
 	
 	# --- Special / Rare Items ---
@@ -100,7 +86,7 @@ var UPGRADES = {
 	"supply": {
 		"name": "보급물자",
 		"category": Category.HULL,
-		"description": "체력 즉시 회복 및 최대 HP +20",
+		"description": "체력 즉시 소폭 회복",
 		"max_level": 99,
 		"color": Color(0.5, 1.0, 0.5)
 	},
@@ -110,29 +96,6 @@ var UPGRADES = {
 		"description": "점수 +50",
 		"max_level": 99,
 		"color": Color(1.0, 0.85, 0.3)
-	},
-	
-	# --- Fleet Upgrades (Captured Ships) ---
-	"fleet_hull": {
-		"name": "함대 장갑강화",
-		"category": Category.FLEET,
-		"description": "나포한 배들의 최대 체력 +40, 방어력 +1",
-		"max_level": 5,
-		"color": Color(0.3, 0.5, 0.8)
-	},
-	"fleet_regen": {
-		"name": "함대 긴급수리",
-		"category": Category.FLEET,
-		"description": "나포한 배들의 자동 수리 속도 +0.8/s",
-		"max_level": 3,
-		"color": Color(0.2, 0.8, 0.6)
-	},
-	"fleet_training": {
-		"name": "함대 포술훈련",
-		"category": Category.FLEET,
-		"description": "나포한 배들의 무기 데미지 +30%, 쿨다운 -15%",
-		"max_level": 4,
-		"color": Color(0.8, 0.3, 0.2)
 	}
 }
 
@@ -197,31 +160,28 @@ func apply_upgrade(upgrade_id: String) -> void:
 		return
 	
 	match upgrade_id:
-		"crew":
-			_apply_crew(player_ship)
+		"crew_numbers":
+			_apply_crew_numbers(player_ship, new_level)
+		"crew_quality":
+			_apply_crew_quality_to_all_soldiers(player_ship)
 		"cannon":
 			_apply_cannon(player_ship, new_level)
 		"singigeon":
 			_apply_singigeon(player_ship, new_level)
 		"janggun":
 			_apply_janggun(player_ship, new_level)
-		"iron_armor", "black_powder", "fire_arrows", "training":
-			# 대부분의 공격 패시브는 실시간 반영되므로 추가 처리 불필요 (무기가 발사 시 체크)
-			# 단, Training은 병사 속도에 즉각 반영
-			if upgrade_id == "training":
-				_apply_training_to_all_soldiers(player_ship)
-		"seamanship":
-			_apply_seamanship(player_ship)
-		"carpentry":
-			_apply_carpentry(player_ship)
+		"hull_defense":
+			_apply_hull_defense(player_ship)
+		"navigation":
+			_apply_navigation(player_ship)
+		"supply_bonus":
+			pass # Applied dynamically when picking up supplies
 		"sextant":
 			_apply_sextant(player_ship)
 		"supply":
 			_apply_supply(player_ship)
 		"gold":
 			_apply_gold()
-		"fleet_hull", "fleet_regen", "fleet_training":
-			_apply_fleet_upgrade(upgrade_id)
 	
 	upgrade_applied.emit(upgrade_id, new_level)
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
@@ -239,20 +199,28 @@ func get_next_description(upgrade_id: String) -> String:
 	
 	# 동적 설명 생성
 	match upgrade_id:
-		"crew":
+		"cannon":
+			if next_level % 2 != 0:
+				return "대포 +1문 추가 (교대 배치)"
+			else:
+				return "대포 데미지 및 사거리/장전속도 향상"
+		"janggun":
+			return "대장군전 화력 및 화염/디버프 강화"
+		"singigeon":
+			return "신기전 발사 개수 및 파괴력 향상"
+		"crew_numbers":
 			if ship:
-				return "아군 병사 정원 증설\n(현재 %d명 → %d명)" % [ship.max_crew_count, ship.max_crew_count + 1]
+				return "정원 증가(%d → %d) 및 리스폰 가속" % [ship.max_crew_count, ship.max_crew_count + 1]
+		"crew_quality":
+			return "병사 최대 HP/방어력/공격력 일괄 강화"
+		"hull_defense":
+			return "함선 최대 체력 및 방어력 강화\n(즉시 일부 체력 수리)"
+		"navigation":
+			return "러더 선회 속도 및 돛 기동성 증가"
+		"supply_bonus":
+			return "해상 보급 획득 시 회복량 대폭 증가"
 		"supply":
-			if ship:
-				return "선체 수리 및 강화\n(Max HP %d → %d)" % [ship.max_hull_hp, ship.max_hull_hp + 20]
-		"iron_armor":
-			return "대포/장군전 피해량 +25%%\n(현재 총 보너스: +%d%%)" % (current_lv * 25)
-		"black_powder":
-			return "폭발 범위 및 화력 강화\n(현재 보너스: +%d%%)" % (current_lv * 20)
-		"fire_arrows":
-			return "화살/신기전에 화염 속성 부여\n(중첩 시 데미지 강화)"
-		"seamanship":
-			return "선회력 및 노 젓기 효율 강화\n(현재 Lv.%d)" % current_lv
+			return "선체 수리 (즉시 소폭 회복)"
 		"sextant":
 			return "자동 항해 장치 설치\n(돛을 바람에 맞춰 자동 조절)"
 
@@ -264,32 +232,65 @@ func get_next_description(upgrade_id: String) -> String:
 
 # === 업그레이드 적용 함수들 ===
 
-func _apply_crew(ship: Node3D) -> void:
+func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
+	if "max_crew_count" in ship:
+		ship.max_crew_count += 1
+	if "soldier_respawn_time" in ship:
+		ship.soldier_respawn_time = maxf(1.0, ship.soldier_respawn_time * 0.8) # 리스폰 속도 20%씩 단축
+		
+	# 바로 1명 스폰 시도
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if not soldiers_node:
 		return
-	
 	var soldier = soldier_scene.instantiate()
 	soldiers_node.add_child(soldier)
 	soldier.set_team("player")
 	var offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
 	soldier.position = offset
-	
-	# 기존 업그레이드 스탯 적용 (중요!)
-	_apply_current_stats_to_soldier(soldier)
-	
-	# 함선의 병사 정원 증가
-	if "max_crew_count" in ship:
-		ship.max_crew_count += 1
+	var current_max = ship.get("max_crew_count") if "max_crew_count" in ship else 0
+	print("[Crew] 병사 정원 증가! (현재 최대: %d)" % current_max)
+
+func _apply_crew_quality_to_all_soldiers(ship: Node3D) -> void:
+	var soldiers = _get_player_soldiers(ship)
+	var quality_lv = current_levels.get("crew_quality", 0)
+	for s in soldiers:
+		_apply_current_stats_to_soldier(s)
+	print("[Crew Quality] 정예병 훈련 Lv.%d 완료!" % quality_lv)
 
 func _apply_current_stats_to_soldier(soldier: Node) -> void:
-	# Training 반영 (속도)
-	var train_lv = current_levels.get("training", 0)
-	if train_lv > 0:
-		soldier.move_speed *= (1.0 + 0.15 * train_lv)
-	
-	# Fire Arrows 등 공격 속성은 발사 시점에 UpgradeManager 참조
+	var quality_lv = current_levels.get("crew_quality", 0)
+	if quality_lv > 0:
+		# 체력 증가 (+10 per level)
+		var base_max_hp = 40.0
+		var new_max_hp = base_max_hp + (quality_lv * 10.0)
+		if "max_health" in soldier:
+			soldier.max_health = new_max_hp
+			soldier.current_health = minf(soldier.current_health + 10.0, soldier.max_health)
+		
+		# 공격력 증가 (+15% per level) / 방어력 증가 (피해감소율 +10% per level)
+		soldier.set_meta("damage_multiplier", 1.0 + (quality_lv * 0.15))
+		soldier.set_meta("defense_reduction", quality_lv * 0.1)
 
+func _apply_hull_defense(ship: Node3D) -> void:
+	var def_lv = current_levels.get("hull_defense", 0)
+	if "max_hull_hp" in ship:
+		ship.max_hull_hp += 30.0 # 5단계까지 총 +150
+		ship.hull_hp += 20.0 # 즉시 체력 일부 회복
+	if "hull_defense" in ship:
+		ship.hull_defense = def_lv * 2.0 # 단계당 방어력 +2
+	
+	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
+	if hud and hud.has_method("update_hull_hp"):
+		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
+	print("[Hull] 선체 장갑 강화 Lv.%d" % def_lv)
+
+func _apply_navigation(ship: Node3D) -> void:
+	var nav_lv = current_levels.get("navigation", 0)
+	if "rudder_turn_speed" in ship:
+		ship.rudder_turn_speed *= 1.15 # 선회 15%씩 증가
+	if "stamina_drain_rate" in ship:
+		ship.stamina_drain_rate *= 0.85
+	print("[Navigation] 항해 기동 강화 Lv.%d" % nav_lv)
 
 func _apply_cannon(ship: Node3D, level: int) -> void:
 	var cannons_node = ship.get_node_or_null("Cannons")
@@ -298,42 +299,44 @@ func _apply_cannon(ship: Node3D, level: int) -> void:
 		cannons_node.name = "Cannons"
 		ship.add_child(cannons_node)
 	
-	var cannon = cannon_scene.instantiate()
-	cannons_node.add_child(cannon)
-	
-	# 고정된 대포 위치 정의 (기존 대포는 z=0, Side는 x=±1.3)
-	var positions = [
-		Vector3(1.3, 0.6, -2.0), # Lv1: 우측 선수 (Fore-Right)
-		Vector3(-1.3, 0.6, -2.0), # Lv2: 좌측 선수 (Fore-Left)
-		Vector3(1.3, 0.6, 2.0), # Lv3: 우측 선미 (Aft-Right)
-		Vector3(-1.3, 0.6, 2.0) # Lv4: 좌측 선미 (Aft-Left)
-	]
-	
-	if level <= positions.size():
-		var pos = positions[level - 1]
+	if level % 2 != 0:
+		# 홀수 레벨: 대포 추가 (1, 3, 5, 7) -> 총 4기 배치
+		var count_idx = int((level + 1) / 2.0)
+		var cannon = cannon_scene.instantiate()
+		cannons_node.add_child(cannon)
+		
+		var positions = [
+			Vector3(1.3, 0.6, -2.0), # Lv1 -> 우측 선수
+			Vector3(-1.3, 0.6, -2.0), # Lv3 -> 좌측 선수
+			Vector3(1.3, 0.6, 2.0), # Lv5 -> 우측 선미
+			Vector3(-1.3, 0.6, 2.0) # Lv7 -> 좌측 선미
+		]
+		
+		var pos = positions[0]
+		if count_idx <= positions.size():
+			pos = positions[count_idx - 1]
+		else:
+			var side = 1 if count_idx % 2 == 1 else -1
+			var z_offset = 2.0 + (count_idx - 4) * 1.0
+			pos = Vector3(side * 1.3, 0.6, z_offset)
+
 		cannon.position = pos
-		# 우측(x>0)이면 -90도(우향), 좌측(x<0)이면 90도(좌향)
 		var rot_y = -90.0 if pos.x > 0 else 90.0
 		cannon.rotation.y = deg_to_rad(rot_y)
-		print("[Cannon] 대포 추가! (Lv.%d, 위치: %s)" % [level, pos])
+		print("[Cannon] 대포 추가! (위치: %s)" % pos)
 	else:
-		# 예외 처리: 혹시 더 추가된다면 기존 방식대로 뒤쪽으로 나열
-		var side = 1 if level % 2 == 1 else -1
-		var z_offset = 2.0 + (level - 5) * 1.0
-		cannon.position = Vector3(side * 1.3, 0.6, z_offset)
-		cannon.rotation.y = deg_to_rad(-90.0 if side == 1 else 90.0)
+		# 짝수 레벨: 화력 강화 (별도 적용 없이 cannon.gd에서 upgrade_manager 상태 조회)
+		print("[Cannon] 대포 화력/장전/사거리 강화! (Lv.%d)" % level)
 
 
 func _apply_singigeon(ship: Node3D, level: int) -> void:
 	if level == 1:
-		# 최초 배치: 발사기 인스턴스 생성
 		var launcher = singigeon_scene.instantiate()
 		launcher.name = "SingijeonLauncher"
 		ship.add_child(launcher)
 		launcher.position = Vector3(0, 0.5, -3.5) # 배 앞쪽
-		launcher.upgrade_to_level(1)
+		launcher.upgrade_to_level(level)
 	else:
-		# 기존 발사기 업그레이드
 		var launcher = ship.get_node_or_null("SingijeonLauncher")
 		if launcher:
 			launcher.upgrade_to_level(level)
@@ -341,26 +344,12 @@ func _apply_singigeon(ship: Node3D, level: int) -> void:
 
 func _apply_janggun(ship: Node3D, level: int) -> void:
 	if level == 1:
-		# 1기: 배 중앙 뒤쪽
 		var launcher = janggun_scene.instantiate()
-		launcher.name = "JanggunLauncher1"
+		launcher.name = "JanggunLauncher"
 		ship.add_child(launcher)
 		launcher.position = Vector3(0, 0.8, 2.0)
-	elif level == 2:
-		# 2기: 양현에 추가
-		var launcher2 = janggun_scene.instantiate()
-		launcher2.name = "JanggunLauncher2"
-		ship.add_child(launcher2)
-		launcher2.position = Vector3(-1.5, 0.8, 1.0)
-
-
-func _apply_seamanship(ship: Node3D) -> void:
-	# 선회력 및 노 젓기 강화
-	if "rudder_turn_speed" in ship:
-		ship.rudder_turn_speed *= 1.2
-	if "stamina_drain_rate" in ship:
-		ship.stamina_drain_rate *= 0.85
-	print("[Skill] 항해술 강화! 선회 속도 및 효율 증가.")
+	else:
+		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
 
 
 func _apply_supply(ship: Node3D) -> void:
@@ -396,24 +385,6 @@ func _get_player_ship() -> Node3D:
 	return null
 
 
-func _apply_training_to_all_soldiers(ship: Node3D) -> void:
-	var soldiers = _get_player_soldiers(ship)
-	for s in soldiers:
-		s.move_speed *= 1.15
-
-func _apply_carpentry(ship: Node3D) -> void:
-	if "max_hull_hp" in ship:
-		ship.max_hull_hp += 30.0
-		ship.hull_hp += 30.0 # 보너스로 현재 체력도 증가
-	if "hull_regen_rate" in ship:
-		ship.hull_regen_rate += 0.5
-	
-	# HUD 업데이트
-	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
-	if hud and hud.has_method("update_hull_hp"):
-		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
-	print("[Skill] 조선술 업그레이드! 선체 내구도 및 수리 능력 강화.")
-
 func _apply_sextant(ship: Node3D) -> void:
 	if "has_sextant" in ship:
 		ship.has_sextant = true
@@ -429,42 +400,3 @@ func _get_player_soldiers(ship: Node3D) -> Array:
 		if child.has_method("take_damage") and child.get("current_state") != null:
 			result.append(child)
 	return result
-
-func _apply_fleet_upgrade(upgrade_id: String) -> void:
-	var minions = get_tree().get_nodes_in_group("captured_minion")
-	for m in minions:
-		apply_fleet_stats_to_minion(m)
-	print("[Fleet] 함대 업그레이드 적용 완료: %s (현재 함선 수: %d)" % [upgrade_id, minions.size()])
-
-## 나포한 배에 현재 함대 업그레이드 스탯을 적용
-func apply_fleet_stats_to_minion(minion: Node3D) -> void:
-	if not is_instance_valid(minion) or minion.get("is_dying"):
-		return
-	
-	# 1. 체력 및 방어력 (fleet_hull)
-	var hull_lv = current_levels.get("fleet_hull", 0)
-	if hull_lv > 0:
-		var base_hp = 60.0 # ChaserShip 기본 HP
-		minion.max_hull_hp = base_hp + (hull_lv * 40.0)
-		minion.hull_defense = hull_lv * 1.0
-		# 처음 적용 시 현재 체력도 증가분만큼 보정
-		minion.hull_hp = minf(minion.hull_hp + 40.0, minion.max_hull_hp)
-	
-	# 2. 자동 수리 (fleet_regen)
-	var regen_lv = current_levels.get("fleet_regen", 0)
-	if regen_lv > 0:
-		minion.hull_regen_rate = regen_lv * 0.8
-		
-	# 3. 무기 공격력 (fleet_training)
-	var train_lv = current_levels.get("fleet_training", 0)
-	if train_lv > 0:
-		# 자식 노드 중 대포(Cannon)들을 찾아 스탯 반영
-		for child in minion.get_children():
-			if child.is_in_group("cannons") or child.name.contains("Cannon"):
-				# 대포 스크립트에 데미지 배율 변수가 있다면 적용 (없다면 직접 주입)
-				# 현재 cannon.gd는 UpgradeManager를 실시간 참조하므로 
-				# 대포 자체에 'fleet_bonus' 같은 변수를 두어 보정하게 하거나
-				# 대포 내부 로직에서 apply_fleet_stats 여부를 체크하게 함.
-				# 일단은 나포함의 대포임을 표시
-				if child.has_method("set_fleet_bonus"):
-					child.set_fleet_bonus(1.0 + (train_lv * 0.3), 1.0 - (train_lv * 0.15))

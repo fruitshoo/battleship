@@ -32,8 +32,8 @@ var tilt_offset: float = 0.0
 var stuck_objects: Array[Node3D] = []
 
 # === 선체 내구도 ===
-@export var max_hull_hp: float = 100.0
-var hull_hp: float = 100.0
+@export var max_hull_hp: float = 200.0 # 스케일 상향 (100 -> 200)
+var hull_hp: float = 200.0
 @export var hull_regen_rate: float = 0.0
 var hull_defense: float = 0.0
 
@@ -139,6 +139,25 @@ func _set_fire_emitting(active: bool) -> void:
 	if flame: flame.emitting = active
 	if smoke: smoke.emitting = active
 
+## 함선 충각(Ramming) 시 갑판 위 병사들에게 광역 데미지 및 넉백 부여
+func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
+	var soldiers_node = get_node_or_null("Soldiers")
+	if not soldiers_node: return
+	
+	for child in soldiers_node.get_children():
+		if child.has_method("take_damage") and child.get("current_state") != 4: # 4 = DEAD
+			# 병사들에게 충격파 데미지 전달
+			child.take_damage(damage, impact_pos)
+			
+			# 물리적 비틀거림/스턴 연출을 위해 일시적으로 공격 타이머 초기화 (딜레이 보장)
+			if "attack_timer" in child:
+				child.attack_timer = max(child.attack_timer, 1.5)
+			
+			# 약간 띄우는 넉백 효과 추가
+			if "velocity" in child:
+				child.velocity.y += 2.0
+				
+	print("[%s] 함선 충돌로 인해 갑판 위 병사들이 %d의 충격 피해를 입었습니다." % [name, int(damage)])
 ## 데미지 처리 (공통)
 func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if is_sinking or is_dying:

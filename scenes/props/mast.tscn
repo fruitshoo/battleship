@@ -52,4 +52,3 @@ surface_material_override/0 = SubResource("ShaderMaterial_sail")
 [node name="Flag" parent="SailVisual" unique_id=85230560 instance=ExtResource("3_flag_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
 flag_shape = 1
-pole_height = 0.5

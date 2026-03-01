@@ -20,8 +20,14 @@ var duration: float = 1.0
 var is_stuck: bool = false
 var is_sinking: bool = false
 var target_ship: Node3D = null
+var janggun_lv: int = 0
 
 func _ready() -> void:
+	# 업그레이드 수치 반영 (DoT, 디버프 강화)
+	dot_damage += janggun_lv * 1.5
+	speed_debuff = maxf(0.2, speed_debuff - janggun_lv * 0.05)
+	turn_debuff = maxf(0.2, turn_debuff - janggun_lv * 0.05)
+	
 	var distance = start_pos.distance_to(target_pos)
 	duration = distance / speed
 	

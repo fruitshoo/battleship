@@ -191,6 +191,22 @@ func _collect_loot() -> void:
 		if _cached_lm.has_method("add_xp"):
 			_cached_lm.add_xp(xp_amount)
 			
+	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
+	if is_instance_valid(target_player) and "hull_hp" in target_player and "max_hull_hp" in target_player:
+		var um = get_node_or_null("/root/UpgradeManager")
+		var supply_lv = 0
+		if is_instance_valid(um) and "current_levels" in um:
+			supply_lv = um.current_levels.get("supply_bonus", 0)
+			
+		var heal_amount = 5.0 + (supply_lv * 10.0) # 기본 5, 레벨당 +10
+		target_player.hull_hp = minf(target_player.hull_hp + heal_amount, target_player.max_hull_hp)
+		
+		# HUD 연동
+		if target_player.has_method("_find_hud"):
+			var hud = target_player._find_hud()
+			if hud and hud.has_method("update_hull_hp"):
+				hud.update_hull_hp(target_player.hull_hp, target_player.max_hull_hp)
+				
 	# 파티클이나 시각적인 먹는 효과 (크기가 줄어들면서 사라짐)
 	if visual:
 		var tween = create_tween()

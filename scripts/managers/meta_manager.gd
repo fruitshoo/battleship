@@ -8,8 +8,8 @@ signal meta_upgraded(id: String, new_level: int)
 # 영구 업그레이드 정의
 var UPGRADES = {
 	"hull_hp": {
-		"name": "선체 강화",
-		"description": "기본 체력 +20",
+		"name": "선체 체력",
+		"description": "배 체력 +40",
 		"base_cost": 500,
 		"cost_multiplier": 1.5,
 		"max_level": 5
@@ -65,7 +65,7 @@ func buy_upgrade(id: String) -> bool:
 # --- 인게임 스탯 보너스 계산용 ---
 
 func get_hull_hp_bonus() -> float:
-	return SaveManager.get_upgrade_level("hull_hp") * 20.0
+	return SaveManager.get_upgrade_level("hull_hp") * 40.0
 
 func get_hull_defense_bonus() -> float:
 	return SaveManager.get_upgrade_level("hull_defense") * 2.0
