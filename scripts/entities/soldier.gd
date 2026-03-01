@@ -519,6 +519,18 @@ func _check_ship_capture_opportunity() -> void:
 
 	# 상황 2: 본선 혹은 아군 함선에 있으면서, 주변의 비어있는 적선(폐선) 탐색하여 뛰어들기
 	if owned_ship.is_in_group("player"):
+		# [핵심] 갑판 방어 우선: 내 배에 적군이 침투해 백병전이 진행 중이라면 나포를 보류함
+		var in_combat = false
+		var own_soldiers = owned_ship.get_node_or_null("Soldiers")
+		if own_soldiers:
+			for c in own_soldiers.get_children():
+				if c.get("team") != team and c.get("current_state") != State.DEAD:
+					in_combat = true
+					break
+		
+		if in_combat:
+			return # 백병전 방어에 집중 (표적 탐색 중단)
+			
 		var enemy_ships = get_ships_cached(get_tree(), "enemy")
 		for ship in enemy_ships:
 			# 폐선 상태이고 나포되지 않은 배인 경우

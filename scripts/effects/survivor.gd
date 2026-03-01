@@ -70,7 +70,7 @@ func _physics_process(delta: float) -> void:
 			global_position += direction * current_magnet_speed * delta
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
-			if dist < 2.0:
+			if dist < 2.5: # 2.0 -> 2.5
 				_collect_by_proximity()
 		else:
 			current_magnet_speed = 0.0
@@ -109,16 +109,21 @@ func _apply_floating(delta: float) -> void:
 
 func _find_target_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
-	# 진짜 플레이어 배를 우선 탐색 (나포함 제외)
+	var closest_dist = INF
+	var closest_p = null
+	
 	for p in players:
-		if p.get("is_player_controlled") == true and not p.get("is_sinking"):
-			target_player = p
-			return
-	# 못 찾으면 나포함이 아닌 아무나
-	for p in players:
-		if not p.is_in_group("captured_minion"):
-			target_player = p
-			return
+		if p.get("is_sinking"): continue
+		
+		var d = global_position.distance_to(p.global_position)
+		if d < closest_dist:
+			closest_dist = d
+			closest_p = p
+			
+	if closest_dist <= magnet_radius * 1.5:
+		target_player = closest_p
+	else:
+		target_player = null
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -145,7 +150,7 @@ func _on_area_entered(area: Area3D) -> void:
 
 func _collect_by_proximity() -> void:
 	if is_collected: return
-	if is_instance_valid(target_player) and target_player.get("is_player_controlled") == true:
+	if is_instance_valid(target_player):
 		_try_collect(target_player)
 
 

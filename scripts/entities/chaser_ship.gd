@@ -24,6 +24,7 @@ var target: Node3D = null
 var is_dying: bool = false
 var is_boarding: bool = false
 var is_derelict: bool = false # 병사 전멸 시 무력화(폐선) 상태
+var boarding_attacker: Node3D = null # 이 배를 도선 중인 함선
 var is_burning: bool = false
 var burn_timer: float = 0.0
 var fire_build_up: float = 0.0 # 화재 누적 수치
@@ -217,7 +218,9 @@ func die() -> void:
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
 	_evacuate_player_soldiers_as_survivors()
 	
-	# 밧줄 제거
+	# 밧줄 및 도선 공격자 정보 제거
+	if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
+		boarding_target.set("boarding_attacker", null)
 	_clear_ropes()
 	
 	# 침몰 시작 시 타겟 그룹에서 제외 (대포가 시체를 쏘지 않게 함)
@@ -305,9 +308,10 @@ func _drop_floating_loot() -> void:
 	var loot_count = randi_range(1, 3)
 	for i in range(loot_count):
 		# 위치 먼저 설정 (add_child 이전에 설정해야 _ready에서 올바른 base_y 캡처 가능)
+		var loot = loot_scene.instantiate()
 		var offset_x = randf_range(-2.0, 2.0)
 		var offset_z = randf_range(-2.0, 2.0)
-		loot.global_position = Vector3(global_position.x + offset_x, 0.5, global_position.z + offset_z)
+		loot.position = Vector3(global_position.x + offset_x, 0.5, global_position.z + offset_z)
 		
 		get_tree().root.add_child.call_deferred(loot)
 		
@@ -315,7 +319,7 @@ func _drop_floating_loot() -> void:
 	if survivor_scene and randf() < 0.3:
 		var survivor = survivor_scene.instantiate()
 		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
-		survivor.global_position = global_position + s_offset
+		survivor.position = global_position + s_offset
 		get_tree().root.add_child.call_deferred(survivor)
 		print("[Rescue] 구출 가능한 생존자가 발생했습니다!")
 
@@ -533,6 +537,8 @@ func _process_boarding(delta: float) -> void:
 	# 너무 멀어지면 도선 포기 및 추격 상태로 복귀
 	if dist > boarding_break_distance:
 		print("[Boarding] 밧줄이 팽팽해지다가 끊어졌습니다! 도선 중단.")
+		if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
+			boarding_target.set("boarding_attacker", null)
 		_clear_ropes()
 		is_boarding = false
 		boarding_timer = 0.0
@@ -549,9 +555,25 @@ func _transfer_one_soldier() -> void:
 	
 	# 내 배에서 살아있는 병사 하나 찾기
 	var s = null
+	var enemy_on_deck = false
+	
 	if has_node("Soldiers"):
-		for child in $Soldiers.get_children():
+		var soldiers = $Soldiers.get_children()
+		
+		# 1. 먼저 내 배에 적군이 있는지 확인 (방어 우선)
+		for child in soldiers:
 			if child.get("current_state") != 4: # NOT DEAD
+				if child.get("team") != team:
+					enemy_on_deck = true
+					break
+		
+		if enemy_on_deck:
+			# 갑판에 적이 있으면 도선 공격을 중지하고 방어에 집중
+			return
+			
+		# 2. 적이 없으면 넘어갈 아군 병사 선택
+		for child in soldiers:
+			if child.get("current_state") != 4 and child.get("team") == team:
 				s = child
 				break
 	
@@ -993,7 +1015,12 @@ func _board_ship(target_ship: Node3D) -> void:
 	# 2. 도선 상태 진입
 	is_boarding = true
 	boarding_target = ship_node
-	boarding_timer = 0.0 # 즉시 첫 병사가 넘어가지 않도록 0으로 초기화
+	
+	# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
+	if boarding_target.has_method("set") or "boarding_attacker" in boarding_target:
+		boarding_target.set("boarding_attacker", self )
+		
+	boarding_timer = 0.0
 	
 	# 그레플링 훅 생성
 	if is_instance_valid(boarding_target):

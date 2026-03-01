@@ -126,6 +126,13 @@ func _is_target_valid(target: Node3D) -> bool:
 	var current_range = _get_current_range()
 	if global_position.distance_squared_to(target.global_position) > current_range * current_range: return false
 	if not _is_within_arc(target): return false
+	
+	# 도선 중이거나 폐선인 배인지 최종 체크
+	if target.get("is_derelict") == true: return false
+	var attacker = target.get("boarding_attacker")
+	if is_instance_valid(attacker) and attacker.get("team") == team:
+		return false
+		
 	if _is_ship_occupied_by_friendly(target): return false
 	return true
 
