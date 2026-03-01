@@ -21,7 +21,9 @@ var _cached_lm: Node = null
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
 func _ready() -> void:
-	base_y = position.y
+	# 생성 직후의 높이를 base_y로 캡처 (보통 0.5 근처)
+	base_y = global_position.y
+	if base_y < 0.2: base_y = 0.5 # 비정상적으로 낮게 잡혔을 경우 보정
 	
 	# 초기에는 투명하게 시작해서 나타남 (스폰 연출)
 	if visual and visual is MeshInstance3D:
@@ -38,6 +40,9 @@ func _ready() -> void:
 			
 			var tween = create_tween()
 			tween.tween_property(mat, "albedo_color:a", 1.0, 1.0)
+			
+		# 컬링 방지 마진 추가
+		visual.extra_cull_margin = 1.0
 	
 	# 레벨 매니저 캐싱
 	_cached_lm = get_tree().root.find_child("LevelManager", true, false)

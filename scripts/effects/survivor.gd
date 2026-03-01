@@ -18,7 +18,8 @@ var is_collected: bool = false
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
 func _ready() -> void:
-	base_y = position.y
+	base_y = global_position.y
+	if base_y < 0.2: base_y = 0.5
 	
 	# 파란색 캡슐 이미지 설정 (병사 캐릭터와 동일하게)
 	if visual and visual is MeshInstance3D:
@@ -33,6 +34,9 @@ func _ready() -> void:
 		visual.scale = Vector3.ZERO
 		var tween = create_tween().set_parallel(true)
 		tween.tween_property(visual, "scale", Vector3.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		
+		# 컬링 방지 마진 추가
+		visual.extra_cull_margin = 1.0
 		
 	# 획득 이벤트 연결
 	body_entered.connect(_on_body_entered)

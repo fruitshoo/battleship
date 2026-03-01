@@ -304,23 +304,19 @@ func _drop_floating_loot() -> void:
 	# 1~3개의 부유물 드랍
 	var loot_count = randi_range(1, 3)
 	for i in range(loot_count):
-		var loot = loot_scene.instantiate()
-		get_tree().root.add_child.call_deferred(loot)
-		
-		# 랜덤 오프셋 (수면 위 Y=0 근처 둥둥)
+		# 위치 먼저 설정 (add_child 이전에 설정해야 _ready에서 올바른 base_y 캡처 가능)
 		var offset_x = randf_range(-2.0, 2.0)
 		var offset_z = randf_range(-2.0, 2.0)
+		loot.global_position = Vector3(global_position.x + offset_x, 0.5, global_position.z + offset_z)
 		
-		# 콜백으로 위치 설정 (충돌 안전)
-		var spawn_pos = Vector3(global_position.x + offset_x, 0.5, global_position.z + offset_z)
-		loot.set_deferred("global_position", spawn_pos)
+		get_tree().root.add_child.call_deferred(loot)
 		
 	# 4. 생존자(Survivor) 스폰 추가 (30% 확률)
 	if survivor_scene and randf() < 0.3:
 		var survivor = survivor_scene.instantiate()
-		get_tree().root.add_child.call_deferred(survivor)
 		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
-		survivor.set_deferred("global_position", global_position + s_offset)
+		survivor.global_position = global_position + s_offset
+		get_tree().root.add_child.call_deferred(survivor)
 		print("[Rescue] 구출 가능한 생존자가 발생했습니다!")
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
