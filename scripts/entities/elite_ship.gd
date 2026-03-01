@@ -10,8 +10,8 @@ func _ready() -> void:
 	add_to_group("elite")
 	
 	# 엘리트 특성 부여
-	max_hp *= 3.0
-	hp = max_hp
+	max_hull_hp *= 3.0
+	hull_hp = max_hull_hp
 	move_speed *= 0.8 # 덩치가 커서 조금 느림
 	
 	# 시각적으로 크게 만듦

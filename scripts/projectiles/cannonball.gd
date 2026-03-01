@@ -20,10 +20,12 @@ func set_lifetime_multiplier(mult: float) -> void:
 	lifetime *= mult
 
 func _spawn_effects(_is_crit: bool = false) -> void:
-	if not is_instance_valid(AudioManager): return
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if not is_instance_valid(audio_manager): return
 	
 	# 나무 부서지는 소리 재생
-	AudioManager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
+	if audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
 
 	# 타격 시 검은 연기(발사 시 나오는 연기 재사용) 생성
 	if impact_smoke_scene:
@@ -47,8 +49,10 @@ var has_hit: bool = false
 
 func _on_timeout() -> void:
 	if has_hit: return
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
+	
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
 	queue_free()
 
 func _physics_process(delta: float) -> void:
@@ -113,8 +117,9 @@ func _check_hit(target: Node) -> void:
 		_spawn_effects(is_crit)
 	else:
 		# 함선 외의 물체에 부딪혔을 때 (물보라 소리와 함께 삭제)
-		if is_instance_valid(AudioManager):
-			AudioManager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
 	
 	# 어떤 경우든 부딪히면 삭제
 	queue_free()

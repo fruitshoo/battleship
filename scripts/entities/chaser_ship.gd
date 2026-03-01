@@ -1,4 +1,4 @@
-extends Node3D
+extends "res://scripts/entities/base_ship.gd"
 class_name ChaserShip
 
 ## 추적선 (Chaser Ship)
@@ -9,51 +9,19 @@ class_name ChaserShip
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
 @export var boarders_count: int = 2 # 도선시킬 병사 수
 
-@export var hp: float = 60.0 # 기본 HP 상향 (대포 일제사격 2회 정도 버팀)
-@export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-@export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
-@export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
-@export var survivor_scene: PackedScene = preload("res://scenes/effects/survivor.tscn")
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
-var _fire_instance: Node3D = null
 
-var max_hp: float = 60.0
 var target: Node3D = null
 
 # 상태 (State)
-var is_dying: bool = false
 var is_boarding: bool = false
-var is_derelict: bool = false # 병사 전멸 시 무력화(폐선) 상태
-var boarding_attacker: Node3D = null # 이 배를 도선 중인 함선
-var is_burning: bool = false
-var burn_timer: float = 0.0
-var fire_build_up: float = 0.0 # 화재 누적 수치
-var fire_threshold: float = 100.0 # 화재 임계치
+var leaking_rate: float = 0.0
 
-# 누수(Leaking) 시스템 변수
-var leaking_rate: float = 0.0 # 초당 피해량
-var hull_regen_rate: float = 0.0 # 초당 HP 회복량 (나포함도 수리 가능하게)
-var hull_defense: float = 0.0 # 피격 데미지 감소량
-var _last_splinter_time: float = 0.0 # 파편 생성 쿨다운용
-
-# === 시각 효과 관련 ===
-var tilt_offset: float = 0.0
-var base_y: float = 0.0
-var bobbing_amplitude: float = 0.2
-var bobbing_speed: float = 1.1
-var rocking_amplitude: float = 0.04
-
-var masts: Array[Node] = []
-@onready var rudder_visual: Node3D = $RudderVisual if has_node("RudderVisual") else null
-@onready var oar_pivot_left: Node3D = $OarBaseLeft/OarPivot if has_node("OarBaseLeft/OarPivot") else null
-@onready var oar_pivot_right: Node3D = $OarBaseRight/OarPivot if has_node("OarBaseRight/OarPivot") else null
-var _oar_time: float = 0.0
 
 @export var max_minion_crew: int = 3
 var minion_respawn_timer: float = 0.0
 @export var minion_respawn_interval: float = 15.0 # 아군 배보다 조금 더 느림
 
-var sail_angle: float = 0.0 # 돛 각도 (시각적 피드백용)
 
 # === 함대 진형 (Formation) 관련 ===
 enum Formation {COLUMN, WING}
@@ -84,36 +52,6 @@ static func get_ships_cached(tree: SceneTree) -> Array:
 		_last_ships_cache_frame = current_frame
 	return _cached_ships_list
 
-func get_hull_ratio() -> float:
-	if max_hp <= 0.0:
-		return 1.0
-	return hp / max_hp
-
-func _update_fire_effect() -> void:
-	# is_burning 또는 폐선 상태일 때 화재 파티클 발생 (불꽃 + 연기 분리형)
-	if (is_burning or is_derelict) and not is_dying:
-		if not is_instance_valid(_fire_instance):
-			_fire_instance = fire_effect_scene.instantiate() as Node3D
-			add_child(_fire_instance)
-			_fire_instance.position = Vector3(0, 1.5, 0.0)
-			_set_fire_emitting(true)
-		else:
-			_set_fire_emitting(true)
-	else:
-		if is_instance_valid(_fire_instance):
-			_set_fire_emitting(false)
-
-func _set_fire_emitting(active: bool) -> void:
-	if not is_instance_valid(_fire_instance):
-		return
-	var flame = _fire_instance.get_node_or_null("FlameParticles") as GPUParticles3D
-	var smoke = _fire_instance.get_node_or_null("SmokeParticles") as GPUParticles3D
-	
-	if flame: flame.emitting = active
-	if smoke: smoke.emitting = active
-
-# Boarding Action Variables
-@onready var wake_trail: GPUParticles3D = $WakeTrail if has_node("WakeTrail") else null
 
 # 최적화 변수
 var cached_lm: Node = null
@@ -158,8 +96,8 @@ func _become_derelict() -> void:
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 
 func _ready() -> void:
-	hp = max_hp
-	base_y = global_position.y
+	if max_hull_hp <= 0: max_hull_hp = 60.0 # Default fallback
+	global_position.y = base_y # Keep base_y assignment from BaseShip valid
 	_find_player()
 	
 	# 초기 돛 색상 설정 (Enemy 기본: Red)
@@ -183,33 +121,6 @@ func _ready() -> void:
 		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 
-# 데미지 처리 (hit_position 추가됨)
-func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
-	if is_dying: return
-	hp -= amount
-	
-	# 피격 이펙트 (파편) - 무차별 포격 시 파티클 폭발(렉) 방지 및 시각적 분리 현상 방지
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if wood_splinter_scene and (current_time - _last_splinter_time > 0.2):
-		_last_splinter_time = current_time
-		var splinter = wood_splinter_scene.instantiate()
-		get_tree().root.add_child(splinter)
-		
-		if hit_position != Vector3.ZERO:
-			splinter.global_position = hit_position + Vector3(0, 0.5, 0)
-		else:
-			var offset = Vector3(randf_range(-0.5, 0.5), 1.5, randf_range(-0.5, 0.5))
-			splinter.global_position = global_position + offset
-		splinter.rotation.y = randf() * TAU
-		if splinter.has_method("set_amount_by_damage"):
-			# 방어력 적용된 수치로 파편 양 계산
-			splinter.set_amount_by_damage(maxf(amount - hull_defense, 1.0))
-	
-	var final_damage = maxf(amount - hull_defense, 1.0)
-	hp -= final_damage
-	
-	if hp <= 0:
-		die()
 
 func die() -> void:
 	if is_dying: return
@@ -272,34 +183,6 @@ func die() -> void:
 	sink_tween.set_parallel(false)
 	sink_tween.tween_callback(queue_free)
 
-## 화염 데미지 및 상태 이상
-func take_fire_damage(dps: float, duration: float) -> void:
-	if is_dying: return
-	
-	if is_burning:
-		burn_timer = max(burn_timer, duration)
-		leaking_rate += dps * 0.5 # 이미 불타고 있으면 추가 데미지 약화
-		return
-
-	# 화재 누적
-	fire_build_up += duration * 8.0 # 적 배는 약 2.5 ~ 3발 정도에 점화
-	
-	if fire_build_up >= fire_threshold:
-		is_burning = true
-		fire_build_up = fire_threshold
-		burn_timer = duration
-		leaking_rate += dps
-
-func _update_burning_status(delta: float) -> void:
-	if is_burning:
-		burn_timer -= delta
-		if burn_timer <= 0:
-			is_burning = false
-			fire_build_up = 0.0
-	else:
-		# 미발화 시 누적치 감소
-		if fire_build_up > 0:
-			fire_build_up = move_toward(fire_build_up, 0, 20.0 * delta)
 
 func _drop_floating_loot() -> void:
 	if not loot_scene: return
@@ -347,12 +230,43 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 	if converted_count > 0:
 		print("[Critical] 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
 
+## 생존자 구조 및 병사 합류 처리 (나포함용)
+func add_survivor() -> bool:
+	if is_dying: return false
+	
+	var soldiers_node = get_node_or_null("Soldiers")
+	if not soldiers_node: return false
+	
+	# 현재 살아있는 병사 수 체크
+	var alive_count = 0
+	for child in soldiers_node.get_children():
+		if child.get("current_state") != 4: # NOT DEAD
+			alive_count += 1
+		else:
+			child.queue_free() # 시체 정리
+			
+	# 나포함 전용 정원(max_minion_crew) 체크
+	if alive_count >= max_minion_crew:
+		return false # 정원 초과
+		
+	# 병사 생성
+	var s = soldier_scene.instantiate()
+	soldiers_node.add_child(s)
+	s.set_team("player")
+	
+	# 위치 설정 (갑판 위 랜덤)
+	var offset = Vector3(randf_range(-0.8, 0.8), 0.5, randf_range(-1.5, 1.5))
+	s.position = offset
+	
+	print("[Crew] 나포함이 생존자를 구조했습니다! (현재: %d/%d)" % [alive_count + 1, max_minion_crew])
+	return true
+
 func _process(delta: float) -> void:
 	if is_dying: return
 	
 	_update_fire_effect()
 	_auto_adjust_sail(delta)
-	_update_sail_visual(delta)
+	_update_sail_visual()
 	_update_oar_visual(delta)
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
@@ -367,12 +281,6 @@ func _process(delta: float) -> void:
 	if team == "player":
 		_update_minion_respawn(delta)
 
-func _update_hull_regeneration(delta: float) -> void:
-	if is_dying or hull_regen_rate <= 0: return
-	
-	# 데미지를 입었을 때만 회복
-	if hp < max_hp:
-		hp = move_toward(hp, max_hp, hull_regen_rate * delta)
 
 func _physics_process(delta: float) -> void:
 	if is_dying: return
@@ -457,16 +365,12 @@ func _physics_process(delta: float) -> void:
 		take_damage(leaking_rate * delta)
 		
 	# === 시각적 효과 (둥실둥실 및 기울기) ===
-	_apply_visual_effects(delta)
+	_apply_bobbing_effect()
 
-func _apply_visual_effects(_delta: float) -> void:
-	var time = Time.get_ticks_msec() * 0.001
-	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude
-	
 	# 수면 위 높이 유지 (사망 시 tween에 의해 덮어씌워짐)
 	if not is_dying:
-		global_position.y = base_y + bob_offset
-		rotation.z = (sin(time * bobbing_speed * 0.85) * rocking_amplitude) + tilt_offset
+		rotation.z += tilt_offset # Add tilt_offset since base handles bobbing
+		pass
 
 	# 항적 제어
 	if wake_trail:
@@ -650,7 +554,7 @@ func capture_ship() -> void:
 	is_burning = false
 	fire_build_up = 0.0
 	leaking_rate = 0.0
-	hp = max(hp, max_hp * 0.3) # 최소 30% 체력으로 복구
+	hull_hp = max(hull_hp, max_hull_hp * 0.3) # 최소 30% 체력으로 복구
 	
 	# 철저한 물리적/시각적 리셋 (잠수함화 및 기울기 고정 방지)
 	tilt_offset = 0.0
@@ -691,8 +595,9 @@ func capture_ship() -> void:
 		cached_lm.show_message("적군 함선을 나포했습니다!", 3.0)
 	
 	# 플레이어 업그레이드 스탯 적용 (수리 등)
-	if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("apply_fleet_stats_to_minion"):
-		UpgradeManager.apply_fleet_stats_to_minion(self )
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("apply_fleet_stats_to_minion"):
+		upgrade_manager.apply_fleet_stats_to_minion(self )
 	
 	# 나포 직후 플레이어를 찾아 즉시 따라가기 시작
 	target = null
@@ -756,14 +661,11 @@ func _apply_minion_visuals() -> void:
 	if is_instance_valid(_fire_instance):
 		_set_fire_emitting(false)
 
-func _update_sail_visual(_delta: float) -> void:
-	for mast in masts:
-		if mast.has_method("set_sail_angle"):
-			mast.set_sail_angle(sail_angle)
 
 func _auto_adjust_sail(delta: float) -> void:
-	if not is_instance_valid(WindManager): return
-	var wind_dir = WindManager.get_wind_direction()
+	var wind_manager = get_node_or_null("/root/WindManager")
+	if not is_instance_valid(wind_manager) or not wind_manager.has_method("get_wind_direction"): return
+	var wind_dir = wind_manager.get_wind_direction()
 	
 	# ship.gd의 로직과 유사하게 자동 조절
 	var ship_angle_rad = rotation.y
@@ -861,8 +763,8 @@ func _process_minion_ai(delta: float) -> void:
 		# 뒤처졌거나 정렬 상태 (연속적 가속)
 		# 0m(1.0배) ~ 40m(1.6배) 사이를 부드럽게 연결
 		var lag_factor = clamp(rel_depth / 40.0, 0.0, 1.0)
-		var speed_mult = lerp(1.0, 1.6, lag_factor)
-		target_final_speed = max(player_speed * speed_mult, move_speed * 0.8)
+		var sync_speed_mult = lerp(1.0, 1.6, lag_factor)
+		target_final_speed = max(player_speed * sync_speed_mult, move_speed * 0.8)
 		
 	# 시간차 부드러움 적용 (Temporal Smoothing)
 	# 이전 프레임 속도에서 목표 속도로 서서히 변화시켜 '멈칫'하는 현상 제거
@@ -899,7 +801,7 @@ func _process_minion_ai(delta: float) -> void:
 			global_translate(Vector3.FORWARD.rotated(Vector3.UP, rotation.y) * player_speed * delta + separation_force * delta)
 			
 	# [추가] 나포함 이동 시에도 수면 높이 유지 및 둥실둥실 효과 적용
-	_apply_visual_effects(delta)
+	_apply_bobbing_effect()
 	
 	if wake_trail:
 		wake_trail.emitting = dist_to_target > 2.0 or player_speed > 1.0
@@ -916,8 +818,9 @@ func _update_wave_sounds(delta: float) -> void:
 	if speed > 0.5:
 		_wave_timer -= delta
 		if _wave_timer <= 0:
-			if is_instance_valid(AudioManager):
-				AudioManager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
+			var audio_manager = get_node_or_null("/root/AudioManager")
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
 			var speed_mod = clamp(speed / 5.0, 0.4, 1.5)
 			_wave_timer = randf_range(2.0, 4.5) / speed_mod
 
@@ -1002,8 +905,9 @@ func _board_ship(target_ship: Node3D) -> void:
 		take_damage(1.0, global_position)
 		
 		# 충격 피드백 강화 (화면 흔들림 및 묵직한 사운드)
-		if is_instance_valid(AudioManager):
-			AudioManager.play_sfx("impact_wood", global_position, randf_range(0.6, 0.8)) # 더 낮고 묵직한 피치
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("impact_wood", global_position, randf_range(0.6, 0.8)) # 더 낮고 묵직한 피치
 		
 		var cam = get_viewport().get_camera_3d()
 		if cam and cam.has_method("shake"):

@@ -1,38 +1,27 @@
-extends Node3D
+extends "res://scripts/entities/base_ship.gd"
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
 
 signal boss_died
 
-@export var max_p: float = 1000.0
 @export var move_speed: float = 3.0
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
-@export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-@export var survivor_scene: PackedScene = preload("res://scenes/effects/survivor.tscn")
 
-var hp: float = 1000.0
 var target: Node3D = null
-var is_dead: bool = false
 var orbit_angle: float = 0.0
 
 # 누수(Leaking) 시스템 변수
 var leaking_rate: float = 0.0 # 초당 피해량
 
-# === 시각 효과 관련 ===
-var tilt_offset: float = 0.0 # 장군전 등에 의한 기울기
-var bobbing_amplitude: float = 0.25
-var bobbing_speed: float = 0.8
-var rocking_amplitude: float = 0.03
-var base_y: float = 0.0
-
 var cached_lm: Node = null
 
 func _ready() -> void:
-	hp = max_p
+	if max_hull_hp <= 0: max_hull_hp = 1000.0
+	hull_hp = max_hull_hp
 	base_y = global_position.y
 	add_to_group("enemy")
 	add_to_group("boss")
@@ -109,7 +98,13 @@ func _setup_soldiers() -> void:
 		s.attack_damage = 15.0
 
 func _process(delta: float) -> void:
-	if is_dead: return
+	if is_dying: return
+	
+	_update_fire_effect()
+	_update_sail_visual()
+	_update_burning_status(delta)
+	_update_hull_regeneration(delta)
+	
 	if not is_instance_valid(target):
 		_find_player()
 		return
@@ -152,18 +147,7 @@ func _process(delta: float) -> void:
 		take_damage(leaking_rate * delta)
 		
 	# === 둥실둥실 및 기울기 효과 ===
-	_apply_visual_bobbing()
-
-func _apply_visual_bobbing() -> void:
-	var time = Time.get_ticks_msec() * 0.001
-	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude
-	
-	# 수직 위치 (가라앉지 않음)
-	global_position.y = base_y + bob_offset
-	
-	# 시각적 회전 (기울기 제한 포함)
-	# 보스는 덩치가 커서 원심력 기울기는 아주 작게 적용
-	rotation.z = (sin(time * bobbing_speed * 0.7) * rocking_amplitude) + tilt_offset
+	_apply_bobbing_effect()
 
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
@@ -187,33 +171,13 @@ func _find_player() -> void:
 	if players.size() > 0:
 		target = players[0]
 
-func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
-	if is_dead: return
-	hp -= amount
-	
-	# 피격 이펙트 (파편)
-	if wood_splinter_scene:
-		var splinter = wood_splinter_scene.instantiate()
-		get_tree().root.add_child(splinter)
-		
-		if hit_position != Vector3.ZERO:
-			splinter.global_position = hit_position + Vector3(0, 1.0, 0)
-		else:
-			var offset = Vector3(randf_range(-1.5, 1.5), 2.5, randf_range(-1.5, 1.5))
-			splinter.global_position = global_position + offset
-		splinter.rotation.y = randf() * TAU
-		if splinter.has_method("set_amount_by_damage"):
-			splinter.set_amount_by_damage(amount)
-	
 	# HUD에 보스 체력 업데이트 (LevelManager를 통해)
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
-		cached_lm.update_boss_hp(hp, max_p)
-		
-	if hp <= 0:
-		_die()
+		cached_lm.update_boss_hp(hull_hp, max_hull_hp)
 
-func _die() -> void:
-	is_dead = true
+func die() -> void:
+	if is_dying: return
+	is_dying = true
 	
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
 	_evacuate_player_soldiers_as_survivors()

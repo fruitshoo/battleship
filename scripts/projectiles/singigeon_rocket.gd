@@ -28,13 +28,14 @@ func _ready() -> void:
 	global_position = start_pos
 	
 	# 발사 사운드 재생 (01, 02, 03 무작위 선택)
-	if is_instance_valid(AudioManager):
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		var rand = randf()
 		var sfx_name = "rocket_launch_01"
 		if rand > 0.66: sfx_name = "rocket_launch_03"
 		elif rand > 0.33: sfx_name = "rocket_launch_02"
 		
-		AudioManager.play_sfx(sfx_name, global_position, randf_range(0.9, 1.1))
+		audio_manager.play_sfx(sfx_name, global_position, randf_range(0.9, 1.1))
 	
 	area_entered.connect(_on_hit)
 	body_entered.connect(_on_hit)
@@ -87,10 +88,11 @@ func _apply_damage(target_node: Node) -> void:
 	# 데미지 보정 (블랙 파우더 업그레이드 등)
 	var dmg_mult = 1.0
 	var fire_lv = 0
-	if is_instance_valid(UpgradeManager):
-		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
+		var powder_lv = upgrade_manager.current_levels.get("black_powder", 0)
 		dmg_mult += (0.2 * powder_lv)
-		fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
+		fire_lv = upgrade_manager.current_levels.get("fire_arrows", 0)
 
 	if target_node.has_method("take_damage"):
 		var final_damage = damage * dmg_mult
@@ -115,5 +117,6 @@ func _explode() -> void:
 	
 	# 폭발 VFX(화염/연기) 제거 - 요청에 따라 나무 파편(take_damage 내에 있음)만 남김
 	# 폭발 사운드는 타격감 유지를 위해 남겨둠
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))

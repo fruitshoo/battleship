@@ -1,3 +1,4 @@
+@tool
 extends Node3D
 
 ## 깃발 (Flag) 오브젝트
@@ -6,6 +7,12 @@ extends Node3D
 @export var color: Color = Color(0.9, 0.1, 0.1):
 	set(v):
 		color = v
+		_update_material()
+
+enum Shape {RECTANGLE, TRIANGLE}
+@export var flag_shape: Shape = Shape.RECTANGLE:
+	set(v):
+		flag_shape = v
 		_update_material()
 
 @export var pole_height: float = 2.0
@@ -39,7 +46,7 @@ func _update_dimensions() -> void:
 		flag_mesh.mesh = p_mesh
 
 func _process(_delta: float) -> void:
-	if not is_instance_valid(WindManager):
+	if Engine.is_editor_hint() or not is_instance_valid(WindManager):
 		return
 	
 	var wind_dir = WindManager.get_wind_direction()
@@ -63,8 +70,9 @@ func _process(_delta: float) -> void:
 
 func _update_material() -> void:
 	if not is_inside_tree() or not flag_mesh: return
-	# 인스턴스 셰이더 파라미터로 색상 적용
+	# 인스턴스 셰이더 파라미터로 색상 및 모양 적용
 	flag_mesh.set_instance_shader_parameter("albedo", color)
+	flag_mesh.set_instance_shader_parameter("is_triangular", flag_shape == Shape.TRIANGLE)
 
 func set_team_color(team: String) -> void:
 	if team == "player":

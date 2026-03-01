@@ -1,10 +1,11 @@
 shader_type spatial;
 render_mode cull_disabled, shadows_disabled;
 
-uniform vec4 albedo : source_color = vec4(1.0, 0.0, 0.0, 1.0);
+instance uniform vec4 albedo : source_color;
 uniform float wave_speed : hint_range(0.0, 10.0) = 4.0;
 uniform float wave_strength : hint_range(0.0, 1.0) = 0.3;
 uniform float side_drag : hint_range(0.0, 5.0) = 1.0;
+instance uniform bool is_triangular;
 
 void vertex() {
 	// UV.x == 0 points are pinned to the pole. 
@@ -24,6 +25,15 @@ void vertex() {
 }
 
 void fragment() {
+	if (is_triangular) {
+		// Calculate triangular (pennant) mask
+		// As UV.x increases (away from pole), the allowed UV.y range shrinks.
+		float center_dist = abs(UV.y - 0.5);
+		if (center_dist > (1.0 - UV.x) * 0.5) {
+			discard;
+		}
+	}
+	
 	ALBEDO = albedo.rgb;
 	ROUGHNESS = 0.6;
 	SPECULAR = 0.2;

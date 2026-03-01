@@ -150,8 +150,9 @@ func _play_impact_vfx() -> void:
 			smoke.emitting = true
 	
 	# 피격 사운드 (장군전 전용 중타격음)
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("heavy_missle_impact", global_position, randf_range(0.8, 1.0))
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("heavy_missle_impact", global_position, randf_range(0.8, 1.0))
 
 func _play_launch_vfx() -> void:
 	# 화면 흔들림

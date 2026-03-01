@@ -66,21 +66,34 @@ func _process(_delta: float) -> void:
 
 func _update_sail_display() -> void:
 	if sail_angle_label:
+		var rudder_angle = ship.get("rudder_angle")
 		var rudder_text = ""
-		if ship.get("rudder_angle") != null:
-			rudder_text = " | 러더: %.0f도" % ship.rudder_angle
-		sail_angle_label.text = "돛: %.0f도%s" % [ship.sail_angle, rudder_text]
+		if rudder_angle != null:
+			rudder_text = " | 러더: %.0f도" % rudder_angle
+			
+		var sail_angle = ship.get("sail_angle")
+		if sail_angle == null: sail_angle = 0.0
+		
+		sail_angle_label.text = "돛: %.0f도%s" % [sail_angle, rudder_text]
 
 
 func _update_speed_display() -> void:
 	if speed_label:
-		var mode_text = "노 젓기" if ship.is_rowing else "돛"
-		speed_label.text = "속도: %.1f [%s]" % [ship.current_speed, mode_text]
+		var is_rowing = ship.get("is_rowing")
+		if is_rowing == null: is_rowing = false
+		
+		var current_speed = ship.get("current_speed")
+		if current_speed == null: current_speed = 0.0
+		
+		var mode_text = "노 젓기" if is_rowing else "돛"
+		speed_label.text = "속도: %.1f [%s]" % [current_speed, mode_text]
 
 
 func _update_stamina_display() -> void:
 	if stamina_bar:
-		stamina_bar.value = ship.rowing_stamina
+		var stamina = ship.get("rowing_stamina")
+		if stamina == null: stamina = 0.0
+		stamina_bar.value = stamina
 		stamina_bar.max_value = 100.0
 
 
@@ -105,17 +118,19 @@ func _update_wind_indicator() -> void:
 
 
 func _on_sail_left_pressed() -> void:
-	if ship:
-		ship.adjust_sail_angle(-10.0)
+	if ship and ship.has_method("adjust_sail_angle"):
+		ship.call("adjust_sail_angle", -10.0)
 
 
 func _on_sail_right_pressed() -> void:
-	if ship:
-		ship.adjust_sail_angle(10.0)
+	if ship and ship.has_method("adjust_sail_angle"):
+		ship.call("adjust_sail_angle", 10.0)
 
 
 func _on_rowing_pressed() -> void:
-	if ship:
-		ship.toggle_rowing()
+	if ship and ship.has_method("toggle_rowing"):
+		ship.call("toggle_rowing")
 		if rowing_btn:
-			rowing_btn.text = "노 젓기 중지" if ship.is_rowing else "노 젓기"
+			var is_rowing = ship.get("is_rowing")
+			if is_rowing == null: is_rowing = false
+			rowing_btn.text = "노 젓기 중지" if is_rowing else "노 젓기"

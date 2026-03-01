@@ -14,9 +14,9 @@ var cooldown_timer: float = 0.0
 
 
 func _process(delta: float) -> void:
-	var um = UpgradeManager if is_instance_valid(UpgradeManager) else null
+	var um = get_node_or_null("/root/UpgradeManager")
 	var current_cooldown = fire_cooldown
-	if um:
+	if is_instance_valid(um) and "current_levels" in um:
 		var train_lv = um.current_levels.get("training", 0)
 		current_cooldown = fire_cooldown * (1.0 - 0.1 * train_lv)
 		
@@ -77,8 +77,9 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 		get_tree().root.add_child.call_deferred(rocket)
 		
 		# 발사 사운드
-		if is_instance_valid(AudioManager):
-			AudioManager.play_sfx("rocket_launch", global_position)
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("rocket_launch", global_position)
 		
 		# 연사 간격 (0.12초)
 		await get_tree().create_timer(0.12).timeout

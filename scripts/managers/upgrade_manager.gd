@@ -445,10 +445,10 @@ func apply_fleet_stats_to_minion(minion: Node3D) -> void:
 	var hull_lv = current_levels.get("fleet_hull", 0)
 	if hull_lv > 0:
 		var base_hp = 60.0 # ChaserShip 기본 HP
-		minion.max_hp = base_hp + (hull_lv * 40.0)
+		minion.max_hull_hp = base_hp + (hull_lv * 40.0)
 		minion.hull_defense = hull_lv * 1.0
 		# 처음 적용 시 현재 체력도 증가분만큼 보정
-		minion.hp = minf(minion.hp + 40.0, minion.max_hp)
+		minion.hull_hp = minf(minion.hull_hp + 40.0, minion.max_hull_hp)
 	
 	# 2. 자동 수리 (fleet_regen)
 	var regen_lv = current_levels.get("fleet_regen", 0)

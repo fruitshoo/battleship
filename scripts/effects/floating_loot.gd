@@ -143,24 +143,15 @@ func _find_target_player() -> void:
 
 func _on_body_entered(body: Node3D) -> void:
 	if is_collected: return
-	
-	# body 자체가 player거나, 부모/주인이 player 그룹인지 확인 (CharacterBody3D 등 자식 노드 감지 대응)
-	var is_player = false
-	if body.is_in_group("player"):
-		is_player = true
-	elif body.owner and body.owner.is_in_group("player"):
-		is_player = true
-	elif body.get_parent() and body.get_parent().is_in_group("player"):
-		is_player = true
-		
-	if is_player:
+	var ship = _get_ship_from_node(body)
+	if ship and ship.is_in_group("player"):
 		is_collected = true
 		_collect_loot()
 
 func _on_area_entered(area: Area3D) -> void:
 	if is_collected: return
-	var parent = area.get_parent()
-	if parent and parent.is_in_group("player") and parent.get("is_player_controlled") == true:
+	var ship = _get_ship_from_node(area)
+	if ship and ship.is_in_group("player"):
 		is_collected = true
 		_collect_loot()
 
@@ -169,6 +160,22 @@ func _collect_by_proximity() -> void:
 	if is_instance_valid(target_player):
 		is_collected = true
 		_collect_loot()
+
+func _get_ship_from_node(node: Node) -> Node3D:
+	if not node: return null
+	if node.is_in_group("player"): return node
+	
+	var p = node.get_parent()
+	if p and p.is_in_group("player"): return p
+	
+	if node is CollisionShape3D or node is Area3D:
+		var pp = node.get_parent()
+		if pp and pp.is_in_group("player"): return pp
+		
+	if node.owner and node.owner.is_in_group("player"):
+		return node.owner
+		
+	return null
 
 
 func _collect_loot() -> void:

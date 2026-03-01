@@ -55,8 +55,9 @@ func _process(delta: float) -> void:
 		cooldown_timer -= delta
 		if cooldown_timer <= 0:
 			# 장전 완료 사운드 (금속 철컥/쿵 소리)
-			if is_instance_valid(AudioManager):
-				AudioManager.play_sfx("cannon_reload", global_position, randf_range(0.9, 1.1))
+			var audio_manager = get_node_or_null("/root/AudioManager")
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx("cannon_reload", global_position, randf_range(0.9, 1.1))
 		return
 	
 	# 10프레임마다 또는 타겟이 없을 때만 타겟 탐지 (성능 최적화)
@@ -74,8 +75,9 @@ func _process(delta: float) -> void:
 
 func _get_current_range() -> float:
 	var current_range = detection_range
-	if is_instance_valid(UpgradeManager):
-		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
+		var powder_lv = upgrade_manager.current_levels.get("black_powder", 0)
 		current_range *= (1.0 + 0.15 * powder_lv)
 	return current_range
 
@@ -157,10 +159,10 @@ func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
 
 
 func _get_current_cooldown() -> float:
-	var um = UpgradeManager if is_instance_valid(UpgradeManager) else null
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	var cd = fire_cooldown
-	if um:
-		var train_lv = um.current_levels.get("training", 0)
+	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
+		var train_lv = upgrade_manager.current_levels.get("training", 0)
 		cd *= (1.0 - 0.1 * train_lv)
 	
 	# 함대 보너스 적용 (곱연산)
@@ -176,8 +178,9 @@ func fire(target_enemy: Node3D) -> void:
 	prepare_timer = prepare_time
 	current_target = target_enemy
 	
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("cannon_fuse", global_position)
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("cannon_fuse", global_position)
 
 
 func _execute_fire() -> void:
@@ -189,8 +192,9 @@ func _execute_fire() -> void:
 		return
 		
 	# 사운드 재생
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("cannon_fire", global_position, randf_range(0.9, 1.1))
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("cannon_fire", global_position, randf_range(0.9, 1.1))
 		
 	# 화면 흔들림 (Screen Shake) - 플레이어 대포일 경우만 (오래봐도 안 피로하게 아주 약하게)
 	if team == "player":
@@ -208,11 +212,12 @@ func _execute_fire() -> void:
 	# 데미지 계산 (속성 반영)
 	var base_dmg = 10.0 # 대포알 기본 데미지
 	var range_mult = 1.0 # 사거리/수명 배율
-	if is_instance_valid(UpgradeManager):
-		var iron_lv = UpgradeManager.current_levels.get("iron_armor", 0)
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
+		var iron_lv = upgrade_manager.current_levels.get("iron_armor", 0)
 		base_dmg *= (1.0 + 0.25 * iron_lv)
 		
-		var powder_lv = UpgradeManager.current_levels.get("black_powder", 0)
+		var powder_lv = upgrade_manager.current_levels.get("black_powder", 0)
 		range_mult = 1.0 + 0.15 * powder_lv
 	
 	# 함대 보너스 적용 (곱연산)

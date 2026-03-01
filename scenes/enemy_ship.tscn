@@ -1,12 +1,10 @@
 [gd_scene format=3 uid="uid://dhgl16b2bfb5i"]
 
 [ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/chaser_ship.gd" id="1_chaser"]
-[ext_resource type="PackedScene" path="res://scenes/soldier.tscn" id="2_soldier"]
+[ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/soldier.tscn" id="2_soldier"]
 [ext_resource type="PackedScene" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
-[ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="4_sail_shader"]
-[ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="5_flag_scene"]
-[ext_resource type="PackedScene" uid="uid://rudder_scene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
-[ext_resource type="PackedScene" uid="uid://mast_scene" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_collision"]
 size = Vector3(3, 2, 8)
@@ -16,25 +14,6 @@ size = Vector3(3, 1, 8)
 
 [sub_resource type="StandardMaterial3D" id="Material_wood"]
 albedo_color = Color(0.3, 0.1, 0.1, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_bow"]
-size = Vector3(2, 0.8, 1.5)
-
-[sub_resource type="StandardMaterial3D" id="Material_bow"]
-albedo_color = Color(0.4, 0, 0, 1)
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_sail"]
-size = Vector2(4, 6)
-subdivide_width = 10
-subdivide_depth = 10
-orientation = 2
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_sail"]
-render_priority = 0
-shader = ExtResource("4_sail_shader")
-shader_parameter/wave_speed = 3.0
-shader_parameter/wave_strength = 0.2
-
 
 [sub_resource type="BoxMesh" id="BoxMesh_oar_shaft"]
 size = Vector3(0.1, 4, 0.1)
@@ -60,12 +39,8 @@ shape = SubResource("BoxShape_collision")
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_wood")
 
-[node name="Bow" type="MeshInstance3D" parent="." unique_id=281090423]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, -4.5)
-mesh = SubResource("BoxMesh_bow")
-surface_material_override/0 = SubResource("Material_bow")
+[node name="Mast" parent="." unique_id=623213478 instance=ExtResource("mast_scene")]
 
-[node name="Mast" parent="." instance=ExtResource("mast_scene")]
 [node name="OarBaseLeft" type="Node3D" parent="." unique_id=1948375013]
 transform = Transform3D(0.7680025, 0.10501643, -0.6317781, 0.55431855, 0.38510087, 0.7378536, 0.3207852, -0.9168797, 0.237546, -1.5, 1.25, 2.5)
 
@@ -96,7 +71,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
 mesh = SubResource("BoxMesh_oar_blade")
 surface_material_override/0 = SubResource("Material_wood")
 
-[node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
+[node name="RudderVisual" parent="." unique_id=1975323048 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.5)
 
 [node name="DeckNavigationRegion" type="NavigationRegion3D" parent="." unique_id=685970758]

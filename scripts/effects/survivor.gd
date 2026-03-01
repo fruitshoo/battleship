@@ -128,30 +128,37 @@ func _find_target_player() -> void:
 
 func _on_body_entered(body: Node3D) -> void:
 	if is_collected: return
-	
-	# 플레이어와 충돌했는지 확인
-	var is_player = false
-	if body.is_in_group("player"):
-		is_player = true
-	elif body.owner and body.owner.is_in_group("player"):
-		is_player = true
-	elif body.get_parent() and body.get_parent().is_in_group("player"):
-		is_player = true
-		
-	if is_player:
-		var ship = body if body.is_in_group("player") else (body.owner if body.owner and body.owner.is_in_group("player") else body.get_parent())
+	var ship = _get_ship_from_node(body)
+	if ship and ship.is_in_group("player"):
 		_try_collect(ship)
 
 func _on_area_entered(area: Area3D) -> void:
 	if is_collected: return
-	var parent = area.get_parent()
-	if parent and parent.is_in_group("player") and parent.get("is_player_controlled") == true:
-		_try_collect(parent)
+	var ship = _get_ship_from_node(area)
+	if ship and ship.is_in_group("player"):
+		_try_collect(ship)
 
 func _collect_by_proximity() -> void:
 	if is_collected: return
 	if is_instance_valid(target_player):
 		_try_collect(target_player)
+
+func _get_ship_from_node(node: Node) -> Node3D:
+	if not node: return null
+	if node.is_in_group("player"): return node
+	
+	# 부모나 주인(owner)이 함선인지 확인
+	var p = node.get_parent()
+	if p and p.is_in_group("player"): return p
+	
+	if node is CollisionShape3D or node is Area3D:
+		var pp = node.get_parent()
+		if pp and pp.is_in_group("player"): return pp
+		
+	if node.owner and node.owner.is_in_group("player"):
+		return node.owner
+		
+	return null
 
 
 func _try_collect(player_ship: Node3D) -> void:

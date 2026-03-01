@@ -1,6 +1,6 @@
-[gd_scene load_steps=8 format=3 uid="uid://mast_scene"]
+[gd_scene format=3 uid="uid://qbnj3ecpxn6q"]
 
-[ext_resource type="Script" path="res://scripts/props/mast.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://bsmnclrpmtnr2" path="res://scripts/props/mast.gd" id="1_script"]
 [ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="2_sail_shader"]
 [ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="3_flag_scene"]
 
@@ -29,27 +29,27 @@ shader = ExtResource("2_sail_shader")
 shader_parameter/wave_speed = 3.0
 shader_parameter/wave_strength = 0.2
 
-[node name="Mast" type="Node3D"]
+[node name="Mast" type="Node3D" unique_id=1732171799]
 script = ExtResource("1_script")
 
-[node name="MastMesh" type="MeshInstance3D" parent="."]
+[node name="MastMesh" type="MeshInstance3D" parent="." unique_id=1409497674]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
 mesh = SubResource("CylinderMesh_mast")
 surface_material_override/0 = SubResource("Material_mast")
 
-[node name="SailVisual" type="Node3D" parent="."]
+[node name="SailVisual" type="Node3D" parent="." unique_id=1842287473]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
 
-[node name="Yardarm" type="MeshInstance3D" parent="SailVisual"]
+[node name="Yardarm" type="MeshInstance3D" parent="SailVisual" unique_id=1766133095]
 transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 3, 0)
 mesh = SubResource("CylinderMesh_yardarm")
 surface_material_override/0 = SubResource("Material_mast")
 
-[node name="SailMesh" type="MeshInstance3D" parent="SailVisual"]
+[node name="SailMesh" type="MeshInstance3D" parent="SailVisual" unique_id=1903760530]
 mesh = SubResource("PlaneMesh_sail")
 surface_material_override/0 = SubResource("ShaderMaterial_sail")
 
-[node name="Flag" parent="SailVisual" instance=ExtResource("3_flag_scene")]
+[node name="Flag" parent="SailVisual" unique_id=85230560 instance=ExtResource("3_flag_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
-color = Color(0.9, 0.1, 0.1, 1)
+flag_shape = 1
 pole_height = 0.5

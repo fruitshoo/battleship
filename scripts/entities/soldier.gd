@@ -78,8 +78,10 @@ static func get_ships_cached(tree: SceneTree, team_name: String) -> Array:
 func _ready() -> void:
 	# 영구 업그레이드 보너스 적용 (아군 전용)
 	if team == "player":
-		var hp_mult = MetaManager.get_crew_stat_multiplier()
-		max_health *= hp_mult
+		var _meta_manager_init = get_node_or_null("/root/MetaManager")
+		if is_instance_valid(_meta_manager_init) and _meta_manager_init.has_method("get_crew_stat_multiplier"):
+			var hp_mult = _meta_manager_init.get_crew_stat_multiplier()
+			max_health *= hp_mult
 		
 	current_health = max_health
 	
@@ -115,7 +117,11 @@ func _ready() -> void:
 		$HandPivot.add_child(weapon_bow)
 		
 	# 업그레이드 수치 적용 기능 및 기본 무기 장착
-	var mult = MetaManager.get_crew_stat_multiplier() if team == "player" else 1.0
+	var meta_manager = get_node_or_null("/root/MetaManager")
+	var mult = 1.0
+	if team == "player" and is_instance_valid(meta_manager) and meta_manager.has_method("get_crew_stat_multiplier"):
+		mult = meta_manager.get_crew_stat_multiplier()
+		
 	if weapon_sword and "damage" in weapon_sword:
 		weapon_sword.damage *= mult
 	if weapon_bow and "damage" in weapon_bow:
@@ -210,8 +216,9 @@ func _physics_process(delta: float) -> void:
 	
 	# 공격 쿨다운
 	var current_cooldown_mult = 1.0
-	if is_instance_valid(UpgradeManager):
-		var train_lv = UpgradeManager.current_levels.get("training", 0)
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
+		var train_lv = upgrade_manager.current_levels.get("training", 0)
 		current_cooldown_mult = (1.0 - 0.1 * train_lv)
 	
 	if attack_timer > 0:
@@ -572,21 +579,20 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	var target_soldiers = target_ship.get_node_or_null("Soldiers")
 	if not target_soldiers: target_soldiers = target_ship
 	
-	var start_pos = global_position
 	reparent(target_soldiers)
 	owned_ship = target_ship
 	
+	var start_local_y = position.y
 	var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
-	var end_pos = target_ship.global_transform * jump_offset
 	
 	var tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(self , "global_position:x", end_pos.x, 0.6)
-	tween.tween_property(self , "global_position:z", end_pos.z, 0.6)
+	tween.tween_property(self , "position:x", jump_offset.x, 0.6)
+	tween.tween_property(self , "position:z", jump_offset.z, 0.6)
 	
 	var y_tween = create_tween()
-	y_tween.tween_property(self , "global_position:y", start_pos.y + 2.5, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	y_tween.tween_property(self , "global_position:y", end_pos.y, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	y_tween.tween_property(self , "position:y", start_local_y + 2.5, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	y_tween.tween_property(self , "position:y", jump_offset.y, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	
 	if is_capture_attempt:
 		tween.finished.connect(func():
@@ -620,8 +626,9 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
 	current_health -= final_damage
 	
 	# 피격 사운드
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("soldier_hit", global_position, randf_range(0.9, 1.1))
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("soldier_hit", global_position, randf_range(0.9, 1.1))
 	
 	# 시각적 피드백
 	_flash_hit()
@@ -688,12 +695,14 @@ func _die() -> void:
 			_cached_level_manager.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
 	
 	# 사망 사운드 및 바다로 떨어지는 물보라 소리
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("soldier_die", global_position)
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("soldier_die", global_position)
 		# 데드 후 약간의 시간 차를 두고 물보라(풍덩) 소리 재생
 		get_tree().create_timer(randf_range(0.3, 0.6)).timeout.connect(func():
-			if is_instance_valid(AudioManager):
-				AudioManager.play_sfx("water_splash_small", global_position, randf_range(0.8, 1.2))
+			var delay_am = get_node_or_null("/root/AudioManager")
+			if is_instance_valid(delay_am) and delay_am.has_method("play_sfx"):
+				delay_am.play_sfx("water_splash_small", global_position, randf_range(0.8, 1.2))
 		)
 	
 	# 비활성화 및 그룹에서 제거 (타켓팅 방지)
