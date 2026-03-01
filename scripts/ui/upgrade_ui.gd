@@ -15,13 +15,22 @@ var card_ids: Array[String] = []
 var reroll_button: Button = null
 
 var _focused_index: int = 0
+var _input_lock_timer: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 작동
 	visible = false
 
+func _process(delta: float) -> void:
+	if _input_lock_timer > 0:
+		_input_lock_timer -= delta
+
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or card_ids.is_empty():
+	if not visible or card_ids.is_empty() or _input_lock_timer > 0:
+		return
+		
+	# 키보드 에코(반복 입력) 무시 및 이미 눌러진 키 무시
+	if event is InputEventKey and event.is_echo():
 		return
 		
 	# A, D, Left, Right 화살표로 포커스 이동
@@ -95,6 +104,9 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	
 	_focused_index = 0
 	_update_focus()
+	
+	# 레벨업 시 방향키를 누르고 있었을 경우를 대비해 0.4초간 입력 잠금
+	_input_lock_timer = 0.4
 	
 	visible = true
 	
