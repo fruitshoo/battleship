@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://cx6m2u2y1y5n8"]
+
+[ext_resource type="Script" uid="uid://bgw1gw7lkuq4a" path="res://scripts/props/flag.gd" id="1_script"]
+[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="2_shader"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pole"]
+top_radius = 0.05
+bottom_radius = 0.05
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
+albedo_color = Color(0.35, 0.2, 0.1, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_flag"]
+size = Vector2(1.5, 1)
+subdivide_width = 8
+subdivide_depth = 5
+orientation = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flag"]
+render_priority = 0
+shader = ExtResource("2_shader")
+shader_parameter/albedo = Color(0.9, 0.1, 0.1, 1)
+shader_parameter/wave_speed = 5.0
+shader_parameter/wave_strength = 0.25
+shader_parameter/side_drag = 1.0
+
+[node name="Flag" type="Node3D" unique_id=1332889059]
+script = ExtResource("1_script")
+
+[node name="Pole" type="MeshInstance3D" parent="." unique_id=555265591]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("CylinderMesh_pole")
+surface_material_override/0 = SubResource("StandardMaterial3D_wood")
+
+[node name="FlagMesh" type="MeshInstance3D" parent="." unique_id=722299975]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 2, 0)
+mesh = SubResource("PlaneMesh_flag")
+surface_material_override/0 = SubResource("ShaderMaterial_flag")

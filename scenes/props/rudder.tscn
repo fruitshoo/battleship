@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3 uid="uid://rudder_scene"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_rudder"]
+size = Vector3(0.2, 1.5, 1)
+
+[sub_resource type="StandardMaterial3D" id="Material_rudder"]
+albedo_color = Color(0.9, 0.7, 0.2, 1)
+
+[node name="Rudder" type="Node3D"]
+
+[node name="RudderMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_rudder")
+surface_material_override/0 = SubResource("Material_rudder")

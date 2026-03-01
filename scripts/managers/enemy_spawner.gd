@@ -8,8 +8,6 @@ extends Node
 @export var min_spawn_distance: float = 40.0 # 최소 생성 거리
 @export var max_spawn_distance: float = 60.0 # 최대 생성 거리
 @export var max_enemies: int = 20 # 최대 적 수
-@export var current_enemy_speed: float = 3.0 # 레벨에 따른 적 속도
-@export var current_enemy_hp: float = 30.0 # 기본 HP를 Level 1(30.0)에 맞춤
 @export var current_boarders: int = 1 # 레벨에 따른 도선 병사 수
 @export var max_distance_limit: float = 120.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
@@ -54,11 +52,9 @@ func _spawn_boss() -> void:
 	print("[Boss] 최종 보스 소환 완료!")
 
 
-func set_difficulty(new_interval: float, new_max: int, new_speed: float, new_hp: float = 5.0, new_boarders: int = 2) -> void:
+func set_difficulty(new_interval: float, new_max: int, new_boarders: int = 2) -> void:
 	spawn_interval = new_interval
 	max_enemies = new_max
-	current_enemy_speed = new_speed
-	current_enemy_hp = new_hp
 	current_boarders = new_boarders
 	# timer가 너무 길게 남았으면 즉시 단축
 	if timer > spawn_interval:
@@ -138,34 +134,52 @@ func _spawn_enemy() -> void:
 	# 초기 회전: 플레이어를 바라보게
 	enemy.look_at(player.global_position, Vector3.UP)
 	
-	# 레벨 기반 스탯 설정
-	if "move_speed" in enemy:
-		enemy.move_speed = current_enemy_speed
-	if "hp" in enemy:
-		enemy.hp = current_enemy_hp
-		if "max_hp" in enemy:
-			enemy.max_hp = current_enemy_hp
+	# 레벨 기반 스탯 설정 (이동 속도와 HP는 함선 씬 고유 스탯을 사용하도록 수정)
 	if "boarders_count" in enemy:
 		enemy.boarders_count = current_boarders
 
 
-## 스폰 위치 계산 (플레이어 전방 70% 편향)
+## 스폰 위치 계산 (플레이어 전방 70% 편향 및 부하 선박 회피)
 func _get_biased_spawn_position() -> Vector3:
-	var angle: float
+	var best_pos: Vector3
 	
-	if randf() < 0.7:
-		# 70% 확률: 플레이어 전방 ±60도 범위
-		var player_heading = player.rotation.y
-		angle = player_heading + randf_range(-deg_to_rad(60), deg_to_rad(60))
-	else:
-		# 30% 확률: 완전 랜덤
-		angle = randf() * TAU
+	# 안전장치: 최대 5번 위치 계산 시도
+	for i in range(5):
+		var angle: float
+		if randf() < 0.7:
+			# 70% 확률: 플레이어 전방 ±60도 범위
+			var player_heading = player.rotation.y
+			angle = player_heading + randf_range(-deg_to_rad(60), deg_to_rad(60))
+		else:
+			# 30% 확률: 완전 랜덤
+			angle = randf() * TAU
+		
+		var distance = randf_range(min_spawn_distance, max_spawn_distance)
+		var offset = Vector3(cos(angle), 0, sin(angle)) * distance
+		best_pos = player.global_position + offset
+		best_pos.y = 0 # 배는 물 위에
+		
+		# 해당 위치가 전체 아군(플레이어+나포함)과 안전 거리를 유지하는지 확인
+		if _is_position_safe(best_pos, 25.0):
+			return best_pos
+			
+	# 반복 실패 시 최후의 수단: 가장 마지막 위치를 더 멀리 밀어냄
+	var fallback_offset = (best_pos - player.global_position).normalized() * 40.0
+	best_pos += fallback_offset
+	return best_pos
+
+## 특정 위치가 모든 아군 배(플레이어+나포함)로부터 일정 거리(min_dist) 이상 떨어져 있는지 확인
+func _is_position_safe(pos: Vector3, min_dist: float) -> bool:
+	var safe_sq = min_dist * min_dist
+	var allies = get_tree().get_nodes_in_group("player")
 	
-	var distance = randf_range(min_spawn_distance, max_spawn_distance)
-	var offset = Vector3(cos(angle), 0, sin(angle)) * distance
-	var spawn_pos = player.global_position + offset
-	spawn_pos.y = 0 # 배는 물 위에
-	return spawn_pos
+	for ally in allies:
+		if not is_instance_valid(ally): continue
+		# distance_squared_to가 연산이 더 빠름
+		if pos.distance_squared_to(ally.global_position) < safe_sq:
+			return false
+			
+	return true
 
 
 func _spawn_elite_ship() -> void:

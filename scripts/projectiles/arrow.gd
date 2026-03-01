@@ -4,7 +4,7 @@ extends Area3D
 ## 병사가 쏘는 원거리 투사체
 
 @export var damage: float = 15.0
-@export var speed: float = 20.0 # 초당 이동 거리
+@export var speed: float = 16.0 # 초당 이동 거리 (이전 20.0 -> 8.0 -> 14.0 -> 16.0)
 @export var arc_height: float = 2.0 # 포물선 최대 높이
 
 var start_pos: Vector3 = Vector3.ZERO

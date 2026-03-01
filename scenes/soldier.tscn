@@ -1,28 +1,28 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://bykgjn3jeng2p"]
 
-[ext_resource type="Script" path="res://scripts/entities/soldier.gd" id="1"]
+[ext_resource type="Script" uid="uid://exs8qtex3tcr" path="res://scripts/entities/soldier.gd" id="1"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
-radius = 0.2
-height = 1.25
-
-[sub_resource type="CapsuleShape3D" id="CapsuleShape_collision"]
 radius = 0.2
 height = 1.25
 
 [sub_resource type="StandardMaterial3D" id="Material_soldier"]
 albedo_color = Color(0.8, 0.3, 0.3, 1)
 
-[node name="Soldier" type="CharacterBody3D" groups=["soldiers"]]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_collision"]
+radius = 0.2
+height = 1.25
+
+[node name="Soldier" type="CharacterBody3D" unique_id=1637527619 groups=["soldiers"]]
 script = ExtResource("1")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1387958528]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.625, 0)
 mesh = SubResource("CapsuleMesh_body")
 surface_material_override/0 = SubResource("Material_soldier")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=539607817]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.625, 0)
 shape = SubResource("CapsuleShape_collision")
 
-[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=61839417]

@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://bvguridmjyrk2"]
+
+[ext_resource type="Script" uid="uid://dho82v83vb7mx" path="res://scripts/entities/weapons/weapon_sword.gd" id="1_script"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_sword"]
+size = Vector3(0.05, 0.8, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="Material_steel"]
+albedo_color = Color(0.8, 0.8, 0.8, 1)
+metallic = 1.0
+roughness = 0.4
+
+[node name="Sword" type="Node3D" unique_id=180455063]
+script = ExtResource("1_script")
+
+[node name="Visual" type="MeshInstance3D" parent="." unique_id=846399445]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("BoxMesh_sword")
+surface_material_override/0 = SubResource("Material_steel")

@@ -12,12 +12,7 @@ enum State {
 
 # === 기본 속성 ===
 @export var max_health: float = 100.0
-@export var attack_damage: float = 10.0
-@export var attack_range: float = 1.2
 @export var detection_range: float = 15.0 # 적 탐지 범위 (이 밖의 적은 무시)
-@export var range_attack_limit: float = 20.0 # 화살 사거리
-@export var attack_cooldown: float = 1.0
-@export var shoot_cooldown: float = 2.0 # 활 쏘기 쿨다운
 @export var crit_chance: float = 0.1 # 크리티컬 확률 (10%)
 @export var crit_multiplier: float = 2.0 # 크리티컬 데미지 배율
 @export var defense: float = 0.0 # 방어력 (피해 감소)
@@ -25,19 +20,21 @@ enum State {
 @export var move_speed: float = 3.0
 @export var team: String = "player" # "player" or "enemy"
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
-@export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
+@export var weapon_switch_distance: float = 10.0 # 무기 교체 거리 (이내면 검, 밖이면 활)
 @export var hit_effect_scene: PackedScene = preload("res://scenes/effects/hit_effect.tscn")
-@export var slash_effect_scene: PackedScene = preload("res://scenes/effects/slash_effect.tscn")
 
 # === 내부 상태 ===
 var current_health: float = 100.0
 var current_state: State = State.IDLE
 var current_target: Node3D = null
+var current_weapon: Node3D = null
 var attack_timer: float = 0.0
-var shoot_timer: float = 0.0
 var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
+
+var weapon_sword: Node3D = null
+var weapon_bow: Node3D = null
 
 # 소속 배 및 매니저 참조
 var owned_ship: Node3D = null
@@ -81,10 +78,9 @@ static func get_ships_cached(tree: SceneTree, team_name: String) -> Array:
 func _ready() -> void:
 	# 영구 업그레이드 보너스 적용 (아군 전용)
 	if team == "player":
-		var mult = MetaManager.get_crew_stat_multiplier()
-		max_health *= mult
-		attack_damage *= mult
-	
+		var hp_mult = MetaManager.get_crew_stat_multiplier()
+		max_health *= hp_mult
+		
 	current_health = max_health
 	
 	# 부모 노드 구조에 따라 배 참조 찾기
@@ -99,22 +95,34 @@ func _ready() -> void:
 		home_ship = owned_ship # 플레이어 진영일 때만 홈 저장
 	
 	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
-	
-	# 무기(검) 절차적 생성
-	if not has_node("WeaponPivot"):
+			
+	if not has_node("HandPivot"):
 		var pivot = Node3D.new()
-		pivot.name = "WeaponPivot"
-		# 캐릭터 오른손 위치 대략 잡기
+		pivot.name = "HandPivot"
+		# 캐릭터 오른손 위치
 		pivot.position = Vector3(0.3, 0.7, -0.15)
 		add_child(pivot)
 		
-		# 검 모델 (BoxMesh)
-		var sword = MeshInstance3D.new()
-		var sword_mesh = BoxMesh.new()
-		sword_mesh.size = Vector3(0.05, 0.05, 0.8) # 얇고 긴 막대
-		sword.mesh = sword_mesh
-		sword.position = Vector3(0, 0, -0.4) # 피벗 기준 앞으로 뻗음
-		pivot.add_child(sword)
+	# 무기 2개 모두 생성 (칼과 활)
+	var sword_scene = load("res://scenes/entities/weapons/weapon_sword.tscn")
+	var bow_scene = load("res://scenes/entities/weapons/weapon_bow.tscn")
+	
+	if sword_scene:
+		weapon_sword = sword_scene.instantiate() as Node3D
+		$HandPivot.add_child(weapon_sword)
+	if bow_scene:
+		weapon_bow = bow_scene.instantiate() as Node3D
+		$HandPivot.add_child(weapon_bow)
+		
+	# 업그레이드 수치 적용 기능 및 기본 무기 장착
+	var mult = MetaManager.get_crew_stat_multiplier() if team == "player" else 1.0
+	if weapon_sword and "damage" in weapon_sword:
+		weapon_sword.damage *= mult
+	if weapon_bow and "damage" in weapon_bow:
+		weapon_bow.damage *= mult
+		
+	# 시작은 무조건 원거리(활)로 세팅 (함선간 교전부터 시작하므로)
+	_set_active_weapon("bow")
 	
 	if nav_agent:
 		nav_agent.max_speed = move_speed
@@ -127,6 +135,21 @@ func _ready() -> void:
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
 	add_to_group("soldiers")
+
+
+func _set_active_weapon(type: String) -> void:
+	if type == "sword" and weapon_sword:
+		current_weapon = weapon_sword
+		if weapon_sword.has_method("set_visual_visible"):
+			weapon_sword.set_visual_visible(true)
+		if weapon_bow and weapon_bow.has_method("set_visual_visible"):
+			weapon_bow.set_visual_visible(false)
+	elif type == "bow" and weapon_bow:
+		current_weapon = weapon_bow
+		if weapon_bow.has_method("set_visual_visible"):
+			weapon_bow.set_visual_visible(true)
+		if weapon_sword and weapon_sword.has_method("set_visual_visible"):
+			weapon_sword.set_visual_visible(false)
 
 
 func set_team(new_team: String) -> void:
@@ -152,7 +175,7 @@ func _physics_process(delta: float) -> void:
 	
 	# 고정형(is_stationary) 병사는 AI 로직 실행하지 않음 — 사격만 함
 	if is_stationary:
-		if shoot_timer > 0: shoot_timer -= delta
+		if attack_timer > 0: attack_timer -= delta
 		_check_ranged_combat()
 		return
 	
@@ -186,19 +209,35 @@ func _physics_process(delta: float) -> void:
 		_try_evacuate_to_home()
 	
 	# 공격 쿨다운
-	if attack_timer > 0: attack_timer -= delta
-	
-	var current_shoot_cooldown_mult = 1.0
+	var current_cooldown_mult = 1.0
 	if is_instance_valid(UpgradeManager):
 		var train_lv = UpgradeManager.current_levels.get("training", 0)
-		current_shoot_cooldown_mult = (1.0 - 0.1 * train_lv)
+		current_cooldown_mult = (1.0 - 0.1 * train_lv)
 	
-	if shoot_timer > 0: shoot_timer -= delta * (1.0 / current_shoot_cooldown_mult)
+	if attack_timer > 0:
+		# 원거리 무기면 쿨다운 감소 버프 적용
+		if current_weapon and "max_range" in current_weapon:
+			attack_timer -= delta * (1.0 / current_cooldown_mult)
+		else:
+			attack_timer -= delta
 	
-	# 원거리 사격 체크 (스로틀링)
-	if run_heavy_logic and current_state != State.ATTACK and current_state != State.DEAD:
-		_check_ranged_combat()
-		_check_ship_capture_opportunity()
+	# 원거리 사격 및 무기 스위칭 체크 (스로틀링)
+	if run_heavy_logic and current_state != State.DEAD:
+		# 다이나믹 무기 스위칭: 가장 가까운 적을 찾아 거리에 따라 무기 변경
+		var nearest = find_nearest_enemy()
+		if nearest:
+			var dist = global_position.distance_to(nearest.global_position)
+			if dist <= weapon_switch_distance:
+				_set_active_weapon("sword")
+			else:
+				_set_active_weapon("bow")
+		else:
+			# 적이 없으면 기본적으로 검을 들고 대기 (또는 활 유지)
+			_set_active_weapon("sword")
+			
+		if current_state != State.ATTACK:
+			_check_ranged_combat()
+			_check_ship_capture_opportunity()
 
 
 ## IDLE 상태: 잠시 대기하다가 다시 배회
@@ -314,6 +353,9 @@ func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
 		_change_state(State.IDLE)
 		return
 	
+	# 무기 사정거리 호출
+	var attack_range = current_weapon.attack_range if current_weapon and "attack_range" in current_weapon else 1.2
+	
 	if distance <= attack_range:
 		_change_state(State.ATTACK)
 		return
@@ -352,6 +394,9 @@ func _state_attack(_delta: float) -> void:
 	
 	var distance = global_position.distance_to(current_target.global_position)
 	
+	var attack_range = current_weapon.attack_range if current_weapon and "attack_range" in current_weapon else 1.2
+	var attack_cooldown = current_weapon.attack_cooldown if current_weapon and "attack_cooldown" in current_weapon else 1.0
+	
 	# 사거리 벗어남
 	if distance > attack_range * 1.2:
 		_change_state(State.MOVE)
@@ -360,50 +405,43 @@ func _state_attack(_delta: float) -> void:
 	# 타겟 바라보기
 	look_at(Vector3(current_target.global_position.x, global_position.y, current_target.global_position.z), Vector3.UP)
 	
-	# 공격
+		# 공격
 	if attack_timer <= 0:
 		_perform_attack()
-		attack_timer = attack_cooldown
+		attack_timer = current_weapon.attack_cooldown if current_weapon and "attack_cooldown" in current_weapon else 1.0
 
 
 ## 공격 실행
 func _perform_attack() -> void:
 	if not is_instance_valid(current_target): return
 	
-	# 크리티컬 히트 판정
-	var final_damage = attack_damage
-	var is_crit = randf() < crit_chance
-	if is_crit:
-		final_damage *= crit_multiplier
-	
-	# 사운드 재생
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("sword_swing", global_position)
-	
-	if current_target.has_method("take_damage"):
-		current_target.take_damage(final_damage, global_position)
+	if current_weapon and current_weapon.has_method("attack"):
+		current_weapon.attack(current_target, self )
 		
-		# 시각적 피드백: 런지(Lunge) 애니메이션
-		# 현재 바라보는 방향(Forward)으로 몸체를 잠깐 밈
-		var _original_transform = $MeshInstance3D.transform
-		var tween = create_tween()
-		tween.tween_property($MeshInstance3D, "position:z", -0.5, 0.1).as_relative()
-		tween.tween_property($MeshInstance3D, "position:z", 0.5, 0.1).as_relative()
-		
-		# 무기도 휘두르기 (WeaponPivot이 있다면)
-		var weapon_pivot = get_node_or_null("WeaponPivot")
-		if weapon_pivot:
-			var w_tween = create_tween()
-			w_tween.set_parallel(true)
-			w_tween.tween_property(weapon_pivot, "rotation:x", -deg_to_rad(60), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-			w_tween.tween_property(weapon_pivot, "scale", Vector3(1.2, 1.2, 1.2), 0.1)
+	# 시각적 피드백: 런지(Lunge) 애니메이션
+	# 현재 바라보는 방향(Forward)으로 몸체를 잠깐 밈
+	var _original_transform = $MeshInstance3D.transform
+	var tween = create_tween()
+	tween.tween_property($MeshInstance3D, "position:z", -0.5, 0.1).as_relative()
+	tween.tween_property($MeshInstance3D, "position:z", 0.5, 0.1).as_relative()
+	
+	# 무기도 휘두르기 (HandPivot)
+	var hand_pivot = get_node_or_null("HandPivot")
+	if hand_pivot:
+		var w_tween = create_tween()
+		w_tween.set_parallel(true)
+		# 원거리 무기가 아니면 회전
+		if current_weapon and not "max_range" in current_weapon:
+			w_tween.tween_property(hand_pivot, "rotation:x", -deg_to_rad(60), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			w_tween.tween_property(hand_pivot, "scale", Vector3(1.2, 1.2, 1.2), 0.1)
 			
 			w_tween.chain().set_parallel(true)
-			w_tween.tween_property(weapon_pivot, "rotation:x", 0.0, 0.2)
-			w_tween.tween_property(weapon_pivot, "scale", Vector3.ONE, 0.2)
-		
-		# 슬래시(휘두르기) 이펙트 생성
-		_spawn_slash_effect()
+			w_tween.tween_property(hand_pivot, "rotation:x", 0.0, 0.2)
+			w_tween.tween_property(hand_pivot, "scale", Vector3.ONE, 0.2)
+		else:
+			# 활 등 원거리 무기면 반동 느낌
+			w_tween.tween_property(hand_pivot, "position:z", 0.2, 0.1).as_relative()
+			w_tween.chain().tween_property(hand_pivot, "position:z", -0.2, 0.2).as_relative()
 
 
 ## 하얀색으로 깜빡임
@@ -618,19 +656,9 @@ func _spawn_hit_effect(hit_pos: Vector3) -> void:
 	if effect is GPUParticles3D:
 		effect.emitting = true
 
-## 휘두르기 이펙트 생성
+## 휘두르기 이펙트 생성 (이 메서드는 이제 Weapon 씬 자체에서 관리하므로 빈칸)
 func _spawn_slash_effect() -> void:
-	if not slash_effect_scene: return
-	var effect = slash_effect_scene.instantiate()
-	get_tree().root.add_child(effect)
-	
-	# 병사 앞쪽에 생성
-	var forward = - global_transform.basis.z
-	effect.global_position = global_position + forward * 0.8 + Vector3(0, 0.7, 0)
-	
-	# 방향 맞추기
-	if current_target:
-		effect.look_at(current_target.global_position + Vector3(0, 1.0, 0), Vector3.UP)
+	pass
 
 ## 체력 100% 회복 (나포 보상 등)
 func heal_full() -> void:
@@ -690,20 +718,29 @@ func move_to_position(target_pos: Vector3) -> void:
 
 ## 원거리 적 확인 및 사격
 func _check_ranged_combat() -> void:
-	if shoot_timer > 0: return
+	# 근접 병사면 제외
+	if not current_weapon or not "max_range" in current_weapon:
+		return
+		
+	var attack_cooldown = current_weapon.attack_cooldown if "attack_cooldown" in current_weapon else 2.0
+	
+	if attack_timer > 0: return
 	
 	var target = _find_ranged_target()
 	if target:
-		_perform_range_attack(target)
-		shoot_timer = shoot_cooldown
+		current_target = target
+		_perform_attack()
+		attack_timer = attack_cooldown
 
 func _find_ranged_target() -> Node3D:
+	var max_range = current_weapon.attack_range if current_weapon and "attack_range" in current_weapon else 20.0
+	
 	# 1. 적군 병사 탐색 (캐시 사용으로 성능 최적화)
 	var soldiers = get_soldiers_cached(get_tree())
 	for s in soldiers:
 		if s.get("team") != team and s.get("current_state") != State.DEAD:
 			var dist = global_position.distance_to(s.global_position)
-			if dist < range_attack_limit:
+			if dist < max_range:
 				return s
 	
 	# 2. 적군 함선 탐색
@@ -720,42 +757,10 @@ func _find_ranged_target() -> Node3D:
 			continue
 			
 		var dist = global_position.distance_to(ship.global_position)
-		if dist < range_attack_limit:
+		if dist < max_range:
 			return ship
 			
 	return null
 
-func _perform_range_attack(target: Node3D) -> void:
-	if not arrow_scene: return
-	
-	# 타겟 방향 바라보기
-	var look_pos = target.global_position
-	look_pos.y = global_position.y
-	if not global_position.is_equal_approx(look_pos):
-		look_at(look_pos, Vector3.UP)
-
-	# 화살 발사
-	var arrow = arrow_scene.instantiate()
-	
-	# 데이터 설정 (SceneTree에 추가하기 전에 설정하여 _ready에서 사용 가능하게 함)
-	arrow.start_pos = global_position + Vector3(0, 0.8, 0)
-	# 적군 병사면 가슴 높이, 배면 갑판 높이 조준
-	arrow.target_pos = target.global_position + Vector3(0, 0.5, 0)
-	arrow.team = team
-	
-	# 시너지 반영: 불화살 (플레이어 진영 전용)
-	if team == "player" and is_instance_valid(UpgradeManager):
-		var fire_lv = UpgradeManager.current_levels.get("fire_arrows", 0)
-		if fire_lv > 0:
-			arrow.is_fire_arrow = true
-			arrow.fire_damage = fire_lv * 1.5
-	
-	# 거리에 따른 곡선 높이 조절
-	var dist = arrow.start_pos.distance_to(arrow.target_pos)
-	arrow.arc_height = clamp(dist * 0.3, 1.0, 5.0)
-	
-	# 발사 사운드
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("bow_shoot", global_position)
-	
-	get_tree().root.add_child(arrow)
+func _perform_range_attack(_target: Node3D) -> void:
+	pass

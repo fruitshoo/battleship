@@ -57,7 +57,7 @@ var fire_threshold: float = 100.0 # 화재 발생 임계치
 var _fire_instance: Node3D = null
 
 # 노드 참조
-@onready var sail_visual: Node3D = $SailVisual if has_node("SailVisual") else null
+var masts: Array[Node] = []
 @onready var rudder_visual: Node3D = $RudderVisual if has_node("RudderVisual") else null
 @onready var wake_trail: GPUParticles3D = $WakeTrail if has_node("WakeTrail") else null
 
@@ -92,6 +92,12 @@ func _ready() -> void:
 	base_y = position.y
 	add_to_group("ships")
 	
+	for child in get_children():
+		if child.name.begins_with("Mast"):
+			masts.append(child)
+			print("[Ship] Found mast: ", child.name)
+	print("[Ship] Total masts connected: ", masts.size())
+			
 	# 영구 업그레이드 보너스 적용
 	if is_in_group("player") or is_player_controlled:
 		max_hull_hp += MetaManager.get_hull_hp_bonus()
@@ -320,10 +326,10 @@ func _auto_adjust_sail(delta: float) -> void:
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
 	var neighbors = get_tree().get_nodes_in_group("ships")
-	var separation_dist = 6.0 # 함선 폭이 3, 길이가 8이므로 평균적인 안전 거리
+	var separation_dist = 8.0 # 함선 폭/길이 고려 (8m)
 	
 	# 성능을 위해 주변 함선이 많을 때만 계산하거나, 최대 척수 제한
-	var max_checks = min(neighbors.size(), 10)
+	var max_checks = min(neighbors.size(), 12)
 	for i in range(max_checks):
 		var other = neighbors[i]
 		if other == self or not is_instance_valid(other) or other.get("is_sinking"):
@@ -332,9 +338,10 @@ func _calculate_separation() -> Vector3:
 		var dist = global_position.distance_to(other.global_position)
 		if dist < separation_dist and dist > 0.1:
 			var push_dir = (global_position - other.global_position).normalized()
-			# 가까울수록 더 강하게 밀어내며, 거리에 따른 가중치 부여
-			var strength = (separation_dist - dist) / separation_dist
-			force += push_dir * strength * 5.0 # 밀어내는 강도 계수
+			# 가까울수록 사정없이 강하게 밀어냄 (Quadratic curve 적용)
+			var ratio = (separation_dist - dist) / separation_dist
+			var strength = pow(ratio, 2.0)
+			force += push_dir * strength * 12.0 # 밀어내는 강도 계수 상향 (5.0 -> 12.0)
 			
 	return force
 
@@ -462,15 +469,9 @@ func _apply_bobbing_effect() -> void:
 
 ## 돛 시각화 업데이트
 func _update_sail_visual() -> void:
-	if sail_visual:
-		# 시각적으로 반대로 (E키 = 시계방향)
-		sail_visual.rotation.y = deg_to_rad(-sail_angle)
-		
-		# 돛 물리 시뮬레이션 (Shader 연동) - instance uniform은 MeshInstance3D에 직접 적용
-		var mesh = sail_visual.get_node_or_null("SailMesh") as MeshInstance3D
-		if mesh:
-			mesh.set_instance_shader_parameter("wind_strength", _current_wind_intake)
-
+	for mast in masts:
+		if mast.has_method("set_sail_angle"):
+			mast.set_sail_angle(sail_angle)
 
 ## 러더 시각화 업데이트
 func _update_rudder_visual() -> void:

@@ -42,7 +42,7 @@ var bobbing_amplitude: float = 0.2
 var bobbing_speed: float = 1.1
 var rocking_amplitude: float = 0.04
 
-@onready var sail_visual: Node3D = $SailVisual if has_node("SailVisual") else null
+var masts: Array[Node] = []
 @onready var rudder_visual: Node3D = $RudderVisual if has_node("RudderVisual") else null
 @onready var oar_pivot_left: Node3D = $OarBaseLeft/OarPivot if has_node("OarBaseLeft/OarPivot") else null
 @onready var oar_pivot_right: Node3D = $OarBaseRight/OarPivot if has_node("OarBaseRight/OarPivot") else null
@@ -58,9 +58,10 @@ var sail_angle: float = 0.0 # 돛 각도 (시각적 피드백용)
 enum Formation {COLUMN, WING}
 static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정
 
-var formation_spacing: float = 12.0 # 선박 간 간격
+var formation_spacing: float = 20.0 # 선박 간 간격 상향 (12.0 -> 20.0)
 
 var _wave_timer: float = 0.0 # 물결 소리 타이머
+var _last_ai_speed: float = 0.0 # 속도 평활화를 위한 이전 프레임 속도 저장
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_minion_list: Array = []
@@ -161,10 +162,11 @@ func _ready() -> void:
 	_find_player()
 	
 	# 초기 돛 색상 설정 (Enemy 기본: Red)
-	if sail_visual:
-		var mesh = sail_visual.get_node_or_null("SailMesh") as MeshInstance3D
-		if mesh:
-			mesh.set_instance_shader_parameter("albedo", Color(0.7, 0.1, 0.1, 1.0))
+	for mast in masts:
+		if mast.has_method("set_sail_color"):
+			mast.set_sail_color(Color(0.7, 0.1, 0.1, 1.0))
+		if mast.has_method("set_team_color"):
+			mast.set_team_color("enemy")
 	add_to_group("ships")
 	if team == "player":
 		add_to_group("player")
@@ -442,10 +444,13 @@ func _physics_process(delta: float) -> void:
 	
 	# 전진 (누수율에 비례하여 속도 감소)
 	var leak_speed_mult = clamp(1.0 - (leaking_rate * 0.05), 0.3, 1.0)
-	var final_velocity = move_dir * move_speed * leak_speed_mult
+	var velocity = move_dir * move_speed * leak_speed_mult
 	
-	# 직접 이동 (translate 대신 부모와 동일한 방식)
-	position += final_velocity * delta
+	# === 겹침 방지 (Separation) 적용 ===
+	# 이제 방향에 합치는 게 아니라, 속도에 직접 더해서 물리적으로 밀쳐내게 함
+	velocity += separation_force
+	
+	position += velocity * delta
 	
 	# === 누수(Leaking) 데미지 ===
 	if leaking_rate > 0:
@@ -481,7 +486,7 @@ func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
 	var neighbors = get_ships_cached(get_tree())
 	var count = 0
-	var separation_dist = 6.0 # 함선 폭/길이 고려한 간격
+	var separation_dist = 8.0 # 함선 폭/길이 고려 (8m)
 	
 	var max_checks = min(neighbors.size(), 15)
 	for i in range(max_checks):
@@ -492,12 +497,14 @@ func _calculate_separation() -> Vector3:
 		var dist = global_position.distance_to(other.global_position)
 		if dist < separation_dist and dist > 0.001:
 			var push_dir = (global_position - other.global_position).normalized()
-			# 가까울수록 더 강하게 밀어냄
-			force += push_dir * (separation_dist - dist) / separation_dist
+			# 가까울수록 사정없이 강하게 밀어냄 (Quadratic curve 적용)
+			var ratio = (separation_dist - dist) / separation_dist
+			var strength = pow(ratio, 2.0)
+			force += push_dir * strength
 			count += 1
 			
 	if count > 0:
-		force = (force / count) * 4.0 # 밀어내는 강도 계수
+		force = (force / count) * 12.0 # 밀어내는 강도 계수 상향 (4.0 -> 12.0)
 		
 	return force
 
@@ -645,7 +652,13 @@ func capture_ship() -> void:
 	is_boarding = false
 	boarding_target = null
 	_clear_ropes()
-	move_speed = 3.2 # 플레이어 배 보조를 위해 약간 하향
+	
+	# 플레이어의 현재 업그레이드된 최대 속도를 상속받아 평준화 (기본치 3.2 대신)
+	var players = get_tree().get_nodes_in_group("player")
+	if players.size() > 0 and players[0].get("is_player_controlled"):
+		move_speed = players[0].get("max_speed")
+	else:
+		move_speed = 10.0 # 하드코딩된 예비값
 	
 	# 그룹 변경
 	if is_in_group("enemy"): remove_from_group("enemy")
@@ -715,31 +728,20 @@ func _recursive_set_team(node: Node, new_team: String) -> void:
 
 func _apply_minion_visuals() -> void:
 	# 돛 색상 변경 (흰색/파란색 조화) - instance uniform 사용
-	var mesh = get_node_or_null("SailVisual/SailMesh") as MeshInstance3D
-	if mesh:
-		mesh.set_instance_shader_parameter("albedo", Color(0.9, 0.9, 1.0, 1.0)) # 밝은 하늘색/흰색
-	
+	for mast in masts:
+		if mast.has_method("set_sail_color"):
+			mast.set_sail_color(Color(0.9, 0.9, 1.0, 1.0)) # 밝은 하늘색/흰색
+		if mast.has_method("set_team_color"):
+			mast.set_team_color("player")
+			
 	# 연기 효과 중지 (폐선 상태에서 났던 것)
 	if is_instance_valid(_fire_instance):
 		_set_fire_emitting(false)
 
 func _update_sail_visual(_delta: float) -> void:
-	if sail_visual:
-		# 돛 물리 시각적 회전 적용
-		sail_visual.rotation.y = deg_to_rad(-sail_angle)
-
-		# 적함도 바람의 영향을 시각적으로 표현하기 위해 간단한 계산
-		var wind_intake = 1.0
-		if is_instance_valid(WindManager):
-			var wind_dir = WindManager.get_wind_direction()
-			# 돛의 정면(바람이 들어오는 쪽)은 -Z 방향
-			var sail_fwd = - sail_visual.global_transform.basis.z
-			var sail_fwd_2d = Vector2(sail_fwd.x, sail_fwd.z).normalized()
-			wind_intake = max(0.0, wind_dir.dot(sail_fwd_2d))
-			
-		var mesh = sail_visual.get_node_or_null("SailMesh") as MeshInstance3D
-		if mesh:
-			mesh.set_instance_shader_parameter("wind_strength", wind_intake)
+	for mast in masts:
+		if mast.has_method("set_sail_angle"):
+			mast.set_sail_angle(sail_angle)
 
 func _auto_adjust_sail(delta: float) -> void:
 	if not is_instance_valid(WindManager): return
@@ -816,42 +818,67 @@ func _process_minion_ai(delta: float) -> void:
 	var player_speed = target.get("current_speed")
 	if player_speed == null: player_speed = 0.0
 	
-	# 4. 이동 및 회전 로직
-	var direction = (target_pos - global_position).normalized()
+	# 거리 및 위치 관계 상세 분석 (Overshoot Detection)
+	var to_target_vec = (target_pos - global_position)
+	var direction = to_target_vec.normalized()
+	var player_fwd = - target.global_transform.basis.z # 플레이어가 바라보는 방향
+	# 목표 지점이 내 뒤에 있는지 앞에 있는지 판별 (내적 이용)
+	# rel_depth > 0: 내가 슬롯보다 뒤에 있음 (추격 필요)
+	# rel_depth < 0: 내가 슬롯보다 앞에 있음 (브레이크 필요)
+	var rel_depth = to_target_vec.dot(player_fwd)
+	var dist_to_player = global_position.distance_to(target.global_position)
+	
+	# A. 속도 조절 (연속적 보간 및 평활화 적용)
+	var target_final_speed = player_speed
+	
+	if dist_to_player < 12.0:
+		# 최우선 순위: 물리적 충돌 방지 (완전 정지)
+		target_final_speed = 0.0
+	elif rel_depth < -0.5:
+		# 슬롯을 지나쳐 플레이어쪽으로 파고드는 경우 (연속적 브레이크)
+		# 0m ~ 15m 사이를 보간하여 서서히 속도 감소
+		var brake_factor = clamp(abs(rel_depth) / 15.0, 0.0, 0.9)
+		target_final_speed = player_speed * (1.0 - brake_factor)
+	else:
+		# 뒤처졌거나 정렬 상태 (연속적 가속)
+		# 0m(1.0배) ~ 40m(1.6배) 사이를 부드럽게 연결
+		var lag_factor = clamp(rel_depth / 40.0, 0.0, 1.0)
+		var speed_mult = lerp(1.0, 1.6, lag_factor)
+		target_final_speed = max(player_speed * speed_mult, move_speed * 0.8)
+		
+	# 시간차 부드러움 적용 (Temporal Smoothing)
+	# 이전 프레임 속도에서 목표 속도로 서서히 변화시켜 '멈칫'하는 현상 제거
+	_last_ai_speed = lerp(_last_ai_speed, target_final_speed, delta * 2.5)
+	var final_move_speed = _last_ai_speed
+		
+	# B. 방향 조절 (Broadside Alignment)
+	var target_head_rot = atan2(-direction.x, -direction.z) # 목표 슬롯을 향하는 기본 각도
+	var player_head_rot = rotation.y # 기본값은 자기 자신
+	if target and "rotation" in target:
+		player_head_rot = target.rotation.y
+		
+	# 거리가 가까울수록 목표지점을 보는 대신, 플레이어와 완벽하게 수평을 맞춤(Broadside 유지)
+	var rotation_blend = clamp(dist_to_target / 15.0, 0.0, 1.0)
 	
 	if dist_to_target > 1.5:
-		# 목표 지점 바라보기 (부드럽게)
-		var target_rot = atan2(-direction.x, -direction.z)
-		rotation.y = lerp_angle(rotation.y, target_rot, delta * 2.5)
-		
-		# 속도 결정: 멀면 속도 보정, 가까우면 플레이어 속도에 수렴
-		var final_move_speed = move_speed
-		if dist_to_target > 10.0:
-			final_move_speed *= 1.5 # 추격 모드
-		elif dist_to_target < 5.0:
-			# 플레이어 속도와 동기화 시도 (플레이어가 느리면 같이 느려짐)
-			final_move_speed = max(player_speed * 1.1, 1.5)
-		
-		# 실제 이동
-		translate(Vector3.FORWARD * final_move_speed * delta)
+		# 멀 때는 슬롯을 향해 주로 보고, 가까워질수록 플레이어와 나란해짐
+		var blended_rot = lerp_angle(player_head_rot, target_head_rot, rotation_blend)
+		rotation.y = lerp_angle(rotation.y, blended_rot, delta * 2.5)
+		# 실제 이동 (플레이어 속도 동기화 + 반발력 적용)
+		var velocity = Vector3.FORWARD * final_move_speed
+		# translate는 로컬 좌표계 기준이므로, separation_force(월드)를 로컬로 변환하거나 
+		# 혹은 global_position을 직접 조작하는 편이 안전함. 여기서는 translate를 global_translate로 대체 고려.
+		global_translate(velocity.rotated(Vector3.UP, rotation.y) * delta + separation_force * delta)
 	elif dist_to_target > 0.4:
-		# 근접 정렬 단계 (천천히 속도와 방향을 맞춤)
-		var target_fwd = - target.global_transform.basis.z
-		var head_rot = atan2(-target_fwd.x, -target_fwd.z)
-		rotation.y = lerp_angle(rotation.y, head_rot, delta * 2.0)
-		
-		# 플레이어 속도에 근접하게 이동
+		# 근접 정렬 단계 (플레이어와 거의 평행 유지)
+		rotation.y = lerp_angle(rotation.y, player_head_rot, delta * 3.0)
 		var sync_speed = lerp(move_speed * 0.5, player_speed, 0.5)
-		translate(Vector3.FORWARD * sync_speed * delta)
+		global_translate(Vector3.FORWARD.rotated(Vector3.UP, rotation.y) * sync_speed * delta + separation_force * delta)
 	else:
-		# 정지 또는 완전 동기화 상태
-		var target_fwd = - target.global_transform.basis.z
-		var head_rot = atan2(-target_fwd.x, -target_fwd.z)
-		rotation.y = lerp_angle(rotation.y, head_rot, delta * 3.0)
-		
-		# 목표 지점에 거의 도달했으므로 플레이어 속도와 동일하게 유지
+		# 완전 안착 상태 (플레이어와 완벽 동기화)
+		rotation.y = lerp_angle(rotation.y, player_head_rot, delta * 4.0)
 		if player_speed > 0.1:
-			translate(Vector3.FORWARD * player_speed * delta)
+			global_translate(Vector3.FORWARD.rotated(Vector3.UP, rotation.y) * player_speed * delta + separation_force * delta)
 			
 	# [추가] 나포함 이동 시에도 수면 높이 유지 및 둥실둥실 효과 적용
 	_apply_visual_effects(delta)

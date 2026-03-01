@@ -1,6 +1,6 @@
-[gd_scene load_steps=6 format=3 uid="uid://cannon_scene"]
+[gd_scene format=3 uid="uid://dm1th7lnodv3x"]
 
-[ext_resource type="Script" path="res://scripts/entities/cannon.gd" id="1"]
+[ext_resource type="Script" uid="uid://wbf6ywtwubid" path="res://scripts/entities/cannon.gd" id="1"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_barrel"]
 top_radius = 0.2
@@ -15,21 +15,21 @@ roughness = 0.4
 [sub_resource type="BoxShape3D" id="BoxShape_detection"]
 size = Vector3(10, 5, 30)
 
-[node name="Cannon" type="Node3D"]
+[node name="Cannon" type="Node3D" unique_id=2056286122]
 script = ExtResource("1")
 
-[node name="Barrel" type="MeshInstance3D" parent="."]
+[node name="Barrel" type="MeshInstance3D" parent="." unique_id=898618534]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, -0.4)
 mesh = SubResource("CylinderMesh_barrel")
 surface_material_override/0 = SubResource("Material_barrel")
 
-[node name="Muzzle" type="Marker3D" parent="."]
+[node name="Muzzle" type="Marker3D" parent="." unique_id=234675379]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
 
-[node name="DetectionArea" type="Area3D" parent="."]
+[node name="DetectionArea" type="Area3D" parent="." unique_id=739132103]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -15)
 collision_layer = 0
 collision_mask = 4
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea" unique_id=245402452]
 shape = SubResource("BoxShape_detection")
