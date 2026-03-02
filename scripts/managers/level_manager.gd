@@ -62,7 +62,15 @@ func _ready() -> void:
 		hud.update_xp(current_xp, xp_to_next_level)
 		
 	# 쉐이더 예열 (Shader Pre-warming / Web stutter fix)
-	_prewarm_shaders()
+	# 예열 중 발생하는 소음을 방지하기 위해 잠시 뮤트
+	var master_bus_idx = AudioServer.get_bus_index("Master")
+	var was_muted = AudioServer.is_bus_mute(master_bus_idx)
+	AudioServer.set_bus_mute(master_bus_idx, true)
+	
+	await _prewarm_shaders()
+	
+	# 오디오 복구 (was_muted 상태로 복구)
+	AudioServer.set_bus_mute(master_bus_idx, was_muted)
 
 func _prewarm_shaders() -> void:
 	# 1. 로딩(예열) 화면 생성 (화면 전체를 가리는 검은색 UI)

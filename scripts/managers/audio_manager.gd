@@ -172,7 +172,30 @@ func _preload_essential_audio() -> void:
 				_cached_streams[key] = load(path)
 			elif path is AudioStream:
 				_cached_streams[key] = path
-	print("[Resource] 전투 필수 오디오 사전 로드 완료")
+	
+	# === 무음 재생을 통한 오디오 파이프라인 예열 (Silent Warm-up) ===
+	# 단순히 load만 하는 것보다, 한 번씩 재생해줘야 첫 사격 시 렉이 완전히 사라집니다.
+	var warm_up_player = AudioStreamPlayer.new()
+	warm_up_player.name = "AudioWarmupPlayer"
+	warm_up_player.volume_db = -80.0 # 완전 무음
+	add_child(warm_up_player)
+	
+	for key in _cached_streams:
+		var s = _cached_streams[key]
+		if s is Array:
+			for stream in s:
+				if stream is AudioStream:
+					warm_up_player.stream = stream
+					warm_up_player.play()
+					# 아주 짧게만 재생하고 다음으로 넘어감
+					await get_tree().process_frame
+		elif s is AudioStream:
+			warm_up_player.stream = s
+			warm_up_player.play()
+			await get_tree().process_frame
+	
+	warm_up_player.queue_free()
+	print("[Resource] 전투 필수 오디오 사전 로드 및 무음 예열 완료")
 
 
 ## 오디오 버스 상태 진단 로직
