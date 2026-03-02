@@ -25,9 +25,9 @@ uniform float wave_freq : hint_range(0.0, 2.0) = 0.05;
 uniform float wave_amp : hint_range(0.0, 5.0) = 0.5;
 
 // FOAM UNIFORMS
-uniform vec3 foam_color : source_color = vec3(1.0, 1.0, 1.0);
-uniform float foam_depth_start : hint_range(0.0, 5.0, 0.01) = 0.8;
-uniform float foam_depth_end : hint_range(0.0, 15.0, 0.01) = 0.0;
+uniform vec3 foam_color : source_color = vec3(0.9, 0.95, 1.0);
+uniform float foam_depth_start : hint_range(0.0, 5.0, 0.01) = 0.0;
+uniform float foam_depth_end : hint_range(0.0, 15.0, 0.01) = 1.0;
 uniform float foam_noise_scale : hint_range(0.0, 10.0, 0.01) = 2.0;
 uniform float foam_noise_speed : hint_range(0.0, 2.0, 0.01) = 1.0;
 uniform float foam_cutoff : hint_range(0.0, 1.0, 0.01) = 0.7;
@@ -35,7 +35,7 @@ uniform float foam_crest_threshold : hint_range(0.0, 1.0, 0.01) = 0.7;
 uniform float foam_crest_amount : hint_range(0.0, 10.0, 0.1) = 2.0;
 
 // NEW FOAM DETAILS (Voronoi & Outline)
-uniform vec3 foam_edge_color : source_color = vec3(0.0, 0.0, 0.05);
+uniform vec3 foam_edge_color : source_color = vec3(0.05, 0.1, 0.2);
 uniform vec2 foam_edge_offset = vec2(0.02, 0.02);
 uniform float voronoi_scale : hint_range(0.0, 50.0) = 9.0;
 uniform float voronoi_strength : hint_range(0.0, 8.0) = 0.8;
@@ -228,7 +228,8 @@ void fragment() {
 	float foam_mask_primary = 0.0;
 	float foam_mask_shadow = 0.0;
 	
-	float depth_foam_factor = smoothstep(foam_depth_start, foam_depth_end, depth_diff);
+	// 깊이가 얕을수록(0.0에 가까울수록) 값이 1.0(거품 생성)에 가까워짐
+	float depth_foam_factor = 1.0 - smoothstep(foam_depth_start, foam_depth_end, depth_diff);
 	float wave_crest_factor = smoothstep(foam_crest_threshold, foam_crest_threshold - 0.1, NORMAL.y);
 	wave_crest_factor *= foam_crest_amount;
 	float foam_level = clamp(depth_foam_factor + wave_crest_factor, 0.0, 1.0);
@@ -276,17 +277,21 @@ void fragment() {
 	vec3 water_base = mix(water_color, primary_color.rgb, basic_fresnel * 0.5);
 	vec3 final_albedo = water_base + (basic_fresnel * 0.2);
 	
+	// 거품 마스크에서 ALPHA 부스트 (거품이 얕아서 투명해지지 않도록)
+	float primary_foam_alpha = foam_mask_primary * bubble_alpha;
+	float final_alpha = clamp(1.0 - (beers_blend * 0.85) + water_transparency + primary_foam_alpha, 0.0, 1.0);
+	
 	// Apply Foam
 	final_albedo = mix(final_albedo, foam_edge_color, foam_mask_shadow);
-	final_albedo = mix(final_albedo, foam_color, foam_mask_primary * bubble_alpha);
+	final_albedo = mix(final_albedo, foam_color, primary_foam_alpha);
 	
 	// 출력
 	ALBEDO = final_albedo;
 	// 깊을수록 점진적으로 불투명해짐 (0.85 배수로 표면 근처에서 물의 부피감이 느껴지게 함)
-	ALPHA = clamp(1.0 - (beers_blend * 0.85) + water_transparency, 0.0, 1.0);
+	ALPHA = final_alpha;
 	
 	// Make foam rougher
-	ROUGHNESS = mix(roughness, 0.8, (foam_mask_primary * bubble_alpha) + foam_mask_shadow);
+	ROUGHNESS = mix(roughness, 0.8, primary_foam_alpha + foam_mask_shadow);
 	
 	NORMAL_MAP = normal_blend;
 	NORMAL_MAP_DEPTH = max(normalmap_a_strength, normalmap_b_strength);
