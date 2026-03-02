@@ -18,7 +18,7 @@ var is_boarding: bool = false
 var leaking_rate: float = 0.0
 
 
-@export var max_minion_crew: int = 3
+@export var max_minion_crew: int = 4
 var minion_respawn_timer: float = 0.0
 @export var minion_respawn_interval: float = 15.0 # 아군 배보다 조금 더 느림
 
@@ -247,7 +247,8 @@ func add_survivor() -> bool:
 			
 	# 나포함 전용 정원(max_minion_crew) 체크
 	if alive_count >= max_minion_crew:
-		return false # 정원 초과
+		print("[Rescue] 정원 초과 합류! (현재 인원: %d/%d)" % [alive_count + 1, max_minion_crew])
+		# 정원 초과 시에도 합류는 허용하여 생존자가 배에 부딪혀 튕겨나가는 것을 방지함
 		
 	# 병사 생성
 	var s = soldier_scene.instantiate()
