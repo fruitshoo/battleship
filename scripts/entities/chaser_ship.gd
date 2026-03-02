@@ -27,7 +27,7 @@ var minion_respawn_timer: float = 0.0
 enum Formation {COLUMN, WING}
 static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정 (기본: 장사진)
 
-var formation_spacing: float = 20.0 # 선박 간 간격 상향 (12.0 -> 20.0)
+var formation_spacing: float = 14.0 # 선박 간 간격 축소 (밀집 대형)
 
 var _wave_timer: float = 0.0 # 물결 소리 타이머
 var _last_ai_speed: float = 0.0 # 속도 평활화를 위한 이전 프레임 속도 저장
@@ -769,10 +769,10 @@ func _process_minion_ai(delta: float) -> void:
 			# 장사진: 플레이어 뒤로 일렬 (인덱스에 따라 거리 증가)
 			offset = Vector3(0, 0, formation_dist)
 		Formation.WING:
-			# 학익진: 좌우 번갈아가며 V자 배치
+			# 학익진: 좌우 번갈아가며 V자 배치 (간격 축소)
 			var side = 1 if my_index % 2 == 0 else -1
 			var row = floor(my_index / 2.0) + 1
-			offset = Vector3(8.0 * side * row, 0, 8.0 * row)
+			offset = Vector3(6.0 * side * row, 0, 6.0 * row)
 	
 	# 3. 월드 목표 지점 계산
 	var target_pos = target.to_global(offset)
@@ -795,13 +795,13 @@ func _process_minion_ai(delta: float) -> void:
 	# A. 속도 조절 (연속적 보간 및 평활화 적용)
 	var target_final_speed = player_speed
 	
-	if dist_to_player < 12.0:
-		# 최우선 순위: 물리적 충돌 방지 (완전 정지)
+	if dist_to_player < 8.0:
+		# 최우선 순위: 물리적 충돌 방지 (완전 정지, 거리 대폭 단축)
 		target_final_speed = 0.0
 	elif rel_depth < -0.5:
 		# 슬롯을 지나쳐 플레이어쪽으로 파고드는 경우 (연속적 브레이크)
-		# 0m ~ 15m 사이를 보간하여 서서히 속도 감소
-		var brake_factor = clamp(abs(rel_depth) / 15.0, 0.0, 0.9)
+		# 0m ~ 10m 사이를 보간하여 서서히 속도 감소
+		var brake_factor = clamp(abs(rel_depth) / 10.0, 0.0, 0.9)
 		target_final_speed = player_speed * (1.0 - brake_factor)
 	else:
 		# 뒤처졌거나 정렬 상태 (연속적 가속)
