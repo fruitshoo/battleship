@@ -1,7 +1,7 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://4lae5aqyw1qq"]
 
-[ext_resource type="Shader" path="res://assets/shaders/water_04.gdshader" id="1_newww"]
-[ext_resource type="Texture2D" uid="uid://cx6yqw6s7p0h7" path="res://assets/vfx/particles/alpha/caustics_01.png" id="2_caustic"]
+[ext_resource type="Shader" uid="uid://o0p0qj3arfb0" path="res://assets/shaders/water_04.gdshader" id="1_newww"]
+[ext_resource type="Texture2D" uid="uid://bpicsuypxd31r" path="res://assets/vfx/particles/alpha/caustics_01.png" id="2_caustic"]
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_lollj"]
 noise_type = 2
@@ -42,4 +42,20 @@ shader_parameter/water_transparency = 0.1
 shader_parameter/wave_speed = 1.2
 shader_parameter/wave_freq = 0.08
 shader_parameter/wave_amp = 0.4
+shader_parameter/foam_color = Color(0.9, 0.95, 1.0, 1)
+shader_parameter/foam_depth_start = 0.0
+shader_parameter/foam_depth_end = 1.0
+shader_parameter/foam_noise_scale = 2.0
+shader_parameter/foam_noise_speed = 1.0
+shader_parameter/foam_cutoff = 0.7
+shader_parameter/foam_crest_threshold = 0.7
+shader_parameter/foam_crest_amount = 2.0
+shader_parameter/foam_edge_color = Color(0.05, 0.1, 0.2, 1)
+shader_parameter/foam_edge_offset = Vector2(0.02, 0.02)
+shader_parameter/voronoi_scale = 9.0
+shader_parameter/voronoi_strength = 0.8
 shader_parameter/caustics_texture = ExtResource("2_caustic")
+shader_parameter/caustics_scale = 2.0
+shader_parameter/caustics_speed = 0.1
+shader_parameter/caustics_intensity = 0.8
+shader_parameter/caustics_depth_fade = 0.7
