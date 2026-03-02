@@ -547,20 +547,25 @@ func _transfer_one_soldier() -> void:
 
 func _find_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
-	for p in players:
-		# 나포된 배가 아닌 진짜 플레이어 배(Ship.gd)를 찾음
-		# is_player_controlled는 변수이므로 get()으로 확인
-		if p.get("is_player_controlled") == true:
-			if not p.get("is_sinking"):
-				target = p
-				break
+	var closest_dist = INF
+	var closest_player = null
 	
-	# 위에서 못 찾으면 (captured_minion이 아닌) player 그룹 중 아무나
-	if not is_instance_valid(target):
-		for p in players:
-			if not p.is_in_group("captured_minion") and not p.get("is_sinking"):
-				target = p
-				break
+	for p in players:
+		if not p.get("is_sinking") and not p.get("is_dead"):
+			var dist = global_position.distance_squared_to(p.global_position)
+			# 본선(is_player_controlled)일 경우 약간의 스텔스 페널티(어그로 가중치)를 주어
+			# 동일 거리면 본선을 더 치게 만들 수도 있지만, 일단 순수 거리 기반으로 가장 가까운 적을 찾음
+			var weight = 1.0
+			if p.get("is_player_controlled") == true:
+				weight = 0.8 # 본선은 20% 더 가까운 것으로 취급 (어그로 약간 높음)
+				
+			var weighted_dist = dist * weight
+			
+			if weighted_dist < closest_dist:
+				closest_dist = weighted_dist
+				closest_player = p
+				
+	target = closest_player
 
 ## 나포(Capture) 처리
 func capture_ship() -> void:

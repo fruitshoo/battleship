@@ -183,8 +183,23 @@ func _calculate_separation() -> Vector3:
 
 func _find_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
-	if players.size() > 0:
-		target = players[0]
+	var closest_dist = INF
+	var closest_player = null
+	
+	for p in players:
+		if not p.get("is_sinking") and not p.get("is_dead"):
+			var dist = global_position.distance_squared_to(p.global_position)
+			var weight = 1.0
+			if p.get("is_player_controlled") == true:
+				weight = 0.8 # 본선 어그로 약간 높음
+				
+			var weighted_dist = dist * weight
+			
+			if weighted_dist < closest_dist:
+				closest_dist = weighted_dist
+				closest_player = p
+				
+	target = closest_player
 
 	# HUD에 보스 체력 업데이트 (LevelManager를 통해)
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
