@@ -187,6 +187,7 @@ func _find_player() -> void:
 	var closest_player = null
 	
 	for p in players:
+		if p == self: continue # 자기 자신 제외
 		if not p.get("is_sinking") and not p.get("is_dead"):
 			var dist = global_position.distance_squared_to(p.global_position)
 			var weight = 1.0

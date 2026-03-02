@@ -547,10 +547,21 @@ func _transfer_one_soldier() -> void:
 
 func _find_player() -> void:
 	var players = get_tree().get_nodes_in_group("player")
+	
+	# 나포된 미니언인 경우, 호위 대상인 플레이어 본선만 타겟으로 삼음
+	if is_in_group("captured_minion") or team == "player":
+		for p in players:
+			if p.get("is_player_controlled") == true:
+				target = p
+				break
+		return
+		
+	# 적군인 경우: 가장 가까운 아군(본선 및 나포함) 탐색
 	var closest_dist = INF
 	var closest_player = null
 	
 	for p in players:
+		if p == self: continue # 자기 자신 제외
 		if not p.get("is_sinking") and not p.get("is_dead"):
 			var dist = global_position.distance_squared_to(p.global_position)
 			# 본선(is_player_controlled)일 경우 약간의 스텔스 페널티(어그로 가중치)를 주어
