@@ -109,8 +109,12 @@ func _prewarm_shaders() -> void:
 			# 모든 하위 파티클 검색 및 작동 유도
 			_trigger_all_particles(inst)
 			
-	# 오디오 매니저의 사전 캐싱 작업 대기 (약간의 프레임 대기)
-	for i in range(5):
+	# 오디오 매니저의 사전 캐싱 작업 대기 (비동기 완료 보장)
+	if not AudioManager.is_prewarm_finished:
+		await AudioManager.prewarm_finished
+		
+	# 프레임 안정화를 위해 추가로 2프레임 대기
+	for i in range(2):
 		await get_tree().process_frame
 	
 	# 3. 예열 노드 삭제 및 로딩 화면 페이드 아웃

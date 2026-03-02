@@ -103,6 +103,10 @@ var current_2d_index: int = 0
 var bgm_player: AudioStreamPlayer
 var current_bgm_name: String = ""
 
+# 예열 완료 신호
+signal prewarm_finished
+var is_prewarm_finished: bool = false
+
 func _ready() -> void:
 	# 1. 3D SFX 풀 생성
 	for i in range(sfx_pool_size):
@@ -195,6 +199,8 @@ func _preload_essential_audio() -> void:
 			await get_tree().process_frame
 	
 	warm_up_player.queue_free()
+	is_prewarm_finished = true
+	prewarm_finished.emit()
 	print("[Resource] 전투 필수 오디오 사전 로드 및 무음 예열 완료")
 
 
