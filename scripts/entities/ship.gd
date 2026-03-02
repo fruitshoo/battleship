@@ -473,7 +473,7 @@ func die() -> void:
 	
 	print("[Critical] 배가 침몰합니다!")
 	
-	# 침몰 애니메이션 (기울어지면서 깊게 가라앉음 + 페이드 아웃)
+	# 침몰 애니메이션 (기울어지면서 깊게 가라앉음)
 	var sink_tween = create_tween()
 	sink_tween.set_parallel(true)
 	var sink_duration = 6.0
@@ -481,13 +481,19 @@ func die() -> void:
 	sink_tween.tween_property(self , "rotation:z", deg_to_rad(25.0), sink_duration).set_ease(Tween.EASE_IN)
 	sink_tween.tween_property(self , "rotation:x", deg_to_rad(15.0), sink_duration).set_ease(Tween.EASE_IN)
 	
-	# (메쉬 투명도 조절 대신 셰이더 수심 효과로 대체)
+	# 메쉬 투명도 조절 (페이드 아웃)
+	_fade_out_meshes(self , sink_tween, sink_duration)
 	
 	sink_tween.set_parallel(false)
 	sink_tween.tween_callback(func():
-		# 플레이어 배는 queue_free 하지 않음 (게임오버 상태 유지 필요할 수 있음)
-		# 다만 시각적으로는 완전히 가라앉은 상태
-		pass
+		# HUD에 게임 오버 표시
+		var hud = _find_hud()
+		if hud and hud.has_method("show_game_over"):
+			hud.show_game_over()
+		
+		# 실시간 저장이므로 여기서는 메시지만 처리
+		if _cached_level_manager and "current_score" in _cached_level_manager:
+			print("[GameOver] 침몰! 최종 점수: %d" % _cached_level_manager.current_score)
 	)
 
 # 재귀적으로 모든 메쉬의 transparency속성을 트윈합니다.
@@ -497,14 +503,6 @@ func _fade_out_meshes(node: Node, tween: Tween, duration: float) -> void:
 	
 	for child in node.get_children():
 		_fade_out_meshes(child, tween, duration)
-	
-	# HUD에 게임 오버 표시
-	if _cached_hud and _cached_hud.has_method("show_game_over"):
-		_cached_hud.show_game_over()
-	
-	# 실시간 저장이므로 여기서는 메시지만 처리
-	if _cached_level_manager and _cached_level_manager.get("current_score") != null:
-		print("[GameOver] 침몰! 현재 판에서 %d 골드 획득" % _cached_level_manager.current_score)
 
 
 func _find_hud() -> Node:
