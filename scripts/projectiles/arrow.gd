@@ -9,6 +9,7 @@ extends Area3D
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
+var target_node: Node3D = null # 목표물 참조 (강제 명중 판정용)
 var team: String = "player"
 var is_fire_arrow: bool = false
 var fire_damage: float = 0.0
@@ -32,7 +33,12 @@ func _physics_process(delta: float) -> void:
 	progress += delta / duration
 	
 	if progress >= 1.0:
-		# 도달 시 삭제
+		# 도달 시 강제 타격 판정 (트리거 충돌 무시 현상 방지)
+		if is_instance_valid(target_node) and not target_node.is_queued_for_deletion():
+			# 목표물이 아직 주변에 있다면 (이동 중일 수 있으므로 반경 3.0m 이내 허용)
+			if global_position.distance_to(target_node.global_position) < 3.0:
+				_check_hit(target_node)
+				
 		global_position = target_pos
 		queue_free()
 		return

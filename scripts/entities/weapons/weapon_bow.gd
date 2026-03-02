@@ -26,6 +26,10 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var distance = spawn_pos.distance_to(current_target_pos)
 	var time_to_reach = distance / arrow_speed
 	
+	# arrow.gd 내부의 duration 최소값(0.2)과 동기화하여 근거리 예측 오류 방지
+	if time_to_reach < 0.2:
+		time_to_reach = 0.2
+		
 	# 타겟의 이동 속도(velocity)를 기반으로 미래 위치 예측
 	var local_vel = target.get("velocity") if "velocity" in target else Vector3.ZERO
 	
@@ -61,6 +65,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	# 데이터 설정 (SceneTree에 추가하기 전에 설정하여 _ready에서 사용 가능하게 함)
 	if "start_pos" in arrow: arrow.start_pos = spawn_pos
 	if "target_pos" in arrow: arrow.target_pos = current_target_pos
+	if "target_node" in arrow: arrow.target_node = target # 목표 노드 전달 (강제 명중 판정용)
 	if "speed" in arrow: arrow.speed = arrow_speed # 속도 강제 동기화
 	
 	var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
