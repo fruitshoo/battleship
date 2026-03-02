@@ -136,6 +136,7 @@ float fbm_voronoi(vec2 uv) {
 // -----------------------------------------------------------------------------
 
 varying vec3 uv_world_pos;
+varying float v_wave_h;
 
 void vertex() {
 	// Called for every vertex the material is visible on.
@@ -150,6 +151,7 @@ void vertex() {
 	float w3 = sin((uv_world_pos.x + uv_world_pos.z) * wave_freq * 0.6 - time * 0.9) * wave_amp * 0.5;
 	
 	float wave_height = w1 + w2 + w3;
+	v_wave_h = wave_height;
 	VERTEX.y += wave_height;
 }
 
@@ -230,7 +232,9 @@ void fragment() {
 	
 	// 깊이가 얕을수록(0.0에 가까울수록) 값이 1.0(거품 생성)에 가까워짐
 	float depth_foam_factor = 1.0 - smoothstep(foam_depth_start, foam_depth_end, depth_diff);
-	float wave_crest_factor = smoothstep(foam_crest_threshold, foam_crest_threshold - 0.1, NORMAL.y);
+	
+	// 파도 마루(Crest) 거품: 높이가 높을수록 거품 생성 (View Space NORMAL.y 의존성 제거)
+	float wave_crest_factor = smoothstep(foam_crest_threshold * wave_amp, wave_amp, v_wave_h);
 	wave_crest_factor *= foam_crest_amount;
 	float foam_level = clamp(depth_foam_factor + wave_crest_factor, 0.0, 1.0);
 	
