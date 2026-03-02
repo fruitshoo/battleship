@@ -22,14 +22,14 @@ direction = Vector3(0, 0, -1)
 spread = 20.0
 initial_velocity_min = 3.0
 initial_velocity_max = 6.0
-gravity = Vector3(0, 0.5, 0)
+gravity = Vector3(0, 0.3, 0)
 damping_min = 2.0
 damping_max = 4.0
 scale_min = 1.0
 scale_max = 2.0
 scale_curve = SubResource("CurveTexture_smoke")
 alpha_curve = SubResource("CurveTexture_alpha")
-color = Color(0.2, 0.2, 0.2, 0.6)
+color = Color(0.9, 0.9, 0.9, 0.6)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
 transparency = 1
@@ -45,8 +45,8 @@ size = Vector2(2, 2)
 
 [node name="MuzzleSmoke" type="GPUParticles3D"]
 emitting = false
-amount = 12
-lifetime = 1.5
+amount = 15
+lifetime = 2.5
 one_shot = true
 explosiveness = 0.95
 process_material = SubResource("ParticleProcessMaterial_smoke")

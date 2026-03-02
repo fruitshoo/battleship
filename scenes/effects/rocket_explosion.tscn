@@ -56,7 +56,7 @@ size = Vector2(2.5, 2.5)
 ; ── 폭발 연기 ────────────────────────────
 [sub_resource type="Gradient" id="Gradient_expsmk"]
 offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
-colors = PackedColorArray(0.3, 0.25, 0.2, 0,  0.2, 0.18, 0.15, 0.3,  0.12, 0.1, 0.08, 0.2,  0.05, 0.05, 0.05, 0)
+colors = PackedColorArray(0.95, 0.95, 0.95, 0,  0.9, 0.9, 0.9, 0.6,  0.85, 0.85, 0.85, 0.4,  0.8, 0.8, 0.8, 0)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_expsmk"]
 gradient = SubResource("Gradient_expsmk")
@@ -119,7 +119,7 @@ script = ExtResource("3_script")
 [node name="SmokeCloud" type="GPUParticles3D" parent="."]
 emitting = false
 amount = 4
-lifetime = 1.2
+lifetime = 2.5
 one_shot = true
 explosiveness = 0.85
 randomness = 0.5
