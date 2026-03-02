@@ -4,7 +4,7 @@ extends MeshInstance3D
 ## 작은 메시 하나로 무한 바다처럼 보이게 하는 표준 기법 (포그로 경계 숨김)
 
 @export var follow_target_path: NodePath
-@export var grid_size: float = 100.0 # 100미터 단위로 이동
+@export var grid_size: float = 50.0 # 50미터 단위로 이동 (바다 축소 대응)
 
 var _target: Node3D = null
 
