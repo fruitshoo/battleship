@@ -490,8 +490,8 @@ func die() -> void:
 	# 메쉬 투명도 조절 (페이드 아웃)
 	_fade_out_meshes(self , sink_tween, sink_duration)
 	
-	# 커다란 침몰 물보라 생성
-	var sinking_splash_scene = preload("res://scenes/effects/ship_sinking_splash.tscn")
+	# 보글보글 끓어오르는 수면 효과 (침몰 연출)
+	var sinking_splash_scene = preload("res://scenes/effects/ship_sinking_bubbles.tscn")
 	if sinking_splash_scene:
 		var splash = sinking_splash_scene.instantiate()
 		splash.position = Vector3(global_position.x, 0.2, global_position.z)
