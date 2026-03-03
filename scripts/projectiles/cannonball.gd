@@ -81,6 +81,7 @@ func _physics_process(delta: float) -> void:
 	var result = space_state.intersect_ray(query)
 	if result:
 		global_position = result.position
+		_check_hit(result.collider)
 		return
 		
 	global_position = next_pos
@@ -138,8 +139,10 @@ func _check_hit(target: Node) -> void:
 	queue_free()
 
 func _spawn_water_explosion() -> void:
-	if water_explosion_scene:
-		var explosion = water_explosion_scene.instantiate()
-		explosion.global_position = global_position
-		explosion.global_position.y = 0.2 # 수면 높이에 맞춤
-		get_tree().root.add_child.call_deferred(explosion)
+	if not is_inside_tree() or not water_explosion_scene: return
+	
+	var pos = global_position
+	var explosion = water_explosion_scene.instantiate()
+	explosion.global_position = pos
+	explosion.global_position.y = 0.2 # 수면 높이에 맞춤
+	get_tree().root.add_child.call_deferred(explosion)
