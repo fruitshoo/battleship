@@ -631,6 +631,14 @@ func capture_ship() -> void:
 	add_to_group("player")
 	add_to_group("captured_minion")
 	
+	# ✅ 물리 레이어 및 마스크 변경 (적군이 나포함을 인식하고 도선할 수 있게 함)
+	# PlayerShip.tscn 기준: layer=2, mask=21 (1|4|16)
+	# EnemyShip.tscn 기준: layer=4, mask=2 (도선 감지용)
+	# 나포되면 레이어를 "Player" 레이어(비트값 2)로 변경하여 적의 mask=2에 걸리게 함
+	set_deferred("collision_layer", 2)
+	set_deferred("collision_mask", 21) # 1(환경) + 4(적선) + 16(기타)
+
+	
 	# 자식들(대포, 병사) 팀 변경 및 UI 알림
 	_update_children_team()
 	_apply_minion_visuals()
