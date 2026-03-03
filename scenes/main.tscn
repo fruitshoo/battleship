@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="5_spawner"]
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
+[ext_resource type="PackedScene" uid="uid://orgd0ri27p5o" path="res://scenes/effects/water_explosion.tscn" id="11_ya4ey"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_choun"]
@@ -61,3 +62,6 @@ mesh = SubResource("BoxMesh_choun")
 [node name="MeshInstance3D3" type="MeshInstance3D" parent="." unique_id=420706576]
 transform = Transform3D(1, 0, 0, 0, 0.9371481, -0.3489319, 0, 0.3489319, 0.9371481, 16.745987, -1.1631579, 6.324033)
 mesh = SubResource("BoxMesh_choun")
+
+[node name="WaterExplosion" parent="." unique_id=1591442480 instance=ExtResource("11_ya4ey")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6459613, 0, 1.0891116)

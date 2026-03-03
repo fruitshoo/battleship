@@ -211,14 +211,16 @@ func _update_team_color() -> void:
 
 func _physics_process(delta: float) -> void:
 	# 바다에 빠지면 사망 (글로벌 Y < -5)
-	if global_position.y < -5.0:
+	if is_inside_tree() and global_position.y < -5.0:
 		# 바다에 빠질 때 작은 물보라 이펙트 재생
 		var water_explosion_scene = preload("res://scenes/effects/water_explosion.tscn")
 		if water_explosion_scene:
 			var explosion = water_explosion_scene.instantiate()
 			var splash_pos = global_position
 			splash_pos.y = 0.05
-			explosion.global_position = splash_pos
+			# 아직 씬 트리에 없는 노드의 global_position을 설정하면 에러가 발생하므로 position 사용.
+			# 루트에 담길 것이므로 position이 global_position과 동일함.
+			explosion.position = splash_pos
 			explosion.scale = Vector3(0.5, 0.5, 0.5) # 병사 크기에 맞게 축소
 			get_tree().root.add_child.call_deferred(explosion)
 			
