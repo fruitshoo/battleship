@@ -94,7 +94,7 @@ func _prewarm_shaders() -> void:
 		preload("res://scenes/effects/muzzle_smoke.tscn"),
 		preload("res://scenes/effects/hit_effect.tscn"),
 		preload("res://scenes/effects/wood_splinter.tscn"),
-		preload("res://scenes/effects/rocket_explosion.tscn")
+		preload("res://scenes/effects/fire_effect.tscn")
 	]
 	
 	# 카메라 뷰 안에 강제로 배치하여 Culling 방지 (보이지 않게 투명/초소형 처리)

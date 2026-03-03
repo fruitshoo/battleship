@@ -8,7 +8,7 @@ extends Area3D
 @export var personnel_damage_mult: float = 5.0 # 병사 데미지 배수 하향 (25 -> 5)
 @export var lifetime: float = 3.0
 @export var blast_radius: float = 3.5
-@export var explosion_scene: PackedScene = preload("res://scenes/effects/rocket_explosion.tscn")
+@export var explosion_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 
 var team: String = "player"
 var shooter: Node3D = null # 이 로켓을 쏜 선박 (오사 방지용)
