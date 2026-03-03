@@ -67,7 +67,7 @@ var boarding_timer: float = 0.0
 var boarding_interval: float = 1.0
 var boarding_target: Node3D = null
 var max_boarding_distance: float = 12.0 # 이 거리 이내여야 도선 진행 (회피 반경 고려 6.0 -> 10.0 -> 12.0)
-var boarding_break_distance: float = 25.0 # 밧줄이 끊어지는 거리 (10.0 -> 15.0 -> 25.0 상향)
+var boarding_break_distance: float = 20.0 # 밧줄이 끊어지는 거리 (15.0 -> 25.0 -> 20.0 조정)
 var has_rammed: bool = false # 중복 데미지 방지
 var rope_instances: Array[MeshInstance3D] = [] # 그레플링 훅용 밧줄들
 

@@ -287,6 +287,15 @@ func _calculate_separation() -> Vector3:
 			
 	return force
 
+## 도선(밧줄) 연결 시 이동 방해(Snare/Drag) 배수 계산
+func _get_boarding_drag_multiplier() -> float:
+	var drag = 1.0
+	var neighbors = _get_ships_cached(get_tree())
+	for other in neighbors:
+		if other.get("is_boarding") and other.get("boarding_target") == self:
+			drag *= 0.6 # 밧줄 하나당 속도 40% 감소
+	return maxf(0.1, drag) # 최대 90%까지 감소 허용
+
 ## 이동 업데이트
 func _update_movement(delta: float) -> void:
 	var target_speed: float = _calculate_sail_speed()
@@ -295,7 +304,9 @@ func _update_movement(delta: float) -> void:
 	if is_rowing and rowing_stamina > 0:
 		target_speed += rowing_speed
 	
-	# 속도 보간
+	# 속도 보간 전 밧줄 구속력 적용
+	target_speed *= _get_boarding_drag_multiplier()
+	
 	target_speed *= speed_mult
 	
 	if target_speed > current_speed:
