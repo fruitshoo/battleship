@@ -762,11 +762,13 @@ func _process_minion_ai(delta: float) -> void:
 	
 	# 2. 진형에 따른 목표 상대 위치(Relative Target) 계산
 	var offset = Vector3.ZERO
-	var formation_dist = formation_spacing * (my_index + 1)
+	
+	# 2번째 배부터 너무 멀어지지 않도록 간격을 대폭 좁힘 (Separation 힘이 알아서 좌우 V자로 퍼지게 만듦)
+	var formation_dist = 6.0 + (my_index * 3.0)
 	
 	match fleet_formation:
 		Formation.COLUMN:
-			# 장사진: 플레이어 뒤로 일렬 (인덱스에 따라 거리 증가)
+			# 군집(Swarm) 유지: 뒤로 길게 뻗지 않고 플레이어 바로 뒤쪽으로 밀집
 			offset = Vector3(0, 0, formation_dist)
 		Formation.WING:
 			# 학익진: 좌우 번갈아가며 V자 배치 (간격 축소)
