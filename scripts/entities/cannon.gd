@@ -209,6 +209,7 @@ func _execute_fire() -> void:
 	
 	var ball = cannonball_scene.instantiate()
 	ball.position = muzzle.global_position
+	ball.team = team
 	get_tree().root.add_child.call_deferred(ball)
 	
 	# 데미지 계산 (속성 반영)
@@ -231,7 +232,7 @@ func _execute_fire() -> void:
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(current_target.global_position)
 	
-	var time_to_hit = dist / 80.0
+	var time_to_hit = dist / 50.0 # 탄속 50.0으로 동기화 (기존 80.0 오류 수정)
 	
 	var enemy_speed = 3.5
 	if "move_speed" in current_target: enemy_speed = current_target.move_speed

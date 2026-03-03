@@ -20,7 +20,7 @@ var leaking_rate: float = 0.0 # 초당 피해량
 var cached_lm: Node = null
 
 func _ready() -> void:
-	if max_hull_hp <= 0: max_hull_hp = 1000.0
+	if max_hull_hp <= 0 or max_hull_hp == 1000.0: max_hull_hp = 4000.0
 	hull_hp = max_hull_hp
 	base_y = global_position.y
 	add_to_group("enemy")

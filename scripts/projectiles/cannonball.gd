@@ -13,6 +13,7 @@ extends Area3D
 @export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
 var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
 
+var team: String = "player"
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
 var time_alive: float = 0.0
@@ -108,11 +109,14 @@ func _check_hit(target: Node) -> void:
 	# 일단 무언가에 부딪혔으므로 삭제 준비
 	has_hit = true
 	
-	# 적/아군 함선 그룹 확인
+	# 적 함선 그룹 확인 (피아식별 강화)
 	var enemy = null
-	if target.is_in_group("enemy") or (target.get_parent() and target.get_parent().is_in_group("enemy")):
+	var target_is_enemy = (team == "player" and (target.is_in_group("enemy") or (target.get_parent() and target.get_parent().is_in_group("enemy"))))
+	var target_is_player = (team == "enemy" and (target.is_in_group("player") or (target.get_parent() and target.get_parent().is_in_group("player"))))
+	
+	if target_is_enemy:
 		enemy = target if target.is_in_group("enemy") else target.get_parent()
-	elif target.is_in_group("player") or (target.get_parent() and target.get_parent().is_in_group("player")):
+	elif target_is_player:
 		enemy = target if target.is_in_group("player") else target.get_parent()
 	
 	if enemy:
