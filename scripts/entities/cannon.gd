@@ -154,7 +154,7 @@ func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
 	
 	for child in soldiers_node.get_children():
 		# 살아있는 아군 병사가 한 명이라도 있으면 True
-		if child.get("team") == "player" and child.get("current_state") != 4: # 4 = DEAD
+		if child.get("team") == team and child.get("current_state") != 4: # 4 = DEAD
 			return true
 	return false
 
