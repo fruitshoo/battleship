@@ -136,7 +136,7 @@ func _splash_and_sink() -> void:
 	if water_explosion_scene:
 		var pos = global_position
 		var explosion = water_explosion_scene.instantiate()
-		explosion.global_position = Vector3(pos.x, 0.2, pos.z)
+		explosion.position = Vector3(pos.x, 0.2, pos.z)
 		get_tree().root.add_child.call_deferred(explosion)
 	
 	# 물보라 사운드
