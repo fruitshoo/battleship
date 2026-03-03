@@ -50,11 +50,13 @@ size = Vector2(1.5, 1.5)
 
 [node name="WaterExplosion" type="GPUParticles3D" unique_id=1683394169]
 emitting = false
-amount = 15
-lifetime = 1.0
+amount = 20
+lifetime = 1.5
 one_shot = true
 explosiveness = 0.95
 randomness = 0.5
+interpolate = false
+fract_delta = false
 process_material = SubResource("ParticleProcessMaterial_water")
 draw_pass_1 = SubResource("QuadMesh_water")
 script = ExtResource("2_script")
