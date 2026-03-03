@@ -447,6 +447,20 @@ func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
 	# NavMesh를 통한 이동
 	if nav_agent:
 		var target_pos = current_target.global_position
+		
+		# 대상이 NavMesh 위에 정확히 있지 않을 수 있으므로, 단순 직선 거리로 닫힐 수 있으면 이동 시도
+		if distance <= attack_range * 1.5:
+			var direction = (target_pos - global_position).normalized()
+			velocity = direction * move_speed
+			move_and_slide()
+			
+			if direction.length_squared() > 0.01:
+				var target_look = global_position + direction
+				target_look.y = global_position.y
+				if not global_position.is_equal_approx(target_look):
+					look_at(target_look, Vector3.UP)
+			return
+			
 		if target_pos.distance_to(last_nav_target_pos) > 1.0:
 			nav_agent.target_position = target_pos
 			last_nav_target_pos = target_pos

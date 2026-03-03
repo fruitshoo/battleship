@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dx4p1pd0iw6dy"
-path="res://.godot/imported/water_splash_medium.png-8cbb6c7aeca122a47108ca5cd837346c.ctex"
+path="res://.godot/imported/water_splash_medium.png-8cf05bfc6901365f092687bb3723ed99.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/vfx/particles/water/water_splash_medium.png"
-dest_files=["res://.godot/imported/water_splash_medium.png-8cbb6c7aeca122a47108ca5cd837346c.ctex"]
+dest_files=["res://.godot/imported/water_splash_medium.png-8cf05bfc6901365f092687bb3723ed99.ctex"]
 
 [params]
 

@@ -420,6 +420,13 @@ func _calculate_separation() -> Vector3:
 		if other == self or not is_instance_valid(other) or other.get("is_dying"):
 			continue
 			
+		# 도선 중인 상대와는 분리력(Separation)을 적용하지 않음 (가까이 붙어야 하므로)
+		if is_boarding and other == boarding_target:
+			continue
+		if other.get("boarding_attacker") == self:
+			continue
+
+			
 		var dist = global_position.distance_to(other.global_position)
 		if dist < separation_dist and dist > 0.001:
 			var push_dir = (global_position - other.global_position).normalized()
