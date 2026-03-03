@@ -13,14 +13,14 @@ var wind_angle_degrees: float = 0.0
 
 # === 느린 회전 (Slow Drift) ===
 @export var drift_enabled: bool = true
-@export var drift_speed: float = 0.2 # 초당 회전 각도 (도) → 분당 12도, ~30분에 한 바퀴
+@export var drift_speed: float = 1.2 # 초당 회전 각도 (도) 상향 (0.2 -> 1.2)
 var drift_direction: float = 1.0 # 1.0 = 시계, -1.0 = 반시계
 
 # === 돌풍 (Gust) ===
 @export var gust_enabled: bool = true
-@export var gust_interval_min: float = 30.0 # 최소 간격 (초)
-@export var gust_interval_max: float = 60.0 # 최대 간격 (초)
-@export var gust_duration: float = 3.0 # 돌풍 지속 시간
+@export var gust_interval_min: float = 15.0 # 최소 간격 (초) 상향 (30.0 -> 15.0)
+@export var gust_interval_max: float = 40.0 # 최대 간격 (초) 상향 (60.0 -> 40.0)
+@export var gust_duration: float = 5.0 # 돌풍 지속 시간 상향 (3.0 -> 5.0)
 @export var gust_strength_multiplier: float = 2.0 # 돌풍 시 강도 배율
 
 var _gust_timer: float = 0.0
@@ -156,4 +156,4 @@ func _start_gust() -> void:
 	_gust_angle_offset = randf_range(30.0, 90.0) * (1.0 if randf() > 0.5 else -1.0)
 	_gust_blend = 0.0
 	gust_started.emit(_gust_angle_offset)
-	print("[Wind] 돌풍! 방향 오프셋: %.1f°, 지속: %.1f초" % [_gust_angle_offset, gust_duration])
+	print("[Wind] 돌풍 발생! 지속: %.1f초" % [gust_duration])

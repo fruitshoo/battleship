@@ -455,10 +455,9 @@ func _update_crew_count() -> void:
 		update_crew_status(alive_count, max_val)
 
 
-func _on_gust_started(angle_offset: float) -> void:
+func _on_gust_started(_angle_offset: float) -> void:
 	if gust_warning:
-		var dir = "→" if angle_offset > 0 else "←"
-		gust_warning.text = "!! [GUST] %s !!" % dir
+		gust_warning.text = "!! [GUST] 돌풍 주의 !!"
 		gust_warning.visible = true
 		_gust_warning_timer = 3.5
 
