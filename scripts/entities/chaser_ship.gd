@@ -66,8 +66,8 @@ var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
 var boarding_timer: float = 0.0
 var boarding_interval: float = 1.0
 var boarding_target: Node3D = null
-var max_boarding_distance: float = 10.0 # 이 거리 이내여야 도선 진행 (회비 반경 고려 6.0 -> 10.0)
-var boarding_break_distance: float = 15.0 # 밧줄이 끊어지는 거리 (10.0 -> 15.0 상향)
+var max_boarding_distance: float = 12.0 # 이 거리 이내여야 도선 진행 (회피 반경 고려 6.0 -> 10.0 -> 12.0)
+var boarding_break_distance: float = 25.0 # 밧줄이 끊어지는 거리 (10.0 -> 15.0 -> 25.0 상향)
 var has_rammed: bool = false # 중복 데미지 방지
 var rope_instances: Array[MeshInstance3D] = [] # 그레플링 훅용 밧줄들
 
@@ -454,7 +454,7 @@ func _process_boarding(delta: float) -> void:
 	var target_pos = boarding_target.global_position
 	var dist = global_position.distance_to(target_pos)
 	
-	if dist > 7.0: # 회피 거리(6.0)보다 약간 먼 거리까지 접근을 허용
+	if dist > 8.0: # 회피 거리(6.0)보다 약간 먼 거리까지 접근을 허용 (7.0 -> 8.0)
 		var dir = (target_pos - global_position).normalized()
 		global_position += dir * move_speed * 0.5 * delta
 		
