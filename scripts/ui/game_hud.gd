@@ -457,7 +457,7 @@ func _update_crew_count() -> void:
 
 func _on_gust_started(_angle_offset: float) -> void:
 	if gust_warning:
-		gust_warning.text = "!! [GUST] 돌풍 주의 !!"
+		gust_warning.text = "!! 바람이 거세집니다 !!"
 		gust_warning.visible = true
 		_gust_warning_timer = 3.5
 
