@@ -231,6 +231,22 @@ func die() -> void:
 			cached_lm.show_victory()
 	)
 	
+	# 임시 렐릭 드롭 연출 (추후 실제 렐릭 데이터 연동 시 변경 가능)
+	# 보스 격침 시 전리품 렐릭 추가 (예시: 임시 하트 아이콘)
+	if is_instance_valid(UpgradeManager):
+		# 'explore'는 이미 육분의로 쓰고 있으므로, 임시로 'favorite' (하트) 사용
+		# TODO: 추후 획득 가능 렐릭 풀(Pool) 구현
+		var dummy_relic = "boss_heart"
+		if not UpgradeManager.acquired_relics.has(dummy_relic):
+			UpgradeManager.acquired_relics.append(dummy_relic)
+			var ship = UpgradeManager._get_player_ship()
+			if ship:
+				var hud = ship._find_hud() if ship.has_method("_find_hud") else null
+				if hud and hud.has_method("add_relic_icon"):
+					hud.add_relic_icon("favorite")
+				if hud and hud.has_method("show_message"):
+					hud.show_message("!! 보스 격침 전리품: 해적왕의 심장 !!", 3.0)
+	
 	# 생존자 대량 스폰 (보스 격침 보너스: 3~5명)
 	if survivor_scene:
 		var count = randi_range(3, 5)

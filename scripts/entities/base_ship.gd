@@ -66,11 +66,11 @@ var masts: Array[Node] = []
 # Oar (노) 레퍼런스
 @onready var oar_pivot_left: Node3D = $OarBaseLeft/OarPivot if has_node("OarBaseLeft/OarPivot") else null
 @onready var oar_pivot_right: Node3D = $OarBaseRight/OarPivot if has_node("OarBaseRight/OarPivot") else null
-var _oar_time: float = 0.0
 
 var _cached_level_manager: Node = null
 var _cached_hud: Node = null
 var _cached_ocean: Node3D = null
+var _cached_audio_manager: Node = null
 
 func _ready() -> void:
 	base_y = position.y
@@ -91,6 +91,8 @@ func _cache_common_references() -> void:
 		
 	if _cached_level_manager and "hud" in _cached_level_manager:
 		_cached_hud = _cached_level_manager.hud
+	
+	_cached_audio_manager = get_node_or_null("/root/AudioManager")
 
 ## 둥실둥실 시각 효과
 func _apply_bobbing_effect() -> void:

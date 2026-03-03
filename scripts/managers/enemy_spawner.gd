@@ -26,11 +26,11 @@ func trigger_boss_event() -> void:
 	regular_spawn_stopped = true
 	print("[Warning] 보스 등장 이벤트 시작! 일반 적 스폰 중단")
 	
-	# 모든 일반 적 제거 (선택사항 - 더 극적인 연출을 위해)
-	var enemies = get_tree().get_nodes_in_group("enemy")
-	for enemy in enemies:
-		if not enemy.is_in_group("boss") and enemy.has_method("die"):
-			enemy.die()
+	# 기존 배들은 침몰시키지 않고 그대로 둡니다 (유저 피드백 반영)
+	# var enemies = get_tree().get_nodes_in_group("enemy")
+	# for enemy in enemies:
+	# 	if not enemy.is_in_group("boss") and enemy.has_method("die"):
+	# 		enemy.die()
 	
 	# 보스 소환
 	_spawn_boss()

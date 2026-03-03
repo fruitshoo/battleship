@@ -31,12 +31,15 @@ var formation_spacing: float = 14.0 # 선박 간 간격 축소 (밀집 대형)
 
 var _wave_timer: float = 0.0 # 물결 소리 타이머
 var _last_ai_speed: float = 0.0 # 속도 평활화를 위한 이전 프레임 속도 저장
+var _oar_time: float = 0.0
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_minion_list: Array = []
 static var _last_minion_cache_frame: int = -1
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
+
+var _cached_wind_manager: Node = null
 
 static func get_minions_cached(tree: SceneTree) -> Array:
 	var current_frame = Engine.get_physics_frames()
@@ -120,6 +123,8 @@ func _ready() -> void:
 	if not cached_lm:
 		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
+	
+	_cached_wind_manager = get_node_or_null("/root/WindManager")
 
 
 func die() -> void:
@@ -356,10 +361,9 @@ func _physics_process(delta: float) -> void:
 	
 	# === 바람 영향(Wind Force) 적용 ===
 	var wind_mult = 1.0
-	var wind_manager = get_node_or_null("/root/WindManager")
-	if is_instance_valid(wind_manager) and wind_manager.has_method("get_wind_direction"):
-		var wind_dir: Vector2 = wind_manager.get_wind_direction()
-		var wind_str: float = wind_manager.get_wind_strength()
+	if is_instance_valid(_cached_wind_manager) and _cached_wind_manager.has_method("get_wind_direction"):
+		var wind_dir: Vector2 = _cached_wind_manager.get_wind_direction()
+		var wind_str: float = _cached_wind_manager.get_wind_strength()
 		
 		# 배의 전방 벡터 (2D 평면 기준)
 		var ship_forward = Vector2(move_dir.x, move_dir.z).normalized()
@@ -722,9 +726,8 @@ func _apply_minion_visuals() -> void:
 
 
 func _auto_adjust_sail(delta: float) -> void:
-	var wind_manager = get_node_or_null("/root/WindManager")
-	if not is_instance_valid(wind_manager) or not wind_manager.has_method("get_wind_direction"): return
-	var wind_dir = wind_manager.get_wind_direction()
+	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"): return
+	var wind_dir = _cached_wind_manager.get_wind_direction()
 	
 	# ship.gd의 로직과 유사하게 자동 조절
 	var ship_angle_rad = rotation.y
@@ -879,9 +882,8 @@ func _update_wave_sounds(delta: float) -> void:
 	if speed > 0.5:
 		_wave_timer -= delta
 		if _wave_timer <= 0:
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-				audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
+			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+				_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
 			var speed_mod = clamp(speed / 5.0, 0.4, 1.5)
 			_wave_timer = randf_range(2.0, 4.5) / speed_mod
 
@@ -974,9 +976,8 @@ func _board_ship(target_ship: Node3D) -> void:
 		apply_ramming_aoe(5.0, global_position)
 		
 		# 충격 피드백 강화 (화면 흔들림 및 묵직한 사운드)
-		var audio_manager = get_node_or_null("/root/AudioManager")
-		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx("impact_wood", global_position, randf_range(0.6, 0.8)) # 더 낮고 묵직한 피치
+		if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+			_cached_audio_manager.play_sfx("impact_wood", global_position, randf_range(0.6, 0.8)) # 더 낮고 묵직한 피치
 		
 		var cam = get_viewport().get_camera_3d()
 		if cam and cam.has_method("shake"):

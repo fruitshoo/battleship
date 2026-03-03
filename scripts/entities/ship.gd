@@ -31,6 +31,7 @@ var is_rowing: bool = false
 @onready var ship_audio: AudioStreamPlayer3D = $ShipAudio if has_node("ShipAudio") else null
 
 var _cached_um: Node = null
+var _cached_wind_manager: Node = null
 
 # 부착된 선원(병사) 정보 (동적)# 길군악(노동요) 재생 상태
 var _gilgunak_playing: bool = false
@@ -40,6 +41,18 @@ var _flap_timer: float = 0.0
 var _wave_timer: float = 2.0
 var _current_wind_intake: float = 1.0 # 0.0(쳐짐) ~ 1.0(빵빵함)
 var _oars_timer: float = 0.0
+var _oar_time: float = 0.0
+
+# 성능 최적화: ships 그룹 캐싱 (프레임당 1회 조회)
+static var _cached_ships: Array = []
+static var _last_ships_frame: int = -1
+
+static func _get_ships_cached(tree: SceneTree) -> Array:
+	var f = Engine.get_physics_frames()
+	if f != _last_ships_frame:
+		_cached_ships = tree.get_nodes_in_group("ships")
+		_last_ships_frame = f
+	return _cached_ships
 
 
 # === 병사 자동 보충 ===
@@ -67,9 +80,9 @@ func _ready() -> void:
 		print("[Ship] 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f)" % [max_hull_hp, max_speed, hull_defense])
 	
 	
-	var wind_manager = get_node_or_null("/root/WindManager")
-	if is_instance_valid(wind_manager) and wind_manager.has_signal("gust_started"):
-		wind_manager.gust_started.connect(_on_gust_started)
+	_cached_wind_manager = get_node_or_null("/root/WindManager")
+	if is_instance_valid(_cached_wind_manager) and _cached_wind_manager.has_signal("gust_started"):
+		_cached_wind_manager.gust_started.connect(_on_gust_started)
 		
 	hull_hp = max_hull_hp
 	if is_player_controlled:
@@ -79,9 +92,8 @@ func _ready() -> void:
 
 func _on_gust_started(_angle_offset: float) -> void:
 	# 돌풍 시작 시 펄럭임 효과음 (플레이어 배만)
-	var audio_manager = get_node_or_null("/root/AudioManager")
-	if is_player_controlled and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("sail_flap", global_position, randf_range(0.9, 1.2))
+	if is_player_controlled and is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+		_cached_audio_manager.play_sfx("sail_flap", global_position, randf_range(0.9, 1.2))
 
 
 func _cache_references() -> void:
@@ -113,9 +125,8 @@ func _physics_process(delta: float) -> void:
 	if current_speed > 0.5:
 		_wave_timer -= delta
 		if _wave_timer <= 0:
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-				audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
+			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+				_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
 			# 속도가 빠를수록 자주, 느릴수록 드문드문 (최소 1.5초 ~ 최대 4.5초)
 			var speed_mod = clamp(current_speed / 5.0, 0.2, 2.0)
 			_wave_timer = randf_range(1.5, 3.5) / speed_mod
@@ -135,9 +146,8 @@ func _physics_process(delta: float) -> void:
 	# 노 젓기 사운드 재생 (주기적)
 	if is_rowing and rowing_stamina > 0:
 		if _oars_timer <= 0:
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-				audio_manager.play_sfx("oars_rowing", global_position, randf_range(0.95, 1.05))
+			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+				_cached_audio_manager.play_sfx("oars_rowing", global_position, randf_range(0.95, 1.05))
 			_oars_timer = 1.3
 		else:
 			_oars_timer -= delta
@@ -145,17 +155,15 @@ func _physics_process(delta: float) -> void:
 		# 길군악(노동요) 시작
 		if rowing_stamina > 0.1 and not _gilgunak_playing:
 			_gilgunak_playing = true
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_gilgunak"):
-				audio_manager.play_gilgunak(true)
+			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_gilgunak"):
+				_cached_audio_manager.play_gilgunak(true)
 	else:
 		_oars_timer = 0.0
 		# 길군악 정지
 		if _gilgunak_playing:
 			_gilgunak_playing = false
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_gilgunak"):
-				audio_manager.play_gilgunak(false)
+			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_gilgunak"):
+				_cached_audio_manager.play_gilgunak(false)
 ## 병사 자동 보충 로직
 func _update_crew_respawn(delta: float) -> void:
 	if is_sinking: return
@@ -234,9 +242,8 @@ func steer(direction: float, delta: float) -> void:
 		_auto_adjust_sail(delta)
 
 func _auto_adjust_sail(delta: float) -> void:
-	var wind_manager = get_node_or_null("/root/WindManager")
-	if not is_instance_valid(wind_manager) or not wind_manager.has_method("get_wind_direction"): return
-	var wind_dir = wind_manager.get_wind_direction()
+	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"): return
+	var wind_dir = _cached_wind_manager.get_wind_direction()
 	
 	# WindManager: Clockwise (0=N, 90=E)
 	# rotation.y: Counter-clockwise (0=N, -90=E)
@@ -260,7 +267,7 @@ func _auto_adjust_sail(delta: float) -> void:
 
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
-	var neighbors = get_tree().get_nodes_in_group("ships")
+	var neighbors = _get_ships_cached(get_tree())
 	var separation_dist = 8.0 # 함선 폭/길이 고려 (8m)
 	
 	# 성능을 위해 주변 함선이 많을 때만 계산하거나, 최대 척수 제한
@@ -326,12 +333,11 @@ func _update_steering(delta: float) -> void:
 
 ## 실제 범선 물리: 돛 기반 속도 계산
 func _calculate_sail_speed() -> float:
-	var wind_manager = get_node_or_null("/root/WindManager")
-	if not is_instance_valid(wind_manager) or not wind_manager.has_method("get_wind_direction") or not wind_manager.has_method("get_wind_strength"):
+	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction") or not _cached_wind_manager.has_method("get_wind_strength"):
 		return 0.0
 	
-	var wind_dir: Vector2 = wind_manager.get_wind_direction()
-	var wind_str: float = wind_manager.get_wind_strength()
+	var wind_dir: Vector2 = _cached_wind_manager.get_wind_direction()
+	var wind_str: float = _cached_wind_manager.get_wind_strength()
 	
 	# 1) 돛의 월드 각도 계산 (배 rotation.y + 돛 각도)
 	#    주의: 시각적 회전(Visual)은 -sail_angle (시계방향)

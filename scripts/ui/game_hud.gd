@@ -80,7 +80,7 @@ func _setup_top_xp_bar() -> void:
 	
 	# 상단 가득 차게 설정
 	xp_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	xp_bar.custom_minimum_size.y = 4.0 # 더 얇게 (6 -> 4)
+	xp_bar.custom_minimum_size.y = 18.0 # 내부에 레벨 텍스트를 넣기 위해 두께 확보 (기존 4.0)
 	xp_bar.show_percentage = false
 	xp_bar.z_index = 10 # 가장 위에 표시
 	
@@ -97,12 +97,12 @@ func _setup_top_xp_bar() -> void:
 	# 다른 UI들이 XP바와 겹치지 않도록 TopPanel 위치 조정
 	var top_panel = get_node_or_null("TopPanel")
 	if top_panel:
-		top_panel.offset_top = 14.0 # XP바(4px) + 여유공간(10px) = 14px
+		top_panel.offset_top = 22.0 # XP바(18px) + 여유공간(4px) = 22px
 	
 	# SidePanel도 약간 내림
 	var side_panel = get_node_or_null("SidePanel")
 	if side_panel:
-		side_panel.offset_top = 264.0 # 기존 260 -> 264
+		side_panel.offset_top = 264.0
 
 func _setup_new_layout() -> void:
 	# 1. 기존 거추장스러운 레거시 패널들(컨테이너)을 숨김
@@ -123,31 +123,23 @@ func _setup_new_layout() -> void:
 		top_left_container.offset_left = 24
 		top_left_container.offset_top = 32 # XP바(4px)에서 충분히 아래로 (기존 24)
 		
-		# 레벨 라벨
+		# 레벨 라벨은 XP 바 내부 중앙으로 이동
 		if level_label and level_label.get_parent():
 			level_label.get_parent().remove_child(level_label)
-			top_left_container.add_child(level_label)
-			level_label.add_theme_font_size_override("font_size", 18)
-		
-		# 골드(점수) 라벨 - 우상단에서 좌상단으로 이동
-		if score_label and score_label.get_parent():
-			score_label.get_parent().remove_child(score_label)
-			top_left_container.add_child(score_label)
-			score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			score_label.add_theme_font_size_override("font_size", 18)
-			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
-
-		# 난이도 라벨 - 우상단에서 좌상단으로 이동
-		if difficulty_label and difficulty_label.get_parent():
-			difficulty_label.get_parent().remove_child(difficulty_label)
-			top_left_container.add_child(difficulty_label)
-			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			difficulty_label.add_theme_font_size_override("font_size", 12)
-			difficulty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+			if xp_bar:
+				xp_bar.add_child(level_label)
+				level_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				level_label.add_theme_font_size_override("font_size", 14)
+				# 눈에 잘 띄게 아웃라인(테두리) 추가
+				level_label.add_theme_color_override("font_outline_color", Color.BLACK)
+				level_label.add_theme_constant_override("outline_size", 4)
 			
 		# --- 렐릭(유물) 슬롯 (Slay the Spire 스타일) ---
+		# 금화 등의 텍스트보다 위에 오도록 먼저 컨테이너에 추가
 		var relic_margin = MarginContainer.new()
-		relic_margin.add_theme_constant_override("margin_top", 10) # 경험치/점수 라벨과 약간의 간격 확보
+		relic_margin.add_theme_constant_override("margin_bottom", 10) # 아래 라벨들과 약간의 간격 확보
 		top_left_container.add_child(relic_margin)
 		
 		relic_container = HBoxContainer.new()
@@ -181,6 +173,22 @@ func _setup_new_layout() -> void:
 				
 			slot_bg.add_child(icon_label)
 			relic_container.add_child(slot_bg)
+
+		# 골드(점수) 라벨 - 유물 슬롯 아래에 위치
+		if score_label and score_label.get_parent():
+			score_label.get_parent().remove_child(score_label)
+			top_left_container.add_child(score_label)
+			score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			score_label.add_theme_font_size_override("font_size", 18)
+			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+
+		# 난이도 라벨 - 유물 슬롯 아래 금화 패널 밑에 위치
+		if difficulty_label and difficulty_label.get_parent():
+			difficulty_label.get_parent().remove_child(difficulty_label)
+			top_left_container.add_child(difficulty_label)
+			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			difficulty_label.add_theme_font_size_override("font_size", 12)
+			difficulty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 
 
 	# === 상단 중앙 (타이머) ===

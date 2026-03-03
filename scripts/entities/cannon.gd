@@ -24,6 +24,34 @@ var _search_tick: int = 0
 var fleet_damage_mult: float = 1.0
 var fleet_cooldown_mult: float = 1.0
 
+# 함수(수명 주기별) 성능을 위한 업그레이드 수치 캐싱
+var _cached_range_mult: float = 1.0
+var _cached_cd_mult: float = 1.0
+var _cached_dmg_mult: float = 1.0
+
+func _ready() -> void:
+	# 초기 업그레이드 적용
+	_update_cached_stats()
+	# 업그레이드 발생 시그널 연결
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and upgrade_manager.has_signal("upgrade_applied"):
+		upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
+
+func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
+	if upgrade_id == "cannon":
+		_update_cached_stats()
+
+func _update_cached_stats() -> void:
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager and "UPGRADES" in upgrade_manager:
+		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
+		var stat_lv = int(cannon_lv / 2)
+		var s = upgrade_manager.UPGRADES.get("cannon", {}).get("stats", {})
+		
+		_cached_range_mult = 1.0 + (s.get("range_pct_per_stat", 15) / 100.0) * stat_lv
+		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_stat", 10) / 100.0) * stat_lv)
+		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_stat", 25) / 100.0) * stat_lv
+
 func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 	fleet_damage_mult = dmg_mult
 	fleet_cooldown_mult = cd_mult
@@ -74,18 +102,15 @@ func _process(delta: float) -> void:
 			fire(current_target)
 
 func _get_current_range() -> float:
-	var current_range = detection_range
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
-	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
-		var stat_lv = int(cannon_lv / 2)
-		current_range *= (1.0 + 0.15 * stat_lv)
-	return current_range
+	return detection_range * _cached_range_mult
 
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
 	var current_range = _get_current_range()
-	var min_dist_sq: float = current_range * current_range
+	# 최대 탐지 거리의 제곱값 초기화 (이보다 먼 타겟은 무시)
+	var max_range_sq: float = current_range * current_range
+	# 현재까지 찾은 가장 '매력적인' 타겟의 가중치 적용 거리
+	var best_score_sq: float = INF
 	
 	var enemy_group = "enemy" if team == "player" else "player"
 	var enemies = get_tree().get_nodes_in_group(enemy_group)
@@ -94,8 +119,11 @@ func _update_target() -> void:
 		if not is_instance_valid(enemy):
 			continue
 		
-		var dist_sq = global_position.distance_squared_to(enemy.global_position)
-		if dist_sq > min_dist_sq:
+		# 실제 물리적 거리 스퀘어 계산
+		var real_dist_sq = global_position.distance_squared_to(enemy.global_position)
+		
+		# 실제 거리가 최대 사거리를 벗어나면 무조건 패스
+		if real_dist_sq > max_range_sq:
 			continue
 		
 		if not _is_within_arc(enemy):
@@ -103,9 +131,19 @@ func _update_target() -> void:
 			
 		if _is_ship_occupied_by_friendly(enemy):
 			continue
+			
+		# [핵심 로직] 타겟 점수 계산 (실제 거리를 기반으로 패널티 부여)
+		var score_sq = real_dist_sq
+		
+		# 타겟 배에 적군이 한 명도 없다면 (빈 배거나 곧 빈 배가 될 배),
+		# 거리에 엄청난 페널티(예: 10배 거리)를 주어 우선순위를 대폭 낮춤
+		if not _is_ship_occupied_by_enemy(enemy):
+			score_sq *= 100.0 # 스퀘어 값이므로 100배 = 거리 10배
 				
-		min_dist_sq = dist_sq
-		nearest_enemy = enemy
+		# 점수가 가장 낮은(가장 매력적인) 타겟 갱신
+		if score_sq < best_score_sq:
+			best_score_sq = score_sq
+			nearest_enemy = enemy
 	
 	current_target = nearest_enemy
 
@@ -158,18 +196,22 @@ func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
 			return true
 	return false
 
+## 타겟 우선순위를 위해 배에 적군이 있는지 체크
+func _is_ship_occupied_by_enemy(target_ship: Node3D) -> bool:
+	var soldiers_node = target_ship.get_node_or_null("Soldiers")
+	if not soldiers_node: return false
+	
+	var enemy_team = "enemy" if team == "player" else "player"
+	for child in soldiers_node.get_children():
+		# 살아있는 적군 병사가 한 명이라도 있으면 True
+		if child.get("team") == enemy_team and child.get("current_state") != 4: # 4 = DEAD
+			return true
+	return false
+
 
 func _get_current_cooldown() -> float:
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
-	var cd = fire_cooldown
-	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
-		var stat_lv = int(cannon_lv / 2)
-		cd *= maxf(0.5, 1.0 - 0.1 * stat_lv)
-	
-	# 함대 보너스 적용 (곱연산)
-	cd *= fleet_cooldown_mult
-	return cd
+	# 캐시된 업그레이드 배율 * 함대 배율
+	return fire_cooldown * _cached_cd_mult * fleet_cooldown_mult
 
 
 func fire(target_enemy: Node3D) -> void:
@@ -212,22 +254,14 @@ func _execute_fire() -> void:
 	ball.team = team
 	get_tree().root.add_child.call_deferred(ball)
 	
-	# 데미지 계산 (속성 반영)
-	var base_dmg = 15.0 # 대포알 데미지 상향 (10 -> 15)
-	var range_mult = 1.0 # 사거리/수명 배율
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
-	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
-		var stat_lv = int(cannon_lv / 2)
-		base_dmg *= (1.0 + 0.25 * stat_lv)
-		range_mult = 1.0 + 0.15 * stat_lv
-	
-	# 함대 보너스 적용 (곱연산)
-	base_dmg *= fleet_damage_mult
+	# 데미지 계산 (캐싱된 속성 반영 + 함대 보너스)
+	var base_dmg = 15.0 # 대포알 기준 데미지
+	base_dmg *= _cached_dmg_mult * fleet_damage_mult
 	ball.damage = base_dmg
+
 	
 	if ball.has_method("set_lifetime_multiplier"):
-		ball.set_lifetime_multiplier(range_mult)
+		ball.set_lifetime_multiplier(_cached_range_mult)
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(current_target.global_position)

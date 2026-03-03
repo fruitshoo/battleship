@@ -17,6 +17,7 @@ var base_y: float = 0.0
 var time_alive: float = 0.0
 var is_collected: bool = false
 var _cached_lm: Node = null
+var _cached_um: Node = null
 
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
@@ -53,6 +54,9 @@ func _ready() -> void:
 	# 획득 이벤트 연결
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
+	
+	# UpgradeManager 캐싱
+	_cached_um = get_node_or_null("/root/UpgradeManager")
 
 
 @export var lifetime: float = 60.0 # 소멸 시간 (초)
@@ -143,9 +147,8 @@ func _find_target_player() -> void:
 
 
 func _get_current_magnet_radius() -> float:
-	var um = get_node_or_null("/root/UpgradeManager")
-	if is_instance_valid(um) and "current_levels" in um:
-		var supply_lv = um.current_levels.get("supply_bonus", 0)
+	if is_instance_valid(_cached_um) and "current_levels" in _cached_um:
+		var supply_lv = _cached_um.current_levels.get("supply_bonus", 0)
 		return base_magnet_radius + (supply_lv * 2.0) # 레벨당 +2.0 (최대 18.0)
 	return base_magnet_radius
 
@@ -202,10 +205,9 @@ func _collect_loot() -> void:
 			
 	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
 	if is_instance_valid(target_player) and "hull_hp" in target_player and "max_hull_hp" in target_player:
-		var um = get_node_or_null("/root/UpgradeManager")
 		var supply_lv = 0
-		if is_instance_valid(um) and "current_levels" in um:
-			supply_lv = um.current_levels.get("supply_bonus", 0)
+		if is_instance_valid(_cached_um) and "current_levels" in _cached_um:
+			supply_lv = _cached_um.current_levels.get("supply_bonus", 0)
 			
 		var heal_amount = 5.0 + (supply_lv * 10.0) # 기본 5, 레벨당 +10
 		target_player.hull_hp = minf(target_player.hull_hp + heal_amount, target_player.max_hull_hp)

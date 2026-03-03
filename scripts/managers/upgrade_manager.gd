@@ -17,7 +17,8 @@ var UPGRADES = {
 		"category": Category.ANTI_SHIP,
 		"description": "대포 1문 추가 또는 데미지/사거리 강화",
 		"max_level": 8,
-		"color": Color(1.0, 0.5, 0.2)
+		"color": Color(1.0, 0.5, 0.2),
+		"stats": {"dmg_pct_per_stat": 25, "range_pct_per_stat": 15, "cd_pct_per_stat": 10}
 	},
 	"janggun": {
 		"name": "대장군전",
@@ -40,14 +41,16 @@ var UPGRADES = {
 		"category": Category.ANTI_PERSONNEL,
 		"description": "최대 정원 증가 및 리스폰 속도 단축",
 		"max_level": 5,
-		"color": Color(0.4, 0.8, 1.0)
+		"color": Color(0.4, 0.8, 1.0),
+		"stats": {"crew_add": 1, "respawn_mult": 0.8, "respawn_min": 1.0}
 	},
 	"crew_quality": {
 		"name": "정예병 훈련",
 		"category": Category.ANTI_PERSONNEL,
 		"description": "병사의 체력, 방어력, 공격력 일괄 상승",
 		"max_level": 5,
-		"color": Color(0.8, 0.8, 0.2)
+		"color": Color(0.8, 0.8, 0.2),
+		"stats": {"base_hp": 40.0, "hp_per_lv": 10.0, "dmg_pct_per_lv": 15, "def_pct_per_lv": 10}
 	},
 	
 	# --- Hull / Navigation (5 Levels) ---
@@ -56,30 +59,24 @@ var UPGRADES = {
 		"category": Category.HULL,
 		"description": "함선의 최대 체력 및 방어력 증가",
 		"max_level": 5,
-		"color": Color(0.6, 0.3, 0.1)
+		"color": Color(0.6, 0.3, 0.1),
+		"stats": {"hp_add": 30.0, "heal_on_apply": 20.0, "def_per_lv": 2.0}
 	},
 	"navigation": {
 		"name": "항해 기동",
 		"category": Category.NAVIGATION,
 		"description": "선회 속도 및 돛 기동력 증가",
 		"max_level": 5,
-		"color": Color(0.4, 1.0, 0.4)
+		"color": Color(0.4, 1.0, 0.4),
+		"stats": {"turn_mult": 1.15, "stamina_mult": 0.85}
 	},
 	"supply_bonus": {
 		"name": "보급 효율",
 		"category": Category.HULL,
 		"description": "보급품 획득 시 회복량 및 습득 범위 대폭 증가",
 		"max_level": 5,
-		"color": Color(0.3, 0.8, 0.3)
-	},
-	
-	# --- Special / Rare Items ---
-	"sextant": {
-		"name": "육분의",
-		"category": Category.SPECIAL,
-		"description": "[자동화] 바람 방향에 맞춰 돛 자동 최적화",
-		"max_level": 1,
-		"color": Color(1.0, 0.9, 0.5)
+		"color": Color(0.3, 0.8, 0.3),
+		"stats": {"base_radius": 8.0, "radius_per_lv": 2.0, "heal_per_lv": 5.0}
 	},
 	
 	# --- Consumables / Instant ---
@@ -88,14 +85,32 @@ var UPGRADES = {
 		"category": Category.HULL,
 		"description": "체력 즉시 소폭 회복",
 		"max_level": 99,
-		"color": Color(0.5, 1.0, 0.5)
+		"color": Color(0.5, 1.0, 0.5),
+		"stats": {"max_hp_add": 20.0}
 	},
 	"gold": {
 		"name": "전리품",
 		"category": Category.SPECIAL,
 		"description": "점수 +50",
 		"max_level": 99,
-		"color": Color(1.0, 0.85, 0.3)
+		"color": Color(1.0, 0.85, 0.3),
+		"stats": {"score_add": 50}
+	}
+}
+
+# 렐릭(유물) 정의
+var RELICS = {
+	"sextant": {
+		"name": "육분의",
+		"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
+		"icon": "explore", # HUD에 표시할 아이콘(임시)
+		"alert_msg": "!! 렐릭 획득: 육분의 !!\n(자동 항해 활성화)"
+	},
+	"boss_heart": {
+		"name": "보스의 심장",
+		"description": "임시 보스 드롭 렐릭입니다.",
+		"icon": "favorite",
+		"alert_msg": "!! 렐릭 획득: 보스의 심장 !!"
 	}
 }
 
@@ -123,7 +138,7 @@ func get_random_choices(count: int = 3) -> Array:
 	
 	# 무제한 업그레이드 (보급/돈) 제외하고 선택지 수집
 	for id in UPGRADES:
-		if id in ["supply", "gold", "maintenance"]:
+		if id in ["supply", "gold"]:
 			continue
 		if current_levels[id] < UPGRADES[id]["max_level"]:
 			available.append(id)
@@ -131,8 +146,8 @@ func get_random_choices(count: int = 3) -> Array:
 	available.shuffle()
 	var choices = available.slice(0, mini(count, available.size()))
 	
-	# 빈 자리는 보급/돈/정비로 채움
-	var fallbacks = ["supply", "gold", "maintenance"]
+	# 빈 자리는 보급/돈으로 채움
+	var fallbacks = ["supply", "gold"]
 	while choices.size() < count:
 		var fb = fallbacks[choices.size() % fallbacks.size()]
 		# 이미 선택된 것이거나, (혹시나) 정비가 만렙이면서 병사가 풀이면 패스 (일단은 무조건 허용)
@@ -162,29 +177,12 @@ func apply_upgrade(upgrade_id: String) -> void:
 		push_warning("UpgradeManager: 플레이어 배를 찾을 수 없습니다")
 		return
 	
-	match upgrade_id:
-		"crew_numbers":
-			_apply_crew_numbers(player_ship, new_level)
-		"crew_quality":
-			_apply_crew_quality_to_all_soldiers(player_ship)
-		"cannon":
-			_apply_cannon(player_ship, new_level)
-		"singigeon":
-			_apply_singigeon(player_ship, new_level)
-		"janggun":
-			_apply_janggun(player_ship, new_level)
-		"hull_defense":
-			_apply_hull_defense(player_ship)
-		"navigation":
-			_apply_navigation(player_ship)
-		"supply_bonus":
-			pass # Applied dynamically when picking up supplies
-		"sextant":
-			_apply_sextant(player_ship)
-		"supply":
-			_apply_supply(player_ship)
-		"gold":
-			_apply_gold()
+	# 함수명 규칙 기반 자동 디스패치: _apply_{upgrade_id}(ship, level)
+	var method_name = "_apply_%s" % upgrade_id
+	if has_method(method_name):
+		call(method_name, player_ship, new_level)
+	else:
+		pass # supply_bonus 등 동적 적용 업그레이드는 별도 함수 없이 pass
 	
 	upgrade_applied.emit(upgrade_id, new_level)
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
@@ -200,32 +198,49 @@ func get_next_description(upgrade_id: String) -> String:
 	if "level_desc" in data and next_level in data["level_desc"]:
 		return data["level_desc"][next_level]
 	
-	# 동적 설명 생성
+	# 동적 설명 생성 (stats 딕셔너리 참조)
+	var s = data.get("stats", {})
 	match upgrade_id:
 		"cannon":
+			var stat_lv = int(next_level / 2)
 			if next_level % 2 != 0:
-				return "대포 +1문 추가 (교대 배치)"
+				return "대포 교대 배치 추가 (+1문)"
 			else:
-				return "대포 데미지 및 사거리/장전속도 향상"
+				return "대포 데미지 +%d%%, 사거리 +%d%%, 장전 시간 -%d%%" % [
+					stat_lv * s.get("dmg_pct_per_stat", 25),
+					stat_lv * s.get("range_pct_per_stat", 15),
+					stat_lv * s.get("cd_pct_per_stat", 10)]
 		"janggun":
 			return "대장군전 화력 및 화염/디버프 강화"
 		"singigeon":
 			return "신기전 발사 개수 및 파괴력 향상"
 		"crew_numbers":
 			if ship:
-				return "정원 증가(%d → %d) 및 리스폰 가속" % [ship.max_crew_count, ship.max_crew_count + 1]
+				var add = s.get("crew_add", 1)
+				var spd = int((1.0 - s.get("respawn_mult", 0.8)) * 100)
+				return "정원 증가(%d → %d) 및 리스폰 가속(-%d%%)" % [
+					ship.max_crew_count, ship.max_crew_count + add, spd]
 		"crew_quality":
-			return "병사 최대 HP/방어력/공격력 일괄 강화"
+			return "병사 최대 HP +%d, 공격력 +%d%%, 피해 감소 +%d%%" % [
+				next_level * int(s.get("hp_per_lv", 10)),
+				next_level * s.get("dmg_pct_per_lv", 15),
+				next_level * s.get("def_pct_per_lv", 10)]
 		"hull_defense":
-			return "함선 최대 체력 및 방어력 강화\n(즉시 일부 체력 수리)"
+			return "함선 최대 체력 +%d, 장갑 방어력 +%d\n(즉시 체력 +%d 수리)" % [
+				int(s.get("hp_add", 30)), int(s.get("def_per_lv", 2)),
+				int(s.get("heal_on_apply", 20))]
 		"navigation":
-			return "러더 선회 속도 및 돛 기동성 증가"
+			var turn_pct = int((s.get("turn_mult", 1.15) - 1.0) * 100)
+			var stam_pct = int((1.0 - s.get("stamina_mult", 0.85)) * 100)
+			return "러더 선회 속도 +%d%%, 스태미나 소모 -%d%%" % [turn_pct, stam_pct]
 		"supply_bonus":
-			return "해상 보급 획득 시 회복량 및 습득 범위 증가"
+			var radius = s.get("base_radius", 8.0) + (next_level * s.get("radius_per_lv", 2.0))
+			var heal = s.get("heal_per_lv", 5.0) * (next_level + 1)
+			return "부유물 획득 범위 증가(%.1fm) 및\n체력 회복량 증가(+%.0f)" % [radius, heal]
 		"supply":
-			return "선체 수리 (즉시 소폭 회복)"
-		"sextant":
-			return "자동 항해 장치 설치\n(돛을 바람에 맞춰 자동 조절)"
+			return "선체 수리 (즉시 HP +%d 회복)" % int(s.get("max_hp_add", 20))
+		"gold":
+			return "점수 +%d" % int(s.get("score_add", 50))
 
 	if next_level > 1 and upgrade_id not in ["supply", "gold"]:
 		return data["description"] + " (Lv.%d)" % next_level
@@ -236,10 +251,11 @@ func get_next_description(upgrade_id: String) -> String:
 # === 업그레이드 적용 함수들 ===
 
 func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
+	var s = UPGRADES["crew_numbers"]["stats"]
 	if "max_crew_count" in ship:
-		ship.max_crew_count += 1
+		ship.max_crew_count += s.get("crew_add", 1)
 	if "soldier_respawn_time" in ship:
-		ship.soldier_respawn_time = maxf(1.0, ship.soldier_respawn_time * 0.8) # 리스폰 속도 20%씩 단축
+		ship.soldier_respawn_time = maxf(s.get("respawn_min", 1.0), ship.soldier_respawn_time * s.get("respawn_mult", 0.8))
 		
 	# 바로 1명 스폰 시도
 	var soldiers_node = ship.get_node_or_null("Soldiers")
@@ -253,46 +269,46 @@ func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
 	var current_max = ship.get("max_crew_count") if "max_crew_count" in ship else 0
 	print("[Crew] 병사 정원 증가! (현재 최대: %d)" % current_max)
 
-func _apply_crew_quality_to_all_soldiers(ship: Node3D) -> void:
+func _apply_crew_quality(ship: Node3D, _level: int) -> void:
 	var soldiers = _get_player_soldiers(ship)
 	var quality_lv = current_levels.get("crew_quality", 0)
-	for s in soldiers:
-		_apply_current_stats_to_soldier(s)
+	for sol in soldiers:
+		_apply_current_stats_to_soldier(sol)
 	print("[Crew Quality] 정예병 훈련 Lv.%d 완료!" % quality_lv)
 
 func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var quality_lv = current_levels.get("crew_quality", 0)
+	var s = UPGRADES["crew_quality"]["stats"]
 	if quality_lv > 0:
-		# 체력 증가 (+10 per level)
-		var base_max_hp = 40.0
-		var new_max_hp = base_max_hp + (quality_lv * 10.0)
+		var new_max_hp = s.get("base_hp", 40.0) + (quality_lv * s.get("hp_per_lv", 10.0))
 		if "max_health" in soldier:
 			soldier.max_health = new_max_hp
-			soldier.current_health = minf(soldier.current_health + 10.0, soldier.max_health)
+			soldier.current_health = minf(soldier.current_health + s.get("hp_per_lv", 10.0), soldier.max_health)
 		
-		# 공격력 증가 (+15% per level) / 방어력 증가 (피해감소율 +10% per level)
-		soldier.set_meta("damage_multiplier", 1.0 + (quality_lv * 0.15))
-		soldier.set_meta("defense_reduction", quality_lv * 0.1)
+		soldier.set_meta("damage_multiplier", 1.0 + (quality_lv * s.get("dmg_pct_per_lv", 15) / 100.0))
+		soldier.set_meta("defense_reduction", quality_lv * s.get("def_pct_per_lv", 10) / 100.0)
 
-func _apply_hull_defense(ship: Node3D) -> void:
+func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	var def_lv = current_levels.get("hull_defense", 0)
+	var s = UPGRADES["hull_defense"]["stats"]
 	if "max_hull_hp" in ship:
-		ship.max_hull_hp += 30.0 # 5단계까지 총 +150
-		ship.hull_hp += 20.0 # 즉시 체력 일부 회복
+		ship.max_hull_hp += s.get("hp_add", 30.0)
+		ship.hull_hp += s.get("heal_on_apply", 20.0)
 	if "hull_defense" in ship:
-		ship.hull_defense = def_lv * 2.0 # 단계당 방어력 +2
+		ship.hull_defense = def_lv * s.get("def_per_lv", 2.0)
 	
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
 	if hud and hud.has_method("update_hull_hp"):
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	print("[Hull] 선체 장갑 강화 Lv.%d" % def_lv)
 
-func _apply_navigation(ship: Node3D) -> void:
+func _apply_navigation(ship: Node3D, _level: int) -> void:
 	var nav_lv = current_levels.get("navigation", 0)
+	var s = UPGRADES["navigation"]["stats"]
 	if "rudder_turn_speed" in ship:
-		ship.rudder_turn_speed *= 1.15 # 선회 15%씩 증가
+		ship.rudder_turn_speed *= s.get("turn_mult", 1.15)
 	if "stamina_drain_rate" in ship:
-		ship.stamina_drain_rate *= 0.85
+		ship.stamina_drain_rate *= s.get("stamina_mult", 0.85)
 	print("[Navigation] 항해 기동 강화 Lv.%d" % nav_lv)
 
 func _apply_cannon(ship: Node3D, level: int) -> void:
@@ -355,9 +371,11 @@ func _apply_janggun(ship: Node3D, level: int) -> void:
 		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
 
 
-func _apply_supply(ship: Node3D) -> void:
+func _apply_supply(ship: Node3D, _level: int) -> void:
+	var s = UPGRADES["supply"]["stats"]
+	var add = s.get("max_hp_add", 20.0)
 	if "max_hull_hp" in ship:
-		ship.max_hull_hp += 20.0
+		ship.max_hull_hp += add
 	if "hull_hp" in ship:
 		ship.hull_hp = ship.max_hull_hp
 	print("[Supply] 보급! HP: %.0f / %.0f" % [ship.hull_hp, ship.max_hull_hp])
@@ -368,17 +386,18 @@ func _apply_supply(ship: Node3D) -> void:
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 
 
-func _apply_gold() -> void:
+func _apply_gold(_ship: Node3D, _level: int) -> void:
+	var s = UPGRADES["gold"]["stats"]
+	var pts = int(s.get("score_add", 50))
 	var level_mgr = get_tree().get_first_node_in_group("level_manager")
 	if level_mgr and level_mgr.has_method("add_score"):
-		level_mgr.add_score(50)
+		level_mgr.add_score(pts)
 	else:
-		# 직접 LevelManager 찾기
 		for node in get_tree().root.get_children():
 			if node.has_method("add_score"):
-				node.add_score(50)
+				node.add_score(pts)
 				break
-	print("[Gold] 전리품! 점수 +50")
+	print("[Gold] 전리품! 점수 +%d" % pts)
 
 
 func _get_player_ship() -> Node3D:
@@ -388,18 +407,42 @@ func _get_player_ship() -> Node3D:
 	return null
 
 
-func _apply_sextant(ship: Node3D) -> void:
+func add_relic(relic_id: String) -> void:
+	if relic_id not in RELICS:
+		push_warning("UpgradeManager: 존재하지 않는 렐릭 ID입니다 - %s" % relic_id)
+		return
+		
+	if acquired_relics.has(relic_id):
+		return
+		
+	var ship = _get_player_ship()
+	if not ship: return
+	
+	acquired_relics.append(relic_id)
+	
+	# 함수명 규칙 기반 자동 디스패치: _apply_relic_{relic_id}(ship)
+	var method_name = "_apply_relic_%s" % relic_id
+	if has_method(method_name):
+		call(method_name, ship)
+	
+	# HUD 공통 업데이트 로직
+	var relic_data = RELICS[relic_id]
+	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
+	
+	if hud:
+		if "icon" in relic_data and hud.has_method("add_relic_icon"):
+			hud.add_relic_icon(relic_data["icon"])
+			
+		if "alert_msg" in relic_data and hud.has_method("show_message"):
+			hud.show_message(relic_data["alert_msg"], 3.0)
+			
+	print("[Relic] %s 획득! - %s" % [relic_data["name"], relic_data["description"]])
+
+# === 렐릭 적용 함수들 ===
+
+func _apply_relic_sextant(ship: Node3D) -> void:
 	if "has_sextant" in ship:
 		ship.has_sextant = true
-	
-	# 렐릭 목록에 추가 및 HUD 연동
-	if not acquired_relics.has("sextant"):
-		acquired_relics.append("sextant")
-		var hud = ship._find_hud() if ship.has_method("_find_hud") else null
-		if hud and hud.has_method("add_relic_icon"):
-			hud.add_relic_icon("explore") # 'explore' 문자열은 Material Symbols에서 나침반 형태
-	
-	print("[Item] 육분의(렐릭) 획득! 이제 돛이 자동으로 조절됩니다.")
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:

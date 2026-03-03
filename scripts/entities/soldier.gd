@@ -48,6 +48,10 @@ var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지�
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
 var home_ground_timer: float = 0.0 # 홈그라운드 체력 재생 타이머
 
+# 성능 최적화: UpgradeManager 캐싱
+var _cached_upgrade_manager: Node = null
+var _cached_cooldown_mult: float = 1.0
+
 var weapon_sword: Node3D = null
 var weapon_bow: Node3D = null
 
@@ -164,6 +168,22 @@ func _ready() -> void:
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
 	add_to_group("soldiers")
+	
+	# UpgradeManager 캐싱 및 시그널 연결 (매 프레임 노드 탐색 방지)
+	_cached_upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(_cached_upgrade_manager):
+		_update_cached_cooldown()
+		if _cached_upgrade_manager.has_signal("upgrade_applied"):
+			_cached_upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
+
+func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
+	if upgrade_id == "crew_quality":
+		_update_cached_cooldown()
+
+func _update_cached_cooldown() -> void:
+	if is_instance_valid(_cached_upgrade_manager) and "current_levels" in _cached_upgrade_manager:
+		var quality_lv = _cached_upgrade_manager.current_levels.get("crew_quality", 0)
+		_cached_cooldown_mult = maxf(0.5, 1.0 - 0.1 * quality_lv)
 
 ## 무기 공격력 수치 동기화
 func _update_weapon_stats() -> void:
@@ -293,12 +313,8 @@ func _physics_process(delta: float) -> void:
 	if run_heavy_logic and team == "player" and is_instance_valid(owned_ship) and owned_ship.get("is_dying") == true:
 		_try_evacuate_to_home()
 	
-	# 공격 쿨다운
-	var current_cooldown_mult = 1.0
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
-	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var quality_lv = upgrade_manager.current_levels.get("crew_quality", 0)
-		current_cooldown_mult = maxf(0.5, 1.0 - 0.1 * quality_lv)
+	# 공격 쿨다운 (캐싱된 업그레이드 수치 사용)
+	var current_cooldown_mult = _cached_cooldown_mult
 	
 	if attack_timer > 0:
 		# 원거리 무기면 쿨다운 감소 버프 적용
