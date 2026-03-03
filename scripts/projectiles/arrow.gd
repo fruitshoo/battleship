@@ -97,6 +97,11 @@ func _check_hit(target: Node) -> void:
 	# 적 배 피격 (배는 Soldier가 아닌 enemy/player 그룹)
 	var potential_ship = target if target.is_in_group("enemy") or target.is_in_group("player") else target.get_parent()
 	if potential_ship and (potential_ship.is_in_group("enemy") or potential_ship.is_in_group("player")):
+		var is_sinking = potential_ship.get("is_sinking") == true
+		if is_sinking:
+			queue_free()
+			return
+			
 		# 상대 팀 배인지 확인
 		var enemy_team = "enemy" if team == "player" else "player"
 		if potential_ship.is_in_group(enemy_team):

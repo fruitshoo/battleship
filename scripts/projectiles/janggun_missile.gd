@@ -82,6 +82,10 @@ func _on_hit(target: Node) -> void:
 			ship = p
 	
 	if ship:
+		var target_is_sinking = ship.get("is_sinking") == true
+		if target_is_sinking:
+			return # 침몰 중인 배엔 데미지도 스플래시도 넣지 않고 통과 (또는 다른 처리)
+			
 		_play_impact_vfx() # 임팩트 이펙트 재생
 		_stick_to_ship(ship)
 		

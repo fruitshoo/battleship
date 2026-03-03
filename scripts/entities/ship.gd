@@ -490,6 +490,17 @@ func die() -> void:
 	# 메쉬 투명도 조절 (페이드 아웃)
 	_fade_out_meshes(self , sink_tween, sink_duration)
 	
+	# 커다란 침몰 물보라 생성
+	var sinking_splash_scene = preload("res://scenes/effects/ship_sinking_splash.tscn")
+	if sinking_splash_scene:
+		var splash = sinking_splash_scene.instantiate()
+		splash.position = Vector3(global_position.x, 0.2, global_position.z)
+		get_tree().root.add_child.call_deferred(splash)
+		
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.0))
+	
 	sink_tween.set_parallel(false)
 	sink_tween.tween_callback(func():
 		# HUD에 게임 오버 표시

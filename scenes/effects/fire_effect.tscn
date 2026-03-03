@@ -1,11 +1,10 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene format=3 uid="uid://bilro8ijftry1"]
 
-[ext_resource type="Texture2D" uid="uid://smoke01flip" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="2_smoke01"]
+[ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="2_smoke01"]
 
-; ── 연기 파티클용 리소스 ────────────────────────────
 [sub_resource type="Gradient" id="Gradient_smoke"]
 offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
-colors = PackedColorArray(0.15, 0.15, 0.15, 0,  0.2, 0.2, 0.2, 0.55,  0.12, 0.12, 0.12, 0.35,  0.05, 0.05, 0.05, 0)
+colors = PackedColorArray(0.15, 0.15, 0.15, 0, 0.2, 0.2, 0.2, 0.55, 0.12, 0.12, 0.12, 0.35, 0.05, 0.05, 0.05, 0)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
 gradient = SubResource("Gradient_smoke")
@@ -27,13 +26,11 @@ initial_velocity_max = 3.5
 angular_velocity_min = -12.0
 angular_velocity_max = 12.0
 gravity = Vector3(0, 0.2, 0)
-scale_min = 1.0
 scale_max = 1.8
 scale_curve = SubResource("CurveTexture_smoke")
 color_ramp = SubResource("GradientTexture1D_smoke")
 anim_speed_min = 0.6
 anim_speed_max = 1.0
-anim_offset_min = 0.0
 anim_offset_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
@@ -52,10 +49,9 @@ particles_anim_loop = false
 material = SubResource("StandardMaterial3D_smoke")
 size = Vector2(2.8, 2.8)
 
-; ── 씬 트리 ────────────────────────────
-[node name="FireEffect" type="Node3D"]
+[node name="FireEffect" type="Node3D" unique_id=1847126054]
 
-[node name="SmokeParticles" type="GPUParticles3D" parent="."]
+[node name="SmokeParticles" type="GPUParticles3D" parent="." unique_id=1301637500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 amount = 10
 lifetime = 3.0

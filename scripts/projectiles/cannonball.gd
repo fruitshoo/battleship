@@ -133,11 +133,17 @@ func _check_hit(target: Node) -> void:
 		
 		_spawn_effects(is_crit)
 	else:
-		# 함선 외의 물체에 부딪혔을 때 → 물 폭발 이펙트 생성
-		_spawn_water_explosion()
-		var audio_manager = get_node_or_null("/root/AudioManager")
-		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
+		# 침몰 중인 함선에 맞은 거면 무시 (부자연스러운 물폭발 방지)
+		var is_sinking = target.get("is_sinking") == true
+		if not is_sinking and target.get_parent() != null and target.get_parent().get("is_sinking") == true:
+			is_sinking = true
+			
+		if not is_sinking:
+			# 함선 외의 물체에 부딪혔을 때 → 물 폭발 이펙트 생성
+			_spawn_water_explosion()
+			var audio_manager = get_node_or_null("/root/AudioManager")
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
 	
 	# 어떤 경우든 부딪히면 삭제
 	queue_free()
