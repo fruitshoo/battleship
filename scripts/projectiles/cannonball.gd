@@ -143,6 +143,6 @@ func _spawn_water_explosion() -> void:
 	
 	var pos = global_position
 	var explosion = water_explosion_scene.instantiate()
-	explosion.global_position = pos
-	explosion.global_position.y = 0.2 # 수면 높이에 맞춤
+	# 수면 높이에 맞춘 위치를 한 번에 설정 (오리진 없는 노드의 게터 호출 방지)
+	explosion.global_position = Vector3(pos.x, 0.2, pos.z)
 	get_tree().root.add_child.call_deferred(explosion)

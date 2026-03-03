@@ -64,9 +64,9 @@ func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
 	var water_explosion_scene = preload("res://scenes/effects/water_explosion.tscn")
 	if water_explosion_scene:
+		var pos = global_position
 		var explosion = water_explosion_scene.instantiate()
-		explosion.global_position = global_position
-		explosion.global_position.y = 0.05
+		explosion.global_position = Vector3(pos.x, 0.05, pos.z)
 		explosion.scale = Vector3(0.3, 0.3, 0.3) # 화살에 맞게 아주 작게 축소
 		get_tree().root.add_child.call_deferred(explosion)
 		
