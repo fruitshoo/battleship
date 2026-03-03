@@ -70,6 +70,7 @@ var _oar_time: float = 0.0
 
 var _cached_level_manager: Node = null
 var _cached_hud: Node = null
+var _cached_ocean: Node3D = null
 
 func _ready() -> void:
 	base_y = position.y
@@ -94,9 +95,23 @@ func _cache_common_references() -> void:
 ## 둥실둥실 시각 효과
 func _apply_bobbing_effect() -> void:
 	var time = Time.get_ticks_msec() * 0.001
-	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude
 	
-	position.y = base_y + bob_offset
+	if not is_instance_valid(_cached_ocean):
+		var oceans = get_tree().get_nodes_in_group("ocean")
+		if oceans.size() > 0:
+			_cached_ocean = oceans[0]
+			
+	var wave_h = 0.0
+	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
+		# 매 프레임 해당 좌표의 파도 높이를 계산 (안전하고 최적화됨)
+		wave_h = _cached_ocean.get_wave_height(global_position)
+		
+	# 기존 단순 둥실거림은 진폭을 살짝만 남겨 파도 위의 미세한 진동으로 사용
+	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude * 0.2
+	
+	# 무거운 배의 관성(Inertia)을 모방하기 위해 부드럽게 보간(Lerp)합니다.
+	var target_y = base_y + wave_h + bob_offset
+	position.y = lerp(position.y, target_y, 3.0 * get_physics_process_delta_time())
 	
 	var turn_factor = rudder_angle / 45.0
 	var speed_ratio = clamp(current_speed / max_speed, 0.0, 1.0)

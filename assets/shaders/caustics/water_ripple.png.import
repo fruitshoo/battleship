@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvxvt302j2bq6"
-path.s3tc="res://.godot/imported/caust00.png-38b3e25f53d10039951deee9205c0ca3.s3tc.ctex"
+uid="uid://bsvuvfigjh2nv"
+path.s3tc="res://.godot/imported/water_ripple.png-33eee64555c716f1855f746ded90ea72.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/shaders/caustics/caust00.png"
-dest_files=["res://.godot/imported/caust00.png-38b3e25f53d10039951deee9205c0ca3.s3tc.ctex"]
+source_file="res://assets/shaders/caustics/water_ripple.png"
+dest_files=["res://.godot/imported/water_ripple.png-33eee64555c716f1855f746ded90ea72.s3tc.ctex"]
 
 [params]
 

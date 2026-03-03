@@ -1,0 +1,140 @@
+[gd_scene format=3 uid="uid://orgd0ri27p5o"]
+
+[ext_resource type="Texture2D" uid="uid://ltcunirokurh" path="res://assets/shaders/caustics/water_splash.png" id="1_splash"]
+[ext_resource type="Texture2D" uid="uid://ccdi2r4onspp0" path="res://assets/shaders/caustics/water_pillar.png" id="2_pillar"]
+[ext_resource type="Texture2D" uid="uid://bsvuvfigjh2nv" path="res://assets/shaders/caustics/water_ripple.png" id="3_ripple"]
+[ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="4_script"]
+
+[sub_resource type="Gradient" id="Gradient_splash"]
+offsets = PackedFloat32Array(0, 0.1, 0.6, 1)
+colors = PackedColorArray(0.9, 0.95, 1, 0, 1, 1, 1, 1, 0.8, 0.9, 1, 0.9, 0.6, 0.8, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_splash"]
+gradient = SubResource("Gradient_splash")
+
+[sub_resource type="Curve" id="Curve_splash"]
+_data = [Vector2(0, 0.3), 0.0, 0.0, 0, 0, Vector2(0.15, 1), 0.0, 0.0, 0, 0, Vector2(1, 1.6), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_splash"]
+curve = SubResource("Curve_splash")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splash"]
+emission_shape = 1
+emission_sphere_radius = 0.5
+direction = Vector3(0, 1, 0)
+spread = 80.0
+initial_velocity_min = 4.0
+initial_velocity_max = 8.0
+scale_min = 0.5
+scale_max = 1.2
+scale_curve = SubResource("CurveTexture_splash")
+color_ramp = SubResource("GradientTexture1D_splash")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash"]
+transparency = 1
+blend_mode = 1
+depth_draw_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_splash")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_splash"]
+material = SubResource("StandardMaterial3D_splash")
+size = Vector2(3, 3)
+
+[sub_resource type="Curve" id="Curve_pillar"]
+_data = [Vector2(0, 0.5), 0.0, 0.0, 0, 0, Vector2(0.1, 1), 0.0, 0.0, 0, 0, Vector2(1, 1.2), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_pillar"]
+curve = SubResource("Curve_pillar")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_pillar"]
+direction = Vector3(0, 1, 0)
+spread = 15.0
+initial_velocity_min = 5.0
+initial_velocity_max = 10.0
+gravity = Vector3(0, -12, 0)
+scale_max = 1.6
+scale_curve = SubResource("CurveTexture_pillar")
+color_ramp = SubResource("GradientTexture1D_splash")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pillar"]
+transparency = 1
+blend_mode = 1
+depth_draw_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_pillar")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_pillar"]
+material = SubResource("StandardMaterial3D_pillar")
+size = Vector2(2.5, 4.5)
+
+[sub_resource type="Curve" id="Curve_ripple"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.1, 0.6), 0.0, 0.0, 0, 0, Vector2(1, 2.5), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_ripple"]
+curve = SubResource("Curve_ripple")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ripple"]
+gravity = Vector3(0, 0, 0)
+scale_min = 1.5
+scale_max = 2.0
+scale_curve = SubResource("CurveTexture_ripple")
+color_ramp = SubResource("GradientTexture1D_splash")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ripple"]
+transparency = 1
+blend_mode = 1
+depth_draw_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_ripple")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ripple"]
+material = SubResource("StandardMaterial3D_ripple")
+size = Vector2(5, 5)
+orientation = 1
+
+[node name="WaterExplosion" type="GPUParticles3D" unique_id=1591442480]
+emitting = false
+amount = 15
+lifetime = 1.2
+one_shot = true
+explosiveness = 0.95
+randomness = 0.5
+process_material = SubResource("ParticleProcessMaterial_splash")
+draw_pass_1 = SubResource("QuadMesh_splash")
+script = ExtResource("4_script")
+
+[node name="Pillar" type="GPUParticles3D" parent="." unique_id=2146911867]
+emitting = false
+amount = 6
+one_shot = true
+explosiveness = 0.9
+randomness = 0.2
+process_material = SubResource("ParticleProcessMaterial_pillar")
+draw_pass_1 = SubResource("QuadMesh_pillar")
+
+[node name="Ripple" type="GPUParticles3D" parent="." unique_id=650495394]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+emitting = false
+amount = 2
+lifetime = 1.5
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_ripple")
+draw_pass_1 = SubResource("QuadMesh_ripple")
