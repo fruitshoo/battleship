@@ -68,7 +68,7 @@ var UPGRADES = {
 	"supply_bonus": {
 		"name": "보급 효율",
 		"category": Category.HULL,
-		"description": "해상 보급품 획득 시 회복량 대폭 증가",
+		"description": "보급품 획득 시 회복량 및 습득 범위 대폭 증가",
 		"max_level": 5,
 		"color": Color(0.3, 0.8, 0.3)
 	},
@@ -218,7 +218,7 @@ func get_next_description(upgrade_id: String) -> String:
 		"navigation":
 			return "러더 선회 속도 및 돛 기동성 증가"
 		"supply_bonus":
-			return "해상 보급 획득 시 회복량 대폭 증가"
+			return "해상 보급 획득 시 회복량 및 습득 범위 증가"
 		"supply":
 			return "선체 수리 (즉시 소폭 회복)"
 		"sextant":

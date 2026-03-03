@@ -5,7 +5,7 @@ extends Area3D
 
 @export var gold_amount: int = 30
 @export var xp_amount: int = 15
-@export var magnet_radius: float = 8.0 # 자석 효과 범위 (15.0 -> 8.0 하향)
+@export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 5.0 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도
 @export var float_height: float = 0.3 # 둥실거리는 진폭
@@ -76,7 +76,8 @@ func _physics_process(delta: float) -> void:
 	
 	if is_instance_valid(target_player):
 		var dist = global_position.distance_to(target_player.global_position)
-		if dist <= magnet_radius:
+		var current_radius = _get_current_magnet_radius()
+		if dist <= current_radius:
 			# 자석 효과 발동: 가속도가 붙으면서 끌려감
 			current_magnet_speed = lerp(current_magnet_speed, magnet_speed + (15.0 / max(dist, 1.0)), 2.0 * delta)
 			var direction = (target_player.global_position - global_position).normalized()
@@ -135,10 +136,18 @@ func _find_target_player() -> void:
 			closest_p = p
 			
 	# 가장 가까운 아군 배를 타겟으로 함 (본선/나포함 구분 없음)
-	if closest_dist <= magnet_radius * 1.5:
+	if closest_dist <= _get_current_magnet_radius() * 1.5:
 		target_player = closest_p
 	else:
 		target_player = null
+
+
+func _get_current_magnet_radius() -> float:
+	var um = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(um) and "current_levels" in um:
+		var supply_lv = um.current_levels.get("supply_bonus", 0)
+		return base_magnet_radius + (supply_lv * 2.0) # 레벨당 +2.0 (최대 18.0)
+	return base_magnet_radius
 
 
 func _on_body_entered(body: Node3D) -> void:

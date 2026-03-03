@@ -3,7 +3,7 @@ extends Area3D
 ## 생존자(Survivor) 시스템
 ## 적함 침몰 시 발생하며, 플레이어가 다가가면 자석처럼 끌려와 병사로 합류함
 
-@export var magnet_radius: float = 7.0 # 자석 효과 범위 (12.0 -> 7.0 하향)
+@export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 5.0 # 끌려가는 기본 속도
 @export var float_speed: float = 1.5 # 둥실거리는 속도
 @export var float_height: float = 0.2 # 둥실거리는 진폭
@@ -63,7 +63,8 @@ func _physics_process(delta: float) -> void:
 	
 	if is_instance_valid(target_player):
 		var dist = global_position.distance_to(target_player.global_position)
-		if dist <= magnet_radius:
+		var current_radius = _get_current_magnet_radius()
+		if dist <= current_radius:
 			# 자석 효과: 거리가 가까울수록 더 빠르게 가속
 			current_magnet_speed = lerp(current_magnet_speed, magnet_speed + (10.0 / max(dist, 1.0)), 3.0 * delta)
 			var direction = (target_player.global_position - global_position).normalized()
@@ -120,10 +121,18 @@ func _find_target_player() -> void:
 			closest_dist = d
 			closest_p = p
 			
-	if closest_dist <= magnet_radius * 1.5:
+	if closest_dist <= _get_current_magnet_radius() * 1.5:
 		target_player = closest_p
 	else:
 		target_player = null
+
+
+func _get_current_magnet_radius() -> float:
+	var um = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(um) and "current_levels" in um:
+		var supply_lv = um.current_levels.get("supply_bonus", 0)
+		return base_magnet_radius + (supply_lv * 2.0)
+	return base_magnet_radius
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -168,6 +177,22 @@ func _try_collect(player_ship: Node3D) -> void:
 	if player_ship and player_ship.has_method("add_survivor"):
 		if player_ship.add_survivor():
 			is_collected = true
+			
+			# 생존자 구조 시에도 체력 소폭 회복 로직 추가
+			if "hull_hp" in player_ship and "max_hull_hp" in player_ship:
+				var um = get_node_or_null("/root/UpgradeManager")
+				var supply_lv = 0
+				if is_instance_valid(um) and "current_levels" in um:
+					supply_lv = um.current_levels.get("supply_bonus", 0)
+				
+				var heal_amount = 5.0 + (supply_lv * 5.0) # 기본 5, 레벨당 +5
+				player_ship.hull_hp = minf(player_ship.hull_hp + heal_amount, player_ship.max_hull_hp)
+				
+				if player_ship.has_method("_find_hud"):
+					var hud = player_ship._find_hud()
+					if hud and hud.has_method("update_hull_hp"):
+						hud.update_hull_hp(player_ship.hull_hp, player_ship.max_hull_hp)
+			
 			_finish_collection()
 		else:
 			# 정원이 가득 찬 경우: 획득하지 않고 그냥 밀려남 (튕겨나가는 연출)
