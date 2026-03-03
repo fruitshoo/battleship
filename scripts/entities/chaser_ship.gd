@@ -1030,6 +1030,7 @@ func _spawn_ropes() -> void:
 		if local_to_target.x < 0: offset.x = -1.0
 		
 		mesh_instance.position = offset
+		mesh_instance.set_meta("anchor_offset", offset)
 		rope_instances.append(mesh_instance)
 
 func _update_ropes() -> void:
@@ -1043,28 +1044,22 @@ func _update_ropes() -> void:
 	for rope in rope_instances:
 		if not is_instance_valid(rope): continue
 		
-		var start_pos = rope.global_position
+		# 원래 배에 붙어있어야 할 로컬 오프셋을 기반으로 정확한 시작점 계산
+		var offset = rope.get_meta("anchor_offset")
+		var start_pos = global_transform * offset
 		var dist = start_pos.distance_to(target_center)
 		
-		# 방향 및 길이 업데이트
-		rope.look_at(target_center, Vector3.UP)
-		# CylinderMesh는 초기 상태에서 Y축이 위임. look_at은 -Z를 바라보게 함. 
-		# 이를 보정하기 위해 X축으로 90도 회전
-		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(90))
+		# 밧줄의 중심이 중간에 오도록 위치 보정하고 타겟을 바라보게 함
+		var mid_pos = start_pos + (target_center - start_pos) * 0.5
+		rope.global_transform = Transform3D().looking_at(target_center - mid_pos, Vector3.UP)
+		rope.global_position = mid_pos
 		
-		# 스케일 조절 (CylinderMesh의 height가 1이므로 dist만큼 scale)
-		rope.scale.y = dist # CylinderMesh의 height 방향이 스케일됨
-		# 밧줄 굵기 유지
-		rope.scale.x = 1.0
-		rope.scale.z = 1.0
+		# CylinderMesh는 초기 상태에서 Y축이 위임. 
+		# Transform3D.looking_at()은 -Z축이 타겟을 향하게 하므로, Y축이 타겟을 향하도록 X축 기준 -90도 회전
+		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
 		
-		# 밧줄의 중심이 중간에 오도록 위치 보정 (또는 Cylinder Mesh의 중심 이동)
-		# Cylinder의 피봇은 중앙이므로, 시작점에서 타겟 방향으로 절반만큼 이동시킨 위치에 놓아야 함
-		# rope.global_position은 이미 고정된 offset 위치이므로 
-		# 로컬 스케일은 중앙 기준이라, 배에 붙은 지점을 한쪽 끝으로 만들려면 추가 오프셋 필요
-		# CylinderMesh의 길이를 2로 하고 피봇을 한끝으로 옮기거나, 위치를 매 프레임 재계산
-		var dir = (target_center - start_pos).normalized()
-		rope.global_position = start_pos + dir * dist * 0.5
+		# 스케일 조절 (CylinderMesh의 height가 기본 1.0이므로 dist만큼 Y축 스케일)
+		rope.scale = Vector3(1.0, dist, 1.0)
 
 func _clear_ropes() -> void:
 	for rope in rope_instances:
