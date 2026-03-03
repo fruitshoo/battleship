@@ -11,7 +11,7 @@ extends Camera3D
 @export_group("Control Settings")
 @export var zoom_speed: float = 2.0
 @export var min_zoom: float = 10.0
-@export var max_zoom: float = 80.0
+@export var max_zoom: float = 88.0 # +10% 줌아웃 (기존 80.0)
 @export var rotation_sensitivity: float = 0.005
 
 var target: Node3D = null

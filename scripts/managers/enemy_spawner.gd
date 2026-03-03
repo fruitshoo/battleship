@@ -5,11 +5,11 @@ extends Node
 
 @export var enemy_scene: PackedScene = preload("res://scenes/enemy_ship.tscn")
 @export var spawn_interval: float = 6.0 # 생성 주기 (초)
-@export var min_spawn_distance: float = 40.0 # 최소 생성 거리
-@export var max_spawn_distance: float = 60.0 # 최대 생성 거리
+@export var min_spawn_distance: float = 65.0 # 최소 생성 거리 (카메라 줌아웃 고려하여 밖에서)
+@export var max_spawn_distance: float = 85.0 # 최대 생성 거리
 @export var max_enemies: int = 20 # 최대 적 수
 @export var current_boarders: int = 1 # 레벨에 따른 도선 병사 수
-@export var max_distance_limit: float = 120.0 # 재배치 거리
+@export var max_distance_limit: float = 140.0 # 재배치 거리 (더 멀리 허용)
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
 
 @export var boss_scene: PackedScene = preload("res://scenes/entities/boss_ship.tscn")
@@ -195,7 +195,7 @@ func _get_biased_spawn_position() -> Vector3:
 			return best_pos
 			
 	# 반복 실패 시 최후의 수단: 가장 마지막 위치를 더 멀리 밀어냄
-	var fallback_offset = (best_pos - player.global_position).normalized() * 40.0
+	var fallback_offset = (best_pos - player.global_position).normalized() * 60.0
 	best_pos += fallback_offset
 	return best_pos
 
