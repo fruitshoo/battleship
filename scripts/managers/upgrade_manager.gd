@@ -186,6 +186,13 @@ func apply_upgrade(upgrade_id: String) -> void:
 	
 	upgrade_applied.emit(upgrade_id, new_level)
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
+	
+	# 무기 종류 업그레이드 시 HUD 무기 슬롯 갱신
+	var weapon_ids = ["cannon", "singigeon", "janggun"]
+	if upgrade_id in weapon_ids:
+		var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
+		if hud and hud.has_method("update_weapon_ui"):
+			hud.update_weapon_ui(upgrade_id, new_level)
 
 
 ## 현재 레벨의 설명 가져오기 (다음 레벨 기준)

@@ -48,6 +48,11 @@ var _last_difficulty_text: String = ""
 var relic_container: HBoxContainer = null
 var current_relic_count: int = 0
 
+# === 무기 UI 변수 ===
+var weapon_container: HBoxContainer = null
+var weapon_slots: Array[PanelContainer] = []
+var active_weapons: Dictionary = {} # 무기 ID를 슬롯 인덱스에 매핑
+
 func _ready() -> void:
 	# 기존 요소 숨기기 & 신규 레이아웃 셋업
 	_setup_new_layout()
@@ -174,7 +179,69 @@ func _setup_new_layout() -> void:
 			slot_bg.add_child(icon_label)
 			relic_container.add_child(slot_bg)
 
-		# 골드(점수) 라벨 - 유물 슬롯 아래에 위치
+		# --- 무기 현황 슬롯 (렐릭 바로 아래) ---
+		weapon_container = HBoxContainer.new()
+		weapon_container.add_theme_constant_override("separation", 8)
+		# 렐릭 마진 하단보다 덜 띄우고 붙여둠
+		top_left_container.add_child(weapon_container)
+		
+		# 3개의 빈 상태 무기 슬롯 생성 (대포, 신기전, 대장군전)
+		weapon_slots.clear()
+		for i in range(3):
+			var w_slot_bg = PanelContainer.new()
+			w_slot_bg.custom_minimum_size = Vector2(32, 32)
+			
+			var w_slot_sb = StyleBoxFlat.new()
+			w_slot_sb.bg_color = Color(0, 0, 0, 0.4) # 약간 더 투명한 배경
+			w_slot_sb.set_corner_radius_all(4)
+			w_slot_sb.border_width_bottom = 1
+			w_slot_sb.border_width_top = 1
+			w_slot_sb.border_width_left = 1
+			w_slot_sb.border_width_right = 1
+			w_slot_sb.border_color = Color(0.3, 0.3, 0.3, 0.8)
+			w_slot_bg.add_theme_stylebox_override("panel", w_slot_sb)
+			
+			# 아이콘 (초기엔 빈칸)
+			var icon_label = Label.new()
+			icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			icon_label.add_theme_font_size_override("font_size", 20)
+			
+			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+			if icon_font:
+				icon_label.add_theme_font_override("font", icon_font)
+			icon_label.name = "Icon"
+			w_slot_bg.add_child(icon_label)
+			
+			# 우측 하단 레벨 텍스트 오버레이 (초기엔 숨김)
+			var level_label_overlay = Label.new()
+			level_label_overlay.name = "Level"
+			level_label_overlay.text = "1"
+			level_label_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			level_label_overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+			level_label_overlay.add_theme_font_size_override("font_size", 10)
+			level_label_overlay.add_theme_color_override("font_outline_color", Color.BLACK)
+			level_label_overlay.add_theme_constant_override("outline_size", 3)
+			level_label_overlay.visible = false
+			
+			# 우측 하단에 고정하기 위한 앵커 설정
+			level_label_overlay.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+			level_label_overlay.offset_left = -16
+			level_label_overlay.offset_top = -14
+			level_label_overlay.offset_right = -2
+			level_label_overlay.offset_bottom = -2
+			
+			w_slot_bg.add_child(level_label_overlay)
+			
+			weapon_container.add_child(w_slot_bg)
+			weapon_slots.append(w_slot_bg)
+
+		# 약간의 간격 확보를 위해 빈 컨테이너 추가
+		var spacer = Control.new()
+		spacer.custom_minimum_size.y = 10
+		top_left_container.add_child(spacer)
+
+		# 골드(점수) 라벨 - 무기 슬롯 아래에 위치
 		if score_label and score_label.get_parent():
 			score_label.get_parent().remove_child(score_label)
 			top_left_container.add_child(score_label)
@@ -607,6 +674,60 @@ func add_relic_icon(icon_text: String) -> void:
 			tween.tween_property(slot_sb, "border_color", Color(0.6, 0.5, 0.1, 0.8), 0.5)
 			
 		current_relic_count += 1
+
+
+## 무기 슬롯 업데이트 (획득 순서대로 빈 칸에 채워넣기)
+func update_weapon_ui(weapon_id: String, level: int) -> void:
+	if level <= 0: return
+	
+	# 무기별 아이콘 매핑 (Material Symbols)
+	var icon_map = {
+		"cannon": "sports_baseball", # 대포 (둥근 포탄)
+		"singigeon": "rocket_launch", # 신기전 (로켓)
+		"janggun": "hardware", # 대장군전 (망치/무거운 쇳덩이 이미지)
+	}
+	# 무기별 색상 매핑
+	var color_map = {
+		"cannon": Color(1.0, 0.7, 0.3), # 주황
+		"singigeon": Color(1.0, 0.4, 0.4), # 빨강
+		"janggun": Color(0.8, 0.5, 0.2), # 황갈색
+	}
+	
+	var actual_icon = icon_map.get(weapon_id, "help")
+	var actual_color = color_map.get(weapon_id, Color.WHITE)
+	
+	# 이미 등록된 무기인지 확인
+	var slot_idx = -1
+	if active_weapons.has(weapon_id):
+		slot_idx = active_weapons[weapon_id]
+	else:
+		# 신규 획득: 빈 슬롯 앞쪽부터 순서대로 채워넣기
+		slot_idx = active_weapons.size()
+		if slot_idx >= weapon_slots.size():
+			return # 3개 이상의 무기는 표시 불가
+		active_weapons[weapon_id] = slot_idx
+	
+	# UI 갱신
+	var slot = weapon_slots[slot_idx]
+	var icon_label = slot.get_node_or_null("Icon") as Label
+	var lv_label = slot.get_node_or_null("Level") as Label
+	
+	if icon_label:
+		icon_label.text = actual_icon
+		icon_label.add_theme_color_override("font_color", actual_color)
+		
+	if lv_label:
+		lv_label.text = str(level)
+		lv_label.visible = true
+	
+	# 슬롯 테두리를 무기 색으로 잠깐 반짝이게 (획득/레벨업 피드백)
+	var slot_sb = slot.get_theme_stylebox("panel")
+	if slot_sb:
+		slot_sb = slot_sb.duplicate()
+		slot.add_theme_stylebox_override("panel", slot_sb)
+		var tween = create_tween()
+		tween.tween_property(slot_sb, "border_color", actual_color, 0.2)
+		tween.tween_property(slot_sb, "border_color", Color(0.4, 0.4, 0.4, 0.8), 0.5)
 
 
 func _update_hull_display() -> void:
