@@ -918,11 +918,13 @@ func _on_body_entered(body: Node3D) -> void:
 		_board_ship(body)
 
 func _on_area_entered(area: Area3D) -> void:
-	# 플레이어의 감지 영역(ProximityArea)과 충돌했는지 확인
-	# ProximityArea의 부모가 PlayerShip인지 확인
-	var parent = area.get_parent()
-	if parent and parent.is_in_group("player"):
-		_board_ship(parent)
+	# 본선(ProximityArea 자식) 또는 나포함(Area3D 본체)과 충돌했는지 확인
+	if area.is_in_group("player"):
+		_board_ship(area)
+	else:
+		var parent = area.get_parent()
+		if parent and parent.is_in_group("player"):
+			_board_ship(parent)
 
 
 func remove_stuck_object(_obj: Node3D, _s_mult: float, _t_mult: float) -> void:
