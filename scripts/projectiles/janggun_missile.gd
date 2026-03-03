@@ -12,6 +12,7 @@ extends Area3D
 
 @export var arc_height: float = 8.0
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
+var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -130,6 +131,18 @@ func _unstick() -> void:
 func _splash_and_sink() -> void:
 	if is_sinking: return
 	is_sinking = true
+	
+	# 바다에 떨어질 때 물 폭발 이펙트 생성
+	if water_explosion_scene:
+		var explosion = water_explosion_scene.instantiate()
+		explosion.global_position = global_position
+		explosion.global_position.y = 0.2
+		get_tree().root.add_child.call_deferred(explosion)
+	
+	# 물보라 사운드
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
 	
 	var tween = create_tween()
 	tween.tween_property(self , "position:y", position.y - 2.0, 1.0)

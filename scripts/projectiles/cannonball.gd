@@ -11,6 +11,7 @@ extends Area3D
 @export var crit_chance: float = 0.2 # 20% 크리티컬 확률
 @export var crit_multiplier: float = 2.0 # 크리티컬 2배 데미지
 @export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
+var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
 
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
@@ -49,6 +50,9 @@ var has_hit: bool = false
 
 func _on_timeout() -> void:
 	if has_hit: return
+	
+	# 수명 만료 = 바다에 떨어짐 → 물 폭발 이펙트 생성
+	_spawn_water_explosion()
 	
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -116,10 +120,18 @@ func _check_hit(target: Node) -> void:
 		
 		_spawn_effects(is_crit)
 	else:
-		# 함선 외의 물체에 부딪혔을 때 (물보라 소리와 함께 삭제)
+		# 함선 외의 물체에 부딪혔을 때 → 물 폭발 이펙트 생성
+		_spawn_water_explosion()
 		var audio_manager = get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
 	
 	# 어떤 경우든 부딪히면 삭제
 	queue_free()
+
+func _spawn_water_explosion() -> void:
+	if water_explosion_scene:
+		var explosion = water_explosion_scene.instantiate()
+		explosion.global_position = global_position
+		explosion.global_position.y = 0.2 # 수면 높이에 맞춤
+		get_tree().root.add_child.call_deferred(explosion)

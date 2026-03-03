@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://orgd0ri27p5o"]
 
-[ext_resource type="Texture2D" uid="uid://ltcunirokurh" path="res://assets/shaders/caustics/water_splash.png" id="1_splash"]
-[ext_resource type="Texture2D" uid="uid://ccdi2r4onspp0" path="res://assets/shaders/caustics/water_pillar.png" id="2_pillar"]
-[ext_resource type="Texture2D" uid="uid://bsvuvfigjh2nv" path="res://assets/shaders/caustics/water_ripple.png" id="3_ripple"]
+[ext_resource type="Texture2D" uid="uid://db7ceqqn4njkh" path="res://assets/shaders/caustics/water_mist_spritesheet.png" id="1_splash"]
+[ext_resource type="Texture2D" uid="uid://dx4p1pd0iw6dy" path="res://assets/shaders/caustics/water_splash_medium_realistic.png" id="2_pillar"]
+[ext_resource type="Texture2D" uid="uid://c7mnpsybyp6wv" path="res://assets/shaders/caustics/water_splash_omni_spritesheet.png" id="3_ripple"]
 [ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="4_script"]
 
 [sub_resource type="Gradient" id="Gradient_splash"]
@@ -30,6 +30,8 @@ scale_min = 0.5
 scale_max = 1.2
 scale_curve = SubResource("CurveTexture_splash")
 color_ramp = SubResource("GradientTexture1D_splash")
+anim_speed_min = 1.0
+anim_speed_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash"]
 transparency = 1
@@ -38,10 +40,11 @@ depth_draw_mode = 2
 shading_mode = 0
 vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("1_splash")
+texture_filter = 5
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
+particles_anim_h_frames = 4
+particles_anim_v_frames = 4
 particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_splash"]
@@ -64,6 +67,8 @@ gravity = Vector3(0, -12, 0)
 scale_max = 1.6
 scale_curve = SubResource("CurveTexture_pillar")
 color_ramp = SubResource("GradientTexture1D_splash")
+anim_speed_min = 1.0
+anim_speed_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pillar"]
 transparency = 1
@@ -72,10 +77,11 @@ depth_draw_mode = 2
 shading_mode = 0
 vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("2_pillar")
+texture_filter = 5
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
+particles_anim_h_frames = 4
+particles_anim_v_frames = 4
 particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_pillar"]
@@ -95,6 +101,8 @@ scale_min = 1.5
 scale_max = 2.0
 scale_curve = SubResource("CurveTexture_ripple")
 color_ramp = SubResource("GradientTexture1D_splash")
+anim_speed_min = 1.0
+anim_speed_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ripple"]
 transparency = 1
@@ -103,6 +111,12 @@ depth_draw_mode = 2
 shading_mode = 0
 vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("3_ripple")
+texture_filter = 5
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 4
+particles_anim_v_frames = 4
+particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_ripple"]
 material = SubResource("StandardMaterial3D_ripple")
