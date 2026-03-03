@@ -11,7 +11,7 @@ enum State {
 }
 
 # === 기본 속성 ===
-@export var max_health: float = 40.0: # 인간화 패치 (100 -> 40)
+@export var max_health: float = 70.0: # 인간화 밸런스 조정 (40 -> 70)
 	set(value):
 		max_health = value
 		current_health = max_health
@@ -38,7 +38,7 @@ enum State {
 @export var hit_effect_scene: PackedScene = preload("res://scenes/effects/hit_effect.tscn")
 
 # === 내부 상태 ===
-var current_health: float = 40.0
+var current_health: float = 70.0
 var current_state: State = State.IDLE
 var current_target: Node3D = null
 var current_weapon: Node3D = null
