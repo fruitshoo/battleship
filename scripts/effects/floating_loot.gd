@@ -18,6 +18,7 @@ var time_alive: float = 0.0
 var is_collected: bool = false
 var _cached_lm: Node = null
 var _cached_um: Node = null
+var _cached_ocean: Node = null
 
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
@@ -57,6 +58,9 @@ func _ready() -> void:
 	
 	# UpgradeManager 캐싱
 	_cached_um = get_node_or_null("/root/UpgradeManager")
+	
+	# OceanPlane 캐싱
+	_cached_ocean = get_tree().get_first_node_in_group("ocean")
 
 
 @export var lifetime: float = 60.0 # 소멸 시간 (초)
@@ -66,12 +70,10 @@ func _physics_process(delta: float) -> void:
 	if is_collected: return
 	time_alive += delta
 	
-	# 수명 체크 및 소멸 연출 시작
-	if not is_expiring and time_alive > lifetime - 10.0:
-		_start_expire_sequence()
-	
-	if time_alive > lifetime:
+	if not is_expiring and time_alive > lifetime:
 		_expire_and_free()
+		
+	if is_expiring:
 		return
 
 	# 가장 가까운 플레이어 탐색 (주기적 탐색 대신 매 프레임 탐지)
@@ -98,29 +100,26 @@ func _physics_process(delta: float) -> void:
 		_apply_floating(delta)
 
 
-func _start_expire_sequence() -> void:
-	is_expiring = true
-	# 깜빡이는 효과 (Material의 alpha 조절)
-	if visual and visual is MeshInstance3D:
-		var mat = visual.get_surface_override_material(0)
-		if mat is StandardMaterial3D:
-			var tween = create_tween().set_loops(10)
-			tween.tween_property(mat, "albedo_color:a", 0.3, 0.5)
-			tween.tween_property(mat, "albedo_color:a", 1.0, 0.5)
-
 func _expire_and_free() -> void:
+	is_expiring = true
 	is_collected = true # 획득 방지
 	var tween = create_tween().set_parallel(true)
-	# 가라앉으며 사라짐
-	tween.tween_property(self , "position:y", position.y - 1.5, 1.5)
+	# 천천히 가라앉으며 사라짐 (깜빡임 대신)
+	tween.tween_property(self , "position:y", position.y - 2.0, 3.0)
 	if visual:
-		tween.tween_property(visual, "scale", Vector3.ZERO, 1.5)
+		tween.tween_property(visual, "scale", Vector3.ZERO, 3.0)
 	tween.chain().tween_callback(queue_free)
 
 
 func _apply_floating(delta: float) -> void:
-	# 물 위에서 둥실거리고 회전함
-	position.y = base_y + sin(time_alive * float_speed) * float_height
+	var target_y = base_y + sin(time_alive * float_speed) * float_height
+	
+	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
+		target_y += _cached_ocean.get_wave_height(global_position)
+		
+	# lerp를 사용하여 부드럽게 파도와 기본 높이를 따라감
+	position.y = lerp(position.y, target_y, 5.0 * delta)
+	
 	if visual:
 		visual.rotation.y += rotation_speed * delta
 		visual.rotation.z = sin(time_alive * float_speed * 1.5) * 0.1 # 살짝 갸우뚱
