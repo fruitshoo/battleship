@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://orgd0ri27p5o"]
 
-[ext_resource type="Texture2D" uid="uid://db7ceqqn4njkh" path="res://assets/shaders/caustics/water_mist_spritesheet.png" id="1_splash"]
-[ext_resource type="Texture2D" uid="uid://dx4p1pd0iw6dy" path="res://assets/shaders/caustics/water_splash_medium_realistic.png" id="2_pillar"]
-[ext_resource type="Texture2D" uid="uid://c7mnpsybyp6wv" path="res://assets/shaders/caustics/water_splash_omni_spritesheet.png" id="3_ripple"]
+[ext_resource type="Texture2D" uid="uid://db7ceqqn4njkh" path="res://assets/vfx/particles/water/water_mist.png" id="1_splash"]
+[ext_resource type="Texture2D" uid="uid://dx4p1pd0iw6dy" path="res://assets/vfx/particles/water/water_splash_medium.png" id="2_pillar"]
+[ext_resource type="Texture2D" uid="uid://c7mnpsybyp6wv" path="res://assets/vfx/particles/water/water_splash_omni.png" id="3_ripple"]
 [ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="4_script"]
 
 [sub_resource type="Gradient" id="Gradient_splash"]

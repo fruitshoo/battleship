@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c7mnpsybyp6wv"
-path="res://.godot/imported/water_splash_omni_spritesheet.png-1f99a87b9565c9a2a8c981681b5716d4.ctex"
+uid="uid://dx4p1pd0iw6dy"
+path="res://.godot/imported/water_splash_medium.png-8cbb6c7aeca122a47108ca5cd837346c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/shaders/caustics/water_splash_omni_spritesheet.png"
-dest_files=["res://.godot/imported/water_splash_omni_spritesheet.png-1f99a87b9565c9a2a8c981681b5716d4.ctex"]
+source_file="res://assets/vfx/particles/water/water_splash_medium.png"
+dest_files=["res://.godot/imported/water_splash_medium.png-8cbb6c7aeca122a47108ca5cd837346c.ctex"]
 
 [params]
 

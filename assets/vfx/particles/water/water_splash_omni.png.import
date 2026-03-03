@@ -2,22 +2,21 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ltcunirokurh"
-path.s3tc="res://.godot/imported/water_splash.png-7c5ed075eac9a1f67afe616d4e61e71c.s3tc.ctex"
+uid="uid://c7mnpsybyp6wv"
+path="res://.godot/imported/water_splash_omni.png-1f99a87b9565c9a2a8c981681b5716d4.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/shaders/caustics/water_splash.png"
-dest_files=["res://.godot/imported/water_splash.png-7c5ed075eac9a1f67afe616d4e61e71c.s3tc.ctex"]
+source_file="res://assets/vfx/particles/water/water_splash_omni.png"
+dest_files=["res://.godot/imported/water_splash_omni.png-1f99a87b9565c9a2a8c981681b5716d4.ctex"]
 
 [params]
 
-compress/mode=2
-compress/high_quality=false
+compress/mode=0
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

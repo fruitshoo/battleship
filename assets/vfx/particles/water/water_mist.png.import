@@ -2,22 +2,21 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bsvuvfigjh2nv"
-path.s3tc="res://.godot/imported/water_ripple.png-33eee64555c716f1855f746ded90ea72.s3tc.ctex"
+uid="uid://db7ceqqn4njkh"
+path="res://.godot/imported/water_mist.png-6384ef2a1ab15b77747d3feb90b7cc7f.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/shaders/caustics/water_ripple.png"
-dest_files=["res://.godot/imported/water_ripple.png-33eee64555c716f1855f746ded90ea72.s3tc.ctex"]
+source_file="res://assets/vfx/particles/water/water_mist.png"
+dest_files=["res://.godot/imported/water_mist.png-6384ef2a1ab15b77747d3feb90b7cc7f.ctex"]
 
 [params]
 
-compress/mode=2
-compress/high_quality=false
+compress/mode=0
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
