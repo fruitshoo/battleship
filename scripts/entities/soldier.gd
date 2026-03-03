@@ -212,6 +212,20 @@ func _update_team_color() -> void:
 func _physics_process(delta: float) -> void:
 	# 바다에 빠지면 사망 (글로벌 Y < -5)
 	if global_position.y < -5.0:
+		# 바다에 빠질 때 작은 물보라 이펙트 재생
+		var water_explosion_scene = preload("res://scenes/effects/water_explosion.tscn")
+		if water_explosion_scene:
+			var explosion = water_explosion_scene.instantiate()
+			var splash_pos = global_position
+			splash_pos.y = 0.05
+			explosion.global_position = splash_pos
+			explosion.scale = Vector3(0.5, 0.5, 0.5) # 병사 크기에 맞게 축소
+			get_tree().root.add_child.call_deferred(explosion)
+			
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("water_splash_small", global_position, randf_range(0.9, 1.2))
+			
 		_die()
 		return
 	

@@ -81,10 +81,18 @@ func _physics_process(delta: float) -> void:
 	var result = space_state.intersect_ray(query)
 	if result:
 		global_position = result.position
-		_check_hit(result.collider)
 		return
 		
 	global_position = next_pos
+	
+	# 수면(y=0.0) 타격 감지 기능 추가
+	if global_position.y <= 0.0:
+		_spawn_water_explosion()
+		var audio_manager = get_node_or_null("/root/AudioManager")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
+		has_hit = true
+		queue_free()
 
 
 func _on_area_entered(area: Area3D) -> void:

@@ -56,6 +56,25 @@ func _physics_process(delta: float) -> void:
 		
 	global_position = current_pos
 
+	# 수면(y=0.0) 타격 감지 기능 추가
+	if global_position.y <= 0.0:
+		_splash_and_sink()
+
+func _splash_and_sink() -> void:
+	# 화살은 스플래시만 작게 재생
+	var water_explosion_scene = preload("res://scenes/effects/water_explosion.tscn")
+	if water_explosion_scene:
+		var explosion = water_explosion_scene.instantiate()
+		explosion.global_position = global_position
+		explosion.global_position.y = 0.05
+		explosion.scale = Vector3(0.3, 0.3, 0.3) # 화살에 맞게 아주 작게 축소
+		get_tree().root.add_child.call_deferred(explosion)
+		
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("water_splash_small", global_position, randf_range(0.9, 1.2))
+		
+	queue_free()
 
 func _on_area_entered(area: Area3D) -> void:
 	_check_hit(area)

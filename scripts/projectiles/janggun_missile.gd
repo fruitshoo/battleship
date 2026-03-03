@@ -68,8 +68,8 @@ func _physics_process(delta: float) -> void:
 		
 	global_position = current_pos
 	
-	# 타겟 지점을 지나쳤는데도 아무것도 안 맞았다면 바다로 추락
-	if progress > 1.1:
+	# 수면(y=0.0) 타격 감지 기능 추가
+	if current_pos.y <= 0.0:
 		_splash_and_sink()
 
 func _on_hit(target: Node) -> void:
