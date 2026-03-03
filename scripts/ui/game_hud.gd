@@ -44,6 +44,9 @@ var _last_speed_str: String = ""
 var _last_xp_text: String = ""
 var _last_difficulty_text: String = ""
 
+# === 렐릭 UI 변수 ===
+var relic_container: HBoxContainer = null
+var current_relic_count: int = 0
 
 func _ready() -> void:
 	# 기존 요소 숨기기 & 신규 레이아웃 셋업
@@ -141,6 +144,44 @@ func _setup_new_layout() -> void:
 			difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 			difficulty_label.add_theme_font_size_override("font_size", 12)
 			difficulty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+			
+		# --- 렐릭(유물) 슬롯 (Slay the Spire 스타일) ---
+		var relic_margin = MarginContainer.new()
+		relic_margin.add_theme_constant_override("margin_top", 10) # 경험치/점수 라벨과 약간의 간격 확보
+		top_left_container.add_child(relic_margin)
+		
+		relic_container = HBoxContainer.new()
+		relic_container.add_theme_constant_override("separation", 8) # 슬롯 간격
+		relic_margin.add_child(relic_container)
+		
+		# 5개의 빈 슬롯 미리 생성
+		for i in range(5):
+			var slot_bg = PanelContainer.new()
+			slot_bg.custom_minimum_size = Vector2(32, 32)
+			
+			var slot_sb = StyleBoxFlat.new()
+			slot_sb.bg_color = Color(0, 0, 0, 0.5) # 반투명 검은색 배경
+			slot_sb.set_corner_radius_all(4)
+			slot_sb.border_width_bottom = 1
+			slot_sb.border_width_top = 1
+			slot_sb.border_width_left = 1
+			slot_sb.border_width_right = 1
+			slot_sb.border_color = Color(0.3, 0.3, 0.3, 0.8) # 얇은 테두리
+			slot_bg.add_theme_stylebox_override("panel", slot_sb)
+			
+			# 아이콘이 들어갈 라벨 (Material Symbols 폰트를 사용할 것이므로 Label 사용)
+			var icon_label = Label.new()
+			icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			icon_label.add_theme_font_size_override("font_size", 20)
+			
+			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+			if icon_font:
+				icon_label.add_theme_font_override("font", icon_font)
+				
+			slot_bg.add_child(icon_label)
+			relic_container.add_child(slot_bg)
+
 
 	# === 상단 중앙 (타이머) ===
 	if timer_label:
@@ -538,6 +579,26 @@ func _update_xp_display() -> void:
 			update_xp(cached_lm.current_xp, cached_lm.xp_to_next_level)
 		if cached_lm.get("game_difficulty") != null:
 			update_difficulty_ui(cached_lm.game_difficulty)
+
+func add_relic_icon(icon_text: String) -> void:
+	if not relic_container or current_relic_count >= 5: return
+	
+	var slots = relic_container.get_children()
+	if current_relic_count < slots.size():
+		var slot_bg = slots[current_relic_count]
+		var icon_label = slot_bg.get_child(0)
+		if icon_label is Label:
+			icon_label.text = icon_text
+			var slot_sb = slot_bg.get_theme_stylebox("panel").duplicate()
+			slot_bg.add_theme_stylebox_override("panel", slot_sb)
+			
+			var tween = create_tween()
+			tween.tween_property(slot_sb, "border_color", Color(1, 0.8, 0.2, 1.0), 0.2)
+			tween.tween_property(icon_label, "scale", Vector2(1.2, 1.2), 0.2)
+			tween.tween_property(icon_label, "scale", Vector2(1.0, 1.0), 0.2)
+			tween.tween_property(slot_sb, "border_color", Color(0.6, 0.5, 0.1, 0.8), 0.5)
+			
+		current_relic_count += 1
 
 
 func _update_hull_display() -> void:

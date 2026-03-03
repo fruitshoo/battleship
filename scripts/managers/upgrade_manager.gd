@@ -102,6 +102,9 @@ var UPGRADES = {
 # 현재 업그레이드 레벨 추적
 var current_levels: Dictionary = {}
 
+# 획득한 렐릭(유물) 목록
+var acquired_relics: Array[String] = []
+
 # 프리로드
 var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
 var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
@@ -388,7 +391,15 @@ func _get_player_ship() -> Node3D:
 func _apply_sextant(ship: Node3D) -> void:
 	if "has_sextant" in ship:
 		ship.has_sextant = true
-	print("[Item] 육분의 장착! 이제 돛이 자동으로 조절됩니다.")
+	
+	# 렐릭 목록에 추가 및 HUD 연동
+	if not acquired_relics.has("sextant"):
+		acquired_relics.append("sextant")
+		var hud = ship._find_hud() if ship.has_method("_find_hud") else null
+		if hud and hud.has_method("add_relic_icon"):
+			hud.add_relic_icon("explore") # 'explore' 문자열은 Material Symbols에서 나침반 형태
+	
+	print("[Item] 육분의(렐릭) 획득! 이제 돛이 자동으로 조절됩니다.")
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:
