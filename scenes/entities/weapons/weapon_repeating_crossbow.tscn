@@ -1,0 +1,33 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/entities/weapons/weapon_repeating_crossbow.gd" id="1_script"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_stock"]
+size = Vector3(0.08, 0.1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="Material_wood"]
+albedo_color = Color(0.3, 0.15, 0.05, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_magazine"]
+size = Vector3(0.06, 0.15, 0.2)
+
+[node name="RepeatingCrossbow" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Visual" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866025, -0.5, 0, 0.5, 0.866025, 0, 0, 0)
+
+[node name="Stock" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.2)
+mesh = SubResource("BoxMesh_stock")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="Magazine" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.625, 0.1)
+mesh = SubResource("BoxMesh_magazine")
+surface_material_override/0 = SubResource("Material_wood")
+
+[node name="BowArm" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_stock")
+surface_material_override/0 = SubResource("Material_wood")

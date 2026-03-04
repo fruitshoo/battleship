@@ -55,6 +55,18 @@ var UPGRADES = {
 			"base_cooldown": 6.0, "cooldown_reduce_per_lv": 1.0
 		}
 	},
+	"repeating_crossbow": {
+		"name": "연노",
+		"category": Category.ANTI_PERSONNEL,
+		"description": "활 대신 고속 연속 발사가 가능한 연노를 병사들이 사용",
+		"max_level": 5,
+		"color": Color(0.6, 0.8, 0.2),
+		"stats": {
+			"base_damage": 10.0, "damage_per_lv": 2.0,
+			"base_cooldown": 2.0, "cooldown_reduce_per_lv": 0.2,
+			"burst_delay": 0.15
+		}
+	},
 	"crew_numbers": {
 		"name": "병사 충원",
 		"category": Category.ANTI_PERSONNEL,
@@ -216,7 +228,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
 	# 무기 종류 업그레이드 시 HUD 무기 슬롯 갱신
-	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail", "fire_pot"]
+	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail", "fire_pot", "repeating_crossbow"]
 	if upgrade_id in weapon_ids:
 		var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 		if hud and hud.has_method("update_weapon_ui"):
@@ -278,6 +290,12 @@ func get_next_description(upgrade_id: String) -> String:
 			if next_level == 4: cd = 3.5
 			if next_level >= 5: cd = 3.0
 			return "화염 데미지 %.0f, 발사 대기시간 %.1f초" % [dmg, cd]
+		"repeating_crossbow":
+			var burst = 3
+			if next_level >= 3: burst = 4
+			if next_level >= 5: burst = 5
+			var dmg = s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 2.0)
+			return "한 번에 %d발 연속 발사, 데미지 %.0f" % [burst, dmg]
 		"supply_bonus":
 			var radius = s.get("base_radius", 8.0) + (next_level * s.get("radius_per_lv", 2.0))
 			var heal = s.get("heal_per_lv", 5.0) * (next_level + 1)
@@ -330,8 +348,18 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 			soldier.max_health = new_max_hp
 			soldier.current_health = minf(soldier.current_health + s.get("hp_per_lv", 10.0), soldier.max_health)
 		
-		soldier.set_meta("damage_multiplier", 1.0 + (quality_lv * s.get("dmg_pct_per_lv", 15) / 100.0))
+		# 추가 공격력 / 방어력 설정 등은 soldier에 넘길 수 있음
+		var dmg_mult = 1.0 + (quality_lv * s.get("dmg_pct_per_lv", 15) / 100.0)
+		soldier.set_meta("damage_multiplier", dmg_mult)
 		soldier.set_meta("defense_reduction", quality_lv * s.get("def_pct_per_lv", 10) / 100.0)
+	
+	# 연노 업그레이드 여부 확인 및 장착 (새로 스폰된 병사에게 자동 적용)
+	var rc_lv = current_levels.get("repeating_crossbow", 0)
+	if rc_lv > 0:
+		if soldier.has_method("equip_weapon"):
+			# 이 병사가 원거리 병사인지 확인 (현재 weapon_bow 등 max_range가 있는 무기 사용 중인지 여부)
+			if soldier.current_weapon and soldier.current_weapon.has_method("attack") and "max_range" in soldier.current_weapon:
+				soldier.equip_weapon(repeating_crossbow_scene)
 
 func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	var def_lv = current_levels.get("hull_defense", 0)
@@ -473,6 +501,20 @@ func _apply_fire_pot(ship: Node3D, level: int) -> void:
 		print("[FirePot] 화통 투척 준비 완료! (Lv.1)")
 	else:
 		print("[FirePot] 화통 데미지/쿨다운 강화! (Lv.%d)" % level)
+
+
+var repeating_crossbow_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_repeating_crossbow.tscn")
+
+func _apply_repeating_crossbow(ship: Node3D, level: int) -> void:
+	print("[RepeatingCrossbow] 병사 연노 업그레이드 발동! (Lv.%d)" % level)
+	
+	# 이미 배치된 아군 병사들의 무기를 연노로 일괄 교체
+	var soldiers = _get_player_soldiers(ship)
+	for sol in soldiers:
+		if sol.has_method("equip_weapon"):
+			# 기존 원거리 무기를 장착 중인 병사만 연노로 갱신 (근접 병사가 있다면 무시)
+			if sol.current_weapon and sol.current_weapon.has_method("attack") and "max_range" in sol.current_weapon:
+				sol.equip_weapon(repeating_crossbow_scene)
 
 
 func _apply_supply(ship: Node3D, _level: int) -> void:
