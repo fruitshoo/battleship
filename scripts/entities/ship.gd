@@ -268,7 +268,12 @@ func _auto_adjust_sail(delta: float) -> void:
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
 	var neighbors = _get_ships_cached(get_tree())
-	var separation_dist = 8.0 # 함선 폭/길이 고려 (8m)
+	var separation_dist = 8.0 # 기준 반경
+	
+	# 직사각형/타원형(배 모양)에 맞게 분리력 적용용 배율 (앞뒤로는 더 멀게, 양옆으로는 더 가깝게)
+	# z축(전후) 방향의 거리에 가중치를 주면, 앞/뒤일 때 더 쉽게 밀어냅니다.
+	var length_multiplier = 0.5 # 전후 방향일 때 거리가 절반으로 계산되는 효과 (더 멀리서부터 밀침)
+	var width_multiplier = 1.2 # 좌우 방향일 때 거리가 길게 계산되는 효과 (더 가까워야 밀침)
 	
 	# 성능을 위해 주변 함선이 많을 때만 계산하거나, 최대 척수 제한
 	var max_checks = min(neighbors.size(), 12)
@@ -277,11 +282,24 @@ func _calculate_separation() -> Vector3:
 		if other == self or not is_instance_valid(other) or other.get("is_sinking"):
 			continue
 			
-		var dist = global_position.distance_to(other.global_position)
-		if dist < separation_dist and dist > 0.1:
-			var push_dir = (global_position - other.global_position).normalized()
+		var offset = other.global_position - global_position
+		
+		# 내 배의 로컬 좌표계 기준으로 변환 (Y축 회전 역적용)
+		# 이를 통해 상대 배가 내 앞/뒤에 있는지, 양 옆에 있는지 구분 가능
+		var relative_offset = offset.rotated(Vector3.UP, -rotation.y)
+		
+		# 타원형(배의 길쭉한 형태) 거리 계산
+		var adjusted_offset = Vector3(
+			relative_offset.x * width_multiplier,
+			0,
+			relative_offset.z * length_multiplier
+		)
+		var adjusted_dist = adjusted_offset.length()
+		
+		if adjusted_dist < separation_dist and adjusted_dist > 0.1:
+			var push_dir = - offset.normalized()
 			# 가까울수록 사정없이 강하게 밀어냄 (Quadratic curve 적용)
-			var ratio = (separation_dist - dist) / separation_dist
+			var ratio = (separation_dist - adjusted_dist) / separation_dist
 			var strength = pow(ratio, 2.0)
 			force += push_dir * strength * 12.0 # 밀어내는 강도 계수 상향 (5.0 -> 12.0)
 			
