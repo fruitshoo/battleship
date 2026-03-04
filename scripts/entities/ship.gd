@@ -268,7 +268,7 @@ func _auto_adjust_sail(delta: float) -> void:
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
 	var neighbors = _get_ships_cached(get_tree())
-	var separation_dist = 8.0 # 기준 반경
+	var separation_dist = 10.0 # 기준 반경
 	
 	# 직사각형/타원형(배 모양)에 맞게 분리력 적용용 배율 (앞뒤로는 더 멀게, 양옆으로는 더 가깝게)
 	# z축(전후) 방향의 거리에 가중치를 주면, 앞/뒤일 때 더 쉽게 밀어냅니다.

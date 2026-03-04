@@ -782,7 +782,7 @@ func _process_minion_ai(delta: float) -> void:
 	var offset = Vector3.ZERO
 	
 	# 2번째 배부터 적당한 간격으로 모이게 조절 (기존 너무 좁았던 것을 완화, 간격 통일)
-	var base_spacing = 8.0
+	var base_spacing = 10.0
 	var formation_dist = base_spacing + (my_index * base_spacing)
 	
 	match fleet_formation:
@@ -816,7 +816,7 @@ func _process_minion_ai(delta: float) -> void:
 	# A. 속도 조절 (연속적 보간 및 평활화 적용)
 	var target_final_speed = player_speed
 	
-	if dist_to_player < 8.0:
+	if dist_to_player < 10.0:
 		# 최우선 순위: 물리적 충돌 방지 (완전 정지, 거리 대폭 단축)
 		target_final_speed = 0.0
 	elif rel_depth < -0.5:
