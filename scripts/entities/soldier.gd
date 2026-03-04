@@ -704,11 +704,64 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	var target_soldiers = target_ship.get_node_or_null("Soldiers")
 	if not target_soldiers: target_soldiers = target_ship
 	
+	var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
+	var target_global_pos = target_ship.to_global(jump_offset)
+	
+	# === 밧줄(Grappling Hook) 이펙트 ===
+	if team == "player" and is_capture_attempt:
+		var rope_mesh = CylinderMesh.new()
+		rope_mesh.top_radius = 0.05
+		rope_mesh.bottom_radius = 0.05
+		rope_mesh.height = 1.0 # 초기 길이 1 (나중에 스케일로 늘림)
+		
+		var rope_mat = StandardMaterial3D.new()
+		rope_mat.albedo_color = Color(0.4, 0.3, 0.2) # 밧줄 색상 (갈색)
+		rope_mesh.surface_set_material(0, rope_mat)
+		
+		var rope = MeshInstance3D.new()
+		rope.mesh = rope_mesh
+		
+		# 밧줄의 축을 Z축으로 눕혀서 LookAt에 맞게 정렬되도록 조정
+		rope.rotation_degrees.x = 90
+		
+		var rope_pivot = Node3D.new()
+		rope_pivot.add_child(rope)
+		# 피벗의 원점이 밧줄의 한쪽 끝에 오도록 위치 조정 (길이가 1이므로 0.5 이동)
+		rope.position.z = -0.5
+		
+		get_tree().root.add_child.call_deferred(rope_pivot)
+		# 피벗의 글로벌 위치를 병사의 현재 위치(약간 위쪽)로 설정
+		rope_pivot.set_deferred("global_position", global_position + Vector3(0, 0.5, 0))
+		
+		# 1프레임 대기 후 (deferred position 적용을 위해) 타겟을 향해 회전하고 스케일 애니메이션 시작
+		await get_tree().process_frame
+		if is_instance_valid(target_ship) and is_instance_valid(rope_pivot):
+			rope_pivot.look_at(target_global_pos, Vector3.UP)
+			var dist = global_position.distance_to(target_global_pos)
+			
+			# 시작 길이는 0, 도착 거리에 맞게 Z축 스케일을 늘림
+			rope_pivot.scale.z = 0.1
+			var rope_tween = create_tween()
+			rope_tween.tween_property(rope_pivot, "scale:z", dist, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+			
+			# 밧줄 던지는 효과음
+			var audio_manager = get_node_or_null("/root/AudioManager")
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx("rope_throw", global_position, randf_range(0.9, 1.1))
+			
+			await rope_tween.finished
+			
+			# 점프 끝날 때 쯤 밧줄 회수(삭제)를 위해 병사의 점프 트윈 길이에 맞춘 타이머
+			get_tree().create_timer(0.6).timeout.connect(func():
+				if is_instance_valid(rope_pivot): rope_pivot.queue_free()
+			)
+		else:
+			if is_instance_valid(rope_pivot): rope_pivot.queue_free()
+
 	reparent(target_soldiers)
 	owned_ship = target_ship
 	
 	var start_local_y = position.y
-	var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
 	
 	var tween = create_tween()
 	tween.set_parallel(true)
