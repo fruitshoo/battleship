@@ -35,7 +35,14 @@ var UPGRADES = {
 		"color": Color(1.0, 0.3, 0.3)
 	},
 	
-	# --- Crew / Boarding (5 Levels) ---
+	"spear_rail": {
+		"name": "창 난간",
+		"category": Category.ANTI_PERSONNEL,
+		"description": "배 측면에 창을 배치하여 도선하는 적에게 자동 데미지",
+		"max_level": 5,
+		"color": Color(0.7, 0.5, 0.3),
+		"stats": {"base_damage": 10.0, "damage_per_lv": 5.0, "base_count": 4, "count_per_lv": 2}
+	},
 	"crew_numbers": {
 		"name": "병사 충원",
 		"category": Category.ANTI_PERSONNEL,
@@ -197,7 +204,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
 	# 무기 종류 업그레이드 시 HUD 무기 슬롯 갱신
-	var weapon_ids = ["cannon", "singigeon", "janggun"]
+	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail"]
 	if upgrade_id in weapon_ids:
 		var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 		if hud and hud.has_method("update_weapon_ui"):
@@ -249,6 +256,10 @@ func get_next_description(upgrade_id: String) -> String:
 			var turn_pct = int((s.get("turn_mult", 1.15) - 1.0) * 100)
 			var stam_pct = int((1.0 - s.get("stamina_mult", 0.85)) * 100)
 			return "러더 선회 속도 +%d%%, 스태미나 소모 -%d%%" % [turn_pct, stam_pct]
+		"spear_rail":
+			var total_count = int(s.get("base_count", 4) + int((next_level - 1) / 2.0) * s.get("count_per_lv", 2))
+			var total_dmg = int(s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 5.0))
+			return "창 %d개 배치, 도선 시 적 병사에게 %d 데미지" % [total_count, total_dmg]
 		"supply_bonus":
 			var radius = s.get("base_radius", 8.0) + (next_level * s.get("radius_per_lv", 2.0))
 			var heal = s.get("heal_per_lv", 5.0) * (next_level + 1)
@@ -385,6 +396,51 @@ func _apply_janggun(ship: Node3D, level: int) -> void:
 		launcher.position = Vector3(0, 0.8, 2.0)
 	else:
 		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
+
+
+var spear_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_spear.tscn")
+
+func _apply_spear_rail(ship: Node3D, level: int) -> void:
+	# SpearRail 컨테이너 가져오거나 생성
+	var rail_node = ship.get_node_or_null("SpearRail")
+	if not rail_node:
+		rail_node = Node3D.new()
+		rail_node.name = "SpearRail"
+		ship.add_child(rail_node)
+	
+	# 기존 창 모두 제거 후 재배치 (레벨에 맞게 새로 배치)
+	for child in rail_node.get_children():
+		child.queue_free()
+	
+	var s = UPGRADES["spear_rail"]["stats"]
+	var spear_count = int(s.get("base_count", 4) + int((level - 1) / 2.0) * s.get("count_per_lv", 2))
+	var spear_damage = s.get("base_damage", 10.0) + (level - 1) * s.get("damage_per_lv", 5.0)
+	
+	# 배의 측면에 창을 균등하게 배치 (좌우 번갈아가며)
+	# 배 크기: 대략 좌우 ±1.5, 전후 -3.5 ~ 3.5
+	var ship_half_width = 1.5
+	var ship_front = -3.0
+	var ship_back = 3.0
+	var ship_length = ship_back - ship_front
+	
+	for i in range(spear_count):
+		var spear = spear_scene.instantiate()
+		rail_node.add_child(spear)
+		
+		# 좌우 번갈아 배치
+		var side = 1.0 if i % 2 == 0 else -1.0
+		var row_index = int(i / 2.0)
+		var z_pos = ship_front + (row_index + 0.5) * (ship_length / max(int(spear_count / 2.0), 1))
+		
+		spear.position = Vector3(side * ship_half_width, 0.3, z_pos)
+		# 좌측은 외부로 기울임, 우측도 외부로 기울임
+		spear.rotation_degrees = Vector3(0, 0, side * -30.0)
+		# 창을 약간 작게 조정 (배 난간 크기에 맞게)
+		spear.scale = Vector3(0.7, 0.7, 0.7)
+	
+	# 배에 창 난간 데미지 메타데이터 저장 (병사 도선 시 참조)
+	ship.set_meta("spear_rail_damage", spear_damage)
+	print("[SpearRail] 창 난간 Lv.%d: 창 %d개 배치, 도선 데미지 %.0f" % [level, spear_count, spear_damage])
 
 
 func _apply_supply(ship: Node3D, _level: int) -> void:
