@@ -781,8 +781,9 @@ func _process_minion_ai(delta: float) -> void:
 	# 2. 진형에 따른 목표 상대 위치(Relative Target) 계산
 	var offset = Vector3.ZERO
 	
-	# 2번째 배부터 적당한 간격으로 모이게 조절 (기존 너무 좁았던 것을 완화)
-	var formation_dist = 12.0 + (my_index * 6.0)
+	# 2번째 배부터 적당한 간격으로 모이게 조절 (기존 너무 좁았던 것을 완화, 간격 통일)
+	var base_spacing = 8.0
+	var formation_dist = base_spacing + (my_index * base_spacing)
 	
 	match fleet_formation:
 		Formation.COLUMN:
@@ -792,7 +793,7 @@ func _process_minion_ai(delta: float) -> void:
 			# 학익진: 좌우 번갈아가며 V자 배치 (간격 축소)
 			var side = 1 if my_index % 2 == 0 else -1
 			var row = floor(my_index / 2.0) + 1
-			offset = Vector3(10.0 * side * row, 0, 10.0 * row)
+			offset = Vector3(base_spacing * side * row, 0, base_spacing * row)
 	
 	# 3. 월드 목표 지점 계산
 	var target_pos = target.to_global(offset)
