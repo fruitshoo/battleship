@@ -72,8 +72,12 @@ func _ready() -> void:
 	# 오디오 복구 (was_muted 상태로 복구)
 	AudioServer.set_bus_mute(master_bus_idx, was_muted)
 	
-	# 육분의(Sextant) 렐릭 기본 지급 (예열 완료 후 약간의 딜레이를 두어 UI가 준비되도록 함)
-	get_tree().create_timer(1.0).timeout.connect(func(): if is_instance_valid(UpgradeManager): UpgradeManager.add_relic("sextant"))
+	# 육분의(Sextant) 렐릭 및 기본 무기(대포) 지급 (예열 완료 후 약간의 딜레이를 두어 UI가 준비되도록 함)
+	get_tree().create_timer(1.0).timeout.connect(func():
+		if is_instance_valid(UpgradeManager):
+			UpgradeManager.add_relic("sextant")
+			UpgradeManager.initialize_default_weapons()
+	)
 
 func _prewarm_shaders() -> void:
 	# 1. 로딩(예열) 화면 생성 (화면 전체를 가리는 검은색 UI)

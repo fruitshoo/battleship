@@ -131,6 +131,15 @@ func _ready() -> void:
 	for key in UPGRADES:
 		current_levels[key] = 0
 
+## 게임 시작 시 기본 무기 지급
+func initialize_default_weapons() -> void:
+	# 기본 대포 (Level 1)
+	current_levels["cannon"] = 1
+	var ship = _get_player_ship()
+	var hud = ship._find_hud() if ship != null and ship.has_method("_find_hud") else null
+	if hud and hud.has_method("update_weapon_ui"):
+		hud.update_weapon_ui("cannon", 1)
+
 
 ## 랜덤 선택지 반환
 func get_random_choices(count: int = 3) -> Array:
