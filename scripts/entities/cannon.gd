@@ -132,6 +132,10 @@ func _update_target() -> void:
 		if _is_ship_occupied_by_friendly(enemy):
 			continue
 			
+		# [핵심 로직] 빈 배(is_derelict)는 아예 타겟에서 제외 (시스템 개편)
+		if enemy.get("is_derelict") == true:
+			continue
+			
 		# [핵심 로직] 타겟 점수 계산 (실제 거리를 기반으로 패널티 부여)
 		var score_sq = real_dist_sq
 		

@@ -28,6 +28,10 @@ func _find_nearest_enemy() -> Node3D:
 	
 	for enemy in enemies:
 		if not is_instance_valid(enemy): continue
+		
+		# 빈 배(폐선)는 타겟에서 제외
+		if enemy.get("is_derelict") == true: continue
+		
 		var dist = global_position.distance_to(enemy.global_position)
 		if dist < min_dist:
 			min_dist = dist

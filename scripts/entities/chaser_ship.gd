@@ -93,6 +93,9 @@ func _become_derelict() -> void:
 	# 도선 방지를 위해 이동 및 회전 정지
 	move_speed = 0.0
 	
+	# 빈 배는 스스로 서서히 침몰하도록 누수 설정 (초당 최대 체력의 5% 데미지 -> 약 20초 뒤 침몰)
+	leaking_rate = max_hull_hp * 0.05
+	
 	cached_lm = get_tree().root.find_child("LevelManager", true, false)
 	if not cached_lm:
 		var lm_nodes = get_tree().get_nodes_in_group("level_manager")

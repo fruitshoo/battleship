@@ -42,6 +42,9 @@ func _find_nearest_enemy() -> Node3D:
 		# 자기 자신(부모 배)은 무시
 		if get_parent() == enemy: continue
 		
+		# 빈 배(폐선)는 타겟에서 제외
+		if enemy.get("is_derelict") == true: continue
+		
 		var dist = global_position.distance_to(enemy.global_position)
 		if dist < min_dist:
 			min_dist = dist
