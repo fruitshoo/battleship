@@ -14,7 +14,6 @@ class_name ChaserShip
 var target: Node3D = null
 
 # 상태 (State)
-var is_boarding: bool = false
 var leaking_rate: float = 0.0
 
 
@@ -62,16 +61,8 @@ var separation_force: Vector3 = Vector3.ZERO
 var separation_timer: float = 0.0
 var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
 
-# 도선 로직 변수
-var boarding_timer: float = 0.0
-var boarding_interval: float = 1.5 # 도선 간격 연장 (0.5/1.0 -> 1.5)
-var boarding_prep_timer: float = 0.0
-var boarding_prep_duration: float = 2.5 # 밧줄만 걸치고 대기하는 예열 시간
-var boarding_target: Node3D = null
-var max_boarding_distance: float = 12.0 # 이 거리 이내여야 도선 진행 (회피 반경 고려 6.0 -> 10.0 -> 12.0)
-var boarding_break_distance: float = 20.0 # 밧줄이 끊어지는 거리 (15.0 -> 25.0 -> 20.0 조정)
+# 도선 로직 변수 (base_ship.gd에서 상속)
 var has_rammed: bool = false # 중복 데미지 방지
-var rope_instances: Array[MeshInstance3D] = [] # 그레플링 훅용 밧줄들
 
 func get_radius() -> float:
 	return 2.5 # 대략적인 선체 반경 (상황에 맞게 조정)
@@ -136,7 +127,8 @@ func die() -> void:
 	if is_dying: return
 	is_dying = true
 	
-	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
+	# ✅ 배 위의 병사들을 원래 배로 복귀시키고, 복귀 불가 시 생존자로 전환
+	_evacuate_soldiers_to_home()
 	_evacuate_player_soldiers_as_survivors()
 	
 	# 밧줄 및 도선 공격자 정보 제거
@@ -241,6 +233,47 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 	if converted_count > 0:
 		print("[Critical] 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
 
+## 침몰 시 배 위의 병사들을 원래 배(home_ship)로 복귀시킴
+func _evacuate_soldiers_to_home() -> void:
+	var soldiers_node = get_node_or_null("Soldiers")
+	if not soldiers_node: return
+	
+	var returned_count = 0
+	for child in soldiers_node.get_children():
+		if child.get("current_state") == 4: continue # DEAD
+		
+		var h_ship = child.get("home_ship")
+		# home_ship이 유효하고, 아직 가라앉지 않았으며, 현재 배가 아닌 경우 복귀
+		if is_instance_valid(h_ship) and h_ship != self and not h_ship.get("is_sinking") and not h_ship.get("is_dying"):
+			var target_soldiers = h_ship.get_node_or_null("Soldiers")
+			if not target_soldiers: continue
+			
+			# 점프 애니메이션으로 복귀
+			var start_pos = child.global_position
+			child.call_deferred("reparent", target_soldiers)
+			
+			var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.5, 1.5))
+			var end_pos = h_ship.global_transform * jump_offset
+			
+			var tween = create_tween()
+			tween.set_parallel(true)
+			tween.tween_property(child, "global_position:x", end_pos.x, 0.5).set_trans(Tween.TRANS_LINEAR)
+			tween.tween_property(child, "global_position:z", end_pos.z, 0.5).set_trans(Tween.TRANS_LINEAR)
+			
+			var mid_y = max(start_pos.y, end_pos.y) + 2.0
+			var y_tween = create_tween()
+			y_tween.tween_property(child, "global_position:y", mid_y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			y_tween.tween_property(child, "global_position:y", end_pos.y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+			
+			child.set("owned_ship", h_ship)
+			if child.get("is_stationary"): child.set("is_stationary", false)
+			returned_count += 1
+			print("[Evacuation] 병사가 원래 배(%s)로 복귀합니다!" % h_ship.name)
+	
+	if returned_count > 0:
+		print("[Evacuation] 총 %d명의 병사가 원래 배로 복귀했습니다." % returned_count)
+
+
 ## 생존자 구조 및 병사 합류 처리 (나포함용)
 func add_survivor() -> bool:
 	if is_dying: return false
@@ -312,14 +345,16 @@ func _physics_process(delta: float) -> void:
 		if wake_trail: wake_trail.emitting = false
 		return
 	
-	# 병사 전멸 시 폐선화
+	# === 모든 소속 병사 전멸 시 폐선화 ===
+	# (갑판 위뿐 아니라, 다른 배로 도선간 병사도 포함해서 체크)
 	if logic_timer <= 0:
-		var alive_soldiers = 0
-		if has_node("Soldiers"):
-			for child in $Soldiers.get_children():
-				if child.get("current_state") != 4:
-					alive_soldiers += 1
-		if alive_soldiers == 0:
+		var all_crew_dead = true
+		var all_soldiers = get_tree().get_nodes_in_group("soldiers")
+		for s in all_soldiers:
+			if s.get("home_ship") == self and s.get("current_state") != 4: # NOT DEAD
+				all_crew_dead = false
+				break
+		if all_crew_dead:
 			_become_derelict()
 			return
 
@@ -469,102 +504,8 @@ func _process_boarding(delta: float) -> void:
 	var target_rot = atan2(-look_dir.x, -look_dir.z)
 	rotation.y = lerp_angle(rotation.y, target_rot, delta * 2.0)
 	
-	# 타이머 기반 병사 전이
-	# 배가 충분히 가까울 때만 타이머 진행 (날아다니는 현상 방지)
-	if dist <= max_boarding_distance:
-		if boarding_prep_timer < boarding_prep_duration:
-			# 1. 예열 단계 (밧줄만 걸침)
-			boarding_prep_timer += delta
-		else:
-			# 2. 본격적인 도선 시작
-			boarding_timer += delta
-			if boarding_timer >= boarding_interval:
-				boarding_timer = 0.0
-				_transfer_one_soldier()
-	
-	# 너무 멀어지면 도선 포기 및 추격 상태로 복귀
-	if dist > boarding_break_distance:
-		print("[Boarding] 밧줄이 팽팽해지다가 끊어졌습니다! 도선 중단.")
-		if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
-			boarding_target.set("boarding_attacker", null)
-		_clear_ropes()
-		is_boarding = false
-		boarding_timer = 0.0
-		# target은 이미 boarding_target이었으므로 그대로 유지됨
-		
-	# 밧줄 비주얼 업데이트
-	_update_ropes()
-
-func _transfer_one_soldier() -> void:
-	if not is_instance_valid(boarding_target): return
-	
-	var target_soldiers_node = boarding_target.get_node_or_null("Soldiers")
-	if not target_soldiers_node: target_soldiers_node = boarding_target
-	
-	# 내 배에서 살아있는 병사 하나 찾기
-	var s = null
-	var enemy_on_deck = false
-	
-	if has_node("Soldiers"):
-		var soldiers = $Soldiers.get_children()
-		
-		# 1. 먼저 내 배에 적군이 있는지 확인 (방어 우선)
-		for child in soldiers:
-			if child.get("current_state") != 4: # NOT DEAD
-				if child.get("team") != team:
-					enemy_on_deck = true
-					break
-		
-		if enemy_on_deck:
-			# 갑판에 적이 있으면 도선 공격을 중지하고 방어에 집중
-			return
-			
-		# 2. 적이 없으면 넘어갈 아군 병사 선택
-		for child in soldiers:
-			if child.get("current_state") != 4 and child.get("team") == team:
-				s = child
-				break
-	
-	if s:
-		# 월선 실행 (Jump Animation 포함)
-		var start_global = s.global_position
-		s.call_deferred("reparent", target_soldiers_node)
-		
-		# 점프 효과 (Tween)
-		var jump_offset = Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.0, 2.0))
-		var end_global = boarding_target.global_transform * jump_offset
-		
-		# 0.5초간 깔끔한 점프 애니메이션
-		var tween = create_tween()
-		tween.set_parallel(true)
-		
-		# X, Z 수평 이동
-		tween.tween_property(s, "global_position:x", end_global.x, 0.5).set_trans(Tween.TRANS_LINEAR)
-		tween.tween_property(s, "global_position:z", end_global.z, 0.5).set_trans(Tween.TRANS_LINEAR)
-		
-		# Y축 포물선 (위로 솟았다가 내려옴)
-		var mid_y = max(start_global.y, end_global.y) + 2.0
-		var y_tween = create_tween()
-		y_tween.tween_property(s, "global_position:y", mid_y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		y_tween.tween_property(s, "global_position:y", end_global.y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		
-		# 상태 설정
-		if s.has_method("set_team"):
-			# 이 배의 팀을 따름 (나포된 후라면 player, 적 상태라면 enemy)
-			s.set_team(team)
-		
-		# ✅ 도선 시 현재 탑승 중인 배(owned_ship) 정보 업데이트 및 폭발 타이머 리셋
-		s.set("owned_ship", boarding_target)
-		if team == "enemy" and boarding_target.get("team") == "player":
-			s.set("boarder_explosion_timer", 8.0)
-			
-		if s.get("is_stationary"): s.set("is_stationary", false)
-		
-		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team, boarding_target.name])
-	else:
-		# 더 이상 넘길 병사가 없으면 임무 조기 종료 (폐선 상태로 전환)
-		print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
-		_become_derelict()
+	# 베이스의 공통 도선 처리 (타이머, 전이, 밧줄 끊어짐 등)
+	_process_boarding_common(delta)
 
 
 func _find_player() -> void:
@@ -963,13 +904,8 @@ func _board_ship(target_ship: Node3D) -> void:
 	if team == "player":
 		return
 
-	# === 무력화(폐선) 상태일 경우 나포 판정 ===
+	# === 무력화(폐선) 상태인 배는 이미 도선이 불필요함 (나포는 ship.gd의 boarding scan으로 처리) ===
 	if is_derelict:
-		print("[Capture] 플레이어가 폐선에 접근! 나포 성공.")
-		if ship_node.has_method("capture_derelict_ship"):
-			ship_node.capture_derelict_ship()
-		# 달달하게 보상 주고 배는 가라앉음
-		die()
 		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
@@ -1012,74 +948,6 @@ func _board_ship(target_ship: Node3D) -> void:
 	# 그레플링 훅 생성
 	if is_instance_valid(boarding_target):
 		_spawn_ropes()
-
-func _spawn_ropes() -> void:
-	_clear_ropes()
-	# 2~3개의 밧줄 생성
-	var count = randi_range(2, 3)
-	for i in range(count):
-		var mesh_instance = MeshInstance3D.new()
-		var cylinder = CylinderMesh.new()
-		cylinder.top_radius = 0.04
-		cylinder.bottom_radius = 0.04
-		cylinder.height = 1.0 # 기본 길이는 1로 설정 (scale로 조절)
-		mesh_instance.mesh = cylinder
-		
-		# 회색/갈색 로프 재질
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.4, 0.3, 0.2)
-		mat.roughness = 0.9
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA # 투명도 허용
-		mesh_instance.material_override = mat
-		
-		# 이 배의 자식으로 추가
-		add_child(mesh_instance)
-		
-		# 초기 오프셋 (배의 측면 앞/뒤)
-		var offset = Vector3(1.0, 0.8, lerp(-2.0, 2.0, float(i) / (count - 1)))
-		# 플레이어 배가 어느 쪽에 있는지에 따라 X좌표 반전
-		var to_target = (boarding_target.global_position - global_position).normalized()
-		var local_to_target = global_transform.basis.inverse() * to_target
-		if local_to_target.x < 0: offset.x = -1.0
-		
-		mesh_instance.position = offset
-		mesh_instance.set_meta("anchor_offset", offset)
-		rope_instances.append(mesh_instance)
-
-func _update_ropes() -> void:
-	if not is_instance_valid(boarding_target):
-		_clear_ropes()
-		return
-		
-	# 플레이어의 중앙 위치 대신, 선체 범위를 고려한 타겟 포인트 설정 (간략화)
-	var target_center = boarding_target.global_position + Vector3(0, 0.5, 0)
-	
-	for rope in rope_instances:
-		if not is_instance_valid(rope): continue
-		
-		# 원래 배에 붙어있어야 할 로컬 오프셋을 기반으로 정확한 시작점 계산
-		var offset = rope.get_meta("anchor_offset")
-		var start_pos = global_transform * offset
-		var dist = start_pos.distance_to(target_center)
-		
-		# 밧줄의 중심이 중간에 오도록 위치 보정하고 타겟을 바라보게 함
-		var mid_pos = start_pos + (target_center - start_pos) * 0.5
-		rope.global_transform = Transform3D().looking_at(target_center - mid_pos, Vector3.UP)
-		rope.global_position = mid_pos
-		
-		# CylinderMesh는 초기 상태에서 Y축이 위임. 
-		# Transform3D.looking_at()은 -Z축이 타겟을 향하게 하므로, Y축이 타겟을 향하도록 X축 기준 -90도 회전
-		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
-		
-		# 스케일 조절 (CylinderMesh의 height가 기본 1.0이므로 dist만큼 Y축 스케일)
-		rope.scale = Vector3(1.0, dist, 1.0)
-
-func _clear_ropes() -> void:
-	for rope in rope_instances:
-		if is_instance_valid(rope):
-			rope.queue_free()
-	rope_instances.clear()
-
 
 # 누수 추가/제거
 func add_leak(amount: float) -> void:

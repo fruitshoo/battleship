@@ -118,8 +118,8 @@ func _ready() -> void:
 	elif parent and parent.has_method("get_wind_strength"): # Ship 스크립트 체크
 		owned_ship = parent
 		
-	if team == "player":
-		home_ship = owned_ship # 플레이어 진영일 때만 홈 저장
+	# 모든 병사에게 home_ship 기록 (원래 소속 배 추적용)
+	home_ship = owned_ship
 	
 	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
 			
@@ -645,49 +645,8 @@ func _check_ship_capture_opportunity() -> void:
 				owned_ship.capture_derelict_ship()
 		return # 이미 다른 배 위이므로 아래 로직(주변 배 찾기)은 실행 않음
 
-	# 상황 2: 본선 혹은 아군 함선에 있으면서, 주변의 비어있는 적선(폐선) 탐색하여 뛰어들기
-	if owned_ship.is_in_group("player"):
-		# [핵심] 갑판 방어 우선: 내 배에 적군이 침투해 백병전이 진행 중이거나, 아군 병사가 나 혼자라면 나포를 보류함
-		var in_combat = false
-		var alive_friends_count = 0
-		var own_soldiers = owned_ship.get_node_or_null("Soldiers")
-		if own_soldiers:
-			for c in own_soldiers.get_children():
-				if c.get("current_state") != State.DEAD:
-					if c.get("team") != team:
-						in_combat = true
-						break
-					elif c.get("team") == team:
-						alive_friends_count += 1
-		
-		if in_combat or alive_friends_count <= 1:
-			return # 백병전 방어에 집중 (표적 탐색 중단) 또는 배를 지키기 위해 잔류
-			
-		var enemy_ships = get_ships_cached(get_tree(), "enemy")
-		for ship in enemy_ships:
-			# 폐선 상태이고 나포되지 않은 배인 경우
-			if ship.get("is_derelict") == true and not ship.is_in_group("player"):
-				var dist = global_position.distance_to(ship.global_position)
-				if dist < 12.0:
-					# 중복 방지: 이미 그 배로 뛰어드는 중인 동료가 있는지 확인
-					# (배의 메타데이터나 특정 플래그를 활용)
-					if ship.get_meta("being_boarded", false):
-						continue
-					
-					# 이미 배 위에 누군가 타고 있는지 확인
-					var p_count = 0
-					var s_node = ship.get_node_or_null("Soldiers")
-					if s_node:
-						for c in s_node.get_children():
-							if c.get("team") == "player" and c.get("current_state") != State.DEAD:
-								p_count += 1
-					
-					if p_count == 0:
-						# 나포 결정!
-						ship.set_meta("being_boarded", true)
-						print("[Action] 빈 배 발견! 나포를 위해 뛰어듭니다.")
-						_jump_to_ship(ship, true) # 나포용 점프
-						return # 한 번에 한 척만 타겟팅
+	# 상황 2: 전이 로직은 이제 owned_ship에서 관리하므로 개별 판단 중단
+	return
 
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:
@@ -752,7 +711,7 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 			await rope_tween.finished
 			
 			# 점프 끝날 때 쯤 밧줄 회수(삭제)를 위해 병사의 점프 트윈 길이에 맞춘 타이머
-			get_tree().create_timer(0.6).timeout.connect(func():
+			get_tree().create_timer(1.2).timeout.connect(func():
 				if is_instance_valid(rope_pivot): rope_pivot.queue_free()
 			)
 		else:
@@ -761,21 +720,39 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	reparent(target_soldiers)
 	owned_ship = target_ship
 	
-	var start_local_y = position.y
+	var start_local_pos = position
+	var start_local_y = start_local_pos.y
+	
+	# 수평 이동 거리 계산 (reparent 후 로컬 좌표 기준)
+	var horiz_dist = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
+	# 점프 높이를 수평 거리에 비례하게 설정 (최소 2.5, 거리의 40%)
+	var jump_height = maxf(2.5, horiz_dist * 0.4)
+	# 이동 시간도 거리에 맞게 조절 (최소 0.6초, 최대 1.2초)
+	var travel_time = clampf(horiz_dist / 15.0, 0.6, 1.2)
 	
 	var tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(self , "position:x", jump_offset.x, 0.6)
-	tween.tween_property(self , "position:z", jump_offset.z, 0.6)
+	tween.tween_property(self , "position:x", jump_offset.x, travel_time)
+	tween.tween_property(self , "position:z", jump_offset.z, travel_time)
 	
 	var y_tween = create_tween()
-	y_tween.tween_property(self , "position:y", start_local_y + 2.5, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	y_tween.tween_property(self , "position:y", jump_offset.y, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	y_tween.tween_property(self , "position:y", start_local_y + jump_height, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	y_tween.tween_property(self , "position:y", jump_offset.y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	
 	# 도선 시 타이머 리셋 (적군이 플레이어 배로 넘어갈 때)
 	if team == "enemy" and is_instance_valid(target_ship) and target_ship.get("team") == "player":
 		chaos_duration_timer = 8.0 # 최대 8초 생존 허용
 		chaos_tick_timer = 1.0 # 1초 후 첫 틱
+		
+		# 창 난간(Spear Rail) 데미지 체크: 적 병사가 착지할 때 자동 데미지
+		var spear_dmg = target_ship.get_meta("spear_rail_damage", 0.0)
+		if spear_dmg > 0:
+			# 착지 시점에 데미지 적용 (트윈 완료 후)
+			tween.finished.connect(func():
+				if is_instance_valid(self ) and current_state != State.DEAD:
+					take_damage(spear_dmg, global_position)
+					print("[SpearRail] 도선 병사가 창 난간에 찔렸습니다! (데미지: %.0f)" % spear_dmg)
+			)
 	
 	if is_capture_attempt:
 		tween.finished.connect(func():

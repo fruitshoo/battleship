@@ -43,6 +43,17 @@ var is_burning: bool = false
 var is_derelict: bool = false # 선원 전멸 시 무력화(폐선)
 var boarding_attacker: Node3D = null
 
+# === 도선(Boarding) 상태 및 변수 ===
+var is_boarding: bool = false
+var boarding_timer: float = 0.0
+var boarding_interval: float = 1.5
+var boarding_prep_timer: float = 0.0
+var boarding_prep_duration: float = 2.5
+var boarding_target: Node3D = null
+var max_boarding_distance: float = 9.0
+var boarding_break_distance: float = 12.0
+var rope_instances: Array[MeshInstance3D] = []
+
 var fire_build_up: float = 0.0
 var fire_threshold: float = 100.0
 var burn_timer: float = 0.0
@@ -249,3 +260,163 @@ func get_hull_ratio() -> float:
 ## 가상 함수 분리용 (자식 클래스에서 오버라이드)
 func die() -> void:
 	pass
+
+# ==========================================
+# === 공통 도선(Boarding) 밧줄 처리 로직 ===
+# ==========================================
+
+func _spawn_ropes() -> void:
+	_clear_ropes()
+	var count = randi_range(2, 3)
+	for i in range(count):
+		var mesh_instance = MeshInstance3D.new()
+		var cylinder = CylinderMesh.new()
+		cylinder.top_radius = 0.04
+		cylinder.bottom_radius = 0.04
+		cylinder.height = 1.0 # 기본 길이는 1로 설정 (scale로 조절)
+		mesh_instance.mesh = cylinder
+		
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.4, 0.3, 0.2)
+		mat.roughness = 0.9
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mesh_instance.material_override = mat
+		
+		add_child(mesh_instance)
+		
+		var offset = Vector3(1.0, 0.8, lerp(-2.0, 2.0, float(i) / (count - 1)))
+		if is_instance_valid(boarding_target):
+			var to_target = (boarding_target.global_position - global_position).normalized()
+			var local_to_target = global_transform.basis.inverse() * to_target
+			if local_to_target.x < 0: offset.x = -1.0
+			
+		mesh_instance.position = offset
+		mesh_instance.set_meta("anchor_offset", offset)
+		rope_instances.append(mesh_instance)
+
+func _update_ropes() -> void:
+	if not is_instance_valid(boarding_target):
+		_clear_ropes()
+		return
+		
+	var target_center = boarding_target.global_position + Vector3(0, 0.5, 0)
+	
+	for rope in rope_instances:
+		if not is_instance_valid(rope): continue
+		
+		var offset = rope.get_meta("anchor_offset")
+		var start_pos = global_transform * offset
+		var dist = start_pos.distance_to(target_center)
+		
+		var mid_pos = start_pos + (target_center - start_pos) * 0.5
+		rope.global_transform = Transform3D().looking_at(target_center - mid_pos, Vector3.UP)
+		rope.global_position = mid_pos
+		
+		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
+		rope.scale = Vector3(1.0, dist, 1.0)
+
+func _clear_ropes() -> void:
+	for rope in rope_instances:
+		if is_instance_valid(rope):
+			rope.queue_free()
+	rope_instances.clear()
+
+func _process_boarding_common(delta: float) -> void:
+	if not is_instance_valid(boarding_target):
+		_cancel_boarding()
+		return
+		
+	var target_pos = boarding_target.global_position
+	var dist = global_position.distance_to(target_pos)
+	
+	if dist <= max_boarding_distance:
+		if boarding_prep_timer < boarding_prep_duration:
+			boarding_prep_timer += delta
+		else:
+			boarding_timer += delta
+			if boarding_timer >= boarding_interval:
+				boarding_timer = 0.0
+				_transfer_one_soldier()
+				
+	if dist > boarding_break_distance:
+		print("[Boarding] 밧줄이 끊어졌습니다. 도선 중단.")
+		_cancel_boarding()
+		return
+		
+	_update_ropes()
+
+func _cancel_boarding() -> void:
+	if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
+		boarding_target.set("boarding_attacker", null)
+	_clear_ropes()
+	is_boarding = false
+	boarding_timer = 0.0
+	boarding_prep_timer = 0.0
+
+func _transfer_one_soldier() -> void:
+	if not is_instance_valid(boarding_target): return
+	
+	var target_soldiers_node = boarding_target.get_node_or_null("Soldiers")
+	if not target_soldiers_node: target_soldiers_node = boarding_target
+	
+	var team_prop = get("team") if "team" in self else "enemy"
+	
+	var s = null
+	var enemy_on_deck = false
+	
+	if has_node("Soldiers"):
+		var soldiers = $Soldiers.get_children()
+		
+		# 1. 방어 판단: 내 배에 침입한 적군이 있는지
+		for child in soldiers:
+			if child.get("current_state") != 4: # NOT DEAD
+				if child.get("team") != team_prop:
+					enemy_on_deck = true
+					break
+					
+		if enemy_on_deck:
+			return
+			
+		# 2. 아군 병사 선택
+		for child in soldiers:
+			if child.get("current_state") != 4 and child.get("team") == team_prop:
+				s = child
+				break
+				
+	if s:
+		var start_global = s.global_position
+		s.call_deferred("reparent", target_soldiers_node)
+		
+		# 점프 애니메이션 세팅
+		var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.5, 1.5))
+		var end_global = boarding_target.global_transform * jump_offset
+		
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(s, "global_position:x", end_global.x, 0.5).set_trans(Tween.TRANS_LINEAR)
+		tween.tween_property(s, "global_position:z", end_global.z, 0.5).set_trans(Tween.TRANS_LINEAR)
+		
+		var mid_y = max(start_global.y, end_global.y) + 2.0
+		var y_tween = create_tween()
+		y_tween.tween_property(s, "global_position:y", mid_y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		y_tween.tween_property(s, "global_position:y", end_global.y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		
+		if s.has_method("set_team"):
+			s.set_team(team_prop)
+			
+		s.set("owned_ship", boarding_target)
+		
+		# 폭발병 로직 (임시)
+		if team_prop == "enemy" and boarding_target.get("team") == "player":
+			s.set("boarder_explosion_timer", 8.0)
+			
+		if s.get("is_stationary"): s.set("is_stationary", false)
+		
+		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team_prop, boarding_target.name])
+	else:
+		if has_method("_become_derelict") and not is_in_group("player"):
+			print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
+			call("_become_derelict")
+		else:
+			print("[Status] 도선할 병사가 더 이상 없습니다.")
+			_cancel_boarding()

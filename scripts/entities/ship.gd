@@ -63,6 +63,8 @@ var crew_respawn_timer: float = 0.0
 var fire_pot_cooldown_timer: float = 0.0
 var fire_pot_scene: PackedScene = preload("res://scenes/projectiles/fire_pot.tscn")
 
+var boarding_scan_timer: float = 0.0
+
 func _ready() -> void:
 	base_y = position.y
 	fire_effect_offset = Vector3(0, 1.0, 0.0)
@@ -147,7 +149,11 @@ func _physics_process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_crew_respawn(delta)
 	_update_fire_pot_logic(delta)
+	_update_boarding_scan(delta)
 	
+	if is_boarding:
+		_process_boarding_common(delta)
+		
 	# 노 젓기 사운드 재생 (주기적)
 	if is_rowing and rowing_stamina > 0:
 		if _oars_timer <= 0:
@@ -777,3 +783,50 @@ func _update_fire_pot_logic(delta: float) -> void:
 			# 3. 투척수(아군 병사) 시각적 피드백 (화통 던지는 방향 바라보기)
 			tosser.look_at(Vector3(t_pos.x, tosser.global_position.y, t_pos.z), Vector3.UP)
 			print("[FirePot] 병사가 적선으로 화통을 던졌습니다!")
+
+## 주변의 폐선(Derelict)을 탐색하여 도선 시작
+func _update_boarding_scan(delta: float) -> void:
+	if is_boarding or is_sinking: return
+	
+	boarding_scan_timer -= delta
+	if boarding_scan_timer <= 0:
+		boarding_scan_timer = 2.0
+		
+		# 폐선 탐색 로직
+		var enemy_ships = _get_ships_cached(get_tree())
+		var closest = null
+		var min_dist = INF
+		
+		for ship in enemy_ships:
+			if ship == self or ship.get("team") == team: continue
+			
+			if ship.get("is_derelict") == true:
+				var dist = global_position.distance_to(ship.global_position)
+				if dist <= max_boarding_distance:
+					# 다른 누군가가 이미 도선 중인지 체크 (배의 attacker가 내가 아닌 다른 사람)
+					var atk = ship.get("boarding_attacker")
+					if atk != null and atk != self: continue
+					
+					if dist < min_dist:
+						min_dist = dist
+						closest = ship
+						
+		if closest:
+			_start_boarding(closest)
+
+func _start_boarding(target_ship: Node3D) -> void:
+	if is_boarding: return
+	
+	is_boarding = true
+	boarding_target = target_ship
+	boarding_timer = 0.0
+	boarding_prep_timer = 0.0
+	
+	if target_ship.has_method("set") or "boarding_attacker" in target_ship:
+		target_ship.set("boarding_attacker", self )
+	
+	print("[Boarding] 아군 함선이 폐선 나포를 시도합니다! (%s)" % target_ship.name)
+	_spawn_ropes()
+	
+	if _cached_hud and _cached_hud.has_method("show_message"):
+		_cached_hud.show_message("폐선 발견! 도선 밧줄을 걸었습니다.", 2.5)
