@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/projectiles/fire_pot.gd" id="1_script"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_h1m54"]
+radius = 0.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_pot"]
+radius = 0.15
+height = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pot"]
+albedo_color = Color(0.2, 0.1, 0.05, 1)
+roughness = 0.8
+
+[node name="FirePot" type="Area3D"]
+collision_layer = 16
+collision_mask = 7
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_h1m54")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Visual"]
+mesh = SubResource("SphereMesh_pot")
+surface_material_override/0 = SubResource("StandardMaterial3D_pot")

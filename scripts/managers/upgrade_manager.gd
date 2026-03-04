@@ -43,6 +43,18 @@ var UPGRADES = {
 		"color": Color(0.7, 0.5, 0.3),
 		"stats": {"base_damage": 10.0, "damage_per_lv": 5.0, "base_count": 4, "count_per_lv": 2}
 	},
+	"fire_pot": {
+		"name": "화통",
+		"category": Category.ANTI_PERSONNEL,
+		"description": "적선 갑판에 화통을 던져 주위의 적 병사들을 불태움",
+		"max_level": 5,
+		"color": Color(0.9, 0.3, 0.1),
+		"stats": {
+			"base_damage": 15.0, "damage_per_lv": 5.0,
+			"base_radius": 3.0, "radius_per_lv": 0.5,
+			"base_cooldown": 6.0, "cooldown_reduce_per_lv": 1.0
+		}
+	},
 	"crew_numbers": {
 		"name": "병사 충원",
 		"category": Category.ANTI_PERSONNEL,
@@ -204,7 +216,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
 	# 무기 종류 업그레이드 시 HUD 무기 슬롯 갱신
-	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail"]
+	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail", "fire_pot"]
 	if upgrade_id in weapon_ids:
 		var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 		if hud and hud.has_method("update_weapon_ui"):
@@ -260,6 +272,12 @@ func get_next_description(upgrade_id: String) -> String:
 			var total_count = int(s.get("base_count", 4) + int((next_level - 1) / 2.0) * s.get("count_per_lv", 2))
 			var total_dmg = int(s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 5.0))
 			return "창 %d개 배치, 도선 시 적 병사에게 %d 데미지" % [total_count, total_dmg]
+		"fire_pot":
+			var dmg = s.get("base_damage", 15.0) + (next_level - 1) * s.get("damage_per_lv", 5.0)
+			var cd = s.get("base_cooldown", 6.0) - (next_level - 1) * s.get("cooldown_reduce_per_lv", 1.0)
+			if next_level == 4: cd = 3.5
+			if next_level >= 5: cd = 3.0
+			return "화염 데미지 %.0f, 발사 대기시간 %.1f초" % [dmg, cd]
 		"supply_bonus":
 			var radius = s.get("base_radius", 8.0) + (next_level * s.get("radius_per_lv", 2.0))
 			var heal = s.get("heal_per_lv", 5.0) * (next_level + 1)
@@ -441,6 +459,20 @@ func _apply_spear_rail(ship: Node3D, level: int) -> void:
 	# 배에 창 난간 데미지 메타데이터 저장 (병사 도선 시 참조)
 	ship.set_meta("spear_rail_damage", spear_damage)
 	print("[SpearRail] 창 난간 Lv.%d: 창 %d개 배치, 도선 데미지 %.0f" % [level, spear_count, spear_damage])
+
+
+var fire_pot_scene: PackedScene = preload("res://scenes/weapons/fire_pot_launcher.tscn")
+
+func _apply_fire_pot(ship: Node3D, level: int) -> void:
+	if level == 1:
+		var launcher = fire_pot_scene.instantiate()
+		launcher.name = "FirePotLauncher"
+		ship.add_child(launcher)
+		# 투척수 위치 (배 중앙 살짝 뒤)
+		launcher.position = Vector3(0, 0.8, 1.0)
+		print("[FirePot] 화통 투척 준비 완료! (Lv.1)")
+	else:
+		print("[FirePot] 화통 데미지/쿨다운 강화! (Lv.%d)" % level)
 
 
 func _apply_supply(ship: Node3D, _level: int) -> void:

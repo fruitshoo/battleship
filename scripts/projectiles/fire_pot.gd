@@ -1,0 +1,138 @@
+extends Area3D
+
+## 화통 (Fire Pot)
+## 포물선으로 날아가 착탄 시 폭발하며 범위 데미지(화염)를 줍니다.
+
+@export var damage: float = 15.0
+@export var explosion_radius: float = 3.0
+@export var lifetime: float = 3.0
+
+var team: String = "player"
+var target_pos: Vector3 = Vector3.ZERO
+var start_pos: Vector3 = Vector3.ZERO
+var time_alive: float = 0.0
+var flight_duration: float = 1.0 # 1초 동안 날아감
+var arc_height: float = 3.0
+
+var explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
+var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
+
+var has_exploded: bool = false
+var velocity: Vector3 = Vector3.ZERO
+
+func _ready() -> void:
+	# 충돌 시그널
+	body_entered.connect(_on_body_entered)
+	area_entered.connect(_on_area_entered)
+	
+	start_pos = global_position
+	
+	# 수명 종료 시 자동 기폭 (안전장치)
+	get_tree().create_timer(lifetime).timeout.connect(func():
+		if not has_exploded:
+			explode()
+	)
+
+func setup_flight(start: Vector3, target: Vector3, flight_time: float = 1.0, arc: float = 3.0) -> void:
+	start_pos = start
+	target_pos = target
+	flight_duration = flight_time
+	arc_height = arc
+	
+	# 초기 방향 설정 (시각적)
+	look_at(target_pos, Vector3.UP)
+
+func _physics_process(delta: float) -> void:
+	if has_exploded: return
+	
+	time_alive += delta
+	var t = min(time_alive / flight_duration, 1.0)
+	
+	# XZ 평면 선형 보간, Y축 포물선 (sin 그래프)
+	var current_pos = start_pos.lerp(target_pos, t)
+	current_pos.y += sin(t * PI) * arc_height
+	
+	# 이동 방향으로 look_at
+	var last_pos = global_position
+	global_position = current_pos
+	
+	var frame_dir = current_pos - last_pos
+	if frame_dir.length_squared() > 0.001:
+		look_at(current_pos + frame_dir.normalized(), Vector3.UP)
+	
+	# 시각적으로 빙글빙글 돌기
+	if has_node("Visual"):
+		$Visual.rotate_x(15.0 * delta)
+	
+	if t >= 1.0:
+		explode()
+
+func _on_body_entered(body: Node3D) -> void:
+	_check_impact(body)
+
+func _on_area_entered(area: Area3D) -> void:
+	_check_impact(area)
+
+func _check_impact(target: Node3D) -> void:
+	if has_exploded: return
+	
+	# 바닥, 다른 배, 혹은 적과 직접 충돌 시
+	if target.is_in_group("ocean") or target.is_in_group("ship") or target.is_in_group("enemy"):
+		explode()
+
+func explode() -> void:
+	if has_exploded: return
+	has_exploded = true
+	
+	# 1. 폭발 이펙트 
+	if explosion_scene:
+		var expl = explosion_scene.instantiate()
+		expl.position = global_position
+		get_tree().root.add_child.call_deferred(expl)
+	
+	# 2. 바닥 잔여 화염 이펙트 (1.5초)
+	if fire_effect_scene:
+		var fire = fire_effect_scene.instantiate()
+		fire.position = global_position
+		if fire is GPUParticles3D:
+			fire.emitting = true
+		get_tree().root.add_child.call_deferred(fire)
+		
+		var timer = get_tree().create_timer(1.5)
+		timer.timeout.connect(func(): if is_instance_valid(fire): fire.queue_free())
+	
+	# 3. 사운드
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("explosion_small", global_position, randf_range(0.9, 1.2))
+	
+	# 4. 범위 데미지 처리 (물리 질의)
+	_apply_area_damage()
+	
+	# 자신 삭제
+	queue_free()
+
+func _apply_area_damage() -> void:
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsShapeQueryParameters3D.new()
+	var sphere = SphereShape3D.new()
+	sphere.radius = explosion_radius
+	query.shape = sphere
+	query.transform = global_transform
+	# Layer 2 (Player) / 3 (Enemy/Ship) - 설정에 맞게 켜야 함, 임시로 전 체 마스크
+	query.collision_mask = 0xFFFFFFFF
+	
+	var results = space_state.intersect_shape(query)
+	for result in results:
+		var col = result.collider
+		# 적 병사(Soldier)에게 데미지
+		if col.has_method("take_damage") and col.get("team") != team:
+			# 함선 본체에는 데미지 주지 않음(화통은 병사용 무기)
+			if col.is_in_group("ship"):
+				continue
+				
+			col.take_damage(damage, global_position)
+			
+			# 불타는 효과를 줄 수 있다면 추가 (선택)
+			if col.has_method("apply_status_effect"):
+				col.apply_status_effect("burn", 3.0)
