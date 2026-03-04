@@ -46,7 +46,7 @@ var UPGRADES = {
 	"fire_pot": {
 		"name": "화통",
 		"category": Category.ANTI_PERSONNEL,
-		"description": "적선 갑판에 화통을 던져 주위의 적 병사들을 불태움",
+		"description": "적선 도선 예열 시 아군 병사가 적 갑판에 화통을 던짐",
 		"max_level": 5,
 		"color": Color(0.9, 0.3, 0.1),
 		"stats": {
@@ -489,16 +489,9 @@ func _apply_spear_rail(ship: Node3D, level: int) -> void:
 	print("[SpearRail] 창 난간 Lv.%d: 창 %d개 배치, 도선 데미지 %.0f" % [level, spear_count, spear_damage])
 
 
-var fire_pot_scene: PackedScene = preload("res://scenes/weapons/fire_pot_launcher.tscn")
-
-func _apply_fire_pot(ship: Node3D, level: int) -> void:
+func _apply_fire_pot(_ship: Node3D, level: int) -> void:
 	if level == 1:
-		var launcher = fire_pot_scene.instantiate()
-		launcher.name = "FirePotLauncher"
-		ship.add_child(launcher)
-		# 투척수 위치 (배 중앙 살짝 뒤)
-		launcher.position = Vector3(0, 0.8, 1.0)
-		print("[FirePot] 화통 투척 준비 완료! (Lv.1)")
+		print("[FirePot] 화통 투척 훈련 완료! (Lv.1)")
 	else:
 		print("[FirePot] 화통 데미지/쿨다운 강화! (Lv.%d)" % level)
 

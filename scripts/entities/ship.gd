@@ -59,6 +59,10 @@ static func _get_ships_cached(tree: SceneTree) -> Array:
 @export var crew_respawn_interval: float = 12.0 # 보충 주기 (초)
 var crew_respawn_timer: float = 0.0
 
+# === 방어 무기 (화통) 로직 변수 ===
+var fire_pot_cooldown_timer: float = 0.0
+var fire_pot_scene: PackedScene = preload("res://scenes/projectiles/fire_pot.tscn")
+
 func _ready() -> void:
 	base_y = position.y
 	fire_effect_offset = Vector3(0, 1.0, 0.0)
@@ -142,6 +146,7 @@ func _physics_process(delta: float) -> void:
 	_update_hull_regeneration(delta)
 	_update_burning_status(delta)
 	_update_crew_respawn(delta)
+	_update_fire_pot_logic(delta)
 	
 	# 노 젓기 사운드 재생 (주기적)
 	if is_rowing and rowing_stamina > 0:
@@ -702,3 +707,73 @@ func add_survivor() -> bool:
 		audio_manager.play_sfx("soldier_hit", global_position, 1.5) # 약간 높은 피치로 구조음 대용
 		
 	return true
+
+## 갑판 방어 무기 2: 화통 투척 로직 (병사가 수행)
+func _update_fire_pot_logic(delta: float) -> void:
+	if fire_pot_cooldown_timer > 0:
+		fire_pot_cooldown_timer -= delta
+		
+	if fire_pot_cooldown_timer <= 0:
+		if not is_instance_valid(_cached_um) or not "fire_pot" in _cached_um.UPGRADES:
+			return
+			
+		var fp_lv = _cached_um.current_levels.get("fire_pot", 0)
+		if fp_lv <= 0: return # 화통 업그레이드가 없으면 던지지 않음
+		
+		# 도선 공격자가 대기 중/당겨오는 중인지 확인
+		if not is_instance_valid(boarding_attacker) or boarding_attacker.get("is_dying"):
+			return
+			
+		var target = boarding_attacker
+		var dist = global_position.distance_to(target.global_position)
+		if dist > 15.0: return # 밧줄 길이/목표 사거리 밖이면 대기
+		
+		# 내 배(Player)에서 아무 살아있는 아군 병사 하나를 투척수로 지정
+		var soldiers_node = get_node_or_null("Soldiers")
+		if not soldiers_node: return
+		
+		var tosser = null
+		for child in soldiers_node.get_children():
+			if child.get("current_state") != 4 and child.get("team") == "player":
+				tosser = child
+				break
+				
+		if tosser and fire_pot_scene:
+			# 1. 쿨다운 설정
+			var s = _cached_um.UPGRADES["fire_pot"]["stats"]
+			var cdr = s.get("cooldown_reduce_per_lv", 1.0) * (fp_lv - 1)
+			var cd = s.get("base_cooldown", 6.0) - cdr
+			if fp_lv == 4: cd = 3.5
+			if fp_lv >= 5: cd = 3.0
+			fire_pot_cooldown_timer = cd
+			
+			# 2. 화통 투사체 인스턴스화
+			var pot = fire_pot_scene.instantiate()
+			var t_pos = target.global_position
+			# 적 배 갑판(살짝 무작위 오프셋)
+			t_pos.x += randf_range(-1.2, 1.2)
+			t_pos.z += randf_range(-1.2, 1.2)
+			t_pos.y += 0.5
+			
+			# 투척 시작 위치 (아군 병사 머리 위/손)
+			var s_pos = tosser.global_position
+			s_pos.y += 1.0
+			
+			# 파라미터 적용
+			pot.damage = s.get("base_damage", 15.0) + (fp_lv - 1) * s.get("damage_per_lv", 5.0)
+			pot.explosion_radius = s.get("base_radius", 3.0) + (fp_lv - 1) * s.get("radius_per_lv", 0.5)
+			pot.team = team
+			
+			get_tree().root.add_child.call_deferred(pot)
+			
+			# call_deferred 이슈 방지를 위해 즉시 세팅 (안전) 혹은 set_deferred 사용
+			pot.set_deferred("global_position", s_pos)
+			
+			# pot.setup_flight(start, target, flight_time, arc_height)
+			# call_deferred 시점에서 바로 setup_flight를 콜하면 아직 scene tree 내부가 아닐 수 있으므로 
+			# call_deferred로 함수 호출 대리 예약
+			pot.call_deferred("setup_flight", s_pos, t_pos, 0.8, 3.5)
+			
+			# 3. 투척수(아군 병사) 시각적 피드백 (화통 던지는 방향 바라보기)
+			tosser.look_at(Vector3(t_pos.x, tosser.global_position.y, t_pos.z), Vector3.UP)
+			print("[FirePot] 병사가 적선으로 화통을 던졌습니다!")

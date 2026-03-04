@@ -64,7 +64,9 @@ var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
 
 # 도선 로직 변수
 var boarding_timer: float = 0.0
-var boarding_interval: float = 1.0
+var boarding_interval: float = 1.5 # 도선 간격 연장 (0.5/1.0 -> 1.5)
+var boarding_prep_timer: float = 0.0
+var boarding_prep_duration: float = 2.5 # 밧줄만 걸치고 대기하는 예열 시간
 var boarding_target: Node3D = null
 var max_boarding_distance: float = 12.0 # 이 거리 이내여야 도선 진행 (회피 반경 고려 6.0 -> 10.0 -> 12.0)
 var boarding_break_distance: float = 20.0 # 밧줄이 끊어지는 거리 (15.0 -> 25.0 -> 20.0 조정)
@@ -470,10 +472,15 @@ func _process_boarding(delta: float) -> void:
 	# 타이머 기반 병사 전이
 	# 배가 충분히 가까울 때만 타이머 진행 (날아다니는 현상 방지)
 	if dist <= max_boarding_distance:
-		boarding_timer += delta
-		if boarding_timer >= boarding_interval:
-			boarding_timer = 0.0
-			_transfer_one_soldier()
+		if boarding_prep_timer < boarding_prep_duration:
+			# 1. 예열 단계 (밧줄만 걸침)
+			boarding_prep_timer += delta
+		else:
+			# 2. 본격적인 도선 시작
+			boarding_timer += delta
+			if boarding_timer >= boarding_interval:
+				boarding_timer = 0.0
+				_transfer_one_soldier()
 	
 	# 너무 멀어지면 도선 포기 및 추격 상태로 복귀
 	if dist > boarding_break_distance:
@@ -1000,6 +1007,7 @@ func _board_ship(target_ship: Node3D) -> void:
 		boarding_target.set("boarding_attacker", self )
 		
 	boarding_timer = 0.0
+	boarding_prep_timer = 0.0
 	
 	# 그레플링 훅 생성
 	if is_instance_valid(boarding_target):
