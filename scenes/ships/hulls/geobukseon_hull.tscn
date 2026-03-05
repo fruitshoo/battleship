@@ -1,0 +1,48 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/cannon_joseon.tscn" id="cannon_scene"]
+[ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_hull"]
+size = Vector3(3, 1.2, 8)
+
+[sub_resource type="StandardMaterial3D" id="Material_wood_dark"]
+albedo_color = Color(0.3, 0.2, 0.1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_shell"]
+size = Vector3(3.2, 0.8, 8.2)
+
+[sub_resource type="StandardMaterial3D" id="Material_iron"]
+albedo_color = Color(0.2, 0.2, 0.25, 1)
+metallic = 0.5
+roughness = 0.4
+
+[node name="GeobukseonHull" type="Node3D"]
+
+[node name="Hull" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_hull")
+surface_material_override/0 = SubResource("Material_wood_dark")
+
+[node name="ArmoredShell" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+mesh = SubResource("BoxMesh_shell")
+surface_material_override/0 = SubResource("Material_iron")
+
+[node name="DragonHead" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -4.5)
+mesh = SubResource("BoxMesh_hull")
+surface_material_override/0 = SubResource("Material_iron")
+# Scale for dragon head placeholder
+scale = Vector3(0.2, 0.2, 0.2)
+
+[node name="Mast" parent="." instance=ExtResource("mast_scene")]
+visible = false # Geobukseon often lowered mast in battle
+
+[node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.0)
+
+[node name="Cannons" type="Node3D" parent="."]
+
+[node name="CannonFront" parent="Cannons" instance=ExtResource("cannon_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -4.5)

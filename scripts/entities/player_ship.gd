@@ -1,3 +1,4 @@
+@tool
 extends "res://scripts/entities/base_ship.gd"
 
 
@@ -6,7 +7,7 @@ extends "res://scripts/entities/base_ship.gd"
 var team: String = "player"
 
 # === 이동 관련 ===
-@export var rowing_speed: float = 3.0 # 노 젓기 부스트 하향 (4.0 -> 3.0)
+@export var rowing_speed: float = 4.0 # 노 젓기 부스트 상향 (3.0 -> 4.0)
 
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/chaser_ship.gd")
@@ -18,6 +19,14 @@ const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/chaser_ship.gd")
 # === 둥실둥실 효과 및 육분의 ===
 
 @export var rudder_turn_speed: float = 120.0 # Seamanship에 의해 강화됨
+
+@export var ship_type: String = "panokseon_player":
+	set(value):
+		ship_type = value
+		if Engine.is_editor_hint():
+			_update_editor_hull()
+
+@export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/panokseon_hull.tscn")
 @export var has_sextant: bool = false # Sextant 아이템 소지 여부
 
 # === 노 젓기 ===
@@ -65,17 +74,44 @@ var fire_pot_scene: PackedScene = preload("res://scenes/projectiles/fire_pot.tsc
 
 var boarding_scan_timer: float = 0.0
 
-func _ready() -> void:
-	base_y = position.y
-	fire_effect_offset = Vector3(0, 1.0, 0.0)
-	add_to_group("ships")
-	
+func _update_editor_hull() -> void:
+	# 에디터 전용: 선체 미리보기 갱신
 	for child in get_children():
-		if child.name.begins_with("Mast"):
-			masts.append(child)
-			print("[Ship] Found mast: ", child.name)
-	print("[Ship] Total masts connected: ", masts.size())
+		if child.name.contains("Hull"):
+			child.free()
 			
+	var stats = load_ship_stats(ship_type)
+	if stats.is_empty(): return
+	
+	var type_lower = ship_type.to_lower()
+	var h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
+	if type_lower.contains("sekibune"): h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
+	elif type_lower.contains("atakebune"): h_path = "res://scenes/ships/hulls/atakebune_hull.tscn"
+	elif type_lower.contains("maengseon"): h_path = "res://scenes/ships/hulls/maengseon_hull.tscn"
+	
+	var new_hull = load(h_path)
+	if new_hull:
+		var inst = new_hull.instantiate()
+		inst.name = "EditorHull"
+		add_child(inst)
+		_cache_hull_references(self )
+
+func _ready() -> void:
+	if Engine.is_editor_hint():
+		# 에디터용 Hull이 이미 있다면 중복 생성 방지
+		var has_hull = false
+		for child in get_children():
+			if child.name.contains("Hull"):
+				has_hull = true
+				break
+		if not has_hull:
+			_update_editor_hull()
+		return
+
+	super._ready()
+	fire_effect_offset = Vector3(0, 1.0, 0.0)
+	print("[Ship] Total masts connected: ", masts.size())
+	
 	# 영구 업그레이드 보너스 적용
 	if is_in_group("player") or is_player_controlled:
 		var meta_manager = get_node_or_null("/root/MetaManager")
@@ -95,6 +131,11 @@ func _ready() -> void:
 		add_to_group("player")
 	
 	_cache_references()
+	
+	# 레벨 매니저 시그널 연결 (함대 업그레이드 액션 완료 시)
+	if is_instance_valid(_cached_level_manager):
+		if _cached_level_manager.has_signal("merit_full_action_completed"):
+			_cached_level_manager.merit_full_action_completed.connect(_spawn_or_repair_ally)
 
 func _on_gust_started(_angle_offset: float) -> void:
 	# 돌풍 시작 시 펄럭임 효과음 (플레이어 배만)
@@ -123,8 +164,12 @@ func _process(_delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not is_sinking:
-		_apply_bobbing_effect()
+	if Engine.is_editor_hint(): return
+	if is_sinking:
+		return
+	
+	# 기본 물리 프로세스 (둥실거림 등)
+	super._physics_process(delta)
 	if _flap_timer > 0:
 		_flap_timer -= delta
 		
@@ -132,15 +177,15 @@ func _physics_process(delta: float) -> void:
 		_wave_timer -= delta
 		if _wave_timer <= 0:
 			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
-				_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2))
+				_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2), 3.0)
 			# 속도가 빠를수록 자주, 느릴수록 드문드문 (최소 1.5초 ~ 최대 4.5초)
 			var speed_mod = clamp(current_speed / 5.0, 0.2, 2.0)
 			_wave_timer = randf_range(1.5, 3.5) / speed_mod
 		
-	if is_sinking:
-		return
 	if is_player_controlled:
 		_handle_input(delta)
+	if has_sextant:
+		_auto_adjust_sail(delta)
 	_update_movement(delta)
 	_update_steering(delta)
 	_update_rowing_stamina(delta)
@@ -149,7 +194,6 @@ func _physics_process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_crew_respawn(delta)
 	_update_fire_pot_logic(delta)
-	_update_boarding_scan(delta)
 	
 	if is_boarding:
 		_process_boarding_common(delta)
@@ -158,7 +202,7 @@ func _physics_process(delta: float) -> void:
 	if is_rowing and rowing_stamina > 0:
 		if _oars_timer <= 0:
 			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
-				_cached_audio_manager.play_sfx("oars_rowing", global_position, randf_range(0.95, 1.05))
+				_cached_audio_manager.play_sfx("oars_rowing", global_position, randf_range(0.95, 1.05), 5.0)
 			_oars_timer = 1.3
 		else:
 			_oars_timer -= delta
@@ -175,6 +219,89 @@ func _physics_process(delta: float) -> void:
 			_gilgunak_playing = false
 			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_gilgunak"):
 				_cached_audio_manager.play_gilgunak(false)
+				
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_sinking or not is_player_controlled: return
+	
+	if event is InputEventKey and event.pressed and not event.echo:
+		# 치트키: F2 누르면 바로 공적 레벨업
+		if OS.is_debug_build() and event.keycode == KEY_F2:
+			if is_instance_valid(_cached_level_manager):
+				_cached_level_manager.add_merit(999)
+				
+		# if event.keycode == KEY_F:
+		# 	_execute_merit_action()
+		pass
+
+func _execute_merit_action() -> void:
+	if not is_instance_valid(_cached_level_manager): return
+		
+	if _cached_level_manager.merit_points < _cached_level_manager.max_merit_points:
+		if _cached_hud and _cached_hud.has_method("show_message"):
+			_cached_hud.show_message("공적이 부족합니다!", 1.5)
+		return
+		
+	# 공적 소비 (여기서 함대 업그레이드 UI가 뜨고, 선택 후 _spawn_or_repair_ally 가 호출됨)
+	_cached_level_manager.consume_merit()
+
+func _spawn_or_repair_ally() -> void:
+	# 시각/청각 피드백
+	if _cached_hud and _cached_hud.has_method("show_message"):
+		_cached_hud.show_message("초요기를 올렸습니다! 함대 강화 및 합류!", 3.0)
+		
+	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+		_cached_audio_manager.play_sfx("trumpet_war", global_position)
+		
+	# 이미 미니언이 있는지 체크
+	var minions = get_tree().get_nodes_in_group("captured_minion")
+	if minions.size() > 0:
+		# 이미 있으면 수리 및 강화 전파
+		for m in minions:
+			if m.has_method("repair_ship"):
+				m.repair_ship(0.5) # 체력 50% 회복
+			if is_instance_valid(UpgradeManager):
+				UpgradeManager.apply_fleet_upgrades_to_ship(m)
+		print("[Merit] 기존 함대를 수리 및 강화했습니다.")
+		return
+
+	# 아군 배 스폰 (없을 때만)
+	var ship_scene = load("res://scenes/enemy_ship.tscn")
+	if ship_scene:
+		var ally = ship_scene.instantiate()
+		
+		# 아군 용도로 맹선 선체 및 조선 대포 할당
+		if "ship_type" in ally:
+			ally.ship_type = "maengseon_ally"
+		if "hull_scene" in ally:
+			ally.hull_scene = load("res://scenes/ships/hulls/maengseon_hull.tscn")
+		if "cannon_scene" in ally:
+			ally.cannon_scene = load("res://scenes/entities/cannon_joseon.tscn")
+		
+		# 아군 편입 (add_child 전에 설정해야 _ready에서 올바른 병사가 생성됨)
+		if ally.has_method("set_team"):
+			ally.set_team("player")
+		else:
+			ally.team = "player"
+		
+		get_parent().add_child(ally)
+		
+		# 플레이어 후방 무작위 배치
+		var forward = - global_transform.basis.z
+		var right = forward.cross(Vector3.UP).normalized()
+		var spawn_pos = global_position + right * randf_range(-10.0, 10.0) - forward * 20.0
+		spawn_pos.y = 0
+		
+		ally.global_position = spawn_pos
+		ally.look_at(global_position + forward * 50.0, Vector3.UP)
+		
+		if ally.has_method("add_to_group"):
+			ally.add_to_group("player")
+			ally.add_to_group("captured_minion")
+			ally.remove_from_group("enemy")
+			
+		print("[Summon] 정규군 함선을 소환했습니다!")
+
 ## 병사 자동 보충 로직
 func _update_crew_respawn(delta: float) -> void:
 	if is_sinking: return
@@ -231,10 +358,12 @@ func _handle_input(delta: float) -> void:
 func _toggle_fleet_formation() -> void:
 	if CHASER_SHIP_SCRIPT.fleet_formation == CHASER_SHIP_SCRIPT.Formation.COLUMN:
 		CHASER_SHIP_SCRIPT.fleet_formation = CHASER_SHIP_SCRIPT.Formation.WING
-		if _cached_level_manager: _cached_level_manager.show_message("함대 진형: 학익진 (Wing)", 2.0)
+		if _cached_hud and _cached_hud.has_method("show_message"):
+			_cached_hud.show_message("함대 진형: 학익진 (Wing)", 2.0)
 	else:
 		CHASER_SHIP_SCRIPT.fleet_formation = CHASER_SHIP_SCRIPT.Formation.COLUMN
-		if _cached_level_manager: _cached_level_manager.show_message("함대 진형: 장사진 (Column)", 2.0)
+		if _cached_hud and _cached_hud.has_method("show_message"):
+			_cached_hud.show_message("함대 진형: 장사진 (Column)", 2.0)
 
 
 ## 러더 조향 입력 처리
@@ -247,10 +376,6 @@ func steer(direction: float, delta: float) -> void:
 	else:
 		# 입력이 없으면 러더 자동 복귀
 		rudder_angle = move_toward(rudder_angle, 0.0, rudder_return_speed * delta)
-	
-	# 육분의: 자동 돛 조절
-	if has_sextant:
-		_auto_adjust_sail(delta)
 
 func _auto_adjust_sail(delta: float) -> void:
 	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"): return
@@ -279,40 +404,38 @@ func _auto_adjust_sail(delta: float) -> void:
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
 	var neighbors = _get_ships_cached(get_tree())
-	var separation_dist = 10.0 # 기준 반경
-	
-	# 직사각형/타원형(배 모양)에 맞게 분리력 적용용 배율 (앞뒤로는 더 멀게, 양옆으로는 더 가깝게)
-	# z축(전후) 방향의 거리에 가중치를 주면, 앞/뒤일 때 더 쉽게 밀어냅니다.
-	var length_multiplier = 0.5 # 전후 방향일 때 거리가 절반으로 계산되는 효과 (더 멀리서부터 밀침)
-	var width_multiplier = 1.2 # 좌우 방향일 때 거리가 길게 계산되는 효과 (더 가까워야 밀침)
 	
 	# 성능을 위해 주변 함선이 많을 때만 계산하거나, 최대 척수 제한
-	var max_checks = min(neighbors.size(), 12)
-	for i in range(max_checks):
-		var other = neighbors[i]
+	var _max_checks = min(neighbors.size(), 12)
+	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_sinking"):
 			continue
 			
+		# 도선 중인 상대와는 분리력(Separation)을 적용하지 않음 (가까이 붙어야 하므로)
+		if is_boarding and other == boarding_target:
+			continue
+		if other.get("boarding_attacker") == self:
+			continue
+			
 		var offset = other.global_position - global_position
+		offset.y = 0.0
+		var dist_sq = offset.length_squared()
+		if dist_sq <= 0.01:
+			continue
 		
-		# 내 배의 로컬 좌표계 기준으로 변환 (Y축 회전 역적용)
-		# 이를 통해 상대 배가 내 앞/뒤에 있는지, 양 옆에 있는지 구분 가능
-		var relative_offset = offset.rotated(Vector3.UP, -rotation.y)
+		var dist = sqrt(dist_sq)
+		var coll_dist = get_collision_distance_to(other)
+		# 적선이 본선을 추격/도선 중일 때는 접촉 직전 분리력을 빼서 맞물리게 함
+		var is_enemy_attacker = other.get("team") == "enemy" and (other.get("target") == self or other.get("boarding_target") == self)
+		if is_enemy_attacker and dist < coll_dist + 1.0:
+			continue
+		var separation_trigger_dist = coll_dist + 0.25
 		
-		# 타원형(배의 길쭉한 형태) 거리 계산
-		var adjusted_offset = Vector3(
-			relative_offset.x * width_multiplier,
-			0,
-			relative_offset.z * length_multiplier
-		)
-		var adjusted_dist = adjusted_offset.length()
-		
-		if adjusted_dist < separation_dist and adjusted_dist > 0.1:
-			var push_dir = - offset.normalized()
-			# 가까울수록 사정없이 강하게 밀어냄 (Quadratic curve 적용)
-			var ratio = (separation_dist - adjusted_dist) / separation_dist
+		if dist < separation_trigger_dist:
+			var push_dir = -offset / max(dist, 0.001)
+			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
 			var strength = pow(ratio, 2.0)
-			force += push_dir * strength * 12.0 # 밀어내는 강도 계수 상향 (5.0 -> 12.0)
+			force += push_dir * strength * 2.2
 			
 	return force
 
@@ -351,6 +474,10 @@ func _update_movement(delta: float) -> void:
 	# === 겹침 방지 (Separation) 적용 ===
 	var sep = _calculate_separation()
 	velocity += sep
+	
+	# === 도선 인동력(Pull) 및 겹침 방지 반발력(Collision Repulsion) 적용 ===
+	velocity += _calculate_boarding_pull() * delta
+	velocity += _calculate_collision_repulsion() * delta
 	
 	position += velocity * delta
 	
@@ -539,7 +666,7 @@ func die() -> void:
 		
 		var audio_manager = get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.0))
+			audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.0), 3.0)
 	
 	sink_tween.set_parallel(false)
 	sink_tween.tween_callback(func():
@@ -613,7 +740,7 @@ func capture_derelict_ship() -> void:
 				child.heal_full()
 	
 	# 2. 병사 1명 보충 (최대치 초과 안하게)
-	# ship.gd에는 soldier_scene이 export 되어있지 않으므로, LevelManager나 임시 캐싱본 활용 필수
+	# player_ship.gd에는 soldier_scene이 export 되어있지 않으므로, LevelManager나 임시 캐싱본 활용 필수
 	# 기존 replenish_crew()에서 주입받는 구조이므로 여기선 LevelManager를 통해 Instantiate 시도
 	var alive_count = 0
 	if soldiers_node:
@@ -633,10 +760,8 @@ func capture_derelict_ship() -> void:
 				_cached_um._apply_current_stats_to_soldier(s)
 			print("[Crew] 포로 구출! 아군 병사 1명 합류.")
 			
-	# 3. 사운드 및 피드백 재생
-	var audio_manager = get_node_or_null("/root/AudioManager")
-	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("treasure_collect", global_position) # 획득음 재활용
+	# 4. 도선 상태 및 밧줄 제거
+	_cancel_boarding()
 
 ## 병사 보충 (Maintenance 전용)
 func replenish_crew(soldier_scene: PackedScene) -> void:
@@ -783,50 +908,3 @@ func _update_fire_pot_logic(delta: float) -> void:
 			# 3. 투척수(아군 병사) 시각적 피드백 (화통 던지는 방향 바라보기)
 			tosser.look_at(Vector3(t_pos.x, tosser.global_position.y, t_pos.z), Vector3.UP)
 			print("[FirePot] 병사가 적선으로 화통을 던졌습니다!")
-
-## 주변의 폐선(Derelict)을 탐색하여 도선 시작
-func _update_boarding_scan(delta: float) -> void:
-	if is_boarding or is_sinking: return
-	
-	boarding_scan_timer -= delta
-	if boarding_scan_timer <= 0:
-		boarding_scan_timer = 2.0
-		
-		# 폐선 탐색 로직
-		var enemy_ships = _get_ships_cached(get_tree())
-		var closest = null
-		var min_dist = INF
-		
-		for ship in enemy_ships:
-			if ship == self or ship.get("team") == team: continue
-			
-			if ship.get("is_derelict") == true:
-				var dist = global_position.distance_to(ship.global_position)
-				if dist <= max_boarding_distance:
-					# 다른 누군가가 이미 도선 중인지 체크 (배의 attacker가 내가 아닌 다른 사람)
-					var atk = ship.get("boarding_attacker")
-					if atk != null and atk != self: continue
-					
-					if dist < min_dist:
-						min_dist = dist
-						closest = ship
-						
-		if closest:
-			_start_boarding(closest)
-
-func _start_boarding(target_ship: Node3D) -> void:
-	if is_boarding: return
-	
-	is_boarding = true
-	boarding_target = target_ship
-	boarding_timer = 0.0
-	boarding_prep_timer = 0.0
-	
-	if target_ship.has_method("set") or "boarding_attacker" in target_ship:
-		target_ship.set("boarding_attacker", self )
-	
-	print("[Boarding] 아군 함선이 폐선 나포를 시도합니다! (%s)" % target_ship.name)
-	_spawn_ropes()
-	
-	if _cached_hud and _cached_hud.has_method("show_message"):
-		_cached_hud.show_message("폐선 발견! 도선 밧줄을 걸었습니다.", 2.5)

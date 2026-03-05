@@ -8,8 +8,6 @@
 noise_type = 2
 
 [sub_resource type="NoiseTexture2D" id="NoiseTexture2D_2h7kf"]
-width = 1024
-height = 1024
 noise = SubResource("FastNoiseLite_lollj")
 seamless = true
 as_normal_map = true
@@ -18,8 +16,6 @@ as_normal_map = true
 noise_type = 2
 
 [sub_resource type="NoiseTexture2D" id="NoiseTexture2D_t7v3j"]
-width = 1024
-height = 1024
 noise = SubResource("FastNoiseLite_2h7kf")
 seamless = true
 as_normal_map = true
@@ -46,8 +42,8 @@ shader_parameter/sea_height = 0.6
 shader_parameter/sea_choppy = 4.0
 shader_parameter/sea_speed = 0.8
 shader_parameter/sea_freq = 0.16
-shader_parameter/ITER_GEOMETRY = 3
-shader_parameter/ITER_FRAGMENT = 5
+shader_parameter/ITER_GEOMETRY = 2
+shader_parameter/ITER_FRAGMENT = 3
 shader_parameter/foam_color = Color(1, 1, 1, 1)
 shader_parameter/foam_depth_start = 0.8
 shader_parameter/foam_depth_end = 0.0

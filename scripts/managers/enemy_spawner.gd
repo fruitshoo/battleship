@@ -20,6 +20,7 @@ var player: Node3D = null
 var boss_spawned: bool = false
 var elite_spawn_timer: float = 180.0 # 3분 주기
 var regular_spawn_stopped: bool = false
+var start_time: int = 0
 
 
 func trigger_boss_event() -> void:
@@ -41,6 +42,8 @@ func _spawn_boss() -> void:
 	boss_spawned = true
 	
 	var boss = boss_scene.instantiate()
+	if "ship_type" in boss:
+		boss.ship_type = "atakebune_final" # 최종 보스 설정
 	# 플레이어 전방 50m 지점에 소환
 	var player_forward = - player.global_transform.basis.z
 	var spawn_pos = player.global_position + (player_forward * 50.0)
@@ -153,6 +156,16 @@ func _spawn_enemy() -> void:
 			
 		var enemy = enemy_scene.instantiate()
 		
+		# 시간 경과에 따른 함종 결정 (초반 90초는 대포 없는 Chaser 위주)
+		var elapsed_sec = (Time.get_ticks_msec() - start_time) / 1000.0
+		var cannon_chance = clamp((elapsed_sec - 90.0) / 150.0, 0.0, 0.5) # 90초부터 시작해서 240초에 50%까지 완만하게 상승
+		
+		# JSON 기반 함종 할당
+		if randf() > cannon_chance:
+			if "ship_type" in enemy: enemy.ship_type = "sekibune_melee"
+		else:
+			if "ship_type" in enemy: enemy.ship_type = "sekibune_cannon"
+		
 		# 차단진일 경우 가로로 배치 (간격 15m)
 		var spawn_pos = center_pos
 		if is_blockade and spawn_count > 1:
@@ -214,22 +227,18 @@ func _is_position_safe(pos: Vector3, min_dist: float) -> bool:
 
 
 func _spawn_elite_ship() -> void:
-	if not enemy_scene: return
+	if not boss_scene: return
 	
-	# 엘리트는 일반 적 베이스지만 elite_ship.gd 스크립트를 동적으로 붙이거나 
-	# (여유가 있다면) 전용 씬을 사용. 여기서는 일반 적을 인스턴스화 후 스크립트 교체 방식 사용.
-	var enemy = enemy_scene.instantiate()
-	
-	# 수동으로 스크립트 설정 (elite_ship.gd는 chaser_ship.gd를 확장함)
-	var elite_script = load("res://scripts/entities/elite_ship.gd")
-	enemy.set_script(elite_script)
-	
-	# 스폰 위치 (전방 먼 곳)
+	# 중간 보스는 보스 베이스(Atakebune)를 사용하되 tier 1로 설정
+	var elite = boss_scene.instantiate()
+	if "ship_type" in elite:
+		# 중간 보스 성격의 엘리트 함선
+		elite.ship_type = "atakebune_mid"
+		
+	# 스폰 위치 (전역 좌표로 변환)
 	var spawn_pos = _get_biased_spawn_position()
-	enemy.position = spawn_pos
+	get_parent().add_child(elite)
+	elite.global_position = spawn_pos
+	elite.look_at(player.global_position, Vector3.UP)
 	
-	get_parent().add_child(enemy)
-	enemy.look_at(player.global_position, Vector3.UP)
-	
-	# 엘리트 전용 메타데이터 (필요 시)
-	print("[Event] 엘리트 함선(중간보스) 출현!")
+	print("[Event] 중간 보스(아타케부네) 출현!")

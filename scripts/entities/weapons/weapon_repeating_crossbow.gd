@@ -36,15 +36,11 @@ func _ready() -> void:
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return
 	
-	# 발사 위치는 활 부근으로 약간 보정
-	var spawn_pos = attacker.global_position
-	spawn_pos.y += 0.8
-	
 	# 코루틴으로 연사 처리
-	_fire_burst(target, attacker, spawn_pos)
+	_fire_burst(target, attacker)
 
 
-func _fire_burst(target: Node3D, attacker: Node3D, spawn_pos: Vector3) -> void:
+func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 	for i in range(burst_count):
 		if not is_instance_valid(target) or not is_instance_valid(attacker):
 			break
@@ -53,6 +49,10 @@ func _fire_burst(target: Node3D, attacker: Node3D, spawn_pos: Vector3) -> void:
 		if target.has_method("get") and target.get("current_state") == 3: # 3 = DEAD
 			break
 			
+		# 발사 위치는 활 부근으로 약간 보정 (매번 갱신)
+		var spawn_pos = attacker.global_position
+		spawn_pos.y += 0.8
+		
 		var arrow = arrow_scene.instantiate() as Node3D
 		var current_target_pos = target.global_position
 		current_target_pos.y += 0.5
@@ -118,7 +118,7 @@ func _fire_burst(target: Node3D, attacker: Node3D, spawn_pos: Vector3) -> void:
 		arrow.look_at(current_target_pos, Vector3.UP)
 		
 		if is_instance_valid(AudioManager):
-			AudioManager.play_sfx("arrow_shoot", attacker.global_position, randf_range(1.1, 1.3)) # 조금 높은 피치
+			AudioManager.play_sfx("arrow_shoot", attacker.global_position, randf_range(1.1, 1.3), 4.0) # 조금 높은 피치, 볼륨 증가
 			
 		# 다음 발사 대기
 		if i < burst_count - 1:

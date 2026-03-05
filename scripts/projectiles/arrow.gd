@@ -1,4 +1,5 @@
 extends Area3D
+const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 
 ## 화살 (Arrow)
 ## 병사가 쏘는 원거리 투사체
@@ -52,7 +53,11 @@ func _physics_process(delta: float) -> void:
 	
 	# 회전 (진행 방향 응시)
 	if (current_pos - global_position).length_squared() > 0.001:
-		look_at(current_pos, Vector3.UP)
+		var dir = (current_pos - global_position).normalized()
+		var up_vec = Vector3.UP
+		if abs(dir.y) > 0.999:
+			up_vec = Vector3.RIGHT
+		look_at(current_pos, up_vec)
 		
 	global_position = current_pos
 
@@ -94,9 +99,9 @@ func _check_hit(target: Node) -> void:
 			# 불화살 이펙트 소환 등 가능
 			queue_free()
 	
-	# 적 배 피격 (배는 Soldier가 아닌 enemy/player 그룹)
-	var potential_ship = target if target.is_in_group("enemy") or target.is_in_group("player") else target.get_parent()
-	if potential_ship and (potential_ship.is_in_group("enemy") or potential_ship.is_in_group("player")):
+	# 적 배 피격 (HitArea 등 하위 노드에서 부모 함선까지 자동 해석)
+	var potential_ship = HitTargetResolver.resolve_ship_from_node(target)
+	if potential_ship:
 		var is_sinking = potential_ship.get("is_sinking") == true
 		if is_sinking:
 			queue_free()
@@ -104,7 +109,7 @@ func _check_hit(target: Node) -> void:
 			
 		# 상대 팀 배인지 확인
 		var enemy_team = "enemy" if team == "player" else "player"
-		if potential_ship.is_in_group(enemy_team):
+		if HitTargetResolver.resolve_team_tag(potential_ship) == enemy_team:
 			if potential_ship.has_method("take_damage"):
 				potential_ship.take_damage(1.0, global_position) # 배에는 미미한 데미지
 				if is_fire_arrow and potential_ship.has_method("take_fire_damage"):

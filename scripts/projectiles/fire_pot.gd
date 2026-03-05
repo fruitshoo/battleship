@@ -40,7 +40,10 @@ func setup_flight(start: Vector3, target: Vector3, flight_time: float = 1.0, arc
 	arc_height = arc
 	
 	# 초기 방향 설정 (시각적)
-	look_at(target_pos, Vector3.UP)
+	var up_vec = Vector3.UP
+	if abs((target_pos - global_position).normalized().y) > 0.999:
+		up_vec = Vector3.RIGHT
+	look_at(target_pos, up_vec)
 
 func _physics_process(delta: float) -> void:
 	if has_exploded: return
@@ -58,7 +61,11 @@ func _physics_process(delta: float) -> void:
 	
 	var frame_dir = current_pos - last_pos
 	if frame_dir.length_squared() > 0.001:
-		look_at(current_pos + frame_dir.normalized(), Vector3.UP)
+		var dir = frame_dir.normalized()
+		var up_vec = Vector3.UP
+		if abs(dir.y) > 0.999:
+			up_vec = Vector3.RIGHT
+		look_at(current_pos + dir, up_vec)
 	
 	# 시각적으로 빙글빙글 돌기
 	if has_node("Visual"):
@@ -125,14 +132,24 @@ func _apply_area_damage() -> void:
 	var results = space_state.intersect_shape(query)
 	for result in results:
 		var col = result.collider
-		# 적 병사(Soldier)에게 데미지
-		if col.has_method("take_damage") and col.get("team") != team:
-			# 함선 본체에는 데미지 주지 않음(화통은 병사용 무기)
-			if col.is_in_group("ship"):
-				continue
-				
-			col.take_damage(damage, global_position)
+		
+		# 같은 팀(player면 player)에게는 데미지 주지 않음
+		if col.has_method("get") and col.get("team") == team:
+			continue
 			
-			# 불타는 효과를 줄 수 있다면 추가 (선택)
+		# 함선(Ship) 본체에도 화통 폭발 데미지와 화재 유발 적용
+		if col.is_in_group("ship") and col.has_method("take_damage"):
+			var source_id = "fire_pot" if team == "player" else ""
+			col.take_damage(damage * 1.5, global_position, source_id) # 배에는 데미지 1.5배
+			if col.has_method("add_fire_buildup"):
+				col.add_fire_buildup(30.0) # 화재 게이지 폭증
+			elif col.has_method("apply_status_effect"):
+				col.apply_status_effect("burn", 5.0)
+				
+		# 적 병사(Soldier)에게 데미지
+		elif col.has_method("take_damage") and col.get("team") != team:
+			var soldier_source = "fire_pot" if team == "player" else ""
+			col.take_damage(damage, global_position, soldier_source)
+			# 불타는 효과를 줄 수 있다면 추가
 			if col.has_method("apply_status_effect"):
 				col.apply_status_effect("burn", 3.0)

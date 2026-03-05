@@ -1,3 +1,4 @@
+@tool
 extends Node
 
 ## 글로벌 바람 시스템 관리

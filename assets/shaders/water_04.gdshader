@@ -26,8 +26,8 @@ uniform float sea_height : hint_range(0.0, 5.0) = 0.6;
 uniform float sea_choppy : hint_range(0.0, 10.0) = 4.0;
 uniform float sea_speed : hint_range(0.0, 5.0) = 0.8;
 uniform float sea_freq : hint_range(0.0, 0.5) = 0.16;
-uniform int ITER_GEOMETRY = 3;
-uniform int ITER_FRAGMENT = 5;
+uniform int ITER_GEOMETRY = 2;
+uniform int ITER_FRAGMENT = 3;
 const mat2 octave_m = mat2(vec2(1.6, 1.2), vec2(-1.2, 1.6));
 
 // FOAM UNIFORMS

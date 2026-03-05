@@ -1,3 +1,4 @@
+@tool
 extends Node
 
 ## 업그레이드 매니저 (AutoLoad)
@@ -9,141 +10,14 @@ signal upgrade_applied(upgrade_id: String, new_level: int)
 # 업그레이드 카테고리
 enum Category {ANTI_SHIP, ANTI_PERSONNEL, HULL, NAVIGATION, SPECIAL, FLEET}
 
-# 업그레이드 정의
-var UPGRADES = {
-	# --- Primary Weapons (8 Levels) ---
-	"cannon": {
-		"name": "대포",
-		"category": Category.ANTI_SHIP,
-		"description": "대포 1문 추가 또는 데미지/사거리 강화",
-		"max_level": 8,
-		"color": Color(1.0, 0.5, 0.2),
-		"stats": {"dmg_pct_per_stat": 25, "range_pct_per_stat": 15, "cd_pct_per_stat": 10}
-	},
-	"janggun": {
-		"name": "대장군전",
-		"category": Category.ANTI_SHIP,
-		"description": "화력 강화 및 명중 시 화염/이속저하 디버프",
-		"max_level": 8,
-		"color": Color(0.6, 0.4, 0.2)
-	},
-	"singigeon": {
-		"name": "신기전",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "발사 개수 추가 및 데미지/사거리 강화",
-		"max_level": 8,
-		"color": Color(1.0, 0.3, 0.3)
-	},
-	
-	"spear_rail": {
-		"name": "창 난간",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "배 측면에 창을 배치하여 도선하는 적에게 자동 데미지",
-		"max_level": 5,
-		"color": Color(0.7, 0.5, 0.3),
-		"stats": {"base_damage": 10.0, "damage_per_lv": 5.0, "base_count": 4, "count_per_lv": 2}
-	},
-	"fire_pot": {
-		"name": "화통",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "적선 도선 예열 시 아군 병사가 적 갑판에 화통을 던짐",
-		"max_level": 5,
-		"color": Color(0.9, 0.3, 0.1),
-		"stats": {
-			"base_damage": 15.0, "damage_per_lv": 5.0,
-			"base_radius": 3.0, "radius_per_lv": 0.5,
-			"base_cooldown": 6.0, "cooldown_reduce_per_lv": 1.0
-		}
-	},
-	"repeating_crossbow": {
-		"name": "연노",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "활 대신 고속 연속 발사가 가능한 연노를 병사들이 사용",
-		"max_level": 5,
-		"color": Color(0.6, 0.8, 0.2),
-		"stats": {
-			"base_damage": 10.0, "damage_per_lv": 2.0,
-			"base_cooldown": 2.0, "cooldown_reduce_per_lv": 0.2,
-			"burst_delay": 0.15
-		}
-	},
-	"crew_numbers": {
-		"name": "병사 충원",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "최대 정원 증가 및 리스폰 속도 단축",
-		"max_level": 5,
-		"color": Color(0.4, 0.8, 1.0),
-		"stats": {"crew_add": 1, "respawn_mult": 0.8, "respawn_min": 1.0}
-	},
-	"crew_quality": {
-		"name": "정예병 훈련",
-		"category": Category.ANTI_PERSONNEL,
-		"description": "병사의 체력, 방어력, 공격력 일괄 상승",
-		"max_level": 5,
-		"color": Color(0.8, 0.8, 0.2),
-		"stats": {"base_hp": 40.0, "hp_per_lv": 10.0, "dmg_pct_per_lv": 15, "def_pct_per_lv": 10}
-	},
-	
-	# --- Hull / Navigation (5 Levels) ---
-	"hull_defense": {
-		"name": "선체 장갑",
-		"category": Category.HULL,
-		"description": "함선의 최대 체력 및 방어력 증가",
-		"max_level": 5,
-		"color": Color(0.6, 0.3, 0.1),
-		"stats": {"hp_add": 30.0, "heal_on_apply": 20.0, "def_per_lv": 2.0}
-	},
-	"navigation": {
-		"name": "항해 기동",
-		"category": Category.NAVIGATION,
-		"description": "선회 속도 및 돛 기동력 증가",
-		"max_level": 5,
-		"color": Color(0.4, 1.0, 0.4),
-		"stats": {"turn_mult": 1.15, "stamina_mult": 0.85}
-	},
-	"supply_bonus": {
-		"name": "보급 효율",
-		"category": Category.HULL,
-		"description": "보급품 획득 시 회복량 및 습득 범위 대폭 증가",
-		"max_level": 5,
-		"color": Color(0.3, 0.8, 0.3),
-		"stats": {"base_radius": 8.0, "radius_per_lv": 2.0, "heal_per_lv": 5.0}
-	},
-	
-	# --- Consumables / Instant ---
-	"supply": {
-		"name": "보급물자",
-		"category": Category.HULL,
-		"description": "체력 즉시 소폭 회복",
-		"max_level": 99,
-		"color": Color(0.5, 1.0, 0.5),
-		"stats": {"max_hp_add": 20.0}
-	},
-	"gold": {
-		"name": "전리품",
-		"category": Category.SPECIAL,
-		"description": "점수 +50",
-		"max_level": 99,
-		"color": Color(1.0, 0.85, 0.3),
-		"stats": {"score_add": 50}
-	}
-}
+# 업그레이드 정의 (JSON에서 로드됨)
+var UPGRADES = {}
 
-# 렐릭(유물) 정의
-var RELICS = {
-	"sextant": {
-		"name": "육분의",
-		"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
-		"icon": "explore", # HUD에 표시할 아이콘(임시)
-		"alert_msg": "!! 렐릭 획득: 육분의 !!\n(자동 항해 활성화)"
-	},
-	"boss_heart": {
-		"name": "보스의 심장",
-		"description": "임시 보스 드롭 렐릭입니다.",
-		"icon": "favorite",
-		"alert_msg": "!! 렐릭 획득: 보스의 심장 !!"
-	}
-}
+# 렐릭 정의 (JSON에서 로드됨)
+var RELICS = {}
+
+const DATA_PATH = "res://data/upgrades.json"
+
 
 # 현재 업그레이드 레벨 추적
 var current_levels: Dictionary = {}
@@ -156,11 +30,43 @@ var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
 var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
 var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
 var janggun_scene: PackedScene = preload("res://scenes/entities/janggun_launcher.tscn")
+var ballista_scene: PackedScene = preload("res://scenes/entities/ballista_launcher.tscn")
 
 
 func _ready() -> void:
+	_load_data_from_json()
+	
 	for key in UPGRADES:
 		current_levels[key] = 0
+
+## 데이터 로드 (JSON)
+func _load_data_from_json() -> void:
+	if not FileAccess.file_exists(DATA_PATH):
+		push_error("UpgradeManager: 데이터 파일을 찾을 수 없습니다: %s" % DATA_PATH)
+		return
+		
+	var file = FileAccess.open(DATA_PATH, FileAccess.READ)
+	var json_text = file.get_as_text()
+	file.close()
+	
+	var json = JSON.new()
+	var error = json.parse(json_text)
+	if error != OK:
+		push_error("UpgradeManager: JSON 파싱 오류 (Line %d): %s" % [json.get_error_line(), json.get_error_message()])
+		return
+		
+	var data = json.data
+	if data.has("upgrades"):
+		UPGRADES = data["upgrades"]
+		# Color 값 변환 (Hex -> Color 객체)
+		for key in UPGRADES:
+			if UPGRADES[key].has("color"):
+				UPGRADES[key]["color"] = Color.from_string(UPGRADES[key]["color"], Color.WHITE)
+				
+	if data.has("relics"):
+		RELICS = data["relics"]
+
+	print("[UpgradeManager] 데이터를 성공적으로 로드했습니다: %d개의 업그레이드, %d개의 렐릭" % [UPGRADES.size(), RELICS.size()])
 
 ## 게임 시작 시 기본 무기 지급
 func initialize_default_weapons() -> void:
@@ -173,20 +79,34 @@ func initialize_default_weapons() -> void:
 
 
 ## 랜덤 선택지 반환
-func get_random_choices(count: int = 3) -> Array:
+func get_random_choices(count: int = 3, category_filter: int = -1) -> Array:
 	var available: Array = []
 	
 	# 무제한 업그레이드 (보급/돈) 제외하고 선택지 수집
 	for id in UPGRADES:
 		if id in ["supply", "gold"]:
 			continue
-		if current_levels[id] < UPGRADES[id]["max_level"]:
+			
+		var u = UPGRADES[id]
+		# 카테고리 필터링 (있을 경우)
+		if category_filter != -1 and u.get("category", -1) != category_filter:
+			continue
+		# 일반 레벨업 시 함대 업그레이드 제외 (카테고리 5 = FLEET)
+		if category_filter == -1 and u.get("category", -1) == 5:
+			continue
+			
+		if current_levels[id] < u["max_level"]:
 			available.append(id)
 	
 	available.shuffle()
 	var choices = available.slice(0, mini(count, available.size()))
 	
-	# 빈 자리는 보급/돈으로 채움
+	# 함대 업그레이드 필터링 중이면 보급/돈 대신 다른 함대 항목이나 빈 배열을 반환할 수도 있음
+	# 여기선 함대 항목이 부족할 경우 보급/돈은 넣지 않음 (함대 강화는 한정적이므로)
+	if category_filter == 5:
+		return choices
+		
+	# 빈 자리는 보급/돈으로 채움 (일반 레벨업용)
 	var fallbacks = ["supply", "gold"]
 	while choices.size() < count:
 		var fb = fallbacks[choices.size() % fallbacks.size()]
@@ -222,17 +142,28 @@ func apply_upgrade(upgrade_id: String) -> void:
 	if has_method(method_name):
 		call(method_name, player_ship, new_level)
 	else:
-		pass # supply_bonus 등 동적 적용 업그레이드는 별도 함수 없이 pass
+		pass # supply_bonus 등 동적 적용 업그레이드는 별도 함수
 	
 	upgrade_applied.emit(upgrade_id, new_level)
+	
+	# 함대 업그레이드인 경우 현재 활성화된 모든 미니언에 즉시 적용
+	if UPGRADES[upgrade_id].get("category", -1) == Category.FLEET: # Category.FLEET
+		var minions = get_tree().get_nodes_in_group("captured_minion")
+		for m in minions:
+			apply_fleet_upgrades_to_ship(m)
+	
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
 	# 무기 종류 업그레이드 시 HUD 무기 슬롯 갱신
-	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail", "fire_pot", "repeating_crossbow"]
+	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail", "fire_pot", "repeating_crossbow", "ballista"]
+	var support_ids = ["crew_numbers", "crew_quality", "hull_defense", "navigation", "supply_bonus"]
+	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if upgrade_id in weapon_ids:
-		var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 		if hud and hud.has_method("update_weapon_ui"):
 			hud.update_weapon_ui(upgrade_id, new_level)
+	elif upgrade_id in support_ids:
+		if hud and hud.has_method("update_support_ui"):
+			hud.update_support_ui(upgrade_id, new_level)
 
 
 ## 현재 레벨의 설명 가져오기 (다음 레벨 기준)
@@ -249,18 +180,17 @@ func get_next_description(upgrade_id: String) -> String:
 	var s = data.get("stats", {})
 	match upgrade_id:
 		"cannon":
-			var stat_lv = int(next_level / 2)
-			if next_level % 2 != 0:
-				return "대포 교대 배치 추가 (+1문)"
-			else:
-				return "대포 데미지 +%d%%, 사거리 +%d%%, 장전 시간 -%d%%" % [
-					stat_lv * s.get("dmg_pct_per_stat", 25),
-					stat_lv * s.get("range_pct_per_stat", 15),
-					stat_lv * s.get("cd_pct_per_stat", 10)]
+			var desc = ""
+			if next_level == 2 or next_level == 4:
+				desc = "대포 추가 배치 (+1문) 및 "
+			return desc + "화력 +%d%%, 사거리 +%d%%, 장전속도 +%d%%" % [
+				s.get("dmg_pct_per_lv", 20), s.get("range_pct_per_lv", 10), s.get("cd_pct_per_lv", 8)]
 		"janggun":
-			return "대장군전 화력 및 화염/디버프 강화"
+			return "대장군전 파괴력 및 디버프 효과(화염/둔화) 대폭 강화"
 		"singigeon":
-			return "신기전 발사 개수 및 파괴력 향상"
+			var shots = 1 + int(next_level / 2.0)
+			if next_level == 5: shots = 3
+			return "신기전 발사 수 증가(최대 %d발) 및 파괴력 향상" % shots
 		"crew_numbers":
 			if ship:
 				var add = s.get("crew_add", 1)
@@ -300,6 +230,10 @@ func get_next_description(upgrade_id: String) -> String:
 			var radius = s.get("base_radius", 8.0) + (next_level * s.get("radius_per_lv", 2.0))
 			var heal = s.get("heal_per_lv", 5.0) * (next_level + 1)
 			return "부유물 획득 범위 증가(%.1fm) 및\n체력 회복량 증가(+%.0f)" % [radius, heal]
+		"ballista":
+			var dmg = s.get("base_damage", 45.0) + (next_level - 1) * s.get("damage_per_lv", 15.0)
+			var pierce = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))
+			return "관통 화살 데미지 %.0f, 최대 %d명 관통 및 넉백" % [dmg, pierce]
 		"supply":
 			return "선체 수리 (즉시 HP +%d 회복)" % int(s.get("max_hp_add", 20))
 		"gold":
@@ -331,6 +265,21 @@ func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
 	soldier.position = offset
 	var current_max = ship.get("max_crew_count") if "max_crew_count" in ship else 0
 	print("[Crew] 병사 정원 증가! (현재 최대: %d)" % current_max)
+
+func _apply_ballista(ship: Node3D, _level: int) -> void:
+	if not ballista_scene: return
+	
+	# 이미 팔우노가 있는지 확인
+	if ship.has_node("BallistaLauncher"):
+		return
+		
+	var ballista = ballista_scene.instantiate()
+	ballista.name = "BallistaLauncher"
+	# 함선 후방 적절한 위치에 배치 (보통 꼬리 쪽 중앙)
+	# Ship.tscn의 돛이나 다른 오브젝트와 안 겹치도록 조정
+	ballista.position = Vector3(0, 1.3, 3.5)
+	ship.add_child(ballista)
+	print("[Upgrade] 팔우노(Ballista) 장착 완료.")
 
 func _apply_crew_quality(ship: Node3D, _level: int) -> void:
 	var soldiers = _get_player_soldiers(ship)
@@ -391,34 +340,30 @@ func _apply_cannon(ship: Node3D, level: int) -> void:
 		cannons_node.name = "Cannons"
 		ship.add_child(cannons_node)
 	
-	if level % 2 != 0:
-		# 홀수 레벨: 대포 추가 (1, 3, 5, 7) -> 총 4기 배치
-		var count_idx = int((level + 1) / 2.0)
+	if level == 1:
+		# 시작 시 대포 1문 지급 (이미 initialize_default_weapons에서 처리됨)
+		return
+		
+	# 대포 추가 배치 (레벨 2, 4에서 추가)
+	if level == 2 or level == 4:
 		var cannon = cannon_scene.instantiate()
 		cannons_node.add_child(cannon)
 		
 		var positions = [
-			Vector3(1.3, 0.6, -2.0), # Lv1 -> 우측 선수
-			Vector3(-1.3, 0.6, -2.0), # Lv3 -> 좌측 선수
-			Vector3(1.3, 0.6, 2.0), # Lv5 -> 우측 선미
-			Vector3(-1.3, 0.6, 2.0) # Lv7 -> 좌측 선미
+			Vector3.ZERO, # Lv1 (이미 존재)
+			Vector3(-1.3, 0.6, -2.0), # Lv2 -> 좌측 선수
+			Vector3.ZERO, # Lv3 (강화만)
+			Vector3(1.3, 0.6, 2.0), # Lv4 -> 우측 선미
 		]
 		
-		var pos = positions[0]
-		if count_idx <= positions.size():
-			pos = positions[count_idx - 1]
-		else:
-			var side = 1 if count_idx % 2 == 1 else -1
-			var z_offset = 2.0 + (count_idx - 4) * 1.0
-			pos = Vector3(side * 1.3, 0.6, z_offset)
-
+		var pos = positions[level - 1]
 		cannon.position = pos
 		var rot_y = -90.0 if pos.x > 0 else 90.0
 		cannon.rotation.y = deg_to_rad(rot_y)
-		print("[Cannon] 대포 추가! (위치: %s)" % pos)
-	else:
-		# 짝수 레벨: 화력 강화 (별도 적용 없이 cannon.gd에서 upgrade_manager 상태 조회)
-		print("[Cannon] 대포 화력/장전/사거리 강화! (Lv.%d)" % level)
+		print("[Cannon] 대포 추가 배치! (위치: %s)" % pos)
+	
+	# 모든 레벨에서 화력 강화는 cannon.gd의 업그레이드 레벨 참조로 자동 적용됨
+	print("[Cannon] 대포 성능 강화 적용 (Lv.%d)" % level)
 
 
 func _apply_singigeon(ship: Node3D, level: int) -> void:
@@ -541,28 +486,36 @@ func _apply_gold(_ship: Node3D, _level: int) -> void:
 
 func _get_player_ship() -> Node3D:
 	var players = get_tree().get_nodes_in_group("player")
+	for p in players:
+		if is_instance_valid(p) and p.get("is_player_controlled") == true:
+			return p
 	if players.size() > 0:
 		return players[0]
 	return null
+
+func _apply_relic_to_ship(relic_id: String, ship: Node3D) -> void:
+	var method_name = "_apply_relic_%s" % relic_id
+	if has_method(method_name):
+		call(method_name, ship)
 
 
 func add_relic(relic_id: String) -> void:
 	if relic_id not in RELICS:
 		push_warning("UpgradeManager: 존재하지 않는 렐릭 ID입니다 - %s" % relic_id)
 		return
-		
-	if acquired_relics.has(relic_id):
+
+	var ship = _get_player_ship()
+	if not ship:
 		return
 		
-	var ship = _get_player_ship()
-	if not ship: return
+	if acquired_relics.has(relic_id):
+		# 이미 획득한 렐릭이어도 현재 본선에는 효과를 재적용한다.
+		_apply_relic_to_ship(relic_id, ship)
+		return
 	
 	acquired_relics.append(relic_id)
 	
-	# 함수명 규칙 기반 자동 디스패치: _apply_relic_{relic_id}(ship)
-	var method_name = "_apply_relic_%s" % relic_id
-	if has_method(method_name):
-		call(method_name, ship)
+	_apply_relic_to_ship(relic_id, ship)
 	
 	# HUD 공통 업데이트 로직
 	var relic_data = RELICS[relic_id]
@@ -582,6 +535,35 @@ func add_relic(relic_id: String) -> void:
 func _apply_relic_sextant(ship: Node3D) -> void:
 	if "has_sextant" in ship:
 		ship.has_sextant = true
+
+
+## 함대(미니언) 업그레이드 일괄 적용 함수
+func apply_fleet_upgrades_to_ship(ship: Node3D) -> void:
+	if not is_instance_valid(ship): return
+	
+	# 1. 함대 대포 업그레이드 (함선 내부의 _equip_minion_cannons 호출 보조)
+	if "fleet_cannon" in current_levels:
+		var lv = current_levels["fleet_cannon"]
+		if ship.has_method("apply_fleet_weapon_upgrade"):
+			ship.apply_fleet_weapon_upgrade(lv)
+			
+	# 2. 함대 체력/방어력 업그레이드
+	if "fleet_hull" in current_levels:
+		var lv = current_levels["fleet_hull"]
+		var s = UPGRADES["fleet_hull"].get("stats", {})
+		if "max_hull_hp" in ship:
+			var base_hp = 300.0 # ChaserShip 기본 체력 가정 (자동화 필요 시 수정)
+			ship.max_hull_hp = base_hp + (s.get("hp_add", 100.0) * lv)
+			ship.hull_hp = minf(ship.hull_hp + s.get("hp_add", 100.0), ship.max_hull_hp)
+			
+	# 3. 함대 병사 업그레이드
+	if "fleet_crew" in current_levels:
+		var lv = current_levels["fleet_crew"]
+		var s = UPGRADES["fleet_crew"].get("stats", {})
+		if "enemy_respawn_interval" in ship:
+			var base_interval = 12.0
+			var mult = pow(s.get("respawn_mult", 0.7), lv)
+			ship.enemy_respawn_interval = maxf(1.0, base_interval * mult)
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:

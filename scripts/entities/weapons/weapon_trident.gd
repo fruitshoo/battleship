@@ -5,7 +5,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 
 func _ready() -> void:
 	damage = 18.0
-	attack_range = 1.8
+	attack_range = 3.0
 	attack_cooldown = 1.6
 
 func attack(target: Node3D, attacker: Node3D) -> void:

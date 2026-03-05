@@ -1,4 +1,5 @@
 extends Area3D
+const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 
 ## 장군전 미사일 (Janggun Missile)
 ## 느리지만 고데미지 통나무 미사일. 범위 피해.
@@ -22,6 +23,7 @@ var is_stuck: bool = false
 var is_sinking: bool = false
 var target_ship: Node3D = null
 var janggun_lv: int = 0
+var team: String = "player"
 
 func _ready() -> void:
 	# 업그레이드 수치 반영 (DoT, 디버프 강화)
@@ -63,8 +65,12 @@ func _physics_process(delta: float) -> void:
 	current_pos.y += y_offset
 	
 	if (current_pos - global_position).length_squared() > 0.0001:
-		var target_look = current_pos + (current_pos - global_position).normalized()
-		look_at(target_look, Vector3.UP)
+		var dir = (current_pos - global_position).normalized()
+		var target_look = current_pos + dir
+		var up_vec = Vector3.UP
+		if abs(dir.y) > 0.999:
+			up_vec = Vector3.RIGHT
+		look_at(target_look, up_vec)
 		
 	global_position = current_pos
 	
@@ -75,11 +81,7 @@ func _physics_process(delta: float) -> void:
 func _on_hit(target: Node) -> void:
 	if is_stuck: return
 	
-	var ship = target if target.is_in_group("enemy") or target.is_in_group("player") else null
-	if not ship:
-		var p = target.get_parent()
-		if p and (p.is_in_group("enemy") or p.is_in_group("player")):
-			ship = p
+	var ship = HitTargetResolver.resolve_ship_from_node(target)
 	
 	if ship:
 		var target_is_sinking = ship.get("is_sinking") == true
@@ -100,7 +102,8 @@ func _stick_to_ship(ship: Node3D) -> void:
 	
 	# 데미지 주기
 	if ship.has_method("take_damage"):
-		ship.take_damage(damage, global_position)
+		var source_id = "janggun" if team == "player" else ""
+		ship.take_damage(damage, global_position, source_id)
 	
 	# 물리/충돌 끄기
 	set_deferred("monitoring", false)

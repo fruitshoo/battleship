@@ -15,6 +15,9 @@ var base_y: float = 0.0
 var time_alive: float = 0.0
 var is_collected: bool = false
 var _cached_ocean: Node = null
+var _cached_wave_height: float = 0.0
+var _wave_sample_timer: float = 0.0
+@export_range(0.03, 0.3) var wave_sample_interval: float = 0.1
 
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
@@ -53,6 +56,7 @@ var is_expiring: bool = false # 소멸 진행 중 여부
 func _physics_process(delta: float) -> void:
 	if is_collected: return
 	time_alive += delta
+	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
 	
 	if not is_expiring and time_alive > lifetime:
 		_expire_and_free()
@@ -97,7 +101,10 @@ func _apply_floating(delta: float) -> void:
 	var target_y = base_y + sin(time_alive * float_speed) * float_height
 	
 	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
-		target_y += _cached_ocean.get_wave_height(global_position)
+		if _wave_sample_timer <= 0.0:
+			_cached_wave_height = _cached_ocean.get_wave_height(global_position)
+			_wave_sample_timer = wave_sample_interval
+		target_y += _cached_wave_height
 		
 	# lerp를 사용하여 부드럽게 파도와 기본 높이를 따라감
 	position.y = lerp(position.y, target_y, 4.0 * delta)

@@ -35,6 +35,8 @@ enum State {
 			_update_weapon_stats()
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
 @export var weapon_switch_distance: float = 4.0 # 무기 교체 거리 (이내면 검, 밖이면 활)하향 (10 -> 4)
+@export var is_melee_only: bool = false ## 근접 무기만 사용 (백병전용)
+@export var is_ranged_only: bool = false ## 원거리 무기만 사용 (포격 지원용)
 @export var hit_effect_scene: PackedScene = preload("res://scenes/effects/hit_effect.tscn")
 
 # === 내부 상태 ===
@@ -47,6 +49,7 @@ var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
 var home_ground_timer: float = 0.0 # 홈그라운드 체력 재생 타이머
+var _is_jumping: bool = false # 점프/도선 중인지 여부
 
 # 성능 최적화: UpgradeManager 캐싱
 var _cached_upgrade_manager: Node = null
@@ -66,6 +69,9 @@ var is_boarder_on_player_ship: bool = false
 var chaos_duration_timer: float = 8.0 # 최대 8초간 약탈 후 도망감
 var chaos_tick_timer: float = 0.0 # 1초마다 데미지 틱
 var chaos_damage_per_tick: float = 5.0 # 상향: 초당 5의 화재 피해 (배 체력 비례)
+
+const CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 10.0
+const CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 12.0
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_soldiers: Array = []
@@ -96,8 +102,7 @@ static func get_ships_cached(tree: SceneTree, team_name: String) -> Array:
 		return _cached_enemy_ships
 
 
-# 노드 참조
-@onready var nav_agent: NavigationAgent3D = $NavigationAgent3D if has_node("NavigationAgent3D") else null
+# 노드 참조 (이제 NavMesh를 사용하지 않습니다)
 
 
 func _ready() -> void:
@@ -130,41 +135,48 @@ func _ready() -> void:
 		pivot.position = Vector3(0.3, 0.7, -0.15)
 		add_child(pivot)
 		
-	# 무기 생성 (근접 무기 4종 중 랜덤 1개 + 활)
+	# 무기 생성
 	var melee_scenes = [
 		"res://scenes/entities/weapons/weapon_sword.tscn",
 		"res://scenes/entities/weapons/weapon_spear.tscn",
 		"res://scenes/entities/weapons/weapon_trident.tscn",
 		"res://scenes/entities/weapons/weapon_harpoon.tscn"
 	]
-	var random_melee_path = melee_scenes[randi() % melee_scenes.size()]
-	var sword_scene = load(random_melee_path)
-	var bow_scene = load("res://scenes/entities/weapons/weapon_bow.tscn")
 	
-	if sword_scene:
-		weapon_sword = sword_scene.instantiate() as Node3D
-		# 수동 생성 노드가 아닐 경우 대비 (HandPivot이 없는 구버전 배 하위 호환)
-		var hand = get_node_or_null("HandPivot")
-		if hand:
+	var hand = get_node_or_null("HandPivot")
+	
+	# 근접 무기 로드 (Ranged Only가 아닐 때만)
+	if not is_ranged_only:
+		var random_melee_path = melee_scenes[randi() % melee_scenes.size()]
+		var sword_scene = load(random_melee_path)
+		if sword_scene and hand:
+			weapon_sword = sword_scene.instantiate() as Node3D
 			hand.add_child(weapon_sword)
-	if bow_scene:
-		weapon_bow = bow_scene.instantiate() as Node3D
-		$HandPivot.add_child(weapon_bow)
+			
+	# 활 로드 (Melee Only가 아닐 때만)
+	if not is_melee_only:
+		var bow_scene = load("res://scenes/entities/weapons/weapon_bow.tscn")
+		if bow_scene and hand:
+			weapon_bow = bow_scene.instantiate() as Node3D
+			hand.add_child(weapon_bow)
 		
 	# 공격력 수치 및 무기 상태 업데이트
 	_update_weapon_stats()
 		
-	# 시작은 무조건 원거리(활)로 세팅 (함선간 교전부터 시작하므로)
-	_set_active_weapon("bow")
+	# 시작 무기 설정
+	if is_melee_only:
+		_set_active_weapon("sword")
+	else:
+		_set_active_weapon("bow") # General이나 Ranged Only는 활부터 시작
 	
-	if nav_agent:
-		nav_agent.max_speed = move_speed
-		nav_agent.path_desired_distance = 0.5
-		nav_agent.target_desired_distance = 0.5
+	# NavMeshAgent 관련 초기화 제거
 	
 	# 시작 시 랜덤 배회 시작
 	_start_wander()
 	_update_team_color()
+	
+	# AI 실행 시점 분산 (Staggering)
+	decision_timer = randf_range(0.0, 0.2)
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
 	add_to_group("soldiers")
@@ -248,11 +260,27 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("water_splash_small", global_position, randf_range(0.9, 1.2))
 			
+		# [최적화] 사망 시 배의 폐선 여부 체크 이벤트 트리거
+		if is_instance_valid(home_ship) and home_ship.has_method("check_derelict_status"):
+			home_ship.call_deferred("check_derelict_status")
+			
 		_die()
 		return
+		
+	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
+	if not _is_jumping and current_state != State.DEAD:
+		# 넉백(velocity) 감쇄
+		velocity.x = lerp(velocity.x, 0.0, 5.0 * delta)
+		velocity.z = lerp(velocity.z, 0.0, 5.0 * delta)
+		
+		# 이동 시 충돌 등으로 Y축이 뜨지 않도록 처리
+		if velocity.y > 0.0: velocity.y = 0.0
 	
 	# 고정형(is_stationary) 병사는 AI 로직 실행하지 않음 — 사격만 함
 	if is_stationary:
+		if not _is_jumping and current_state != State.DEAD:
+			move_and_slide()
+			_keep_within_owned_ship_bounds()
 		if attack_timer > 0: attack_timer -= delta
 		_check_ranged_combat()
 		return
@@ -266,7 +294,20 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(owned_ship) and owned_ship.has_method("get_hull_ratio"):
 			ship_hp_ratio = owned_ship.get_hull_ratio()
 			
+		# === 성능 최적화: 거리 기반 AI LOD (Level of Detail) ===
+		var dist_to_player = 0.0
+		var player_ships = get_ships_cached(get_tree(), "player")
+		if not player_ships.is_empty():
+			dist_to_player = global_position.distance_to(player_ships[0].global_position)
+			
 		var throttle_time = 0.2 if ship_hp_ratio > 0.2 else 0.1
+		
+		# 플레이어와 멀리 떨어져 있으면(50m 이상) AI 주기를 대폭 늘림 (0.2s -> 0.8s)
+		if dist_to_player > 50.0:
+			throttle_time = 0.8
+		elif dist_to_player > 30.0:
+			throttle_time = 0.4
+			
 		decision_timer = throttle_time + randf_range(0.0, 0.05)
 		run_heavy_logic = true
 		
@@ -308,6 +349,11 @@ func _physics_process(delta: float) -> void:
 			_state_attack(delta)
 		State.DEAD:
 			pass
+	
+	if not _is_jumping and current_state != State.DEAD:
+		if current_state == State.IDLE or current_state == State.ATTACK:
+			move_and_slide()
+		_keep_within_owned_ship_bounds()
 			
 	# 탈출(Evacuation) 체크: 소속된 나포함이 가라앉고 있으면 홈으로 복귀
 	if run_heavy_logic and team == "player" and is_instance_valid(owned_ship) and owned_ship.get("is_dying") == true:
@@ -325,17 +371,28 @@ func _physics_process(delta: float) -> void:
 	
 	# 원거리 사격 및 무기 스위칭 체크 (스로틀링)
 	if run_heavy_logic and current_state != State.DEAD:
-		# 다이나믹 무기 스위칭: 가장 가까운 적을 찾아 거리에 따라 무기 변경
 		var nearest = find_nearest_enemy()
 		if nearest:
-			var dist = global_position.distance_to(nearest.global_position)
-			if dist <= weapon_switch_distance:
+			var dist_xz = Vector2(global_position.x - nearest.global_position.x, global_position.z - nearest.global_position.z).length()
+			var target_ship = nearest.get("owned_ship")
+			var cross_ship_close = is_instance_valid(owned_ship) and is_instance_valid(target_ship) and target_ship != owned_ship and _is_ship_pair_in_melee_range(target_ship)
+			if is_melee_only:
+				_set_active_weapon("sword")
+			elif is_ranged_only:
+				_set_active_weapon("bow")
+			elif cross_ship_close:
+				# 인접한 적선과 난간전이 시작되면 월선보다 근접전을 우선한다.
+				_set_active_weapon("sword")
+			elif dist_xz <= weapon_switch_distance:
 				_set_active_weapon("sword")
 			else:
 				_set_active_weapon("bow")
 		else:
-			# 적이 없으면 기본적으로 검을 들고 대기 (또는 활 유지)
-			_set_active_weapon("sword")
+			# 적이 없으면 기본적으로 활을 들고 대기 (Melee Only만 검 유지)
+			if is_melee_only:
+				_set_active_weapon("sword")
+			else:
+				_set_active_weapon("bow")
 			
 		if current_state != State.ATTACK:
 			_check_ranged_combat()
@@ -387,31 +444,26 @@ func _state_wander(_delta: float, run_heavy_logic: bool) -> void:
 	# 1. 로컬 목표점을 현재 월드 좌표로 변환 (배가 움직이니까 매 프레임 갱신)
 	var current_global_target = owned_ship.to_global(wander_target_local)
 	
-	# 2. 이동 로직
-	if nav_agent:
-		# 부하 경감을 위해 목표가 크게 바뀌었을 때만 경로 갱신 (또는 주기적으로)
-		if current_global_target.distance_to(last_nav_target_pos) > 0.5:
-			nav_agent.target_position = current_global_target
-			last_nav_target_pos = current_global_target
+	# 2. 이동 로직 (직선 이동)
+	var diff = current_global_target - global_position
+	var wander_dist = diff.length()
+	
+	if wander_dist < 0.2:
+		# 도착했으면 IDLE로 전환하여 잠시 대기
+		wander_timer = randf_range(1.0, 3.0)
+		_change_state(State.IDLE)
+		return
 		
-		if nav_agent.is_navigation_finished():
-			# 도착했으면 IDLE로 전환하여 잠시 대기
-			wander_timer = randf_range(1.0, 3.0)
-			_change_state(State.IDLE)
-			return
-			
-		# 다음 경로점 이동
-		var next_pos = nav_agent.get_next_path_position()
-		var direction = (next_pos - global_position).normalized()
-		velocity = direction * move_speed
-		move_and_slide()
-		
-		# 이동 방향 회전
-		if direction.length_squared() > 0.01:
-			var target_look = global_position + direction
-			target_look.y = global_position.y # Y축 평면 유지
-			if not global_position.is_equal_approx(target_look):
-				look_at(target_look, Vector3.UP)
+	var direction = diff.normalized()
+	velocity = direction * move_speed * 0.5 # 배회는 천천히
+	move_and_slide()
+	
+	# 이동 방향 회전
+	if direction.length_squared() > 0.01:
+		var target_look = global_position + direction
+		target_look.y = global_position.y # Y축 평면 유지
+		if not global_position.is_equal_approx(target_look):
+			look_at(target_look, Vector3.UP)
 
 
 ## 배회 시작: 새로운 로컬 목표점 설정
@@ -419,11 +471,10 @@ func _start_wander() -> void:
 	if not is_instance_valid(owned_ship):
 		return
 	
-	# 배의 갑판 범위 내에서 랜덤 좌표 생성 (로컬)
-	# 갑판 크기: X(-1.25 ~ 1.25), Z(-3.75 ~ 3.75)
-	# 여유를 두고 약간 안쪽으로 잡음
-	var random_x = randf_range(-1.0, 1.0)
-	var random_z = randf_range(-3.0, 3.0)
+	# 배의 갑판 범위 내에서 랜덤 좌표 생성 (로컬, 선체 크기 동기화)
+	var half_ext = _get_ship_deck_half_extents(owned_ship)
+	var random_x = randf_range(-half_ext.x, half_ext.x)
+	var random_z = randf_range(-half_ext.y, half_ext.y)
 	
 	wander_target_local = Vector3(random_x, 0.0, random_z) # Y=0.0 (갑판 지면)
 	_change_state(State.WANDER)
@@ -440,17 +491,29 @@ func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
 		_change_state(State.IDLE)
 		return
 
-	# 타겟이 죽었으면 IDLE로 전환
+	# 타겟이 죽었거나 다른 배에 있으면 추적 중단
 	if current_target.get("current_state") == State.DEAD:
 		current_target = null
 		_change_state(State.IDLE)
 		return
+		
+	# 목표까지 거리 확인 (2D)
+	var pos_self_2d = Vector2(global_position.x, global_position.z)
+	var pos_target_2d = Vector2(current_target.global_position.x, current_target.global_position.z)
+	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
 	
-	# 목표까지 거리 확인
-	var distance = global_position.distance_to(current_target.global_position)
+	if is_instance_valid(owned_ship) and current_target.get("owned_ship") != owned_ship:
+		var target_ship = current_target.get("owned_ship")
+		if not _is_ship_pair_in_melee_range(target_ship):
+			_change_state(State.IDLE)
+			return
+		# 난간전 최대 교전 거리까지는 다른 배 적 추적 허용
+		if distance_xz > CROSS_SHIP_ENGAGE_MAX_DISTANCE:
+			_change_state(State.IDLE)
+			return
 	
 	# 탐지 범위 밖이면 포기 (다른 배의 적 추적 방지)
-	if distance > detection_range:
+	if distance_xz > detection_range:
 		current_target = null
 		_change_state(State.IDLE)
 		return
@@ -458,42 +521,27 @@ func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
 	# 무기 사정거리 호출
 	var attack_range = current_weapon.attack_range if current_weapon and "attack_range" in current_weapon else 1.2
 	
-	if distance <= attack_range:
+	if distance_xz <= attack_range:
+		# [Legacy] 타겟이 함선일 경우 수동 점프(도선) 시도 제거
+		# 이제 함선(BaseShip)의 _transfer_one_soldier 로직에 의해서만 도선합니다.
+		# if current_target.has_method("get_hull_ratio") and current_target != owned_ship:
+		# 	_jump_to_ship(current_target, true)
+		# 	_change_state(State.IDLE)
+		# 	return
 		_change_state(State.ATTACK)
 		return
 	
-	# NavMesh를 통한 이동
-	if nav_agent:
-		var target_pos = current_target.global_position
-		
-		# 대상이 NavMesh 위에 정확히 있지 않을 수 있으므로, 단순 직선 거리로 닫힐 수 있으면 이동 시도
-		if distance <= attack_range * 1.5:
-			var direction = (target_pos - global_position).normalized()
-			velocity = direction * move_speed
-			move_and_slide()
-			
-			if direction.length_squared() > 0.01:
-				var target_look = global_position + direction
-				target_look.y = global_position.y
-				if not global_position.is_equal_approx(target_look):
-					look_at(target_look, Vector3.UP)
-			return
-			
-		if target_pos.distance_to(last_nav_target_pos) > 1.0:
-			nav_agent.target_position = target_pos
-			last_nav_target_pos = target_pos
-		
-		if not nav_agent.is_navigation_finished():
-			var next_pos = nav_agent.get_next_path_position()
-			var direction = (next_pos - global_position).normalized()
-			velocity = direction * move_speed
-			move_and_slide()
-			
-			if direction.length_squared() > 0.01:
-				var target_look = global_position + direction
-				target_look.y = global_position.y
-				if not global_position.is_equal_approx(target_look):
-					look_at(target_look, Vector3.UP)
+	# 직선 이동 (NavMesh 없이 물리 엔진만 사용)
+	var target_pos = current_target.global_position
+	var direction = (target_pos - global_position).normalized()
+	velocity = direction * move_speed
+	move_and_slide()
+	
+	if direction.length_squared() > 0.01:
+		var target_look = global_position + direction
+		target_look.y = global_position.y
+		if not global_position.is_equal_approx(target_look):
+			look_at(target_look, Vector3.UP)
 
 
 ## ATTACK 상태
@@ -502,19 +550,21 @@ func _state_attack(_delta: float) -> void:
 		_change_state(State.IDLE)
 		return
 	
-	# 타겟이 죽었으면 IDLE로 전환
-	if current_target.get("current_state") == State.DEAD:
+	# 타겟이 죽었거나 같은 팀이 되었으면(나포 등) IDLE로 전환
+	if current_target.get("current_state") == State.DEAD or current_target.get("team") == team:
 		current_target = null
 		_change_state(State.IDLE)
 		return
 	
-	var distance = global_position.distance_to(current_target.global_position)
+	var pos_self_2d = Vector2(global_position.x, global_position.z)
+	var pos_target_2d = Vector2(current_target.global_position.x, current_target.global_position.z)
+	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
 	
 	var attack_range = current_weapon.attack_range if current_weapon and "attack_range" in current_weapon else 1.2
-	var attack_cooldown = current_weapon.attack_cooldown if current_weapon and "attack_cooldown" in current_weapon else 1.0
+	var _attack_cooldown = current_weapon.attack_cooldown if current_weapon and "attack_cooldown" in current_weapon else 1.0
 	
-	# 사거리 벗어남
-	if distance > attack_range * 1.2:
+	# 사거리 벗어남 (1.2배 여유)
+	if distance_xz > attack_range * 1.2:
 		_change_state(State.MOVE)
 		return
 	
@@ -523,9 +573,42 @@ func _state_attack(_delta: float) -> void:
 	
 		# 공격
 	if attack_timer <= 0:
-		_perform_attack()
+		# 타겟이 함선(Ship)일 경우 밧줄 공격 또는 나포 시도 분기
+		if current_target.has_method("take_rope_damage") or current_target.has_method("get_hull_ratio"):
+			_perform_special_attack(current_target)
+		else:
+			_perform_attack()
 		attack_timer = current_weapon.attack_cooldown if current_weapon and "attack_cooldown" in current_weapon else 1.0
 
+
+## 함선 또는 밧줄에 대한 특수 공격 (절단/나포)
+func _perform_special_attack(target: Node3D) -> void:
+	if not is_instance_valid(target): return
+	
+	# 수비 상황: 우리 배에 걸린 밧줄을 끊어야 하는 경우
+	if is_instance_valid(owned_ship) and target == owned_ship.get("boarding_attacker"):
+		if team == "player":
+			# 밧줄 끊기 (우리 배의 밧줄 HP 깎음)
+			if owned_ship.has_method("take_rope_damage"):
+				owned_ship.take_rope_damage(attack_damage * 1.5) # 건물/밧줄엔 검술 보너스
+				_play_rope_hit_effects()
+				return
+	
+	# 공격 상황: 그냥 공격 (배 자체에는 데미지 주지 않음, 건너가기 위한 타겟팅용)
+	# 병사 이동 로직에서 target이 ship이면 가까이 갔을 때 점프함
+	_perform_attack()
+
+func _play_rope_hit_effects() -> void:
+	# 사운드 및 피격 이펙트 (밧줄 피격 느낌)
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("impact_wood", global_position, randf_range(1.1, 1.3))
+	
+	# 파편 효과
+	if is_instance_valid(hit_effect_scene):
+		var effect = hit_effect_scene.instantiate()
+		get_tree().root.add_child(effect)
+		effect.global_position = global_position + (global_transform.basis.z * -1.0)
 
 ## 공격 실행
 func _perform_attack() -> void:
@@ -572,6 +655,8 @@ func find_nearest_enemy() -> Node3D:
 	var nearest_global: Node3D = null
 	var nearest_distance_global: float = INF
 	
+	var detection_range_sq = detection_range * detection_range
+	
 	for other in all_soldiers:
 		if other == self or not is_instance_valid(other):
 			continue
@@ -583,70 +668,57 @@ func find_nearest_enemy() -> Node3D:
 		# 같은 팀이면 무시
 		if other.get("team") == team:
 			continue
+			
+		var other_ship = other.get("owned_ship")
 		
-		var distance = global_position.distance_to(other.global_position)
+		# [최적화] Broad-phase Culling: 상대가 다른 배에 타고 있는데 두 배가 멀면 스킵 (2D 기준)
+		if is_instance_valid(owned_ship) and is_instance_valid(other_ship) and owned_ship != other_ship:
+			var ship_diff_xz = Vector2(owned_ship.global_position.x - other_ship.global_position.x, owned_ship.global_position.z - other_ship.global_position.z)
+			if ship_diff_xz.length_squared() > 1600.0: # 40m 기준 (충분히 넉넉하게)
+				continue
+		
+		var pos_diff_xz = Vector2(global_position.x - other.global_position.x, global_position.z - other.global_position.z)
+		var dist_sq_xz = pos_diff_xz.length_squared()
+		if dist_sq_xz > detection_range_sq:
+			continue
 		
 		# 1. 동일 함선(`owned_ship`)에 있는 적 체크
-		if is_instance_valid(owned_ship) and other.get("owned_ship") == owned_ship:
-			if distance < nearest_distance_on_ship:
-				nearest_distance_on_ship = distance
+		if is_instance_valid(owned_ship) and other_ship == owned_ship:
+			if dist_sq_xz < nearest_distance_on_ship:
+				nearest_distance_on_ship = dist_sq_xz
 				nearest_on_ship = other
 		
 		# 2. 전역 탐지 범위 체크
-		if distance <= detection_range:
-			if distance < nearest_distance_global:
-				nearest_distance_global = distance
-				nearest_global = other
-				
-	# 같은 배 위에 적이 있다면 거리와 상관없이 우선 반환 (갑판 전투 우선)
-	if nearest_on_ship:
-		return nearest_on_ship
+		# - 원거리 병사나 사거리 긴 무기는 항시 전역 탐지 허용
+		# - 근거리 병사도 배가 인접해 있으면(난간전 가능 거리) 다른 배의 적을 인지하도록 함
+		var is_ranged = is_ranged_only or (current_weapon and current_weapon.get("max_range") != null and current_weapon.get("max_range") > 5.0)
+		var can_cross_ship_engage = false
+		if is_instance_valid(owned_ship) and is_instance_valid(other_ship) and owned_ship != other_ship:
+			can_cross_ship_engage = _is_ship_pair_in_melee_range(other_ship) and dist_sq_xz < (CROSS_SHIP_ENGAGE_MAX_DISTANCE * CROSS_SHIP_ENGAGE_MAX_DISTANCE)
+		else:
+			can_cross_ship_engage = dist_sq_xz < 16.0 # 같은 배는 기존 근접 우선 기준 유지
 		
-	# 같은 배 위에 적이 없으면 가장 가까운 전역 적 반환
-	return nearest_global
-
-## 나포 기회 확인
-func _check_ship_capture_opportunity() -> void:
-	# 아군 병사가 아닐 경우 무시
-	if team != "player": return
-	if not is_instance_valid(owned_ship): return
+		if is_ranged or can_cross_ship_engage:
+			if dist_sq_xz < nearest_distance_global:
+				nearest_distance_global = dist_sq_xz
+				nearest_global = other
 	
-	# 상황 1: 이미 적선 위에 올라탄 경우 (기존 나포 트리거)
-	if owned_ship.is_in_group("enemy") and not owned_ship.is_in_group("player"):
-		# 해당 배에 살아있는 적군이 있는지 확인
-		var enemy_count = 0
-		var soldiers_node = owned_ship.get_node_or_null("Soldiers")
-		if soldiers_node:
-			for child in soldiers_node.get_children():
-				if child.get("team") == "enemy" and child.get("current_state") != State.DEAD:
-					enemy_count += 1
-					
-		# 적군이 한 명도 없으면 나포 실행
-		if enemy_count == 0:
-			# [추가] 만약 이 배의 선원들이 다른 배(보통 플레이어 배)로 도선 중이라면, 그곳의 적들도 소탕해야 함
-			var b_target = owned_ship.get("boarding_target")
-			if is_instance_valid(b_target):
-				var target_soldiers = b_target.get_node_or_null("Soldiers")
-				var has_active_boarders = false
-				if target_soldiers:
-					for boarder in target_soldiers.get_children():
-						# 원래 적팀(enemy)이었던 병사가 타겟 배 위에 살아있는지 확인
-						if boarder.get("team") == "enemy" and boarder.get("current_state") != State.DEAD:
-							has_active_boarders = true
-							break
-				
-				if has_active_boarders:
-					# 아직 플레이어 배 위에 적이 남아있으므로 나포를 보류함
-					return
+	# [중요] 근접 공격용 타겟 우선순위: 같은 배 우선 -> 아주 가까운 전역 적
+	if is_melee_only:
+		return nearest_on_ship if nearest_on_ship else nearest_global
+		
+	# 원거리 가용 시: 같은 배 우선, 없으면 전역 적
+	return nearest_on_ship if nearest_on_ship else nearest_global
 
-			if owned_ship.has_method("capture_ship"):
-				owned_ship.capture_ship()
-			elif owned_ship.has_method("capture_derelict_ship"):
-				owned_ship.capture_derelict_ship()
-		return # 이미 다른 배 위이므로 아래 로직(주변 배 찾기)은 실행 않음
-
-	# 상황 2: 전이 로직은 이제 owned_ship에서 관리하므로 개별 판단 중단
+## 전이 로직은 통제됨 (개별 나포 기회 체크 삭제)
+func _check_ship_capture_opportunity() -> void:
 	return
+
+func _is_ship_pair_in_melee_range(other_ship: Node3D) -> bool:
+	if not is_instance_valid(owned_ship) or not is_instance_valid(other_ship):
+		return false
+	var ship_diff_xz = Vector2(owned_ship.global_position.x - other_ship.global_position.x, owned_ship.global_position.z - other_ship.global_position.z)
+	return ship_diff_xz.length_squared() <= (CROSS_SHIP_ENGAGE_SHIP_DISTANCE * CROSS_SHIP_ENGAGE_SHIP_DISTANCE)
 
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:
@@ -663,61 +735,22 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	var target_soldiers = target_ship.get_node_or_null("Soldiers")
 	if not target_soldiers: target_soldiers = target_ship
 	
-	var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.0, 2.0))
-	var target_global_pos = target_ship.to_global(jump_offset)
+	_is_jumping = true
+	var d_h = target_ship.get("deck_height") if "deck_height" in target_ship else 0.4
+	var target_half_ext = _get_ship_deck_half_extents(target_ship)
+	var jump_offset = Vector3(
+		randf_range(-target_half_ext.x, target_half_ext.x),
+		d_h,
+		randf_range(-target_half_ext.y, target_half_ext.y)
+	)
 	
 	# === 밧줄(Grappling Hook) 이펙트 ===
-	if team == "player" and is_capture_attempt:
-		var rope_mesh = CylinderMesh.new()
-		rope_mesh.top_radius = 0.05
-		rope_mesh.bottom_radius = 0.05
-		rope_mesh.height = 1.0 # 초기 길이 1 (나중에 스케일로 늘림)
-		
-		var rope_mat = StandardMaterial3D.new()
-		rope_mat.albedo_color = Color(0.4, 0.3, 0.2) # 밧줄 색상 (갈색)
-		rope_mesh.surface_set_material(0, rope_mat)
-		
-		var rope = MeshInstance3D.new()
-		rope.mesh = rope_mesh
-		
-		# 밧줄의 축을 Z축으로 눕혀서 LookAt에 맞게 정렬되도록 조정
-		rope.rotation_degrees.x = 90
-		
-		var rope_pivot = Node3D.new()
-		rope_pivot.add_child(rope)
-		# 피벗의 원점이 밧줄의 한쪽 끝에 오도록 위치 조정 (길이가 1이므로 0.5 이동)
-		rope.position.z = -0.5
-		
-		get_tree().root.add_child.call_deferred(rope_pivot)
-		# 피벗의 글로벌 위치를 병사의 현재 위치(약간 위쪽)로 설정
-		rope_pivot.set_deferred("global_position", global_position + Vector3(0, 0.5, 0))
-		
-		# 1프레임 대기 후 (deferred position 적용을 위해) 타겟을 향해 회전하고 스케일 애니메이션 시작
-		await get_tree().process_frame
-		if is_instance_valid(target_ship) and is_instance_valid(rope_pivot):
-			rope_pivot.look_at(target_global_pos, Vector3.UP)
-			var dist = global_position.distance_to(target_global_pos)
-			
-			# 시작 길이는 0, 도착 거리에 맞게 Z축 스케일을 늘림
-			rope_pivot.scale.z = 0.1
-			var rope_tween = create_tween()
-			rope_tween.tween_property(rope_pivot, "scale:z", dist, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-			
-			# 밧줄 던지는 효과음
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-				audio_manager.play_sfx("rope_throw", global_position, randf_range(0.9, 1.1))
-			
-			await rope_tween.finished
-			
-			# 점프 끝날 때 쯤 밧줄 회수(삭제)를 위해 병사의 점프 트윈 길이에 맞춘 타이머
-			get_tree().create_timer(1.2).timeout.connect(func():
-				if is_instance_valid(rope_pivot): rope_pivot.queue_free()
-			)
-		else:
-			if is_instance_valid(rope_pivot): rope_pivot.queue_free()
-
+	# [Legacy] 개별 병사가 밧줄을 생성하던 로직 제거 (이제 BaseShip에서 중앙 관리함)
+	# reparent 시 global_position을 유지하도록 보정
+	var start_glob = global_position
 	reparent(target_soldiers)
+	global_position = start_glob
+	
 	owned_ship = target_ship
 	
 	var start_local_pos = position
@@ -727,8 +760,8 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	var horiz_dist = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
 	# 점프 높이를 수평 거리에 비례하게 설정 (최소 2.5, 거리의 40%)
 	var jump_height = maxf(2.5, horiz_dist * 0.4)
-	# 이동 시간도 거리에 맞게 조절 (최소 0.6초, 최대 1.2초)
-	var travel_time = clampf(horiz_dist / 15.0, 0.6, 1.2)
+	# 이동 시간도 거리에 맞게 조절 (최소 0.6초, 최대 1.0초)
+	var travel_time = clampf(horiz_dist / 15.0, 0.6, 1.0)
 	
 	var tween = create_tween()
 	tween.set_parallel(true)
@@ -738,6 +771,7 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	var y_tween = create_tween()
 	y_tween.tween_property(self , "position:y", start_local_y + jump_height, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	y_tween.tween_property(self , "position:y", jump_offset.y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	y_tween.finished.connect(func(): _is_jumping = false)
 	
 	# 도선 시 타이머 리셋 (적군이 플레이어 배로 넘어갈 때)
 	if team == "enemy" and is_instance_valid(target_ship) and target_ship.get("team") == "player":
@@ -758,7 +792,6 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 		tween.finished.connect(func():
 			if is_instance_valid(target_ship):
 				target_ship.set_meta("being_boarded", false)
-				_check_ship_capture_opportunity() # 착지 후 즉시 나포 체크
 		)
 	
 	if not is_capture_attempt:
@@ -776,14 +809,45 @@ func _teleport_to_ship(_target_ship: Node3D) -> void:
 		print("[Rescue] 병사가 바다에 빠져 생존자가 되었습니다!")
 	queue_free()
 
+func _keep_within_owned_ship_bounds() -> void:
+	if not is_instance_valid(owned_ship):
+		return
+		
+	var d_height = owned_ship.get("deck_height") if "deck_height" in owned_ship else 0.4
+	if position.y != d_height:
+		position.y = d_height
+		
+	var half_ext = _get_ship_deck_half_extents(owned_ship)
+	position.x = clampf(position.x, -half_ext.x, half_ext.x)
+	position.z = clampf(position.z, -half_ext.y, half_ext.y)
+
+func _get_ship_deck_half_extents(ship: Node3D) -> Vector2:
+	if is_instance_valid(ship) and ship.has_method("get_deck_half_extents"):
+		var ext = ship.call("get_deck_half_extents")
+		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
+			return ext
+			
+	var radius = ship.get("base_collision_radius") if "base_collision_radius" in ship else 4.5
+	var w_mult = ship.get("width_multiplier") if "width_multiplier" in ship else 1.0
+	var l_mult = ship.get("length_multiplier") if "length_multiplier" in ship else 1.0
+	return Vector2(
+		maxf(0.4, radius * w_mult * 0.85),
+		maxf(0.8, radius * l_mult * 0.85)
+	)
+
 ## 데미지 받기
-func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO) -> void:
+func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
 	if current_state == State.DEAD:
 		return
 	
 	# 방어력 적용 (최소 1 데미지)
 	var final_damage = maxf(amount - defense, 1.0)
 	current_health -= final_damage
+	
+	# 플레이어 무기 피해 집계: 적 병사에만 기록
+	if not damage_source.is_empty() and team == "enemy":
+		if _cached_level_manager and _cached_level_manager.has_method("add_player_weapon_damage"):
+			_cached_level_manager.add_player_weapon_damage(damage_source, final_damage)
 	
 	# 피격 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -894,10 +958,16 @@ func heal_full() -> void:
 func _die() -> void:
 	current_state = State.DEAD
 	
+	# [최적화] 사망 시 배의 폐선 여부 체크 이벤트 트리거 (중복 방지를 방어적으로 처리)
+	if is_instance_valid(home_ship) and home_ship.has_method("check_derelict_status"):
+		home_ship.call_deferred("check_derelict_status")
+	
 	# XP 부여 (적군일 경우에만)
 	if team == "enemy":
 		if _cached_level_manager and _cached_level_manager.has_method("add_xp"):
 			_cached_level_manager.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
+		if _cached_level_manager and _cached_level_manager.has_method("add_soldier_kill"):
+			_cached_level_manager.add_soldier_kill(1)
 	
 	# 사망 사운드 및 바다로 떨어지는 물보라 소리
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -937,10 +1007,9 @@ func move_to_target(target: Node3D) -> void:
 
 
 ## 특정 위치로 이동
-func move_to_position(target_pos: Vector3) -> void:
-	if nav_agent:
-		nav_agent.target_position = target_pos
-		_change_state(State.MOVE)
+func move_to_position(_target_pos: Vector3) -> void:
+	# NavMesh 대신 단순 상태 전환 및 타이머/거리 체크로직 등 필요시 구현 (현재는 MOVE 상태에서 실시간 추적)
+	_change_state(State.MOVE)
 
 ## 원거리 적 확인 및 사격
 func _check_ranged_combat() -> void:
@@ -964,8 +1033,8 @@ func _find_ranged_target() -> Node3D:
 	# 1. 병사 탐색: find_nearest_enemy()의 개선된 로직(갑판 우선)을 그대로 활용
 	var nearest = find_nearest_enemy()
 	if is_instance_valid(nearest):
-		var dist = global_position.distance_to(nearest.global_position)
-		if dist <= max_range:
+		var dist_xz = Vector2(global_position.x - nearest.global_position.x, global_position.z - nearest.global_position.z).length()
+		if dist_xz <= max_range:
 			return nearest
 	
 	# 2. 함선 탐색: 병사가 없을 경우에만 함선 타겟팅 (기존 로직 유지)
@@ -974,15 +1043,15 @@ func _find_ranged_target() -> Node3D:
 	
 	# 함대 정원 체크 (나포 가능 여부)
 	var minions = get_tree().get_nodes_in_group("captured_minion")
-	var has_room = minions.size() < 2
+	var has_room = minions.size() < 3
 	
 	for ship in ships:
 		# ✅ 나포 가능하면 자기가 서 있는 배는 쏘지 않음 (나포 기회 보장)
 		if ship == owned_ship and has_room:
 			continue
 			
-		var dist = global_position.distance_to(ship.global_position)
-		if dist < max_range:
+		var dist_xz = Vector2(global_position.x - ship.global_position.x, global_position.z - ship.global_position.z).length()
+		if dist_xz < max_range:
 			return ship
 			
 	return null

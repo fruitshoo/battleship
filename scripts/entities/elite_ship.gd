@@ -34,6 +34,10 @@ func _apply_elite_visuals() -> void:
 func die() -> void:
 	if is_dying: return
 	
+	# 엘리트 함선 추가 공적 (부모 20 + 엘리트 보너스 10 = 총 30)
+	if not _merit_granted and is_instance_valid(cached_lm) and cached_lm.has_method("add_merit"):
+		cached_lm.add_merit(10) # 20포인트는 부모의 die()에서 자동으로 처리됨
+	
 	# 보물 상자 드랍
 	_drop_treasure_chest()
 	

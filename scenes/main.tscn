@@ -1,6 +1,5 @@
 [gd_scene format=3 uid="uid://cw5vsucpn0xa"]
 
-[ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ship.tscn" id="1"]
 [ext_resource type="Environment" uid="uid://d3wyl5ks17fd8" path="res://resources/environment/world_environment.tres" id="1_h2yge"]
 [ext_resource type="PackedScene" path="res://scenes/ui/ship_control_panel.tscn" id="3"]
 [ext_resource type="Theme" uid="uid://vloxxb0s8llf" path="res://resources/ui/theme.tres" id="4_1bvp3"]
@@ -8,8 +7,8 @@
 [ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="5_attributes"]
 [ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="5_spawner"]
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
+[ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
-[ext_resource type="PackedScene" uid="uid://orgd0ri27p5o" path="res://scenes/effects/water_explosion.tscn" id="11_ya4ey"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_choun"]
@@ -41,9 +40,6 @@ script = ExtResource("8_level_manager")
 hud = NodePath("../GameHUD")
 enemy_spawner = NodePath("../EnemySpawner")
 
-[node name="PlayerShip" parent="." unique_id=894322639 instance=ExtResource("1")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, 0)
-
 [node name="UI" type="CanvasLayer" parent="." unique_id=839851457]
 
 [node name="ShipControlPanel" parent="UI" unique_id=1539809376 instance=ExtResource("3")]
@@ -63,5 +59,6 @@ mesh = SubResource("BoxMesh_choun")
 transform = Transform3D(1, 0, 0, 0, 0.9371481, -0.3489319, 0, 0.3489319, 0.9371481, 16.745987, -1.1631579, 6.324033)
 mesh = SubResource("BoxMesh_choun")
 
-[node name="WaterExplosion" parent="." unique_id=1591442480 instance=ExtResource("11_ya4ey")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6459613, 0, 1.0891116)
+[node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7088671, 0, 15.67263)
+wave_sample_interval = null

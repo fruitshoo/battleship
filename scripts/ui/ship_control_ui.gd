@@ -18,10 +18,22 @@ var ship: Node3D = null
 @onready var wind_arrow: Node2D = %Arrow if has_node("%Arrow") else null
 @onready var compass_wheel: Node2D = %CompassWheel if has_node("%CompassWheel") else null
 
+func _resolve_controlled_ship() -> void:
+	ship = null
+	if controlled_ship != NodePath("") and has_node(controlled_ship):
+		ship = get_node(controlled_ship)
+		return
+	var players = get_tree().get_nodes_in_group("player")
+	for p in players:
+		if is_instance_valid(p) and p.get("is_player_controlled") == true:
+			ship = p
+			return
+	if players.size() > 0:
+		ship = players[0]
+
 
 func _ready() -> void:
-	if has_node(controlled_ship):
-		ship = get_node(controlled_ship)
+	_resolve_controlled_ship()
 	
 	# 불필요한 패널들의 부모 컨테이너(VBoxContainer) 전체를 숨겨서 배경 박스까지 완전히 제거
 	var vbox = get_node_or_null("VBoxContainer")
@@ -56,7 +68,9 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if not is_instance_valid(ship):
-		return
+		_resolve_controlled_ship()
+		if not is_instance_valid(ship):
+			return
 	
 	_update_sail_display()
 	_update_speed_display()
@@ -112,8 +126,9 @@ func _update_wind_indicator() -> void:
 		compass_wheel.rotation = cam_yaw
 	
 	# 2. 바람 화살표 회전: 카메라 시점 기준으로 상대적 바람 방향 표시
-	# 글로벌 바람 각도(deg) + 카메라 회전(rad)
-	var wind_angle_rad = deg_to_rad(WindManager.wind_angle_degrees)
+	# 실제 풍향 벡터를 직접 각도로 변환해 표시 (보조 각도 캐시값 의존 제거)
+	var wind_dir = WindManager.get_wind_direction()
+	var wind_angle_rad = atan2(wind_dir.x, -wind_dir.y)
 	wind_arrow.rotation = wind_angle_rad + cam_yaw
 
 

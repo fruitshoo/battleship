@@ -7,6 +7,7 @@ extends Node3D
 @export var fire_cooldown: float = 12.0
 @export var detection_range: float = 35.0
 @export var damage: float = 10.0
+@export var team: String = "player"
 
 var cooldown_timer: float = 0.0
 
@@ -22,7 +23,8 @@ func _process(delta: float) -> void:
 
 
 func _find_nearest_enemy() -> Node3D:
-	var enemies = get_tree().get_nodes_in_group("enemy")
+	var enemy_group = "enemy" if team == "player" else "player"
+	var enemies = get_tree().get_nodes_in_group(enemy_group)
 	var nearest: Node3D = null
 	var min_dist: float = detection_range
 	
@@ -48,14 +50,16 @@ func fire(target: Node3D) -> void:
 	if is_instance_valid(um) and "current_levels" in um:
 		janggun_lv = um.current_levels.get("janggun", 0)
 		
-	cooldown_timer = maxf(5.0, fire_cooldown - janggun_lv * 0.8)
+	# 5레벨 체계: 쿨다운 감소폭 상향 (레벨당 1.4초 감소, 5레벨에서 약 5초대 도달)
+	cooldown_timer = maxf(5.0, fire_cooldown - janggun_lv * 1.4)
 	
 	var missile = missile_scene.instantiate()
 	missile.start_pos = global_position + Vector3(0, 1.0, 0)
 	
 	# 예측 사격 (Predictive Aiming)
 	var dist = global_position.distance_to(target.global_position)
-	var projectile_speed = 18.0 * (1.0 + janggun_lv * 0.1) # janggun_missile.gd의 기본 속도 + 레벨 스케일링
+	# 레벨당 속도 증가폭 상향 (0.1 -> 0.15)
+	var projectile_speed = 18.0 * (1.0 + janggun_lv * 0.15)
 	var travel_time = dist / projectile_speed
 	
 	# 타겟의 속도와 방향 가져오기
@@ -72,8 +76,11 @@ func fire(target: Node3D) -> void:
 	var predicted_pos = target.global_position + (target_velocity * travel_time)
 	
 	missile.target_pos = predicted_pos
-	missile.damage = damage * (1.0 + janggun_lv * 0.3)
+	# 레벨당 데미지 증가폭 상향 (0.3 -> 0.5)
+	missile.damage = damage * (1.0 + janggun_lv * 0.5)
 	missile.speed = projectile_speed
+	if "team" in missile:
+		missile.team = team
 	if "janggun_lv" in missile:
 		missile.janggun_lv = janggun_lv
 	

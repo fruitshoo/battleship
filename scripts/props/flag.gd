@@ -59,11 +59,12 @@ func _update_dimensions() -> void:
 		f_mesh.position.y = pole_height - (flag_size.y * 0.5)
 
 func _process(_delta: float) -> void:
-	if Engine.is_editor_hint() or not is_instance_valid(WindManager):
+	var wind_manager = get_node_or_null("/root/WindManager")
+	if not is_instance_valid(wind_manager):
 		return
 	
-	var wind_dir = WindManager.get_wind_direction()
-	var wind_str = WindManager.get_wind_strength()
+	var wind_dir = wind_manager.get_wind_direction()
+	var wind_str = wind_manager.get_wind_strength()
 	var wind_3d = Vector3(wind_dir.x, 0, wind_dir.y).normalized()
 	
 	if wind_3d.length_squared() > 0.01:

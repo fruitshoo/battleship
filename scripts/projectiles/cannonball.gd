@@ -1,4 +1,5 @@
 extends Area3D
+const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 
 ## 대포알 (Cannonball)
 ## 정해진 방향으로 전진하며, 적과 충돌 시 적을 파괴함
@@ -40,6 +41,14 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 			smoke.emitting = true
 
 func _ready() -> void:
+	# 팀에 따른 충돌 마스크 자동 설정
+	if team == "player":
+		# 아군 대포알 → 적군(layer 4) 감시
+		collision_mask = 4
+	else:
+		# 적군 대포알 → 플레이어(layer 2) 감시
+		collision_mask = 2
+		
 	# 충돌 시그널 연결
 	area_entered.connect(_on_area_entered)
 	body_entered.connect(_on_body_entered)
@@ -68,7 +77,10 @@ func _physics_process(delta: float) -> void:
 	if time_alive < homing_duration and is_instance_valid(target_node):
 		var to_target = (target_node.global_position - global_position).normalized()
 		direction = direction.lerp(to_target, homing_strength * delta).normalized()
-		look_at(global_position + direction, Vector3.UP)
+		var up_vec = Vector3.UP
+		if abs(direction.y) > 0.999:
+			up_vec = Vector3.RIGHT
+		look_at(global_position + direction, up_vec)
 		
 	var move_vec = direction * speed * delta
 	var next_pos = global_position + move_vec
@@ -109,34 +121,31 @@ func _check_hit(target: Node) -> void:
 	# 일단 무언가에 부딪혔으므로 삭제 준비
 	has_hit = true
 	
-	# 적 함선 그룹 확인 (피아식별 강화)
-	var enemy = null
-	var target_is_enemy = (team == "player" and (target.is_in_group("enemy") or (target.get_parent() and target.get_parent().is_in_group("enemy"))))
-	var target_is_player = (team == "enemy" and (target.is_in_group("player") or (target.get_parent() and target.get_parent().is_in_group("player"))))
-	
-	if target_is_enemy:
-		enemy = target if target.is_in_group("enemy") else target.get_parent()
-	elif target_is_player:
-		enemy = target if target.is_in_group("player") else target.get_parent()
-	
-	if enemy:
-		# 함선 적중 시 데미지 처리
+	# 적 함선 찾기 로직 강화
+	var ship = HitTargetResolver.resolve_ship_from_node(target)
+		
+	if ship:
+		# 피아 식별 (내 팀과 같은 팀이면 통과 - 오사 방지)
+		var ship_team = HitTargetResolver.resolve_team_tag(ship)
+		if ship_team == team:
+			has_hit = false # 아군이면 맞은 걸로 치지 않음 (관통)
+			return
+		
+		# 적중 처리
 		var is_crit = randf() < crit_chance
 		var final_damage = damage * (crit_multiplier if is_crit else 1.0)
 		
-		if enemy.has_method("take_damage"):
-			enemy.take_damage(final_damage, global_position)
-		elif enemy.has_method("die"):
-			enemy.die()
-		else:
-			enemy.queue_free()
+		if ship.has_method("take_damage"):
+			var source_id = "cannon" if team == "player" else ""
+			ship.take_damage(final_damage, global_position, source_id)
 		
 		_spawn_effects(is_crit)
+		queue_free()
 	else:
 		# 침몰 중인 함선에 맞은 거면 무시 (부자연스러운 물폭발 방지)
-		var is_sinking = target.get("is_sinking") == true
-		if not is_sinking and target.get_parent() != null and target.get_parent().get("is_sinking") == true:
-			is_sinking = true
+		var is_sinking = false
+		if target.has_method("get") and target.get("is_sinking") == true: is_sinking = true
+		elif target.get_parent() and target.get_parent().has_method("get") and target.get_parent().get("is_sinking") == true: is_sinking = true
 			
 		if not is_sinking:
 			# 함선 외의 물체에 부딪혔을 때 → 물 폭발 이펙트 생성

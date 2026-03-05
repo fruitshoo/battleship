@@ -1,3 +1,4 @@
+@tool
 extends Node3D
 
 ## 함포 (Cannon)
@@ -45,12 +46,12 @@ func _update_cached_stats() -> void:
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager and "UPGRADES" in upgrade_manager:
 		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
-		var stat_lv = int(cannon_lv / 2)
 		var s = upgrade_manager.UPGRADES.get("cannon", {}).get("stats", {})
 		
-		_cached_range_mult = 1.0 + (s.get("range_pct_per_stat", 15) / 100.0) * stat_lv
-		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_stat", 10) / 100.0) * stat_lv)
-		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_stat", 25) / 100.0) * stat_lv
+		# 5레벨 체계: 매 레벨마다 보너스가 중첩됨
+		_cached_range_mult = 1.0 + (s.get("range_pct_per_lv", 10) / 100.0) * (cannon_lv - 1)
+		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_lv", 8) / 100.0) * (cannon_lv - 1))
+		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_lv", 20) / 100.0) * (cannon_lv - 1)
 
 func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 	fleet_damage_mult = dmg_mult
@@ -258,8 +259,8 @@ func _execute_fire() -> void:
 	ball.team = team
 	get_tree().root.add_child.call_deferred(ball)
 	
-	# 데미지 계산 (캐싱된 속성 반영 + 함대 보너스)
-	var base_dmg = 15.0 # 대포알 기준 데미지
+	# 데미지 계산 (포탄 씬의 기본 데미지 반영 + 함대 보너스)
+	var base_dmg = ball.damage
 	base_dmg *= _cached_dmg_mult * fleet_damage_mult
 	ball.damage = base_dmg
 

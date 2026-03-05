@@ -1,0 +1,53 @@
+[gd_scene format=3 uid="uid://xbd1hcgmpq23"]
+
+[ext_resource type="Script" uid="uid://cy7yako2yokck" path="res://scripts/entities/player_ship.gd" id="1"]
+[ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/soldier.tscn" id="2_soldier"]
+[ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
+[ext_resource type="PackedScene" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
+[ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_proximity"]
+size = Vector3(4, 3, 9)
+
+[node name="PlayerShip" type="Node3D" unique_id=2118299445]
+script = ExtResource("1")
+floating_offset = 0.5
+
+[node name="HullScene" parent="." unique_id=29881526 instance=ExtResource("hull_scene")]
+
+[node name="ProximityArea" type="Area3D" parent="." unique_id=244065699 groups=["ship_proximity"]]
+collision_layer = 2
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
+shape = SubResource("BoxShape_proximity")
+
+[node name="HitArea" type="Area3D" parent="." unique_id=195625511 groups=["ship_hitbox"]]
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape_proximity")
+
+[node name="Soldiers" type="Node3D" parent="." unique_id=351081976]
+
+[node name="Soldier1" parent="Soldiers" unique_id=67460350 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.5, -2)
+
+[node name="Soldier2" parent="Soldiers" unique_id=1246081066 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, -1)
+
+[node name="Soldier3" parent="Soldiers" unique_id=1480054011 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.5, 1)
+
+[node name="Soldier4" parent="Soldiers" unique_id=512227994 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 2)
+
+[node name="WakeTrail" parent="." unique_id=790263304 instance=ExtResource("3_wake_trail")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
+
+[node name="ShipAudio" type="AudioStreamPlayer3D" parent="." unique_id=739675513]
+
+[node name="CollisionVisualizer" type="Node3D" parent="." unique_id=2033846630]
+script = ExtResource("sys_vis_script")

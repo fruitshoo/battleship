@@ -22,7 +22,7 @@ var xp_bar: ProgressBar = null
 var game_time: float = 0.0
 var _gust_warning_timer: float = 0.0
 var player_ship: Node3D = null
-var cached_lm: Node = null
+var _player_lookup_cooldown: float = 0.0
 
 # 신규 레이아웃 UI 요소
 var hp_bar: ProgressBar = null
@@ -33,16 +33,23 @@ var stamina_bar: ProgressBar = null
 var top_left_container: VBoxContainer = null
 var top_right_container: VBoxContainer = null
 var bottom_left_container: VBoxContainer = null
-var bottom_right_container: VBoxContainer = null
 var speed_display: Label = null
-var cooldown_bar: ProgressBar = null
-var cooldown_label: Label = null
+
+# --- 도선 UI ---
+var boarding_ui: VBoxContainer = null
+var boarding_bar: ProgressBar = null
+var boarding_label: Label = null
+
+# --- 초요기(소집) UI ---
+var merit_bar: ProgressBar = null
+var merit_label: Label = null
 
 # 캐싱 변수들
 var _last_timer_str: String = ""
 var _last_speed_str: String = ""
 var _last_xp_text: String = ""
 var _last_difficulty_text: String = ""
+var _last_combat_stats_text: String = ""
 
 # === 렐릭 UI 변수 ===
 var relic_container: HBoxContainer = null
@@ -52,16 +59,20 @@ var current_relic_count: int = 0
 var weapon_container: HBoxContainer = null
 var weapon_slots: Array[PanelContainer] = []
 var active_weapons: Dictionary = {} # 무기 ID를 슬롯 인덱스에 매핑
+var support_container: HBoxContainer = null
+var support_slots: Array[PanelContainer] = []
+var active_supports: Dictionary = {} # 보조 업그레이드 ID를 슬롯 인덱스에 매핑
+var combat_stats_label: Label = null
 
 func _ready() -> void:
 	# 기존 요소 숨기기 & 신규 레이아웃 셋업
+	_setup_top_xp_bar()
 	_setup_new_layout()
 	
 	update_level(1)
 	update_score(0)
 	update_enemy_count(0)
 	update_crew_status(4)
-	_setup_top_xp_bar()
 	
 	if xp_label: xp_label.visible = false # 기존 라벨 숨김
 	
@@ -71,12 +82,6 @@ func _ready() -> void:
 			WindManager.gust_started.connect(_on_gust_started)
 		if WindManager.has_signal("gust_ended"):
 			WindManager.gust_ended.connect(_on_gust_ended)
-			
-	# 레벨매니저 캐싱
-	cached_lm = get_tree().root.find_child("LevelManager", true, false)
-	if not cached_lm:
-		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
-		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 
 func _setup_top_xp_bar() -> void:
 	xp_bar = ProgressBar.new()
@@ -99,10 +104,40 @@ func _setup_top_xp_bar() -> void:
 	sb_fg.set_border_width_all(0) # 얇은 바에서는 테두리 제거가 더 깔끔
 	xp_bar.add_theme_stylebox_override("fill", sb_fg)
 	
-	# 다른 UI들이 XP바와 겹치지 않도록 TopPanel 위치 조정
+	# === 초요기(공적) 바 추가 ===
+	merit_bar = ProgressBar.new()
+	merit_bar.name = "TopMeritBar"
+	add_child(merit_bar)
+	
+	merit_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	merit_bar.offset_top = 22.0 # XP 바(두께 18) 바로 아래 여유있게 배치
+	merit_bar.custom_minimum_size.y = 12.0 # XP바(18)보다 약간 얇게
+	merit_bar.show_percentage = false
+	merit_bar.z_index = 10
+	
+	var mb_bg = StyleBoxFlat.new()
+	mb_bg.bg_color = Color(0, 0, 0, 0.3)
+	merit_bar.add_theme_stylebox_override("background", mb_bg)
+	
+	var mb_fg = StyleBoxFlat.new()
+	mb_fg.bg_color = Color(1.0, 0.8, 0.2, 0.9) # 금색/주황색 계열
+	mb_fg.set_border_width_all(0)
+	merit_bar.add_theme_stylebox_override("fill", mb_fg)
+	
+	merit_label = Label.new()
+	merit_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	merit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	merit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	merit_label.add_theme_font_size_override("font_size", 10)
+	merit_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	merit_label.add_theme_constant_override("outline_size", 3)
+	merit_label.text = "공적 포인트 (초요기 대기)"
+	merit_bar.add_child(merit_label)
+	
+	# 컨테이너 오프셋 조정
 	var top_panel = get_node_or_null("TopPanel")
 	if top_panel:
-		top_panel.offset_top = 22.0 # XP바(18px) + 여유공간(4px) = 22px
+		top_panel.offset_top = 34.0 # XP(18)+Merit(12)+여백(4)
 	
 	# SidePanel도 약간 내림
 	var side_panel = get_node_or_null("SidePanel")
@@ -129,17 +164,7 @@ func _setup_new_layout() -> void:
 		top_left_container.offset_top = 32 # XP바(4px)에서 충분히 아래로 (기존 24)
 		
 		# 레벨 라벨은 XP 바 내부 중앙으로 이동
-		if level_label and level_label.get_parent():
-			level_label.get_parent().remove_child(level_label)
-			if xp_bar:
-				xp_bar.add_child(level_label)
-				level_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-				level_label.add_theme_font_size_override("font_size", 14)
-				# 눈에 잘 띄게 아웃라인(테두리) 추가
-				level_label.add_theme_color_override("font_outline_color", Color.BLACK)
-				level_label.add_theme_constant_override("outline_size", 4)
+		_attach_level_label_to_xp_bar()
 			
 		# --- 렐릭(유물) 슬롯 (Slay the Spire 스타일) ---
 		# 금화 등의 텍스트보다 위에 오도록 먼저 컨테이너에 추가
@@ -187,7 +212,7 @@ func _setup_new_layout() -> void:
 		
 		# 3개의 빈 상태 무기 슬롯 생성 (대포, 신기전, 대장군전)
 		weapon_slots.clear()
-		for i in range(3):
+		for i in range(4):
 			var w_slot_bg = PanelContainer.new()
 			w_slot_bg.custom_minimum_size = Vector2(32, 32)
 			
@@ -236,6 +261,56 @@ func _setup_new_layout() -> void:
 			weapon_container.add_child(w_slot_bg)
 			weapon_slots.append(w_slot_bg)
 
+		# --- 보조 업그레이드 슬롯 (무기 슬롯 바로 아래) ---
+		support_container = HBoxContainer.new()
+		support_container.add_theme_constant_override("separation", 8)
+		top_left_container.add_child(support_container)
+
+		support_slots.clear()
+		for i in range(4):
+			var s_slot_bg = PanelContainer.new()
+			s_slot_bg.custom_minimum_size = Vector2(32, 32)
+
+			var s_slot_sb = StyleBoxFlat.new()
+			s_slot_sb.bg_color = Color(0, 0, 0, 0.35)
+			s_slot_sb.set_corner_radius_all(4)
+			s_slot_sb.border_width_bottom = 1
+			s_slot_sb.border_width_top = 1
+			s_slot_sb.border_width_left = 1
+			s_slot_sb.border_width_right = 1
+			s_slot_sb.border_color = Color(0.25, 0.25, 0.25, 0.8)
+			s_slot_bg.add_theme_stylebox_override("panel", s_slot_sb)
+
+			var icon_label = Label.new()
+			icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			icon_label.add_theme_font_size_override("font_size", 20)
+
+			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+			if icon_font:
+				icon_label.add_theme_font_override("font", icon_font)
+			icon_label.name = "Icon"
+			s_slot_bg.add_child(icon_label)
+
+			var level_label_overlay = Label.new()
+			level_label_overlay.name = "Level"
+			level_label_overlay.text = "1"
+			level_label_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			level_label_overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+			level_label_overlay.add_theme_font_size_override("font_size", 10)
+			level_label_overlay.add_theme_color_override("font_outline_color", Color.BLACK)
+			level_label_overlay.add_theme_constant_override("outline_size", 3)
+			level_label_overlay.visible = false
+			level_label_overlay.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+			level_label_overlay.offset_left = -16
+			level_label_overlay.offset_top = -14
+			level_label_overlay.offset_right = -2
+			level_label_overlay.offset_bottom = -2
+
+			s_slot_bg.add_child(level_label_overlay)
+			support_container.add_child(s_slot_bg)
+			support_slots.append(s_slot_bg)
+
 		# 약간의 간격 확보를 위해 빈 컨테이너 추가
 		var spacer = Control.new()
 		spacer.custom_minimum_size.y = 10
@@ -248,6 +323,14 @@ func _setup_new_layout() -> void:
 			score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 			score_label.add_theme_font_size_override("font_size", 18)
 			score_label.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+
+		# 전투 통계 (격침/병사 처치)
+		combat_stats_label = Label.new()
+		combat_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		combat_stats_label.add_theme_font_size_override("font_size", 12)
+		combat_stats_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+		combat_stats_label.text = "[전과] 격침 0 | 병사 0"
+		top_left_container.add_child(combat_stats_label)
 
 		# 난이도 라벨 - 유물 슬롯 아래 금화 패널 밑에 위치
 		if difficulty_label and difficulty_label.get_parent():
@@ -291,6 +374,32 @@ func _setup_new_layout() -> void:
 	# 에너미 숫자는 표시하지 않음 (나침반과 겹침 및 불필요)
 	if enemy_count_label:
 		enemy_count_label.visible = false
+
+	# === 우측 상단 (속도: 나침반 인접) ===
+	if not top_right_container:
+		top_right_container = VBoxContainer.new()
+		add_child(top_right_container)
+		top_right_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		top_right_container.offset_right = -24
+		top_right_container.offset_top = 248
+		top_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+
+		var speed_panel = PanelContainer.new()
+		var speed_panel_style = StyleBoxFlat.new()
+		speed_panel_style.bg_color = Color(0.0, 0.0, 0.0, 0.35)
+		speed_panel_style.set_corner_radius_all(8)
+		speed_panel_style.content_margin_left = 10
+		speed_panel_style.content_margin_right = 10
+		speed_panel_style.content_margin_top = 4
+		speed_panel_style.content_margin_bottom = 4
+		speed_panel.add_theme_stylebox_override("panel", speed_panel_style)
+		top_right_container.add_child(speed_panel)
+
+		speed_display = Label.new()
+		speed_display.add_theme_font_size_override("font_size", 17)
+		speed_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		speed_display.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
+		speed_panel.add_child(speed_display)
 
 	# === 좌측 하단 (플레이어 상태) ===
 	if not bottom_left_container:
@@ -351,46 +460,6 @@ func _setup_new_layout() -> void:
 		stamina_bar.add_theme_stylebox_override("background", stam_bg)
 		stamina_bar.add_theme_stylebox_override("fill", stam_fg)
 
-	# === 우측 하단 (속도 및 무기) ===
-	if not bottom_right_container:
-		bottom_right_container = VBoxContainer.new()
-		add_child(bottom_right_container)
-		bottom_right_container.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-		bottom_right_container.offset_right = -24
-		bottom_right_container.offset_bottom = -24
-		bottom_right_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		bottom_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-
-		speed_display = Label.new()
-		speed_display.add_theme_font_size_override("font_size", 18)
-		speed_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		bottom_right_container.add_child(speed_display)
-
-		# --- 무기 쿨타임 인디케이터 ---
-		var cd_box = VBoxContainer.new()
-		cd_box.alignment = BoxContainer.ALIGNMENT_END
-		bottom_right_container.add_child(cd_box)
-		
-		cooldown_label = Label.new()
-		cooldown_label.text = "장전 중..."
-		cooldown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		cooldown_label.add_theme_font_size_override("font_size", 12)
-		cooldown_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-		cd_box.add_child(cooldown_label)
-		
-		cooldown_bar = ProgressBar.new()
-		cooldown_bar.custom_minimum_size = Vector2(140, 6)
-		cooldown_bar.show_percentage = false
-		var cd_bg = StyleBoxFlat.new()
-		cd_bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
-		cd_bg.set_corner_radius_all(3)
-		var cd_fg = StyleBoxFlat.new()
-		cd_fg.bg_color = Color(1.0, 0.6, 0.2, 0.9)
-		cd_fg.set_corner_radius_all(3)
-		cooldown_bar.add_theme_stylebox_override("background", cd_bg)
-		cooldown_bar.add_theme_stylebox_override("fill", cd_fg)
-		cd_box.add_child(cooldown_bar)
-
 	# === 상단 중앙 (보스 HP 바) ===
 	boss_hp_bar_new = ProgressBar.new()
 	add_child(boss_hp_bar_new)
@@ -418,18 +487,50 @@ func _setup_new_layout() -> void:
 	boss_hp_text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	boss_hp_bar_new.add_child(boss_hp_text_label)
 
+	# === 화면 중앙 (도선 진행 바) ===
+	boarding_ui = VBoxContainer.new()
+	add_child(boarding_ui)
+	boarding_ui.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	boarding_ui.offset_top = 100 # 보스 HP바보다 아래, 혹은 중앙 부근
+	boarding_ui.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	boarding_ui.visible = false
+	
+	boarding_label = Label.new()
+	boarding_label.text = "도선 준비 중..."
+	boarding_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boarding_label.add_theme_font_size_override("font_size", 16)
+	boarding_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	boarding_label.add_theme_constant_override("outline_size", 4)
+	boarding_ui.add_child(boarding_label)
+	
+	boarding_bar = ProgressBar.new()
+	boarding_bar.custom_minimum_size = Vector2(200, 12)
+	boarding_bar.show_percentage = false
+	var b_bg = StyleBoxFlat.new()
+	b_bg.bg_color = Color(0, 0, 0, 0.4)
+	b_bg.set_corner_radius_all(4)
+	var b_fg = StyleBoxFlat.new()
+	b_fg.bg_color = Color(1.0, 1.0, 1.0, 0.8) # 흰색 계열 (준비 중)
+	b_fg.set_corner_radius_all(4)
+	boarding_bar.add_theme_stylebox_override("background", b_bg)
+	boarding_bar.add_theme_stylebox_override("fill", b_fg)
+	boarding_ui.add_child(boarding_bar)
+
 
 func _process(delta: float) -> void:
 	game_time += delta
+	_player_lookup_cooldown = maxf(0.0, _player_lookup_cooldown - delta)
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+
 	_update_timer()
 
 
 	_update_speed_display()
-	_update_cooldown_display()
 	_update_crew_count()
 	_update_hull_display()
 	_update_stamina_display()
-	_update_xp_display()
+	_update_boarding_display()
 	
 	# 돌풍 경고 깜박임
 	if _gust_warning_timer > 0:
@@ -442,6 +543,37 @@ func _process(delta: float) -> void:
 			gust_warning.text = ""
 
 
+func _attach_level_label_to_xp_bar() -> void:
+	if not level_label or not xp_bar:
+		return
+	var current_parent = level_label.get_parent()
+	if current_parent and current_parent != xp_bar:
+		current_parent.remove_child(level_label)
+	if level_label.get_parent() != xp_bar:
+		xp_bar.add_child(level_label)
+	level_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	level_label.add_theme_font_size_override("font_size", 14)
+	level_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	level_label.add_theme_constant_override("outline_size", 4)
+
+
+func _try_resolve_player_ship() -> void:
+	if is_instance_valid(player_ship):
+		return
+	if _player_lookup_cooldown > 0.0:
+		return
+	_player_lookup_cooldown = 0.25
+	var players = get_tree().get_nodes_in_group("player")
+	for p in players:
+		if is_instance_valid(p) and p.get("is_player_controlled") == true:
+			player_ship = p
+			return
+	if players.size() > 0 and is_instance_valid(players[0]):
+		player_ship = players[0]
+
+
 func update_level(val: int) -> void:
 	if level_label:
 		level_label.text = "[Lv] %d" % val
@@ -450,6 +582,14 @@ func update_score(val: int) -> void:
 	if score_label:
 		var total_gold = SaveManager.gold if is_instance_valid(SaveManager) else val
 		score_label.text = "[Gold] %d (Total %d)" % [val, total_gold]
+
+func update_combat_stats(ship_sunk: int, soldiers_killed: int) -> void:
+	var text = "[전과] 격침 %d | 병사 %d" % [ship_sunk, soldiers_killed]
+	if _last_combat_stats_text == text:
+		return
+	_last_combat_stats_text = text
+	if combat_stats_label:
+		combat_stats_label.text = text
 
 func update_difficulty_ui(val: int) -> void:
 	if difficulty_label:
@@ -501,53 +641,22 @@ func _get_screen_wind_arrow(wind_angle_deg: float) -> String:
 
 
 func _update_speed_display() -> void:
-	# 플레이어 배 찾기
 	if not is_instance_valid(player_ship):
-		var players = get_tree().get_nodes_in_group("player")
-		if players.size() > 0:
-			player_ship = players[0]
-	
-	if is_instance_valid(player_ship) and player_ship.get("current_speed") != null:
-		var speed = player_ship.current_speed
-		var mode = "노 젓기" if player_ship.get("is_rowing") else "돛 펼침"
-		
-		# 속도 표기 (knots 또는 m/s 단위로 시각적 변환)
-		var speed_text = "%s : %.1f ㏏" % [mode, speed]
-		
-		if _last_speed_str != speed_text:
-			_last_speed_str = speed_text
-			if speed_display:
-				speed_display.text = speed_text
-			elif speed_label: # 레거시 폴백
-				speed_label.text = speed_text
-
-
-func _update_cooldown_display() -> void:
-	if not cooldown_bar or not is_instance_valid(player_ship):
 		return
-		
-	# 메인 대포 찾기
-	var cannons = player_ship.find_child("Cannons", true, false)
-	if cannons and cannons.get_child_count() > 0:
-		var main_cannon = cannons.get_child(0)
-		if main_cannon.get("cooldown_timer") != null:
-			var current_cd = main_cannon.cooldown_timer
-			var max_cd = main_cannon.call("_get_current_cooldown") if main_cannon.has_method("_get_current_cooldown") else main_cannon.get("fire_cooldown")
-			
-			if max_cd > 0:
-				var progress = clamp(1.0 - (current_cd / max_cd), 0.0, 1.0)
-				cooldown_bar.value = progress * 100
-				
-				# 준비 완료 시 디자인 변경
-				var fill_style = cooldown_bar.get_theme_stylebox("fill") as StyleBoxFlat
-				if progress >= 1.0:
-					cooldown_label.text = "발사 대기"
-					cooldown_label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4))
-					if fill_style: fill_style.bg_color = Color(0.4, 1.0, 0.4, 0.9)
-				else:
-					cooldown_label.text = "장전 중..."
-					cooldown_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-					if fill_style: fill_style.bg_color = Color(1.0, 0.6, 0.2, 0.9)
+	if player_ship.get("current_speed") == null:
+		return
+	var speed = player_ship.current_speed
+	var mode = "노 젓기" if player_ship.get("is_rowing") else "돛 펼침"
+	
+	# 속도 표기 (knots 또는 m/s 단위로 시각적 변환)
+	var speed_text = "%s : %.1f ㏏" % [mode, speed]
+	
+	if _last_speed_str != speed_text:
+		_last_speed_str = speed_text
+		if speed_display:
+			speed_display.text = speed_text
+		elif speed_label: # 레거시 폴백
+			speed_label.text = speed_text
 
 
 func _update_crew_count() -> void:
@@ -644,16 +753,33 @@ func update_xp(current: int, maximum: int) -> void:
 			xp_label.text = new_text
 
 
-func _update_xp_display() -> void:
-	# LevelManager에서 데이터 가져옴
-	if Engine.get_process_frames() % 15 != 0:
-		return
+## === 초요기 진행도 ===
+func update_merit(current: int, maximum: int, level: int = 1) -> void:
+	if merit_bar:
+		merit_bar.max_value = maximum
 		
-	if is_instance_valid(cached_lm):
-		if cached_lm.get("current_xp") != null:
-			update_xp(cached_lm.current_xp, cached_lm.xp_to_next_level)
-		if cached_lm.get("game_difficulty") != null:
-			update_difficulty_ui(cached_lm.game_difficulty)
+		# 차오르는 효과를 위해 트윈 사용
+		var tween = create_tween()
+		tween.tween_property(merit_bar, "value", current, 0.3).set_trans(Tween.TRANS_SINE)
+		
+		if merit_label:
+			if current >= maximum:
+				merit_label.text = "[ 함대 LEVEL UP! ]"
+				merit_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.4))
+				
+				# 가득 찼을 때 번쩍이는 연출
+				var style = merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
+				if style:
+					style.bg_color = Color(1.0, 1.0, 0.5, 1.0) # 더 밝은 색으로
+			else:
+				merit_label.text = "공적 Lv.%d (%d / %d)" % [level, current, maximum]
+				merit_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+				
+				# 원래 색으로
+				var style_normal = merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
+				if style_normal:
+					style_normal.bg_color = Color(1.0, 0.8, 0.2, 0.9)
+
 
 func add_relic_icon(icon_text: String) -> void:
 	if not relic_container or current_relic_count >= 5: return
@@ -704,7 +830,7 @@ func update_weapon_ui(weapon_id: String, level: int) -> void:
 		# 신규 획득: 빈 슬롯 앞쪽부터 순서대로 채워넣기
 		slot_idx = active_weapons.size()
 		if slot_idx >= weapon_slots.size():
-			return # 3개 이상의 무기는 표시 불가
+			return # 슬롯 수를 초과하면 표시하지 않음
 		active_weapons[weapon_id] = slot_idx
 	
 	# UI 갱신
@@ -730,6 +856,59 @@ func update_weapon_ui(weapon_id: String, level: int) -> void:
 		tween.tween_property(slot_sb, "border_color", Color(0.4, 0.4, 0.4, 0.8), 0.5)
 
 
+## 보조 업그레이드 슬롯 업데이트 (획득 순서대로 빈 칸에 채워넣기)
+func update_support_ui(upgrade_id: String, level: int) -> void:
+	if level <= 0:
+		return
+
+	var icon_map = {
+		"crew_numbers": "group_add",
+		"crew_quality": "military_tech",
+		"hull_defense": "shield",
+		"navigation": "explore",
+		"supply_bonus": "medical_services",
+	}
+	var color_map = {
+		"crew_numbers": Color(0.5, 0.8, 1.0),
+		"crew_quality": Color(1.0, 0.9, 0.35),
+		"hull_defense": Color(0.75, 0.45, 0.2),
+		"navigation": Color(0.45, 1.0, 0.45),
+		"supply_bonus": Color(0.35, 0.95, 0.35),
+	}
+
+	var actual_icon = icon_map.get(upgrade_id, "build")
+	var actual_color = color_map.get(upgrade_id, Color.WHITE)
+
+	var slot_idx = -1
+	if active_supports.has(upgrade_id):
+		slot_idx = active_supports[upgrade_id]
+	else:
+		slot_idx = active_supports.size()
+		if slot_idx >= support_slots.size():
+			return
+		active_supports[upgrade_id] = slot_idx
+
+	var slot = support_slots[slot_idx]
+	var icon_label = slot.get_node_or_null("Icon") as Label
+	var lv_label = slot.get_node_or_null("Level") as Label
+
+	if icon_label:
+		icon_label.text = actual_icon
+		icon_label.add_theme_color_override("font_color", actual_color)
+
+	if lv_label:
+		lv_label.text = str(level)
+		lv_label.visible = true
+
+	var slot_sb = slot.get_theme_stylebox("panel")
+	if slot_sb:
+		slot_sb = slot_sb.duplicate()
+		slot.add_theme_stylebox_override("panel", slot_sb)
+		var tween = create_tween()
+		tween.tween_property(slot_sb, "border_color", actual_color, 0.2)
+		tween.tween_property(slot_sb, "border_color", Color(0.35, 0.35, 0.35, 0.8), 0.5)
+
+
 func _update_hull_display() -> void:
 	# 30프레임마다 체크
 	if Engine.get_process_frames() % 30 != 0:
@@ -742,6 +921,31 @@ func _update_stamina_display() -> void:
 		return
 	if is_instance_valid(player_ship) and player_ship.get("rowing_stamina") != null:
 		update_stamina(player_ship.rowing_stamina, 100.0) # 기본 100.0 유지
+
+func _update_boarding_display() -> void:
+	if not boarding_ui or not is_instance_valid(player_ship):
+		return
+		
+	var is_boarding = player_ship.get("is_boarding") == true
+	var prep_timer = player_ship.get("boarding_prep_timer") if "boarding_prep_timer" in player_ship else 0.0
+	var prep_duration = player_ship.get("boarding_prep_duration") if "boarding_prep_duration" in player_ship else 2.5
+	
+	if is_boarding:
+		boarding_ui.visible = true
+		if prep_timer < prep_duration:
+			# 예열 단계
+			boarding_label.text = "도선 준비 중 (밧줄 고정)..."
+			boarding_bar.value = (prep_timer / prep_duration) * 100
+			var fill = boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
+			if fill: fill.bg_color = Color(1.0, 1.0, 1.0, 0.7)
+		else:
+			# 실제 도선(병사 이동) 단계
+			boarding_label.text = "도선 진행 중!"
+			boarding_bar.value = 100
+			var fill = boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
+			if fill: fill.bg_color = Color(0.2, 0.8, 1.0, 0.8) # 하늘색
+	else:
+		boarding_ui.visible = false
 
 
 func show_game_over() -> void:
@@ -783,3 +987,33 @@ func show_victory() -> void:
 		var tween = create_tween()
 		victory_label.modulate.a = 0.0
 		tween.tween_property(victory_label, "modulate:a", 1.0, 2.0)
+
+func show_victory_with_damage(rows: Array, total_damage: float) -> void:
+	if not victory_label:
+		return
+	var lines: Array[String] = []
+	lines.append("[!] VICTORY [!]")
+	lines.append("총 무기 피해: %.0f" % total_damage)
+	if rows.is_empty():
+		lines.append("무기 데미지 통계 없음")
+	else:
+		lines.append("----- 무기별 데미지 -----")
+		for row in rows:
+			var name = str(row.get("name", "?"))
+			var dmg = float(row.get("damage", 0.0))
+			lines.append("%s : %.0f" % [name, dmg])
+	
+	victory_label.text = "\n".join(lines)
+	victory_label.visible = true
+	victory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	victory_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	victory_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	victory_label.offset_left = -320.0
+	victory_label.offset_top = -180.0
+	victory_label.offset_right = 320.0
+	victory_label.offset_bottom = 220.0
+	victory_label.add_theme_font_size_override("font_size", 24)
+	
+	var tween = create_tween()
+	victory_label.modulate.a = 0.0
+	tween.tween_property(victory_label, "modulate:a", 1.0, 0.8)

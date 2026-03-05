@@ -1,3 +1,4 @@
+@tool
 extends "res://scripts/entities/base_ship.gd"
 
 ## 보스 함선 (Boss Ship)
@@ -7,22 +8,73 @@ signal boss_died
 
 @export var move_speed: float = 3.0
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
-@export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
+@export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_japanese.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
+@export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/atakebune_hull.tscn")
 
 var target: Node3D = null
 var orbit_angle: float = 0.0
-
-# 누수(Leaking) 시스템 변수
-var leaking_rate: float = 0.0 # 초당 피해량
-
+var leaking_rate: float = 0.0
 var cached_lm: Node = null
+var _merit_granted: bool = false
+
+@export var ship_type: String = "atakebune_mid":
+	set(value):
+		ship_type = value
+		if Engine.is_editor_hint():
+			_update_editor_hull()
+@export var tier: int = 1 ## 1: 중간 보스 (Front/L/R 1개씩), 2: 최종 보스 (고화력)
+
+func _update_editor_hull() -> void:
+	for child in get_children():
+		if child.name.contains("Hull"):
+			child.free()
+			
+	var stats = load_ship_stats(ship_type)
+	if stats.is_empty(): return
+	
+	var type_lower = ship_type.to_lower()
+	var h_path = "res://scenes/ships/hulls/atakebune_hull.tscn"
+	if type_lower.contains("sekibune"): h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
+	elif type_lower.contains("panokseon"): h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
+	elif type_lower.contains("maengseon"): h_path = "res://scenes/ships/hulls/maengseon_hull.tscn"
+	
+	var new_hull = load(h_path)
+	if new_hull:
+		var inst = new_hull.instantiate()
+		inst.name = "EditorHull"
+		add_child(inst)
+		_cache_hull_references(self )
 
 func _ready() -> void:
-	if max_hull_hp <= 0 or max_hull_hp == 1000.0: max_hull_hp = 4000.0
+	if Engine.is_editor_hint():
+		var has_hull = false
+		for child in get_children():
+			if child.name.contains("Hull"):
+				has_hull = true
+				break
+		if not has_hull:
+			_update_editor_hull()
+		return
+
+	# JSON 데이터 로드 및 적용
+	var stats = load_ship_stats(ship_type)
+	if not stats.is_empty():
+		if stats.has("hull_hp"): max_hull_hp = stats["hull_hp"]
+		if stats.has("move_speed"): move_speed = stats["move_speed"]
+		if stats.has("tier"): tier = stats["tier"]
+		if stats.has("orbit_distance"): orbit_distance = stats["orbit_distance"]
+
+	# 선체(Hull) 씬 인스턴스화 및 추가
+	if is_instance_valid(hull_scene):
+		var hull_inst = hull_scene.instantiate()
+		add_child(hull_inst)
+	else:
+		_update_editor_hull()
+		
+	super._ready()
 	hull_hp = max_hull_hp
-	base_y = global_position.y
 	add_to_group("enemy")
 	add_to_group("boss")
 	add_to_group("ships")
@@ -37,38 +89,44 @@ func _ready() -> void:
 	_setup_soldiers()
 
 func _setup_weapons() -> void:
-	# 다수의 대포 배치 (좌우 각 3개)
+	# 다수의 대포 배치
 	var cannons_node = Node3D.new()
 	cannons_node.name = "Cannons"
 	add_child(cannons_node)
 	
-	for i in range(3):
-		var z_pos = -2.0 + (i * 2.0)
-		# 좌측 대포
-		var cl = cannon_scene.instantiate()
-		cannons_node.add_child(cl)
-		cl.position = Vector3(-2.5, 0.8, z_pos)
-		cl.rotation.y = deg_to_rad(90)
-		cl.team = "enemy"
-		cl.detection_range = 45.0
-		cl.detection_arc = 40.0
-		# 우측 대포
-		var cr = cannon_scene.instantiate()
-		cannons_node.add_child(cr)
-		cr.position = Vector3(2.5, 0.8, z_pos)
-		cr.rotation.y = deg_to_rad(-90)
-		cr.team = "enemy"
-		cr.detection_range = 45.0
-		cr.detection_arc = 40.0
+	if tier == 1:
+		# 중간 보스: 전방 1, 좌방 1, 우방 1 (총 3문)
+		_spawn_boss_cannon(cannons_node, Vector3(0, 0.8, -5.0), 0)
+		_spawn_boss_cannon(cannons_node, Vector3(-2.8, 0.8, 0), 90)
+		_spawn_boss_cannon(cannons_node, Vector3(2.8, 0.8, 0), -90)
 		
-	# 전방 신기전 배치
-	var singigeon = singigeon_scene.instantiate()
-	add_child(singigeon)
-	singigeon.position = Vector3(0, 1.0, -5.0)
-	singigeon.team = "enemy"
-	singigeon.detection_range = 45.0
-	if singigeon.has_method("upgrade_to_level"):
-		singigeon.upgrade_to_level(3) # 최고 레벨 신기전
+		# 중간 보스는 체력 하향 조절
+		max_hull_hp = 1800.0
+		hull_hp = max_hull_hp
+	else:
+		# 최종 보스: 기존의 고화력 세팅 (좌우 각 3문 + 전방 신기전)
+		for i in range(3):
+			var z_pos = -2.0 + (i * 2.0)
+			_spawn_boss_cannon(cannons_node, Vector3(-2.8, 0.8, z_pos), 90)
+			_spawn_boss_cannon(cannons_node, Vector3(2.8, 0.8, z_pos), -90)
+			
+		# 전방 신기전 배치
+		var singigeon = singigeon_scene.instantiate()
+		add_child(singigeon)
+		singigeon.position = Vector3(0, 1.0, -5.0)
+		singigeon.team = "enemy"
+		singigeon.detection_range = 45.0
+		if singigeon.has_method("upgrade_to_level"):
+			singigeon.upgrade_to_level(3) # 최고 레벨 신기전
+
+func _spawn_boss_cannon(container: Node, pos: Vector3, rot_y: float) -> void:
+	var c = cannon_scene.instantiate()
+	container.add_child(c)
+	c.position = pos
+	c.rotation_degrees.y = rot_y
+	c.team = "enemy"
+	c.detection_range = 45.0
+	c.detection_arc = 50.0
 
 func _setup_soldiers() -> void:
 	if not soldier_scene: return
@@ -88,16 +146,25 @@ func _setup_soldiers() -> void:
 		Vector3(1.5, 0, 3)
 	]
 	
+	var i = 0
 	for pos in spawn_points:
 		var s = soldier_scene.instantiate()
 		s.position = pos
 		s.team = "enemy"
+		
 		# 보스 병사는 엘리트급 체력/데미지 보너스
 		s.max_health = 150.0
 		s.attack_damage = 15.0
+		
+		# 50%는 원거리 사격 전용, 50%는 범용(근접 방어 가능)
+		if i % 2 == 0:
+			s.is_ranged_only = true
+			
 		soldiers_node.add_child(s)
+		i += 1
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
+	if Engine.is_editor_hint(): return
 	if is_dying: return
 	
 	_update_fire_effect()
@@ -125,12 +192,16 @@ func _process(delta: float) -> void:
 		var side_dir = Vector3(-to_player.z, 0, to_player.x)
 		move_dir = side_dir
 		
-	# 3. 이동 및 회전 (Separation 포함)
-	# Separation (충돌 방지)
+	# === 이동 및 회전 (Separation 및 Hard Collision 포함) ===
+	# 1. Separation (부드러운 충돌 방지)
 	var sep = _calculate_separation()
-	if sep.length_squared() > 0.001:
-		# 보스는 질량이 크므로 다른 배들에 비해 밀려나는 정도를 적게 함
-		move_dir = (move_dir.normalized() + sep * 0.5).normalized()
+	
+	# 2. Collision Repulsion (강체 충돌 및 충각 데미지)
+	var hard_rep = _calculate_collision_repulsion()
+	
+	if (sep + hard_rep).length_squared() > 0.001:
+		# 보스는 질량이 크므로 다른 배들에 비해 밀려나는 정도를 적게 함 (0.5배 -> 0.3배)
+		move_dir = (move_dir.normalized() + (sep + hard_rep) * 0.3).normalized()
 	
 	# 이동 및 회전
 	var target_look = global_position + move_dir
@@ -155,7 +226,9 @@ func _process(delta: float) -> void:
 		var base_wind_influence = remap(dot_prod, -1.0, 1.0, 0.6, 1.3)
 		wind_mult = lerp(1.0, base_wind_influence, wind_str)
 		
-	global_position += move_dir * move_speed * leak_speed_mult * wind_mult * delta
+	# velocity 계산 및 적용
+	var final_velocity = move_dir * move_speed * leak_speed_mult * wind_mult
+	global_position += (final_velocity + hard_rep) * delta
 	
 	# === 누수(Leaking) 데미지 ===
 	if leaking_rate > 0:
@@ -167,17 +240,25 @@ func _process(delta: float) -> void:
 func _calculate_separation() -> Vector3:
 	var force = Vector3.ZERO
 	var neighbors = get_tree().get_nodes_in_group("ships")
-	var separation_dist = 8.0 # 보스는 덩치가 크므로 회피 반경을 넓게 설정
 	
 	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_dead") or other.get("is_sinking"):
 			continue
 			
-		var dist = global_position.distance_to(other.global_position)
-		if dist < separation_dist and dist > 0.1:
-			var push_dir = (global_position - other.global_position).normalized()
-			# 거리에 따른 반성능(Repulsion) 계산
-			force += push_dir * (separation_dist - dist) / separation_dist
+		var offset = global_position - other.global_position
+		offset.y = 0.0
+		var dist_sq = offset.length_squared()
+		if dist_sq <= 0.01:
+			continue
+		
+		var dist = sqrt(dist_sq)
+		var coll_dist = get_collision_distance_to(other)
+		var separation_trigger_dist = coll_dist + 0.45
+		
+		if dist < separation_trigger_dist:
+			var push_dir = offset.normalized()
+			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
+			force += push_dir * pow(ratio, 2.0) * 1.8
 			
 	return force
 
@@ -219,6 +300,19 @@ func die() -> void:
 	
 	boss_died.emit()
 	print("[Boss] 보스 격침!")
+	if is_instance_valid(cached_lm):
+		if cached_lm.has_method("add_ship_sunk"):
+			cached_lm.add_ship_sunk(1)
+		# 규칙 통일: 함선 격침은 XP/점수 지급
+		if cached_lm.has_method("add_score"):
+			cached_lm.add_score(500)
+		if cached_lm.has_method("add_xp"):
+			cached_lm.add_xp(100)
+	
+	# 공적 포인트(Merit) 추가 (보스는 대량의 공적 부여)
+	if not _merit_granted and is_instance_valid(cached_lm) and cached_lm.has_method("add_merit"):
+		cached_lm.add_merit(50)
+		_merit_granted = true
 	
 	# 침몰 효과 (회전하며 가라앉음)
 	var tween = create_tween()

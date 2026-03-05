@@ -5,6 +5,7 @@ extends Node
 
 signal level_up(new_level: int)
 signal score_changed(new_score: int)
+signal merit_full_action_completed() # 함대 업그레이드 선택 완료 시 발생
 
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
@@ -12,6 +13,11 @@ signal score_changed(new_score: int)
 @export var max_level: int = 15
 @export var max_hull_hp_cap: float = 800.0 # 레벨업 HP 보너스 상한 (함선 체력 상향에 맞춰 400->800)
 @export var hud: CanvasLayer = null
+@export_group("Progression Tuning")
+@export var level_xp_base: float = 7.0 ## 플레이어 레벨 1->2 기본 필요 XP
+@export var level_xp_exponent: float = 1.10 ## 레벨업 필요 XP 성장 곡선 지수
+@export var merit_base_points: int = 50 ## 공적 레벨 1 기본 요구치
+@export var merit_growth_per_level: int = 10 ## 공적 레벨당 증가치
 
 var current_level: int = 1
 var current_xp: int = 0
@@ -22,8 +28,33 @@ var game_difficulty: int = 1 # 적 난이도 레벨
 var current_score: int = 0
 var current_time: float = 0.0
 var enemies_killed: int = 0
+var ships_sunk: int = 0
+var soldiers_killed: int = 0
+var weapon_damage_stats: Dictionary = {}
 var _boss_triggered: bool = false
 var rerolls_available: int = 0
+
+const DAMAGE_SOURCE_NAME := {
+	"cannon": "대포",
+	"singigeon": "신기전",
+	"janggun": "대장군전",
+	"fire_pot": "화통",
+	"ballista": "팔우노",
+	"repeating_crossbow": "연노",
+	"bow": "활",
+	"spear_rail": "창 난간",
+	"sword": "검",
+	"spear": "창",
+	"trident": "삼지창",
+	"harpoon": "작살",
+}
+
+# 공적(Merit) 시스템: 조선 수군 소집(초요기)용
+signal merit_changed(current: int, maximum: int, level: int)
+signal merit_full()
+var merit_points: int = 0
+var max_merit_points: int = 50
+var merit_level: int = 1
 
 # 레벨별 난이도 설정 (밸런스 조정)
 # spawn_interval: 적 생성 간격 (초)
@@ -53,6 +84,8 @@ var level_data = {
 func _ready() -> void:
 	add_to_group("level_manager")
 	_calculate_next_level_xp()
+	max_merit_points = _get_merit_requirement(merit_level)
+	merit_points = clamp(merit_points, 0, max_merit_points)
 	
 	# 초기 HUD 및 난이도(Spawner) 업데이트
 	_update_difficulty()
@@ -60,34 +93,39 @@ func _ready() -> void:
 		hud.update_level(current_level)
 		hud.update_score(current_score)
 		hud.update_xp(current_xp, xp_to_next_level)
+		hud.update_merit(merit_points, max_merit_points, merit_level)
+		if hud.has_method("update_combat_stats"):
+			hud.update_combat_stats(ships_sunk, soldiers_killed)
+		if hud.has_method("update_difficulty_ui"):
+			hud.update_difficulty_ui(game_difficulty)
 		
-	# 쉐이더 예열 (Shader Pre-warming / Web stutter fix)
-	# 예열 중 발생하는 소음을 방지하기 위해 잠시 뮤트
-	var master_bus_idx = AudioServer.get_bus_index("Master")
-	var was_muted = AudioServer.is_bus_mute(master_bus_idx)
-	AudioServer.set_bus_mute(master_bus_idx, true)
+	# 시작 차단 없이 예열은 백그라운드에서 진행한다.
+	call_deferred("_run_startup_prewarm_async")
 	
-	await _prewarm_shaders()
-	
-	# 오디오 복구 (was_muted 상태로 복구)
-	AudioServer.set_bus_mute(master_bus_idx, was_muted)
-	
-	# 육분의(Sextant) 렐릭 및 기본 무기(대포) 지급 (예열 완료 후 약간의 딜레이를 두어 UI가 준비되도록 함)
-	get_tree().create_timer(1.0).timeout.connect(func():
+	# 육분의(Sextant) 렐릭 및 기본 무기(대포) 지급
+	# 시작 지연을 줄이기 위해 예열 완료를 기다리지 않고 초기 프레임 이후 즉시 적용
+	get_tree().create_timer(0.1).timeout.connect(func():
 		if is_instance_valid(UpgradeManager):
 			UpgradeManager.add_relic("sextant")
 			UpgradeManager.initialize_default_weapons()
 	)
 
-func _prewarm_shaders() -> void:
-	# 1. 로딩(예열) 화면 생성 (화면 전체를 가리는 검은색 UI)
-	var loading_layer = CanvasLayer.new()
-	loading_layer.layer = 120 # 최상단
-	var bg = ColorRect.new()
-	bg.color = Color.BLACK
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	loading_layer.add_child(bg)
-	add_child(loading_layer)
+func _run_startup_prewarm_async() -> void:
+	# 백그라운드 예열: 게임 시작을 막지 않도록 비차단 모드로 실행
+	await _prewarm_shaders(false)
+
+func _prewarm_shaders(show_blocking_overlay: bool = true) -> void:
+	# 1. (선택) 로딩(예열) 화면 생성
+	var loading_layer: CanvasLayer = null
+	var bg: ColorRect = null
+	if show_blocking_overlay:
+		loading_layer = CanvasLayer.new()
+		loading_layer.layer = 120 # 최상단
+		bg = ColorRect.new()
+		bg.color = Color.BLACK
+		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		loading_layer.add_child(bg)
+		add_child(loading_layer)
 	
 	# 2. 쉐이더 예열 씬 목록 (누락된 씬 추가)
 	var scenes_to_warm = [
@@ -116,6 +154,10 @@ func _prewarm_shaders() -> void:
 			# 모든 하위 파티클 검색 및 작동 유도
 			_trigger_all_particles(inst)
 			
+			# 백그라운드 모드에서는 프레임에 작업을 분산해 시작 프레임 스파이크를 줄인다.
+			if not show_blocking_overlay:
+				await get_tree().process_frame
+			
 	# 오디오 매니저의 사전 캐싱 작업 대기 (비동기 완료 보장)
 	if not AudioManager.is_prewarm_finished:
 		await AudioManager.prewarm_finished
@@ -128,9 +170,10 @@ func _prewarm_shaders() -> void:
 	container.queue_free()
 	print("[Resource] 쉐이더 예열 및 오디오 캐싱 완료")
 	
-	var tween = create_tween()
-	tween.tween_property(bg, "modulate:a", 0.0, 1.0) # 1초 동안 부드럽게 밝아짐
-	tween.tween_callback(loading_layer.queue_free)
+	if show_blocking_overlay and is_instance_valid(bg) and is_instance_valid(loading_layer):
+		var tween = create_tween()
+		tween.tween_property(bg, "modulate:a", 0.0, 1.0) # 1초 동안 부드럽게 밝아짐
+		tween.tween_callback(loading_layer.queue_free)
 
 func _trigger_all_particles(node: Node) -> void:
 	if node is GPUParticles3D or node is CPUParticles3D:
@@ -174,6 +217,8 @@ func _process(delta: float) -> void:
 	if new_difficulty > game_difficulty:
 		game_difficulty = new_difficulty
 		_update_difficulty()
+		if hud and hud.has_method("update_difficulty_ui"):
+			hud.update_difficulty_ui(game_difficulty)
 		print("[Difficulty] 난이도 상승! Level %d (적 강화)" % game_difficulty)
 	
 	# 주기적으로 적 수 체크 (HUD용)
@@ -197,6 +242,48 @@ func add_score(points: int) -> void:
 	if hud:
 		hud.update_score(current_score)
 
+func add_ship_sunk(count: int = 1) -> void:
+	ships_sunk += max(0, count)
+	if hud and hud.has_method("update_combat_stats"):
+		hud.update_combat_stats(ships_sunk, soldiers_killed)
+
+func add_soldier_kill(count: int = 1) -> void:
+	soldiers_killed += max(0, count)
+	if hud and hud.has_method("update_combat_stats"):
+		hud.update_combat_stats(ships_sunk, soldiers_killed)
+
+func add_player_weapon_damage(source_id: String, amount: float) -> void:
+	if source_id.is_empty():
+		return
+	if amount <= 0.0:
+		return
+	var current = float(weapon_damage_stats.get(source_id, 0.0))
+	weapon_damage_stats[source_id] = current + amount
+
+func get_total_weapon_damage() -> float:
+	var total := 0.0
+	for key in weapon_damage_stats.keys():
+		total += float(weapon_damage_stats[key])
+	return total
+
+func get_weapon_damage_rows(max_rows: int = 8) -> Array:
+	var rows: Array = []
+	for key in weapon_damage_stats.keys():
+		var dmg = float(weapon_damage_stats[key])
+		if dmg <= 0.0:
+			continue
+		rows.append({
+			"id": key,
+			"name": DAMAGE_SOURCE_NAME.get(key, key),
+			"damage": dmg
+		})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("damage", 0.0)) > float(b.get("damage", 0.0))
+	)
+	if rows.size() > max_rows:
+		return rows.slice(0, max_rows)
+	return rows
+
 
 ## XP 획득 및 레벨업 처리
 func add_xp(amount: int) -> void:
@@ -209,11 +296,97 @@ func add_xp(amount: int) -> void:
 		current_xp -= xp_to_next_level
 		_set_level(current_level + 1)
 
+## 공적 (Merit) 획득
+func add_merit(amount: int) -> void:
+	if merit_points >= max_merit_points: return # 이미 꽉 찼으면 무시
+	
+	merit_points = min(merit_points + amount, max_merit_points)
+	merit_changed.emit(merit_points, max_merit_points, merit_level)
+	
+	if hud and hud.has_method("update_merit"):
+		hud.update_merit(merit_points, max_merit_points, merit_level)
+		
+	if merit_points >= max_merit_points:
+		merit_full.emit()
+		print("[Merit] 공적이 가득 찼습니다! 자동으로 함대 업그레이드를 시작합니다.")
+		consume_merit() # 자동 소비 및 UI 팝업
+		
+func consume_merit() -> void:
+	# 공적 소비 시 함대 업그레이드 UI를 띄움
+	_show_fleet_upgrade_ui()
+	
+	merit_points = 0
+	merit_changed.emit(merit_points, max_merit_points, merit_level)
+	if hud and hud.has_method("update_merit"):
+		hud.update_merit(merit_points, max_merit_points, merit_level)
+
+
+func _show_fleet_upgrade_ui() -> void:
+	if not is_instance_valid(UpgradeManager): return
+	
+	# 함대 전용 업그레이드 (Category 5) 3개 선택
+	var choices = UpgradeManager.get_random_choices(3, 5) # 5 = Category.FLEET
+	if choices.is_empty():
+		# 만약 함대 업그레이드가 더 이상 없으면 레벨만 올리고 종료
+		_finalize_merit_levelup("")
+		return
+		
+	get_tree().paused = true
+	
+	if is_instance_valid(_upgrade_ui_instance):
+		_upgrade_ui_instance.queue_free()
+		
+	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
+	add_child(_upgrade_ui_instance)
+	
+	# 함대 업그레이드용 특별 라벨 설정
+	if _upgrade_ui_instance.has_node("VBox/TitleLabel"):
+		_upgrade_ui_instance.get_node("VBox/TitleLabel").text = "함대 강화 (공적 레벨업!)"
+	
+	# 함대 업그레이드는 리롤권 0개로 고정 (또는 필요시 설정)
+	_upgrade_ui_instance.show_upgrades(choices, 0)
+	
+	# 전용 콜백 연결
+	_upgrade_ui_instance.upgrade_chosen.connect(_on_fleet_upgrade_chosen)
+
+
+func _on_fleet_upgrade_chosen(upgrade_id: String) -> void:
+	# 함대 업그레이드 적용
+	UpgradeManager.apply_upgrade(upgrade_id)
+	
+	# 공적 레벨 수치 상승 처리
+	_finalize_merit_levelup(upgrade_id)
+	
+	# 함대 강화 액션 완료 전파 (소환/수리 발동용)
+	merit_full_action_completed.emit()
+	
+	# UI 제거 및 게임 재개
+	if is_instance_valid(_upgrade_ui_instance):
+		_upgrade_ui_instance.queue_free()
+		_upgrade_ui_instance = null
+	
+	get_tree().paused = false
+
+
+func _finalize_merit_levelup(upgrade_id: String) -> void:
+	merit_level += 1
+	max_merit_points = _get_merit_requirement(merit_level)
+	
+	print("[Merit] Fleet Upgraded! Level %d (%s)" % [merit_level, upgrade_id])
+	
+	if hud and hud.has_method("update_merit"):
+		hud.update_merit(merit_points, max_merit_points, merit_level)
+
 
 func _calculate_next_level_xp() -> void:
-	# 레벨업 공식: 16 * (level ^ 1.2)
-	# 훨씬 시원시원하게 레벨업 되도록 대폭 상향 조정 (25 -> 16)
-	xp_to_next_level = int(16.0 * pow(current_level, 1.2))
+	# 레벨업 공식: base * (level ^ exponent)
+	# 조정 가능한 곡선으로 관리
+	xp_to_next_level = max(1, int(level_xp_base * pow(current_level, level_xp_exponent)))
+
+
+func _get_merit_requirement(level: int) -> int:
+	# 공적 레벨 요구량: base + (level - 1) * growth
+	return max(1, merit_base_points + (level - 1) * merit_growth_per_level)
 
 var upgrade_ui_scene: PackedScene = preload("res://scenes/ui/upgrade_ui.tscn")
 var meta_upgrade_ui_scene: PackedScene = preload("res://scenes/ui/meta_upgrade_ui.tscn")
@@ -359,8 +532,11 @@ func show_victory() -> void:
 	# 실시간 저장이므로 여기서는 메시지만 처리
 	print("[Win] 승리! 현재 판에서 %d 골드 획득" % current_score)
 	
-	if hud and hud.has_method("show_victory"):
-		hud.show_victory()
+	if hud:
+		if hud.has_method("show_victory_with_damage"):
+			hud.show_victory_with_damage(get_weapon_damage_rows(8), get_total_weapon_damage())
+		elif hud.has_method("show_victory"):
+			hud.show_victory()
 
 
 func show_meta_shop() -> void:

@@ -12,7 +12,6 @@ func _ready() -> void:
 	# Y는 항상 0 (수면)으로 고정
 	global_position.y = 0.0
 	add_to_group("ocean")
-	print("[Ocean] 스크립트 로드 완료 (Grid Size: %.1f)" % grid_size)
 	_sync_shader_params()
 
 # === CPU 파도 연산용 파라미터 ===
@@ -35,7 +34,6 @@ func _sync_shader_params() -> void:
 		if s != null: sea_speed = s
 		var f = mat.get_shader_parameter("sea_freq")
 		if f != null: sea_freq = f
-		print("[Ocean] 셰이더 파라미터 연동 완료 (height: %.2f, choppy: %.1f)" % [sea_height, sea_choppy])
 
 # GPU 셰이더의 hash12 이식
 func _hash12(p: Vector2) -> float:
@@ -103,7 +101,6 @@ func _process(_delta: float) -> void:
 		var ships = get_tree().get_nodes_in_group("player")
 		if ships.size() > 0:
 			_target = ships[0]
-			print("[Ocean] 타겟 발견: ", _target.name)
 		else:
 			return # 타겟 찾을 때까지 대기
 	
@@ -114,6 +111,5 @@ func _process(_delta: float) -> void:
 	var new_z = round(target_pos.z / grid_size) * grid_size
 	
 	if abs(global_position.x - new_x) > 0.1 or abs(global_position.z - new_z) > 0.1:
-		print("[Ocean] 위치 이동: ", global_position, " -> ", Vector3(new_x, 0, new_z))
 		global_position.x = new_x
 		global_position.z = new_z

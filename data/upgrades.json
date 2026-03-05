@@ -1,0 +1,213 @@
+{
+	"upgrades": {
+		"cannon": {
+			"name": "대포",
+			"category": 0,
+			"description": "함포 성능 강화 및 수량 추가",
+			"max_level": 5,
+			"color": "ff7f33",
+			"stats": {
+				"dmg_pct_per_lv": 20,
+				"range_pct_per_lv": 10,
+				"cd_pct_per_lv": 8
+			}
+		},
+		"janggun": {
+			"name": "대장군전",
+			"category": 0,
+			"description": "화력 강화 및 명중 시 화염/이속저하 디버프",
+			"max_level": 5,
+			"color": "996633"
+		},
+		"singigeon": {
+			"name": "신기전",
+			"category": 1,
+			"description": "발사 개수 추가 및 데미지/사거리 강화",
+			"max_level": 5,
+			"color": "ff4c4c"
+		},
+		"spear_rail": {
+			"name": "창 난간",
+			"category": 1,
+			"description": "배 측면에 창을 배치하여 도선하는 적에게 자동 데미지",
+			"max_level": 5,
+			"color": "b27f4c",
+			"stats": {
+				"base_damage": 10.0,
+				"damage_per_lv": 5.0,
+				"base_count": 4,
+				"count_per_lv": 2
+			}
+		},
+		"fire_pot": {
+			"name": "화통",
+			"category": 1,
+			"description": "적선 도선 예열 시 아군 병사가 적 갑판에 화통을 던짐",
+			"max_level": 5,
+			"color": "e54c19",
+			"stats": {
+				"base_damage": 15.0,
+				"damage_per_lv": 5.0,
+				"base_radius": 3.0,
+				"radius_per_lv": 0.5,
+				"base_cooldown": 6.0,
+				"cooldown_reduce_per_lv": 1.0
+			}
+		},
+		"repeating_crossbow": {
+			"name": "연노",
+			"category": 1,
+			"description": "활 대신 고속 연속 발사가 가능한 연노를 병사들이 사용",
+			"max_level": 5,
+			"color": "99cc33",
+			"stats": {
+				"base_damage": 10.0,
+				"damage_per_lv": 2.0,
+				"base_cooldown": 2.0,
+				"cooldown_reduce_per_lv": 0.2,
+				"burst_delay": 0.15
+			}
+		},
+		"ballista": {
+			"name": "팔우노",
+			"category": 1,
+			"description": "함선 후방에 거대 발리스타를 장착하여 적 병사들을 일직선으로 관통합니다.",
+			"max_level": 5,
+			"color": "cc6619",
+			"stats": {
+				"base_damage": 45.0,
+				"damage_per_lv": 15.0,
+				"base_cooldown": 10.0,
+				"cooldown_reduce_per_lv": 1.0,
+				"base_pierce": 3,
+				"pierce_per_lv": 1
+			}
+		},
+		"crew_numbers": {
+			"name": "병사 충원",
+			"category": 1,
+			"description": "최대 정원 증가 및 리스폰 속도 단축",
+			"max_level": 5,
+			"color": "66ccff",
+			"stats": {
+				"crew_add": 1,
+				"respawn_mult": 0.8,
+				"respawn_min": 1.0
+			}
+		},
+		"crew_quality": {
+			"name": "정예병 훈련",
+			"category": 1,
+			"description": "병사의 체력, 방어력, 공격력 일괄 상승",
+			"max_level": 5,
+			"color": "cccc33",
+			"stats": {
+				"base_hp": 40.0,
+				"hp_per_lv": 10.0,
+				"dmg_pct_per_lv": 15,
+				"def_pct_per_lv": 10
+			}
+		},
+		"hull_defense": {
+			"name": "선체 장갑",
+			"category": 2,
+			"description": "함선의 최대 체력 및 방어력 증가",
+			"max_level": 5,
+			"color": "994c19",
+			"stats": {
+				"hp_add": 30.0,
+				"heal_on_apply": 20.0,
+				"def_per_lv": 2.0
+			}
+		},
+		"navigation": {
+			"name": "항해 기동",
+			"category": 3,
+			"description": "선회 속도 및 돛 기동력 증가",
+			"max_level": 5,
+			"color": "66ff66",
+			"stats": {
+				"turn_mult": 1.15,
+				"stamina_mult": 0.85
+			}
+		},
+		"supply_bonus": {
+			"name": "보급 효율",
+			"category": 2,
+			"description": "보급품 획득 시 회복량 및 습득 범위 대폭 증가",
+			"max_level": 5,
+			"color": "4ccc4c",
+			"stats": {
+				"base_radius": 8.0,
+				"radius_per_lv": 2.0,
+				"heal_per_lv": 5.0
+			}
+		},
+		"supply": {
+			"name": "보급물자",
+			"category": 2,
+			"description": "체력 즉시 소폭 회복",
+			"max_level": 99,
+			"color": "7fff7f",
+			"stats": {
+				"max_hp_add": 20.0
+			}
+		},
+		"gold": {
+			"name": "전리품",
+			"category": 4,
+			"description": "점수 +50",
+			"max_level": 99,
+			"color": "ffd84c",
+			"stats": {
+				"score_add": 50
+			}
+		},
+		"fleet_cannon": {
+			"name": "함대 화력",
+			"category": 5,
+			"description": "미니언 함선의 대포 수량 추가 및 공격력 강화",
+			"max_level": 5,
+			"color": "ff33e5",
+			"stats": {
+				"dmg_pct_per_lv": 25,
+				"cd_pct_per_lv": 10
+			}
+		},
+		"fleet_hull": {
+			"name": "함대 보호",
+			"category": 5,
+			"description": "미니언 함선의 최대 체력 및 충돌 방어력 증가",
+			"max_level": 5,
+			"color": "33ffcc",
+			"stats": {
+				"hp_add": 100,
+				"def_per_lv": 5
+			}
+		},
+		"fleet_crew": {
+			"name": "함대 병사",
+			"category": 5,
+			"description": "미니언 함선의 병사 리스폰 속도 대폭 단축",
+			"max_level": 5,
+			"color": "33e5ff",
+			"stats": {
+				"respawn_mult": 0.7
+			}
+		}
+	},
+	"relics": {
+		"sextant": {
+			"name": "육분의",
+			"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
+			"icon": "explore",
+			"alert_msg": "!! 렐릭 획득: 육분의 !!\n(자동 항해 활성화)"
+		},
+		"boss_heart": {
+			"name": "보스의 심장",
+			"description": "임시 보스 드롭 렐릭입니다.",
+			"icon": "favorite",
+			"alert_msg": "!! 렐릭 획득: 보스의 심장 !!"
+		}
+	}
+}

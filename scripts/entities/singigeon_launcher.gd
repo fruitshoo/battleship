@@ -6,8 +6,12 @@ extends Node3D
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
 @export var fire_cooldown: float = 4.0
 @export var detection_range: float = 30.0
-@export var shot_count: int = 1 # 레벨에 따라 1/3/5
-@export var spread_angle: float = 0.0 # 레벨에 따라 0/8/12
+@export var shot_count: int = 1 # 레벨에 따라 2/3/4
+@export var spread_angle: float = 0.0 # 레벨에 따라 점진적 확산각 증가
+@export var burst_interval: float = 0.08
+@export var retarget_radius: float = 16.0
+@export var lock_on_delay: float = 0.12
+@export var projectile_speed: float = 32.0
 @export var team: String = "player" # "player" or "enemy"
 
 var cooldown_timer: float = 0.0
@@ -56,6 +60,8 @@ func _find_nearest_enemy() -> Node3D:
 func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 	if not rocket_scene: return
 	cooldown_timer = cooldown_override if cooldown_override > 0 else fire_cooldown
+	var muzzle = get_node_or_null("Muzzle")
+	var base_forward = -global_transform.basis.z
 	
 	# MLRS 스타일: 연사 (Sequential Fire)
 	for i in range(shot_count):
@@ -63,11 +69,30 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 		
 		var rocket = rocket_scene.instantiate()
 		var side_offset = 0.3 if i % 2 == 0 else -0.3
-		var spawn_pos = global_position + Vector3(0, 0.5, 0) + (basis.x * side_offset)
+		var spawn_base = muzzle.global_position if is_instance_valid(muzzle) else (global_position + Vector3(0, 0.5, 0))
+		var spawn_pos = spawn_base + (basis.x * side_offset)
 		
-		# 포물선 비행을 위해 위치 데이터 전달
+		# 발사체 초기값 전달
+		var spread_t = 0.0
+		if shot_count > 1:
+			spread_t = lerpf(-spread_angle, spread_angle, float(i) / float(shot_count - 1))
+		var jitter = randf_range(-1.0, 1.0)
+		var predicted_pos = _predict_target_position(target, spawn_pos)
+		var lead_dir = (predicted_pos - spawn_pos).normalized()
+		var launch_dir = lead_dir.rotated(Vector3.UP, deg_to_rad(spread_t + jitter)).normalized()
+
 		rocket.start_pos = spawn_pos
-		rocket.target_pos = target.global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))
+		rocket.target_pos = predicted_pos + Vector3(randf_range(-0.5, 0.5), 0.0, randf_range(-0.5, 0.5))
+		if "target_node" in rocket:
+			rocket.target_node = target
+		if "launch_direction" in rocket:
+			rocket.launch_direction = launch_dir
+		if "speed" in rocket:
+			rocket.speed = projectile_speed
+		if "retarget_radius" in rocket:
+			rocket.retarget_radius = retarget_radius
+		if "lock_on_delay" in rocket:
+			rocket.lock_on_delay = lock_on_delay + 0.02 * float(i)
 		
 		# 발사 주체 (팀/쏜 사람) 전달
 		if "team" in rocket:
@@ -84,13 +109,45 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("rocket_launch", global_position)
 		
-		# 연사 간격 (0.12초)
-		await get_tree().create_timer(0.12).timeout
+		# 연사 간격
+		await get_tree().create_timer(burst_interval).timeout
 
 
 ## 업그레이드 시 호출
 func upgrade_to_level(level: int) -> void:
-	# 1~8 단계에 따른 발사 수 증가 (레벨 1, 3, 5, 7 마다 1발씩 증가)
-	shot_count = 1 + int((level - 1) / 2.0)
-	spread_angle = shot_count * 3.0
+	# 발키리 스타일: 짧은 간격 다연장 + 확산 후 유도
+	if level <= 2:
+		shot_count = 2
+	elif level <= 4:
+		shot_count = 3
+	else:
+		shot_count = 4
+	spread_angle = 6.0 + float(level) * 1.2
+	burst_interval = maxf(0.04, 0.10 - float(level) * 0.008)
 	print("[Launcher] 신기전 Lv.%d (%d발, ±%.0f°)" % [level, shot_count, spread_angle])
+
+
+func _predict_target_position(target: Node3D, from_pos: Vector3) -> Vector3:
+	if not is_instance_valid(target):
+		return from_pos + (-global_transform.basis.z) * 10.0
+
+	var target_pos = target.global_position
+	var to_target = target_pos - from_pos
+	var dist = maxf(0.1, to_target.length())
+	var t_flight = dist / maxf(1.0, projectile_speed)
+
+	var target_speed = 0.0
+	if "current_speed" in target:
+		target_speed = float(target.current_speed)
+	elif "move_speed" in target:
+		target_speed = float(target.move_speed)
+
+	var target_fwd = -target.global_transform.basis.z
+	target_fwd.y = 0.0
+	if target_fwd.length_squared() > 0.001:
+		target_fwd = target_fwd.normalized()
+
+	# 완전 선행 예측은 빗나감이 커서 70%만 반영
+	var lead_pos = target_pos + target_fwd * target_speed * t_flight * 0.7
+	lead_pos.y = target_pos.y
+	return lead_pos

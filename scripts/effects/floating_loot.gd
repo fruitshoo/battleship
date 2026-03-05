@@ -4,7 +4,7 @@ extends Area3D
 ## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
 
 @export var gold_amount: int = 30
-@export var xp_amount: int = 15
+@export var xp_amount: int = 15 # Deprecated: 부유물에서는 XP를 지급하지 않음(규칙 단순화용)
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 5.0 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도
@@ -19,6 +19,9 @@ var is_collected: bool = false
 var _cached_lm: Node = null
 var _cached_um: Node = null
 var _cached_ocean: Node = null
+var _cached_wave_height: float = 0.0
+var _wave_sample_timer: float = 0.0
+@export_range(0.03, 0.3) var wave_sample_interval: float = 0.1
 
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
@@ -27,21 +30,22 @@ func _ready() -> void:
 	base_y = global_position.y
 	if base_y < 0.2: base_y = 0.5 # 비정상적으로 낮게 잡혔을 경우 보정
 	
-	# 초기에는 투명하게 시작해서 나타남 (스폰 연출)
+	# 초기에는 크기를 0으로 시작해서 나타남 (스폰 연출)
 	if visual and visual is MeshInstance3D:
 		var mat = visual.get_active_material(0)
 		if mat == null:
 			mat = StandardMaterial3D.new()
 			visual.set_surface_override_material(0, mat)
 		
-		# 예시 재질 (나무통/상자 느낌)
+		# 예시 재질 (나무통/상자 느낌 - 불투명하게 설정)
 		if mat is StandardMaterial3D:
-			mat.albedo_color = Color(0.6, 0.4, 0.2)
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat.albedo_color.a = 0.0
+			mat.albedo_color = Color(0.7, 0.5, 0.3) # 색상을 조금 더 밝게 조정
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED # 투명도 비활성화
 			
-			var tween = create_tween()
-			tween.tween_property(mat, "albedo_color:a", 1.0, 1.0)
+		# 스케일 애니메이션 적용 (투명도 버그 회피)
+		visual.scale = Vector3.ZERO
+		var tween = create_tween()
+		tween.tween_property(visual, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			
 		# 컬링 방지 마진 추가
 		visual.extra_cull_margin = 1.0
@@ -69,6 +73,7 @@ var is_expiring: bool = false # 소멸 진행 중 여부
 func _physics_process(delta: float) -> void:
 	if is_collected: return
 	time_alive += delta
+	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
 	
 	if not is_expiring and time_alive > lifetime:
 		_expire_and_free()
@@ -115,7 +120,10 @@ func _apply_floating(delta: float) -> void:
 	var target_y = base_y + sin(time_alive * float_speed) * float_height
 	
 	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
-		target_y += _cached_ocean.get_wave_height(global_position)
+		if _wave_sample_timer <= 0.0:
+			_cached_wave_height = _cached_ocean.get_wave_height(global_position)
+			_wave_sample_timer = wave_sample_interval
+		target_y += _cached_wave_height
 		
 	# lerp를 사용하여 부드럽게 파도와 기본 높이를 따라감
 	position.y = lerp(position.y, target_y, 5.0 * delta)
@@ -199,8 +207,6 @@ func _collect_loot() -> void:
 	if is_instance_valid(_cached_lm):
 		if _cached_lm.has_method("add_score"):
 			_cached_lm.add_score(gold_amount)
-		if _cached_lm.has_method("add_xp"):
-			_cached_lm.add_xp(xp_amount)
 			
 	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
 	if is_instance_valid(target_player) and "hull_hp" in target_player and "max_hull_hp" in target_player:

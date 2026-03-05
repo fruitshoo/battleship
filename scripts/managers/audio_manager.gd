@@ -1,3 +1,4 @@
+@tool
 extends Node
 
 ## 오디오 매니저 (AudioManager)
@@ -106,8 +107,18 @@ var current_bgm_name: String = ""
 # 예열 완료 신호
 signal prewarm_finished
 var is_prewarm_finished: bool = false
+var _essential_warm_keys: Array[String] = [
+	"cannon_fire",
+	"impact_wood",
+	"sword_swing",
+	"musket_fire",
+	"wave_splash",
+	"water_splash_large"
+]
 
 func _ready() -> void:
+	if Engine.is_editor_hint(): return
+	
 	# 1. 3D SFX 풀 생성
 	for i in range(sfx_pool_size):
 		var p = AudioStreamPlayer3D.new()
@@ -149,50 +160,33 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 UI 소리는 나야 함
 	
 	# 오디오 버스 진단 보고서 출력
-	_print_bus_status()
+	if OS.is_debug_build():
+		_print_bus_status()
 	
-	# 엔진 기동 시 필수 오디오 즉시 캐싱 (로딩 화면 대기 시간에 처리)
-	_preload_essential_audio()
+	# 엔진 기동 시 필수 오디오만 빠르게 예열 (시작 프레임 차단 방지)
+	call_deferred("_preload_essential_audio")
 
 ## 필수 효과음 사전 캐싱 (오디오 끊김 방지용)
 func _preload_essential_audio() -> void:
-	var essential_keys = [
-		"cannon_fire", "cannon_hit", "rocket_exploded",
-		"heavy_missle_impact", "wood_break", "soldier_hit", "bow_shoot",
-		"sword_swing", "musket_fire", "soldier_die"
-	]
-	
-	for key in essential_keys:
-		if sfx_streams.has(key):
-			var path = sfx_streams[key]
-			if path is Array:
-				var loaded_arr = []
-				for p in path:
-					if p is String and ResourceLoader.exists(p):
-						loaded_arr.append(load(p))
-				if loaded_arr.size() > 0:
-					_cached_streams[key] = loaded_arr
-			elif path is String and ResourceLoader.exists(path):
-				_cached_streams[key] = load(path)
-			elif path is AudioStream:
-				_cached_streams[key] = path
+	for key in _essential_warm_keys:
+		_cache_stream_for_key(key)
 	
 	# === 무음 재생을 통한 오디오 파이프라인 예열 (Silent Warm-up) ===
-	# 단순히 load만 하는 것보다, 한 번씩 재생해줘야 첫 사격 시 렉이 완전히 사라집니다.
+	# 시작 지연을 막기 위해 필수 키만 1샷 예열한다.
 	var warm_up_player = AudioStreamPlayer.new()
 	warm_up_player.name = "AudioWarmupPlayer"
 	warm_up_player.volume_db = -80.0 # 완전 무음
 	add_child(warm_up_player)
 	
-	for key in _cached_streams:
+	for key in _essential_warm_keys:
+		if not _cached_streams.has(key):
+			continue
 		var s = _cached_streams[key]
 		if s is Array:
-			for stream in s:
-				if stream is AudioStream:
-					warm_up_player.stream = stream
-					warm_up_player.play()
-					# 아주 짧게만 재생하고 다음으로 넘어감
-					await get_tree().process_frame
+			if s.size() > 0 and s[0] is AudioStream:
+				warm_up_player.stream = s[0]
+				warm_up_player.play()
+				await get_tree().process_frame
 		elif s is AudioStream:
 			warm_up_player.stream = s
 			warm_up_player.play()
@@ -201,7 +195,40 @@ func _preload_essential_audio() -> void:
 	warm_up_player.queue_free()
 	is_prewarm_finished = true
 	prewarm_finished.emit()
-	print("[Resource] 전투 필수 오디오 사전 로드 및 무음 예열 완료")
+	print("[Resource] 필수 오디오 예열 완료")
+	
+	# 나머지 효과음은 백그라운드로 지연 캐싱
+	call_deferred("_preload_secondary_audio")
+
+func _preload_secondary_audio() -> void:
+	var step := 0
+	for key in sfx_streams.keys():
+		if key in _essential_warm_keys:
+			continue
+		_cache_stream_for_key(key)
+		step += 1
+		if step % 4 == 0:
+			await get_tree().process_frame
+	print("[Resource] 보조 오디오 캐싱 완료")
+
+func _cache_stream_for_key(key: String) -> void:
+	if _cached_streams.has(key):
+		return
+	if not sfx_streams.has(key):
+		return
+		
+	var path = sfx_streams[key]
+	if path is Array:
+		var loaded_arr = []
+		for p in path:
+			if p is String and ResourceLoader.exists(p):
+				loaded_arr.append(load(p))
+		if loaded_arr.size() > 0:
+			_cached_streams[key] = loaded_arr
+	elif path is String and ResourceLoader.exists(path):
+		_cached_streams[key] = load(path)
+	elif path is AudioStream:
+		_cached_streams[key] = path
 
 
 ## 오디오 버스 상태 진단 로직
