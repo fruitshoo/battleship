@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 화살 (Arrow)
 ## 병사가 쏘는 원거리 투사체
@@ -12,6 +13,7 @@ var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
 var target_node: Node3D = null # 목표물 참조 (강제 명중 판정용)
 var team: String = "player"
+var damage_source: String = "bow"
 var is_fire_arrow: bool = false
 var fire_damage: float = 0.0
 
@@ -68,7 +70,7 @@ func _physics_process(delta: float) -> void:
 func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
 	var water_explosion_scene = preload("res://scenes/effects/water_explosion.tscn")
-	if water_explosion_scene:
+	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
 		var pos = global_position
 		var explosion = water_explosion_scene.instantiate()
 		explosion.position = Vector3(pos.x, 0.05, pos.z)
@@ -95,7 +97,7 @@ func _check_hit(target: Node) -> void:
 		
 		# 적군 병사 피격
 		if target.has_method("take_damage"):
-			target.take_damage(damage, global_position)
+			target.take_damage(damage, global_position, damage_source)
 			# 불화살 이펙트 소환 등 가능
 			queue_free()
 	
@@ -111,7 +113,7 @@ func _check_hit(target: Node) -> void:
 		var enemy_team = "enemy" if team == "player" else "player"
 		if HitTargetResolver.resolve_team_tag(potential_ship) == enemy_team:
 			if potential_ship.has_method("take_damage"):
-				potential_ship.take_damage(1.0, global_position) # 배에는 미미한 데미지
+				potential_ship.take_damage(1.0, global_position, damage_source) # 배에는 미미한 데미지
 				if is_fire_arrow and potential_ship.has_method("take_fire_damage"):
 					potential_ship.take_fire_damage(fire_damage, 5.0) # 5초간 화상
 			elif potential_ship.has_method("die") and randf() < 0.1: # 아주 낮은 확률로 파괴 (또는 HP가 1인 경우)

@@ -1,4 +1,6 @@
 extends Node
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const DEBUG_SPAWNER_LOGS := false
 
 ## 적 생성 관리자 (Enemy Spawner)
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
@@ -74,8 +76,8 @@ func _process(delta: float) -> void:
 		return
 		
 	# 1. 적 생성 주기 관리
-	var enemies = get_tree().get_nodes_in_group("enemy")
-	var elite_count = get_tree().get_nodes_in_group("elite").size()
+	var enemies = SceneGroupCache.get_nodes(get_tree(), "enemy")
+	var elite_count = SceneGroupCache.get_nodes(get_tree(), "elite").size()
 	
 	if not regular_spawn_stopped:
 		# 1-1. 엘리트 소환 주기 체크
@@ -92,9 +94,12 @@ func _process(delta: float) -> void:
 				timer = compute_next_interval()
 				_spawn_enemy()
 	
-	# 2. 너무 멀어진 적 재배치 (Tension 유지) - 부하 분산을 위해 매 프레임 조금씩 체크
-	if not enemies.is_empty():
-		_check_enemy_reposition_incremental(enemies)
+	# 2. 너무 멀어진 적 재배치 (Tension 유지) - 타이머 기반으로 분산 체크
+	reposition_timer -= delta
+	if reposition_timer <= 0.0:
+		reposition_timer = reposition_check_interval
+		if not enemies.is_empty():
+			_check_enemy_reposition_incremental(enemies)
 
 func _check_enemy_reposition_incremental(enemies: Array) -> void:
 	# 한 프레임에 최대 5개까지만 체크
@@ -121,7 +126,8 @@ func _check_enemy_reposition_incremental(enemies: Array) -> void:
 				var look_target = spawn_pos - player_forward * 10.0
 				enemy.look_at(look_target, Vector3.UP)
 			
-			print("[Spawner] 멀어진 적함을 플레이어 전방 차단진으로 재배치(Recycle) 했습니다.")
+				if DEBUG_SPAWNER_LOGS:
+					print("[Spawner] 멀어진 적함을 플레이어 전방 차단진으로 재배치(Recycle) 했습니다.")
 
 
 func compute_next_interval() -> float:
@@ -129,9 +135,7 @@ func compute_next_interval() -> float:
 	return spawn_interval * randf_range(0.8, 1.2)
 
 func _find_player() -> void:
-	var players = get_tree().get_nodes_in_group("player")
-	if players.size() > 0:
-		player = players[0]
+	player = SceneGroupCache.get_first(get_tree(), "player") as Node3D
 
 func _spawn_enemy() -> void:
 	if not enemy_scene:
@@ -149,9 +153,10 @@ func _spawn_enemy() -> void:
 	var player_forward = - player.global_transform.basis.z if player else Vector3.FORWARD
 	var blockade_right = player_forward.cross(Vector3.UP).normalized()
 	
+	var existing_enemy_count := SceneGroupCache.get_nodes(get_tree(), "enemy").size()
 	for i in range(spawn_count):
 		# 최대 적 수 초과 체크
-		if get_tree().get_nodes_in_group("enemy").size() >= max_enemies:
+		if existing_enemy_count >= max_enemies:
 			break
 			
 		var enemy = enemy_scene.instantiate()
@@ -172,16 +177,16 @@ func _spawn_enemy() -> void:
 			var offset_multiplier = i - (spawn_count - 1) / 2.0
 			spawn_pos += blockade_right * (offset_multiplier * 15.0)
 			
-		enemy.position = spawn_pos
+		# 초기 회전: 아직 트리에 없을 수 있으므로 look_at_from_position() 사용
+		if is_instance_valid(player):
+			var look_target = spawn_pos - player_forward * 10.0
+			enemy.look_at_from_position(spawn_pos, look_target, Vector3.UP)
+		else:
+			enemy.position = spawn_pos
 		
 		# Main 씬에 추가
 		get_parent().add_child(enemy)
-		
-		# 초기 회전: 일렬 횡대이므로 플레이어를 바라보는 대신 플레이어의 반대 방향(마주보는 방향)을 보도록 설정
-		# (단일 스폰이라도 플레이어 정면을 향해 돌진하는 그림 연출)
-		if is_instance_valid(player):
-			var look_target = spawn_pos - player_forward * 10.0
-			enemy.look_at(look_target, Vector3.UP)
+		existing_enemy_count += 1
 		
 		# 레벨 기반 스탯 설정 (이동 속도와 HP는 함선 씬 고유 스탯을 사용하도록 수정)
 		if "boarders_count" in enemy:
@@ -215,7 +220,7 @@ func _get_biased_spawn_position() -> Vector3:
 ## 특정 위치가 모든 아군 배(플레이어+나포함)로부터 일정 거리(min_dist) 이상 떨어져 있는지 확인
 func _is_position_safe(pos: Vector3, min_dist: float) -> bool:
 	var safe_sq = min_dist * min_dist
-	var allies = get_tree().get_nodes_in_group("player")
+	var allies = SceneGroupCache.get_nodes(get_tree(), "player")
 	
 	for ally in allies:
 		if not is_instance_valid(ally): continue

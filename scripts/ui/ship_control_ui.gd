@@ -6,6 +6,7 @@ extends Control
 @export var controlled_ship: NodePath
 
 var ship: Node3D = null
+const TOP_STATUS_RESERVED_PX: float = 46.0
 
 # UI 노드들
 @onready var sail_angle_label: Label = %SailAngleLabel if has_node("%SailAngleLabel") else null
@@ -47,6 +48,11 @@ func _ready() -> void:
 		var wind_label_title = wind_panel.get_node_or_null("VBox/Label")
 		if wind_label_title:
 			wind_label_title.visible = false
+		# 상단 XP/지휘 바와 겹치지 않도록 최소 여백 확보
+		var panel_height = wind_panel.offset_bottom - wind_panel.offset_top
+		if wind_panel.offset_top < TOP_STATUS_RESERVED_PX:
+			wind_panel.offset_top = TOP_STATUS_RESERVED_PX
+			wind_panel.offset_bottom = TOP_STATUS_RESERVED_PX + panel_height
 	
 	# 안전을 위해 개별 버튼들도 숨김 처리 유지
 	if sail_left_btn: sail_left_btn.visible = false

@@ -1,0 +1,33 @@
+[gd_resource type="Environment" format=3 uid="uid://dvj1gb6t1np06"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_storm_eve"]
+sky_top_color = Color(0.06, 0.1, 0.17, 1)
+sky_horizon_color = Color(0.22, 0.29, 0.38, 1)
+ground_bottom_color = Color(0.03, 0.05, 0.08, 1)
+ground_horizon_color = Color(0.2, 0.27, 0.35, 1)
+sun_curve = 0.08
+
+[sub_resource type="Sky" id="Sky_storm_eve"]
+sky_material = SubResource("ProceduralSkyMaterial_storm_eve")
+
+[resource]
+background_mode = 2
+sky = SubResource("Sky_storm_eve")
+ambient_light_source = 3
+ambient_light_color = Color(0.68, 0.74, 0.82, 1)
+tonemap_mode = 3
+ssao_enabled = true
+ssao_radius = 1.8
+ssao_intensity = 1.35
+glow_enabled = true
+glow_normalized = true
+glow_strength = 0.3
+glow_bloom = 0.06
+glow_blend_mode = 0
+fog_enabled = true
+fog_light_color = Color(0.21, 0.29, 0.36, 1)
+fog_sun_scatter = 0.16
+fog_density = 0.011
+fog_sky_affect = 0.38
+fog_depth_begin = 20.0
+fog_depth_end = 95.0

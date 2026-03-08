@@ -1,4 +1,7 @@
 extends CanvasLayer
+const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 
 ## 게임 HUD (Game HUD)
 ## 레벨, 점수, 바람, 속도, 돌풍 경고 등을 시각화
@@ -58,16 +61,43 @@ var current_relic_count: int = 0
 # === 무기 UI 변수 ===
 var weapon_container: HBoxContainer = null
 var weapon_slots: Array[PanelContainer] = []
-var active_weapons: Dictionary = {} # 무기 ID를 슬롯 인덱스에 매핑
+var active_weapons: Dictionary = {} # 함선 업그레이드 ID -> 슬롯 인덱스
 var support_container: HBoxContainer = null
 var support_slots: Array[PanelContainer] = []
-var active_supports: Dictionary = {} # 보조 업그레이드 ID를 슬롯 인덱스에 매핑
+var active_supports: Dictionary = {} # 병사 업그레이드 ID -> 슬롯 인덱스
 var combat_stats_label: Label = null
+var upgrade_tooltip_panel: PanelContainer = null
+var upgrade_tooltip_label: Label = null
+var _tooltip_slot_ref: PanelContainer = null
+var _tooltip_hover_slot: PanelContainer = null
+var _tooltip_hover_elapsed: float = 0.0
+var _tooltip_tween: Tween = null
+var game_over_panel: PanelContainer = null
+var game_over_subtitle: Label = null
+var game_over_button: Button = null
+var _game_over_return_timer: float = -1.0
+var _game_over_transitioning: bool = false
+
+const UPGRADE_TOOLTIP_SHOW_DELAY: float = 0.14
+const UPGRADE_TOOLTIP_OFFSET := Vector2(18.0, 16.0)
+const UPGRADE_TOOLTIP_MIN_WIDTH: float = 320.0
+
+const SHIP_UPGRADE_IDS := [
+	"cannon", "singigeon", "janggun", "ballista",
+	"hull_defense", "navigation", "supply_bonus", "fleet_signal",
+	"fleet_cannon", "fleet_hull", "supply", "gold"
+]
+const CREW_UPGRADE_IDS := [
+	"crew_numbers", "crew_quality", "fire_pot", "repeating_crossbow",
+	"fleet_crew"
+]
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	# 기존 요소 숨기기 & 신규 레이아웃 셋업
 	_setup_top_xp_bar()
 	_setup_new_layout()
+	_setup_game_over_panel()
 	
 	update_level(1)
 	update_score(0)
@@ -131,7 +161,7 @@ func _setup_top_xp_bar() -> void:
 	merit_label.add_theme_font_size_override("font_size", 10)
 	merit_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	merit_label.add_theme_constant_override("outline_size", 3)
-	merit_label.text = "공적 포인트 (초요기 대기)"
+	merit_label.text = "지휘 포인트 (병영 강화 대기)"
 	merit_bar.add_child(merit_label)
 	
 	# 컨테이너 오프셋 조정
@@ -149,6 +179,7 @@ func _setup_new_layout() -> void:
 	if hull_label: hull_label.visible = false
 	if speed_label: speed_label.visible = false
 	if boss_hp_panel: boss_hp_panel.visible = false
+	_setup_upgrade_tooltip()
 	
 	var legacy_top = get_node_or_null("TopPanel")
 	if legacy_top: legacy_top.visible = false
@@ -197,24 +228,29 @@ func _setup_new_layout() -> void:
 			icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			icon_label.add_theme_font_size_override("font_size", 20)
 			
-			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-			if icon_font:
-				icon_label.add_theme_font_override("font", icon_font)
+			if MATERIAL_SYMBOLS_FONT:
+				icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
 				
 			slot_bg.add_child(icon_label)
 			relic_container.add_child(slot_bg)
 
-		# --- 무기 현황 슬롯 (렐릭 바로 아래) ---
+		# --- 함선 업그레이드 슬롯 ---
+		var ship_title = Label.new()
+		ship_title.text = "[함선 업그레이드]"
+		ship_title.add_theme_font_size_override("font_size", 12)
+		ship_title.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
+		top_left_container.add_child(ship_title)
+
 		weapon_container = HBoxContainer.new()
 		weapon_container.add_theme_constant_override("separation", 8)
-		# 렐릭 마진 하단보다 덜 띄우고 붙여둠
 		top_left_container.add_child(weapon_container)
 		
-		# 3개의 빈 상태 무기 슬롯 생성 (대포, 신기전, 대장군전)
+		# 함선 업그레이드 슬롯 4칸
 		weapon_slots.clear()
 		for i in range(4):
 			var w_slot_bg = PanelContainer.new()
 			w_slot_bg.custom_minimum_size = Vector2(32, 32)
+			w_slot_bg.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			
 			var w_slot_sb = StyleBoxFlat.new()
 			w_slot_sb.bg_color = Color(0, 0, 0, 0.4) # 약간 더 투명한 배경
@@ -232,9 +268,8 @@ func _setup_new_layout() -> void:
 			icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			icon_label.add_theme_font_size_override("font_size", 20)
 			
-			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-			if icon_font:
-				icon_label.add_theme_font_override("font", icon_font)
+			if MATERIAL_SYMBOLS_FONT:
+				icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
 			icon_label.name = "Icon"
 			w_slot_bg.add_child(icon_label)
 			
@@ -257,11 +292,20 @@ func _setup_new_layout() -> void:
 			level_label_overlay.offset_bottom = -2
 			
 			w_slot_bg.add_child(level_label_overlay)
+			w_slot_bg.set_meta("upgrade_id", "")
+			w_slot_bg.set_meta("upgrade_level", 0)
+			_bind_upgrade_slot_hover(w_slot_bg)
 			
 			weapon_container.add_child(w_slot_bg)
 			weapon_slots.append(w_slot_bg)
 
-		# --- 보조 업그레이드 슬롯 (무기 슬롯 바로 아래) ---
+		# --- 병사 업그레이드 슬롯 ---
+		var crew_title = Label.new()
+		crew_title.text = "[병사 업그레이드]"
+		crew_title.add_theme_font_size_override("font_size", 12)
+		crew_title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.72))
+		top_left_container.add_child(crew_title)
+
 		support_container = HBoxContainer.new()
 		support_container.add_theme_constant_override("separation", 8)
 		top_left_container.add_child(support_container)
@@ -270,6 +314,7 @@ func _setup_new_layout() -> void:
 		for i in range(4):
 			var s_slot_bg = PanelContainer.new()
 			s_slot_bg.custom_minimum_size = Vector2(32, 32)
+			s_slot_bg.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 			var s_slot_sb = StyleBoxFlat.new()
 			s_slot_sb.bg_color = Color(0, 0, 0, 0.35)
@@ -286,9 +331,8 @@ func _setup_new_layout() -> void:
 			icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			icon_label.add_theme_font_size_override("font_size", 20)
 
-			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-			if icon_font:
-				icon_label.add_theme_font_override("font", icon_font)
+			if MATERIAL_SYMBOLS_FONT:
+				icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
 			icon_label.name = "Icon"
 			s_slot_bg.add_child(icon_label)
 
@@ -308,6 +352,9 @@ func _setup_new_layout() -> void:
 			level_label_overlay.offset_bottom = -2
 
 			s_slot_bg.add_child(level_label_overlay)
+			s_slot_bg.set_meta("upgrade_id", "")
+			s_slot_bg.set_meta("upgrade_level", 0)
+			_bind_upgrade_slot_hover(s_slot_bg)
 			support_container.add_child(s_slot_bg)
 			support_slots.append(s_slot_bg)
 
@@ -417,9 +464,8 @@ func _setup_new_layout() -> void:
 			crew_label.add_theme_font_size_override("font_size", 18) # 아이콘이므로 조금 더 크게
 			
 			# Material Symbols 폰트 적용
-			var icon_font = load("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-			if icon_font:
-				crew_label.add_theme_font_override("font", icon_font)
+			if MATERIAL_SYMBOLS_FONT:
+				crew_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
 		
 		# 플레이어 HP 바 생성
 		hp_bar = ProgressBar.new()
@@ -518,6 +564,7 @@ func _setup_new_layout() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_game_over_return(delta)
 	game_time += delta
 	_player_lookup_cooldown = maxf(0.0, _player_lookup_cooldown - delta)
 	if not is_instance_valid(player_ship):
@@ -531,6 +578,8 @@ func _process(delta: float) -> void:
 	_update_hull_display()
 	_update_stamina_display()
 	_update_boarding_display()
+	_update_upgrade_tooltip_state(delta)
+	_update_upgrade_tooltip_position()
 	
 	# 돌풍 경고 깜박임
 	if _gust_warning_timer > 0:
@@ -565,7 +614,7 @@ func _try_resolve_player_ship() -> void:
 	if _player_lookup_cooldown > 0.0:
 		return
 	_player_lookup_cooldown = 0.25
-	var players = get_tree().get_nodes_in_group("player")
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
 	for p in players:
 		if is_instance_valid(p) and p.get("is_player_controlled") == true:
 			player_ship = p
@@ -764,7 +813,7 @@ func update_merit(current: int, maximum: int, level: int = 1) -> void:
 		
 		if merit_label:
 			if current >= maximum:
-				merit_label.text = "[ 함대 LEVEL UP! ]"
+				merit_label.text = "[ 병영 LEVEL UP! ]"
 				merit_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.4))
 				
 				# 가득 찼을 때 번쩍이는 연출
@@ -772,7 +821,7 @@ func update_merit(current: int, maximum: int, level: int = 1) -> void:
 				if style:
 					style.bg_color = Color(1.0, 1.0, 0.5, 1.0) # 더 밝은 색으로
 			else:
-				merit_label.text = "공적 Lv.%d (%d / %d)" % [level, current, maximum]
+				merit_label.text = "지휘 Lv.%d (%d / %d)" % [level, current, maximum]
 				merit_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
 				
 				# 원래 색으로
@@ -802,103 +851,331 @@ func add_relic_icon(icon_text: String) -> void:
 		current_relic_count += 1
 
 
-## 무기 슬롯 업데이트 (획득 순서대로 빈 칸에 채워넣기)
-func update_weapon_ui(weapon_id: String, level: int) -> void:
-	if level <= 0: return
-	
-	# 무기별 아이콘 매핑 (Material Symbols)
-	var icon_map = {
-		"cannon": "sports_baseball", # 대포 (둥근 포탄)
-		"singigeon": "rocket_launch", # 신기전 (로켓)
-		"janggun": "hardware", # 대장군전 (망치/무거운 쇳덩이 이미지)
-	}
-	# 무기별 색상 매핑
-	var color_map = {
-		"cannon": Color(1.0, 0.7, 0.3), # 주황
-		"singigeon": Color(1.0, 0.4, 0.4), # 빨강
-		"janggun": Color(0.8, 0.5, 0.2), # 황갈색
-	}
-	
-	var actual_icon = icon_map.get(weapon_id, "help")
-	var actual_color = color_map.get(weapon_id, Color.WHITE)
-	
-	# 이미 등록된 무기인지 확인
-	var slot_idx = -1
-	if active_weapons.has(weapon_id):
-		slot_idx = active_weapons[weapon_id]
-	else:
-		# 신규 획득: 빈 슬롯 앞쪽부터 순서대로 채워넣기
-		slot_idx = active_weapons.size()
-		if slot_idx >= weapon_slots.size():
-			return # 슬롯 수를 초과하면 표시하지 않음
-		active_weapons[weapon_id] = slot_idx
-	
-	# UI 갱신
-	var slot = weapon_slots[slot_idx]
-	var icon_label = slot.get_node_or_null("Icon") as Label
-	var lv_label = slot.get_node_or_null("Level") as Label
-	
-	if icon_label:
-		icon_label.text = actual_icon
-		icon_label.add_theme_color_override("font_color", actual_color)
-		
-	if lv_label:
-		lv_label.text = str(level)
-		lv_label.visible = true
-	
-	# 슬롯 테두리를 무기 색으로 잠깐 반짝이게 (획득/레벨업 피드백)
-	var slot_sb = slot.get_theme_stylebox("panel")
-	if slot_sb:
-		slot_sb = slot_sb.duplicate()
-		slot.add_theme_stylebox_override("panel", slot_sb)
-		var tween = create_tween()
-		tween.tween_property(slot_sb, "border_color", actual_color, 0.2)
-		tween.tween_property(slot_sb, "border_color", Color(0.4, 0.4, 0.4, 0.8), 0.5)
-
-
-## 보조 업그레이드 슬롯 업데이트 (획득 순서대로 빈 칸에 채워넣기)
-func update_support_ui(upgrade_id: String, level: int) -> void:
-	if level <= 0:
+func _setup_upgrade_tooltip() -> void:
+	if is_instance_valid(upgrade_tooltip_panel):
 		return
+	upgrade_tooltip_panel = PanelContainer.new()
+	upgrade_tooltip_panel.visible = false
+	upgrade_tooltip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	upgrade_tooltip_panel.z_index = 300
+	upgrade_tooltip_panel.custom_minimum_size = Vector2(UPGRADE_TOOLTIP_MIN_WIDTH, 0)
+	upgrade_tooltip_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	add_child(upgrade_tooltip_panel)
 
+	var tip_style = StyleBoxFlat.new()
+	tip_style.bg_color = Color(0.03, 0.045, 0.075, 0.96)
+	tip_style.border_color = Color(0.9, 0.85, 0.6, 0.9)
+	tip_style.border_width_top = 1
+	tip_style.border_width_bottom = 1
+	tip_style.border_width_left = 1
+	tip_style.border_width_right = 1
+	tip_style.set_corner_radius_all(8)
+	tip_style.shadow_color = Color(0, 0, 0, 0.45)
+	tip_style.shadow_size = 6
+	tip_style.content_margin_left = 12
+	tip_style.content_margin_right = 12
+	tip_style.content_margin_top = 10
+	tip_style.content_margin_bottom = 10
+	upgrade_tooltip_panel.add_theme_stylebox_override("panel", tip_style)
+
+	upgrade_tooltip_label = Label.new()
+	upgrade_tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	upgrade_tooltip_label.add_theme_font_size_override("font_size", 12)
+	upgrade_tooltip_label.add_theme_constant_override("line_spacing", 2)
+	upgrade_tooltip_label.add_theme_color_override("font_color", Color(0.96, 0.96, 0.96))
+	upgrade_tooltip_label.custom_minimum_size = Vector2(UPGRADE_TOOLTIP_MIN_WIDTH - 24.0, 0.0)
+	upgrade_tooltip_panel.add_child(upgrade_tooltip_label)
+
+func _bind_upgrade_slot_hover(slot: PanelContainer) -> void:
+	slot.mouse_entered.connect(_on_upgrade_slot_mouse_entered.bind(slot))
+	slot.mouse_exited.connect(_on_upgrade_slot_mouse_exited.bind(slot))
+
+func _on_upgrade_slot_mouse_entered(slot: PanelContainer) -> void:
+	if not is_instance_valid(upgrade_tooltip_panel) or not is_instance_valid(upgrade_tooltip_label):
+		return
+	var upgrade_id = str(slot.get_meta("upgrade_id", ""))
+	var level = int(slot.get_meta("upgrade_level", 0))
+	if upgrade_id.is_empty() or level <= 0:
+		return
+	_tooltip_hover_slot = slot
+	_tooltip_hover_elapsed = 0.0
+	if _tooltip_slot_ref != slot and is_instance_valid(upgrade_tooltip_panel) and upgrade_tooltip_panel.visible:
+		_show_upgrade_tooltip(slot)
+
+func _on_upgrade_slot_mouse_exited(slot: PanelContainer) -> void:
+	if _tooltip_hover_slot == slot:
+		_tooltip_hover_slot = null
+		_tooltip_hover_elapsed = 0.0
+	if _tooltip_slot_ref != slot:
+		return
+	_tooltip_slot_ref = null
+	_hide_upgrade_tooltip()
+
+func _update_upgrade_tooltip_state(delta: float) -> void:
+	if is_instance_valid(_tooltip_hover_slot):
+		_tooltip_hover_elapsed += delta
+		if (not is_instance_valid(upgrade_tooltip_panel) or not upgrade_tooltip_panel.visible) and _tooltip_hover_elapsed >= UPGRADE_TOOLTIP_SHOW_DELAY:
+			_show_upgrade_tooltip(_tooltip_hover_slot)
+
+func _show_upgrade_tooltip(slot: PanelContainer) -> void:
+	if not is_instance_valid(upgrade_tooltip_panel) or not is_instance_valid(upgrade_tooltip_label):
+		return
+	var upgrade_id = str(slot.get_meta("upgrade_id", ""))
+	var level = int(slot.get_meta("upgrade_level", 0))
+	if upgrade_id.is_empty() or level <= 0:
+		return
+	_tooltip_slot_ref = slot
+	upgrade_tooltip_label.text = _build_upgrade_tooltip_text(upgrade_id, level)
+	_apply_upgrade_tooltip_theme(_get_upgrade_color(upgrade_id))
+	upgrade_tooltip_panel.visible = true
+	upgrade_tooltip_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	if is_instance_valid(_tooltip_tween):
+		_tooltip_tween.kill()
+	_tooltip_tween = create_tween()
+	_tooltip_tween.tween_property(upgrade_tooltip_panel, "modulate:a", 1.0, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_update_upgrade_tooltip_position()
+
+func _hide_upgrade_tooltip(instant: bool = false) -> void:
+	if not is_instance_valid(upgrade_tooltip_panel):
+		return
+	if is_instance_valid(_tooltip_tween):
+		_tooltip_tween.kill()
+	_tooltip_tween = null
+	if instant or not upgrade_tooltip_panel.visible:
+		upgrade_tooltip_panel.visible = false
+		upgrade_tooltip_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		return
+	_tooltip_tween = create_tween()
+	_tooltip_tween.tween_property(upgrade_tooltip_panel, "modulate:a", 0.0, 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_tooltip_tween.finished.connect(_on_upgrade_tooltip_fade_out_finished, CONNECT_ONE_SHOT)
+
+func _on_upgrade_tooltip_fade_out_finished() -> void:
+	if not is_instance_valid(upgrade_tooltip_panel):
+		return
+	upgrade_tooltip_panel.visible = false
+	upgrade_tooltip_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+func _apply_upgrade_tooltip_theme(accent_color: Color) -> void:
+	if not is_instance_valid(upgrade_tooltip_panel):
+		return
+	var tip_style = upgrade_tooltip_panel.get_theme_stylebox("panel")
+	if not (tip_style is StyleBoxFlat):
+		return
+	var style_copy = (tip_style as StyleBoxFlat).duplicate()
+	var accent = accent_color.lerp(Color.WHITE, 0.15)
+	accent.a = 0.95
+	style_copy.border_color = accent
+	upgrade_tooltip_panel.add_theme_stylebox_override("panel", style_copy)
+
+func _update_upgrade_tooltip_position() -> void:
+	if not is_instance_valid(upgrade_tooltip_panel) or not upgrade_tooltip_panel.visible:
+		return
+	var mouse_pos = get_viewport().get_mouse_position()
+	var viewport_size = get_viewport().get_visible_rect().size
+	var panel_size = upgrade_tooltip_panel.size
+	if panel_size.x <= 1.0:
+		panel_size = upgrade_tooltip_panel.custom_minimum_size
+	var pos = mouse_pos + UPGRADE_TOOLTIP_OFFSET
+	pos.x = clampf(pos.x, 12.0, maxf(12.0, viewport_size.x - panel_size.x - 12.0))
+	pos.y = clampf(pos.y, 12.0, maxf(12.0, viewport_size.y - panel_size.y - 12.0))
+	upgrade_tooltip_panel.position = pos
+
+func _is_ship_upgrade(upgrade_id: String) -> bool:
+	return upgrade_id in SHIP_UPGRADE_IDS
+
+func _is_crew_upgrade(upgrade_id: String) -> bool:
+	return upgrade_id in CREW_UPGRADE_IDS
+
+func _build_upgrade_tooltip_text(upgrade_id: String, level: int) -> String:
+	var track_name = "함선" if _is_ship_upgrade(upgrade_id) else "병사"
+	var name = upgrade_id
+	var desc = ""
+	var stats: Dictionary = {}
+	var max_level = level
+	if is_instance_valid(UpgradeManager):
+		var upgrades_data = UpgradeManager.get("UPGRADES")
+		if upgrades_data is Dictionary:
+			var data = (upgrades_data as Dictionary).get(upgrade_id, {})
+			if data is Dictionary:
+				name = str(data.get("name", upgrade_id))
+				desc = str(data.get("description", ""))
+				stats = data.get("stats", {})
+				max_level = int(data.get("max_level", level))
+	var spec = _build_upgrade_spec_text(upgrade_id, level, stats)
+	var text = "[%s] %s  Lv.%d/%d" % [track_name, name, level, max_level]
+	if not desc.is_empty():
+		text += "\n" + desc
+	if not spec.is_empty():
+		text += "\n현재 효과: " + spec
+	if level >= max_level:
+		text += "\n다음 단계: 최대 레벨"
+	elif is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_next_description"):
+		var next_desc = str(UpgradeManager.get_next_description(upgrade_id))
+		if not next_desc.is_empty():
+			text += "\n다음 단계: " + next_desc
+	return text
+
+func _build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dictionary) -> String:
+	match upgrade_id:
+		"cannon":
+			return "화력 +%d%% | 사거리 +%d%% | 장전속도 +%d%%" % [
+				int(stats.get("dmg_pct_per_lv", 20) * level),
+				int(stats.get("range_pct_per_lv", 10) * level),
+				int(stats.get("cd_pct_per_lv", 8) * level),
+			]
+		"singigeon":
+			var shot_count = 2 if level <= 2 else (3 if level <= 4 else 4)
+			return "연사 발수 %d발 | 확산 사격 강화" % shot_count
+		"janggun":
+			return "명중 시 화염/둔화 디버프 강화"
+		"ballista":
+			var dmg = stats.get("base_damage", 45.0) + (level - 1) * stats.get("damage_per_lv", 15.0)
+			var pierce = int(stats.get("base_pierce", 3) + (level - 1) * stats.get("pierce_per_lv", 1))
+			return "데미지 %.0f | 관통 %d명" % [dmg, pierce]
+		"hull_defense":
+			var ranged_block = clampf(
+				float(level) * float(stats.get("crew_ranged_block_per_lv", 0.06)),
+				0.0,
+				float(stats.get("crew_ranged_block_max", 0.30))
+			)
+			return "최대 체력 +%d | 방어력 +%.1f" % [
+				int(stats.get("hp_add", 30.0) * level),
+				level * float(stats.get("def_per_lv", 2.0)),
+			] + " | 원거리 피해 -%d%%" % int(round(ranged_block * 100.0))
+		"navigation":
+			var turn_pct = int((pow(float(stats.get("turn_mult", 1.15)), level) - 1.0) * 100.0)
+			var stamina_save = int((1.0 - pow(float(stats.get("stamina_mult", 0.85)), level)) * 100.0)
+			return "선회 +%d%% | 스태미나 소모 -%d%%" % [turn_pct, stamina_save]
+		"supply_bonus":
+			var radius = stats.get("base_radius", 8.0) + level * stats.get("radius_per_lv", 2.0)
+			var heal = stats.get("heal_per_lv", 5.0) * level
+			return "획득 반경 %.1fm | 추가 회복 +%.0f" % [radius, heal]
+		"fleet_signal":
+			return "희귀 카드: 지원 함대 소집"
+		"fleet_cannon":
+			return "지원 함선 화력 +%d%% | 재장전 +%d%%" % [
+				int(stats.get("dmg_pct_per_lv", 25) * level),
+				int(stats.get("cd_pct_per_lv", 10) * level),
+			]
+		"fleet_hull":
+			return "지원 함선 체력 +%d | 방어력 +%d" % [
+				int(stats.get("hp_add", 100) * level),
+				int(stats.get("def_per_lv", 5) * level),
+			]
+		"fleet_crew":
+			var respawn_gain = int((1.0 - pow(float(stats.get("respawn_mult", 0.7)), level)) * 100.0)
+			return "지원 함선 병사 리스폰 +%d%%" % respawn_gain
+		"crew_numbers":
+			var crew_add = int(stats.get("crew_add", 1) * level)
+			var respawn_gain = int((1.0 - pow(float(stats.get("respawn_mult", 0.8)), level)) * 100.0)
+			return "병사 정원 +%d | 리스폰 속도 +%d%%" % [crew_add, respawn_gain]
+		"crew_quality":
+			return "병사 HP +%d | 공격력 +%d%% | 피해 감소 +%d%%" % [
+				int(stats.get("hp_per_lv", 10) * level),
+				int(stats.get("dmg_pct_per_lv", 15) * level),
+				int(stats.get("def_pct_per_lv", 10) * level),
+			]
+		"fire_pot":
+			var fp_dmg = stats.get("base_damage", 15.0) + (level - 1) * stats.get("damage_per_lv", 5.0)
+			var fp_cd = maxf(1.0, stats.get("base_cooldown", 6.0) - (level - 1) * stats.get("cooldown_reduce_per_lv", 1.0))
+			return "폭발 데미지 %.0f | 재사용 %.1f초" % [fp_dmg, fp_cd]
+		"repeating_crossbow":
+			var burst = 3
+			if level >= 3:
+				burst = 4
+			if level >= 5:
+				burst = 5
+			var rc_dmg = stats.get("base_damage", 10.0) + (level - 1) * stats.get("damage_per_lv", 2.0)
+			return "연사 %d발 | 1발 데미지 %.0f" % [burst, rc_dmg]
+		"supply":
+			return "즉시 최대체력 +%d" % int(stats.get("max_hp_add", 20.0))
+		"gold":
+			return "점수 +%d" % int(stats.get("score_add", 50))
+	return ""
+
+func _get_upgrade_icon(upgrade_id: String) -> String:
 	var icon_map = {
-		"crew_numbers": "group_add",
-		"crew_quality": "military_tech",
+		"cannon": "sports_baseball",
+		"singigeon": "rocket_launch",
+		"janggun": "hardware",
+		"ballista": "arrow_selector_tool",
 		"hull_defense": "shield",
 		"navigation": "explore",
 		"supply_bonus": "medical_services",
+		"fleet_signal": "groups",
+		"fleet_cannon": "flaky",
+		"fleet_hull": "security",
+		"fleet_crew": "diversity_3",
+		"crew_numbers": "group_add",
+		"crew_quality": "military_tech",
+		"fire_pot": "local_fire_department",
+		"repeating_crossbow": "bolt",
+		"supply": "healing",
+		"gold": "paid",
 	}
+	return icon_map.get(upgrade_id, "build")
+
+func _get_upgrade_color(upgrade_id: String) -> Color:
 	var color_map = {
-		"crew_numbers": Color(0.5, 0.8, 1.0),
-		"crew_quality": Color(1.0, 0.9, 0.35),
+		"cannon": Color(1.0, 0.7, 0.3),
+		"singigeon": Color(1.0, 0.4, 0.4),
+		"janggun": Color(0.8, 0.5, 0.2),
+		"ballista": Color(0.9, 0.6, 0.25),
 		"hull_defense": Color(0.75, 0.45, 0.2),
 		"navigation": Color(0.45, 1.0, 0.45),
 		"supply_bonus": Color(0.35, 0.95, 0.35),
+		"fleet_signal": Color(1.0, 0.75, 0.35),
+		"fleet_cannon": Color(1.0, 0.45, 0.85),
+		"fleet_hull": Color(0.3, 1.0, 0.8),
+		"fleet_crew": Color(0.35, 0.9, 1.0),
+		"crew_numbers": Color(0.5, 0.8, 1.0),
+		"crew_quality": Color(1.0, 0.9, 0.35),
+		"fire_pot": Color(0.93, 0.42, 0.2),
+		"repeating_crossbow": Color(0.65, 0.95, 0.35),
+		"supply": Color(0.55, 0.95, 0.6),
+		"gold": Color(1.0, 0.86, 0.3),
 	}
+	return color_map.get(upgrade_id, Color.WHITE)
 
-	var actual_icon = icon_map.get(upgrade_id, "build")
-	var actual_color = color_map.get(upgrade_id, Color.WHITE)
+func _update_upgrade_track_slot(upgrade_id: String, level: int, track: String) -> void:
+	if level <= 0:
+		return
+	var actual_icon = _get_upgrade_icon(upgrade_id)
+	var actual_color = _get_upgrade_color(upgrade_id)
+	var slots = weapon_slots if track == "ship" else support_slots
+	if slots.is_empty():
+		return
 
 	var slot_idx = -1
-	if active_supports.has(upgrade_id):
-		slot_idx = active_supports[upgrade_id]
+	if track == "ship":
+		if active_weapons.has(upgrade_id):
+			slot_idx = active_weapons[upgrade_id]
+		else:
+			slot_idx = active_weapons.size()
+			if slot_idx >= slots.size():
+				return
+			active_weapons[upgrade_id] = slot_idx
 	else:
-		slot_idx = active_supports.size()
-		if slot_idx >= support_slots.size():
-			return
-		active_supports[upgrade_id] = slot_idx
+		if active_supports.has(upgrade_id):
+			slot_idx = active_supports[upgrade_id]
+		else:
+			slot_idx = active_supports.size()
+			if slot_idx >= slots.size():
+				return
+			active_supports[upgrade_id] = slot_idx
 
-	var slot = support_slots[slot_idx]
+	var slot = slots[slot_idx]
 	var icon_label = slot.get_node_or_null("Icon") as Label
 	var lv_label = slot.get_node_or_null("Level") as Label
-
 	if icon_label:
 		icon_label.text = actual_icon
 		icon_label.add_theme_color_override("font_color", actual_color)
-
 	if lv_label:
 		lv_label.text = str(level)
 		lv_label.visible = true
+
+	slot.set_meta("upgrade_id", upgrade_id)
+	slot.set_meta("upgrade_level", level)
 
 	var slot_sb = slot.get_theme_stylebox("panel")
 	if slot_sb:
@@ -907,6 +1184,26 @@ func update_support_ui(upgrade_id: String, level: int) -> void:
 		var tween = create_tween()
 		tween.tween_property(slot_sb, "border_color", actual_color, 0.2)
 		tween.tween_property(slot_sb, "border_color", Color(0.35, 0.35, 0.35, 0.8), 0.5)
+
+func update_ship_upgrade_ui(upgrade_id: String, level: int) -> void:
+	_update_upgrade_track_slot(upgrade_id, level, "ship")
+
+func update_crew_upgrade_ui(upgrade_id: String, level: int) -> void:
+	_update_upgrade_track_slot(upgrade_id, level, "crew")
+
+## 레거시 호환: 무기 슬롯 업데이트 -> 함선/병사 슬롯으로 라우팅
+func update_weapon_ui(weapon_id: String, level: int) -> void:
+	if _is_crew_upgrade(weapon_id):
+		update_crew_upgrade_ui(weapon_id, level)
+		return
+	update_ship_upgrade_ui(weapon_id, level)
+
+## 레거시 호환: 보조 슬롯 업데이트 -> 함선/병사 슬롯으로 라우팅
+func update_support_ui(upgrade_id: String, level: int) -> void:
+	if _is_crew_upgrade(upgrade_id):
+		update_crew_upgrade_ui(upgrade_id, level)
+		return
+	update_ship_upgrade_ui(upgrade_id, level)
 
 
 func _update_hull_display() -> void:
@@ -949,6 +1246,8 @@ func _update_boarding_display() -> void:
 
 
 func show_game_over() -> void:
+	if _game_over_transitioning:
+		return
 	if game_over_label:
 		game_over_label.text = "!!! SHIP DESTROYED !!!"
 		game_over_label.visible = true
@@ -956,6 +1255,14 @@ func show_game_over() -> void:
 		var tween = create_tween()
 		game_over_label.modulate.a = 0.0
 		tween.tween_property(game_over_label, "modulate:a", 1.0, 1.0)
+	_game_over_return_timer = 4.0
+	get_tree().paused = true
+	if is_instance_valid(game_over_panel):
+		game_over_panel.visible = true
+		game_over_panel.modulate.a = 0.0
+		_update_game_over_button_text()
+		var panel_tween = create_tween()
+		panel_tween.tween_property(game_over_panel, "modulate:a", 1.0, 0.25)
 
 
 func update_boss_hp(current: float, maximum: float) -> void:
@@ -1017,3 +1324,76 @@ func show_victory_with_damage(rows: Array, total_damage: float) -> void:
 	var tween = create_tween()
 	victory_label.modulate.a = 0.0
 	tween.tween_property(victory_label, "modulate:a", 1.0, 0.8)
+
+func _setup_game_over_panel() -> void:
+	if is_instance_valid(game_over_panel):
+		return
+	game_over_panel = PanelContainer.new()
+	game_over_panel.visible = false
+	game_over_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	game_over_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	game_over_panel.z_index = 400
+	game_over_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	game_over_panel.offset_left = -180.0
+	game_over_panel.offset_top = 54.0
+	game_over_panel.offset_right = 180.0
+	game_over_panel.offset_bottom = 150.0
+
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.05, 0.06, 0.08, 0.92)
+	panel_style.border_width_left = 2
+	panel_style.border_width_top = 2
+	panel_style.border_width_right = 2
+	panel_style.border_width_bottom = 2
+	panel_style.border_color = Color(0.86, 0.32, 0.24, 0.9)
+	panel_style.set_corner_radius_all(12)
+	panel_style.content_margin_left = 18.0
+	panel_style.content_margin_top = 16.0
+	panel_style.content_margin_right = 18.0
+	panel_style.content_margin_bottom = 16.0
+	game_over_panel.add_theme_stylebox_override("panel", panel_style)
+	add_child(game_over_panel)
+
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.theme_override_constants.separation = 10
+	game_over_panel.add_child(vbox)
+
+	game_over_subtitle = Label.new()
+	game_over_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	game_over_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	game_over_subtitle.add_theme_font_size_override("font_size", 14)
+	game_over_subtitle.add_theme_color_override("font_color", Color(0.83, 0.86, 0.89))
+	game_over_subtitle.text = "함선이 침몰했습니다. 항구로 복귀합니다."
+	vbox.add_child(game_over_subtitle)
+
+	game_over_button = Button.new()
+	game_over_button.process_mode = Node.PROCESS_MODE_ALWAYS
+	game_over_button.custom_minimum_size = Vector2(220.0, 42.0)
+	game_over_button.text = "메인 메뉴로"
+	game_over_button.pressed.connect(_return_to_main_menu)
+	vbox.add_child(game_over_button)
+
+func _update_game_over_return(delta: float) -> void:
+	if _game_over_return_timer < 0.0 or _game_over_transitioning:
+		return
+	_game_over_return_timer = maxf(0.0, _game_over_return_timer - delta)
+	_update_game_over_button_text()
+	if _game_over_return_timer <= 0.0:
+		_return_to_main_menu()
+
+func _update_game_over_button_text() -> void:
+	if not is_instance_valid(game_over_button):
+		return
+	if _game_over_return_timer < 0.0:
+		game_over_button.text = "메인 메뉴로"
+		return
+	game_over_button.text = "메인 메뉴로 (%.0f)" % ceil(_game_over_return_timer)
+
+func _return_to_main_menu() -> void:
+	if _game_over_transitioning:
+		return
+	_game_over_transitioning = true
+	_game_over_return_timer = -1.0
+	get_tree().paused = false
+	get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)

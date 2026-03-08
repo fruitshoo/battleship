@@ -31,7 +31,32 @@ var cannon_scene: PackedScene = preload("res://scenes/entities/cannon.tscn")
 var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
 var janggun_scene: PackedScene = preload("res://scenes/entities/janggun_launcher.tscn")
 var ballista_scene: PackedScene = preload("res://scenes/entities/ballista_launcher.tscn")
+var hull_defense_spear_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_spear.tscn")
+var round_shield_scene: PackedScene = preload("res://scenes/entities/props/round_shield.tscn")
+var square_shield_scene: PackedScene = preload("res://scenes/entities/props/square_shield.tscn")
 
+const SHIP_UPGRADE_IDS: Array[String] = [
+	"cannon",
+	"janggun",
+	"singigeon",
+	"ballista",
+	"hull_defense",
+	"navigation",
+	"supply_bonus",
+]
+const CREW_UPGRADE_IDS: Array[String] = [
+	"crew_numbers",
+	"crew_quality",
+	"fire_pot",
+	"repeating_crossbow",
+]
+const FLEET_UPGRADE_IDS: Array[String] = [
+	"fleet_cannon",
+	"fleet_hull",
+	"fleet_crew",
+]
+const RARE_FLEET_UPGRADE_ID: String = "fleet_signal"
+const RARE_FLEET_UPGRADE_CHANCE: float = 0.08
 
 func _ready() -> void:
 	_load_data_from_json()
@@ -77,9 +102,79 @@ func initialize_default_weapons() -> void:
 	if hud and hud.has_method("update_weapon_ui"):
 		hud.update_weapon_ui("cannon", 1)
 
+func get_ship_upgrade_choices(count: int = 3) -> Array:
+	var choices = _collect_choices_from_ids(SHIP_UPGRADE_IDS, count)
+	_maybe_add_rare_fleet_upgrade(choices, count)
+	_fill_with_fallbacks(choices, count)
+	return choices
+
+func get_command_upgrade_choices(count: int = 3) -> Array:
+	var command_pool: Array[String] = CREW_UPGRADE_IDS.duplicate()
+	if _is_fleet_progress_available():
+		for upgrade_id in FLEET_UPGRADE_IDS:
+			command_pool.append(upgrade_id)
+	return _collect_choices_from_ids(command_pool, count)
+
+func _is_fleet_progress_available() -> bool:
+	# 지원 함대를 해금했거나 이미 함대 강화가 시작됐으면 지휘 선택지에 함대 강화를 노출한다.
+	if int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0:
+		return true
+	for upgrade_id in FLEET_UPGRADE_IDS:
+		if int(current_levels.get(upgrade_id, 0)) > 0:
+			return true
+	var tree = get_tree()
+	if tree == null:
+		return false
+	var minions = tree.get_nodes_in_group("captured_minion")
+	return not minions.is_empty()
+
+func _collect_choices_from_ids(ids: Array[String], count: int) -> Array:
+	var available: Array = []
+	for id in ids:
+		if not _is_upgrade_available(id):
+			continue
+		available.append(id)
+	available.shuffle()
+	return available.slice(0, mini(count, available.size()))
+
+func _is_upgrade_available(upgrade_id: String) -> bool:
+	if upgrade_id not in UPGRADES:
+		return false
+	return int(current_levels.get(upgrade_id, 0)) < int(UPGRADES[upgrade_id].get("max_level", 0))
+
+func _maybe_add_rare_fleet_upgrade(choices: Array, count: int) -> void:
+	if count <= 0:
+		return
+	if not _is_upgrade_available(RARE_FLEET_UPGRADE_ID):
+		return
+	if randf() > RARE_FLEET_UPGRADE_CHANCE:
+		return
+	if choices.has(RARE_FLEET_UPGRADE_ID):
+		return
+
+	if choices.size() >= count and choices.size() > 0:
+		var replace_idx = randi() % choices.size()
+		choices[replace_idx] = RARE_FLEET_UPGRADE_ID
+	else:
+		choices.append(RARE_FLEET_UPGRADE_ID)
+
+func _fill_with_fallbacks(choices: Array, count: int) -> void:
+	var fallbacks = ["supply", "gold"]
+	var guard = 0
+	while choices.size() < count and guard < 8:
+		var fb = fallbacks[guard % fallbacks.size()]
+		if not choices.has(fb):
+			choices.append(fb)
+		guard += 1
+
 
 ## 랜덤 선택지 반환
 func get_random_choices(count: int = 3, category_filter: int = -1) -> Array:
+	if category_filter == -1:
+		return get_ship_upgrade_choices(count)
+	if category_filter == Category.FLEET:
+		return get_command_upgrade_choices(count)
+
 	var available: Array = []
 	
 	# 무제한 업그레이드 (보급/돈) 제외하고 선택지 수집
@@ -154,16 +249,21 @@ func apply_upgrade(upgrade_id: String) -> void:
 	
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
-	# 무기 종류 업그레이드 시 HUD 무기 슬롯 갱신
-	var weapon_ids = ["cannon", "singigeon", "janggun", "spear_rail", "fire_pot", "repeating_crossbow", "ballista"]
-	var support_ids = ["crew_numbers", "crew_quality", "hull_defense", "navigation", "supply_bonus"]
+	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
+	var ship_ui_ids = ["cannon", "singigeon", "janggun", "ballista", "hull_defense", "navigation", "supply_bonus", "fleet_signal", "fleet_cannon", "fleet_hull", "supply", "gold"]
+	var crew_ui_ids = ["crew_numbers", "crew_quality", "fire_pot", "repeating_crossbow", "fleet_crew"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
-	if upgrade_id in weapon_ids:
-		if hud and hud.has_method("update_weapon_ui"):
-			hud.update_weapon_ui(upgrade_id, new_level)
-	elif upgrade_id in support_ids:
-		if hud and hud.has_method("update_support_ui"):
-			hud.update_support_ui(upgrade_id, new_level)
+	if hud:
+		if upgrade_id in ship_ui_ids:
+			if hud.has_method("update_ship_upgrade_ui"):
+				hud.update_ship_upgrade_ui(upgrade_id, new_level)
+			elif hud.has_method("update_weapon_ui"):
+				hud.update_weapon_ui(upgrade_id, new_level)
+		elif upgrade_id in crew_ui_ids:
+			if hud.has_method("update_crew_upgrade_ui"):
+				hud.update_crew_upgrade_ui(upgrade_id, new_level)
+			elif hud.has_method("update_support_ui"):
+				hud.update_support_ui(upgrade_id, new_level)
 
 
 ## 현재 레벨의 설명 가져오기 (다음 레벨 기준)
@@ -203,17 +303,19 @@ func get_next_description(upgrade_id: String) -> String:
 				next_level * s.get("dmg_pct_per_lv", 15),
 				next_level * s.get("def_pct_per_lv", 10)]
 		"hull_defense":
-			return "함선 최대 체력 +%d, 장갑 방어력 +%d\n(즉시 체력 +%d 수리)" % [
+			var ranged_block = clampf(
+				float(next_level) * float(s.get("crew_ranged_block_per_lv", 0.06)),
+				0.0,
+				float(s.get("crew_ranged_block_max", 0.30))
+			)
+			return "함선 최대 체력 +%d, 장갑 방어력 +%d, 병사 원거리 피해 -%d%%\n(난간 창/방패 보강 + 즉시 체력 +%d 수리)" % [
 				int(s.get("hp_add", 30)), int(s.get("def_per_lv", 2)),
+				int(round(ranged_block * 100.0)),
 				int(s.get("heal_on_apply", 20))]
 		"navigation":
 			var turn_pct = int((s.get("turn_mult", 1.15) - 1.0) * 100)
 			var stam_pct = int((1.0 - s.get("stamina_mult", 0.85)) * 100)
 			return "러더 선회 속도 +%d%%, 스태미나 소모 -%d%%" % [turn_pct, stam_pct]
-		"spear_rail":
-			var total_count = int(s.get("base_count", 4) + int((next_level - 1) / 2.0) * s.get("count_per_lv", 2))
-			var total_dmg = int(s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 5.0))
-			return "창 %d개 배치, 도선 시 적 병사에게 %d 데미지" % [total_count, total_dmg]
 		"fire_pot":
 			var dmg = s.get("base_damage", 15.0) + (next_level - 1) * s.get("damage_per_lv", 5.0)
 			var cd = s.get("base_cooldown", 6.0) - (next_level - 1) * s.get("cooldown_reduce_per_lv", 1.0)
@@ -234,6 +336,8 @@ func get_next_description(upgrade_id: String) -> String:
 			var dmg = s.get("base_damage", 45.0) + (next_level - 1) * s.get("damage_per_lv", 15.0)
 			var pierce = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))
 			return "관통 화살 데미지 %.0f, 최대 %d명 관통 및 넉백" % [dmg, pierce]
+		"fleet_signal":
+			return "희귀 카드: 지원 함대를 호출합니다.\n(이미 함대가 있으면 수리 및 재정비)"
 		"supply":
 			return "선체 수리 (즉시 HP +%d 회복)" % int(s.get("max_hp_add", 20))
 		"gold":
@@ -251,8 +355,13 @@ func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
 	var s = UPGRADES["crew_numbers"]["stats"]
 	if "max_crew_count" in ship:
 		ship.max_crew_count += s.get("crew_add", 1)
-	if "soldier_respawn_time" in ship:
-		ship.soldier_respawn_time = maxf(s.get("respawn_min", 1.0), ship.soldier_respawn_time * s.get("respawn_mult", 0.8))
+	var respawn_mult = s.get("respawn_mult", 0.8)
+	var respawn_min = s.get("respawn_min", 1.0)
+	# 현재 본선은 crew_respawn_interval을 사용하므로 우선 반영하고, 구버전 변수명도 호환 유지.
+	if "crew_respawn_interval" in ship:
+		ship.crew_respawn_interval = maxf(respawn_min, ship.crew_respawn_interval * respawn_mult)
+	elif "soldier_respawn_time" in ship:
+		ship.soldier_respawn_time = maxf(respawn_min, ship.soldier_respawn_time * respawn_mult)
 		
 	# 바로 1명 스폰 시도
 	var soldiers_node = ship.get_node_or_null("Soldiers")
@@ -318,11 +427,75 @@ func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 		ship.hull_hp += s.get("heal_on_apply", 20.0)
 	if "hull_defense" in ship:
 		ship.hull_defense = def_lv * s.get("def_per_lv", 2.0)
+	# 선체 장갑 단계에 비례해 동일 함선 소속 병사에게 원거리 엄폐 보너스 부여
+	var ranged_block = clampf(
+		float(def_lv) * float(s.get("crew_ranged_block_per_lv", 0.06)),
+		0.0,
+		float(s.get("crew_ranged_block_max", 0.30))
+	)
+	ship.set_meta("crew_ranged_damage_reduction", ranged_block)
+
+	var old_rail = ship.get_node_or_null("SpearRail")
+	if old_rail:
+		old_rail.queue_free()
+	if ship.has_meta("spear_rail_damage"):
+		ship.remove_meta("spear_rail_damage")
+
+	_rebuild_hull_defense_visuals(ship, def_lv)
 	
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
 	if hud and hud.has_method("update_hull_hp"):
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	print("[Hull] 선체 장갑 강화 Lv.%d" % def_lv)
+
+func _rebuild_hull_defense_visuals(ship: Node3D, level: int) -> void:
+	if not is_instance_valid(ship):
+		return
+
+	var visuals = ship.get_node_or_null("HullDefenseVisuals")
+	if not (visuals is Node3D):
+		visuals = Node3D.new()
+		visuals.name = "HullDefenseVisuals"
+		ship.add_child(visuals)
+
+	for child in visuals.get_children():
+		child.queue_free()
+
+	if level <= 0:
+		return
+
+	var half_ext = Vector2(1.6, 3.6)
+	if ship.has_method("get_collision_half_extents"):
+		var ext = ship.call("get_collision_half_extents")
+		if ext is Vector2 and ext.x > 0.1 and ext.y > 0.1:
+			half_ext = ext
+
+	var per_side_count = clampi(3 + level, 4, 9)
+	var z_start = -half_ext.y * 0.88
+	var z_end = half_ext.y * 0.88
+
+	for side in [-1, 1]:
+		var side_f = float(side)
+		for i in range(per_side_count):
+			var t = (float(i) + 0.5) / float(per_side_count)
+			var z_pos = lerpf(z_start, z_end, t)
+
+			if hull_defense_spear_scene:
+				var spear = hull_defense_spear_scene.instantiate()
+				visuals.add_child(spear)
+				spear.position = Vector3(side_f * (half_ext.x + 0.16), 0.45, z_pos)
+				spear.rotation_degrees = Vector3(0.0, 0.0, -70.0 * side_f)
+				spear.scale = Vector3(0.45, 0.45, 0.45)
+
+			var shield_scene: PackedScene = round_shield_scene if randf() < 0.5 else square_shield_scene
+			if not shield_scene:
+				shield_scene = round_shield_scene if round_shield_scene else square_shield_scene
+			if not shield_scene:
+				continue
+			var shield = shield_scene.instantiate()
+			visuals.add_child(shield)
+			shield.position = Vector3(side_f * (half_ext.x + 0.03), 0.95, z_pos)
+			shield.rotation_degrees = Vector3(0.0, side_f * 10.0, 90.0)
 
 func _apply_navigation(ship: Node3D, _level: int) -> void:
 	var nav_lv = current_levels.get("navigation", 0)
@@ -389,51 +562,6 @@ func _apply_janggun(ship: Node3D, level: int) -> void:
 		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
 
 
-var spear_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_spear.tscn")
-
-func _apply_spear_rail(ship: Node3D, level: int) -> void:
-	# SpearRail 컨테이너 가져오거나 생성
-	var rail_node = ship.get_node_or_null("SpearRail")
-	if not rail_node:
-		rail_node = Node3D.new()
-		rail_node.name = "SpearRail"
-		ship.add_child(rail_node)
-	
-	# 기존 창 모두 제거 후 재배치 (레벨에 맞게 새로 배치)
-	for child in rail_node.get_children():
-		child.queue_free()
-	
-	var s = UPGRADES["spear_rail"]["stats"]
-	var spear_count = int(s.get("base_count", 4) + int((level - 1) / 2.0) * s.get("count_per_lv", 2))
-	var spear_damage = s.get("base_damage", 10.0) + (level - 1) * s.get("damage_per_lv", 5.0)
-	
-	# 배의 측면에 창을 균등하게 배치 (좌우 번갈아가며)
-	# 배 크기: 대략 좌우 ±1.5, 전후 -3.5 ~ 3.5
-	var ship_half_width = 1.5
-	var ship_front = -3.0
-	var ship_back = 3.0
-	var ship_length = ship_back - ship_front
-	
-	for i in range(spear_count):
-		var spear = spear_scene.instantiate()
-		rail_node.add_child(spear)
-		
-		# 좌우 번갈아 배치
-		var side = 1.0 if i % 2 == 0 else -1.0
-		var row_index = int(i / 2.0)
-		var z_pos = ship_front + (row_index + 0.5) * (ship_length / max(int(spear_count / 2.0), 1))
-		
-		spear.position = Vector3(side * ship_half_width, 0.3, z_pos)
-		# 좌측은 외부로 기울임, 우측도 외부로 기울임
-		spear.rotation_degrees = Vector3(0, 0, side * -30.0)
-		# 창을 약간 작게 조정 (배 난간 크기에 맞게)
-		spear.scale = Vector3(0.7, 0.7, 0.7)
-	
-	# 배에 창 난간 데미지 메타데이터 저장 (병사 도선 시 참조)
-	ship.set_meta("spear_rail_damage", spear_damage)
-	print("[SpearRail] 창 난간 Lv.%d: 창 %d개 배치, 도선 데미지 %.0f" % [level, spear_count, spear_damage])
-
-
 func _apply_fire_pot(_ship: Node3D, level: int) -> void:
 	if level == 1:
 		print("[FirePot] 화통 투척 훈련 완료! (Lv.1)")
@@ -482,6 +610,15 @@ func _apply_gold(_ship: Node3D, _level: int) -> void:
 				node.add_score(pts)
 				break
 	print("[Gold] 전리품! 점수 +%d" % pts)
+
+func _apply_fleet_signal(ship: Node3D, _level: int) -> void:
+	if not is_instance_valid(ship):
+		return
+	if ship.has_method("_spawn_or_repair_ally"):
+		ship.call_deferred("_spawn_or_repair_ally")
+		print("[Fleet] 지원 함대 소집 발동!")
+		return
+	print("[Fleet] 지원 함대 소집은 플레이어 함선에서만 사용할 수 있습니다.")
 
 
 func _get_player_ship() -> Node3D:

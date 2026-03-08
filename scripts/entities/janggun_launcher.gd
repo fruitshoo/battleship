@@ -1,4 +1,6 @@
 extends Node3D
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const DEBUG_COMBAT_LOGS := false
 
 ## 장군전 발사기 (Janggun Launcher)
 ## 통나무 미사일을 발사. 고데미지, 긴 쿨다운.
@@ -7,43 +9,102 @@ extends Node3D
 @export var fire_cooldown: float = 12.0
 @export var detection_range: float = 35.0
 @export var damage: float = 10.0
+@export_range(0.05, 0.5) var target_scan_interval: float = 0.2
 @export var team: String = "player"
 
 var cooldown_timer: float = 0.0
+var _owner_ship: Node = null
+var _target_scan_left: float = 0.0
+var _cached_target: Variant = null
 
+func _ready() -> void:
+	_owner_ship = _resolve_owner_ship()
 
 func _process(delta: float) -> void:
+	if not _is_owner_combat_ready():
+		return
+	
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
 		return
 	
-	var nearest = _find_nearest_enemy()
-	if nearest:
-		fire(nearest)
+	_target_scan_left -= delta
+	if _target_scan_left <= 0.0 or not _is_target_valid(_cached_target):
+		_cached_target = _find_nearest_enemy()
+		_target_scan_left = target_scan_interval
+	
+	if _is_target_valid(_cached_target):
+		fire(_cached_target as Node3D)
+
+func _resolve_owner_ship() -> Node:
+	var node: Node = get_parent()
+	while is_instance_valid(node):
+		if node.is_in_group("ships"):
+			return node
+		if "is_sinking" in node and "is_dying" in node:
+			return node
+		node = node.get_parent()
+	return null
+
+func _is_owner_combat_ready() -> bool:
+	if not is_instance_valid(_owner_ship):
+		_owner_ship = _resolve_owner_ship()
+	if not is_instance_valid(_owner_ship):
+		return true
+	if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict"):
+		return false
+	var owner_hp = _owner_ship.get("hull_hp")
+	if owner_hp != null and float(owner_hp) <= 0.0:
+		return false
+	return true
+
+func _is_target_valid(target: Variant) -> bool:
+	if not is_instance_valid(target):
+		return false
+	if not (target is Node3D):
+		return false
+	var target_node := target as Node3D
+	if target_node.get("is_derelict") == true or target_node.get("is_sinking") == true or target_node.get("is_dying") == true:
+		return false
+	var target_hp = target_node.get("hull_hp")
+	if target_hp != null and float(target_hp) <= 0.0:
+		return false
+	return global_position.distance_squared_to(target_node.global_position) <= detection_range * detection_range
 
 
 func _find_nearest_enemy() -> Node3D:
 	var enemy_group = "enemy" if team == "player" else "player"
-	var enemies = get_tree().get_nodes_in_group(enemy_group)
+	var enemies = SceneGroupCache.get_nodes(get_tree(), enemy_group)
 	var nearest: Node3D = null
-	var min_dist: float = detection_range
+	var min_dist_sq: float = detection_range * detection_range
 	
 	for enemy in enemies:
 		if not is_instance_valid(enemy): continue
 		
 		# 빈 배(폐선)는 타겟에서 제외
 		if enemy.get("is_derelict") == true: continue
+		if enemy.get("is_sinking") == true or enemy.get("is_dying") == true: continue
+		var enemy_hp = enemy.get("hull_hp")
+		if enemy_hp != null and float(enemy_hp) <= 0.0: continue
 		
-		var dist = global_position.distance_to(enemy.global_position)
-		if dist < min_dist:
-			min_dist = dist
+		var dist_sq = global_position.distance_squared_to(enemy.global_position)
+		if dist_sq < min_dist_sq:
+			min_dist_sq = dist_sq
 			nearest = enemy
 	
 	return nearest
 
 
 func fire(target: Node3D) -> void:
-	if not missile_scene: return
+	if not missile_scene:
+		return
+	if not _is_owner_combat_ready():
+		return
+	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true:
+		return
+	var target_hp = target.get("hull_hp")
+	if target_hp != null and float(target_hp) <= 0.0:
+		return
 	
 	var um = get_node_or_null("/root/UpgradeManager")
 	var janggun_lv = 0
@@ -87,4 +148,5 @@ func fire(target: Node3D) -> void:
 	get_tree().root.add_child(missile)
 	missile.global_position = missile.start_pos
 	
-	print("🪵 장군전 예측 사격 발사! (예상 시간: %.1fs)" % travel_time)
+	if DEBUG_COMBAT_LOGS:
+		print("🪵 장군전 예측 사격 발사! (예상 시간: %.1fs)" % travel_time)

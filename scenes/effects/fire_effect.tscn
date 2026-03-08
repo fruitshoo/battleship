@@ -55,8 +55,9 @@ size = Vector2(2.8, 2.8)
 
 [node name="SmokeParticles" type="GPUParticles3D" parent="." unique_id=1301637500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
-amount = 10
-lifetime = 3.0
+amount = 6
+lifetime = 2.2
 randomness = 0.6
+fixed_fps = 20
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")

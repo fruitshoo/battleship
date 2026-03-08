@@ -1,4 +1,5 @@
 extends Area3D
+const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 화통 (Fire Pot)
 ## 포물선으로 날아가 착탄 시 폭발하며 범위 데미지(화염)를 줍니다.
@@ -14,7 +15,7 @@ var time_alive: float = 0.0
 var flight_duration: float = 1.0 # 1초 동안 날아감
 var arc_height: float = 3.0
 
-var explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
+var explosion_scene: PackedScene = preload("res://scenes/effects/fire_pot_explosion.tscn")
 var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 
 var has_exploded: bool = false
@@ -92,13 +93,13 @@ func explode() -> void:
 	has_exploded = true
 	
 	# 1. 폭발 이펙트 
-	if explosion_scene:
+	if explosion_scene and VfxBudget.allow_spawn(get_tree(), "fire_pot_explosion", global_position, 3, 65.0):
 		var expl = explosion_scene.instantiate()
 		expl.position = global_position
 		get_tree().root.add_child.call_deferred(expl)
 	
 	# 2. 바닥 잔여 화염 이펙트 (1.5초)
-	if fire_effect_scene:
+	if fire_effect_scene and VfxBudget.allow_spawn(get_tree(), "fire_effect", global_position, 2, 55.0):
 		var fire = fire_effect_scene.instantiate()
 		fire.position = global_position
 		if fire is GPUParticles3D:
@@ -126,8 +127,8 @@ func _apply_area_damage() -> void:
 	sphere.radius = explosion_radius
 	query.shape = sphere
 	query.transform = global_transform
-	# Layer 2 (Player) / 3 (Enemy/Ship) - 설정에 맞게 켜야 함, 임시로 전 체 마스크
-	query.collision_mask = 0xFFFFFFFF
+	# 선박/병사/환경 기본 레이어만 대상으로 제한해 폭발 쿼리 비용을 줄인다.
+	query.collision_mask = 7
 	
 	var results = space_state.intersect_shape(query)
 	for result in results:

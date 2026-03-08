@@ -116,7 +116,7 @@ func _become_derelict() -> void:
 			cached_lm.add_merit(20) # 20 공적 포인트 스펙
 			_merit_granted = true
 	
-	if wake_trail: wake_trail.emitting = false
+	_set_wake_state(false)
 	
 	print("[Status] 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
 	
@@ -130,7 +130,7 @@ func _become_derelict() -> void:
 	base_collision_radius *= 0.8
 	_sync_profile_from_runtime()
 	
-	if wake_trail: wake_trail.emitting = false
+	_set_wake_state(false)
 	
 	# 즉각적인 시각적 피드백: 더 많이 기울어지고 조금 가라앉음
 	var tilt_tween = create_tween()
@@ -239,15 +239,16 @@ func _ready() -> void:
 		if mast.has_method("set_team_color"):
 			mast.set_team_color("enemy")
 	add_to_group("ships")
+	set_team(team)
 	if team == "player":
-		add_to_group("player")
 		add_to_group("captured_minion")
 		_apply_minion_visuals()
 		_equip_minion_cannons()
 		if is_instance_valid(UpgradeManager):
 			UpgradeManager.apply_fleet_upgrades_to_ship(self )
 	else:
-		add_to_group("enemy")
+		if is_in_group("captured_minion"):
+			remove_from_group("captured_minion")
 	
 	_setup_soldiers() # 모든 함선 초기 병사 배치 (팀 속성 반영)
 		
@@ -361,14 +362,13 @@ func die() -> void:
 			cached_lm.add_merit(20)
 			_merit_granted = true
 	
-	# 물리 및 충돌 비활성화 (Area3D 대응)
-	set_deferred("monitoring", false)
-	set_deferred("monitorable", false)
-	_set_contact_areas_enabled(false)
-		
-	# 항적 끄기
-	if wake_trail:
-		wake_trail.emitting = false
+		# 물리 및 충돌 비활성화 (Area3D 대응)
+		set_deferred("monitoring", false)
+		set_deferred("monitorable", false)
+		_set_contact_areas_enabled(false)
+			
+		# 항적 끄기
+		_set_wake_state(false)
 		
 	# 가라앉는 연출 (침몰 애니메이션)
 	var sink_tween = create_tween()
@@ -571,7 +571,7 @@ func _physics_process(delta: float) -> void:
 			var target_rot = atan2(-wind_dir.x, -wind_dir.z)
 			rotation.y = lerp_angle(rotation.y, target_rot, delta * 0.5)
 			
-		if wake_trail: wake_trail.emitting = false
+			_set_wake_state(false)
 		
 		# 멀리 떨어지면 삭제 (Despawn)
 		if do_logic_update:
@@ -593,7 +593,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if not is_instance_valid(target):
-		if wake_trail: wake_trail.emitting = false
+		_set_wake_state(false)
 		return
 	
 	# 2. 목표 지점 계산 (Galley Intercept Logic)
@@ -726,8 +726,7 @@ func _physics_process(delta: float) -> void:
 		pass
 
 	# 항적 제어
-	if wake_trail:
-		wake_trail.emitting = move_speed > 0.5
+	_set_wake_state(current_speed > 0.4, clampf(current_speed / maxf(max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
 
 func _update_logic_throttled() -> void:
 	# 타겟 유효성 및 침몰 상태 체크
@@ -958,7 +957,7 @@ func capture_ship() -> void:
 		die()
 		return
 			
-	team = "player"
+	set_team("player")
 	
 	# ✅ 상태 초기화 및 긴급 수리 (나포 후 즉시 가라앉는 현상 방지)
 	is_dying = false
@@ -998,22 +997,13 @@ func capture_ship() -> void:
 	else:
 		move_speed = 10.0 # 하드코딩된 예비값
 	
-	# 그룹 변경
-	if is_in_group("enemy"): remove_from_group("enemy")
-	add_to_group("player")
-	add_to_group("captured_minion")
-	
-	# ✅ 물리 레이어 및 마스크 변경 (적군이 나포함을 인식하고 도선할 수 있게 함)
-	# PlayerShip.tscn 기준: layer=2, mask=21 (1|4|16)
-	# EnemyShip.tscn 기준: layer=4, mask=2 (도선 감지용)
-	# 나포되면 레이어를 "Player" 레이어(비트값 2)로 변경하여 적의 mask=2에 걸리게 함
-	set_deferred("collision_layer", 2)
-	set_deferred("collision_mask", 21) # 1(환경) + 4(적선) + 16(기타)
-	_sync_contact_area_layers(2)
+	if not is_in_group("captured_minion"):
+		add_to_group("captured_minion")
 
 	
 	# 자식들(대포, 병사) 팀 변경 및 UI 알림
 	_update_children_team_for_capture()
+	_refresh_deck_light()
 	_apply_minion_visuals()
 	
 	if is_instance_valid(cached_lm) and cached_lm.has_method("show_message"):
@@ -1227,6 +1217,8 @@ func _process_minion_ai(delta: float) -> void:
 	# 가속도를 낮추어 "급격히 튀어나가는" 느낌 완화 (2.5 -> 1.2)
 	_last_ai_speed = lerp(_last_ai_speed, target_final_speed, delta * 1.2)
 	var final_move_speed = _last_ai_speed
+	# 충돌/충각 로직은 current_speed를 기준으로 계산되므로 미니언도 동기화한다.
+	current_speed = maxf(final_move_speed, 0.0)
 		
 	# B. 러더(Rudder) 조향 시스템 (Broadside Alignment 대체)
 	var target_head_rot = atan2(-direction.x, -direction.z) # 목표 슬롯을 향하는 기본 각도
@@ -1257,15 +1249,24 @@ func _process_minion_ai(delta: float) -> void:
 	# 선체 전진 벡터 및 이동
 	var forward_vec = Vector3(-sin(rotation.y), 0, -cos(rotation.y))
 	var velocity = forward_vec * final_move_speed
-	
-	position += (velocity + separation_force) * delta
+
+	# 미니언도 일반 함선과 동일하게 충돌 반발/충각 판정을 거치도록 한다.
+	velocity += separation_force
+	velocity += _calculate_collision_repulsion() * delta
+
+	var prev_pos = global_position
+	var next_pos = prev_pos + velocity * delta
+	if is_instance_valid(target):
+		# 호위 대상(플레이어 본선)과는 데미지 없는 안전거리 보정만 적용.
+		next_pos = _apply_ship_collision_guard(target, prev_pos, next_pos, 0.99, velocity.length(), false)
+	next_pos = _apply_neighbor_ship_guards(prev_pos, next_pos, target)
+	global_position = next_pos
 	
 	# [추가] 러더 및 수면 비주얼 효과 업데이트
 	_update_rudder_visual()
 	_apply_bobbing_effect()
 	
-	if wake_trail:
-		wake_trail.emitting = dist_to_target > 2.0 or player_speed > 1.0
+	_set_wake_state(dist_to_target > 2.0 or player_speed > 1.0, clampf(current_speed / maxf(max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
 
 func _update_wave_sounds(delta: float) -> void:
 	if is_dying or is_derelict: return
@@ -1391,7 +1392,8 @@ func _board_ship(target_ship: Node3D) -> void:
 	# 1. 초기 충돌 효과 (최초 1회만)
 	if not has_rammed:
 		has_rammed = true
-		print("[Impact] 충돌 발생! 도선 시작.")
+		if DEBUG_COMBAT_LOGS:
+			print("[Impact] 충돌 발생! 도선 시작.")
 		
 	# 2. 도선(Boarding) 연결 로직
 	if ship_node != boarding_target:
@@ -1420,9 +1422,11 @@ func _board_ship(target_ship: Node3D) -> void:
 		_initial_rope_deployed = false
 		_full_rope_deployed = false
 		
-		print("[Boarding] 병력 우위! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+		if DEBUG_COMBAT_LOGS:
+			print("[Boarding] 병력 우위! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
 	else:
-		print("[Skirmish] 병력 우위 부족으로 도선하지 않고 대치합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+		if DEBUG_COMBAT_LOGS:
+			print("[Skirmish] 병력 우위 부족으로 도선하지 않고 대치합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
 
 # 누수 추가/제거
 func add_leak(amount: float) -> void:

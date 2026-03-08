@@ -32,7 +32,7 @@ const mat2 octave_m = mat2(vec2(1.6, 1.2), vec2(-1.2, 1.6));
 
 // FOAM UNIFORMS
 uniform vec3 foam_color : source_color = vec3(1.0, 1.0, 1.0);
-uniform float foam_depth_start : hint_range(0.0, 5.0, 0.01) = 0.8;
+uniform float foam_depth_start : hint_range(0.0, 5.0, 0.01) = 1.0;
 uniform float foam_depth_end : hint_range(0.0, 5.0, 0.01) = 0.0;
 uniform float foam_noise_scale : hint_range(0.0, 10.0, 0.01) = 2.0;
 uniform float foam_noise_speed : hint_range(0.0, 2.0, 0.01) = 1.0;

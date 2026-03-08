@@ -36,6 +36,9 @@ transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("1_smoke")
+emission_enabled = true
+emission = Color(0.9, 0.85, 0.75, 1)
+emission_energy_multiplier = 0.28
 billboard_mode = 3
 billboard_keep_scale = true
 
@@ -45,10 +48,11 @@ size = Vector2(2, 2)
 
 [node name="MuzzleSmoke" type="GPUParticles3D"]
 emitting = false
-amount = 15
-lifetime = 2.0
+amount = 8
+lifetime = 1.2
 one_shot = true
 explosiveness = 0.95
+fixed_fps = 24
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")
 script = ExtResource("2_script")

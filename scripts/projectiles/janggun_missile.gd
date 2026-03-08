@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 장군전 미사일 (Janggun Missile)
 ## 느리지만 고데미지 통나무 미사일. 범위 피해.
@@ -119,7 +120,7 @@ func _stick_to_ship(ship: Node3D) -> void:
 	if ship.has_method("add_leak"):
 		ship.add_leak(dot_damage)
 	
-	print("[Impact] 장군전이 함선에 박혔습니다! (즉발:%.0f, 누수:%.1f/s)" % [damage, dot_damage])
+	# 잦은 장군전 적중 로그는 기본 비활성화
 	
 	# 일정 시간 후 제거
 	get_tree().create_timer(stick_duration).timeout.connect(_unstick)
@@ -140,7 +141,7 @@ func _splash_and_sink() -> void:
 	is_sinking = true
 	
 	# 바다에 떨어질 때 물 폭발 이펙트 생성
-	if water_explosion_scene:
+	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion", global_position, 4, 70.0):
 		var pos = global_position
 		var explosion = water_explosion_scene.instantiate()
 		explosion.position = Vector3(pos.x, 0.2, pos.z)
@@ -157,7 +158,7 @@ func _splash_and_sink() -> void:
 
 func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트
-	if wood_splinter_scene:
+	if wood_splinter_scene and VfxBudget.allow_spawn(get_tree(), "wood_splinter", global_position, 3, 60.0):
 		var splinter = wood_splinter_scene.instantiate()
 		splinter.position = global_position
 		get_tree().root.add_child.call_deferred(splinter)
@@ -165,7 +166,7 @@ func _play_impact_vfx() -> void:
 			splinter.set_amount_by_damage(damage)
 			
 	# 타격 시 검은 연기 (발사 연기 재사용)
-	if muzzle_smoke_scene:
+	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
 		var smoke = muzzle_smoke_scene.instantiate()
 		smoke.position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
@@ -189,7 +190,7 @@ func _play_launch_vfx() -> void:
 	var launch_dir = (target_pos - start_pos).normalized()
 	
 	# 머즐 연기
-	if muzzle_smoke_scene:
+	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
 		var smoke = muzzle_smoke_scene.instantiate()
 		smoke.position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 발생하므로 체크

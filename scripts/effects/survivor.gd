@@ -1,4 +1,5 @@
 extends Area3D
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 ## 생존자(Survivor) 시스템
 ## 적함 침몰 시 발생하며, 플레이어가 다가가면 자석처럼 끌려와 병사로 합류함
@@ -15,9 +16,12 @@ var base_y: float = 0.0
 var time_alive: float = 0.0
 var is_collected: bool = false
 var _cached_ocean: Node = null
+var _cached_um: Node = null
 var _cached_wave_height: float = 0.0
 var _wave_sample_timer: float = 0.0
 @export_range(0.03, 0.3) var wave_sample_interval: float = 0.1
+@export_range(0.05, 0.5) var player_search_interval: float = 0.2
+var _player_search_timer: float = 0.0
 
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
@@ -48,6 +52,8 @@ func _ready() -> void:
 	
 	# OceanPlane 캐싱
 	_cached_ocean = get_tree().get_first_node_in_group("ocean")
+	_cached_um = get_node_or_null("/root/UpgradeManager")
+	_player_search_timer = randf_range(0.0, player_search_interval)
 
 
 @export var lifetime: float = 90.0 # 소멸 시간 (초, 생존자는 조금 더 길게)
@@ -57,6 +63,7 @@ func _physics_process(delta: float) -> void:
 	if is_collected: return
 	time_alive += delta
 	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
+	_player_search_timer = maxf(0.0, _player_search_timer - delta)
 	
 	if not is_expiring and time_alive > lifetime:
 		_expire_and_free()
@@ -64,7 +71,10 @@ func _physics_process(delta: float) -> void:
 	if is_expiring:
 		return
 
-	if not is_instance_valid(target_player):
+	if is_instance_valid(target_player) and target_player.get("is_sinking"):
+		target_player = null
+	if not is_instance_valid(target_player) and _player_search_timer <= 0.0:
+		_player_search_timer = player_search_interval
 		_find_target_player()
 	
 	if is_instance_valid(target_player):
@@ -115,7 +125,7 @@ func _apply_floating(delta: float) -> void:
 
 
 func _find_target_player() -> void:
-	var players = get_tree().get_nodes_in_group("player")
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
 	var closest_dist = INF
 	var closest_p = null
 	
@@ -134,11 +144,14 @@ func _find_target_player() -> void:
 
 
 func _get_current_magnet_radius() -> float:
-	var um = get_node_or_null("/root/UpgradeManager")
-	if is_instance_valid(um) and "current_levels" in um:
-		var supply_lv = um.current_levels.get("supply_bonus", 0)
-		return base_magnet_radius + (supply_lv * 2.0)
-	return base_magnet_radius
+	var meta_bonus := 0.0
+	var meta_manager = get_node_or_null("/root/MetaManager")
+	if is_instance_valid(meta_manager) and meta_manager.has_method("get_collection_radius_bonus"):
+		meta_bonus = float(meta_manager.get_collection_radius_bonus())
+	if is_instance_valid(_cached_um) and "current_levels" in _cached_um:
+		var supply_lv = _cached_um.current_levels.get("supply_bonus", 0)
+		return base_magnet_radius + meta_bonus + (supply_lv * 2.0)
+	return base_magnet_radius + meta_bonus
 
 
 func _on_body_entered(body: Node3D) -> void:

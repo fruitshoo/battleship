@@ -26,23 +26,10 @@
 			"max_level": 5,
 			"color": "ff4c4c"
 		},
-		"spear_rail": {
-			"name": "창 난간",
-			"category": 1,
-			"description": "배 측면에 창을 배치하여 도선하는 적에게 자동 데미지",
-			"max_level": 5,
-			"color": "b27f4c",
-			"stats": {
-				"base_damage": 10.0,
-				"damage_per_lv": 5.0,
-				"base_count": 4,
-				"count_per_lv": 2
-			}
-		},
 		"fire_pot": {
 			"name": "화통",
 			"category": 1,
-			"description": "적선 도선 예열 시 아군 병사가 적 갑판에 화통을 던짐",
+			"description": "병사 화통 훈련. 적선 접근 시 아군 병사가 적 갑판에 화통 투척",
 			"max_level": 5,
 			"color": "e54c19",
 			"stats": {
@@ -111,13 +98,15 @@
 		"hull_defense": {
 			"name": "선체 장갑",
 			"category": 2,
-			"description": "함선의 최대 체력 및 방어력 증가",
+			"description": "함선의 최대 체력/방어력 증가 및 난간 창/방패 보강",
 			"max_level": 5,
 			"color": "994c19",
 			"stats": {
 				"hp_add": 30.0,
 				"heal_on_apply": 20.0,
-				"def_per_lv": 2.0
+				"def_per_lv": 2.0,
+				"crew_ranged_block_per_lv": 0.06,
+				"crew_ranged_block_max": 0.30
 			}
 		},
 		"navigation": {
@@ -162,6 +151,13 @@
 			"stats": {
 				"score_add": 50
 			}
+		},
+		"fleet_signal": {
+			"name": "지원 함대 소집",
+			"category": 4,
+			"description": "희귀 카드. 지원 함대를 호출하거나 기존 함대를 재정비합니다.",
+			"max_level": 1,
+			"color": "ffb347"
 		},
 		"fleet_cannon": {
 			"name": "함대 화력",

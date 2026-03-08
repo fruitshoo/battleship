@@ -3,6 +3,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
 @export var max_range: float = 25.0
+var _cached_spawn_parent: Node = null
 
 func _ready() -> void:
 	damage = 12.0
@@ -34,13 +35,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var local_vel = target.get("velocity") if "velocity" in target else Vector3.ZERO
 	
 	# 타겟이 배 위에 타고 있는 경우 배의 이동 속도 합산
-	var node = target
-	var ship = null
-	while node and node != target.get_tree().root:
-		if "current_speed" in node:
-			ship = node
-			break
-		node = node.get_parent()
+	var ship = _resolve_parent_ship(target)
 		
 	var ship_vel = Vector3.ZERO
 	if ship and "current_speed" in ship:
@@ -75,6 +70,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	if "team" in arrow:
 		if "team" in attacker:
 			arrow.team = attacker.get("team")
+	if "damage_source" in arrow:
+		arrow.damage_source = "bow"
 			
 	# 거리에 따른 곡선 조절
 	if "arc_height" in arrow:
@@ -82,11 +79,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		arrow.arc_height = clamp(dist * 0.3, 1.0, 5.0)
 	
 	# 레벨 매니저 또는 부모 트리에 추가 (이 시점에 _ready 실행됨)
-	var lm = attacker.get_tree().root.find_child("LevelManager", true, false)
-	if lm:
-		lm.add_child(arrow)
-	else:
-		attacker.get_tree().root.add_child(arrow)
+	var spawn_parent = _resolve_spawn_parent(attacker.get_tree())
+	spawn_parent.add_child(arrow)
 		
 	# 위치 및 방향 최종 보정
 	arrow.global_position = spawn_pos
@@ -95,3 +89,23 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	# 활 쏘는 소리
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("arrow_shoot", attacker.global_position, randf_range(0.9, 1.1))
+
+func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
+	var current = node
+	var depth = 0
+	while is_instance_valid(current) and depth <= max_depth:
+		if current is Node3D and "current_speed" in current:
+			return current as Node3D
+		current = current.get_parent()
+		depth += 1
+	return null
+
+func _resolve_spawn_parent(tree: SceneTree) -> Node:
+	if is_instance_valid(_cached_spawn_parent):
+		return _cached_spawn_parent
+	var lm = tree.root.find_child("LevelManager", true, false)
+	if is_instance_valid(lm):
+		_cached_spawn_parent = lm
+		return _cached_spawn_parent
+	_cached_spawn_parent = tree.root
+	return _cached_spawn_parent

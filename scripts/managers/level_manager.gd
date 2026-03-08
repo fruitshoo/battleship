@@ -5,11 +5,12 @@ extends Node
 
 signal level_up(new_level: int)
 signal score_changed(new_score: int)
-signal merit_full_action_completed() # 함대 업그레이드 선택 완료 시 발생
+signal merit_full_action_completed() # (레거시) 기존 함대 자동 소환 트리거
 
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
 @export var boss_spawn_time: float = 600.0 # 보스 등장 시간 (초, 기본 10분)
+@export var survival_victory_time: float = 600.0 # 생존 승리 시간 (초)
 @export var max_level: int = 15
 @export var max_hull_hp_cap: float = 800.0 # 레벨업 HP 보너스 상한 (함선 체력 상향에 맞춰 400->800)
 @export var hud: CanvasLayer = null
@@ -18,6 +19,7 @@ signal merit_full_action_completed() # 함대 업그레이드 선택 완료 시 
 @export var level_xp_exponent: float = 1.10 ## 레벨업 필요 XP 성장 곡선 지수
 @export var merit_base_points: int = 50 ## 공적 레벨 1 기본 요구치
 @export var merit_growth_per_level: int = 10 ## 공적 레벨당 증가치
+@export var merit_per_soldier_kill: int = 1 ## 적 병사 1명 처치 시 획득 지휘 포인트
 
 var current_level: int = 1
 var current_xp: int = 0
@@ -32,6 +34,7 @@ var ships_sunk: int = 0
 var soldiers_killed: int = 0
 var weapon_damage_stats: Dictionary = {}
 var _boss_triggered: bool = false
+var _victory_triggered: bool = false
 var rerolls_available: int = 0
 
 const DAMAGE_SOURCE_NAME := {
@@ -42,14 +45,13 @@ const DAMAGE_SOURCE_NAME := {
 	"ballista": "팔우노",
 	"repeating_crossbow": "연노",
 	"bow": "활",
-	"spear_rail": "창 난간",
 	"sword": "검",
 	"spear": "창",
 	"trident": "삼지창",
 	"harpoon": "작살",
 }
 
-# 공적(Merit) 시스템: 조선 수군 소집(초요기)용
+# 공적(Merit) 시스템: 병사(지휘) 업그레이드 전용 트랙
 signal merit_changed(current: int, maximum: int, level: int)
 signal merit_full()
 var merit_points: int = 0
@@ -83,6 +85,8 @@ var level_data = {
 
 func _ready() -> void:
 	add_to_group("level_manager")
+	if is_instance_valid(MetaManager) and MetaManager.has_method("get_xp_gain_multiplier"):
+		xp_multiplier = float(MetaManager.get_xp_gain_multiplier())
 	_calculate_next_level_xp()
 	max_merit_points = _get_merit_requirement(merit_level)
 	merit_points = clamp(merit_points, 0, max_merit_points)
@@ -127,32 +131,31 @@ func _prewarm_shaders(show_blocking_overlay: bool = true) -> void:
 		loading_layer.add_child(bg)
 		add_child(loading_layer)
 	
-	# 2. 쉐이더 예열 씬 목록 (누락된 씬 추가)
+	# 2. 쉐이더 예열 씬 목록 (시작 연출을 해치지 않도록 순수 VFX만 대상)
 	var scenes_to_warm = [
-		preload("res://scenes/projectiles/cannonball.tscn"),
-		preload("res://scenes/projectiles/janggun_missile.tscn"),
-		preload("res://scenes/projectiles/singigeon_rocket.tscn"),
-		preload("res://scenes/projectiles/arrow.tscn"),
 		preload("res://scenes/effects/muzzle_smoke.tscn"),
 		preload("res://scenes/effects/hit_effect.tscn"),
 		preload("res://scenes/effects/wood_splinter.tscn"),
-		preload("res://scenes/effects/fire_effect.tscn")
+		preload("res://scenes/effects/fire_effect.tscn"),
+		preload("res://scenes/effects/fire_pot_explosion.tscn"),
+		preload("res://scenes/effects/water_explosion.tscn"),
 	]
 	
-	# 카메라 뷰 안에 강제로 배치하여 Culling 방지 (보이지 않게 투명/초소형 처리)
+	# 조용한 예열을 위해 전용 컨테이너에 붙이되, 실제 재생(emitting/play)은 하지 않는다.
 	var container = Node3D.new()
 	container.name = "ShaderPrewarmer"
 	add_child(container)
-	container.position = Vector3(0, 0, 0) # 화면 중앙
-	container.scale = Vector3.ONE * 0.001
+	container.position = Vector3(0, -1000, 0)
+	container.scale = Vector3.ONE
 	
 	for scene in scenes_to_warm:
 		if scene:
 			var inst = scene.instantiate()
+			_mark_prewarm_recursive(inst)
 			container.add_child(inst)
 			
-			# 모든 하위 파티클 검색 및 작동 유도
-			_trigger_all_particles(inst)
+			# 파티클/머티리얼 리소스를 터치해 로딩만 유도 (시각/음향 출력 금지)
+			_prime_visual_resources(inst)
 			
 			# 백그라운드 모드에서는 프레임에 작업을 분산해 시작 프레임 스파이크를 줄인다.
 			if not show_blocking_overlay:
@@ -175,17 +178,27 @@ func _prewarm_shaders(show_blocking_overlay: bool = true) -> void:
 		tween.tween_property(bg, "modulate:a", 0.0, 1.0) # 1초 동안 부드럽게 밝아짐
 		tween.tween_callback(loading_layer.queue_free)
 
-func _trigger_all_particles(node: Node) -> void:
-	if node is GPUParticles3D or node is CPUParticles3D:
-		node.emitting = true
-		
-	# 화면 밖(Y=-100)에 있어도 절두체 컬링(Frustum Culling)을 무시하고 강제 렌더링되게 하여
-	# 셰이더 컴파일이 확실하게 일어나도록 보장합니다.
-	if node is GeometryInstance3D:
-		node.extra_cull_margin = 16384.0
-	
+func _mark_prewarm_recursive(node: Node) -> void:
+	node.set_meta("prewarm_mode", true)
 	for child in node.get_children():
-		_trigger_all_particles(child)
+		_mark_prewarm_recursive(child)
+
+func _prime_visual_resources(node: Node) -> void:
+	if node is GPUParticles3D:
+		var gpu := node as GPUParticles3D
+		gpu.emitting = false
+		gpu.process_material = gpu.process_material
+	elif node is CPUParticles3D:
+		var cpu := node as CPUParticles3D
+		cpu.emitting = false
+		cpu.process_material = cpu.process_material
+	elif node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		mesh_inst.mesh = mesh_inst.mesh
+		mesh_inst.material_override = mesh_inst.material_override
+
+	for child in node.get_children():
+		_prime_visual_resources(child)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -203,6 +216,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	current_time += delta
+	
+	# 스테이지 클리어 조건: 일정 시간 생존
+	if current_time >= survival_victory_time:
+		show_victory()
+		return
 	
 	# 보스 등장 체크 (10분 = 600초)
 	if current_time >= boss_spawn_time and not _boss_triggered:
@@ -251,6 +269,12 @@ func add_soldier_kill(count: int = 1) -> void:
 	soldiers_killed += max(0, count)
 	if hud and hud.has_method("update_combat_stats"):
 		hud.update_combat_stats(ships_sunk, soldiers_killed)
+
+func add_command_xp_from_soldier_kill(kill_count: int = 1) -> void:
+	var k = max(0, kill_count)
+	if k <= 0:
+		return
+	add_merit(merit_per_soldier_kill * k)
 
 func add_player_weapon_damage(source_id: String, amount: float) -> void:
 	if source_id.is_empty():
@@ -308,11 +332,11 @@ func add_merit(amount: int) -> void:
 		
 	if merit_points >= max_merit_points:
 		merit_full.emit()
-		print("[Merit] 공적이 가득 찼습니다! 자동으로 함대 업그레이드를 시작합니다.")
+		print("[Command] 지휘 포인트가 가득 찼습니다! 병사 업그레이드를 시작합니다.")
 		consume_merit() # 자동 소비 및 UI 팝업
 		
 func consume_merit() -> void:
-	# 공적 소비 시 함대 업그레이드 UI를 띄움
+	# 공적 소비 시 병사 업그레이드 UI를 띄움
 	_show_fleet_upgrade_ui()
 	
 	merit_points = 0
@@ -324,10 +348,10 @@ func consume_merit() -> void:
 func _show_fleet_upgrade_ui() -> void:
 	if not is_instance_valid(UpgradeManager): return
 	
-	# 함대 전용 업그레이드 (Category 5) 3개 선택
-	var choices = UpgradeManager.get_random_choices(3, 5) # 5 = Category.FLEET
+	# 지휘 업그레이드 선택지 (병사 + 해금 시 함대)
+	var choices = UpgradeManager.get_command_upgrade_choices(3)
 	if choices.is_empty():
-		# 만약 함대 업그레이드가 더 이상 없으면 레벨만 올리고 종료
+		# 병사 업그레이드가 더 이상 없으면 레벨만 올리고 종료
 		_finalize_merit_levelup("")
 		return
 		
@@ -339,11 +363,11 @@ func _show_fleet_upgrade_ui() -> void:
 	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
 	add_child(_upgrade_ui_instance)
 	
-	# 함대 업그레이드용 특별 라벨 설정
+	# 지휘 업그레이드용 특별 라벨 설정
 	if _upgrade_ui_instance.has_node("VBox/TitleLabel"):
-		_upgrade_ui_instance.get_node("VBox/TitleLabel").text = "함대 강화 (공적 레벨업!)"
+		_upgrade_ui_instance.get_node("VBox/TitleLabel").text = "지휘 강화 (병사/함대)"
 	
-	# 함대 업그레이드는 리롤권 0개로 고정 (또는 필요시 설정)
+	# 지휘 레벨업은 리롤권 0개 고정
 	_upgrade_ui_instance.show_upgrades(choices, 0)
 	
 	# 전용 콜백 연결
@@ -351,14 +375,11 @@ func _show_fleet_upgrade_ui() -> void:
 
 
 func _on_fleet_upgrade_chosen(upgrade_id: String) -> void:
-	# 함대 업그레이드 적용
+	# 병사 업그레이드 적용
 	UpgradeManager.apply_upgrade(upgrade_id)
 	
-	# 공적 레벨 수치 상승 처리
+	# 지휘 레벨 수치 상승 처리
 	_finalize_merit_levelup(upgrade_id)
-	
-	# 함대 강화 액션 완료 전파 (소환/수리 발동용)
-	merit_full_action_completed.emit()
 	
 	# UI 제거 및 게임 재개
 	if is_instance_valid(_upgrade_ui_instance):
@@ -372,7 +393,7 @@ func _finalize_merit_levelup(upgrade_id: String) -> void:
 	merit_level += 1
 	max_merit_points = _get_merit_requirement(merit_level)
 	
-	print("[Merit] Fleet Upgraded! Level %d (%s)" % [merit_level, upgrade_id])
+	print("[Command] Troop Upgraded! Level %d (%s)" % [merit_level, upgrade_id])
 	
 	if hud and hud.has_method("update_merit"):
 		hud.update_merit(merit_points, max_merit_points, merit_level)
@@ -413,8 +434,11 @@ func _set_level(new_level: int) -> void:
 		ship.hull_hp = minf(ship.hull_hp + 20.0, ship.max_hull_hp)
 		if hud: hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	
-	# 3. 리롤권 지급 (레벨당 1회)
-	rerolls_available = 1
+	# 3. 리롤권 지급 (기본 1회 + 영구 업그레이드 보너스)
+	var reroll_bonus := 0
+	if is_instance_valid(MetaManager) and MetaManager.has_method("get_reroll_bonus"):
+		reroll_bonus = int(MetaManager.get_reroll_bonus())
+	rerolls_available = 1 + reroll_bonus
 	
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("level_up")
@@ -426,7 +450,7 @@ func _show_upgrade_ui(choice_count: int = 3) -> void:
 	if not is_instance_valid(UpgradeManager):
 		return
 	
-	var choices = UpgradeManager.get_random_choices(choice_count)
+	var choices = UpgradeManager.get_ship_upgrade_choices(choice_count)
 	if choices.is_empty():
 		return
 	
@@ -450,7 +474,7 @@ func _on_reroll_requested() -> void:
 	if rerolls_available > 0:
 		rerolls_available -= 1
 		
-		var choices = UpgradeManager.get_random_choices(3)
+		var choices = UpgradeManager.get_ship_upgrade_choices(3)
 		if _upgrade_ui_instance:
 			_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
 			print("[Reroll] Reroll 사용! (남은 횟수: %d)" % rerolls_available)
@@ -529,6 +553,10 @@ func update_boss_hp(current: float, maximum: float) -> void:
 
 
 func show_victory() -> void:
+	if _victory_triggered:
+		return
+	_victory_triggered = true
+	
 	# 실시간 저장이므로 여기서는 메시지만 처리
 	print("[Win] 승리! 현재 판에서 %d 골드 획득" % current_score)
 	
@@ -544,5 +572,7 @@ func show_meta_shop() -> void:
 	
 	get_tree().paused = true
 	var shop = meta_upgrade_ui_scene.instantiate()
+	shop.title_text = "[항구] 영구 강화"
+	shop.close_button_text = "항해 복귀"
 	add_child(shop)
 	shop.closed.connect(func(): get_tree().paused = false)

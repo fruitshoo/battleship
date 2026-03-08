@@ -66,8 +66,9 @@ shape = SubResource("BoxShape_col")
 
 [node name="RocketTrail" type="GPUParticles3D" parent="." unique_id=1529075744]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4)
-amount = 150
-lifetime = 0.5
+amount = 28
+lifetime = 0.28
 explosiveness = 0.05
+fixed_fps = 20
 process_material = SubResource("ParticleProcessMaterial_spark")
 draw_pass_1 = SubResource("QuadMesh_spark")

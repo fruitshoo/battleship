@@ -1,4 +1,5 @@
 extends Node3D
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 ## 팔우노 (Ballista Launcher)
 ## 적 병사를 조준하여 강력한 관통 화살을 발사합니다.
@@ -13,6 +14,7 @@ extends Node3D
 var cooldown_timer: float = 0.0
 var current_target: Node3D = null
 var _search_tick: int = 0
+var _owner_ship: Node = null
 
 # 업그레이드 수치 캐싱
 var _cached_dmg_mult: float = 1.0
@@ -21,6 +23,7 @@ var _cached_pierce: int = 3
 
 func _ready() -> void:
 	_update_cached_stats()
+	_owner_ship = _resolve_owner_ship()
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and upgrade_manager.has_signal("upgrade_applied"):
 		upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
@@ -40,8 +43,8 @@ func _update_cached_stats() -> void:
 		_cached_pierce = int(s.get("base_pierce", 3) + (lv - 1) * s.get("pierce_per_lv", 1))
 
 func _process(delta: float) -> void:
-	var ship = get_parent()
-	if is_instance_valid(ship) and (ship.get("is_dying") or ship.get("is_sinking")):
+	if not _is_owner_combat_ready():
+		current_target = null
 		return
 
 	if cooldown_timer > 0:
@@ -60,12 +63,34 @@ func _process(delta: float) -> void:
 		else:
 			fire(current_target)
 
+func _resolve_owner_ship() -> Node:
+	var node: Node = get_parent()
+	while is_instance_valid(node):
+		if node.is_in_group("ships"):
+			return node
+		if "is_sinking" in node and "is_dying" in node:
+			return node
+		node = node.get_parent()
+	return null
+
+func _is_owner_combat_ready() -> bool:
+	if not is_instance_valid(_owner_ship):
+		_owner_ship = _resolve_owner_ship()
+	if not is_instance_valid(_owner_ship):
+		return true
+	if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict"):
+		return false
+	var owner_hp = _owner_ship.get("hull_hp")
+	if owner_hp != null and float(owner_hp) <= 0.0:
+		return false
+	return true
+
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
 	var min_dist_sq = detection_range * detection_range
 	
 	var enemy_team = "enemy" if team == "player" else "player"
-	var soldiers = get_tree().get_nodes_in_group("soldiers")
+	var soldiers = SceneGroupCache.get_nodes(get_tree(), "soldiers")
 	
 	for s in soldiers:
 		if not is_instance_valid(s) or s.get("current_state") == 4: # 4 = DEAD
@@ -81,10 +106,15 @@ func _update_target() -> void:
 	current_target = nearest_enemy
 
 func fire(target: Node3D) -> void:
+	if not _is_owner_combat_ready() or not is_instance_valid(target):
+		current_target = null
+		return
 	cooldown_timer = fire_cooldown * _cached_cd_mult
 	
 	var bolt = bolt_scene.instantiate()
-	bolt.position = muzzle.global_position
+	var spawn_pos = muzzle.global_position if is_instance_valid(muzzle) else (global_position + Vector3(0, 0.5, 0))
+	# 아직 트리에 없는 발사체는 global_position 대신 루트 기준 로컬 position을 먼저 설정한다.
+	bolt.position = spawn_pos
 	bolt.team = team
 	bolt.damage = 45.0 * _cached_dmg_mult
 	bolt.max_pierce = _cached_pierce
@@ -92,9 +122,14 @@ func fire(target: Node3D) -> void:
 	get_tree().root.add_child.call_deferred(bolt)
 	
 	# 조준 방향 (목표 병사 위치)
-	var dir = (target.global_position - muzzle.global_position).normalized()
+	var dir = (target.global_position - spawn_pos).normalized()
+	if dir.length_squared() < 0.0001:
+		dir = -global_transform.basis.z
 	bolt.direction = dir
-	bolt.look_at(bolt.position + dir, Vector3.UP)
+	var up_vec = Vector3.UP
+	if absf(dir.dot(up_vec)) > 0.99:
+		up_vec = Vector3.RIGHT
+	bolt.basis = Basis.looking_at(dir, up_vec)
 	
 	# 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")

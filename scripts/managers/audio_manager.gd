@@ -107,6 +107,7 @@ var current_bgm_name: String = ""
 # 예열 완료 신호
 signal prewarm_finished
 var is_prewarm_finished: bool = false
+@export var enable_playback_warmup: bool = false
 var _essential_warm_keys: Array[String] = [
 	"cannon_fire",
 	"impact_wood",
@@ -171,28 +172,30 @@ func _preload_essential_audio() -> void:
 	for key in _essential_warm_keys:
 		_cache_stream_for_key(key)
 	
-	# === 무음 재생을 통한 오디오 파이프라인 예열 (Silent Warm-up) ===
-	# 시작 지연을 막기 위해 필수 키만 1샷 예열한다.
-	var warm_up_player = AudioStreamPlayer.new()
-	warm_up_player.name = "AudioWarmupPlayer"
-	warm_up_player.volume_db = -80.0 # 완전 무음
-	add_child(warm_up_player)
-	
-	for key in _essential_warm_keys:
-		if not _cached_streams.has(key):
-			continue
-		var s = _cached_streams[key]
-		if s is Array:
-			if s.size() > 0 and s[0] is AudioStream:
-				warm_up_player.stream = s[0]
+	# 기본값은 재생 없는 캐시-only 예열: 시작 시 어색한 소리 출력 방지
+	if enable_playback_warmup:
+		var warm_up_player = AudioStreamPlayer.new()
+		warm_up_player.name = "AudioWarmupPlayer"
+		warm_up_player.volume_linear = 0.0 # 완전 무음
+		warm_up_player.bus = "SFX"
+		add_child(warm_up_player)
+		
+		for key in _essential_warm_keys:
+			if not _cached_streams.has(key):
+				continue
+			var s = _cached_streams[key]
+			if s is Array:
+				if s.size() > 0 and s[0] is AudioStream:
+					warm_up_player.stream = s[0]
+					warm_up_player.play()
+					await get_tree().process_frame
+			elif s is AudioStream:
+				warm_up_player.stream = s
 				warm_up_player.play()
 				await get_tree().process_frame
-		elif s is AudioStream:
-			warm_up_player.stream = s
-			warm_up_player.play()
-			await get_tree().process_frame
-	
-	warm_up_player.queue_free()
+		
+		warm_up_player.queue_free()
+
 	is_prewarm_finished = true
 	prewarm_finished.emit()
 	print("[Resource] 필수 오디오 예열 완료")

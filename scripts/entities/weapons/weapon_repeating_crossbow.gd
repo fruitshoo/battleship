@@ -7,6 +7,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 # 연발 설정
 var burst_count: int = 3
 var burst_delay: float = 0.15
+var _cached_spawn_parent: Node = null
 
 func _ready() -> void:
 	damage = 10.0 # 기존 활(12)보다 단발은 약하지만 연사로 총합은 높음
@@ -67,13 +68,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 			
 		var local_vel = target.get("velocity") if "velocity" in target else Vector3.ZERO
 		
-		var node = target
-		var ship = null
-		while node and node != target.get_tree().root:
-			if "current_speed" in node:
-				ship = node
-				break
-			node = node.get_parent()
+		var ship = _resolve_parent_ship(target)
 			
 		var ship_vel = Vector3.ZERO
 		if ship and "current_speed" in ship:
@@ -102,17 +97,16 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		
 		if "team" in arrow and "team" in attacker:
 			arrow.team = attacker.get("team")
-				
+		if "damage_source" in arrow:
+			arrow.damage_source = "repeating_crossbow"
+			
 		if "arc_height" in arrow:
 			var dist = spawn_pos.distance_to(current_target_pos)
 			arrow.arc_height = clamp(dist * 0.2, 0.5, 3.0) # 연노는 궤적이 더 낮음 (빠석궁)
 		
 		# 씬 트리에 추가
-		var lm = attacker.get_tree().root.find_child("LevelManager", true, false)
-		if lm:
-			lm.add_child(arrow)
-		else:
-			attacker.get_tree().root.add_child(arrow)
+		var spawn_parent = _resolve_spawn_parent(attacker.get_tree())
+		spawn_parent.add_child(arrow)
 			
 		arrow.global_position = spawn_pos
 		arrow.look_at(current_target_pos, Vector3.UP)
@@ -123,3 +117,23 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		# 다음 발사 대기
 		if i < burst_count - 1:
 			await attacker.get_tree().create_timer(burst_delay).timeout
+
+func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
+	var current = node
+	var depth = 0
+	while is_instance_valid(current) and depth <= max_depth:
+		if current is Node3D and "current_speed" in current:
+			return current as Node3D
+		current = current.get_parent()
+		depth += 1
+	return null
+
+func _resolve_spawn_parent(tree: SceneTree) -> Node:
+	if is_instance_valid(_cached_spawn_parent):
+		return _cached_spawn_parent
+	var lm = tree.root.find_child("LevelManager", true, false)
+	if is_instance_valid(lm):
+		_cached_spawn_parent = lm
+		return _cached_spawn_parent
+	_cached_spawn_parent = tree.root
+	return _cached_spawn_parent

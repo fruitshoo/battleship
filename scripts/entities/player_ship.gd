@@ -11,6 +11,10 @@ var team: String = "player"
 
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/chaser_ship.gd")
+const ENEMY_SHIP_SCENE = preload("res://scenes/enemy_ship.tscn")
+const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
+const JOSEON_CANNON_SCENE = preload("res://scenes/entities/cannon_joseon.tscn")
+const SOLDIER_SCENE = preload("res://scenes/soldier.tscn")
 
 # === 러더(키) 관련 ===
 
@@ -119,7 +123,8 @@ func _ready() -> void:
 			if meta_manager.has_method("get_hull_hp_bonus"): max_hull_hp += meta_manager.get_hull_hp_bonus()
 			if meta_manager.has_method("get_sail_speed_multiplier"): max_speed *= meta_manager.get_sail_speed_multiplier()
 			if meta_manager.has_method("get_hull_defense_bonus"): hull_defense = meta_manager.get_hull_defense_bonus()
-		print("[Ship] 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f)" % [max_hull_hp, max_speed, hull_defense])
+			if meta_manager.has_method("get_max_crew_bonus"): max_crew_count += int(meta_manager.get_max_crew_bonus())
+		print("[Ship] 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f, 병사 정원: %d)" % [max_hull_hp, max_speed, hull_defense, max_crew_count])
 	
 	
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
@@ -131,11 +136,6 @@ func _ready() -> void:
 		add_to_group("player")
 	
 	_cache_references()
-	
-	# 레벨 매니저 시그널 연결 (함대 업그레이드 액션 완료 시)
-	if is_instance_valid(_cached_level_manager):
-		if _cached_level_manager.has_signal("merit_full_action_completed"):
-			_cached_level_manager.merit_full_action_completed.connect(_spawn_or_repair_ally)
 
 func _on_gust_started(_angle_offset: float) -> void:
 	# 돌풍 시작 시 펄럭임 효과음 (플레이어 배만)
@@ -152,7 +152,7 @@ func _cache_references() -> void:
 
 
 func _process(_delta: float) -> void:
-	if is_sinking:
+	if is_sinking or is_dying:
 		return
 	_update_sail_visual()
 	_update_rudder_visual()
@@ -165,7 +165,7 @@ func _process(_delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint(): return
-	if is_sinking:
+	if is_sinking or is_dying:
 		return
 	
 	# 기본 물리 프로세스 (둥실거림 등)
@@ -222,10 +222,10 @@ func _physics_process(delta: float) -> void:
 				
 
 func _unhandled_input(event: InputEvent) -> void:
-	if is_sinking or not is_player_controlled: return
+	if is_sinking or is_dying or not is_player_controlled: return
 	
 	if event is InputEventKey and event.pressed and not event.echo:
-		# 치트키: F2 누르면 바로 공적 레벨업
+		# 치트키: F2 누르면 바로 지휘(병영) 레벨업
 		if OS.is_debug_build() and event.keycode == KEY_F2:
 			if is_instance_valid(_cached_level_manager):
 				_cached_level_manager.add_merit(999)
@@ -239,22 +239,22 @@ func _execute_merit_action() -> void:
 		
 	if _cached_level_manager.merit_points < _cached_level_manager.max_merit_points:
 		if _cached_hud and _cached_hud.has_method("show_message"):
-			_cached_hud.show_message("공적이 부족합니다!", 1.5)
+			_cached_hud.show_message("지휘 포인트가 부족합니다!", 1.5)
 		return
 		
-	# 공적 소비 (여기서 함대 업그레이드 UI가 뜨고, 선택 후 _spawn_or_repair_ally 가 호출됨)
+	# 지휘 포인트 소비 (병영 업그레이드 UI)
 	_cached_level_manager.consume_merit()
 
 func _spawn_or_repair_ally() -> void:
 	# 시각/청각 피드백
 	if _cached_hud and _cached_hud.has_method("show_message"):
-		_cached_hud.show_message("초요기를 올렸습니다! 함대 강화 및 합류!", 3.0)
+		_cached_hud.show_message("지원 함대가 합류했습니다!", 3.0)
 		
 	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
 		_cached_audio_manager.play_sfx("trumpet_war", global_position)
 		
 	# 이미 미니언이 있는지 체크
-	var minions = get_tree().get_nodes_in_group("captured_minion")
+	var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
 	if minions.size() > 0:
 		# 이미 있으면 수리 및 강화 전파
 		for m in minions:
@@ -266,17 +266,16 @@ func _spawn_or_repair_ally() -> void:
 		return
 
 	# 아군 배 스폰 (없을 때만)
-	var ship_scene = load("res://scenes/enemy_ship.tscn")
-	if ship_scene:
-		var ally = ship_scene.instantiate()
+	if ENEMY_SHIP_SCENE:
+		var ally = ENEMY_SHIP_SCENE.instantiate()
 		
 		# 아군 용도로 맹선 선체 및 조선 대포 할당
 		if "ship_type" in ally:
 			ally.ship_type = "maengseon_ally"
 		if "hull_scene" in ally:
-			ally.hull_scene = load("res://scenes/ships/hulls/maengseon_hull.tscn")
-		if "cannon_scene" in ally:
-			ally.cannon_scene = load("res://scenes/entities/cannon_joseon.tscn")
+			ally.hull_scene = MAENGSEON_HULL_SCENE
+			if "cannon_scene" in ally:
+				ally.cannon_scene = JOSEON_CANNON_SCENE
 		
 		# 아군 편입 (add_child 전에 설정해야 _ready에서 올바른 병사가 생성됨)
 		if ally.has_method("set_team"):
@@ -295,10 +294,11 @@ func _spawn_or_repair_ally() -> void:
 		ally.global_position = spawn_pos
 		ally.look_at(global_position + forward * 50.0, Vector3.UP)
 		
+		# 씬 기본 그룹(enemy) 잔존 방지를 위해 트리 진입 후 팀을 한 번 더 확정
+		if ally.has_method("set_team"):
+			ally.set_team("player")
 		if ally.has_method("add_to_group"):
-			ally.add_to_group("player")
 			ally.add_to_group("captured_minion")
-			ally.remove_from_group("enemy")
 			
 		print("[Summon] 정규군 함선을 소환했습니다!")
 
@@ -482,8 +482,10 @@ func _update_movement(delta: float) -> void:
 	position += velocity * delta
 	
 	# 물결 이펙트 (속도가 있거나 분리력이 있을 때)
-	if wake_trail:
-		wake_trail.emitting = current_speed > 0.5 or sep.length() > 0.2
+	var wake_active = current_speed > 0.5 or sep.length() > 0.2
+	var wake_speed_ratio = clampf(current_speed / maxf(max_speed, 0.01), 0.0, 1.0)
+	var wake_turn_ratio = clampf(rudder_angle / 45.0, -1.0, 1.0)
+	_set_wake_state(wake_active, wake_speed_ratio, wake_turn_ratio, clampf(sep.length() / 2.0, 0.0, 1.0))
 	
 	# 도선 중이거나 폐선일 때는 이동하지 않음
 func _update_steering(delta: float) -> void:
@@ -638,11 +640,17 @@ func toggle_rowing() -> void:
 
 ## 게임 오버 (침몰)
 func die() -> void:
-	if is_sinking:
+	if is_sinking or is_dying:
 		return
+	is_dying = true
 	is_sinking = true
 	is_player_controlled = false
 	current_speed = 0.0
+	fire_pot_cooldown_timer = 9999.0
+	if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
+		boarding_target.set("boarding_attacker", null)
+	boarding_attacker = null
+	_disable_combat_modules_on_sink()
 	
 	print("[Critical] 배가 침몰합니다!")
 	
@@ -679,6 +687,42 @@ func die() -> void:
 		if _cached_level_manager and "current_score" in _cached_level_manager:
 			print("[GameOver] 침몰! 최종 점수: %d" % _cached_level_manager.current_score)
 	)
+
+func _disable_combat_modules_on_sink() -> void:
+	# 침몰 시작 즉시 선체 하위 전투 루프 전체를 끊어 침몰 후 공격을 차단한다.
+	for child in get_children():
+		_disable_combat_subtree(child)
+
+func _disable_combat_subtree(node: Node) -> void:
+	if not is_instance_valid(node):
+		return
+	
+	node.set_process(false)
+	node.set_physics_process(false)
+	node.set_process_input(false)
+	node.set_process_unhandled_input(false)
+	
+	if node is GPUParticles3D:
+		var particles := node as GPUParticles3D
+		particles.emitting = false
+	if node is AudioStreamPlayer3D:
+		var audio_player := node as AudioStreamPlayer3D
+		audio_player.stop()
+	if node is Area3D:
+		var area := node as Area3D
+		area.set_deferred("monitoring", false)
+		area.set_deferred("monitorable", false)
+	if node is CollisionShape3D:
+		var collision_shape := node as CollisionShape3D
+		collision_shape.set_deferred("disabled", true)
+	
+	if "is_preparing" in node:
+		node.is_preparing = false
+	if "current_target" in node:
+		node.current_target = null
+	
+	for child in node.get_children():
+		_disable_combat_subtree(child)
 
 # 재귀적으로 모든 메쉬의 transparency속성을 트윈합니다.
 func _fade_out_meshes(node: Node, tween: Tween, duration: float) -> void:
@@ -814,8 +858,7 @@ func add_survivor() -> bool:
 		# 정원 초과 시에도 합류는 허용하되 메시지만 다르게 표시 가능
 		
 	# 병사 생성
-	var soldier_scene = load("res://scenes/soldier.tscn")
-	var s = soldier_scene.instantiate()
+	var s = SOLDIER_SCENE.instantiate()
 	soldiers_node.add_child(s)
 	s.set_team("player")
 	
@@ -841,6 +884,9 @@ func add_survivor() -> bool:
 
 ## 갑판 방어 무기 2: 화통 투척 로직 (병사가 수행)
 func _update_fire_pot_logic(delta: float) -> void:
+	if is_sinking or is_dying or hull_hp <= 0.0:
+		return
+	
 	if fire_pot_cooldown_timer > 0:
 		fire_pot_cooldown_timer -= delta
 		
@@ -852,7 +898,7 @@ func _update_fire_pot_logic(delta: float) -> void:
 		if fp_lv <= 0: return # 화통 업그레이드가 없으면 던지지 않음
 		
 		# 도선 공격자가 대기 중/당겨오는 중인지 확인
-		if not is_instance_valid(boarding_attacker) or boarding_attacker.get("is_dying"):
+		if not is_instance_valid(boarding_attacker) or boarding_attacker.get("is_dying") or boarding_attacker.get("is_sinking"):
 			return
 			
 		var target = boarding_attacker

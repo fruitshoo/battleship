@@ -16,6 +16,9 @@ scale_max = 1.2
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fw0c5"]
 albedo_color = Color(0.5, 0.35, 0.2, 1)
 roughness = 0.8
+emission_enabled = true
+emission = Color(0.35, 0.22, 0.12, 1)
+emission_energy_multiplier = 0.22
 
 [sub_resource type="BoxMesh" id="BoxMesh_xwfbq"]
 material = SubResource("StandardMaterial3D_fw0c5")
@@ -42,18 +45,20 @@ script = ExtResource("1_q41r5")
 
 [node name="Cubes" type="GPUParticles3D" parent="." unique_id=1433277249]
 emitting = false
-amount = 24
-lifetime = 1.2
+amount = 12
+lifetime = 0.9
 one_shot = true
 explosiveness = 0.95
+fixed_fps = 24
 process_material = SubResource("ParticleProcessMaterial_1wkn6")
 draw_pass_1 = SubResource("BoxMesh_xwfbq")
 
 [node name="Planks" type="GPUParticles3D" parent="." unique_id=56828740]
 emitting = false
-amount = 6
-lifetime = 1.2
+amount = 4
+lifetime = 0.9
 one_shot = true
 explosiveness = 0.85
+fixed_fps = 24
 process_material = SubResource("ParticleProcessMaterial_mqlsy")
 draw_pass_1 = SubResource("BoxMesh_f6m57")

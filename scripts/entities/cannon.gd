@@ -1,5 +1,8 @@
 @tool
 extends Node3D
+const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const DEBUG_COMBAT_LOGS := false
 
 ## 함포 (Cannon)
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
@@ -18,12 +21,13 @@ var cooldown_timer: float = 0.0
 var is_preparing: bool = false
 var prepare_timer: float = 0.0
 @export var prepare_time: float = 0.15 # 0.8에서 타격감을 위해 0.15초로 단축
-var current_target: Node3D = null
+var current_target: Variant = null
 var _search_tick: int = 0
 
 # 함대 업그레이드 보너스 (나포함 전용)
 var fleet_damage_mult: float = 1.0
 var fleet_cooldown_mult: float = 1.0
+var _owner_ship: Node = null
 
 # 함수(수명 주기별) 성능을 위한 업그레이드 수치 캐싱
 var _cached_range_mult: float = 1.0
@@ -33,6 +37,7 @@ var _cached_dmg_mult: float = 1.0
 func _ready() -> void:
 	# 초기 업그레이드 적용
 	_update_cached_stats()
+	_owner_ship = _resolve_owner_ship()
 	# 업그레이드 발생 시그널 연결
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and upgrade_manager.has_signal("upgrade_applied"):
@@ -56,14 +61,17 @@ func _update_cached_stats() -> void:
 func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 	fleet_damage_mult = dmg_mult
 	fleet_cooldown_mult = cd_mult
-	print("[Cannon] 함대 보너스 설정: 데미지x%.1f, 쿨다운x%.1f" % [dmg_mult, cd_mult])
+	if DEBUG_COMBAT_LOGS:
+		print("[Cannon] 함대 보너스 설정: 데미지x%.1f, 쿨다운x%.1f" % [dmg_mult, cd_mult])
 
 
 func _process(delta: float) -> void:
-	# 0. 부모 배의 상태 체크: 배가 침몰 중이거나 유령선(폐선)이면 발사 불가
-	var ship = get_parent()
-	if is_instance_valid(ship):
-		if ship.get("is_dying") or ship.get("is_sinking") or ship.get("is_derelict"):
+	# 0. 소유 배 상태 체크: 배가 침몰/파괴/폐선이면 발사 불가
+	if not is_instance_valid(_owner_ship):
+		_owner_ship = _resolve_owner_ship()
+	if is_instance_valid(_owner_ship):
+		var owner_hp = _owner_ship.get("hull_hp")
+		if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict") or (owner_hp != null and float(owner_hp) <= 0.0):
 			is_preparing = false
 			current_target = null
 			return
@@ -95,15 +103,35 @@ func _process(delta: float) -> void:
 		_search_tick = 0
 		_update_target()
 	
-	if is_instance_valid(current_target):
-		# 사거리 및 각도 재검증 (타겟이 범위를 벗어났는지 확인)
-		if not _is_target_valid(current_target):
-			current_target = null
-		else:
-			fire(current_target)
+	if _is_target_valid(current_target):
+		var target_node := current_target as Node3D
+		fire(target_node)
+	else:
+		current_target = null
+
+func _resolve_owner_ship() -> Node:
+	var node: Node = get_parent()
+	while is_instance_valid(node):
+		if node.is_in_group("ships"):
+			return node
+		if "is_sinking" in node and "is_dying" in node:
+			return node
+		node = node.get_parent()
+	return null
 
 func _get_current_range() -> float:
 	return detection_range * _cached_range_mult
+
+func _enemy_team_tag() -> String:
+	return "enemy" if team == "player" else "player"
+
+func _is_enemy_ship(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	var resolved = HitTargetResolver.resolve_team_tag(node)
+	if not resolved.is_empty():
+		return resolved == _enemy_team_tag()
+	return node.is_in_group(_enemy_team_tag())
 
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
@@ -113,28 +141,32 @@ func _update_target() -> void:
 	# 현재까지 찾은 가장 '매력적인' 타겟의 가중치 적용 거리
 	var best_score_sq: float = INF
 	
-	var enemy_group = "enemy" if team == "player" else "player"
-	var enemies = get_tree().get_nodes_in_group(enemy_group)
+	var enemies = SceneGroupCache.get_nodes(get_tree(), "ships")
 	
 	for enemy in enemies:
-		if not is_instance_valid(enemy):
+		if not is_instance_valid(enemy) or not (enemy is Node3D):
+			continue
+		var enemy_ship := enemy as Node3D
+		if not _is_enemy_ship(enemy_ship):
+			continue
+		if is_instance_valid(_owner_ship) and enemy_ship == _owner_ship:
 			continue
 		
 		# 실제 물리적 거리 스퀘어 계산
-		var real_dist_sq = global_position.distance_squared_to(enemy.global_position)
+		var real_dist_sq = global_position.distance_squared_to(enemy_ship.global_position)
 		
 		# 실제 거리가 최대 사거리를 벗어나면 무조건 패스
 		if real_dist_sq > max_range_sq:
 			continue
 		
-		if not _is_within_arc(enemy):
+		if not _is_within_arc(enemy_ship):
 			continue
 			
-		if _is_ship_occupied_by_friendly(enemy):
+		if _is_ship_occupied_by_friendly(enemy_ship):
 			continue
 			
 		# [핵심 로직] 빈 배(is_derelict)는 아예 타겟에서 제외 (시스템 개편)
-		if enemy.get("is_derelict") == true:
+		if enemy_ship.get("is_derelict") == true:
 			continue
 			
 		# [핵심 로직] 타겟 점수 계산 (실제 거리를 기반으로 패널티 부여)
@@ -142,44 +174,48 @@ func _update_target() -> void:
 		
 		# 타겟 배에 적군이 한 명도 없다면 (빈 배거나 곧 빈 배가 될 배),
 		# 거리에 엄청난 페널티(예: 10배 거리)를 주어 우선순위를 대폭 낮춤
-		if not _is_ship_occupied_by_enemy(enemy):
+		if not _is_ship_occupied_by_enemy(enemy_ship):
 			score_sq *= 100.0 # 스퀘어 값이므로 100배 = 거리 10배
 				
 		# 점수가 가장 낮은(가장 매력적인) 타겟 갱신
 		if score_sq < best_score_sq:
 			best_score_sq = score_sq
-			nearest_enemy = enemy
+			nearest_enemy = enemy_ship
 	
 	current_target = nearest_enemy
 
-func _is_target_valid(target: Node3D) -> bool:
-	if not is_instance_valid(target) or target.is_queued_for_deletion():
+func _is_target_valid(target: Variant) -> bool:
+	if not is_instance_valid(target):
+		return false
+	if not (target is Node3D):
+		return false
+	var target_node := target as Node3D
+	if target_node.is_queued_for_deletion():
 		return false
 	
 	# 침몰 중이거나 체력이 없는 배는 타겟에서 제외
-	var is_dying = target.get("is_dying") == true
-	var is_sinking = target.get("is_sinking") == true
-	var is_dead_hp = target.get("hp") != null and target.get("hp") <= 0
+	var is_dying = target_node.get("is_dying") == true
+	var is_sinking = target_node.get("is_sinking") == true
+	var is_dead_hp = target_node.get("hp") != null and target_node.get("hp") <= 0
 	
 	if is_dying or is_sinking or is_dead_hp:
 		return false
 		
-	# 그룹 체크 (침몰 시 그룹에서 빠짐)
-	var enemy_group = "enemy" if team == "player" else "player"
-	if not target.is_in_group(enemy_group):
+	# 팀 체크 (그룹 꼬임보다 우선)
+	if not _is_enemy_ship(target_node):
 		return false
 		
 	var current_range = _get_current_range()
-	if global_position.distance_squared_to(target.global_position) > current_range * current_range: return false
-	if not _is_within_arc(target): return false
+	if global_position.distance_squared_to(target_node.global_position) > current_range * current_range: return false
+	if not _is_within_arc(target_node): return false
 	
 	# 도선 중이거나 폐선인 배인지 최종 체크
-	if target.get("is_derelict") == true: return false
-	var attacker = target.get("boarding_attacker")
+	if target_node.get("is_derelict") == true: return false
+	var attacker = target_node.get("boarding_attacker")
 	if is_instance_valid(attacker) and attacker.get("team") == team:
 		return false
 		
-	if _is_ship_occupied_by_friendly(target): return false
+	if _is_ship_occupied_by_friendly(target_node): return false
 	return true
 
 func _is_within_arc(target: Node3D) -> bool:
@@ -234,11 +270,17 @@ func fire(target_enemy: Node3D) -> void:
 
 func _execute_fire() -> void:
 	is_preparing = false
+	if is_instance_valid(_owner_ship):
+		var owner_hp = _owner_ship.get("hull_hp")
+		if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict") or (owner_hp != null and float(owner_hp) <= 0.0):
+			current_target = null
+			return
 	
 	# 최종 발사 직전 다시 한번 타겟 유효성 검증
 	if not _is_target_valid(current_target):
 		current_target = null
 		return
+	var target_node := current_target as Node3D
 		
 	# 사운드 재생
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -269,19 +311,19 @@ func _execute_fire() -> void:
 		ball.set_lifetime_multiplier(_cached_range_mult)
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
-	var dist = global_position.distance_to(current_target.global_position)
+	var dist = global_position.distance_to(target_node.global_position)
 	
 	var time_to_hit = dist / 50.0 # 탄속 50.0으로 동기화 (기존 80.0 오류 수정)
 	
 	var enemy_speed = 3.5
-	if "move_speed" in current_target: enemy_speed = current_target.move_speed
-	var enemy_dir = - current_target.global_transform.basis.z
+	if "move_speed" in target_node: enemy_speed = target_node.move_speed
+	var enemy_dir = - target_node.global_transform.basis.z
 	var enemy_velocity = enemy_dir * enemy_speed
 	
-	var predicted_pos = current_target.global_position + enemy_velocity * time_to_hit
+	var predicted_pos = target_node.global_position + enemy_velocity * time_to_hit
 	ball.direction = (predicted_pos - muzzle.global_position).normalized()
 	if ball.direction.is_zero_approx(): ball.direction = - global_transform.basis.z
-	ball.target_node = current_target
+	ball.target_node = target_node
 	# look_at() 대신 Basis 직접 계산
 	ball.basis = Basis.looking_at(ball.direction, Vector3.UP)
 

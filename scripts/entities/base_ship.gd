@@ -1,6 +1,8 @@
 @tool
-class_name BaseShip
 extends Node3D
+class_name BaseShip
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const DEBUG_COMBAT_LOGS := false
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -73,6 +75,7 @@ var max_boarding_rope_hp: float = 100.0
 @export_range(0.5, 8.0) var boarding_max_relative_speed: float = 2.5
 @export_range(0.4, 1.0) var boarding_side_alignment_max_dot: float = 0.82
 @export_range(1, 3) var boarding_initial_rope_count: int = 1
+@export_range(0.05, 1.0) var boarding_rope_throw_duration: float = 0.28
 var boarding_contact_timer: float = 0.0
 var boarding_hook_timer: float = 0.0
 var boarding_secondary_rope_timer: float = 0.0
@@ -104,7 +107,18 @@ var _fire_instance: Node3D = null
 # === 노드 참조 (이제 HullScene 내부를 스캔) ===
 var masts: Array[Node] = []
 var rudder_visual: Node3D = null
-var wake_trail: GPUParticles3D = null
+var wake_trail: Node3D = null
+var deck_light: OmniLight3D = null
+var _cached_environment_preset_manager: Node = null
+
+@export_group("Mood Lighting")
+@export var enable_deck_light: bool = true
+@export var disable_deck_light_in_clear_day: bool = true
+@export var deck_light_player_only: bool = false
+@export var deck_light_energy: float = 1.25
+@export var deck_light_range: float = 18.0
+@export var deck_light_height: float = 1.8
+@export var deck_light_color: Color = Color(1.0, 0.86, 0.68, 1.0)
 
 # Oar (노) 레퍼런스
 var oar_pivot_left: Node3D = null
@@ -134,6 +148,7 @@ func _ready() -> void:
 
 	# 런타임 전용 로직
 	_cache_common_references()
+	_refresh_deck_light()
 
 func _ensure_collision_profile() -> void:
 	# 기존 씬의 export 수치를 유지하면서 프로파일을 기본 소스로 승격한다.
@@ -363,6 +378,35 @@ func _physics_process(_delta: float) -> void:
 	
 	_apply_bobbing_effect()
 
+func set_team(new_team: String) -> void:
+	var normalized_team = "player" if new_team == "player" else "enemy"
+	if "team" in self:
+		set("team", normalized_team)
+
+	# 씬 기본 그룹(enemy) 잔존으로 인한 피아식별 꼬임을 막기 위해
+	# 팀 변경 시 그룹을 항상 재동기화한다.
+	if is_in_group("player"):
+		remove_from_group("player")
+	if is_in_group("enemy"):
+		remove_from_group("enemy")
+	add_to_group(normalized_team)
+
+	# Area3D 루트 함선(예: enemy_ship)의 물리 레이어도 팀과 일치시킨다.
+	if "collision_layer" in self:
+		set("collision_layer", _get_team_collision_layer(normalized_team))
+	if "collision_mask" in self:
+		set("collision_mask", _get_team_collision_mask(normalized_team))
+	if is_inside_tree() and has_method("_sync_contact_area_layers"):
+		call_deferred("_sync_contact_area_layers", _get_team_collision_layer(normalized_team))
+
+	_update_children_team()
+
+func _get_team_collision_layer(team_tag: String) -> int:
+	return 2 if team_tag == "player" else 4
+
+func _get_team_collision_mask(team_tag: String) -> int:
+	return 21 if team_tag == "player" else 2
+
 func _update_children_team() -> void:
 	var team_val = get("team")
 	if team_val == null: team_val = "enemy" # 기본값
@@ -384,6 +428,7 @@ func _cache_hull_references(node: Node) -> void:
 	if node == self:
 		masts.clear()
 		rudder_visual = null
+		wake_trail = null
 		oar_pivot_left = null
 		oar_pivot_right = null
 
@@ -393,6 +438,8 @@ func _cache_hull_references(node: Node) -> void:
 			if not masts.has(child): masts.append(child)
 		elif child.name == "RudderVisual":
 			rudder_visual = child
+		elif child.name == "WakeTrail" and child is Node3D:
+			wake_trail = child as Node3D
 		elif child.name == "OarBaseLeft" and child.has_node("OarPivot"):
 			oar_pivot_left = child.get_node("OarPivot")
 		elif child.name == "OarBaseRight" and child.has_node("OarPivot"):
@@ -405,13 +452,77 @@ func _cache_hull_references(node: Node) -> void:
 func _cache_common_references() -> void:
 	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
 	if not _cached_level_manager:
-		var lms = get_tree().get_nodes_in_group("level_manager")
+		var lms = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lms.size() > 0: _cached_level_manager = lms[0]
 		
 	if _cached_level_manager and "hud" in _cached_level_manager:
 		_cached_hud = _cached_level_manager.hud
 	
 	_cached_audio_manager = get_node_or_null("/root/AudioManager")
+	_cached_environment_preset_manager = get_tree().root.find_child("EnvironmentPresetManager", true, false)
+	if is_instance_valid(_cached_environment_preset_manager) and _cached_environment_preset_manager.has_signal("preset_applied"):
+		var cb = Callable(self, "_on_environment_preset_applied")
+		if not _cached_environment_preset_manager.is_connected("preset_applied", cb):
+			_cached_environment_preset_manager.connect("preset_applied", cb)
+
+func _on_environment_preset_applied(_preset: int) -> void:
+	_refresh_deck_light()
+
+func _is_clear_day_preset_active() -> bool:
+	if not disable_deck_light_in_clear_day:
+		return false
+	if not is_instance_valid(_cached_environment_preset_manager):
+		return false
+	if _cached_environment_preset_manager.has_method("is_clear_day_active"):
+		return bool(_cached_environment_preset_manager.call("is_clear_day_active"))
+	if "current_preset" in _cached_environment_preset_manager:
+		return int(_cached_environment_preset_manager.get("current_preset")) == 0
+	return false
+
+func _resolve_deck_light_parent() -> Node3D:
+	var hull_scene = get_node_or_null("HullScene")
+	if hull_scene is Node3D:
+		return hull_scene as Node3D
+
+	for child in get_children():
+		if child is Node3D and child.name.to_lower().contains("hull"):
+			return child as Node3D
+
+	return self
+
+func _refresh_deck_light() -> void:
+	var should_enable = enable_deck_light
+	if should_enable and _is_clear_day_preset_active():
+		should_enable = false
+	if should_enable and deck_light_player_only:
+		var team_tag = str(get("team"))
+		var is_player_controlled = get("is_player_controlled") == true
+		var is_player_tagged = team_tag == "player" or is_in_group("player") or is_player_controlled
+		should_enable = is_player_tagged
+	
+	if not should_enable:
+		if is_instance_valid(deck_light):
+			deck_light.queue_free()
+			deck_light = null
+		return
+
+	var light_parent = _resolve_deck_light_parent()
+	
+	if not is_instance_valid(deck_light):
+		deck_light = OmniLight3D.new()
+		deck_light.name = "DeckLight"
+		light_parent.add_child(deck_light)
+	elif deck_light.get_parent() != light_parent:
+		var old_parent = deck_light.get_parent()
+		if is_instance_valid(old_parent):
+			old_parent.remove_child(deck_light)
+		light_parent.add_child(deck_light)
+	
+	deck_light.light_color = deck_light_color
+	deck_light.light_energy = deck_light_energy
+	deck_light.omni_range = deck_light_range
+	deck_light.shadow_enabled = false
+	deck_light.position = Vector3(0.0, deck_light_height, 0.0)
 
 ## 둥실둥실 시각 효과
 func _apply_bobbing_effect() -> void:
@@ -486,6 +597,14 @@ func _set_fire_emitting(active: bool) -> void:
 	if flame: flame.emitting = active
 	if smoke: smoke.emitting = active
 
+func _set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float = 0.0, turbulence: float = 0.0) -> void:
+	if not is_instance_valid(wake_trail):
+		return
+	if wake_trail.has_method("set_wake_state"):
+		wake_trail.call("set_wake_state", active, speed_ratio, turn_ratio, turbulence)
+	elif "emitting" in wake_trail:
+		wake_trail.set("emitting", active)
+
 ## 함선 충각(Ramming) 시 갑판 위 병사들에게 광역 데미지 및 넉백 부여
 func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
@@ -537,7 +656,7 @@ func check_derelict_status() -> void:
 				
 	# 만약 밧줄 등을 타고 다른 배로 넘어간 내 병사(home_ship == self)도 고려해야 한다면, 전역 검사 필요
 	if all_crew_dead:
-		var all_soldiers = get_tree().get_nodes_in_group("soldiers")
+		var all_soldiers = SceneGroupCache.get_nodes(get_tree(), "soldiers")
 		for s in all_soldiers:
 			# 다른 배에 넘어가 있더라도 여전히 살아서 싸우고 있는 내 선원이 있다면 폐선 아님
 			if s.get("home_ship") == self and s.get("current_state") != 4:
@@ -615,7 +734,7 @@ func _calculate_boarding_pull() -> Vector3:
 ## 밧줄 연결 전/후로 배끼리 겹치는(통과하는) 것을 막아주는 강한 물리 반발력
 func _calculate_collision_repulsion() -> Vector3:
 	var force = Vector3.ZERO
-	var neighbors = get_tree().get_nodes_in_group("ships")
+	var neighbors = SceneGroupCache.get_nodes(get_tree(), "ships")
 	
 	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_dying") or other.get("is_sinking"):
@@ -738,7 +857,7 @@ func _is_engagement_pair(other: Node3D) -> bool:
 
 ## 나포 가능한 함대 정원(최대 3척)이 남았는지 확인
 func can_capture_more_ships() -> bool:
-	var minions = get_tree().get_nodes_in_group("captured_minion")
+	var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
 	return minions.size() < 3
 
 ## 밧줄에 데미지 적용
@@ -805,7 +924,8 @@ func apply_ramming_damage(other: Node3D, impact_speed: float) -> void:
 		# 충돌 대상들 범위에 충격파 (배 위 병사 데미지)
 		apply_ramming_aoe(clamp(impact_speed * 1.5, 5.0, 20.0), impact_pos)
 	
-	print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, final_ram_damage])
+	if DEBUG_COMBAT_LOGS:
+		print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, final_ram_damage])
 	take_damage(final_ram_damage, (global_position + other.global_position) * 0.5)
 
 
@@ -924,9 +1044,11 @@ func _spawn_ropes(count_override: int = -1) -> void:
 			
 		mesh_instance.position = offset
 		mesh_instance.set_meta("anchor_offset", offset)
+		mesh_instance.set_meta("deploy_progress", 0.0)
+		mesh_instance.set_meta("deploy_duration", maxf(0.05, boarding_rope_throw_duration + randf_range(-0.06, 0.08)))
 		rope_instances.append(mesh_instance)
 
-func _update_ropes() -> void:
+func _update_ropes(delta: float = 0.0) -> void:
 	if not is_instance_valid(boarding_target):
 		_clear_ropes()
 		return
@@ -936,12 +1058,21 @@ func _update_ropes() -> void:
 	for rope in rope_instances:
 		if not is_instance_valid(rope): continue
 		
-		var offset = rope.get_meta("anchor_offset")
+		var offset = rope.get_meta("anchor_offset", Vector3.ZERO)
 		var start_pos = global_transform * offset
-		var dist = start_pos.distance_to(target_center)
 		
-		var mid_pos = start_pos + (target_center - start_pos) * 0.5
-		rope.global_transform = Transform3D().looking_at(target_center - mid_pos, Vector3.UP)
+		var deploy_progress = float(rope.get_meta("deploy_progress", 1.0))
+		var deploy_duration = maxf(0.05, float(rope.get_meta("deploy_duration", boarding_rope_throw_duration)))
+		if deploy_progress < 1.0:
+			deploy_progress = clampf(deploy_progress + (delta / deploy_duration), 0.0, 1.0)
+			rope.set_meta("deploy_progress", deploy_progress)
+		
+		# 밧줄 투척 연출: 시작점에서 목표점까지 전개 길이가 점진적으로 늘어난다.
+		var current_end = start_pos.lerp(target_center, deploy_progress)
+		var dist = maxf(0.05, start_pos.distance_to(current_end))
+		
+		var mid_pos = start_pos + (current_end - start_pos) * 0.5
+		rope.global_transform = Transform3D().looking_at(current_end - mid_pos, Vector3.UP)
 		rope.global_position = mid_pos
 		
 		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
@@ -1040,7 +1171,8 @@ func _process_boarding_common(delta: float) -> void:
 			_initial_rope_deployed = true
 			_full_rope_deployed = boarding_initial_rope_count >= 2
 			boarding_secondary_rope_timer = 0.0
-			print("[Boarding] 갈고리 투척 성공, 밧줄 연결 시작.")
+			if DEBUG_COMBAT_LOGS:
+				print("[Boarding] 갈고리 투척 성공, 밧줄 연결 시작.")
 		return
 		
 	if not _full_rope_deployed:
@@ -1048,7 +1180,8 @@ func _process_boarding_common(delta: float) -> void:
 		if boarding_secondary_rope_timer >= boarding_secondary_rope_delay:
 			_spawn_ropes()
 			_full_rope_deployed = true
-			print("[Boarding] 추가 밧줄이 연결되었습니다.")
+			if DEBUG_COMBAT_LOGS:
+				print("[Boarding] 추가 밧줄이 연결되었습니다.")
 		
 	if boarding_prep_timer < boarding_prep_duration:
 		boarding_prep_timer += delta
@@ -1058,7 +1191,7 @@ func _process_boarding_common(delta: float) -> void:
 			boarding_timer = 0.0
 			_transfer_one_soldier()
 		
-	_update_ropes()
+	_update_ropes(delta)
 
 func _cancel_boarding() -> void:
 	if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:

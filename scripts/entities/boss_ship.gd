@@ -321,7 +321,8 @@ func die() -> void:
 	tween.tween_property(self , "rotation:z", deg_to_rad(25.0), 3.0)
 	
 	tween.chain().tween_callback(func():
-		if is_instance_valid(cached_lm) and cached_lm.has_method("show_victory"):
+		# 중간 보스(tier 1) 격침은 승리 조건이 아니다.
+		if tier >= 2 and is_instance_valid(cached_lm) and cached_lm.has_method("show_victory"):
 			cached_lm.show_victory()
 	)
 	

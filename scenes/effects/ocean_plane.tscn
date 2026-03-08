@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bx5h2f3mwak2a"]
 
 [ext_resource type="Script" uid="uid://cxml41b5iu23e" path="res://scripts/effects/ocean_plane.gd" id="1_script"]
-[ext_resource type="Material" path="res://assets/shaders/water_04.tres" id="1_wvfhj"]
+[ext_resource type="Material" uid="uid://4lae5aqyw1qq" path="res://assets/shaders/water_04.tres" id="1_wvfhj"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ocean"]
 material = ExtResource("1_wvfhj")
@@ -9,9 +9,6 @@ size = Vector2(300, 300)
 subdivide_width = 64
 subdivide_depth = 64
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ocean"]
-
 [node name="OceanPlane" type="MeshInstance3D" unique_id=1629146247]
 mesh = SubResource("PlaneMesh_ocean")
-surface_material_override/0 = null
 script = ExtResource("1_script")

@@ -1,4 +1,5 @@
 extends Node3D
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 ## 보물 상자 (Treasure Chest)
 ## 플레이어가 닿으면 특별한 업그레이드 보상을 제공
@@ -22,11 +23,9 @@ func _process(_delta: float) -> void:
 	if _is_collected: return
 	
 	# 플레이어 탐지 (Area3D가 없으므로 거리 체크)
-	var players = get_tree().get_nodes_in_group("player")
-	if players.size() > 0:
-		var p = players[0]
-		if global_position.distance_to(p.global_position) < collection_range:
-			_collect()
+	var p = SceneGroupCache.get_first(get_tree(), "player") as Node3D
+	if is_instance_valid(p) and global_position.distance_to(p.global_position) < collection_range:
+		_collect()
 
 func _collect() -> void:
 	_is_collected = true
@@ -39,7 +38,7 @@ func _collect() -> void:
 		AudioManager.play_sfx("treasure_collect")
 	
 	# 레벨 매니저를 통해 업그레이드 메뉴 호출 (보물 상자 전용)
-	var lm = get_tree().get_first_node_in_group("level_manager")
+	var lm = SceneGroupCache.get_first(get_tree(), "level_manager")
 	if lm and lm.has_method("_show_upgrade_ui"):
 		# 보물 상자는 5개의 선택지 제공 및 특별 보너스
 		lm.call_deferred("_show_upgrade_ui", 5)

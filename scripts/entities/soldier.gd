@@ -1,4 +1,13 @@
 extends CharacterBody3D
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
+const SURVIVOR_SCENE = preload("res://scenes/effects/survivor.tscn")
+const MELEE_WEAPON_SCENES := [
+	preload("res://scenes/entities/weapons/weapon_sword.tscn"),
+	preload("res://scenes/entities/weapons/weapon_spear.tscn"),
+	preload("res://scenes/entities/weapons/weapon_trident.tscn"),
+	preload("res://scenes/entities/weapons/weapon_harpoon.tscn"),
+]
 
 ## 병사 AI: NavMesh 기반 이동 및 전투
 
@@ -72,6 +81,13 @@ var chaos_damage_per_tick: float = 5.0 # 상향: 초당 5의 화재 피해 (배 
 
 const CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 10.0
 const CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 12.0
+const RANGED_DAMAGE_SOURCES := {
+	"bow": true,
+	"repeating_crossbow": true,
+	"ballista": true,
+	"singigeon": true,
+	"fire_pot": true,
+}
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_soldiers: Array = []
@@ -109,9 +125,15 @@ func _ready() -> void:
 	# 영구 업그레이드 보너스 적용 (아군 전용)
 	if team == "player":
 		var _meta_manager_init = get_node_or_null("/root/MetaManager")
-		if is_instance_valid(_meta_manager_init) and _meta_manager_init.has_method("get_crew_stat_multiplier"):
-			var hp_mult = _meta_manager_init.get_crew_stat_multiplier()
+		if is_instance_valid(_meta_manager_init):
+			var hp_mult := 1.0
+			if _meta_manager_init.has_method("get_crew_stat_multiplier"):
+				hp_mult *= float(_meta_manager_init.get_crew_stat_multiplier())
+			if _meta_manager_init.has_method("get_crew_health_multiplier"):
+				hp_mult *= float(_meta_manager_init.get_crew_health_multiplier())
 			max_health *= hp_mult
+			if _meta_manager_init.has_method("get_crew_defense_bonus"):
+				defense += float(_meta_manager_init.get_crew_defense_bonus())
 		
 	current_health = max_health
 	
@@ -136,28 +158,19 @@ func _ready() -> void:
 		add_child(pivot)
 		
 	# 무기 생성
-	var melee_scenes = [
-		"res://scenes/entities/weapons/weapon_sword.tscn",
-		"res://scenes/entities/weapons/weapon_spear.tscn",
-		"res://scenes/entities/weapons/weapon_trident.tscn",
-		"res://scenes/entities/weapons/weapon_harpoon.tscn"
-	]
-	
 	var hand = get_node_or_null("HandPivot")
 	
 	# 근접 무기 로드 (Ranged Only가 아닐 때만)
 	if not is_ranged_only:
-		var random_melee_path = melee_scenes[randi() % melee_scenes.size()]
-		var sword_scene = load(random_melee_path)
+		var sword_scene: PackedScene = MELEE_WEAPON_SCENES[randi() % MELEE_WEAPON_SCENES.size()]
 		if sword_scene and hand:
 			weapon_sword = sword_scene.instantiate() as Node3D
 			hand.add_child(weapon_sword)
 			
 	# 활 로드 (Melee Only가 아닐 때만)
 	if not is_melee_only:
-		var bow_scene = load("res://scenes/entities/weapons/weapon_bow.tscn")
-		if bow_scene and hand:
-			weapon_bow = bow_scene.instantiate() as Node3D
+		if BOW_SCENE and hand:
+			weapon_bow = BOW_SCENE.instantiate() as Node3D
 			hand.add_child(weapon_bow)
 		
 	# 공격력 수치 및 무기 상태 업데이트
@@ -201,8 +214,11 @@ func _update_cached_cooldown() -> void:
 func _update_weapon_stats() -> void:
 	var meta_manager = get_node_or_null("/root/MetaManager")
 	var mult = 1.0
-	if team == "player" and is_instance_valid(meta_manager) and meta_manager.has_method("get_crew_stat_multiplier"):
-		mult = meta_manager.get_crew_stat_multiplier()
+	if team == "player" and is_instance_valid(meta_manager):
+		if meta_manager.has_method("get_crew_stat_multiplier"):
+			mult *= float(meta_manager.get_crew_stat_multiplier())
+		if meta_manager.has_method("get_crew_damage_multiplier"):
+			mult *= float(meta_manager.get_crew_damage_multiplier())
 		
 	if is_instance_valid(weapon_sword):
 		# 검은 기본 공격력의 1.25배 (근접 보너스)
@@ -777,16 +793,6 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 	if team == "enemy" and is_instance_valid(target_ship) and target_ship.get("team") == "player":
 		chaos_duration_timer = 8.0 # 최대 8초 생존 허용
 		chaos_tick_timer = 1.0 # 1초 후 첫 틱
-		
-		# 창 난간(Spear Rail) 데미지 체크: 적 병사가 착지할 때 자동 데미지
-		var spear_dmg = target_ship.get_meta("spear_rail_damage", 0.0)
-		if spear_dmg > 0:
-			# 착지 시점에 데미지 적용 (트윈 완료 후)
-			tween.finished.connect(func():
-				if is_instance_valid(self ) and current_state != State.DEAD:
-					take_damage(spear_dmg, global_position)
-					print("[SpearRail] 도선 병사가 창 난간에 찔렸습니다! (데미지: %.0f)" % spear_dmg)
-			)
 	
 	if is_capture_attempt:
 		tween.finished.connect(func():
@@ -799,9 +805,8 @@ func _jump_to_ship(target_ship: Node3D, is_capture_attempt: bool = false) -> voi
 
 func _teleport_to_ship(_target_ship: Node3D) -> void:
 	# 텔레포트 대신 → Survivor(생존자)로 변환하여 바다에 떠있게 함
-	var survivor_scn = load("res://scenes/effects/survivor.tscn")
-	if survivor_scn:
-		var survivor = survivor_scn.instantiate()
+	if SURVIVOR_SCENE:
+		var survivor = SURVIVOR_SCENE.instantiate()
 		get_tree().root.add_child.call_deferred(survivor)
 		var spawn_pos = global_position
 		spawn_pos.y = 0.5 # 수면 높이
@@ -841,7 +846,13 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 		return
 	
 	# 방어력 적용 (최소 1 데미지)
-	var final_damage = maxf(amount - defense, 1.0)
+	var mitigated_damage = maxf(amount - defense, 1.0)
+	var quality_reduction = 0.0
+	if has_meta("defense_reduction"):
+		quality_reduction = clampf(float(get_meta("defense_reduction")), 0.0, 0.9)
+	var cover_reduction = _get_ship_ranged_cover_reduction(damage_source)
+	var total_reduction = clampf(quality_reduction + cover_reduction, 0.0, 0.9)
+	var final_damage = maxf(mitigated_damage * (1.0 - total_reduction), 1.0)
 	current_health -= final_damage
 	
 	# 플레이어 무기 피해 집계: 적 병사에만 기록
@@ -875,6 +886,22 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	
 	if current_health <= 0:
 		_die()
+
+func _get_ship_ranged_cover_reduction(damage_source: String) -> float:
+	if damage_source.is_empty():
+		return 0.0
+	if not RANGED_DAMAGE_SOURCES.has(damage_source):
+		return 0.0
+	if not is_instance_valid(owned_ship):
+		return 0.0
+	if owned_ship.get("is_sinking") == true or owned_ship.get("is_dying") == true:
+		return 0.0
+	# 같은 함선 소속 병사만 엄폐 보너스 적용 (적 도선병은 제외)
+	if str(owned_ship.get("team")) != team:
+		return 0.0
+	if not owned_ship.has_meta("crew_ranged_damage_reduction"):
+		return 0.0
+	return clampf(float(owned_ship.get_meta("crew_ranged_damage_reduction")), 0.0, 0.6)
 
 
 ## 피격 시 하얀색으로 깜빡임
@@ -968,6 +995,12 @@ func _die() -> void:
 			_cached_level_manager.add_xp(5) # 병사 처치 XP 상향 (2 -> 5)
 		if _cached_level_manager and _cached_level_manager.has_method("add_soldier_kill"):
 			_cached_level_manager.add_soldier_kill(1)
+		if _cached_level_manager:
+			if _cached_level_manager.has_method("add_command_xp_from_soldier_kill"):
+				_cached_level_manager.add_command_xp_from_soldier_kill(1)
+			elif _cached_level_manager.has_method("add_merit"):
+				# 하위 호환: 메서드가 없는 경우 직접 공적(지휘 포인트) 1 지급
+				_cached_level_manager.add_merit(1)
 	
 	# 사망 사운드 및 바다로 떨어지는 물보라 소리
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -1042,7 +1075,7 @@ func _find_ranged_target() -> Node3D:
 	var ships = get_ships_cached(get_tree(), enemy_team)
 	
 	# 함대 정원 체크 (나포 가능 여부)
-	var minions = get_tree().get_nodes_in_group("captured_minion")
+	var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
 	var has_room = minions.size() < 3
 	
 	for ship in ships:

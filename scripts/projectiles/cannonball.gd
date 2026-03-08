@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 대포알 (Cannonball)
 ## 정해진 방향으로 전진하며, 적과 충돌 시 적을 파괴함
@@ -31,7 +32,7 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
 
 	# 타격 시 검은 연기(발사 시 나오는 연기 재사용) 생성
-	if impact_smoke_scene:
+	if impact_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
 		var smoke = impact_smoke_scene.instantiate()
 		smoke.position = global_position
 		# 연기는 위쪽으로 퍼지게 (Basis 직접 설정)
@@ -159,6 +160,8 @@ func _check_hit(target: Node) -> void:
 
 func _spawn_water_explosion() -> void:
 	if not is_inside_tree() or not water_explosion_scene: return
+	if not VfxBudget.allow_spawn(get_tree(), "water_explosion", global_position, 4, 70.0):
+		return
 	
 	var pos = global_position
 	var explosion = water_explosion_scene.instantiate()

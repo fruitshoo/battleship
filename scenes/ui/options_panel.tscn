@@ -1,0 +1,134 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/options_panel.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.06, 0.10, 0.16, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.75, 0.63, 0.37, 0.9)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+content_margin_left = 24.0
+content_margin_top = 22.0
+content_margin_right = 24.0
+content_margin_bottom = 20.0
+
+[node name="OptionsPanel" type="CanvasLayer"]
+process_mode = 3
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.03, 0.06, 0.1, 0.74)
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -270.0
+offset_top = -210.0
+offset_right = 270.0
+offset_bottom = 210.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Shell" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="Panel/Shell"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+theme_override_colors/font_color = Color(0.95, 0.9, 0.72, 1)
+text = "항해 설정"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Panel/Shell"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.72, 0.79, 0.87, 1)
+text = "음향과 화면 모드를 조정합니다."
+horizontal_alignment = 1
+
+[node name="Content" type="VBoxContainer" parent="Panel/Shell"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="MasterRow" type="VBoxContainer" parent="Panel/Shell/Content"]
+layout_mode = 2
+
+[node name="MasterLabel" type="Label" parent="Panel/Shell/Content/MasterRow"]
+layout_mode = 2
+text = "전체 음량"
+
+[node name="MasterSlider" type="HSlider" parent="Panel/Shell/Content/MasterRow"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+size_flags_horizontal = 3
+value = 0.85
+
+[node name="MusicRow" type="VBoxContainer" parent="Panel/Shell/Content"]
+layout_mode = 2
+
+[node name="MusicLabel" type="Label" parent="Panel/Shell/Content/MusicRow"]
+layout_mode = 2
+text = "음악"
+
+[node name="MusicSlider" type="HSlider" parent="Panel/Shell/Content/MusicRow"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+size_flags_horizontal = 3
+value = 0.75
+
+[node name="SfxRow" type="VBoxContainer" parent="Panel/Shell/Content"]
+layout_mode = 2
+
+[node name="SfxLabel" type="Label" parent="Panel/Shell/Content/SfxRow"]
+layout_mode = 2
+text = "효과음"
+
+[node name="SfxSlider" type="HSlider" parent="Panel/Shell/Content/SfxRow"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+size_flags_horizontal = 3
+value = 0.85
+
+[node name="UiRow" type="VBoxContainer" parent="Panel/Shell/Content"]
+layout_mode = 2
+
+[node name="UiLabel" type="Label" parent="Panel/Shell/Content/UiRow"]
+layout_mode = 2
+text = "UI"
+
+[node name="UiSlider" type="HSlider" parent="Panel/Shell/Content/UiRow"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+size_flags_horizontal = 3
+value = 0.85
+
+[node name="FullscreenCheck" type="CheckBox" parent="Panel/Shell/Content"]
+layout_mode = 2
+text = "전체화면"
+
+[node name="Footer" type="HBoxContainer" parent="Panel/Shell"]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="Panel/Shell/Footer"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 44)
+text = "옵션 닫기"

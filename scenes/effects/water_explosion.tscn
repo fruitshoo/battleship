@@ -50,11 +50,12 @@ size = Vector2(1.5, 1.5)
 
 [node name="WaterExplosion" type="GPUParticles3D" unique_id=1683394169]
 emitting = false
-amount = 20
-lifetime = 1.5
+amount = 10
+lifetime = 1.0
 one_shot = true
 explosiveness = 0.95
 randomness = 0.5
+fixed_fps = 24
 interpolate = false
 fract_delta = false
 process_material = SubResource("ParticleProcessMaterial_water")
