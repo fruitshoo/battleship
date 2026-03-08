@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bpicsuypxd31r"
 path.s3tc="res://.godot/imported/caustics_01.png-d93e4a8856a034b6f107398440974271.s3tc.ctex"
+path.etc2="res://.godot/imported/caustics_01.png-d93e4a8856a034b6f107398440974271.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/alpha/caustics_01.png"
-dest_files=["res://.godot/imported/caustics_01.png-d93e4a8856a034b6f107398440974271.s3tc.ctex"]
+dest_files=["res://.godot/imported/caustics_01.png-d93e4a8856a034b6f107398440974271.s3tc.ctex", "res://.godot/imported/caustics_01.png-d93e4a8856a034b6f107398440974271.etc2.ctex"]
 
 [params]
 

@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cdf624nb44xpc"
 path.s3tc="res://.godot/imported/light_02.png-c51fe36cb1ed1575a26253f3b2792899.s3tc.ctex"
+path.etc2="res://.godot/imported/light_02.png-c51fe36cb1ed1575a26253f3b2792899.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/opague/light_02.png"
-dest_files=["res://.godot/imported/light_02.png-c51fe36cb1ed1575a26253f3b2792899.s3tc.ctex"]
+dest_files=["res://.godot/imported/light_02.png-c51fe36cb1ed1575a26253f3b2792899.s3tc.ctex", "res://.godot/imported/light_02.png-c51fe36cb1ed1575a26253f3b2792899.etc2.ctex"]
 
 [params]
 

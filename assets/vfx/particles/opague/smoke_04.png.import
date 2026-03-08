@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b1u8o1dhvf31h"
 path.s3tc="res://.godot/imported/smoke_04.png-e26222a0a91f91d8c201c4a27e89ef50.s3tc.ctex"
+path.etc2="res://.godot/imported/smoke_04.png-e26222a0a91f91d8c201c4a27e89ef50.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/opague/smoke_04.png"
-dest_files=["res://.godot/imported/smoke_04.png-e26222a0a91f91d8c201c4a27e89ef50.s3tc.ctex"]
+dest_files=["res://.godot/imported/smoke_04.png-e26222a0a91f91d8c201c4a27e89ef50.s3tc.ctex", "res://.godot/imported/smoke_04.png-e26222a0a91f91d8c201c4a27e89ef50.etc2.ctex"]
 
 [params]
 

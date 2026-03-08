@@ -1356,7 +1356,7 @@ func _setup_game_over_panel() -> void:
 
 	var vbox = VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.theme_override_constants.separation = 10
+	vbox.add_theme_constant_override("separation", 10)
 	game_over_panel.add_child(vbox)
 
 	game_over_subtitle = Label.new()

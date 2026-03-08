@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b6g0awmwu3v8p"
 path.s3tc="res://.godot/imported/explosion_02_8x8.tga-1e791e0bbf28957f16ca0c5c8ab02def.s3tc.ctex"
+path.etc2="res://.godot/imported/explosion_02_8x8.tga-1e791e0bbf28957f16ca0c5c8ab02def.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/flipbooks/explosion_02_8x8.tga"
-dest_files=["res://.godot/imported/explosion_02_8x8.tga-1e791e0bbf28957f16ca0c5c8ab02def.s3tc.ctex"]
+dest_files=["res://.godot/imported/explosion_02_8x8.tga-1e791e0bbf28957f16ca0c5c8ab02def.s3tc.ctex", "res://.godot/imported/explosion_02_8x8.tga-1e791e0bbf28957f16ca0c5c8ab02def.etc2.ctex"]
 
 [params]
 

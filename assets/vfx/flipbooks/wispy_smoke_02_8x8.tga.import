@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://d07vjsw78goli"
 path.s3tc="res://.godot/imported/wispy_smoke_02_8x8.tga-23d279292be6f32d60120cb4131dcad3.s3tc.ctex"
+path.etc2="res://.godot/imported/wispy_smoke_02_8x8.tga-23d279292be6f32d60120cb4131dcad3.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/flipbooks/wispy_smoke_02_8x8.tga"
-dest_files=["res://.godot/imported/wispy_smoke_02_8x8.tga-23d279292be6f32d60120cb4131dcad3.s3tc.ctex"]
+dest_files=["res://.godot/imported/wispy_smoke_02_8x8.tga-23d279292be6f32d60120cb4131dcad3.s3tc.ctex", "res://.godot/imported/wispy_smoke_02_8x8.tga-23d279292be6f32d60120cb4131dcad3.etc2.ctex"]
 
 [params]
 

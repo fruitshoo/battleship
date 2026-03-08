@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cgqaxabtr6jwl"
 path.s3tc="res://.godot/imported/magic_03_a.png-6c61c7975cbf8c1ae7d46c30f277f229.s3tc.ctex"
+path.etc2="res://.godot/imported/magic_03_a.png-6c61c7975cbf8c1ae7d46c30f277f229.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/alpha/magic_03_a.png"
-dest_files=["res://.godot/imported/magic_03_a.png-6c61c7975cbf8c1ae7d46c30f277f229.s3tc.ctex"]
+dest_files=["res://.godot/imported/magic_03_a.png-6c61c7975cbf8c1ae7d46c30f277f229.s3tc.ctex", "res://.godot/imported/magic_03_a.png-6c61c7975cbf8c1ae7d46c30f277f229.etc2.ctex"]
 
 [params]
 

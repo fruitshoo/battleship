@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b21wpjclvnw3x"
 path.s3tc="res://.godot/imported/cloud_01_8x8.tga-6d1b6576573646981ed94ef0381d69e6.s3tc.ctex"
+path.etc2="res://.godot/imported/cloud_01_8x8.tga-6d1b6576573646981ed94ef0381d69e6.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/flipbooks/cloud_01_8x8.tga"
-dest_files=["res://.godot/imported/cloud_01_8x8.tga-6d1b6576573646981ed94ef0381d69e6.s3tc.ctex"]
+dest_files=["res://.godot/imported/cloud_01_8x8.tga-6d1b6576573646981ed94ef0381d69e6.s3tc.ctex", "res://.godot/imported/cloud_01_8x8.tga-6d1b6576573646981ed94ef0381d69e6.etc2.ctex"]
 
 [params]
 

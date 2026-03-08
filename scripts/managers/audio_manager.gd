@@ -10,14 +10,14 @@ extends Node
 # preload는 컴파일 타임에 파일이 있어야 하므로, 안전을 위해 load() 사용
 var sfx_streams = {
 	"cannon_fire": [
-		"res://assets/audio/sfx/sfx_cannon_fire.wav",
-		"res://assets/audio/sfx/sfx_cannon_fire_02.wav"
+		"res://assets/audio/sfx/sfx_cannon_fire.ogg",
+		"res://assets/audio/sfx/sfx_cannon_fire_02.ogg"
 	],
 	"cannon_fuse": [
 		"res://assets/audio/sfx/sfx_match_sizzle.wav",
 		"res://assets/audio/sfx/sfx_steam_hiss.wav"
 	],
-	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.wav", # 나무 부러지는/부딪히는 소리
+	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.ogg", # 나무 부러지는/부딪히는 소리
 	"ui_click": [
 		"res://assets/audio/sfx/sfx_ui_click_1.wav",
 		"res://assets/audio/sfx/sfx_ui_click_2.wav",
@@ -25,13 +25,13 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_ui_click_4.wav",
 		"res://assets/audio/sfx/sfx_ui_click_5.wav",
 	],
-	"level_up": "res://assets/audio/sfx/sfx_levelup.wav",
-	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.wav",
-	"rocket_launch_01": "res://assets/audio/sfx/sfx_rocket_launch_01.wav",
-	"rocket_launch_02": "res://assets/audio/sfx/sfx_rocket_launch_02.wav",
-	"rocket_launch_03": "res://assets/audio/sfx/sfx_rocket_launch_03.wav",
-	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.wav",
-	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.wav",
+	"level_up": "res://assets/audio/sfx/sfx_levelup.ogg",
+	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.ogg",
+	"rocket_launch_01": "res://assets/audio/sfx/sfx_rocket_launch_01.ogg",
+	"rocket_launch_02": "res://assets/audio/sfx/sfx_rocket_launch_02.ogg",
+	"rocket_launch_03": "res://assets/audio/sfx/sfx_rocket_launch_03.ogg",
+	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.ogg",
+	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.ogg",
 	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.wav",
 	"sword_swing": [
 		"res://assets/audio/sfx/sfx_sword_swing_1.wav",
@@ -54,9 +54,9 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_sword_ting_4.wav"
 	],
 	"wave_splash": [
-		"res://assets/audio/sfx/sfx_wave_01.wav",
-		"res://assets/audio/sfx/sfx_wave_02.wav",
-		"res://assets/audio/sfx/sfx_wave_03.wav"
+		"res://assets/audio/sfx/sfx_wave_01.ogg",
+		"res://assets/audio/sfx/sfx_wave_02.ogg",
+		"res://assets/audio/sfx/sfx_wave_03.ogg"
 	],
 	"treasure_collect": [
 		"res://assets/audio/sfx/sfx_pickup_1.wav",
@@ -82,7 +82,7 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_water_splash_small_3.wav",
 	],
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
-	"oars_rowing": "res://assets/audio/sfx/sfx_oars.wav",
+	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
 }
 
 # 캐시된 스트림
@@ -115,6 +115,17 @@ var _essential_warm_keys: Array[String] = [
 	"musket_fire",
 	"wave_splash",
 	"water_splash_large"
+]
+var _web_essential_warm_keys: Array[String] = [
+	"ui_click"
+]
+var _web_persistent_cache_keys: Array[String] = [
+	"ui_click",
+	"sword_swing",
+	"soldier_hit",
+	"bow_shoot",
+	"treasure_collect",
+	"water_splash_small"
 ]
 
 func _ready() -> void:
@@ -169,7 +180,8 @@ func _ready() -> void:
 
 ## 필수 효과음 사전 캐싱 (오디오 끊김 방지용)
 func _preload_essential_audio() -> void:
-	for key in _essential_warm_keys:
+	var warm_keys = _get_warm_keys()
+	for key in warm_keys:
 		_cache_stream_for_key(key)
 	
 	# 기본값은 재생 없는 캐시-only 예열: 시작 시 어색한 소리 출력 방지
@@ -180,7 +192,7 @@ func _preload_essential_audio() -> void:
 		warm_up_player.bus = "SFX"
 		add_child(warm_up_player)
 		
-		for key in _essential_warm_keys:
+		for key in warm_keys:
 			if not _cached_streams.has(key):
 				continue
 			var s = _cached_streams[key]
@@ -200,13 +212,18 @@ func _preload_essential_audio() -> void:
 	prewarm_finished.emit()
 	print("[Resource] 필수 오디오 예열 완료")
 	
+	# 웹 빌드는 모든 효과음을 미리 캐시하면 탭 메모리 사용량이 급격히 커진다.
+	# 필수 사운드만 유지하고 나머지는 온디맨드 로드한다.
+	if OS.has_feature("web"):
+		return
+	
 	# 나머지 효과음은 백그라운드로 지연 캐싱
 	call_deferred("_preload_secondary_audio")
 
 func _preload_secondary_audio() -> void:
 	var step := 0
 	for key in sfx_streams.keys():
-		if key in _essential_warm_keys:
+		if key in _get_warm_keys():
 			continue
 		_cache_stream_for_key(key)
 		step += 1
@@ -219,19 +236,76 @@ func _cache_stream_for_key(key: String) -> void:
 		return
 	if not sfx_streams.has(key):
 		return
+	if OS.has_feature("web") and not _should_persist_cache(key):
+		return
 		
 	var path = sfx_streams[key]
 	if path is Array:
 		var loaded_arr = []
 		for p in path:
 			if p is String and ResourceLoader.exists(p):
-				loaded_arr.append(load(p))
+				loaded_arr.append(_load_audio_resource(p, true))
 		if loaded_arr.size() > 0:
 			_cached_streams[key] = loaded_arr
 	elif path is String and ResourceLoader.exists(path):
-		_cached_streams[key] = load(path)
+		_cached_streams[key] = _load_audio_resource(path, true)
 	elif path is AudioStream:
 		_cached_streams[key] = path
+
+func _get_warm_keys() -> Array[String]:
+	if OS.has_feature("web"):
+		return _web_essential_warm_keys
+	return _essential_warm_keys
+
+func _should_persist_cache(key: String) -> bool:
+	if not OS.has_feature("web"):
+		return true
+	return key in _web_persistent_cache_keys
+
+func _load_audio_resource(path: String, persist_cache: bool) -> AudioStream:
+	if not ResourceLoader.exists(path):
+		return null
+	var cache_mode := ResourceLoader.CACHE_MODE_REUSE
+	if OS.has_feature("web") and not persist_cache:
+		cache_mode = ResourceLoader.CACHE_MODE_IGNORE
+	return ResourceLoader.load(path, "", cache_mode) as AudioStream
+
+func _load_stream_for_playback(stream_name: String):
+	if _cached_streams.has(stream_name):
+		var cached = _cached_streams[stream_name]
+		if cached is Array:
+			if cached.size() > 0:
+				return cached.pick_random()
+			return null
+		return cached
+	
+	if not sfx_streams.has(stream_name):
+		return null
+	
+	var path = sfx_streams[stream_name]
+	if path is Array:
+		var loaded_arr = []
+		for p in path:
+			if p is String and ResourceLoader.exists(p):
+				loaded_arr.append(_load_audio_resource(p, _should_persist_cache(stream_name)))
+		if loaded_arr.is_empty():
+			return null
+		if _should_persist_cache(stream_name):
+			_cached_streams[stream_name] = loaded_arr
+		return loaded_arr.pick_random()
+	
+	if path is String and ResourceLoader.exists(path):
+		var loaded_stream = _load_audio_resource(path, _should_persist_cache(stream_name))
+		if _should_persist_cache(stream_name):
+			_cached_streams[stream_name] = loaded_stream
+		return loaded_stream
+	
+	if path is AudioStream:
+		if _should_persist_cache(stream_name):
+			_cached_streams[stream_name] = path
+		return path
+	
+	return null
 
 
 ## 오디오 버스 상태 진단 로직
@@ -256,30 +330,7 @@ func _print_bus_status() -> void:
 ## position이 null이면 2D로 재생
 func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
 	# 1. 리소스 확인 및 동적 로드
-	var stream = null
-	
-	if _cached_streams.has(stream_name):
-		var cached = _cached_streams[stream_name]
-		if cached is Array:
-			if cached.size() > 0: stream = cached.pick_random()
-		else:
-			stream = cached
-	elif sfx_streams.has(stream_name):
-		var path = sfx_streams[stream_name]
-		if path is Array:
-			var loaded_arr = []
-			for p in path:
-				if p is String and ResourceLoader.exists(p):
-					loaded_arr.append(load(p))
-			if loaded_arr.size() > 0:
-				_cached_streams[stream_name] = loaded_arr
-				stream = loaded_arr.pick_random()
-		elif path is String and ResourceLoader.exists(path):
-			stream = load(path)
-			_cached_streams[stream_name] = stream
-		elif path is AudioStream: # 이미 리소스인 경우 (코드에서 직접 넣었을 때)
-			stream = path
-			_cached_streams[stream_name] = stream
+	var stream = _load_stream_for_playback(stream_name)
 	
 	# 2. 리소스가 없으면 디버그용 비프음 재생 (선택사항)
 	if not stream:
@@ -324,7 +375,7 @@ func _setup_gilgunak() -> void:
 	_gilgunak_player.bus = "Master" # 버스 안전을 위해 Master로 설정
 	_gilgunak_player.volume_db = 6.0
 	
-	var stream = load("res://assets/audio/sfx/sfx_gilgunak.wav") as AudioStream
+	var stream = load("res://assets/audio/sfx/sfx_gilgunak.ogg") as AudioStream
 	if stream:
 		_gilgunak_player.stream = stream
 		if stream is AudioStreamWAV:

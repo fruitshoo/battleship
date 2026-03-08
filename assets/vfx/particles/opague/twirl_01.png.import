@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cs22e2lls66d5"
 path.s3tc="res://.godot/imported/twirl_01.png-b3b694598955c67d9b3dfa1726b0b7fb.s3tc.ctex"
+path.etc2="res://.godot/imported/twirl_01.png-b3b694598955c67d9b3dfa1726b0b7fb.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/opague/twirl_01.png"
-dest_files=["res://.godot/imported/twirl_01.png-b3b694598955c67d9b3dfa1726b0b7fb.s3tc.ctex"]
+dest_files=["res://.godot/imported/twirl_01.png-b3b694598955c67d9b3dfa1726b0b7fb.s3tc.ctex", "res://.godot/imported/twirl_01.png-b3b694598955c67d9b3dfa1726b0b7fb.etc2.ctex"]
 
 [params]
 

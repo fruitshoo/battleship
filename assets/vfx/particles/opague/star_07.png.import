@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b3kqwah50uw1r"
 path.s3tc="res://.godot/imported/star_07.png-e84fbe330996795ce756522fe58637c4.s3tc.ctex"
+path.etc2="res://.godot/imported/star_07.png-e84fbe330996795ce756522fe58637c4.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/opague/star_07.png"
-dest_files=["res://.godot/imported/star_07.png-e84fbe330996795ce756522fe58637c4.s3tc.ctex"]
+dest_files=["res://.godot/imported/star_07.png-e84fbe330996795ce756522fe58637c4.s3tc.ctex", "res://.godot/imported/star_07.png-e84fbe330996795ce756522fe58637c4.etc2.ctex"]
 
 [params]
 

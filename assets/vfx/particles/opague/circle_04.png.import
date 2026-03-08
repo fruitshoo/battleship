@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://w2uch0n44r2l"
 path.s3tc="res://.godot/imported/circle_04.png-cda7d2dffe783a874a227017c89dac17.s3tc.ctex"
+path.etc2="res://.godot/imported/circle_04.png-cda7d2dffe783a874a227017c89dac17.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/vfx/particles/opague/circle_04.png"
-dest_files=["res://.godot/imported/circle_04.png-cda7d2dffe783a874a227017c89dac17.s3tc.ctex"]
+dest_files=["res://.godot/imported/circle_04.png-cda7d2dffe783a874a227017c89dac17.s3tc.ctex", "res://.godot/imported/circle_04.png-cda7d2dffe783a874a227017c89dac17.etc2.ctex"]
 
 [params]
 
