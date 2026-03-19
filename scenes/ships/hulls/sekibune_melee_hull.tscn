@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="Texture2D" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
+[ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_hull"]
+size = Vector3(2.4, 0.8, 7)
+
+[sub_resource type="StandardMaterial3D" id="Material_japan_wood"]
+albedo_color = Color(0.45, 0.3, 0.25, 1)
+
+[node name="SekibuneMeleeHull" type="Node3D"]
+
+[node name="Hull" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_hull")
+surface_material_override/0 = SubResource("Material_japan_wood")
+
+[node name="Mast" parent="." instance=ExtResource("mast_scene")]
+sail_texture = ExtResource("vertical_sail")
+
+[node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.5)

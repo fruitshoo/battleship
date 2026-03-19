@@ -2,7 +2,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
-@export var max_range: float = 25.0
+@export var max_range: float = 20.0
 
 # 연발 설정
 var burst_count: int = 3
@@ -10,6 +10,9 @@ var burst_delay: float = 0.15
 var _cached_spawn_parent: Node = null
 
 func _ready() -> void:
+	refresh_upgrade_stats()
+
+func refresh_upgrade_stats() -> void:
 	damage = 10.0 # 기존 활(12)보다 단발은 약하지만 연사로 총합은 높음
 	attack_range = max_range
 	attack_cooldown = shoot_cooldown

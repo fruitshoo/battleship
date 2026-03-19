@@ -1,6 +1,11 @@
 @tool
 extends "res://scripts/entities/base_ship.gd"
 class_name ChaserShip
+const DEBUG_CHASER_LOGS := false
+const ChaserShipBoardingHelper = preload("res://scripts/entities/chaser_ship_boarding_helper.gd")
+const ChaserShipMinionHelper = preload("res://scripts/entities/chaser_ship_minion_helper.gd")
+const ChaserShipSupportHelper = preload("res://scripts/entities/chaser_ship_support_helper.gd")
+const ChaserShipAiHelper = preload("res://scripts/entities/chaser_ship_ai_helper.gd")
 
 ## 추적선 (Chaser Ship)
 ## 플레이어를 단순 추적하고, 충돌 시 병사를 도선(Boarding)시키고 자폭
@@ -10,12 +15,19 @@ class_name ChaserShip
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
 @export var boarders_count: int = 4 # 도선시킬 병사 수 (상향: 2 -> 4)
 
-@export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_japanese.tscn")
+@export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_enemy_light.tscn")
 @export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/sekibune_hull.tscn")
 @export var preferred_soldier_type: String = "general" ## "general", "melee", "ranged"
+enum CombatRole {CHARGER, GUNNER}
+@export var combat_role: CombatRole = CombatRole.CHARGER
+@export_range(4.0, 30.0) var preferred_combat_range: float = 14.0
+@export_range(0.5, 8.0) var combat_range_tolerance: float = 2.5
+@export_range(2.0, 20.0) var retreat_distance: float = 8.0
+@export var allow_boarding: bool = true
 @export var ship_type: String = "sekibune_melee":
 	set(value):
 		ship_type = value
+		_apply_default_combat_profile_for_ship_type()
 		if Engine.is_editor_hint():
 			_update_editor_hull()
 var has_cannons: bool = true ## JSON에서 로드됨
@@ -24,6 +36,7 @@ var target: Node3D = null
 
 # 상태 (State)
 var leaking_rate: float = 0.0
+var _leak_tick_timer: float = 0.0
 
 
 @export var minion_respawn_interval: float = 15.0
@@ -41,6 +54,7 @@ var enemy_respawn_timer: float = 0.0
 @export_range(0.2, 1.0) var ai_turn_authority: float = 0.7
 @export_range(4.0, 24.0) var ai_close_turn_soft_radius: float = 12.0
 @export_range(0.2, 1.0) var ai_close_turn_scale: float = 0.6
+@export_range(0.25, 1.5) var separation_pad_scale: float = 1.0
 
 
 # === 함대 진형 (Formation) 관련 ===
@@ -96,86 +110,56 @@ func get_radius() -> float:
 	return 2.5 # 대략적인 선체 반경 (상황에 맞게 조정)
 
 func _become_derelict() -> void:
-	is_derelict = true
-	
-	# 도선 중지 (더 이상 밧줄 유지 안 함)
 	is_boarding = false
 	_clear_ropes()
 	target = null
-	
-	# LevelManager 캐싱 (공적 획득 전에 먼저 찾아야 함)
-	if not is_instance_valid(cached_lm):
-		cached_lm = get_tree().root.find_child("LevelManager", true, false)
-		if not cached_lm:
-			var lm_nodes = get_tree().get_nodes_in_group("level_manager")
-			if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
-	
-	# 공적 포인트(Merit) 획득
-	if not _merit_granted:
-		if is_instance_valid(cached_lm) and cached_lm.has_method("add_merit"):
-			cached_lm.add_merit(20) # 20 공적 포인트 스펙
-			_merit_granted = true
-	
-	_set_wake_state(false)
-	
-	print("[Status] 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
-	
-	# 침몰 속도 대폭 증가 (누수 가속)
-	leaking_rate += 1.5
-	
-	if boarders_count > 0:
-		boarders_count = 0 # 폐선은 더 이상 도선시키지 않음
-		
-	# 물리적 저항 약화 (길막 방어 반경 축소)
-	base_collision_radius *= 0.8
-	_sync_profile_from_runtime()
-	
-	_set_wake_state(false)
-	
-	# 즉각적인 시각적 피드백: 더 많이 기울어지고 조금 가라앉음
-	var tilt_tween = create_tween()
-	tilt_tween.tween_property(self , "rotation_degrees:z", 15.0, 1.5).set_ease(Tween.EASE_OUT)
-	tilt_tween.set_parallel(true)
-	tilt_tween.tween_property(self , "position:y", base_y - 1.0, 2.0)
-	
-	# 5초 뒤 완전 침몰 (15s -> 5s)
-	get_tree().create_timer(5.0).timeout.connect(func():
-		if is_instance_valid(self ) and not is_sinking:
-			_sink_derelict()
-	)
+	ChaserShipSupportHelper.become_derelict(self)
 
 func _sink_derelict() -> void:
-	if is_sinking: return
-	is_sinking = true
-	print("[Ship] 폐선 침몰 시작!")
-	
-	# 침몰 화염 연산
-	_set_fire_emitting(true)
-	
-	var sink_tween = create_tween()
-	# 가라앉는 속도 대폭 상향 (10.0 -> 5.0)
-	sink_tween.tween_property(self , "global_position:y", base_y - 15.0, 5.0).set_ease(Tween.EASE_IN)
-	sink_tween.parallel().tween_property(self , "rotation_degrees:x", randf_range(-20.0, 20.0), 5.0)
-	sink_tween.parallel().tween_property(self , "rotation_degrees:z", randf_range(20.0, 40.0) * (1 if randf() > 0.5 else -1), 5.0)
-	
-	await sink_tween.finished
-	queue_free()
+	await ChaserShipSupportHelper.sink_derelict(self)
 
 func _check_offscreen_despawn() -> void:
-	var players = get_tree().get_nodes_in_group("player")
-	if players.is_empty(): return
-	var p = players[0]
-	
-	var dist = global_position.distance_to(p.global_position)
-	if dist > 150.0: # 150미터 이상 멀어지면 화면 밖으로 간주하고 삭제
-		print("[Ship] 폐선이 완전히 표류하여 사라집니다.")
-		queue_free()
+	ChaserShipSupportHelper.check_offscreen_despawn(self)
+
+func _apply_default_combat_profile_for_ship_type() -> void:
+	var type_lower := ship_type.to_lower()
+	if type_lower.contains("kobayabune"):
+		combat_role = CombatRole.CHARGER
+		allow_boarding = true
+		preferred_combat_range = 3.8
+		combat_range_tolerance = 0.8
+		retreat_distance = 3.0
+	elif type_lower.contains("cannon") or type_lower.contains("atakebune"):
+		combat_role = CombatRole.GUNNER
+		allow_boarding = false
+		preferred_combat_range = 14.0
+		combat_range_tolerance = 2.5
+		retreat_distance = 8.0
+	else:
+		combat_role = CombatRole.CHARGER
+		allow_boarding = true
+		preferred_combat_range = 4.5
+		combat_range_tolerance = 1.0
+		retreat_distance = 3.5
+
+func _apply_combat_profile_from_stats(stats: Dictionary) -> void:
+	if stats.has("combat_role"):
+		var role_name := str(stats["combat_role"]).to_lower()
+		combat_role = CombatRole.GUNNER if role_name == "gunner" else CombatRole.CHARGER
+	if stats.has("allow_boarding"):
+		allow_boarding = bool(stats["allow_boarding"])
+	if stats.has("preferred_range"):
+		preferred_combat_range = float(stats["preferred_range"])
+	if stats.has("range_tolerance"):
+		combat_range_tolerance = float(stats["range_tolerance"])
+	if stats.has("retreat_distance"):
+		retreat_distance = float(stats["retreat_distance"])
 
 func _update_editor_hull() -> void:
 	# 에디터 전용: 선체 미리보기 갱신
 	for child in get_children():
 		if child.name.contains("Hull"):
-			child.free()
+			child.queue_free()
 	
 	var stats = load_ship_stats(ship_type)
 	if stats.is_empty(): return
@@ -183,7 +167,11 @@ func _update_editor_hull() -> void:
 	# 함종에 따른 선체 씬 경로 결정 (임시 매핑 - 나포 시스템 등에서 정의한 것과 동일하게)
 	var type_lower = ship_type.to_lower()
 	var h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
-	if type_lower.contains("panokseon"): h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
+	if type_lower.contains("kobayabune"):
+		h_path = "res://scenes/ships/hulls/kobayabune_hull.tscn"
+	elif type_lower == "sekibune_melee":
+		h_path = "res://scenes/ships/hulls/sekibune_melee_hull.tscn"
+	elif type_lower.contains("panokseon"): h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
 	elif type_lower.contains("atakebune"): h_path = "res://scenes/ships/hulls/atakebune_hull.tscn"
 	elif type_lower.contains("maengseon"): h_path = "res://scenes/ships/hulls/maengseon_hull.tscn"
 	
@@ -195,6 +183,7 @@ func _update_editor_hull() -> void:
 		_cache_hull_references(self ) # BaseShip 메서드 호출
 
 func _ready() -> void:
+	_apply_default_combat_profile_for_ship_type()
 	if Engine.is_editor_hint():
 		# 이미 에디터용 Hull이 있다면 중복 생성 방지
 		var has_hull = false
@@ -214,11 +203,26 @@ func _ready() -> void:
 		if stats.has("boarders"): boarders_count = stats["boarders"]
 		if stats.has("has_cannons"): has_cannons = stats["has_cannons"]
 		if stats.has("soldier_type"): preferred_soldier_type = stats["soldier_type"]
+		if stats.has("separation_pad_scale"): separation_pad_scale = float(stats["separation_pad_scale"])
+		_apply_combat_profile_from_stats(stats)
 		
 	# 선체(Hull) 씬 인스턴스화 및 추가 (런타임)
-	# 수동으로 지정된 hull_scene이 있으면 사용, 없으면 ship_type에 맞게 로드
-	if is_instance_valid(hull_scene):
-		var hull_inst = hull_scene.instantiate()
+	var runtime_hull_scene: PackedScene = hull_scene
+	var type_lower = ship_type.to_lower()
+	if type_lower.contains("kobayabune"):
+		runtime_hull_scene = load("res://scenes/ships/hulls/kobayabune_hull.tscn")
+	elif type_lower == "sekibune_melee":
+		runtime_hull_scene = load("res://scenes/ships/hulls/sekibune_melee_hull.tscn")
+	elif type_lower.contains("atakebune"):
+		runtime_hull_scene = load("res://scenes/ships/hulls/atakebune_hull.tscn")
+	elif type_lower.contains("sekibune"):
+		runtime_hull_scene = load("res://scenes/ships/hulls/sekibune_hull.tscn")
+	elif type_lower.contains("panokseon"):
+		runtime_hull_scene = load("res://scenes/ships/hulls/panokseon_hull.tscn")
+	elif type_lower.contains("maengseon"):
+		runtime_hull_scene = load("res://scenes/ships/hulls/maengseon_hull.tscn")
+	if is_instance_valid(runtime_hull_scene):
+		var hull_inst = runtime_hull_scene.instantiate()
 		add_child(hull_inst)
 	else:
 		_update_editor_hull()
@@ -256,7 +260,7 @@ func _ready() -> void:
 	
 	cached_lm = get_tree().root.find_child("LevelManager", true, false)
 	if not cached_lm:
-		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
+		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 	
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
@@ -353,7 +357,7 @@ func die() -> void:
 		if team == "enemy" and cached_lm.has_method("add_ship_sunk"):
 			cached_lm.add_ship_sunk(1)
 		if cached_lm.has_method("add_score"):
-			cached_lm.add_score(100)
+			cached_lm.add_score(80)
 		if cached_lm.has_method("add_xp"):
 			cached_lm.add_xp(30)
 			
@@ -395,91 +399,15 @@ func die() -> void:
 
 
 func _drop_floating_loot() -> void:
-	if not loot_scene: return
-	
-	# 1~3개의 부유물 드랍
-	var loot_count = randi_range(1, 3)
-	for i in range(loot_count):
-		var loot = loot_scene.instantiate()
-		var offset_x = randf_range(-2.0, 2.0)
-		var offset_z = randf_range(-2.0, 2.0)
-		var spawn_pos = Vector3(global_position.x + offset_x, 0.5, global_position.z + offset_z)
-		
-		get_tree().root.add_child.call_deferred(loot)
-		loot.set_deferred("global_position", spawn_pos)
-		
-	# 4. 생존자(Survivor) 스폰 추가 (30% 확률)
-	if survivor_scene and randf() < 0.3:
-		var survivor = survivor_scene.instantiate()
-		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
-		var survivor_pos = global_position + s_offset
-		get_tree().root.add_child.call_deferred(survivor)
-		survivor.set_deferred("global_position", survivor_pos)
-		print("[Rescue] 구출 가능한 생존자가 발생했습니다!")
+	ChaserShipSupportHelper.drop_floating_loot(self)
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:
-	if not survivor_scene: return
-	var soldiers_node = get_node_or_null("Soldiers")
-	if not soldiers_node: return
-	
-	var converted_count = 0
-	for child in soldiers_node.get_children():
-		if child.get("team") == "player" and child.get("current_state") != 4: # NOT DEAD
-			# 병사 위치 저장 후 생존자 스폰
-			var spawn_pos = child.global_position
-			spawn_pos.y = 0.5 # 수면 높이
-			
-			var survivor = survivor_scene.instantiate()
-			get_tree().root.add_child.call_deferred(survivor)
-			survivor.set_deferred("global_position", spawn_pos)
-			
-			# 병사 즉시 제거
-			child.queue_free()
-			converted_count += 1
-	
-	if converted_count > 0:
-		print("[Critical] 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
+	ChaserShipSupportHelper.evacuate_player_soldiers_as_survivors(self)
 
 ## 침몰 시 배 위의 병사들을 원래 배(home_ship)로 복귀시킴
 func _evacuate_soldiers_to_home() -> void:
-	var soldiers_node = get_node_or_null("Soldiers")
-	if not soldiers_node: return
-	
-	var returned_count = 0
-	for child in soldiers_node.get_children():
-		if child.get("current_state") == 4: continue # DEAD
-		
-		var h_ship = child.get("home_ship")
-		# home_ship이 유효하고, 아직 가라앉지 않았으며, 현재 배가 아닌 경우 복귀
-		if is_instance_valid(h_ship) and h_ship != self and not h_ship.get("is_sinking") and not h_ship.get("is_dying"):
-			var target_soldiers = h_ship.get_node_or_null("Soldiers")
-			if not target_soldiers: continue
-			
-			# 점프 애니메이션으로 복귀
-			var start_pos = child.global_position
-			child.call_deferred("reparent", target_soldiers)
-			
-			var jump_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.5, 1.5))
-			var end_pos = h_ship.global_transform * jump_offset
-			
-			var tween = create_tween()
-			tween.set_parallel(true)
-			tween.tween_property(child, "global_position:x", end_pos.x, 0.5).set_trans(Tween.TRANS_LINEAR)
-			tween.tween_property(child, "global_position:z", end_pos.z, 0.5).set_trans(Tween.TRANS_LINEAR)
-			
-			var mid_y = max(start_pos.y, end_pos.y) + 2.0
-			var y_tween = create_tween()
-			y_tween.tween_property(child, "global_position:y", mid_y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-			y_tween.tween_property(child, "global_position:y", end_pos.y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-			
-			child.set("owned_ship", h_ship)
-			if child.get("is_stationary"): child.set("is_stationary", false)
-			returned_count += 1
-			print("[Evacuation] 병사가 원래 배(%s)로 복귀합니다!" % h_ship.name)
-	
-	if returned_count > 0:
-		print("[Evacuation] 총 %d명의 병사가 원래 배로 복귀했습니다." % returned_count)
+	ChaserShipSupportHelper.evacuate_soldiers_to_home(self)
 
 
 ## 생존자 구조 및 병사 합류 처리 (나포함용)
@@ -534,211 +462,32 @@ func _process(delta: float) -> void:
 	elif team == "enemy" and not is_derelict:
 		_update_enemy_reinforcement(delta)
 
+	_update_leaking_damage(delta)
+
 func _update_enemy_reinforcement(delta: float) -> void:
-	var alive_count = get_alive_crew_count()
-	if alive_count < max_crew:
-		enemy_respawn_timer += delta
-		if enemy_respawn_timer >= enemy_respawn_interval:
-			enemy_respawn_timer = 0.0
-			_spawn_one_soldier("enemy")
-			print("[Reinforcement] 적 함선에 병사가 보충되었습니다. (현재: %d)" % (alive_count + 1))
+	ChaserShipSupportHelper.update_enemy_reinforcement(self, delta)
+
+func _update_leaking_damage(delta: float) -> void:
+	if leaking_rate <= 0.0:
+		_leak_tick_timer = 0.0
+		return
+	_leak_tick_timer += delta
+	while _leak_tick_timer >= 1.0:
+		_leak_tick_timer -= 1.0
+		take_damage(leaking_rate, global_position, "leak")
 
 
 func _physics_process(delta: float) -> void:
-	if Engine.is_editor_hint(): return
-	
-	if is_dying: return
-	
-	_update_wave_sounds(delta)
-	
-	# 1. 고비용 로직 스로틀링 (0.2초 간격) - 모든 상태(미니언/적/도선/폐선) 공통
-	logic_timer -= delta
-	var do_logic_update = false
-	if logic_timer <= 0:
-		logic_timer = 0.2
-		do_logic_update = true
-		
-	# === 폐선(Derelict) 체크 ===
-	if is_derelict:
-		# 폐선 상태면 조종(AI)을 멈추고 바람 방향을 따라 표류함
-		if is_instance_valid(WindManager):
-			var wind_dir_v2 = WindManager.wind_direction
-			var wind_dir = Vector3(wind_dir_v2.x, 0, wind_dir_v2.y)
-			var wind_force = WindManager.wind_strength * 0.4 # 최대 속도 미만으로 천천히 표류
-			position += wind_dir * wind_force * delta
-			
-			# 선수 방향도 바람 방향으로 서서히 돌아가게 함
-			var target_rot = atan2(-wind_dir.x, -wind_dir.z)
-			rotation.y = lerp_angle(rotation.y, target_rot, delta * 0.5)
-			
-			_set_wake_state(false)
-		
-		# 멀리 떨어지면 삭제 (Despawn)
-		if do_logic_update:
-			_check_offscreen_despawn()
-		return
-
-	# 공통 로직 업데이트 실행 (분리력 계산, 타겟 최신화 등)
-	if do_logic_update:
-		_update_logic_throttled()
-
-	# 0. 아군 나포함(Minion)은 전용 AI 수행 (최우선)
-	if team == "player":
-		_process_minion_ai(delta)
-		return
-
-	# 도선(Boarding) 상태 로직
-	if is_boarding:
-		_process_boarding(delta)
-		return
-
-	if not is_instance_valid(target):
-		_set_wake_state(false)
-		return
-	
-	# 2. 목표 지점 계산 (Galley Intercept Logic)
-	var target_pos = target.global_position
-	var dist_to_player = global_position.distance_to(target_pos)
-	
-	if dist_to_player >= 25.0:
-		# 예측 이동 (Intercept)
-		var target_speed = target.get("current_speed")
-		if target_speed:
-			var target_forward = Vector3(-sin(target.rotation.y), 0, -cos(target.rotation.y))
-			var time_to_reach = min(dist_to_player / move_speed, 3.0)
-			target_pos += target_forward * target_speed * time_to_reach
-
-	# 3. 이동 및 회전 (Rudder 물리 기반)
-	var move_dir = (target_pos - global_position).normalized()
-	
-	# Separation (함선 간 겹침 방지) - 계산은 스로틀링됨
-	if separation_force.length_squared() > 0.001:
-		# 분리력을 이동 방향에 부드럽게 합성 (강도 1.5배 적용)
-		move_dir = (move_dir + separation_force * 1.5).normalized()
-	
-	# 목표 각도 계산 (단순 추적)
-	var target_rotation_y = atan2(-move_dir.x, -move_dir.z)
-	
-	# 러더(Rudder) 조향 시스템 적용
-	var angle_diff = wrapf(target_rotation_y - rotation.y, -PI, PI)
-	var desired_rudder = clamp(-rad_to_deg(angle_diff) * ai_rudder_gain, -40.0, 40.0)
-	var close_turn_blend = 0.0
-	if ai_close_turn_soft_radius > 0.01:
-		close_turn_blend = clamp(1.0 - (dist_to_player / ai_close_turn_soft_radius), 0.0, 1.0)
-	var close_turn_factor = lerp(1.0, ai_close_turn_scale, close_turn_blend)
-	desired_rudder *= close_turn_factor
-	var rudder_speed_adjusted = ai_rudder_response_speed
-	rudder_angle = move_toward(rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
-	
-	# 전진 (누수율에 비례하여 기본 목표 속도 감소)
-	var leak_speed_mult = clamp(1.0 - (leaking_rate * 0.05), 0.3, 1.0)
-	var desired_speed = move_speed * leak_speed_mult
-	
-	# 목표와 매우 가까울 때만 약하게 감속 (충돌 전 멈춤 방지)
-	if dist_to_player < 4.4:
-		var slow_factor = clamp((dist_to_player - 1.4) / 3.0, 0.88, 1.0)
-		desired_speed *= slow_factor
-		is_sprinting = false # 가까우면 돌격 중지
-	else:
-		# [신규] 스태미나 기반 돌격(Sprint) 로직 (적군 전용, 미니언 제외)
-		if team == "enemy":
-			if not is_sprinting and dist_to_player > 10.0 and dist_to_player < 28.0 and stamina > 30.0:
-				is_sprinting = true
-			if is_sprinting and (stamina <= 0.0 or dist_to_player <= 8.0):
-				is_sprinting = false
-				
-			if is_sprinting:
-				stamina = max(0.0, stamina - 20.0 * delta)
-				desired_speed *= sprint_multiplier
-			else:
-				stamina = min(max_stamina, stamina + 15.0 * delta)
-		
-	# 가감속 처리
-	if desired_speed > current_speed:
-		current_speed = move_toward(current_speed, desired_speed, acceleration * delta)
-	else:
-		current_speed = move_toward(current_speed, desired_speed, deceleration * delta)
-	
-	# 속도가 있어야 회전 가능 (실제 배처럼)
-	if current_speed > 0.1:
-		var speed_ratio = clamp(current_speed / maxf(max_speed, 0.01), 0.0, 1.0)
-		var turn_scale = ai_turn_authority * close_turn_factor
-		var actual_turn = (rudder_angle / 45.0) * turn_rate * speed_ratio * turn_mult * turn_scale * delta
-		var max_turn_this_frame = ai_max_turn_rate * delta
-		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
-		rotation.y -= deg_to_rad(actual_turn)
-	
-	# === 바람 영향(Wind Force) 적용 ===
-	var wind_mult = 1.0
-	if is_instance_valid(_cached_wind_manager) and _cached_wind_manager.has_method("get_wind_direction"):
-		var wind_dir: Vector2 = _cached_wind_manager.get_wind_direction()
-		var wind_str: float = _cached_wind_manager.get_wind_strength()
-		
-		# 배의 전방 벡터 (2D 평면 기준)
-		var ship_forward = Vector2(-sin(rotation.y), -cos(rotation.y)).normalized()
-		var dot_prod = wind_dir.dot(ship_forward)
-		var base_wind_influence = remap(dot_prod, -1.0, 1.0, 0.4, 1.5)
-		wind_mult = lerp(1.0, base_wind_influence, wind_str)
-	
-	# 선체 전진 벡터를 사용 (Vector 물리 방식에서 Kinematic 물리 방식으로 전환)
-	var forward_vec = Vector3(-sin(rotation.y), 0, -cos(rotation.y))
-	var velocity = forward_vec * current_speed * wind_mult
-	
-	# === 겹침 방지 (Separation) 적용 ===
-	# 겹침 방지 밀어냄은 속도 벡터에 더해 밀리게 함
-	velocity += separation_force
-	
-	# === 도선 인동력(Pull) 및 겹침 방지 반발력(Collision Repulsion) 적용 ===
-	velocity += _calculate_boarding_pull() * delta
-	var collision_repulsion = _calculate_collision_repulsion()
-	# 교전 직전에는 반발력을 일부 완화해 실제 선체 접촉이 일어나게 함
-	if dist_to_player < max_boarding_distance + 1.2:
-		var to_target_flat = target.global_position - global_position
-		to_target_flat.y = 0.0
-		if to_target_flat.length_squared() > 0.001:
-			var approach_dot = forward_vec.normalized().dot(to_target_flat.normalized())
-			if approach_dot > 0.3:
-				collision_repulsion *= 0.35
-	velocity += collision_repulsion * delta
-	
-	# === 위치 업데이트 ===
-	var prev_pos = global_position
-	var next_pos = prev_pos + velocity * delta
-	if is_instance_valid(target):
-		next_pos = _apply_ship_collision_guard(target, prev_pos, next_pos, 0.985, velocity.length())
-	# 타겟 외 주변 함선과의 겹침도 보정 (적함-적함 통과/겹침 방지)
-	next_pos = _apply_neighbor_ship_guards(prev_pos, next_pos, target)
-	global_position = next_pos
-	
-	# 비주얼 타륜 업데이트 (시각 효과)
-	_update_rudder_visual()
-	
-	# === 누수(Leaking) 데미지 ===
-	if leaking_rate > 0:
-		take_damage(leaking_rate * delta)
-		
-	# === 시각적 효과 (둥실둥실 및 기울기) ===
-	_apply_bobbing_effect()
-
-	# 수면 위 높이 유지 (사망 시 tween에 의해 덮어씌워짐)
-	if not is_dying:
-		rotation.z += tilt_offset # Add tilt_offset since base handles bobbing
-		pass
-
-	# 항적 제어
-	_set_wake_state(current_speed > 0.4, clampf(current_speed / maxf(max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+	ChaserShipAiHelper.process_physics(self, delta)
 
 func _update_logic_throttled() -> void:
-	# 타겟 유효성 및 침몰 상태 체크
-	if not is_instance_valid(target) or target.get("is_sinking"):
-		target = null
-		_find_player()
-	
-	# Separation 계산 (전체 함선 대상)
-	separation_force = _calculate_separation()
+	ChaserShipAiHelper.update_logic_throttled(self)
 
 ## 주변 함선들로부터 멀어지려는 힘 계산
 func _calculate_separation() -> Vector3:
+	if bool(get_meta("derelict_nonblocking", false)):
+		return Vector3.ZERO
+
 	var force = Vector3.ZERO
 	var neighbors = get_ships_cached(get_tree())
 	var count = 0
@@ -747,6 +496,8 @@ func _calculate_separation() -> Vector3:
 	for i in range(_max_checks):
 		var other = neighbors[i]
 		if other == self or not is_instance_valid(other) or other.get("is_dying"):
+			continue
+		if bool(other.get_meta("derelict_nonblocking", false)):
 			continue
 			
 		# 도선 중인 상대와는 분리력(Separation)을 적용하지 않음 (가까이 붙어야 하므로)
@@ -764,9 +515,9 @@ func _calculate_separation() -> Vector3:
 		var dist = sqrt(dist_sq)
 		var coll_dist = get_collision_distance_to(other)
 		# 현재 추격 타겟과는 접촉 직전까지 분리력을 제거해 정박/충돌이 가능하도록 함
-		if is_instance_valid(target) and other == target and dist < coll_dist + 1.2:
+		if combat_role == CombatRole.CHARGER and is_instance_valid(target) and other == target and dist < coll_dist + 1.2:
 			continue
-		var separation_trigger_dist = coll_dist + 0.35
+		var separation_trigger_dist = coll_dist + (0.18 * separation_pad_scale)
 		
 		if dist < separation_trigger_dist:
 			var push_dir = offset.normalized()
@@ -776,181 +527,35 @@ func _calculate_separation() -> Vector3:
 			count += 1
 			
 	if count > 0:
-		force = (force / count) * 2.2
+		force = (force / count) * 1.8
 		
 	return force
 
 func _process_boarding(delta: float) -> void:
-	if not is_instance_valid(boarding_target):
-		die()
-		return
-	var target_pos = boarding_target.global_position
-	var flat_to_target = target_pos - global_position
-	flat_to_target.y = 0.0
-	var dist_to_target = flat_to_target.length()
-	
-	# 회전: 플레이어 바라보기
-	var look_dir = flat_to_target.normalized() if dist_to_target > 0.001 else Vector3.FORWARD
-	var target_rot = atan2(-look_dir.x, -look_dir.z)
-	rotation.y = lerp_angle(rotation.y, target_rot, delta * 2.0)
-	
-	# 도선 중에는 정박 거리까지 능동적으로 붙고, 이후에는 밧줄 장력으로 유지한다.
-	var desired_boarding_speed := 0.0
-	if dist_to_target > (max_boarding_distance - 0.6):
-		desired_boarding_speed = clamp((dist_to_target - (max_boarding_distance - 0.6)) * 1.6, 1.1, move_speed * 0.9)
-	elif dist_to_target > 6.5:
-		desired_boarding_speed = 0.9
-	current_speed = move_toward(current_speed, desired_boarding_speed, acceleration * 2.0 * delta)
-	
-	var approach_velocity = look_dir * current_speed
-	var pull_force = _calculate_boarding_pull()
-	var prev_pos = global_position
-	var next_pos = prev_pos + (approach_velocity + pull_force * delta) * delta
-	if is_instance_valid(boarding_target):
-		next_pos = _apply_ship_collision_guard(boarding_target, prev_pos, next_pos, 0.975, approach_velocity.length())
-	next_pos = _apply_neighbor_ship_guards(prev_pos, next_pos, boarding_target)
-	global_position = next_pos
-	
-	# 시각 효과
-	_apply_bobbing_effect()
-	
-	# 베이스의 공통 도선 처리 (타이머, 전이, 밧줄 끊어짐 등)
-	_process_boarding_common(delta)
+	ChaserShipBoardingHelper.process_boarding(self, delta)
 
 func _apply_neighbor_ship_guards(prev_pos: Vector3, proposed_pos: Vector3, excluded_ship: Node3D = null) -> Vector3:
-	var corrected_pos = proposed_pos
-	var neighbors = get_ships_cached(get_tree())
-	var check_count = 0
-	
-	for other in neighbors:
-		if other == self or not is_instance_valid(other):
-			continue
-		if other == excluded_ship:
-			continue
-		if other.get("is_dying") or other.get("is_sinking"):
-			continue
-			
-		# 가까운 후보만 처리해서 연산량을 제한
-		var safe_probe = get_collision_distance_to(other) * 1.25
-		var diff = corrected_pos - other.global_position
-		diff.y = 0.0
-		if diff.length_squared() > safe_probe * safe_probe:
-			continue
-			
-		corrected_pos = _apply_ship_collision_guard(other, prev_pos, corrected_pos, 0.99, current_speed, false)
-		check_count += 1
-		if check_count >= 6:
-			break
-			
-	return corrected_pos
+	return ChaserShipBoardingHelper.apply_neighbor_ship_guards(self, prev_pos, proposed_pos, excluded_ship)
 
 func _apply_ship_collision_guard(other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = 0.94, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:
-	if not is_instance_valid(other_ship):
-		return proposed_pos
-	if other_ship.get("is_dying") or other_ship.get("is_sinking"):
-		return proposed_pos
-		
-	var target_pos = other_ship.global_position
-	var safe_dist = get_collision_distance_to(other_ship) * safe_ratio
-	if safe_dist <= 0.01:
-		return proposed_pos
-		
-	var from_2d = Vector2(prev_pos.x - target_pos.x, prev_pos.z - target_pos.z)
-	var to_2d = Vector2(proposed_pos.x - target_pos.x, proposed_pos.z - target_pos.z)
-	var move_2d = to_2d - from_2d
-	var a = move_2d.dot(move_2d)
-	
-	# 1) 스윕 교차 검사: 한 프레임에 경계를 건너뛰는 통과(터널링) 방지
-	if a > 0.00001:
-		var b = 2.0 * from_2d.dot(move_2d)
-		var c = from_2d.dot(from_2d) - safe_dist * safe_dist
-		if c > 0.0:
-				var disc = b * b - 4.0 * a * c
-				if disc >= 0.0:
-					var sqrt_disc = sqrt(disc)
-					var t = (-b - sqrt_disc) / (2.0 * a)
-					if t >= 0.0 and t <= 1.0:
-						var hit_t = maxf(0.0, t - 0.02)
-						var hit_pos = prev_pos.lerp(proposed_pos, hit_t)
-						var n2 = Vector2(hit_pos.x - target_pos.x, hit_pos.z - target_pos.z)
-						if n2.length_squared() < 0.0001:
-							n2 = Vector2(-sin(rotation.y), -cos(rotation.y))
-						n2 = n2.normalized()
-						hit_pos.x = target_pos.x + n2.x * safe_dist
-						hit_pos.z = target_pos.z + n2.y * safe_dist
-						if emit_collision_event:
-							_emit_guarded_collision(other_ship, impact_speed_hint)
-						_soften_collision_speed()
-						return hit_pos
-	
-	# 2) 이동 후 겹침 보정: 이미 파고든 상태면 경계까지 밀어냄
-	var diff = proposed_pos - target_pos
-	diff.y = 0.0
-	var dist = diff.length()
-	if dist < safe_dist:
-		var n = diff.normalized() if dist > 0.001 else Vector3(-sin(rotation.y), 0.0, -cos(rotation.y))
-		proposed_pos.x = target_pos.x + n.x * safe_dist
-		proposed_pos.z = target_pos.z + n.z * safe_dist
-		if emit_collision_event:
-			_emit_guarded_collision(other_ship, impact_speed_hint)
-		_soften_collision_speed()
-		
-	return proposed_pos
+	return ChaserShipBoardingHelper.apply_ship_collision_guard(self, other_ship, prev_pos, proposed_pos, safe_ratio, impact_speed_hint, emit_collision_event)
 
 func _emit_guarded_collision(other_ship: Node3D, impact_speed_hint: float) -> void:
-	# 가드에 막히는 순간을 실제 충돌로 처리해 '닿지 않는 느낌'을 줄인다.
-	if not is_instance_valid(other_ship):
-		return
-	# 가드 충돌은 실제 충돌과 동일하게 양쪽 피해를 적용한다.
-	# 근접 보정으로 접근 속도가 깎였더라도 최소 충돌 속도는 확보한다.
-	var impact_speed = maxf(impact_speed_hint, min_ramming_speed * 0.72)
-	apply_ramming_damage(other_ship, impact_speed)
-	if other_ship.has_method("apply_ramming_damage"):
-		other_ship.call("apply_ramming_damage", self, impact_speed)
+	ChaserShipBoardingHelper.emit_guarded_collision(self, other_ship, impact_speed_hint)
 
 func _soften_collision_speed() -> void:
-	current_speed = min(current_speed, move_speed * 0.84)
+	ChaserShipBoardingHelper.soften_collision_speed(self)
 
 
 func _find_player() -> void:
-	var players = get_tree().get_nodes_in_group("player")
-	
-	# 나포된 미니언인 경우, 호위 대상인 플레이어 본선만 타겟으로 삼음
-	if is_in_group("captured_minion") or team == "player":
-		for p in players:
-			if p.get("is_player_controlled") == true:
-				target = p
-				break
-		return
-		
-	# 적군인 경우: 가장 가까운 아군(본선 및 나포함) 탐색
-	var closest_dist = INF
-	var closest_player = null
-	
-	for p in players:
-		if p == self: continue # 자기 자신 제외
-		if not p.get("is_sinking") and not p.get("is_dead"):
-			var dist = global_position.distance_squared_to(p.global_position)
-			# 본선(is_player_controlled)일 경우 약간의 스텔스 페널티(어그로 가중치)를 주어
-			# 동일 거리면 본선을 더 치게 만들 수도 있지만, 일단 순수 거리 기반으로 가장 가까운 적을 찾음
-			var weight = 1.0
-			if p.get("is_player_controlled") == true:
-				weight = 0.8 # 본선은 20% 더 가까운 것으로 취급 (어그로 약간 높음)
-				
-			var weighted_dist = dist * weight
-			
-			if weighted_dist < closest_dist:
-				closest_dist = weighted_dist
-				closest_player = p
-				
-	target = closest_player
+	ChaserShipAiHelper.find_player(self)
 
 ## 나포(Capture) 처리
 func capture_ship() -> void:
 	if team == "player": return
 	
 	# 기존 함대 수 체크 (정예 함선 1척 체제)
-	var minions = get_tree().get_nodes_in_group("captured_minion")
+	var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
 	if minions.size() >= 1:
 		# ✅ 정원 초과 시 나포 대신 배를 파괴함
 		print("[Limitation] 함대 정원 초과! 적함을 파괴합니다.")
@@ -991,7 +596,7 @@ func capture_ship() -> void:
 	# (is_boarding, boarding_target, _clear_ropes 등은 _cancel_boarding()에서 이미 처리됨)
 	
 	# 플레이어의 현재 업그레이드된 최대 속도를 상속받아 평준화 (기본치 3.2 대신)
-	var players = get_tree().get_nodes_in_group("player")
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
 	if players.size() > 0 and players[0].get("is_player_controlled"):
 		move_speed = players[0].get("max_speed")
 	else:
@@ -1061,11 +666,10 @@ func _update_children_team_for_capture() -> void:
 	_update_children_team()
 	
 	# 병사 팀 변경
-	if has_node("Soldiers"):
-		for s in $Soldiers.get_children():
-			if s.has_method("set_team"):
-				s.set_team("player")
-				s.owned_ship = self
+	for s in $Soldiers.get_children():
+		if s.has_method("set_team"):
+			s.set_team("player")
+			s.owned_ship = self
 
 func _remove_all_cannons() -> void:
 	# 선체 내부에 포함된 대포들까지 모두 찾아서 제거
@@ -1092,17 +696,15 @@ func _apply_minion_visuals() -> void:
 
 
 func _auto_adjust_sail(delta: float) -> void:
-	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"): return
+	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"):
+		return
 	var wind_dir = _cached_wind_manager.get_wind_direction()
-	
-	# player_ship.gd의 로직과 유사하게 자동 조절
-	var ship_angle_rad = rotation.y
-	var wind_angle_rad = atan2(wind_dir.x, wind_dir.y)
-	
-	var rel_wind_angle = rad_to_deg(wrapf(wind_angle_rad - ship_angle_rad, -PI, PI))
-	var target_sail_angle = rel_wind_angle / 2.0
-	target_sail_angle = clamp(target_sail_angle, -90, 90)
-	
+
+	# 플레이어 배와 같은 기준으로 상대풍을 계산해 돛이 바람을 향해 자연스럽게 따라가게 한다.
+	var wind_angle = rad_to_deg(atan2(wind_dir.x, -wind_dir.y))
+	var ship_angle_ccw = rad_to_deg(rotation.y)
+	var rel_wind_angle = wrapf(wind_angle + ship_angle_ccw, -180.0, 180.0)
+	var target_sail_angle = clamp(rel_wind_angle / 2.0, -90.0, 90.0)
 	sail_angle = move_toward(sail_angle, target_sail_angle, 60.0 * delta)
 
 ## 동양식 노(Ro/Yuloh) 8자 젓기 애니메이션
@@ -1137,153 +739,10 @@ func _update_oar_visual(delta: float) -> void:
 
 ## 나포함 AI 로직 (플레이어 호위 및 적 탐지)
 func _process_minion_ai(delta: float) -> void:
-	if not is_instance_valid(target):
-		_find_player()
-		return
-		
-	# 1. 내 순번(Index) 확인 (캐시 사용으로 성능 최적화)
-	var minions = get_minions_cached(get_tree())
-	var my_index = minions.find(self )
-	if my_index == -1: my_index = 0
-	
-	# 2. 진형에 따른 목표 상대 위치(Relative Target) 계산
-	var offset = Vector3.ZERO
-	
-	# 2번째 배부터 적당한 간격으로 모이게 조절 (기존 너무 좁았던 것을 완화, 간격 통일)
-	var base_spacing = 10.0
-	var formation_dist = base_spacing + (my_index * base_spacing)
-	
-	match fleet_formation:
-		Formation.COLUMN:
-			# 군집(Swarm) 유지: 뒤로 길게 뻗지 않고 플레이어 바로 뒤쪽으로 밀집
-			offset = Vector3(0, 0, formation_dist)
-		Formation.WING:
-			# 학익진: 좌우 번갈아가며 V자 배치 (간격 축소)
-			var side = 1 if my_index % 2 == 0 else -1
-			var row = floor(my_index / 2.0) + 1
-			offset = Vector3(base_spacing * side * row, 0, base_spacing * row)
-	
-	# 3. 다른 미니언들과의 분리력(Separation Force) 계산
-	var sep_force = Vector3.ZERO
-	for other in minions:
-		if other != self and is_instance_valid(other):
-			var dist = global_position.distance_to(other.global_position)
-			if dist < 12.0 and dist > 0.1: # 12m 이내면 밀어냄
-				var push_dir = (global_position - other.global_position).normalized()
-				# 가까울수록 강하게 밀어냄 (지수적)
-				var strength = (1.0 - (dist / 12.0)) * 5.0
-				sep_force += push_dir * strength
-				
-	# 4. 월드 목표 지점 계산
-	var target_pos = target.to_global(offset)
-	# 목표 지점에 분리력(회피력) 더하기
-	target_pos += sep_force
-	
-	var dist_to_target = global_position.distance_to(target_pos)
-	
-	# 플레이어의 실제 현재 속도 가져오기 (동기화 용도)
-	var player_speed = target.get("current_speed")
-	if player_speed == null: player_speed = 0.0
-	
-	# 거리 및 위치 관계 상세 분석 (Overshoot Detection)
-	var to_target_vec = (target_pos - global_position)
-	var direction = to_target_vec.normalized()
-	var player_fwd = - target.global_transform.basis.z # 플레이어가 바라보는 방향
-	# 목표 지점이 내 뒤에 있는지 앞에 있는지 판별 (내적 이용)
-	# rel_depth > 0: 내가 슬롯보다 뒤에 있음 (추격 필요)
-	# rel_depth < 0: 내가 슬롯보다 앞에 있음 (브레이크 필요)
-	var rel_depth = to_target_vec.dot(player_fwd)
-	var dist_to_player = global_position.distance_to(target.global_position)
-	
-	# A. 속도 조절 (연속적 보간 및 평활화 적용)
-	var target_final_speed = player_speed
-	
-	if dist_to_player < 10.0:
-		# 최우선 순위: 물리적 충돌 방지 (완전 정지, 거리 대폭 단축)
-		target_final_speed = 0.0
-	elif rel_depth < -0.5:
-		# 슬롯을 지나쳐 플레이어쪽으로 파고드는 경우 (연속적 브레이크)
-		# 0m ~ 10m 사이를 보간하여 서서히 속도 감소
-		var brake_factor = clamp(abs(rel_depth) / 10.0, 0.0, 0.9)
-		target_final_speed = player_speed * (1.0 - brake_factor)
-	else:
-		# 뒤처졌거나 정렬 상태 (연속적 가속)
-		# 0m(1.0배) ~ 60m(1.3배) 사이를 부드럽게 연결 (1.6배에서 하향)
-		var lag_factor = clamp(rel_depth / 60.0, 0.0, 1.0)
-		var sync_speed_mult = lerp(1.0, 1.3, lag_factor)
-		target_final_speed = max(player_speed * sync_speed_mult, move_speed * 0.8)
-		
-	# 시간차 부드러움 적용 (Temporal Smoothing)
-	# 가속도를 낮추어 "급격히 튀어나가는" 느낌 완화 (2.5 -> 1.2)
-	_last_ai_speed = lerp(_last_ai_speed, target_final_speed, delta * 1.2)
-	var final_move_speed = _last_ai_speed
-	# 충돌/충각 로직은 current_speed를 기준으로 계산되므로 미니언도 동기화한다.
-	current_speed = maxf(final_move_speed, 0.0)
-		
-	# B. 러더(Rudder) 조향 시스템 (Broadside Alignment 대체)
-	var target_head_rot = atan2(-direction.x, -direction.z) # 목표 슬롯을 향하는 기본 각도
-	var player_head_rot = rotation.y # 기본값은 자기 자신
-	if target and "rotation" in target:
-		player_head_rot = target.rotation.y
-		
-	# 거리가 가까울수록 목표지점을 보는 대신, 플레이어와 완벽하게 수평을 맞춤(Broadside 유지)
-	var rotation_blend = clamp(dist_to_target / 15.0, 0.0, 1.0)
-	var blended_target_rot = lerp_angle(player_head_rot, target_head_rot, rotation_blend)
-	
-	# 러더 계산 (부호 반전 적용)
-	var angle_diff = wrapf(blended_target_rot - rotation.y, -PI, PI)
-	var desired_rudder = clamp(-rad_to_deg(angle_diff) * 2.0, -45.0, 45.0)
-	var rudder_speed_adjusted = 120.0 # 회전 속도
-	rudder_angle = move_toward(rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
-	
-	# 속도가 있어야 회전 가능
-	if final_move_speed > 0.1:
-		var speed_ratio = final_move_speed / max_speed
-		var actual_turn = (rudder_angle / 45.0) * turn_rate * speed_ratio * turn_mult * delta
-		rotation.y -= deg_to_rad(actual_turn)
-	else:
-		# 제자리에서는 부드럽게 정렬만
-		if dist_to_target <= 1.5:
-			rotation.y = lerp_angle(rotation.y, player_head_rot, delta * 3.0)
-
-	# 선체 전진 벡터 및 이동
-	var forward_vec = Vector3(-sin(rotation.y), 0, -cos(rotation.y))
-	var velocity = forward_vec * final_move_speed
-
-	# 미니언도 일반 함선과 동일하게 충돌 반발/충각 판정을 거치도록 한다.
-	velocity += separation_force
-	velocity += _calculate_collision_repulsion() * delta
-
-	var prev_pos = global_position
-	var next_pos = prev_pos + velocity * delta
-	if is_instance_valid(target):
-		# 호위 대상(플레이어 본선)과는 데미지 없는 안전거리 보정만 적용.
-		next_pos = _apply_ship_collision_guard(target, prev_pos, next_pos, 0.99, velocity.length(), false)
-	next_pos = _apply_neighbor_ship_guards(prev_pos, next_pos, target)
-	global_position = next_pos
-	
-	# [추가] 러더 및 수면 비주얼 효과 업데이트
-	_update_rudder_visual()
-	_apply_bobbing_effect()
-	
-	_set_wake_state(dist_to_target > 2.0 or player_speed > 1.0, clampf(current_speed / maxf(max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+	ChaserShipMinionHelper.process_minion_ai(self, delta)
 
 func _update_wave_sounds(delta: float) -> void:
-	if is_dying or is_derelict: return
-	
-	# 현재 속도 대략적 파악 (적함/나포함 공통 로직을 위해)
-	# 여기서는 move_speed와 이동 여부로 판단
-	var speed = move_speed
-	# 멈춰있을 때는 소리 안나게 (target 없거나 거리 가까워서 멈춘 경우 등)
-	if not is_instance_valid(target): speed = 0.0
-	
-	if speed > 0.5:
-		_wave_timer -= delta
-		if _wave_timer <= 0:
-			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
-				_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2), 3.0)
-			var speed_mod = clamp(speed / 5.0, 0.4, 1.5)
-			_wave_timer = randf_range(2.0, 4.5) / speed_mod
+	ChaserShipAiHelper.update_wave_sounds(self, delta)
 
 func _update_minion_respawn(delta: float) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
@@ -1341,11 +800,15 @@ func repair_ship(percent: float) -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
+	if not allow_boarding:
+		return
 	# 플레이어와 충돌했는지 확인 (StaticBody/CharacterBody 등)
 	if body.is_in_group("player") or (body.get_parent() and body.get_parent().is_in_group("player")):
 		_board_ship(body)
 
 func _on_area_entered(area: Area3D) -> void:
+	if not allow_boarding:
+		return
 	# 피격용 히트박스는 도선 트리거에서 제외
 	if area.is_in_group("ship_hitbox"):
 		return
@@ -1364,6 +827,8 @@ func remove_stuck_object(_obj: Node3D, _s_mult: float, _t_mult: float) -> void:
 	if tilt_offset < 0.01: tilt_offset = 0.0
 
 func _board_ship(target_ship: Node3D) -> void:
+	if not allow_boarding:
+		return
 	if is_dying or is_boarding: return
 	
 	# 생존 병사가 없으면 도선 시도 불가
@@ -1387,6 +852,11 @@ func _board_ship(target_ship: Node3D) -> void:
 
 	# === 무력화(폐선) 상태인 배는 이미 도선이 불필요함 (나포는 player_ship.gd의 boarding scan으로 처리) ===
 	if is_derelict:
+		return
+
+	# 선미 추격이나 정면 비비기에서 바로 밧줄이 걸리지 않도록,
+	# 측면 접현이 성립할 때만 실제 도선 상태로 들어간다.
+	if not _is_side_boarding_approach(ship_node):
 		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
@@ -1435,4 +905,6 @@ func add_leak(amount: float) -> void:
 
 func remove_leak(amount: float) -> void:
 	leaking_rate = maxf(0.0, leaking_rate - amount)
+	if leaking_rate <= 0.0:
+		_leak_tick_timer = 0.0
 	print("[Status] 누수 완화. 남은 누수율: %.1f" % leaking_rate)

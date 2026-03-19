@@ -4,10 +4,10 @@ const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 ## 부유물(Floating Loot) 시스템
 ## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
 
-@export var gold_amount: int = 30
+@export var gold_amount: int = 15
 @export var xp_amount: int = 15 # Deprecated: 부유물에서는 XP를 지급하지 않음(규칙 단순화용)
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
-@export var magnet_speed: float = 5.0 # 끌려가는 기본 속도
+@export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도
 @export var float_height: float = 0.3 # 둥실거리는 진폭
 @export var rotation_speed: float = 1.0 # 회전 속도
@@ -22,11 +22,12 @@ var _cached_um: Node = null
 var _cached_ocean: Node = null
 var _cached_wave_height: float = 0.0
 var _wave_sample_timer: float = 0.0
+var _visual_rest_scale: Vector3 = Vector3.ONE
 @export_range(0.03, 0.3) var wave_sample_interval: float = 0.1
 @export_range(0.05, 0.5) var player_search_interval: float = 0.2
 var _player_search_timer: float = 0.0
 
-@onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
+@onready var visual: Node3D = $Visual if has_node("Visual") else ($MeshInstance3D if has_node("MeshInstance3D") else self)
 
 func _ready() -> void:
 	# 생성 직후의 높이를 base_y로 캡처 (보통 0.5 근처)
@@ -34,6 +35,8 @@ func _ready() -> void:
 	if base_y < 0.2: base_y = 0.5 # 비정상적으로 낮게 잡혔을 경우 보정
 	
 	# 초기에는 크기를 0으로 시작해서 나타남 (스폰 연출)
+	if visual:
+		_visual_rest_scale = visual.scale
 	if visual and visual is MeshInstance3D:
 		var mat = visual.get_active_material(0)
 		if mat == null:
@@ -46,12 +49,14 @@ func _ready() -> void:
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED # 투명도 비활성화
 			
 		# 스케일 애니메이션 적용 (투명도 버그 회피)
+	if visual:
 		visual.scale = Vector3.ZERO
 		var tween = create_tween()
-		tween.tween_property(visual, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(visual, "scale", _visual_rest_scale, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			
 		# 컬링 방지 마진 추가
-		visual.extra_cull_margin = 1.0
+		if visual is GeometryInstance3D:
+			(visual as GeometryInstance3D).extra_cull_margin = 1.0
 	
 	# 레벨 매니저 캐싱
 	_cached_lm = get_tree().root.find_child("LevelManager", true, false)
@@ -74,7 +79,8 @@ func _ready() -> void:
 var is_expiring: bool = false # 소멸 진행 중 여부
 
 func _physics_process(delta: float) -> void:
-	if is_collected: return
+	if is_collected or not is_inside_tree():
+		return
 	time_alive += delta
 	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
 	_player_search_timer = maxf(0.0, _player_search_timer - delta)
@@ -86,23 +92,29 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# 플레이어 탐색은 주기적으로 수행하여 비용을 줄임
-	if is_instance_valid(target_player) and target_player.get("is_sinking"):
+	if is_instance_valid(target_player) and (not target_player.is_inside_tree() or target_player.get("is_sinking")):
 		target_player = null
 	if not is_instance_valid(target_player) and _player_search_timer <= 0.0:
 		_player_search_timer = player_search_interval
 		_find_target_player()
 	
-	if is_instance_valid(target_player):
-		var dist = global_position.distance_to(target_player.global_position)
-		var current_radius = _get_current_magnet_radius()
-		if dist <= current_radius:
+	if is_instance_valid(target_player) and target_player.is_inside_tree():
+		var dist: float = global_position.distance_to(target_player.global_position)
+		var current_radius: float = _get_current_magnet_radius()
+		var magnet_lock_radius: float = current_radius * 1.35
+		var within_pull_zone: bool = dist <= current_radius or (current_magnet_speed > 0.1 and dist <= magnet_lock_radius)
+		if within_pull_zone:
 			# 자석 효과 발동: 가속도가 붙으면서 끌려감
-			current_magnet_speed = lerp(current_magnet_speed, magnet_speed + (15.0 / max(dist, 1.0)), 2.0 * delta)
-			var direction = (target_player.global_position - global_position).normalized()
+			var ship_speed_bonus: float = 0.0
+			if target_player.get("current_speed") != null:
+				ship_speed_bonus = maxf(0.0, float(target_player.get("current_speed"))) * 0.9
+			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (22.0 / max(dist, 0.8))
+			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 28.0 * delta)
+			var direction: Vector3 = (target_player.global_position - global_position).normalized()
 			global_position += direction * current_magnet_speed * delta
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
-			if dist < 2.5: # 2.0 -> 2.5 (함선 크기 고려)
+			if dist < 3.5:
 				_collect_by_proximity()
 		else:
 			# 범위를 벗어나면 가속도 초기화 및 제자리 둥실거림
@@ -124,6 +136,8 @@ func _expire_and_free() -> void:
 
 
 func _apply_floating(delta: float) -> void:
+	if not is_inside_tree():
+		return
 	var target_y = base_y + sin(time_alive * float_speed) * float_height
 	
 	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
@@ -141,11 +155,16 @@ func _apply_floating(delta: float) -> void:
 
 
 func _find_target_player() -> void:
+	if not is_inside_tree():
+		target_player = null
+		return
 	var players = SceneGroupCache.get_nodes(get_tree(), "player")
 	var closest_dist = INF
 	var closest_p = null
 	
 	for p in players:
+		if not is_instance_valid(p) or not p.is_inside_tree():
+			continue
 		if p.get("is_sinking"): continue
 		
 		var d = global_position.distance_to(p.global_position)
@@ -165,9 +184,9 @@ func _get_current_magnet_radius() -> float:
 	var meta_manager = get_node_or_null("/root/MetaManager")
 	if is_instance_valid(meta_manager) and meta_manager.has_method("get_collection_radius_bonus"):
 		meta_bonus = float(meta_manager.get_collection_radius_bonus())
-	if is_instance_valid(_cached_um) and "current_levels" in _cached_um:
-		var supply_lv = _cached_um.current_levels.get("supply_bonus", 0)
-		return base_magnet_radius + meta_bonus + (supply_lv * 2.0) # 레벨당 +2.0 (최대 18.0)
+	if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
+		var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
+		return base_magnet_radius + meta_bonus + float(supply_stats.get("radius_bonus", 0.0))
 	return base_magnet_radius + meta_bonus
 
 
@@ -187,7 +206,7 @@ func _on_area_entered(area: Area3D) -> void:
 
 func _collect_by_proximity() -> void:
 	if is_collected: return
-	if is_instance_valid(target_player):
+	if is_instance_valid(target_player) and target_player.is_inside_tree():
 		is_collected = true
 		_collect_loot()
 
@@ -220,13 +239,16 @@ func _collect_loot() -> void:
 			_cached_lm.add_score(gold_amount)
 			
 	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
-	if is_instance_valid(target_player) and "hull_hp" in target_player and "max_hull_hp" in target_player:
-		var supply_lv = 0
-		if is_instance_valid(_cached_um) and "current_levels" in _cached_um:
-			supply_lv = _cached_um.current_levels.get("supply_bonus", 0)
-			
-		var heal_amount = 5.0 + (supply_lv * 10.0) # 기본 5, 레벨당 +10
+	if is_instance_valid(target_player) and target_player.is_inside_tree() and "hull_hp" in target_player and "max_hull_hp" in target_player:
+		var heal_amount: float = 5.0
+		var stamina_recover: float = 0.0
+		if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
+			var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
+			heal_amount += float(supply_stats.get("heal_bonus", 0.0))
+			stamina_recover += float(supply_stats.get("stamina_recovery_bonus", 0.0))
 		target_player.hull_hp = minf(target_player.hull_hp + heal_amount, target_player.max_hull_hp)
+		if "rowing_stamina" in target_player and "max_rowing_stamina" in target_player:
+			target_player.rowing_stamina = minf(target_player.max_rowing_stamina, target_player.rowing_stamina + stamina_recover)
 		
 		# HUD 연동
 		if target_player.has_method("_find_hud"):

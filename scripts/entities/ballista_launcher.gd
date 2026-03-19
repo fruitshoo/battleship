@@ -6,7 +6,7 @@ const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 @export var bolt_scene: PackedScene = preload("res://scenes/projectiles/ballista_bolt.tscn")
 @export var fire_cooldown: float = 10.0
-@export var detection_range: float = 35.0 # 대포보다 긴 사거리
+@export var detection_range: float = 28.0 # 대포보다 긴 사거리
 @export var team: String = "player"
 
 @onready var muzzle: Marker3D = $Muzzle

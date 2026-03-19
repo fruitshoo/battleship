@@ -2,7 +2,14 @@
 extends Node3D
 class_name BaseShip
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
+const BaseShipCollisionHelper = preload("res://scripts/entities/base_ship_collision_helper.gd")
+const BaseShipBoardingHelper = preload("res://scripts/entities/base_ship_boarding_helper.gd")
+const BaseShipStatusHelper = preload("res://scripts/entities/base_ship_status_helper.gd")
+const BaseShipVisualHelper = preload("res://scripts/entities/base_ship_visual_helper.gd")
 const DEBUG_COMBAT_LOGS := false
+const DEBUG_DAMAGE_LOGS := true
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -19,7 +26,8 @@ const DEBUG_COMBAT_LOGS := false
 @export_range(0.1, 3.0) var length_multiplier: float = 1.0 ## 앞/뒤 범위를 늘리거나 줄일 비율 (타원형 길이)
 @export_range(0.1, 3.0) var width_multiplier: float = 1.0 ## 좌/우 범위를 늘리거나 줄일 비율 (타원형 폭)
 @export var auto_fit_collision_to_hull: bool = true ## 선체 메시 기준으로 충돌 타원값 자동 정렬
-@export_range(0.0, 2.0) var collision_padding: float = 0.15 ## 충돌 판정 여유치(반폭/반길이에 추가)
+@export_range(0.75, 1.1) var auto_fit_scale: float = 1.0 ## 선체 자동 충돌 타원 전체 스케일
+@export_range(0.0, 2.0) var collision_padding: float = 0.02 ## 충돌 판정 여유치(반폭/반길이에 추가)
 @export_range(0.6, 1.0) var deck_bounds_ratio: float = 0.88 ## 병사 덱 이동 범위 축소 비율
 
 # === 돛 관련 ===
@@ -96,7 +104,7 @@ var _hull_half_extents: Vector2 = Vector2(1.5, 4.0) # X:반폭, Y:반길이
 
 
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-@export var water_splash_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
+@export var water_splash_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 @export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
 @export var survivor_scene: PackedScene = preload("res://scenes/effects/survivor.tscn")
@@ -158,6 +166,7 @@ func _ensure_collision_profile() -> void:
 		collision_profile.length_multiplier = length_multiplier
 		collision_profile.width_multiplier = width_multiplier
 		collision_profile.auto_fit_collision_to_hull = auto_fit_collision_to_hull
+		collision_profile.auto_fit_scale = auto_fit_scale
 		collision_profile.collision_padding = collision_padding
 		collision_profile.deck_bounds_ratio = deck_bounds_ratio
 		collision_profile.min_ramming_speed = min_ramming_speed
@@ -171,6 +180,7 @@ func _apply_collision_profile() -> void:
 	length_multiplier = collision_profile.length_multiplier
 	width_multiplier = collision_profile.width_multiplier
 	auto_fit_collision_to_hull = collision_profile.auto_fit_collision_to_hull
+	auto_fit_scale = collision_profile.auto_fit_scale
 	collision_padding = collision_profile.collision_padding
 	deck_bounds_ratio = collision_profile.deck_bounds_ratio
 	min_ramming_speed = collision_profile.min_ramming_speed
@@ -183,6 +193,7 @@ func _sync_profile_from_runtime() -> void:
 	collision_profile.length_multiplier = length_multiplier
 	collision_profile.width_multiplier = width_multiplier
 	collision_profile.auto_fit_collision_to_hull = auto_fit_collision_to_hull
+	collision_profile.auto_fit_scale = auto_fit_scale
 	collision_profile.collision_padding = collision_padding
 	collision_profile.deck_bounds_ratio = deck_bounds_ratio
 	collision_profile.min_ramming_speed = min_ramming_speed
@@ -263,8 +274,8 @@ func _refresh_collision_bounds_from_hull() -> void:
 		return
 		
 	var padded = Vector2(
-		hull_ext.x + collision_padding,
-		hull_ext.y + collision_padding
+		(hull_ext.x + collision_padding) * auto_fit_scale,
+		(hull_ext.y + collision_padding) * auto_fit_scale
 	)
 	var base = maxf(padded.x, padded.y)
 	if base <= 0.01:
@@ -370,6 +381,10 @@ func load_ship_stats(type_name: String) -> Dictionary:
 	if stats.has("move_speed"): max_speed = stats["move_speed"]
 	if stats.has("deck_height"): deck_height = stats["deck_height"]
 	if stats.has("hull_defense"): hull_defense = stats["hull_defense"]
+	if stats.has("collision_fit_scale"): auto_fit_scale = float(stats["collision_fit_scale"])
+	if stats.has("collision_padding"): collision_padding = float(stats["collision_padding"])
+	if stats.has("collision_length_mult"): length_multiplier = float(stats["collision_length_mult"])
+	if stats.has("collision_width_mult"): width_multiplier = float(stats["collision_width_mult"])
 	
 	return stats
 
@@ -450,160 +465,41 @@ func _cache_hull_references(node: Node) -> void:
 			_cache_hull_references(child)
 
 func _cache_common_references() -> void:
-	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
-	if not _cached_level_manager:
-		var lms = SceneGroupCache.get_nodes(get_tree(), "level_manager")
-		if lms.size() > 0: _cached_level_manager = lms[0]
-		
-	if _cached_level_manager and "hud" in _cached_level_manager:
-		_cached_hud = _cached_level_manager.hud
-	
-	_cached_audio_manager = get_node_or_null("/root/AudioManager")
-	_cached_environment_preset_manager = get_tree().root.find_child("EnvironmentPresetManager", true, false)
-	if is_instance_valid(_cached_environment_preset_manager) and _cached_environment_preset_manager.has_signal("preset_applied"):
-		var cb = Callable(self, "_on_environment_preset_applied")
-		if not _cached_environment_preset_manager.is_connected("preset_applied", cb):
-			_cached_environment_preset_manager.connect("preset_applied", cb)
+	BaseShipVisualHelper.cache_common_references(self)
 
 func _on_environment_preset_applied(_preset: int) -> void:
-	_refresh_deck_light()
+	BaseShipVisualHelper.on_environment_preset_applied(self, _preset)
 
 func _is_clear_day_preset_active() -> bool:
-	if not disable_deck_light_in_clear_day:
-		return false
-	if not is_instance_valid(_cached_environment_preset_manager):
-		return false
-	if _cached_environment_preset_manager.has_method("is_clear_day_active"):
-		return bool(_cached_environment_preset_manager.call("is_clear_day_active"))
-	if "current_preset" in _cached_environment_preset_manager:
-		return int(_cached_environment_preset_manager.get("current_preset")) == 0
-	return false
+	return BaseShipVisualHelper.is_clear_day_preset_active(self)
 
 func _resolve_deck_light_parent() -> Node3D:
-	var hull_scene = get_node_or_null("HullScene")
-	if hull_scene is Node3D:
-		return hull_scene as Node3D
-
-	for child in get_children():
-		if child is Node3D and child.name.to_lower().contains("hull"):
-			return child as Node3D
-
-	return self
+	return BaseShipVisualHelper.resolve_deck_light_parent(self)
 
 func _refresh_deck_light() -> void:
-	var should_enable = enable_deck_light
-	if should_enable and _is_clear_day_preset_active():
-		should_enable = false
-	if should_enable and deck_light_player_only:
-		var team_tag = str(get("team"))
-		var is_player_controlled = get("is_player_controlled") == true
-		var is_player_tagged = team_tag == "player" or is_in_group("player") or is_player_controlled
-		should_enable = is_player_tagged
-	
-	if not should_enable:
-		if is_instance_valid(deck_light):
-			deck_light.queue_free()
-			deck_light = null
-		return
-
-	var light_parent = _resolve_deck_light_parent()
-	
-	if not is_instance_valid(deck_light):
-		deck_light = OmniLight3D.new()
-		deck_light.name = "DeckLight"
-		light_parent.add_child(deck_light)
-	elif deck_light.get_parent() != light_parent:
-		var old_parent = deck_light.get_parent()
-		if is_instance_valid(old_parent):
-			old_parent.remove_child(deck_light)
-		light_parent.add_child(deck_light)
-	
-	deck_light.light_color = deck_light_color
-	deck_light.light_energy = deck_light_energy
-	deck_light.omni_range = deck_light_range
-	deck_light.shadow_enabled = false
-	deck_light.position = Vector3(0.0, deck_light_height, 0.0)
+	BaseShipVisualHelper.refresh_deck_light(self)
 
 ## 둥실둥실 시각 효과
 func _apply_bobbing_effect() -> void:
-	if Engine.is_editor_hint(): return # 에디터에서는 둥실거림 방지
-	
-	var time = Time.get_ticks_msec() * 0.001
-	var dt = get_physics_process_delta_time()
-	_wave_sample_timer = maxf(0.0, _wave_sample_timer - dt)
-	
-	if not is_instance_valid(_cached_ocean):
-		# 에디터에서는 메인 루프나 씬 트리 접근 시 주의 필요
-		var tree = get_tree()
-		if not tree: return
-		var ocean = tree.root.find_child("Ocean", true, false)
-		if ocean:
-			_cached_ocean = ocean
-				
-	var wave_h = 0.0
-	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
-		# 파도 높이는 짧은 간격으로 샘플링해 CPU 부하를 낮춘다.
-		if _wave_sample_timer <= 0.0:
-			_cached_wave_height = _cached_ocean.get_wave_height(global_position)
-			_wave_sample_timer = wave_sample_interval
-		wave_h = _cached_wave_height
-	else:
-		_cached_wave_height = 0.0
-		
-	# 기존 단순 둥실거림은 진폭을 살짝만 남겨 파도 위의 미세한 진동으로 사용
-	var bob_offset = sin(time * bobbing_speed) * bobbing_amplitude * 0.2
-	
-	# 무거운 배의 관성(Inertia)을 모방하기 위해 부드럽게 보간(Lerp)합니다.
-	var target_y = base_y + wave_h + bob_offset
-	position.y = lerp(position.y, target_y, 3.0 * dt)
-	
-	var turn_factor = rudder_angle / 45.0
-	var speed_ratio = clamp(current_speed / max_speed, 0.0, 1.0)
-	var target_centrifugal = deg_to_rad(-turn_factor * speed_ratio * 12.0)
-	
-	_centrifugal_tilt = lerp(_centrifugal_tilt, target_centrifugal, 2.5 * dt)
-	
-	rotation.z = (sin(time * bobbing_speed * 0.8) * rocking_amplitude) + tilt_offset + _centrifugal_tilt
+	BaseShipVisualHelper.apply_bobbing_effect(self)
 
 ## 돛 시각화 업데이트
 func _update_sail_visual() -> void:
-	for mast in masts:
-		if is_instance_valid(mast) and mast.has_method("set_sail_angle"):
-			mast.set_sail_angle(sail_angle)
+	BaseShipVisualHelper.update_sail_visual(self)
 
 ## 러더 시각화 업데이트
 func _update_rudder_visual() -> void:
-	if rudder_visual:
-		rudder_visual.rotation.y = deg_to_rad(rudder_angle)
+	BaseShipVisualHelper.update_rudder_visual(self)
 
 ## 화재 효과 업데이트
 func _update_fire_effect() -> void:
-	if (is_burning or is_derelict) and not is_sinking and not is_dying:
-		if not is_instance_valid(_fire_instance):
-			_fire_instance = fire_effect_scene.instantiate() as Node3D
-			add_child(_fire_instance)
-			_fire_instance.position = fire_effect_offset
-			_set_fire_emitting(true)
-		else:
-			_set_fire_emitting(true)
-	else:
-		if is_instance_valid(_fire_instance):
-			_set_fire_emitting(false)
+	BaseShipStatusHelper.update_fire_effect(self)
 
 func _set_fire_emitting(active: bool) -> void:
-	if not is_instance_valid(_fire_instance): return
-	var flame = _fire_instance.get_node_or_null("FlameParticles") as GPUParticles3D
-	var smoke = _fire_instance.get_node_or_null("SmokeParticles") as GPUParticles3D
-	if flame: flame.emitting = active
-	if smoke: smoke.emitting = active
+	BaseShipStatusHelper.set_fire_emitting(self, active)
 
 func _set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float = 0.0, turbulence: float = 0.0) -> void:
-	if not is_instance_valid(wake_trail):
-		return
-	if wake_trail.has_method("set_wake_state"):
-		wake_trail.call("set_wake_state", active, speed_ratio, turn_ratio, turbulence)
-	elif "emitting" in wake_trail:
-		wake_trail.set("emitting", active)
+	BaseShipVisualHelper.set_wake_state(self, active, speed_ratio, turn_ratio, turbulence)
 
 ## 함선 충각(Ramming) 시 갑판 위 병사들에게 광역 데미지 및 넉백 부여
 func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
@@ -641,31 +537,7 @@ func get_alive_crew_count() -> int:
 
 ## 병사가 사망할 때마다 호출되어, 배의 폐선 여부를 이벤트 방식으로 검사
 func check_derelict_status() -> void:
-	if is_derelict or is_dying or is_sinking: return
-	
-	# 내 배가 home_ship인 생존 병사가 있는지 확인
-	var all_crew_dead = true
-	var soldiers_node = get_node_or_null("Soldiers")
-	
-	# 자신이 소유한 병사(갑판 위 병사) 중 생존자 확인
-	if soldiers_node:
-		for child in soldiers_node.get_children():
-			if child.get("current_state") != 4: # NOT DEAD
-				all_crew_dead = false
-				break
-				
-	# 만약 밧줄 등을 타고 다른 배로 넘어간 내 병사(home_ship == self)도 고려해야 한다면, 전역 검사 필요
-	if all_crew_dead:
-		var all_soldiers = SceneGroupCache.get_nodes(get_tree(), "soldiers")
-		for s in all_soldiers:
-			# 다른 배에 넘어가 있더라도 여전히 살아서 싸우고 있는 내 선원이 있다면 폐선 아님
-			if s.get("home_ship") == self and s.get("current_state") != 4:
-				all_crew_dead = false
-				break
-				
-	if all_crew_dead:
-		if has_method("_become_derelict"):
-			call("_become_derelict")
+	BaseShipStatusHelper.check_derelict_status(self)
 
 ## 도선 시 상대방을 끌어당기는 힘(장력) 계산
 func _calculate_boarding_pull() -> Vector3:
@@ -733,115 +605,7 @@ func _calculate_boarding_pull() -> Vector3:
 
 ## 밧줄 연결 전/후로 배끼리 겹치는(통과하는) 것을 막아주는 강한 물리 반발력
 func _calculate_collision_repulsion() -> Vector3:
-	var force = Vector3.ZERO
-	var neighbors = SceneGroupCache.get_nodes(get_tree(), "ships")
-	
-	for other in neighbors:
-		if other == self or not is_instance_valid(other) or other.get("is_dying") or other.get("is_sinking"):
-			continue
-			
-		var diff = other.global_position - global_position
-		diff.y = 0.0
-		var dist_sq = diff.length_squared()
-		var my_half = get_collision_half_extents()
-		var other_half = Vector2(
-			other.base_collision_radius * other.width_multiplier,
-			other.base_collision_radius * other.length_multiplier
-		)
-		var broad_phase_dist = maxf(my_half.x, my_half.y) + maxf(other_half.x, other_half.y) + broad_phase_padding
-		
-		# 빠른 거절(Broad-phase) 검사 - 선체 크기에 맞는 동적 반경 사용
-		if dist_sq > broad_phase_dist * broad_phase_dist:
-			continue
-			
-		var dist = sqrt(dist_sq)
-		var dir = diff / max(dist, 0.001)
-		var my_fwd = - global_transform.basis.z
-		my_fwd.y = 0.0
-		if my_fwd.length_squared() > 0.0001:
-			my_fwd = my_fwd.normalized()
-		else:
-			my_fwd = dir
-		var other_fwd = - other.global_transform.basis.z
-		other_fwd.y = 0.0
-		if other_fwd.length_squared() > 0.0001:
-			other_fwd = other_fwd.normalized()
-		else:
-			other_fwd = -dir
-		
-		# 타원형(Capsule/Ellipse) 콜리전 근사
-		# 방향 벡터(dir)와 내적(dot)을 통해 정면/후면(가로축) 이면 ~4.5m, 측면이면 ~2.0m 의 반경을 도출
-		var my_radius = get_directional_collision_radius(dir)
-		var other_radius = 0.0
-		if other.has_method("get_directional_collision_radius"):
-			other_radius = float(other.call("get_directional_collision_radius", -dir))
-		else:
-			other_radius = other.base_collision_radius * other.width_multiplier + (other.base_collision_radius * other.length_multiplier - other.base_collision_radius * other.width_multiplier) * absf(other_fwd.dot(-dir))
-		var coll_dist = my_radius + other_radius
-		var is_engagement_pair = _is_engagement_pair(other)
-		# 교전/도선 대상과는 더 깊게 붙은 뒤 반발이 시작되도록 허용
-		if is_engagement_pair:
-			coll_dist *= 0.90
-		
-		if dist < coll_dist:
-			var compression = coll_dist - dist
-			var target_speed = 0.0
-			if "current_speed" in other:
-				target_speed = other.current_speed
-			var pre_collision_speed = current_speed
-			var pre_my_vel = my_fwd * pre_collision_speed
-			var pre_other_vel = other_fwd * target_speed
-			# 중심점 기준 충돌 방향(나 -> 상대방)으로의 접근 속도 투영
-			var approach_speed = (pre_my_vel - pre_other_vel).dot(dir)
-			
-			# 교전 대상 쌍은 반발력을 낮춰 충돌 직전 멈춤 느낌을 줄임
-			var repulsion_strength = 24.0 if is_engagement_pair else 40.0
-			var head_on_pair = my_fwd.dot(dir) > 0.72 and other_fwd.dot(-dir) > 0.72
-			var high_speed_head_on = head_on_pair and approach_speed >= min_ramming_speed * 0.85
-			# 정면 충돌은 "튕김"보다 "충돌 후 정지"가 느껴지도록 반발력을 더 낮춤
-			if is_engagement_pair and head_on_pair:
-				repulsion_strength *= 0.18
-			elif high_speed_head_on:
-				repulsion_strength *= 0.12
-			var penetration_ratio = compression / maxf(coll_dist, 0.001)
-			# 깊은 겹침에서는 강한 복원력을 걸어 통과를 방지
-			if penetration_ratio > 0.22:
-				if high_speed_head_on:
-					repulsion_strength = maxf(repulsion_strength, 26.0)
-				else:
-					repulsion_strength = maxf(repulsion_strength, 72.0)
-			var repulsion_force = -dir * (compression * repulsion_strength)
-			# 정면 충돌은 후방(역방향) 튕김 성분을 제거해 "충돌 후 멈춤" 감각을 강화
-			if (is_engagement_pair and head_on_pair) or high_speed_head_on:
-				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
-				if backward_component < 0.0:
-					repulsion_force -= my_fwd * backward_component
-			force += repulsion_force
-			
-			# 충돌로 인해 배가 미끄러지지 않고(Sliding 안됨) 아예 멈춰버리는 현상 완화
-			# 상대방이 내 바로 '정면'(dot > 0.8)에 있을 때만 감속하고, 빗겨맞거나 측면이면 그대로 미끄러지며 나아감
-			if current_speed > 0.5:
-				if my_fwd.dot(dir) > 0.8:
-					if high_speed_head_on:
-						current_speed = lerp(current_speed, 0.0, 0.72)
-					elif is_engagement_pair:
-						var stop_blend = 0.48 if head_on_pair else 0.24
-						current_speed = lerp(current_speed, 0.0, stop_blend)
-					else:
-						current_speed = lerp(current_speed, 0.0, 0.1)
-					
-			# ========================
-			# [신규] 충각(Ramming) 데미지 발생 트리거
-			# ========================
-			# 접근 속도가 일정 수치 이상일 때만 강한 충돌로 인정 (가까이서 비벼질 때는 데미지 무시)
-			# 접근 속도가 일정 수치 이상일 때만 강한 충돌로 인정
-			if approach_speed >= min_ramming_speed:
-				apply_ramming_damage(other, approach_speed)
-				# [FIX] 여기서 other.apply_ramming_damage를 호출하지 않습니다.
-				# 모든 배가 각자의 _calculate_collision_repulsion에서 자신에게 가해지는 데미지를 계산하므로,
-				# 여기서 상대를 호출하면 중복 데미지가 발생합니다.
-					
-	return force
+	return BaseShipCollisionHelper.calculate_collision_repulsion(self)
 
 func _is_engagement_pair(other: Node3D) -> bool:
 	if not is_instance_valid(other):
@@ -878,64 +642,40 @@ func take_rope_damage(amount: float) -> void:
 
 ## 충격(충각) 타격 로직 - 타원형 각도 판정 포함
 func apply_ramming_damage(other: Node3D, impact_speed: float) -> void:
-	if is_sinking or is_dying: return
-	
-	# 중복 피격 방지 쿨다운 (1.0초 이내 재충돌 무시) 상향 (0.5 -> 1.0)
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if _recent_ram_targets.has(other):
-		if current_time - _recent_ram_targets[other] < 1.0:
-			return
-	_recent_ram_targets[other] = current_time
-	
-	# 내 전방 벡터와 상대를 향하는 벡터 계산
-	var my_fwd = Vector3(-sin(rotation.y), 0, -cos(rotation.y)).normalized()
-	var dir_to_other = (other.global_position - global_position).normalized()
-	
-	# 내적(Dot Product): 1.0 이면 정면, 0.0 이면 측면
-	var dot = abs(my_fwd.dot(dir_to_other))
-	
-	# 상대방 입장에서의 내적 (상대방도 나를 정면으로 바라보는지, 측면을 내어주었는지)
-	var _other_dot = 1.0 # 기본값 (보수적)
-	if other.has_method("get_rotation"):
-		var other_fwd = Vector3(-sin(other.rotation.y), 0, -cos(other.rotation.y)).normalized()
-		_other_dot = abs(other_fwd.dot(-dir_to_other))
-	
-	# 측면 가중치를 완화해 과도한 충돌 피해를 줄인다.
-	# 내적(Dot)이 1(정면)에 가까울 수록 0.30배, 0(측면)에 가까울 수록 1.25배
-	var angle_mult = remap(dot, 0.0, 1.0, 1.25, 0.30)
-	
-	# 속도 선형 비례 유지하되 계수를 낮춰 충각 피해를 전반적으로 완화한다.
-	var final_ram_damage = impact_speed * 2.8 * angle_mult
-	
-	# 시각 및 청각 피드백 (임팩트)
-	if impact_speed >= min_ramming_speed:
-		var impact_pos = (global_position + other.global_position) * 0.5
-		impact_pos.y = 0.5
-		
-		# 강한 임팩트일 때만 사운드 및 흔들림 적용
-		if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
-			_cached_audio_manager.play_sfx("impact_wood", global_position, randf_range(0.6, 0.8), 5.0)
-			
-		var cam = get_tree().root.get_camera_3d()
-		if cam and cam.has_method("shake"):
-			# 세게 부딪힐 수록 화면이 많이 흔들림
-			cam.shake(clamp(impact_speed * 0.05, 0.2, 0.6), 0.3)
-			
-		# 충돌 대상들 범위에 충격파 (배 위 병사 데미지)
-		apply_ramming_aoe(clamp(impact_speed * 1.5, 5.0, 20.0), impact_pos)
-	
-	if DEBUG_COMBAT_LOGS:
-		print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, final_ram_damage])
-	take_damage(final_ram_damage, (global_position + other.global_position) * 0.5)
+	BaseShipCollisionHelper.apply_ramming_damage(self, other, impact_speed)
+
+func _spawn_ship_collision_effects(impact_pos: Vector3, impact_speed: float) -> void:
+	BaseShipCollisionHelper.spawn_ship_collision_effects(self, impact_pos, impact_speed)
 
 
 ## 데미지 처리 (공통)
 func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
 	if is_sinking or is_dying:
 		return
-		
+	
+	var hp_before: float = hull_hp
 	var final_damage = maxf(amount - hull_defense, 1.0)
 	hull_hp -= final_damage
+	_apply_sail_damage_from_hit(final_damage, damage_source)
+	
+	if DEBUG_DAMAGE_LOGS and OS.is_debug_build():
+		var source_label: String = damage_source if not damage_source.is_empty() else "unknown"
+		var ship_label: String = name
+		if "ship_type" in self and get("ship_type") != null and not str(get("ship_type")).is_empty():
+			ship_label += "/" + str(get("ship_type"))
+		print("[DamageLog][%s][%s] source=%s raw=%.1f defense=%.1f final=%.1f hp=%.1f->%.1f" % [
+			ship_label,
+			str(get("team")),
+			source_label,
+			amount,
+			hull_defense,
+			final_damage,
+			hp_before,
+			hull_hp,
+		])
+
+	if is_derelict and not damage_source.is_empty() and damage_source != "leak" and has_method("_sink_derelict"):
+		call_deferred("_sink_derelict")
 	
 	# 플레이어 무기 피해 집계: 적 함선에만 기록
 	if not damage_source.is_empty() and get("team") == "enemy":
@@ -946,7 +686,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	var current_time = Time.get_ticks_msec() / 1000.0
 	if wood_splinter_scene and (current_time - _last_splinter_time > 0.2):
 		_last_splinter_time = current_time
-		var splinter = wood_splinter_scene.instantiate()
+		var splinter = ScenePool.acquire(get_tree(), wood_splinter_scene)
 		get_tree().root.add_child(splinter)
 		if hit_position != Vector3.ZERO:
 			splinter.global_position = hit_position + Vector3(0, 0.5, 0)
@@ -955,11 +695,40 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 		splinter.rotation.y = randf() * TAU
 		if splinter.has_method("set_amount_by_damage"):
 			splinter.set_amount_by_damage(final_damage)
+		if splinter.has_method("pool_activate"):
+			splinter.pool_activate()
 			
 	_flash_damage(final_damage)
 	
 	if hull_hp <= 0:
 		die()
+
+func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> void:
+	if masts.is_empty():
+		return
+	if damage_source == "leak":
+		return
+	var source_mult: float = 0.0
+	if damage_source.begins_with("cannon") or damage_source == "janggun" or damage_source.begins_with("ramming"):
+		source_mult = 1.0
+	elif damage_source.contains("ballista") or damage_source.contains("singigeon") or damage_source.contains("fire"):
+		source_mult = 0.75
+	elif damage_source.is_empty() or damage_source == "unknown":
+		source_mult = 0.45
+	else:
+		source_mult = 0.25
+	if source_mult <= 0.0:
+		return
+	var sail_damage_delta: float = clamp((final_damage / 220.0) * source_mult, 0.01, 0.12)
+	var intact_masts: Array[Node] = []
+	for mast in masts:
+		if is_instance_valid(mast) and mast.has_method("add_sail_damage"):
+			intact_masts.append(mast)
+	if intact_masts.is_empty():
+		return
+	var chosen_index: int = randi() % intact_masts.size()
+	var chosen_mast: Node = intact_masts[chosen_index]
+	chosen_mast.call("add_sail_damage", sail_damage_delta)
 
 func _flash_damage(amount: float = 10.0) -> void:
 	var shake_mult = clamp(amount / 10.0, 0.15, 2.0)
@@ -970,36 +739,13 @@ func _flash_damage(amount: float = 10.0) -> void:
 
 ## 화염 데미지
 func take_fire_damage(_dps: float, duration: float) -> void:
-	if is_burning:
-		burn_timer = max(burn_timer, duration)
-		return
-		
-	fire_build_up += duration * 6.0
-	if fire_build_up >= fire_threshold:
-		is_burning = true
-		fire_build_up = fire_threshold
-		burn_timer = duration
-		print("[Status] 배에 불이 붙었습니다!")
+	BaseShipStatusHelper.take_fire_damage(self, duration)
 
 func _update_burning_status(delta: float) -> void:
-	if is_burning:
-		hull_hp = move_toward(hull_hp, 0, 2.0 * delta)
-		if hull_hp <= 0:
-			die()
-			
-		burn_timer -= delta
-		if burn_timer <= 0:
-			is_burning = false
-			fire_build_up = 0.0
-	else:
-		if fire_build_up > 0:
-			fire_build_up = move_toward(fire_build_up, 0, 15.0 * delta)
+	BaseShipStatusHelper.update_burning_status(self, delta)
 
 func _update_hull_regeneration(delta: float) -> void:
-	if is_sinking or is_dying or hull_regen_rate <= 0: return
-	
-	if hull_hp < max_hull_hp:
-		hull_hp = move_toward(hull_hp, max_hull_hp, hull_regen_rate * delta)
+	BaseShipStatusHelper.update_hull_regeneration(self, delta)
 
 func get_hull_ratio() -> float:
 	if max_hull_hp <= 0.0: return 1.0
@@ -1084,216 +830,77 @@ func _clear_ropes() -> void:
 			rope.queue_free()
 	rope_instances.clear()
 
-func _is_boarding_contact_stable() -> bool:
-	if not is_instance_valid(boarding_target):
-		return false
-		
-	var diff = boarding_target.global_position - global_position
+func _get_boarding_alignment_state(target_ship: Node3D) -> Dictionary:
+	if not is_instance_valid(target_ship):
+		return {}
+
+	var diff = target_ship.global_position - global_position
 	diff.y = 0.0
 	if diff.length_squared() < 0.01:
-		return false
+		return {}
 	var dir = diff.normalized()
-	
+
 	var my_fwd = -global_transform.basis.z
 	my_fwd.y = 0.0
 	if my_fwd.length_squared() > 0.001:
 		my_fwd = my_fwd.normalized()
 	else:
 		my_fwd = dir
-		
-	var target_fwd = -boarding_target.global_transform.basis.z
+
+	var target_fwd = -target_ship.global_transform.basis.z
 	target_fwd.y = 0.0
 	if target_fwd.length_squared() > 0.001:
 		target_fwd = target_fwd.normalized()
 	else:
 		target_fwd = -dir
-		
-	var my_head_on = absf(my_fwd.dot(dir))
-	var target_head_on = absf(target_fwd.dot(-dir))
-	
-	var target_speed = boarding_target.get("current_speed") if "current_speed" in boarding_target else 0.0
+
+	var my_contact_dot: float = my_fwd.dot(dir)
+	var target_contact_dot: float = target_fwd.dot(-dir)
+	var parallel_dot: float = my_fwd.dot(target_fwd)
+
+	var target_speed = target_ship.get("current_speed") if "current_speed" in target_ship else 0.0
 	var my_vel = my_fwd * current_speed
 	var target_vel = target_fwd * target_speed
 	var closing_speed = absf((my_vel - target_vel).dot(dir))
-	
-	# 완전 정면 대치여도 속도가 충분히 낮으면 밧줄을 허용한다.
-	var both_head_on = my_head_on > boarding_side_alignment_max_dot and target_head_on > boarding_side_alignment_max_dot
-	if both_head_on and closing_speed > maxf(1.2, boarding_max_relative_speed * 0.5):
+
+	return {
+		"dir": dir,
+		"my_fwd": my_fwd,
+		"target_fwd": target_fwd,
+		"my_contact_dot": my_contact_dot,
+		"target_contact_dot": target_contact_dot,
+		"parallel_dot": parallel_dot,
+		"closing_speed": closing_speed,
+	}
+
+func _is_side_boarding_approach(target_ship: Node3D) -> bool:
+	var state = _get_boarding_alignment_state(target_ship)
+	if state.is_empty():
 		return false
-		
+
+	var my_contact_abs: float = absf(float(state["my_contact_dot"]))
+	var target_contact_abs: float = absf(float(state["target_contact_dot"]))
+	var parallel_dot: float = float(state["parallel_dot"])
+	return my_contact_abs <= 0.55 and target_contact_abs <= 0.55 and parallel_dot >= 0.2
+
+func _is_boarding_contact_stable() -> bool:
+	if not is_instance_valid(boarding_target):
+		return false
+
+	if not _is_side_boarding_approach(boarding_target):
+		return false
+
+	var state = _get_boarding_alignment_state(boarding_target)
+	if state.is_empty():
+		return false
+	var closing_speed: float = float(state["closing_speed"])
 	return closing_speed <= boarding_max_relative_speed * 1.35
 
 func _process_boarding_common(delta: float) -> void:
-	if not is_instance_valid(boarding_target):
-		_cancel_boarding()
-		return
-		
-	# 밧줄 HP가 바닥나면 해제
-	if boarding_rope_hp <= 0:
-		_cancel_boarding()
-		return
-		
-	var target_pos = boarding_target.global_position
-	var dist = global_position.distance_to(target_pos)
-	
-	if dist > boarding_break_distance:
-		print("[Boarding] 밧줄이 끊어졌습니다. 도선 중단.")
-		_cancel_boarding()
-		return
-	
-	# 유효 거리 밖에서는 접촉 안정화 상태를 되감아, 재접근 연출을 유도
-	if dist > max_boarding_distance:
-		boarding_contact_timer = maxf(0.0, boarding_contact_timer - delta * 2.0)
-		boarding_hook_timer = 0.0
-		boarding_secondary_rope_timer = 0.0
-		if _initial_rope_deployed and dist > (max_boarding_distance + 0.8):
-			_clear_ropes()
-			_initial_rope_deployed = false
-			_full_rope_deployed = false
-		return
-		
-	boarding_contact_timer += delta
-	if boarding_contact_timer < boarding_contact_grace_duration:
-		return
-		
-	var stable_contact = _is_boarding_contact_stable()
-	if not stable_contact:
-		# 장시간 근접 대치 시 안정성 판정을 강제로 통과시켜 무한 대기를 방지
-		var force_hook_after = boarding_contact_grace_duration + 1.2
-		if boarding_contact_timer < force_hook_after:
-			boarding_contact_timer = maxf(boarding_contact_grace_duration * 0.6, boarding_contact_timer - delta * 1.4)
-			return
-		
-	boarding_hook_timer += delta
-	if not _initial_rope_deployed:
-		if boarding_hook_timer >= boarding_hook_throw_delay:
-			_spawn_ropes(boarding_initial_rope_count)
-			_initial_rope_deployed = true
-			_full_rope_deployed = boarding_initial_rope_count >= 2
-			boarding_secondary_rope_timer = 0.0
-			if DEBUG_COMBAT_LOGS:
-				print("[Boarding] 갈고리 투척 성공, 밧줄 연결 시작.")
-		return
-		
-	if not _full_rope_deployed:
-		boarding_secondary_rope_timer += delta
-		if boarding_secondary_rope_timer >= boarding_secondary_rope_delay:
-			_spawn_ropes()
-			_full_rope_deployed = true
-			if DEBUG_COMBAT_LOGS:
-				print("[Boarding] 추가 밧줄이 연결되었습니다.")
-		
-	if boarding_prep_timer < boarding_prep_duration:
-		boarding_prep_timer += delta
-	else:
-		boarding_timer += delta
-		if boarding_timer >= boarding_interval:
-			boarding_timer = 0.0
-			_transfer_one_soldier()
-		
-	_update_ropes(delta)
+	BaseShipBoardingHelper.process_boarding_common(self, delta)
 
 func _cancel_boarding() -> void:
-	if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
-		boarding_target.set("boarding_attacker", null)
-	_clear_ropes()
-	is_boarding = false
-	boarding_timer = 0.0
-	boarding_prep_timer = 0.0
-	boarding_contact_timer = 0.0
-	boarding_hook_timer = 0.0
-	boarding_secondary_rope_timer = 0.0
-	_initial_rope_deployed = false
-	_full_rope_deployed = false
-	boarding_rope_hp = max_boarding_rope_hp # HP 리셋
+	BaseShipBoardingHelper.cancel_boarding(self)
 
 func _transfer_one_soldier() -> void:
-	if not is_instance_valid(boarding_target): return
-	
-	var target_soldiers_node = boarding_target.get_node_or_null("Soldiers")
-	if not target_soldiers_node: target_soldiers_node = boarding_target
-	
-	var team_prop = get("team") if "team" in self else "enemy"
-	
-	# 난간 근접전 우선: 상대 갑판에 수비병이 남아있으면 월선을 보류한다.
-	var defenders_alive = 0
-	if target_soldiers_node:
-		for child in target_soldiers_node.get_children():
-			if child.get("current_state") != 4 and child.get("team") != team_prop:
-				defenders_alive += 1
-	if defenders_alive > 0:
-		return
-	
-	var s = null
-	
-	if has_node("Soldiers"):
-		var soldiers = $Soldiers.get_children()
-		
-		# 1. 방어 판단: 내 배에 침입한 적군과 아군 비율 확인
-		var enemy_count_on_deck = 0
-		var ally_count_on_deck = 0
-		for child in soldiers:
-			if child.get("current_state") != 4: # NOT DEAD
-				if child.get("team") != team_prop:
-					enemy_count_on_deck += 1
-				else:
-					ally_count_on_deck += 1
-					
-		# 아군이 적군보다 많으면 방어 충분 → 도선 계속 진행
-		# 아군이 적군 이하이면 방어 인원 부족 → 증원 우선 (return하지 않음)
-		if enemy_count_on_deck > 0 and ally_count_on_deck > enemy_count_on_deck:
-			return
-			
-		# 2. 아군 병사 선택
-		for child in soldiers:
-			if child.get("current_state") != 4 and child.get("team") == team_prop:
-				s = child
-				break
-				
-	if s:
-		var start_global = s.global_position
-		s.call_deferred("reparent", target_soldiers_node)
-		
-		# 점프 애니메이션 세팅
-		var target_half_ext = Vector2(1.0, 1.5)
-		if boarding_target.has_method("get_deck_half_extents"):
-			var ext = boarding_target.call("get_deck_half_extents")
-			if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
-				target_half_ext = ext
-		var target_deck_h = boarding_target.get("deck_height") if "deck_height" in boarding_target else 0.5
-		var jump_offset = Vector3(
-			randf_range(-target_half_ext.x, target_half_ext.x),
-			target_deck_h,
-			randf_range(-target_half_ext.y, target_half_ext.y)
-		)
-		var end_global = boarding_target.global_transform * jump_offset
-		
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.tween_property(s, "global_position:x", end_global.x, 0.5).set_trans(Tween.TRANS_LINEAR)
-		tween.tween_property(s, "global_position:z", end_global.z, 0.5).set_trans(Tween.TRANS_LINEAR)
-		
-		var mid_y = max(start_global.y, end_global.y) + 2.0
-		var y_tween = create_tween()
-		y_tween.tween_property(s, "global_position:y", mid_y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		y_tween.tween_property(s, "global_position:y", end_global.y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		
-		if s.has_method("set_team"):
-			s.set_team(team_prop)
-			
-		s.set("owned_ship", boarding_target)
-		
-		# 폭발병 로직 (임시)
-		if team_prop == "enemy" and boarding_target.get("team") == "player":
-			s.set("boarder_explosion_timer", 8.0)
-			
-		if s.get("is_stationary"): s.set("is_stationary", false)
-		
-		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team_prop, boarding_target.name])
-	else:
-		if has_method("_become_derelict") and not is_in_group("player"):
-			print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
-			call("_become_derelict")
-		else:
-			print("[Status] 도선할 병사가 더 이상 없습니다.")
-			_cancel_boarding()
+	BaseShipBoardingHelper.transfer_one_soldier(self)

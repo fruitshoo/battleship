@@ -8,7 +8,7 @@ const DEBUG_COMBAT_LOGS := false
 
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
 @export var fire_cooldown: float = 4.0
-@export var detection_range: float = 30.0
+@export var detection_range: float = 24.0
 @export var shot_count: int = 1 # 레벨에 따라 2/3/4
 @export var spread_angle: float = 0.0 # 레벨에 따라 점진적 확산각 증가
 @export var burst_interval: float = 0.08

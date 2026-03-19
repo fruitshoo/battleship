@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/entities/weapons/weapon_spear.gd" id="1_script"]
+[ext_resource type="Material" path="res://resources/materials/pole_wood_material.tres" id="2_pole_wood"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_pole"]
 top_radius = 0.02
@@ -25,6 +26,7 @@ script = ExtResource("1_script")
 [node name="Pole" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 mesh = SubResource("CylinderMesh_pole")
+surface_material_override/0 = ExtResource("2_pole_wood")
 
 [node name="Tip" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)

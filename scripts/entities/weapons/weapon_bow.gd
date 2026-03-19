@@ -2,7 +2,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
-@export var max_range: float = 25.0
+@export var max_range: float = 20.0
 var _cached_spawn_parent: Node = null
 
 func _ready() -> void:

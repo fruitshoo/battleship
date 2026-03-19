@@ -1,0 +1,103 @@
+extends VBoxContainer
+
+const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+
+var slot_container: HFlowContainer = null
+var slots: Array[PanelContainer] = []
+var _slot_panel_bg: Color = Color(0, 0, 0, 0.4)
+var _slot_border_color: Color = Color(0.3, 0.3, 0.3, 0.8)
+
+func setup_track(title_text: String, title_color: Color, slot_panel_bg: Color, slot_border_color: Color, slot_count: int = 0) -> void:
+	var title = Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_color_override("font_color", title_color)
+	add_child(title)
+
+	_slot_panel_bg = slot_panel_bg
+	_slot_border_color = slot_border_color
+
+	slot_container = HFlowContainer.new()
+	slot_container.add_theme_constant_override("separation", 8)
+	slot_container.alignment = FlowContainer.ALIGNMENT_BEGIN
+	slot_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(slot_container)
+	slots.clear()
+
+	for _i in range(slot_count):
+		_ensure_slot(_i)
+
+func update_slot(slot_idx: int, upgrade_id: String, level: int, icon_text: String, icon_color: Color) -> PanelContainer:
+	if slot_idx < 0:
+		return null
+	_ensure_slot(slot_idx)
+	var slot = slots[slot_idx]
+	var icon_label = slot.get_node_or_null("Icon") as Label
+	var lv_label = slot.get_node_or_null("Level") as Label
+	if icon_label:
+		icon_label.text = icon_text
+		icon_label.add_theme_color_override("font_color", icon_color)
+	if lv_label:
+		lv_label.text = str(level)
+		lv_label.visible = true
+
+	slot.set_meta("upgrade_id", upgrade_id)
+	slot.set_meta("upgrade_level", level)
+
+	var slot_sb = slot.get_theme_stylebox("panel")
+	if slot_sb:
+		slot_sb = slot_sb.duplicate()
+		slot.add_theme_stylebox_override("panel", slot_sb)
+		var tween = create_tween()
+		tween.tween_property(slot_sb, "border_color", icon_color, 0.2)
+		tween.tween_property(slot_sb, "border_color", Color(0.35, 0.35, 0.35, 0.8), 0.5)
+	return slot
+
+func _ensure_slot(slot_idx: int) -> void:
+	while slots.size() <= slot_idx:
+		var slot_bg = _create_slot(_slot_panel_bg, _slot_border_color)
+		slot_container.add_child(slot_bg)
+		slots.append(slot_bg)
+
+func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
+	var slot_bg = PanelContainer.new()
+	slot_bg.custom_minimum_size = Vector2(32, 32)
+	slot_bg.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var slot_sb = StyleBoxFlat.new()
+	slot_sb.bg_color = panel_bg
+	slot_sb.set_corner_radius_all(4)
+	slot_sb.border_width_bottom = 1
+	slot_sb.border_width_top = 1
+	slot_sb.border_width_left = 1
+	slot_sb.border_width_right = 1
+	slot_sb.border_color = border_color
+	slot_bg.add_theme_stylebox_override("panel", slot_sb)
+
+	var icon_label = Label.new()
+	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	icon_label.add_theme_font_size_override("font_size", 20)
+	if MATERIAL_SYMBOLS_FONT:
+		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
+	icon_label.name = "Icon"
+	slot_bg.add_child(icon_label)
+
+	var level_label_overlay = Label.new()
+	level_label_overlay.name = "Level"
+	level_label_overlay.text = "1"
+	level_label_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	level_label_overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	level_label_overlay.add_theme_font_size_override("font_size", 10)
+	level_label_overlay.add_theme_color_override("font_outline_color", Color.BLACK)
+	level_label_overlay.add_theme_constant_override("outline_size", 3)
+	level_label_overlay.visible = false
+	level_label_overlay.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	level_label_overlay.offset_left = -16
+	level_label_overlay.offset_top = -14
+	level_label_overlay.offset_right = -2
+	level_label_overlay.offset_bottom = -2
+	slot_bg.add_child(level_label_overlay)
+	slot_bg.set_meta("upgrade_id", "")
+	slot_bg.set_meta("upgrade_level", 0)
+	return slot_bg

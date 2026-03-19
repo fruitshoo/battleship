@@ -1,30 +1,12 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://urin2213gxp6"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_plate"]
-size = Vector3(0.5, 0.08, 0.6)
+[ext_resource type="Script" path="res://scripts/props/shared_material_model.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://chxvggbngnvjy" path="res://assets/models/props/shield/shield_rectangle.glb" id="2_model"]
+[ext_resource type="Material" path="res://assets/models/props/shield/shield_shared_material.tres" id="3_material"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_boss"]
-size = Vector3(0.14, 0.06, 0.14)
+[node name="SquareShield" type="Node3D" unique_id=1362985899]
+script = ExtResource("1_script")
+shared_material = ExtResource("3_material")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
-albedo_color = Color(0.42, 0.27, 0.16, 1)
-metallic = 0.06
-roughness = 0.8
-cull_mode = 2
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_metal"]
-albedo_color = Color(0.68, 0.66, 0.62, 1)
-metallic = 0.88
-roughness = 0.34
-cull_mode = 2
-
-[node name="SquareShield" type="Node3D"]
-
-[node name="Plate" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_plate")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="Boss" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
-mesh = SubResource("BoxMesh_boss")
-material_override = SubResource("StandardMaterial3D_metal")
+[node name="Model" parent="." unique_id=193627370 instance=ExtResource("2_model")]
+transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)

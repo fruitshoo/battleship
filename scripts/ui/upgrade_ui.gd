@@ -1,5 +1,7 @@
 extends CanvasLayer
 
+const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.gd")
+
 ## 업그레이드 선택 UI
 ## 레벨업 시 3개의 카드를 표시, 플레이어가 하나를 선택
 
@@ -155,8 +157,15 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	
 	# 카테고리 라벨
 	var cat_label = Label.new()
-	var cat_name = UpgradeManager.Category.keys()[data["category"]]
-	cat_label.text = "[" + cat_name.replace("_", " ") + "]"
+	var category_name_map := {
+		UpgradeManager.Category.ANTI_SHIP: "함포",
+		UpgradeManager.Category.ANTI_PERSONNEL: "병사",
+		UpgradeManager.Category.HULL: "선체",
+		UpgradeManager.Category.SEAMANSHIP: "항해",
+		UpgradeManager.Category.SPECIAL: "특수",
+		UpgradeManager.Category.FLEET: "지원함",
+	}
+	cat_label.text = "[" + str(category_name_map.get(data["category"], "강화")) + "]"
 	cat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cat_label.add_theme_font_size_override("font_size", 12)
 	var cat_color = color.lerp(Color.WHITE, 0.4)
@@ -186,7 +195,11 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	
 	# 설명
 	var desc_label = Label.new()
-	desc_label.text = UpgradeManager.get_next_description(upgrade_id)
+	var next_spec := HudUpgradeInfoHelper.build_upgrade_spec_text(upgrade_id, next_lv, data.get("stats", {}))
+	if next_spec.is_empty():
+		desc_label.text = UpgradeManager.get_next_description(upgrade_id)
+	else:
+		desc_label.text = "다음 효과: " + next_spec
 	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_label.add_theme_font_size_override("font_size", 15)

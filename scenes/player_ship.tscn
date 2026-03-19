@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://cy7yako2yokck" path="res://scripts/entities/player_ship.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/soldier.tscn" id="2_soldier"]
 [ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
-[ext_resource type="PackedScene" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
+[ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_proximity"]

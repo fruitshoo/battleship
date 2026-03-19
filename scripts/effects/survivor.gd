@@ -5,7 +5,7 @@ const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 ## 적함 침몰 시 발생하며, 플레이어가 다가가면 자석처럼 끌려와 병사로 합류함
 
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
-@export var magnet_speed: float = 5.0 # 끌려가는 기본 속도
+@export var magnet_speed: float = 7.5 # 끌려가는 기본 속도
 @export var float_speed: float = 1.5 # 둥실거리는 속도
 @export var float_height: float = 0.2 # 둥실거리는 진폭
 @export var rotation_speed: float = 0.5 # 회전 속도
@@ -60,7 +60,8 @@ func _ready() -> void:
 var is_expiring: bool = false # 소멸 진행 중 여부
 
 func _physics_process(delta: float) -> void:
-	if is_collected: return
+	if is_collected or not is_inside_tree():
+		return
 	time_alive += delta
 	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
 	_player_search_timer = maxf(0.0, _player_search_timer - delta)
@@ -77,22 +78,30 @@ func _physics_process(delta: float) -> void:
 		_player_search_timer = player_search_interval
 		_find_target_player()
 	
-	if is_instance_valid(target_player):
-		var dist = global_position.distance_to(target_player.global_position)
-		var current_radius = _get_current_magnet_radius()
-		if dist <= current_radius:
+	if is_instance_valid(target_player) and target_player.is_inside_tree():
+		var dist: float = global_position.distance_to(target_player.global_position)
+		var current_radius: float = _get_current_magnet_radius()
+		var magnet_lock_radius: float = current_radius * 1.35
+		var within_pull_zone: bool = dist <= current_radius or (current_magnet_speed > 0.1 and dist <= magnet_lock_radius)
+		if within_pull_zone:
 			# 자석 효과: 거리가 가까울수록 더 빠르게 가속
-			current_magnet_speed = lerp(current_magnet_speed, magnet_speed + (10.0 / max(dist, 1.0)), 3.0 * delta)
-			var direction = (target_player.global_position - global_position).normalized()
+			var ship_speed_bonus: float = 0.0
+			if target_player.get("current_speed") != null:
+				ship_speed_bonus = maxf(0.0, float(target_player.get("current_speed"))) * 0.75
+			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (16.0 / max(dist, 0.8))
+			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 24.0 * delta)
+			var direction: Vector3 = (target_player.global_position - global_position).normalized()
 			global_position += direction * current_magnet_speed * delta
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
-			if dist < 2.5: # 2.0 -> 2.5
+			if dist < 3.0:
 				_collect_by_proximity()
 		else:
 			current_magnet_speed = 0.0
 			_apply_floating(delta)
 	else:
+		if is_instance_valid(target_player) and not target_player.is_inside_tree():
+			target_player = null
 		_apply_floating(delta)
 
 
@@ -148,9 +157,9 @@ func _get_current_magnet_radius() -> float:
 	var meta_manager = get_node_or_null("/root/MetaManager")
 	if is_instance_valid(meta_manager) and meta_manager.has_method("get_collection_radius_bonus"):
 		meta_bonus = float(meta_manager.get_collection_radius_bonus())
-	if is_instance_valid(_cached_um) and "current_levels" in _cached_um:
-		var supply_lv = _cached_um.current_levels.get("supply_bonus", 0)
-		return base_magnet_radius + meta_bonus + (supply_lv * 2.0)
+	if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
+		var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
+		return base_magnet_radius + meta_bonus + float(supply_stats.get("radius_bonus", 0.0))
 	return base_magnet_radius + meta_bonus
 
 
@@ -200,12 +209,15 @@ func _try_collect(player_ship: Node3D) -> void:
 			# 생존자 구조 시에도 체력 소폭 회복 로직 추가
 			if "hull_hp" in player_ship and "max_hull_hp" in player_ship:
 				var um = get_node_or_null("/root/UpgradeManager")
-				var supply_lv = 0
-				if is_instance_valid(um) and "current_levels" in um:
-					supply_lv = um.current_levels.get("supply_bonus", 0)
-				
-				var heal_amount = 5.0 + (supply_lv * 5.0) # 기본 5, 레벨당 +5
+				var heal_amount: float = 5.0
+				var stamina_recover: float = 0.0
+				if is_instance_valid(um) and um.has_method("get_supply_bonus_stats"):
+					var supply_stats: Dictionary = um.get_supply_bonus_stats()
+					heal_amount += float(supply_stats.get("heal_bonus", 0.0))
+					stamina_recover += float(supply_stats.get("stamina_recovery_bonus", 0.0))
 				player_ship.hull_hp = minf(player_ship.hull_hp + heal_amount, player_ship.max_hull_hp)
+				if "rowing_stamina" in player_ship and "max_rowing_stamina" in player_ship:
+					player_ship.rowing_stamina = minf(player_ship.max_rowing_stamina, player_ship.rowing_stamina + stamina_recover)
 				
 				if player_ship.has_method("_find_hud"):
 					var hud = player_ship._find_hud()

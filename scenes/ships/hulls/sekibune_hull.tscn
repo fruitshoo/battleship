@@ -1,8 +1,9 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://qv4d3dnh8v4u"]
 
-[ext_resource type="PackedScene" uid="uid://j6r6r6r6r6r6" path="res://scenes/entities/cannon_japanese.tscn" id="cannon_scene"]
+[ext_resource type="PackedScene" path="res://scenes/entities/cannon_enemy_light.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+[ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(2.4, 0.8, 7)
@@ -10,18 +11,19 @@ size = Vector3(2.4, 0.8, 7)
 [sub_resource type="StandardMaterial3D" id="Material_japan_wood"]
 albedo_color = Color(0.45, 0.3, 0.25, 1)
 
-[node name="SekibuneHull" type="Node3D"]
+[node name="SekibuneHull" type="Node3D" unique_id=930639546]
 
-[node name="Hull" type="MeshInstance3D" parent="."]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1525302330]
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_japan_wood")
 
-[node name="Mast" parent="." instance=ExtResource("mast_scene")]
+[node name="Mast" parent="." unique_id=1756063749 instance=ExtResource("mast_scene")]
+sail_texture = ExtResource("vertical_sail")
 
-[node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
+[node name="RudderVisual" parent="." unique_id=1052874943 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.5)
 
-[node name="Cannons" type="Node3D" parent="."]
+[node name="Cannons" type="Node3D" parent="." unique_id=1806470902]
 
-[node name="CannonFront" parent="Cannons" instance=ExtResource("cannon_scene")]
+[node name="CannonFront" parent="Cannons" unique_id=1612720500 instance=ExtResource("cannon_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -3.8)

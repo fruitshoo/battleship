@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 대포알 (Cannonball)
@@ -11,17 +12,98 @@ const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 @export var homing_strength: float = 0.0 # 유도 제거
 @export var homing_duration: float = 0.0 # 유도 제거
 @export var crit_chance: float = 0.2 # 20% 크리티컬 확률
-@export var crit_multiplier: float = 2.0 # 크리티컬 2배 데미지
-@export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
-var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
+@export var crit_multiplier: float = 1.5 # 크리티컬 1.5배 데미지
+@export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
+@export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
+var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
 
 var team: String = "player"
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
+var shooter_label: String = ""
 var time_alive: float = 0.0
+var _life_left: float = 0.0
+var _signals_connected: bool = false
+var _base_lifetime: float = 0.0
+var _base_damage: float = 0.0
+var _base_crit_chance: float = 0.0
+var _base_crit_multiplier: float = 1.0
+var _is_releasing: bool = false
+
+@onready var smoke_trail: GPUParticles3D = get_node_or_null("SmokeTrail")
 
 func set_lifetime_multiplier(mult: float) -> void:
 	lifetime *= mult
+
+func get_base_damage() -> float:
+	return _base_damage
+
+func pool_capacity() -> int:
+	return 24
+
+func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3, target: Node3D, final_damage: float, lifetime_mult: float = 1.0) -> void:
+	global_position = spawn_position
+	team = fire_team
+	damage = final_damage
+	target_node = target
+	shooter_label = ""
+	time_alive = 0.0
+	has_hit = false
+	_is_releasing = false
+	direction = fire_direction.normalized()
+	if direction.is_zero_approx():
+		direction = Vector3.FORWARD
+	lifetime = _base_lifetime * lifetime_mult
+	_life_left = lifetime
+	visible = true
+	process_mode = Node.PROCESS_MODE_INHERIT
+	monitoring = true
+	monitorable = true
+	if team == "player":
+		collision_mask = 4
+	else:
+		collision_mask = 2
+	if is_instance_valid(smoke_trail):
+		smoke_trail.restart()
+		smoke_trail.emitting = true
+	var up_vec = Vector3.UP
+	if abs(direction.y) > 0.999:
+		up_vec = Vector3.RIGHT
+	basis = Basis.looking_at(direction, up_vec)
+
+func pool_reset() -> void:
+	has_hit = false
+	_is_releasing = false
+	time_alive = 0.0
+	_life_left = 0.0
+	target_node = null
+	shooter_label = ""
+	damage = _base_damage
+	crit_chance = _base_crit_chance
+	crit_multiplier = _base_crit_multiplier
+	lifetime = _base_lifetime
+	if is_instance_valid(smoke_trail):
+		smoke_trail.emitting = false
+
+func _release_self() -> void:
+	if _is_releasing:
+		return
+	_is_releasing = true
+	if is_inside_tree():
+		set_deferred("monitoring", false)
+		set_deferred("monitorable", false)
+		set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+		call_deferred("_finalize_release")
+	else:
+		monitoring = false
+		monitorable = false
+		process_mode = Node.PROCESS_MODE_DISABLED
+		ScenePool.release(self)
+
+func _finalize_release() -> void:
+	if not is_instance_valid(self):
+		return
+	ScenePool.release(self)
 
 func _spawn_effects(_is_crit: bool = false) -> void:
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -31,17 +113,35 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 	if audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
 
-	# 타격 시 검은 연기(발사 시 나오는 연기 재사용) 생성
-	if impact_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
-		var smoke = impact_smoke_scene.instantiate()
-		smoke.position = global_position
-		# 연기는 위쪽으로 퍼지게 (Basis 직접 설정)
-		smoke.basis = Basis.looking_at(Vector3.UP, Vector3.FORWARD)
-		get_tree().root.add_child.call_deferred(smoke)
-		if smoke is GPUParticles3D:
-			smoke.emitting = true
+	# 타격 연기는 발사 연기와 별도 budget을 사용해야 동시에 보여도 막히지 않는다.
+	if impact_smoke_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 8, 180.0):
+		var smoke = ScenePool.acquire(get_tree(), impact_smoke_scene)
+		if smoke.has_method("configure_as_hit"):
+			smoke.configure_as_hit()
+		get_tree().root.add_child(smoke)
+		smoke.global_position = global_position
+		# 연기는 위쪽으로 퍼지게.
+		smoke.global_basis = Basis.looking_at(Vector3.UP, Vector3.FORWARD)
+		if smoke.has_method("pool_activate"):
+			smoke.pool_activate()
+
+	# 포탄이 선체에 꽂힐 때는 목재 파편이 확실히 보여야 한다.
+	if wood_splinter_scene and VfxBudget.allow_spawn(get_tree(), "cannon_hit_splinter", global_position, 6, 140.0):
+		var splinter = ScenePool.acquire(get_tree(), wood_splinter_scene)
+		get_tree().root.add_child(splinter)
+		splinter.position = global_position + Vector3(0.0, 0.35, 0.0)
+		splinter.rotation.y = randf() * TAU
+		if splinter.has_method("set_amount_by_damage"):
+			splinter.set_amount_by_damage(damage * (1.0 if _is_crit else 0.8) + 6.0)
+		if splinter.has_method("pool_activate"):
+			splinter.pool_activate()
 
 func _ready() -> void:
+	_base_lifetime = lifetime
+	_base_damage = damage
+	_base_crit_chance = crit_chance
+	_base_crit_multiplier = crit_multiplier
+	pool_reset()
 	# 팀에 따른 충돌 마스크 자동 설정
 	if team == "player":
 		# 아군 대포알 → 적군(layer 4) 감시
@@ -51,16 +151,15 @@ func _ready() -> void:
 		collision_mask = 2
 		
 	# 충돌 시그널 연결
-	area_entered.connect(_on_area_entered)
-	body_entered.connect(_on_body_entered)
-	
-	# 수명 종료 시 자동 삭제
-	get_tree().create_timer(lifetime).timeout.connect(_on_timeout)
+	if not _signals_connected:
+		area_entered.connect(_on_area_entered)
+		body_entered.connect(_on_body_entered)
+		_signals_connected = true
 
 var has_hit: bool = false
 
 func _on_timeout() -> void:
-	if has_hit: return
+	if has_hit or _is_releasing: return
 	
 	# 수명 만료 = 바다에 떨어짐 → 물 폭발 이펙트 생성
 	_spawn_water_explosion()
@@ -68,12 +167,16 @@ func _on_timeout() -> void:
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
-	queue_free()
+	_release_self()
 
 func _physics_process(delta: float) -> void:
-	if has_hit: return
+	if has_hit or _is_releasing: return
 	
 	time_alive += delta
+	_life_left -= delta
+	if _life_left <= 0.0:
+		_on_timeout()
+		return
 	# 부드러운 유도 (Soft Homing) - 초반만 작동 (사용 시)
 	if time_alive < homing_duration and is_instance_valid(target_node):
 		var to_target = (target_node.global_position - global_position).normalized()
@@ -107,7 +210,7 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
 		has_hit = true
-		queue_free()
+		_release_self()
 
 
 func _on_area_entered(area: Area3D) -> void:
@@ -117,7 +220,7 @@ func _on_body_entered(body: Node3D) -> void:
 	_check_hit(body)
 
 func _check_hit(target: Node) -> void:
-	if has_hit: return
+	if has_hit or _is_releasing: return
 	
 	# 일단 무언가에 부딪혔으므로 삭제 준비
 	has_hit = true
@@ -137,11 +240,19 @@ func _check_hit(target: Node) -> void:
 		var final_damage = damage * (crit_multiplier if is_crit else 1.0)
 		
 		if ship.has_method("take_damage"):
-			var source_id = "cannon" if team == "player" else ""
+			var source_id = ""
+			if team == "player":
+				source_id = "cannon_crit" if is_crit else "cannon"
+			elif team == "enemy":
+				source_id = "enemy_cannon_crit" if is_crit else "enemy_cannon"
+			if shooter_label.is_empty() and has_meta("shooter_label"):
+				shooter_label = str(get_meta("shooter_label"))
+			if not shooter_label.is_empty():
+				source_id += ":%s" % shooter_label
 			ship.take_damage(final_damage, global_position, source_id)
 		
 		_spawn_effects(is_crit)
-		queue_free()
+		_release_self()
 	else:
 		# 침몰 중인 함선에 맞은 거면 무시 (부자연스러운 물폭발 방지)
 		var is_sinking = false
@@ -154,9 +265,9 @@ func _check_hit(target: Node) -> void:
 			var audio_manager = get_node_or_null("/root/AudioManager")
 			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 				audio_manager.play_sfx("water_splash_large", global_position, randf_range(1.0, 1.3))
-	
-	# 어떤 경우든 부딪히면 삭제
-	queue_free()
+		
+		# 어떤 경우든 부딪히면 삭제
+		_release_self()
 
 func _spawn_water_explosion() -> void:
 	if not is_inside_tree() or not water_explosion_scene: return
@@ -164,9 +275,13 @@ func _spawn_water_explosion() -> void:
 		return
 	
 	var pos = global_position
-	var explosion = water_explosion_scene.instantiate()
+	var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
+	if explosion.has_method("configure_as_splash"):
+		explosion.configure_as_splash()
 	# 수면 높이에 맞춘 위치를 한 번에 설정
 	# 대포알은 root에 추가되므로 position이 global_position과 동일하며, 
 	# 씬 트리에 없는 노드의 global_position을 건드리면 에러가 발생하므로 position 사용.
 	explosion.position = Vector3(pos.x, 0.2, pos.z)
-	get_tree().root.add_child.call_deferred(explosion)
+	get_tree().root.add_child(explosion)
+	if explosion.has_method("pool_activate"):
+		explosion.pool_activate()

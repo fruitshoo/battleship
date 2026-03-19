@@ -14,16 +14,16 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_cannon_fire_02.ogg"
 	],
 	"cannon_fuse": [
-		"res://assets/audio/sfx/sfx_match_sizzle.wav",
-		"res://assets/audio/sfx/sfx_steam_hiss.wav"
+		"res://assets/audio/sfx/sfx_match_sizzle.ogg",
+		"res://assets/audio/sfx/sfx_steam_hiss.ogg"
 	],
 	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.ogg", # 나무 부러지는/부딪히는 소리
 	"ui_click": [
-		"res://assets/audio/sfx/sfx_ui_click_1.wav",
-		"res://assets/audio/sfx/sfx_ui_click_2.wav",
-		"res://assets/audio/sfx/sfx_ui_click_3.wav",
-		"res://assets/audio/sfx/sfx_ui_click_4.wav",
-		"res://assets/audio/sfx/sfx_ui_click_5.wav",
+		"res://assets/audio/sfx/sfx_ui_click_1.ogg",
+		"res://assets/audio/sfx/sfx_ui_click_2.ogg",
+		"res://assets/audio/sfx/sfx_ui_click_3.ogg",
+		"res://assets/audio/sfx/sfx_ui_click_4.ogg",
+		"res://assets/audio/sfx/sfx_ui_click_5.ogg",
 	],
 	"level_up": "res://assets/audio/sfx/sfx_levelup.ogg",
 	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.ogg",
@@ -32,26 +32,26 @@ var sfx_streams = {
 	"rocket_launch_03": "res://assets/audio/sfx/sfx_rocket_launch_03.ogg",
 	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.ogg",
 	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.ogg",
-	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.wav",
+	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.ogg",
 	"sword_swing": [
-		"res://assets/audio/sfx/sfx_sword_swing_1.wav",
-		"res://assets/audio/sfx/sfx_sword_swing_2.wav",
-		"res://assets/audio/sfx/sfx_sword_swing_3.wav",
-		"res://assets/audio/sfx/sfx_sword_swing_4.wav"
+		"res://assets/audio/sfx/sfx_sword_swing_1.ogg",
+		"res://assets/audio/sfx/sfx_sword_swing_2.ogg",
+		"res://assets/audio/sfx/sfx_sword_swing_3.ogg",
+		"res://assets/audio/sfx/sfx_sword_swing_4.ogg"
 	],
 	"bow_shoot": [
-		"res://assets/audio/sfx/sfx_bow_01.wav",
-		"res://assets/audio/sfx/sfx_bow_02.wav"
+		"res://assets/audio/sfx/sfx_bow_01.ogg",
+		"res://assets/audio/sfx/sfx_bow_02.ogg"
 	],
 	"musket_fire": [
-		"res://assets/audio/sfx/sfx_musket_fire.wav",
-		"res://assets/audio/sfx/sfx_musket_fire_02.wav"
+		"res://assets/audio/sfx/sfx_musket_fire.ogg",
+		"res://assets/audio/sfx/sfx_musket_fire_02.ogg"
 	],
 	"soldier_hit": [
-		"res://assets/audio/sfx/sfx_sword_ting_1.wav",
-		"res://assets/audio/sfx/sfx_sword_ting_2.wav",
-		"res://assets/audio/sfx/sfx_sword_ting_3.wav",
-		"res://assets/audio/sfx/sfx_sword_ting_4.wav"
+		"res://assets/audio/sfx/sfx_sword_ting_1.ogg",
+		"res://assets/audio/sfx/sfx_sword_ting_2.ogg",
+		"res://assets/audio/sfx/sfx_sword_ting_3.ogg",
+		"res://assets/audio/sfx/sfx_sword_ting_4.ogg"
 	],
 	"wave_splash": [
 		"res://assets/audio/sfx/sfx_wave_01.ogg",
@@ -59,27 +59,27 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_wave_03.ogg"
 	],
 	"treasure_collect": [
-		"res://assets/audio/sfx/sfx_pickup_1.wav",
-		"res://assets/audio/sfx/sfx_pickup_2.wav",
-		"res://assets/audio/sfx/sfx_pickup_3.wav"
+		"res://assets/audio/sfx/sfx_pickup_1.ogg",
+		"res://assets/audio/sfx/sfx_pickup_2.ogg",
+		"res://assets/audio/sfx/sfx_pickup_3.ogg"
 	],
 	"soldier_die": [
-		"res://assets/audio/sfx/sfx_soldier_die_1.wav",
-		"res://assets/audio/sfx/sfx_soldier_die_2.wav",
-		"res://assets/audio/sfx/sfx_soldier_die_3.wav",
-		"res://assets/audio/sfx/sfx_soldier_die_4.wav",
-		"res://assets/audio/sfx/sfx_soldier_die_5.wav",
-		"res://assets/audio/sfx/sfx_soldier_die_6.wav",
+		"res://assets/audio/sfx/sfx_soldier_die_1.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_2.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_3.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_4.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_5.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_6.ogg",
 	],
 	"water_splash_large": [
-		"res://assets/audio/sfx/sfx_water_splash_large_1.wav",
-		"res://assets/audio/sfx/sfx_water_splash_large_2.wav",
-		"res://assets/audio/sfx/sfx_water_splash_large_3.wav",
+		"res://assets/audio/sfx/sfx_water_splash_large_1.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_large_2.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_large_3.ogg",
 	],
 	"water_splash_small": [
-		"res://assets/audio/sfx/sfx_water_splash_small_1.wav",
-		"res://assets/audio/sfx/sfx_water_splash_small_2.wav",
-		"res://assets/audio/sfx/sfx_water_splash_small_3.wav",
+		"res://assets/audio/sfx/sfx_water_splash_small_1.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_small_2.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_small_3.ogg",
 	],
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",

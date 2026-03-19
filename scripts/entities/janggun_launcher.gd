@@ -7,7 +7,7 @@ const DEBUG_COMBAT_LOGS := false
 
 @export var missile_scene: PackedScene = preload("res://scenes/projectiles/janggun_missile.tscn")
 @export var fire_cooldown: float = 12.0
-@export var detection_range: float = 35.0
+@export var detection_range: float = 28.0
 @export var damage: float = 10.0
 @export_range(0.05, 0.5) var target_scan_interval: float = 0.2
 @export var team: String = "player"

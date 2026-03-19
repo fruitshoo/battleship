@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://bed8fua1cj6ls"]
+
+[ext_resource type="Script" path="res://scripts/props/shared_material_model.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dh3bmbsqdseax" path="res://assets/models/props/barrel/barrel.glb" id="2_model"]
+[ext_resource type="Material" path="res://assets/models/props/barrel/barrel_shared_material.tres" id="3_material"]
+
+[node name="BarrelModel" type="Node3D" unique_id=2112850696]
+script = ExtResource("1_script")
+shared_material = ExtResource("3_material")
+
+[node name="Model" parent="." unique_id=1301088972 instance=ExtResource("2_model")]

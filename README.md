@@ -48,6 +48,9 @@ A dynamic 3D naval combat and boarding action game built with **Godot Engine 4**
 - Custom 3D meshes and Particle Systems (`GPUParticles3D`)
 - Advanced Audio System (`AudioManager` Singleton) for adaptive SFX.
 
+## Asset Pipeline
+- Asset import and folder rules: [`docs/asset_pipeline.md`](docs/asset_pipeline.md)
+
 ## Controls
 - **`A` / `D`**: Steer Rudder Left/Right
 - **`Q` / `E`**: Adjust Sail Angle (Catch the wind)

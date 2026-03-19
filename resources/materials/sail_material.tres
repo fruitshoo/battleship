@@ -1,0 +1,21 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://xegme4v0c7fr"]
+
+[ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="1_shader"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/wave_speed = 3.0
+shader_parameter/wave_strength = 0.38
+shader_parameter/use_sail_texture = false
+shader_parameter/use_dark_alpha_cutoff = false
+shader_parameter/dark_alpha_cutoff = 0.12
+shader_parameter/dark_alpha_softness = 0.04
+shader_parameter/sail_uv_scale = Vector2(1, 1)
+shader_parameter/sail_uv_offset = Vector2(0, 0)
+shader_parameter/swap_uv_axes = false
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/deform_bounds_min = Vector3(-2, -3, 0)
+shader_parameter/deform_bounds_size = Vector3(4, 6, 0.001)
+shader_parameter/bottom_width_scale = 1.0

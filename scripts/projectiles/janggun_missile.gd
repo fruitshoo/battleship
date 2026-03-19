@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 장군전 미사일 (Janggun Missile)
@@ -13,8 +14,8 @@ const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 @export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
 @export var arc_height: float = 8.0
-@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
-var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_explosion.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
+var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -143,9 +144,13 @@ func _splash_and_sink() -> void:
 	# 바다에 떨어질 때 물 폭발 이펙트 생성
 	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion", global_position, 4, 70.0):
 		var pos = global_position
-		var explosion = water_explosion_scene.instantiate()
+		var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
+		if explosion.has_method("configure_as_splash"):
+			explosion.configure_as_splash()
 		explosion.position = Vector3(pos.x, 0.2, pos.z)
-		get_tree().root.add_child.call_deferred(explosion)
+		get_tree().root.add_child(explosion)
+		if explosion.has_method("pool_activate"):
+			explosion.pool_activate()
 	
 	# 물보라 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -159,22 +164,26 @@ func _splash_and_sink() -> void:
 func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트
 	if wood_splinter_scene and VfxBudget.allow_spawn(get_tree(), "wood_splinter", global_position, 3, 60.0):
-		var splinter = wood_splinter_scene.instantiate()
+		var splinter = ScenePool.acquire(get_tree(), wood_splinter_scene)
 		splinter.position = global_position
-		get_tree().root.add_child.call_deferred(splinter)
+		get_tree().root.add_child(splinter)
 		if splinter.has_method("set_amount_by_damage"):
 			splinter.set_amount_by_damage(damage)
+		if splinter.has_method("pool_activate"):
+			splinter.pool_activate()
 			
 	# 타격 시 검은 연기 (발사 연기 재사용)
 	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
-		var smoke = muzzle_smoke_scene.instantiate()
+		var smoke = ScenePool.acquire(get_tree(), muzzle_smoke_scene)
+		if smoke.has_method("configure_as_hit"):
+			smoke.configure_as_hit()
 		smoke.position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
 		var smoke_dir = Vector3.UP
 		smoke.basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
-		get_tree().root.add_child.call_deferred(smoke)
-		if smoke is GPUParticles3D:
-			smoke.emitting = true
+		get_tree().root.add_child(smoke)
+		if smoke.has_method("pool_activate"):
+			smoke.pool_activate()
 	
 	# 피격 사운드 (장군전 전용 중타격음)
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -191,11 +200,13 @@ func _play_launch_vfx() -> void:
 	
 	# 머즐 연기
 	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
-		var smoke = muzzle_smoke_scene.instantiate()
+		var smoke = ScenePool.acquire(get_tree(), muzzle_smoke_scene)
+		if smoke.has_method("configure_as_muzzle"):
+			smoke.configure_as_muzzle()
 		smoke.position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 발생하므로 체크
 		var smoke_look_dir = launch_dir if not launch_dir.is_zero_approx() else Vector3.FORWARD
 		smoke.basis = Basis.looking_at(smoke_look_dir, Vector3.UP)
-		get_tree().root.add_child.call_deferred(smoke)
-		if smoke is GPUParticles3D:
-			smoke.emitting = true
+		get_tree().root.add_child(smoke)
+		if smoke.has_method("pool_activate"):
+			smoke.pool_activate()

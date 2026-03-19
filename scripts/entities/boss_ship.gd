@@ -8,7 +8,7 @@ signal boss_died
 
 @export var move_speed: float = 3.0
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
-@export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_japanese.tscn")
+@export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_enemy_heavy.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
 @export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/atakebune_hull.tscn")
@@ -16,6 +16,7 @@ signal boss_died
 var target: Node3D = null
 var orbit_angle: float = 0.0
 var leaking_rate: float = 0.0
+var _leak_tick_timer: float = 0.0
 var cached_lm: Node = null
 var _merit_granted: bool = false
 
@@ -29,7 +30,7 @@ var _merit_granted: bool = false
 func _update_editor_hull() -> void:
 	for child in get_children():
 		if child.name.contains("Hull"):
-			child.free()
+			child.queue_free()
 			
 	var stats = load_ship_stats(ship_type)
 	if stats.is_empty(): return
@@ -82,7 +83,7 @@ func _ready() -> void:
 	
 	cached_lm = get_tree().root.find_child("LevelManager", true, false)
 	if not cached_lm:
-		var lm_nodes = get_tree().get_nodes_in_group("level_manager")
+		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 		
 	_setup_weapons()
@@ -115,7 +116,7 @@ func _setup_weapons() -> void:
 		add_child(singigeon)
 		singigeon.position = Vector3(0, 1.0, -5.0)
 		singigeon.team = "enemy"
-		singigeon.detection_range = 45.0
+		singigeon.detection_range = 36.0
 		if singigeon.has_method("upgrade_to_level"):
 			singigeon.upgrade_to_level(3) # 최고 레벨 신기전
 
@@ -125,7 +126,7 @@ func _spawn_boss_cannon(container: Node, pos: Vector3, rot_y: float) -> void:
 	c.position = pos
 	c.rotation_degrees.y = rot_y
 	c.team = "enemy"
-	c.detection_range = 45.0
+	c.detection_range = 23.0
 	c.detection_arc = 50.0
 
 func _setup_soldiers() -> void:
@@ -172,13 +173,20 @@ func _physics_process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
 	
-	if not is_instance_valid(target):
+	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true or target.get("is_dead") == true:
+		target = null
 		_find_player()
+		_set_wake_state(false)
 		return
 		
 	# === 선회(Orbiting) AI ===
 	# 플레이어를 중심으로 원을 그리며 이동
-	var to_player = (target.global_position - global_position).normalized()
+	var to_player = target.global_position - global_position
+	to_player.y = 0.0
+	if to_player.length_squared() <= 0.001:
+		_set_wake_state(false)
+		return
+	to_player = to_player.normalized()
 	var dist = global_position.distance_to(target.global_position)
 	
 	# 거리가 너무 멀면 접근, 적절하면 선회, 너무 가까우면 뒤로
@@ -206,7 +214,9 @@ func _physics_process(delta: float) -> void:
 	# 이동 및 회전
 	var target_look = global_position + move_dir
 	if not global_position.is_equal_approx(target_look):
+		target_look.y = global_position.y
 		var look_target = lerp(global_position + -basis.z, target_look, delta * 2.0)
+		look_target.y = global_position.y
 		look_at(look_target, Vector3.UP)
 		
 	# 이동 (누수율에 비례하여 속도 감소)
@@ -230,19 +240,22 @@ func _physics_process(delta: float) -> void:
 	var final_velocity = move_dir * move_speed * leak_speed_mult * wind_mult
 	global_position += (final_velocity + hard_rep) * delta
 	
-	# === 누수(Leaking) 데미지 ===
-	if leaking_rate > 0:
-		take_damage(leaking_rate * delta)
+	_update_leaking_damage(delta)
 		
 	# === 둥실둥실 및 기울기 효과 ===
 	_apply_bobbing_effect()
 
 func _calculate_separation() -> Vector3:
+	if bool(get_meta("derelict_nonblocking", false)):
+		return Vector3.ZERO
+
 	var force = Vector3.ZERO
-	var neighbors = get_tree().get_nodes_in_group("ships")
+	var neighbors = SceneGroupCache.get_nodes(get_tree(), "ships")
 	
 	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_dead") or other.get("is_sinking"):
+			continue
+		if bool(other.get_meta("derelict_nonblocking", false)):
 			continue
 			
 		var offset = global_position - other.global_position
@@ -253,17 +266,17 @@ func _calculate_separation() -> Vector3:
 		
 		var dist = sqrt(dist_sq)
 		var coll_dist = get_collision_distance_to(other)
-		var separation_trigger_dist = coll_dist + 0.45
+		var separation_trigger_dist = coll_dist + 0.2
 		
 		if dist < separation_trigger_dist:
 			var push_dir = offset.normalized()
 			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
-			force += push_dir * pow(ratio, 2.0) * 1.8
+			force += push_dir * pow(ratio, 2.0) * 1.5
 			
 	return force
 
 func _find_player() -> void:
-	var players = get_tree().get_nodes_in_group("player")
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
 	var closest_dist = INF
 	var closest_player = null
 	
@@ -305,7 +318,7 @@ func die() -> void:
 			cached_lm.add_ship_sunk(1)
 		# 규칙 통일: 함선 격침은 XP/점수 지급
 		if cached_lm.has_method("add_score"):
-			cached_lm.add_score(500)
+			cached_lm.add_score(400)
 		if cached_lm.has_method("add_xp"):
 			cached_lm.add_xp(100)
 	
@@ -326,21 +339,9 @@ func die() -> void:
 			cached_lm.show_victory()
 	)
 	
-	# 임시 렐릭 드롭 연출 (추후 실제 렐릭 데이터 연동 시 변경 가능)
-	# 보스 격침 시 전리품 렐릭 추가 (예시: 임시 하트 아이콘)
-	if is_instance_valid(UpgradeManager):
-		# 'explore'는 이미 육분의로 쓰고 있으므로, 임시로 'favorite' (하트) 사용
-		# TODO: 추후 획득 가능 렐릭 풀(Pool) 구현
-		var dummy_relic = "boss_heart"
-		if not UpgradeManager.acquired_relics.has(dummy_relic):
-			UpgradeManager.acquired_relics.append(dummy_relic)
-			var ship = UpgradeManager._get_player_ship()
-			if ship:
-				var hud = ship._find_hud() if ship.has_method("_find_hud") else null
-				if hud and hud.has_method("add_relic_icon"):
-					hud.add_relic_icon("favorite")
-				if hud and hud.has_method("show_message"):
-					hud.show_message("!! 보스 격침 전리품: 해적왕의 심장 !!", 3.0)
+	# 렐릭은 최종 보스(tier 2 이상)만 드롭한다.
+	if tier >= 2 and is_instance_valid(UpgradeManager) and UpgradeManager.has_method("grant_final_boss_relic"):
+		UpgradeManager.grant_final_boss_relic()
 	
 	# 생존자 대량 스폰 (보스 격침 보너스: 3~5명)
 	if survivor_scene:
@@ -387,7 +388,18 @@ func add_leak(amount: float) -> void:
 
 func remove_leak(amount: float) -> void:
 	leaking_rate = maxf(0.0, leaking_rate - amount)
+	if leaking_rate <= 0.0:
+		_leak_tick_timer = 0.0
 	print("[Status] 보스 누수 완화. 남은 누수율: %.1f" % leaking_rate)
+
+func _update_leaking_damage(delta: float) -> void:
+	if leaking_rate <= 0.0:
+		_leak_tick_timer = 0.0
+		return
+	_leak_tick_timer += delta
+	while _leak_tick_timer >= 1.0:
+		_leak_tick_timer -= 1.0
+		take_damage(leaking_rate, global_position, "leak")
 
 # === 장군전 등 특수 피격 로직 ===
 func add_stuck_object(obj: Node3D, _s_mult: float, _t_mult: float) -> void:

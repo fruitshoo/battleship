@@ -3,36 +3,49 @@
 		"cannon": {
 			"name": "대포",
 			"category": 0,
-			"description": "함포 성능 강화 및 수량 추가",
+			"description": "대미지, 사거리, 장전 강화",
 			"max_level": 5,
 			"color": "ff7f33",
 			"stats": {
 				"dmg_pct_per_lv": 20,
 				"range_pct_per_lv": 10,
-				"cd_pct_per_lv": 8
+				"cd_pct_per_lv": 8,
+				"crit_pct_per_lv": 2.5,
+				"crit_multiplier": 1.5
 			}
 		},
 		"janggun": {
 			"name": "대장군전",
 			"category": 0,
-			"description": "화력 강화 및 명중 시 화염/이속저하 디버프",
+			"description": "명중 시 화염과 둔화",
 			"max_level": 5,
 			"color": "996633"
 		},
 		"singigeon": {
-			"name": "신기전",
+			"name": "신기전병",
 			"category": 1,
-			"description": "발사 개수 추가 및 데미지/사거리 강화",
+			"description": "신기전병이 적 병사를 노려 로켓 화살 운용",
 			"max_level": 5,
-			"color": "ff4c4c"
+			"color": "ff4c4c",
+			"stats": {
+				"specialist_levels": [1, 3, 5],
+				"base_damage": 2.2,
+				"personnel_damage_mult": 6.0,
+				"base_blast_radius": 3.5,
+				"blast_radius_per_lv": 0.2,
+				"base_cooldown": 5.0,
+				"cooldown_reduce_per_lv": 0.35,
+				"projectile_speed": 32.0
+			}
 		},
 		"fire_pot": {
-			"name": "화통",
+			"name": "화통병",
 			"category": 1,
-			"description": "병사 화통 훈련. 적선 접근 시 아군 병사가 적 갑판에 화통 투척",
+			"description": "화통병이 화통 투척",
 			"max_level": 5,
 			"color": "e54c19",
 			"stats": {
+				"specialist_levels": [1, 3, 5],
 				"base_damage": 15.0,
 				"damage_per_lv": 5.0,
 				"base_radius": 3.0,
@@ -42,12 +55,13 @@
 			}
 		},
 		"repeating_crossbow": {
-			"name": "연노",
+			"name": "연노병",
 			"category": 1,
-			"description": "활 대신 고속 연속 발사가 가능한 연노를 병사들이 사용",
+			"description": "연노병이 연노 운용",
 			"max_level": 5,
 			"color": "99cc33",
 			"stats": {
+				"specialist_levels": [1, 3, 5],
 				"base_damage": 10.0,
 				"damage_per_lv": 2.0,
 				"base_cooldown": 2.0,
@@ -56,9 +70,9 @@
 			}
 		},
 		"ballista": {
-			"name": "팔우노",
+			"name": "발리스타",
 			"category": 1,
-			"description": "함선 후방에 거대 발리스타를 장착하여 적 병사들을 일직선으로 관통합니다.",
+			"description": "후방 발리스타 장착",
 			"max_level": 5,
 			"color": "cc6619",
 			"stats": {
@@ -71,139 +85,195 @@
 			}
 		},
 		"crew_numbers": {
-			"name": "병사 충원",
+			"name": "창병",
 			"category": 1,
-			"description": "최대 정원 증가 및 리스폰 속도 단축",
+			"description": "창병 편성",
 			"max_level": 5,
 			"color": "66ccff",
 			"stats": {
-				"crew_add": 1,
-				"respawn_mult": 0.8,
-				"respawn_min": 1.0
+				"specialist_levels": [1, 3, 5]
 			}
 		},
-		"crew_quality": {
-			"name": "정예병 훈련",
+		"crew_attack": {
+			"name": "병사 공격력",
 			"category": 1,
-			"description": "병사의 체력, 방어력, 공격력 일괄 상승",
+			"description": "병사 공격력 +2",
 			"max_level": 5,
-			"color": "cccc33",
+			"color": "e3bf3a",
 			"stats": {
-				"base_hp": 40.0,
-				"hp_per_lv": 10.0,
-				"dmg_pct_per_lv": 15,
-				"def_pct_per_lv": 10
+				"attack_add_per_lv": 2.0
+			}
+		},
+		"crew_defense": {
+			"name": "병사 방어력",
+			"category": 1,
+			"description": "병사 방어력 +1",
+			"max_level": 5,
+			"color": "7fb6ff",
+			"stats": {
+				"defense_add_per_lv": 1.0
 			}
 		},
 		"hull_defense": {
-			"name": "선체 장갑",
+			"name": "선체",
 			"category": 2,
-			"description": "함선의 최대 체력/방어력 증가 및 난간 창/방패 보강",
+			"description": "장갑, 수리, 재생 강화",
 			"max_level": 5,
 			"color": "994c19",
 			"stats": {
-				"hp_add": 30.0,
-				"heal_on_apply": 20.0,
-				"def_per_lv": 2.0,
-				"crew_ranged_block_per_lv": 0.06,
-				"crew_ranged_block_max": 0.30
+				"def_levels": [1, 4],
+				"def_add": 2.0,
+				"repair_levels": [2, 5],
+				"repair_add": 35.0,
+				"crew_ranged_block_levels": [3],
+				"crew_ranged_block_add": 0.10,
+				"regen_levels": [5],
+				"regen_add": 1.5
 			}
 		},
-		"navigation": {
-			"name": "항해 기동",
+		"sailing": {
+			"name": "돛",
 			"category": 3,
-			"description": "선회 속도 및 돛 기동력 증가",
+			"description": "돛 속도와 회전 강화",
 			"max_level": 5,
-			"color": "66ff66",
+			"color": "58cfff",
 			"stats": {
-				"turn_mult": 1.15,
-				"stamina_mult": 0.85
+				"speed_levels": [1, 3, 5],
+				"speed_mult": 1.08,
+				"efficiency_levels": [2, 4],
+				"efficiency_mult": 1.08,
+				"turn_levels": [2, 4],
+				"turn_mult": 1.15
+			}
+		},
+		"rowing": {
+			"name": "노",
+			"category": 3,
+			"description": "노 속도와 스태미나 강화",
+			"max_level": 5,
+			"color": "ffc65a",
+			"stats": {
+				"speed_levels": [1, 5],
+				"speed_mult": 1.15,
+				"accel_levels": [1],
+				"accel_mult": 1.25,
+				"stamina_add_levels": [2],
+				"stamina_add": 20.0,
+				"drain_levels": [3],
+				"drain_mult": 0.85,
+				"recovery_levels": [4],
+				"recovery_mult": 1.2
 			}
 		},
 		"supply_bonus": {
-			"name": "보급 효율",
+			"name": "보급",
 			"category": 2,
-			"description": "보급품 획득 시 회복량 및 습득 범위 대폭 증가",
+			"description": "보급 범위와 회복 강화",
 			"max_level": 5,
 			"color": "4ccc4c",
 			"stats": {
 				"base_radius": 8.0,
-				"radius_per_lv": 2.0,
-				"heal_per_lv": 5.0
+				"base_heal": 5.0,
+				"base_stamina_recovery": 0.0,
+				"radius_levels": [1, 4],
+				"radius_add": 5.0,
+				"heal_levels": [2, 5],
+				"heal_add": 10.0,
+				"stamina_recovery_levels": [3],
+				"stamina_recovery_add": 20.0
 			}
 		},
 		"supply": {
-			"name": "보급물자",
+			"name": "응급 보급",
 			"category": 2,
-			"description": "체력 즉시 소폭 회복",
+			"description": "체력과 스태미나 회복",
 			"max_level": 99,
 			"color": "7fff7f",
 			"stats": {
-				"max_hp_add": 20.0
+				"hull_heal": 20.0,
+				"stamina_recover": 25.0
 			}
 		},
 		"gold": {
-			"name": "전리품",
+			"name": "골드",
 			"category": 4,
-			"description": "점수 +50",
+			"description": "골드 +20",
 			"max_level": 99,
 			"color": "ffd84c",
 			"stats": {
-				"score_add": 50
+				"score_add": 20
 			}
 		},
 		"fleet_signal": {
-			"name": "지원 함대 소집",
+			"name": "지원함",
 			"category": 4,
-			"description": "희귀 카드. 지원 함대를 호출하거나 기존 함대를 재정비합니다.",
+			"description": "지원함 호출 또는 수리",
 			"max_level": 1,
 			"color": "ffb347"
 		},
 		"fleet_cannon": {
-			"name": "함대 화력",
+			"name": "지원함 대포",
 			"category": 5,
-			"description": "미니언 함선의 대포 수량 추가 및 공격력 강화",
+			"description": "지원함 포격 강화",
 			"max_level": 5,
 			"color": "ff33e5",
 			"stats": {
-				"dmg_pct_per_lv": 25,
-				"cd_pct_per_lv": 10
+				"dmg_pct_per_lv": 20,
+				"cd_pct_per_lv": 8
 			}
 		},
 		"fleet_hull": {
-			"name": "함대 보호",
+			"name": "지원함 선체",
 			"category": 5,
-			"description": "미니언 함선의 최대 체력 및 충돌 방어력 증가",
+			"description": "지원함 체력과 방어력",
 			"max_level": 5,
 			"color": "33ffcc",
 			"stats": {
-				"hp_add": 100,
-				"def_per_lv": 5
+				"hp_add": 50,
+				"def_per_lv": 1
 			}
 		},
 		"fleet_crew": {
-			"name": "함대 병사",
+			"name": "지원함 재합류",
 			"category": 5,
-			"description": "미니언 함선의 병사 리스폰 속도 대폭 단축",
+			"description": "재합류 시간 감소, Lv5 한계 +1",
 			"max_level": 5,
 			"color": "33e5ff",
 			"stats": {
-				"respawn_mult": 0.7
+				"respawn_reduce_per_lv": 4.0,
+				"respawn_reduce_max_level": 4,
+				"min_respawn_interval": 14.0,
+				"limit_add_level": 5,
+				"limit_add": 1
 			}
 		}
 	},
-	"relics": {
-		"sextant": {
-			"name": "육분의",
-			"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
-			"icon": "explore",
-			"alert_msg": "!! 렐릭 획득: 육분의 !!\n(자동 항해 활성화)"
-		},
-		"boss_heart": {
-			"name": "보스의 심장",
-			"description": "임시 보스 드롭 렐릭입니다.",
-			"icon": "favorite",
-			"alert_msg": "!! 렐릭 획득: 보스의 심장 !!"
+		"relics": {
+			"sextant": {
+				"name": "육분의",
+				"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
+				"icon": "explore",
+				"alert_msg": "!! 렐릭 획득: 육분의 !!\n(자동 항해 활성화)"
+			},
+			"boss_heart": {
+				"name": "보스의 심장",
+				"description": "임시 보스 드롭 렐릭입니다.",
+				"icon": "favorite",
+				"alert_msg": "!! 렐릭 획득: 보스의 심장 !!"
+			},
+			"choyogi": {
+				"name": "초요기",
+				"description": "황색 바탕의 초요기 군기입니다.",
+				"icon_texture": "res://assets/ui/relics/choyogi.png",
+				"icon": "flag",
+				"alert_msg": "!! 렐릭 획득: 초요기 !!"
+			},
+			"ilseongjeongsiui": {
+				"name": "일성정시",
+				"description": "천체 관측기 일성정시의 권위를 담은 렐릭입니다.",
+				"icon_texture": "res://assets/ui/relics/ilseongjeongsiui.png",
+				"icon": "explore",
+				"alert_msg": "!! 렐릭 획득: 일성정시 !!"
+			}
 		}
 	}
-}

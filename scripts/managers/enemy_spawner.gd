@@ -6,12 +6,12 @@ const DEBUG_SPAWNER_LOGS := false
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
 
 @export var enemy_scene: PackedScene = preload("res://scenes/enemy_ship.tscn")
-@export var spawn_interval: float = 6.0 # 생성 주기 (초)
-@export var min_spawn_distance: float = 65.0 # 최소 생성 거리 (카메라 줌아웃 고려하여 밖에서)
-@export var max_spawn_distance: float = 85.0 # 최대 생성 거리
-@export var max_enemies: int = 20 # 최대 적 수
+@export var spawn_interval: float = 5.2 # 생성 주기 (초)
+@export var min_spawn_distance: float = 50.0 # 최소 생성 거리 (화면 안으로 더 빨리 들어오게 조정)
+@export var max_spawn_distance: float = 70.0 # 최대 생성 거리
+@export var max_enemies: int = 3 # 최대 적 수
 @export var current_boarders: int = 1 # 레벨에 따른 도선 병사 수
-@export var max_distance_limit: float = 140.0 # 재배치 거리 (더 멀리 허용)
+@export var max_distance_limit: float = 115.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
 
 @export var boss_scene: PackedScene = preload("res://scenes/entities/boss_ship.tscn")
@@ -20,7 +20,10 @@ var timer: float = 0.0
 var reposition_timer: float = 0.0
 var player: Node3D = null
 var boss_spawned: bool = false
-var elite_spawn_timer: float = 180.0 # 3분 주기
+var elite_spawn_timer: float = 120.0 # 2분 주기
+var elite_spawn_interval: float = 120.0
+var elite_spawn_count: int = 0
+var max_elite_spawns: int = 4 # 2/4/6/8분에만 중간 보스 등장
 var regular_spawn_stopped: bool = false
 var start_time: int = 0
 
@@ -68,6 +71,8 @@ func set_difficulty(new_interval: float, new_max: int, new_boarders: int = 2) ->
 func _ready() -> void:
 	timer = spawn_interval
 	reposition_timer = reposition_check_interval
+	elite_spawn_timer = elite_spawn_interval
+	elite_spawn_count = 0
 	_find_player()
 
 func _process(delta: float) -> void:
@@ -81,10 +86,12 @@ func _process(delta: float) -> void:
 	
 	if not regular_spawn_stopped:
 		# 1-1. 엘리트 소환 주기 체크
-		elite_spawn_timer -= delta
-		if elite_spawn_timer <= 0:
-			elite_spawn_timer = 180.0
-			_spawn_elite_ship()
+		if elite_spawn_count < max_elite_spawns:
+			elite_spawn_timer -= delta
+			if elite_spawn_timer <= 0:
+				elite_spawn_timer = elite_spawn_interval
+				elite_spawn_count += 1
+				_spawn_elite_ship()
 		
 		# 1-2. 일반 적 스폰 (엘리트가 있으면 최대 적 수 제한을 낮춰서 긴장감 조절)
 		var effective_max = max_enemies if elite_count == 0 else int(max_enemies * 0.6)
@@ -161,13 +168,14 @@ func _spawn_enemy() -> void:
 			
 		var enemy = enemy_scene.instantiate()
 		
-		# 시간 경과에 따른 함종 결정 (초반 90초는 대포 없는 Chaser 위주)
+		# 시간 경과에 따른 함종 결정
 		var elapsed_sec = (Time.get_ticks_msec() - start_time) / 1000.0
-		var cannon_chance = clamp((elapsed_sec - 90.0) / 150.0, 0.0, 0.5) # 90초부터 시작해서 240초에 50%까지 완만하게 상승
+		var cannon_chance = clamp((elapsed_sec - 75.0) / 165.0, 0.0, 0.45)
 		
 		# JSON 기반 함종 할당
+		# 근접형은 더 작은 kobayabune, 원거리형은 sekibune, 엘리트는 atakebune
 		if randf() > cannon_chance:
-			if "ship_type" in enemy: enemy.ship_type = "sekibune_melee"
+			if "ship_type" in enemy: enemy.ship_type = "kobayabune_melee"
 		else:
 			if "ship_type" in enemy: enemy.ship_type = "sekibune_cannon"
 		
@@ -196,14 +204,19 @@ func _spawn_enemy() -> void:
 ## 스폰 위치 계산 (플레이어 전방 집중 및 부하 선박 회피)
 func _get_biased_spawn_position() -> Vector3:
 	var best_pos: Vector3
+	var speed_ratio: float = 0.0
+	if is_instance_valid(player) and "current_speed" in player and "max_speed" in player:
+		speed_ratio = clampf(float(player.current_speed) / maxf(float(player.max_speed), 0.01), 0.0, 1.0)
+	var dynamic_min_dist: float = lerpf(min_spawn_distance, 42.0, speed_ratio)
+	var dynamic_max_dist: float = lerpf(max_spawn_distance, 58.0, speed_ratio)
 	
 	# 갤리선 전투 테마: 무조건 전방에서 스폰 (정면 돌파 유도)
 	for i in range(5):
 		var player_heading = player.rotation.y
-		# 전방 ±45도 범위 내에서 무작위 각도
-		var angle = player_heading + randf_range(-deg_to_rad(45), deg_to_rad(45))
+		# 전방 ±55도 범위 내에서 무작위 각도
+		var angle = player_heading + randf_range(-deg_to_rad(55), deg_to_rad(55))
 		
-		var distance = randf_range(min_spawn_distance, max_spawn_distance)
+		var distance = randf_range(dynamic_min_dist, dynamic_max_dist)
 		var offset = Vector3(cos(angle), 0, sin(angle)) * distance
 		best_pos = player.global_position + offset
 		best_pos.y = 0 # 배는 물 위에
@@ -247,3 +260,22 @@ func _spawn_elite_ship() -> void:
 	elite.look_at(player.global_position, Vector3.UP)
 	
 	print("[Event] 중간 보스(아타케부네) 출현!")
+
+func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_offset: float = 0.0) -> Node3D:
+	if not enemy_scene or not is_instance_valid(player):
+		return null
+
+	var enemy = enemy_scene.instantiate()
+	if "ship_type" in enemy:
+		enemy.ship_type = ship_type_name
+
+	var player_forward = -player.global_transform.basis.z
+	var player_right = player_forward.cross(Vector3.UP).normalized()
+	var spawn_pos = player.global_position + player_forward * distance + player_right * lateral_offset
+	spawn_pos.y = 0.0
+
+	get_parent().add_child(enemy)
+	enemy.global_position = spawn_pos
+	enemy.look_at(player.global_position, Vector3.UP)
+	print("[DEBUG] 적 테스트 소환: %s" % ship_type_name)
+	return enemy

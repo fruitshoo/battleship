@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 화살 (Arrow)
@@ -69,13 +70,16 @@ func _physics_process(delta: float) -> void:
 
 func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
-	var water_explosion_scene = preload("res://scenes/effects/water_explosion.tscn")
+	var water_explosion_scene = preload("res://scenes/effects/water_burst.tscn")
 	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
 		var pos = global_position
-		var explosion = water_explosion_scene.instantiate()
+		var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
+		if explosion.has_method("configure_as_small"):
+			explosion.configure_as_small()
 		explosion.position = Vector3(pos.x, 0.05, pos.z)
-		explosion.scale = Vector3(0.3, 0.3, 0.3) # 화살에 맞게 아주 작게 축소
-		get_tree().root.add_child.call_deferred(explosion)
+		get_tree().root.add_child(explosion)
+		if explosion.has_method("pool_activate"):
+			explosion.pool_activate()
 		
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -108,16 +112,7 @@ func _check_hit(target: Node) -> void:
 		if is_sinking:
 			queue_free()
 			return
-			
-		# 상대 팀 배인지 확인
-		var enemy_team = "enemy" if team == "player" else "player"
-		if HitTargetResolver.resolve_team_tag(potential_ship) == enemy_team:
-			if potential_ship.has_method("take_damage"):
-				potential_ship.take_damage(1.0, global_position, damage_source) # 배에는 미미한 데미지
-				if is_fire_arrow and potential_ship.has_method("take_fire_damage"):
-					potential_ship.take_fire_damage(fire_damage, 5.0) # 5초간 화상
-			elif potential_ship.has_method("die") and randf() < 0.1: # 아주 낮은 확률로 파괴 (또는 HP가 1인 경우)
-				# 밸런스상 배 HP가 1이면 화살로는 잘 안터지게 하거나 logic 필요
-				pass
-			
-			queue_free()
+		
+		# 활/연노는 선체를 공격하지 않는다.
+		# 배와 스치거나 히트박스를 지나가더라도 무시하고 계속 날아가 병사만 노린다.
+		return

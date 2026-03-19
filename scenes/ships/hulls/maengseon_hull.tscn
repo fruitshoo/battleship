@@ -1,5 +1,8 @@
 [gd_scene format=3 uid="uid://o87wm0hgwlmn"]
 
+[ext_resource type="PackedScene" uid="uid://urin2213gxp6" path="res://scenes/entities/props/square_shield.tscn" id="3_xr3xt"]
+[ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="4_0irex"]
+[ext_resource type="Texture2D" uid="uid://cpd4hpqapp43q" path="res://assets/models/props/sail/horizon_sail.png" id="horizon_sail"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 
@@ -16,6 +19,24 @@ mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_wood_light")
 
 [node name="Mast" parent="." unique_id=1395988195 instance=ExtResource("mast_scene")]
+sail_texture = ExtResource("horizon_sail")
 
 [node name="RudderVisual" parent="." unique_id=1685454611 instance=ExtResource("rudder_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 2.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.2194414)
+
+[node name="SquareShield" parent="." unique_id=1362985899 instance=ExtResource("3_xr3xt")]
+transform = Transform3D(-8.135998e-08, -0.51763815, 1.9318516, -2.2626677e-08, 1.9318516, 0.51763815, -2, -7.981775e-10, -8.444392e-08, 1.1657964, 0.3567754, 1.7318299)
+
+[node name="SquareShield2" parent="." unique_id=297041578 instance=ExtResource("3_xr3xt")]
+transform = Transform3D(-8.135998e-08, -0.51763815, 1.9318516, -2.2626677e-08, 1.9318516, 0.51763815, -2, -7.981775e-10, -8.444392e-08, 1.1657964, 0.3567754, 2.3468587)
+
+[node name="SquareShield3" parent="." unique_id=1129357440 instance=ExtResource("3_xr3xt")]
+transform = Transform3D(-9.3485575e-08, 0.51763815, -1.9318516, -2.2626681e-08, 1.9318516, 0.51763815, 2, 4.6051547e-08, -8.444392e-08, -1.2691218, 0.3567754, 2.3468587)
+
+[node name="SquareShield4" parent="." unique_id=1790121758 instance=ExtResource("3_xr3xt")]
+transform = Transform3D(-9.3485575e-08, 0.51763815, -1.9318516, -2.2626681e-08, 1.9318516, 0.51763815, 2, 4.6051547e-08, -8.444392e-08, -1.2691218, 0.3567754, 1.7318299)
+
+[node name="Flag" parent="." unique_id=1332889059 instance=ExtResource("4_0irex")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1324006, 0, -3.1213875)
+pole_height = 2.19
+flag_size = Vector2(1, 0.4)

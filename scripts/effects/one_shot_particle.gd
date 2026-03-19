@@ -43,6 +43,8 @@ func _budget_key() -> String:
 			return "hit_effect"
 		"BloodMist":
 			return "blood_mist"
+		"RocketExplosion":
+			return "rocket_explosion"
 	return name.to_snake_case()
 
 func _budget_limit() -> int:
@@ -54,6 +56,8 @@ func _budget_limit() -> int:
 		"HitEffect":
 			return 8
 		"BloodMist":
+			return 5
+		"RocketExplosion":
 			return 5
 	return 6
 
@@ -67,4 +71,6 @@ func _budget_distance() -> float:
 			return 55.0
 		"BloodMist":
 			return 45.0
+		"RocketExplosion":
+			return 90.0
 	return 60.0

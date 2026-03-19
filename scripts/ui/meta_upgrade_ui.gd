@@ -1,6 +1,12 @@
 extends CanvasLayer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const PLAYER_BASE_MOVE_SPEED := 6.0
+const PLAYER_BASE_HULL_HP := 200.0
+const SOLDIER_BASE_HEALTH := 70.0
+const SOLDIER_BASE_ATTACK := 12.0
+const SOLDIER_SWORD_MULT := 1.25
+const SOLDIER_BOW_MULT := 1.0
 
 signal closed
 
@@ -208,13 +214,22 @@ func _build_effect_text(id: String, level: int) -> String:
 	var next_level := level + 1
 	match id:
 		"hull_hp":
-			return "현재 +%d | 다음 +%d" % [level * 40, next_level * 40]
+			return "선체 %.0f → %.0f" % [
+				PLAYER_BASE_HULL_HP + level * 40.0,
+				PLAYER_BASE_HULL_HP + next_level * 40.0,
+			]
 		"hull_defense":
-			return "현재 +%d | 다음 +%d" % [level * 2, next_level * 2]
+			return "방어력 %.0f → %.0f" % [level * 2.0, next_level * 2.0]
 		"sail_speed":
-			return "현재 +%d%% | 다음 +%d%%" % [level * 10, next_level * 10]
+			return "최대 속도 %.1f → %.1f" % [
+				PLAYER_BASE_MOVE_SPEED * (1.0 + level * 0.1),
+				PLAYER_BASE_MOVE_SPEED * (1.0 + next_level * 0.1),
+			]
 		"xp_gain":
-			return "현재 +%d%% | 다음 +%d%%" % [level * 10, next_level * 10]
+			return "획득 XP 100 → %.0f | 다음 100 → %.0f" % [
+				100.0 * (1.0 + level * 0.1),
+				100.0 * (1.0 + next_level * 0.1),
+			]
 		"pickup_range":
 			return "현재 +%.1fm | 다음 +%.1fm" % [level * 1.5, next_level * 1.5]
 		"reroll_stock":
@@ -222,28 +237,33 @@ func _build_effect_text(id: String, level: int) -> String:
 		"crew_capacity":
 			return "현재 +%d명 | 다음 +%d명" % [level, next_level]
 		"crew_health":
-			return "현재 +%d%% | 다음 +%d%%" % [int(level * 12), int(next_level * 12)]
+			return "병사 체력 %.0f → %.0f" % [
+				SOLDIER_BASE_HEALTH * (1.0 + level * 0.12),
+				SOLDIER_BASE_HEALTH * (1.0 + next_level * 0.12),
+			]
 		"crew_attack":
-			return "현재 +%d%% | 다음 +%d%%" % [level * 10, next_level * 10]
+			return "검 %.1f → %.1f | 활 %.1f → %.1f" % [
+				(SOLDIER_BASE_ATTACK + level * 2.0) * SOLDIER_SWORD_MULT,
+				(SOLDIER_BASE_ATTACK + next_level * 2.0) * SOLDIER_SWORD_MULT,
+				(SOLDIER_BASE_ATTACK + level * 2.0) * SOLDIER_BOW_MULT,
+				(SOLDIER_BASE_ATTACK + next_level * 2.0) * SOLDIER_BOW_MULT,
+			]
 		"crew_defense":
-			return "현재 +%d | 다음 +%d" % [level, next_level]
-		"crew_power":
-			return "현재 +%d%% | 다음 +%d%%" % [int(level * 15), int(next_level * 15)]
+			return "병사 방어력 +%d → +%d" % [level, next_level]
 	return ""
 
 func _get_upgrade_icon(id: String) -> String:
 	var icon_map := {
-		"hull_hp": "favorite",
+		"hull_hp": "health_and_safety",
 		"hull_defense": "shield",
-		"sail_speed": "explore",
-		"xp_gain": "school",
-		"pickup_range": "radio_button_checked",
-		"reroll_stock": "autorenew",
-		"crew_capacity": "group_add",
-		"crew_health": "health_and_safety",
+		"sail_speed": "speed",
+		"xp_gain": "trending_up",
+		"pickup_range": "radar",
+		"reroll_stock": "refresh",
+		"crew_capacity": "groups",
+		"crew_health": "favorite",
 		"crew_attack": "swords",
-		"crew_defense": "gpp_good",
-		"crew_power": "military_tech",
+		"crew_defense": "shield_person",
 	}
 	return icon_map.get(id, "build")
 
@@ -259,7 +279,6 @@ func _get_upgrade_color(id: String) -> Color:
 		"crew_health": Color(0.44, 0.92, 0.48),
 		"crew_attack": Color(1.0, 0.56, 0.28),
 		"crew_defense": Color(0.76, 0.88, 1.0),
-		"crew_power": Color(1.0, 0.88, 0.40),
 	}
 	return color_map.get(id, Color.WHITE)
 

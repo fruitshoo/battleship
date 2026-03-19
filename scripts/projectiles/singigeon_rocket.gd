@@ -25,10 +25,10 @@ const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 @export var homing_duration: float = 0.35
 @export var max_homing_distance: float = 14.0
 @export var allow_retarget: bool = false
+@export var prefer_personnel_targets: bool = false
 @export_range(0.03, 0.3) var retarget_scan_interval: float = 0.08
 @export_range(0.01, 0.12) var collision_check_interval: float = 0.03
 @export_range(0.25, 2.0) var collision_check_distance: float = 0.9
-@export var explosion_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 
 var team: String = "player"
 var shooter: Node3D = null # 이 로켓을 쏜 선박 (오사 방지용)
@@ -187,7 +187,7 @@ func _should_run_collision_check(prev_pos: Vector3, delta: float) -> bool:
 func _resolve_homing_target() -> Node3D:
 	if not is_instance_valid(target_node):
 		target_node = null
-	if _is_valid_ship_target(target_node):
+	if _is_valid_target(target_node):
 		return target_node
 	if not allow_retarget:
 		return null
@@ -196,7 +196,22 @@ func _resolve_homing_target() -> Node3D:
 	_retarget_scan_left = retarget_scan_interval
 
 	var best_target: Node3D = null
-	var best_dist_sq = retarget_radius * retarget_radius
+	var best_dist_sq: float = retarget_radius * retarget_radius
+
+	if prefer_personnel_targets:
+		for candidate in SceneGroupCache.get_nodes(get_tree(), "soldiers"):
+			if not (candidate is Node3D):
+				continue
+			var soldier := candidate as Node3D
+			if not _is_valid_soldier_target(soldier):
+				continue
+			var dist_sq: float = global_position.distance_squared_to(soldier.global_position)
+			if dist_sq < best_dist_sq:
+				best_dist_sq = dist_sq
+				best_target = soldier
+		if is_instance_valid(best_target):
+			target_node = best_target
+			return best_target
 
 	for candidate in SceneGroupCache.get_nodes(get_tree(), "ships"):
 		if not (candidate is Node3D):
@@ -205,7 +220,7 @@ func _resolve_homing_target() -> Node3D:
 		if not _is_valid_ship_target(ship):
 			continue
 
-		var dist_sq = global_position.distance_squared_to(ship.global_position)
+		var dist_sq: float = global_position.distance_squared_to(ship.global_position)
 		if dist_sq < best_dist_sq:
 			best_dist_sq = dist_sq
 			best_target = ship
@@ -235,6 +250,23 @@ func _is_valid_ship_target(ship: Node) -> bool:
 		return true
 	return HitTargetResolver.resolve_team_tag(ship_3d) == _target_group
 
+func _is_valid_soldier_target(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if not (node is CharacterBody3D):
+		return false
+	if node.is_queued_for_deletion():
+		return false
+	if str(node.get("team")) != _target_group:
+		return false
+	var state_value: Variant = node.get("current_state")
+	if state_value != null and int(state_value) == 4:
+		return false
+	return true
+
+func _is_valid_target(node: Node) -> bool:
+	return _is_valid_ship_target(node) or _is_valid_soldier_target(node)
+
 func _raycast_hit(from_pos: Vector3, to_pos: Vector3) -> Node:
 	var world = get_world_3d()
 	if not world:
@@ -251,13 +283,23 @@ func _raycast_hit(from_pos: Vector3, to_pos: Vector3) -> Node:
 
 func _on_hit(target: Node) -> void:
 	if has_exploded: return
-	
-	var hit_obj = HitTargetResolver.resolve_ship_from_node(target)
-	if not is_instance_valid(hit_obj) or not _is_valid_ship_target(hit_obj):
+
+	var active_target_soldier: Node = target_node
+	if prefer_personnel_targets and _is_valid_soldier_target(active_target_soldier):
+		var struck_ship: Node = HitTargetResolver.resolve_ship_from_node(target)
+		var target_ship_variant: Variant = active_target_soldier.get("owned_ship")
+		if struck_ship != null and target_ship_variant is Node and struck_ship == target_ship_variant and not _is_valid_soldier_target(target):
+			return
+
+	var hit_obj: Node = target
+	if not _is_valid_target(hit_obj):
+		hit_obj = HitTargetResolver.resolve_ship_from_node(target)
+	if not is_instance_valid(hit_obj) or not _is_valid_target(hit_obj):
 		return
 
 	# 직격 + 주변 스플래시 피해
-	_explode(hit_obj)
+	var primary_target: Node3D = hit_obj as Node3D
+	_explode(primary_target)
 	queue_free()
 
 func _apply_damage(target_node: Node, scale: float = 1.0) -> void:
@@ -321,6 +363,14 @@ func _find_splash_targets() -> Array[Node3D]:
 			continue
 		if global_position.distance_squared_to(ship.global_position) <= radius_sq:
 			out.append(ship)
+	for node in SceneGroupCache.get_nodes(get_tree(), "soldiers"):
+		if not (node is Node3D):
+			continue
+		var soldier := node as Node3D
+		if not _is_valid_soldier_target(soldier):
+			continue
+		if global_position.distance_squared_to(soldier.global_position) <= radius_sq:
+			out.append(soldier)
 	return out
 
 func _configure_team_filters() -> void:

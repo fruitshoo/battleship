@@ -1,0 +1,326 @@
+extends RefCounted
+
+const PLAYER_CANNON_BASE_DAMAGE := 25.0
+const PLAYER_CANNON_BASE_RANGE := 24.0
+const PLAYER_CANNON_BASE_COOLDOWN := 2.5
+const PLAYER_HULL_BASE_HP := 200.0
+const PLAYER_BASE_MAX_SPEED := 6.0
+const PLAYER_ROWING_BASE_SPEED := 4.8
+const PLAYER_ROWING_BASE_ACCEL := 1.0
+const PLAYER_MAX_ROWING_STAMINA := 100.0
+const PLAYER_SAIL_EFFICIENCY := 1.0
+const PLAYER_SAIL_TURN_SPEED := 60.0
+const PLAYER_STAMINA_DRAIN_RATE := 10.0
+const PLAYER_STAMINA_RECOVERY_RATE := 6.5
+const SUPPLY_BASE_HEAL := 5.0
+const SUPPLY_BASE_STAMINA_RECOVERY := 0.0
+const SOLDIER_BASE_ATTACK := 12.0
+const SOLDIER_SWORD_MULT := 1.25
+const SOLDIER_BOW_MULT := 1.0
+const SUPPORT_FLEET_BASE_RESPAWN_INTERVAL := 30.0
+const SUPPORT_FLEET_BASE_LIMIT := 1
+
+static func is_ship_upgrade(hud, upgrade_id: String) -> bool:
+	return upgrade_id in hud.SHIP_UPGRADE_IDS
+
+static func is_crew_upgrade(hud, upgrade_id: String) -> bool:
+	return upgrade_id in hud.CREW_UPGRADE_IDS
+
+static func is_support_upgrade(upgrade_id: String) -> bool:
+	return upgrade_id in ["fleet_signal", "fleet_cannon", "fleet_hull", "fleet_crew"]
+
+static func build_upgrade_tooltip_text(hud, upgrade_id: String, level: int) -> String:
+	var track_name = "함선"
+	if is_support_upgrade(upgrade_id):
+		track_name = "지원함"
+	elif is_crew_upgrade(hud, upgrade_id):
+		track_name = "병사"
+	var name = upgrade_id
+	var desc = ""
+	var stats: Dictionary = {}
+	var max_level = level
+	if is_instance_valid(UpgradeManager):
+		var upgrades_data = UpgradeManager.get("UPGRADES")
+		if upgrades_data is Dictionary:
+			var data = (upgrades_data as Dictionary).get(upgrade_id, {})
+			if data is Dictionary:
+				name = str(data.get("name", upgrade_id))
+				desc = str(data.get("description", ""))
+				stats = data.get("stats", {})
+				max_level = int(data.get("max_level", level))
+	var spec = build_upgrade_spec_text(upgrade_id, level, stats)
+	var text = "[%s] %s  Lv.%d/%d" % [track_name, name, level, max_level]
+	if not desc.is_empty():
+		text += "\n" + desc
+	if not spec.is_empty():
+		text += "\n현재 효과: " + spec
+	if level >= max_level:
+		text += "\n다음 단계: 최대 레벨"
+	else:
+		var next_spec = build_upgrade_spec_text(upgrade_id, level + 1, stats)
+		if not next_spec.is_empty():
+			text += "\n다음 단계 효과: " + next_spec
+		elif is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_next_description"):
+			var next_desc = str(UpgradeManager.get_next_description(upgrade_id))
+			if not next_desc.is_empty():
+				text += "\n다음 단계: " + next_desc
+	return text
+
+static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dictionary) -> String:
+	if level <= 0:
+		return ""
+
+	match upgrade_id:
+		"cannon":
+			var dmg_mult := 1.0 + (float(stats.get("dmg_pct_per_lv", 20)) / 100.0) * (level - 1)
+			var range_mult := 1.0 + (float(stats.get("range_pct_per_lv", 10)) / 100.0) * (level - 1)
+			var cd_mult := maxf(0.5, 1.0 - (float(stats.get("cd_pct_per_lv", 8)) / 100.0) * (level - 1))
+			var crit_chance := maxf(0.0, (float(stats.get("crit_pct_per_lv", 2.5)) / 100.0) * (level - 1))
+			var crit_multiplier := float(stats.get("crit_multiplier", 1.5))
+			var shot_damage := PLAYER_CANNON_BASE_DAMAGE * dmg_mult
+			var shot_range := PLAYER_CANNON_BASE_RANGE * range_mult
+			var shot_cooldown := PLAYER_CANNON_BASE_COOLDOWN * cd_mult
+			return "1발 데미지 %.0f | 사거리 %.1fm | 재장전 %.2f초 | 치명 %.1f%% x%.1f" % [shot_damage, shot_range, shot_cooldown, crit_chance * 100.0, crit_multiplier]
+		"singigeon":
+			var rocketeers = int(UpgradeManager.get_specialist_unit_count("singigeon", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
+			var base_damage := float(stats.get("base_damage", 2.5))
+			var personnel_mult := float(stats.get("personnel_damage_mult", 5.0))
+			var cooldown := maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
+			var blast_radius := float(stats.get("base_blast_radius", 3.5)) + (float(level - 1) * float(stats.get("blast_radius_per_lv", 0.2)))
+			var rocket_damage := base_damage * (1.0 + 0.15 * float(level))
+			return "신기전병 %d명 | 대병 %.0f | 폭발 %.1fm | 재사용 %.1f초" % [rocketeers, rocket_damage * personnel_mult, blast_radius, cooldown]
+		"janggun":
+			return "명중 시 화염/둔화 디버프 강화"
+		"ballista":
+			var dmg = stats.get("base_damage", 45.0) + (level - 1) * stats.get("damage_per_lv", 15.0)
+			var pierce = int(stats.get("base_pierce", 3) + (level - 1) * stats.get("pierce_per_lv", 1))
+			return "데미지 %.0f | 관통 %d명" % [dmg, pierce]
+		"hull_defense":
+			var hull_stats := _calculate_hull_defense_stats(level, stats)
+			return "방어력 %.1f | 병사 원거리 피해 -%d%% | 선체 재생 %.1f/s" % [
+				hull_stats["defense"],
+				int(round(float(hull_stats["ranged_block"]) * 100.0)),
+				hull_stats["regen"],
+			]
+		"sailing":
+			var sailing_stats := _calculate_sailing_stats(level, stats)
+			return "돛 최고속 +%d%% | 풍력 효율 +%d%% | 돛 회전 +%d%%" % [
+				_percent_delta_from_ratio(float(sailing_stats["max_speed"]) / PLAYER_BASE_MAX_SPEED),
+				_percent_delta_from_ratio(float(sailing_stats["efficiency"]) / PLAYER_SAIL_EFFICIENCY),
+				_percent_delta_from_ratio(float(sailing_stats["turn_speed"]) / PLAYER_SAIL_TURN_SPEED),
+			]
+		"rowing":
+			var rowing_stats := _calculate_rowing_stats(level, stats)
+			var drain_pct := int(round((1.0 - (float(rowing_stats["drain_rate"]) / PLAYER_STAMINA_DRAIN_RATE)) * 100.0))
+			return "노 속도 +%d%% | 노 가속 +%d%% | 최대 스태미나 +%.0f | 소모 -%d%% | 회복 +%d%%" % [
+				_percent_delta_from_ratio(float(rowing_stats["rowing_speed"]) / PLAYER_ROWING_BASE_SPEED),
+				_percent_delta_from_ratio(float(rowing_stats["acceleration_mult"]) / PLAYER_ROWING_BASE_ACCEL),
+				float(rowing_stats["max_stamina"]) - PLAYER_MAX_ROWING_STAMINA,
+				max(drain_pct, 0),
+				_percent_delta_from_ratio(float(rowing_stats["recovery_rate"]) / PLAYER_STAMINA_RECOVERY_RATE),
+			]
+		"supply_bonus":
+			var supply_stats := _calculate_supply_bonus_stats(level, stats)
+			var supply_parts: Array[String] = [
+				"획득 반경 %.1fm" % supply_stats["pickup_radius"],
+				"보급 회복 %.0f" % supply_stats["heal_amount"],
+			]
+			if float(supply_stats["stamina_recovery"]) > SUPPLY_BASE_STAMINA_RECOVERY:
+				supply_parts.append("스태미나 회복 %.0f" % supply_stats["stamina_recovery"])
+			return " | ".join(supply_parts)
+		"fleet_signal":
+			return "희귀 카드: 지원함 소집"
+		"fleet_cannon":
+			var active_count := 1
+			if level >= 2:
+				active_count = 2
+			if level >= 3:
+				active_count = 3
+			var dmg_mult := 1.0 + (float(stats.get("dmg_pct_per_lv", 25)) / 100.0) * level
+			var cd_mult := maxf(0.5, 1.0 - (float(stats.get("cd_pct_per_lv", 8)) / 100.0) * level)
+			return "포문 %d문 | 포격 +%d%% | 재장전 -%d%%" % [
+				active_count,
+				_percent_delta_from_ratio(dmg_mult),
+				int(round((1.0 - cd_mult) * 100.0)),
+			]
+		"fleet_hull":
+			return "선체 체력 +%d | 방어력 +%d" % [
+				int(float(stats.get("hp_add", 80)) * level),
+				int(stats.get("def_per_lv", 3) * level),
+			]
+		"fleet_crew":
+			var reduce_levels := mini(level, int(stats.get("respawn_reduce_max_level", 4)))
+			var reduce_per_level := float(stats.get("respawn_reduce_per_lv", 4.0))
+			var min_respawn_interval := float(stats.get("min_respawn_interval", 14.0))
+			var respawn_interval := maxf(min_respawn_interval, SUPPORT_FLEET_BASE_RESPAWN_INTERVAL - (reduce_per_level * float(reduce_levels)))
+			var fleet_limit := SUPPORT_FLEET_BASE_LIMIT
+			if level >= int(stats.get("limit_add_level", 5)):
+				fleet_limit += int(stats.get("limit_add", 1))
+			return "재합류 %.0f초 | 한계 %d척" % [respawn_interval, fleet_limit]
+		"crew_numbers":
+			var spearmen = int(UpgradeManager.get_specialist_unit_count("crew_numbers", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
+			return "창병 %d명 | 근접 방어/난간전 특화" % spearmen
+		"crew_attack":
+			var attack_bonus := float(stats.get("attack_add_per_lv", 2.0)) * level
+			var sword_damage := (SOLDIER_BASE_ATTACK + attack_bonus) * SOLDIER_SWORD_MULT
+			var bow_damage := (SOLDIER_BASE_ATTACK + attack_bonus) * SOLDIER_BOW_MULT
+			return "검 %.1f | 활 %.1f" % [sword_damage, bow_damage]
+		"crew_defense":
+			var defense_bonus := float(stats.get("defense_add_per_lv", 1.0)) * level
+			return "병사 방어력 +%.0f" % defense_bonus
+		"fire_pot":
+			var throwers = int(UpgradeManager.get_specialist_unit_count("fire_pot", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
+			var fp_dmg = stats.get("base_damage", 15.0) + (level - 1) * stats.get("damage_per_lv", 5.0)
+			var fp_cd = maxf(1.0, stats.get("base_cooldown", 6.0) - (level - 1) * stats.get("cooldown_reduce_per_lv", 1.0))
+			return "화통병 %d명 | 폭발 데미지 %.0f | 재사용 %.1f초" % [throwers, fp_dmg, fp_cd]
+		"repeating_crossbow":
+			var repeaters = int(UpgradeManager.get_specialist_unit_count("repeating_crossbow", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
+			var burst = 3
+			if level >= 3:
+				burst = 4
+			if level >= 5:
+				burst = 5
+			var rc_dmg = stats.get("base_damage", 10.0) + (level - 1) * stats.get("damage_per_lv", 2.0)
+			return "연노병 %d명 | 연사 %d발 | 1발 데미지 %.0f" % [repeaters, burst, rc_dmg]
+		"supply":
+			return "선체 회복 +%d | 스태미나 회복 +%d" % [
+				int(stats.get("hull_heal", 20.0)),
+				int(stats.get("stamina_recover", 25.0)),
+			]
+		"gold":
+			return "점수 +%d" % int(stats.get("score_add", 50))
+	return ""
+
+static func get_upgrade_icon(upgrade_id: String) -> String:
+	var icon_map = {
+		"cannon": "sports_baseball",
+		"singigeon": "rocket_launch",
+		"janggun": "hardware",
+		"ballista": "arrow_selector_tool",
+		"hull_defense": "shield",
+		"sailing": "air",
+		"rowing": "rowing",
+		"supply_bonus": "medical_services",
+		"fleet_signal": "groups",
+		"fleet_cannon": "flaky",
+		"fleet_hull": "security",
+		"fleet_crew": "update",
+		"crew_numbers": "swords",
+		"crew_attack": "swords",
+		"crew_defense": "shield",
+		"fire_pot": "local_fire_department",
+		"repeating_crossbow": "bolt",
+		"supply": "healing",
+		"gold": "paid",
+	}
+	return icon_map.get(upgrade_id, "build")
+
+static func get_upgrade_color(upgrade_id: String) -> Color:
+	var color_map = {
+		"cannon": Color(1.0, 0.7, 0.3),
+		"singigeon": Color(1.0, 0.4, 0.4),
+		"janggun": Color(0.8, 0.5, 0.2),
+		"ballista": Color(0.9, 0.6, 0.25),
+		"hull_defense": Color(0.75, 0.45, 0.2),
+		"sailing": Color(0.35, 0.84, 1.0),
+		"rowing": Color(1.0, 0.78, 0.32),
+		"supply_bonus": Color(0.35, 0.95, 0.35),
+		"fleet_signal": Color(1.0, 0.75, 0.35),
+		"fleet_cannon": Color(1.0, 0.45, 0.85),
+		"fleet_hull": Color(0.3, 1.0, 0.8),
+		"fleet_crew": Color(0.35, 0.9, 1.0),
+		"crew_numbers": Color(0.5, 0.82, 1.0),
+		"crew_attack": Color(1.0, 0.9, 0.35),
+		"crew_defense": Color(0.55, 0.8, 1.0),
+		"fire_pot": Color(0.93, 0.42, 0.2),
+		"repeating_crossbow": Color(0.65, 0.95, 0.35),
+		"supply": Color(0.55, 0.95, 0.6),
+		"gold": Color(1.0, 0.86, 0.3),
+	}
+	return color_map.get(upgrade_id, Color.WHITE)
+
+static func _percent_delta_from_ratio(ratio: float) -> int:
+	return int(round((ratio - 1.0) * 100.0))
+
+static func _level_matches(level: int, level_list: Variant) -> bool:
+	if level_list is Array:
+		for entry in level_list:
+			if int(entry) == level:
+				return true
+	return false
+
+static func _calculate_sailing_stats(level: int, stats: Dictionary) -> Dictionary:
+	var max_speed := PLAYER_BASE_MAX_SPEED
+	var efficiency := PLAYER_SAIL_EFFICIENCY
+	var turn_speed := PLAYER_SAIL_TURN_SPEED
+	for current_level in range(1, level + 1):
+		if _level_matches(current_level, stats.get("speed_levels", [])):
+			max_speed *= float(stats.get("speed_mult", 1.08))
+		if _level_matches(current_level, stats.get("efficiency_levels", [])):
+			efficiency *= float(stats.get("efficiency_mult", 1.08))
+		if _level_matches(current_level, stats.get("turn_levels", [])):
+			turn_speed *= float(stats.get("turn_mult", 1.15))
+	return {
+		"max_speed": max_speed,
+		"efficiency": efficiency,
+		"turn_speed": turn_speed,
+	}
+
+static func _calculate_rowing_stats(level: int, stats: Dictionary) -> Dictionary:
+	var rowing_speed := PLAYER_ROWING_BASE_SPEED
+	var acceleration_mult := PLAYER_ROWING_BASE_ACCEL
+	var max_stamina := PLAYER_MAX_ROWING_STAMINA
+	var drain_rate := PLAYER_STAMINA_DRAIN_RATE
+	var recovery_rate := PLAYER_STAMINA_RECOVERY_RATE
+	for current_level in range(1, level + 1):
+		if _level_matches(current_level, stats.get("speed_levels", [])):
+			rowing_speed *= float(stats.get("speed_mult", 1.15))
+		if _level_matches(current_level, stats.get("accel_levels", [])):
+			acceleration_mult *= float(stats.get("accel_mult", 1.2))
+		if _level_matches(current_level, stats.get("stamina_add_levels", [])):
+			max_stamina += float(stats.get("stamina_add", 20.0))
+		if _level_matches(current_level, stats.get("drain_levels", [])):
+			drain_rate *= float(stats.get("drain_mult", 0.85))
+		if _level_matches(current_level, stats.get("recovery_levels", [])):
+			recovery_rate *= float(stats.get("recovery_mult", 1.2))
+	return {
+		"rowing_speed": rowing_speed,
+		"acceleration_mult": acceleration_mult,
+		"max_stamina": max_stamina,
+		"drain_rate": drain_rate,
+		"recovery_rate": recovery_rate,
+	}
+
+static func _calculate_hull_defense_stats(level: int, stats: Dictionary) -> Dictionary:
+	var defense := 0.0
+	var ranged_block := 0.0
+	var regen := 0.0
+	for current_level in range(1, level + 1):
+		if _level_matches(current_level, stats.get("def_levels", [])):
+			defense += float(stats.get("def_add", 2.0))
+		if _level_matches(current_level, stats.get("crew_ranged_block_levels", [])):
+			ranged_block += float(stats.get("crew_ranged_block_add", 0.10))
+		if _level_matches(current_level, stats.get("regen_levels", [])):
+			regen += float(stats.get("regen_add", 1.5))
+	return {
+		"defense": defense,
+		"ranged_block": ranged_block,
+		"regen": regen,
+	}
+
+static func _calculate_supply_bonus_stats(level: int, stats: Dictionary) -> Dictionary:
+	var pickup_radius: float = float(stats.get("base_radius", 8.0))
+	var heal_amount: float = float(stats.get("base_heal", SUPPLY_BASE_HEAL))
+	var stamina_recovery: float = float(stats.get("base_stamina_recovery", SUPPLY_BASE_STAMINA_RECOVERY))
+	for current_level in range(1, level + 1):
+		if _level_matches(current_level, stats.get("radius_levels", [])):
+			pickup_radius += float(stats.get("radius_add", 5.0))
+		if _level_matches(current_level, stats.get("heal_levels", [])):
+			heal_amount += float(stats.get("heal_add", 10.0))
+		if _level_matches(current_level, stats.get("stamina_recovery_levels", [])):
+			stamina_recovery += float(stats.get("stamina_recovery_add", 20.0))
+	return {
+		"pickup_radius": pickup_radius,
+		"heal_amount": heal_amount,
+		"stamina_recovery": stamina_recovery,
+	}

@@ -1,11 +1,17 @@
 extends Node
+const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
+const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
+const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
+const LevelManagerUpgradeFlowHelper = preload("res://scripts/managers/level_manager_upgrade_flow_helper.gd")
+const DEBUG_LEVEL_LOGS := false
 
 ## 레벨 매니저 (Level Manager)
 ## 게임 시간 경과에 따라 난이도(레벨)를 관리하고 스포너에게 지시
 
 signal level_up(new_level: int)
 signal score_changed(new_score: int)
-signal merit_full_action_completed() # (레거시) 기존 함대 자동 소환 트리거
+signal merit_full_action_completed() # 지휘 포인트 가득 참 후속 처리 완료
 
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
@@ -34,16 +40,19 @@ var ships_sunk: int = 0
 var soldiers_killed: int = 0
 var weapon_damage_stats: Dictionary = {}
 var _boss_triggered: bool = false
+var _boss_phase_active: bool = false
 var _victory_triggered: bool = false
 var rerolls_available: int = 0
+var _debug_collision_visuals_enabled: bool = false
 
 const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
-	"singigeon": "신기전",
+	"singigeon": "신기전병",
 	"janggun": "대장군전",
-	"fire_pot": "화통",
+	"crew_numbers": "창병",
+	"fire_pot": "화통병",
 	"ballista": "팔우노",
-	"repeating_crossbow": "연노",
+	"repeating_crossbow": "연노병",
 	"bow": "활",
 	"sword": "검",
 	"spear": "창",
@@ -63,21 +72,21 @@ var merit_level: int = 1
 # max_enemies: 동시 최대 적 수
 # boarders: 도선 병사 수
 var level_data = {
-	1: {"spawn_interval": 6.0, "max_enemies": 2, "boarders": 1},
-	2: {"spawn_interval": 5.5, "max_enemies": 3, "boarders": 1},
-	3: {"spawn_interval": 5.0, "max_enemies": 4, "boarders": 2},
-	4: {"spawn_interval": 4.5, "max_enemies": 5, "boarders": 2},
-	5: {"spawn_interval": 4.0, "max_enemies": 6, "boarders": 2},
-	6: {"spawn_interval": 3.5, "max_enemies": 7, "boarders": 3},
-	7: {"spawn_interval": 3.5, "max_enemies": 8, "boarders": 3},
-	8: {"spawn_interval": 3.0, "max_enemies": 10, "boarders": 3},
-	9: {"spawn_interval": 3.0, "max_enemies": 10, "boarders": 3},
+	1: {"spawn_interval": 5.2, "max_enemies": 3, "boarders": 1},
+	2: {"spawn_interval": 4.8, "max_enemies": 4, "boarders": 1},
+	3: {"spawn_interval": 4.4, "max_enemies": 5, "boarders": 2},
+	4: {"spawn_interval": 4.0, "max_enemies": 6, "boarders": 2},
+	5: {"spawn_interval": 3.7, "max_enemies": 7, "boarders": 2},
+	6: {"spawn_interval": 3.4, "max_enemies": 8, "boarders": 3},
+	7: {"spawn_interval": 3.1, "max_enemies": 9, "boarders": 3},
+	8: {"spawn_interval": 2.9, "max_enemies": 10, "boarders": 3},
+	9: {"spawn_interval": 2.7, "max_enemies": 11, "boarders": 3},
 	10: {"spawn_interval": 2.5, "max_enemies": 12, "boarders": 4},
-	11: {"spawn_interval": 2.5, "max_enemies": 12, "boarders": 4},
-	12: {"spawn_interval": 2.0, "max_enemies": 15, "boarders": 4},
-	13: {"spawn_interval": 2.0, "max_enemies": 15, "boarders": 5},
-	14: {"spawn_interval": 1.5, "max_enemies": 18, "boarders": 5},
-	15: {"spawn_interval": 1.5, "max_enemies": 20, "boarders": 6},
+	11: {"spawn_interval": 2.3, "max_enemies": 13, "boarders": 4},
+	12: {"spawn_interval": 2.1, "max_enemies": 15, "boarders": 4},
+	13: {"spawn_interval": 1.9, "max_enemies": 16, "boarders": 5},
+	14: {"spawn_interval": 1.7, "max_enemies": 18, "boarders": 5},
+	15: {"spawn_interval": 1.6, "max_enemies": 20, "boarders": 6},
 }
 
 # 참조
@@ -90,118 +99,32 @@ func _ready() -> void:
 	_calculate_next_level_xp()
 	max_merit_points = _get_merit_requirement(merit_level)
 	merit_points = clamp(merit_points, 0, max_merit_points)
-	
-	# 초기 HUD 및 난이도(Spawner) 업데이트
-	_update_difficulty()
-	if hud:
-		hud.update_level(current_level)
-		hud.update_score(current_score)
-		hud.update_xp(current_xp, xp_to_next_level)
-		hud.update_merit(merit_points, max_merit_points, merit_level)
-		if hud.has_method("update_combat_stats"):
-			hud.update_combat_stats(ships_sunk, soldiers_killed)
-		if hud.has_method("update_difficulty_ui"):
-			hud.update_difficulty_ui(game_difficulty)
-		
-	# 시작 차단 없이 예열은 백그라운드에서 진행한다.
-	call_deferred("_run_startup_prewarm_async")
-	
-	# 육분의(Sextant) 렐릭 및 기본 무기(대포) 지급
-	# 시작 지연을 줄이기 위해 예열 완료를 기다리지 않고 초기 프레임 이후 즉시 적용
-	get_tree().create_timer(0.1).timeout.connect(func():
-		if is_instance_valid(UpgradeManager):
-			UpgradeManager.add_relic("sextant")
-			UpgradeManager.initialize_default_weapons()
-	)
+	LevelManagerStartupHelper.initialize(self)
 
 func _run_startup_prewarm_async() -> void:
-	# 백그라운드 예열: 게임 시작을 막지 않도록 비차단 모드로 실행
-	await _prewarm_shaders(false)
+	await LevelManagerStartupHelper.run_startup_prewarm_async(self)
 
 func _prewarm_shaders(show_blocking_overlay: bool = true) -> void:
-	# 1. (선택) 로딩(예열) 화면 생성
-	var loading_layer: CanvasLayer = null
-	var bg: ColorRect = null
-	if show_blocking_overlay:
-		loading_layer = CanvasLayer.new()
-		loading_layer.layer = 120 # 최상단
-		bg = ColorRect.new()
-		bg.color = Color.BLACK
-		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-		loading_layer.add_child(bg)
-		add_child(loading_layer)
-	
-	# 2. 쉐이더 예열 씬 목록 (시작 연출을 해치지 않도록 순수 VFX만 대상)
-	var scenes_to_warm = [
-		preload("res://scenes/effects/muzzle_smoke.tscn"),
-		preload("res://scenes/effects/hit_effect.tscn"),
-		preload("res://scenes/effects/wood_splinter.tscn"),
-		preload("res://scenes/effects/fire_effect.tscn"),
-		preload("res://scenes/effects/fire_pot_explosion.tscn"),
-		preload("res://scenes/effects/water_explosion.tscn"),
-	]
-	
-	# 조용한 예열을 위해 전용 컨테이너에 붙이되, 실제 재생(emitting/play)은 하지 않는다.
-	var container = Node3D.new()
-	container.name = "ShaderPrewarmer"
-	add_child(container)
-	container.position = Vector3(0, -1000, 0)
-	container.scale = Vector3.ONE
-	
-	for scene in scenes_to_warm:
-		if scene:
-			var inst = scene.instantiate()
-			_mark_prewarm_recursive(inst)
-			container.add_child(inst)
-			
-			# 파티클/머티리얼 리소스를 터치해 로딩만 유도 (시각/음향 출력 금지)
-			_prime_visual_resources(inst)
-			
-			# 백그라운드 모드에서는 프레임에 작업을 분산해 시작 프레임 스파이크를 줄인다.
-			if not show_blocking_overlay:
-				await get_tree().process_frame
-			
-	# 오디오 매니저의 사전 캐싱 작업 대기 (비동기 완료 보장)
-	if not AudioManager.is_prewarm_finished:
-		await AudioManager.prewarm_finished
-		
-	# 프레임 안정화를 위해 추가로 2프레임 대기
-	for i in range(2):
-		await get_tree().process_frame
-	
-	# 3. 예열 노드 삭제 및 로딩 화면 페이드 아웃
-	container.queue_free()
-	print("[Resource] 쉐이더 예열 및 오디오 캐싱 완료")
-	
-	if show_blocking_overlay and is_instance_valid(bg) and is_instance_valid(loading_layer):
-		var tween = create_tween()
-		tween.tween_property(bg, "modulate:a", 0.0, 1.0) # 1초 동안 부드럽게 밝아짐
-		tween.tween_callback(loading_layer.queue_free)
+	await LevelManagerStartupHelper.prewarm_shaders(self, show_blocking_overlay)
 
 func _mark_prewarm_recursive(node: Node) -> void:
-	node.set_meta("prewarm_mode", true)
-	for child in node.get_children():
-		_mark_prewarm_recursive(child)
+	LevelManagerStartupHelper._mark_prewarm_recursive(node)
 
 func _prime_visual_resources(node: Node) -> void:
-	if node is GPUParticles3D:
-		var gpu := node as GPUParticles3D
-		gpu.emitting = false
-		gpu.process_material = gpu.process_material
-	elif node is CPUParticles3D:
-		var cpu := node as CPUParticles3D
-		cpu.emitting = false
-		cpu.process_material = cpu.process_material
-	elif node is MeshInstance3D:
-		var mesh_inst := node as MeshInstance3D
-		mesh_inst.mesh = mesh_inst.mesh
-		mesh_inst.material_override = mesh_inst.material_override
-
-	for child in node.get_children():
-		_prime_visual_resources(child)
+	LevelManagerStartupHelper._prime_visual_resources(node)
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("toggle_ship_health_bars"):
+		if hud and hud.has_method("toggle_ship_health_bars"):
+			hud.toggle_ship_health_bars()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("toggle_stat_panel"):
+		if hud and hud.has_method("toggle_stat_panel"):
+			hud.toggle_stat_panel()
+		get_viewport().set_input_as_handled()
+		return
 	if not OS.is_debug_build(): return # 이 디버그 키들은 릴리즈 빌드에서는 작동하지 않음
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
@@ -210,23 +133,41 @@ func _unhandled_input(event: InputEvent) -> void:
 				_set_level(current_level + 1)
 			KEY_F2: # 대포 디버그
 				_debug_cannons()
+			KEY_F3: # 충돌 외곽선 시각화
+				_toggle_collision_visualizers()
+			KEY_F4: # sekibune melee 테스트 소환
+				_debug_spawn_test_ship("sekibune_melee", 18.0, 0.0)
+			KEY_F5: # sekibune cannon 테스트 소환
+				_debug_spawn_test_ship("sekibune_cannon", 20.0, 10.0)
+			KEY_F6: # 충돌 시각화 모드 순환
+				_cycle_collision_visualizer_mode()
+			KEY_F9: # 지원함 디버그 추가
+				_debug_spawn_support_ship()
+			KEY_F10: # 지원함 추종 상태 덤프
+				_debug_dump_support_fleet_state()
 			KEY_M: # 메타 업그레이드 상점 (테스트용)
 				show_meta_shop()
 
 
 func _process(delta: float) -> void:
-	current_time += delta
-	
-	# 스테이지 클리어 조건: 일정 시간 생존
-	if current_time >= survival_victory_time:
-		show_victory()
-		return
+	if _boss_phase_active:
+		current_time = boss_spawn_time
+	else:
+		current_time += delta
 	
 	# 보스 등장 체크 (10분 = 600초)
-	if current_time >= boss_spawn_time and not _boss_triggered:
+	if boss_spawn_time > 0.0 and current_time >= boss_spawn_time and not _boss_triggered:
+		current_time = boss_spawn_time
 		_boss_triggered = true
+		_boss_phase_active = true
 		if enemy_spawner:
 			enemy_spawner.trigger_boss_event()
+	
+	# 보스전이 없는 구성일 때만 시간 생존 승리 적용
+	var use_survival_victory: bool = survival_victory_time > 0.0 and (boss_spawn_time <= 0.0 or survival_victory_time < boss_spawn_time)
+	if use_survival_victory and current_time >= survival_victory_time:
+		show_victory()
+		return
 	
 	# 난이도 자동 증가 (시간 기반)
 	var new_difficulty = int(current_time / level_duration) + 1
@@ -237,103 +178,38 @@ func _process(delta: float) -> void:
 		_update_difficulty()
 		if hud and hud.has_method("update_difficulty_ui"):
 			hud.update_difficulty_ui(game_difficulty)
-		print("[Difficulty] 난이도 상승! Level %d (적 강화)" % game_difficulty)
-	
-	# 주기적으로 적 수 체크 (HUD용)
-	if Engine.get_process_frames() % 30 == 0:
-		_update_enemy_count_ui()
-
-func _update_enemy_count_ui() -> void:
-	if hud:
-		var count = get_tree().get_nodes_in_group("enemy").size()
-		hud.update_enemy_count(count)
+		if DEBUG_LEVEL_LOGS:
+			print("[Difficulty] 난이도 상승! Level %d (적 강화)" % game_difficulty)
 
 func add_score(points: int) -> void:
-	current_score += points
-	enemies_killed += 1
-	score_changed.emit(current_score)
-	
-	# 실시간 골드 저장
-	if is_instance_valid(SaveManager):
-		SaveManager.add_gold(points)
-	
-	if hud:
-		hud.update_score(current_score)
+	LevelManagerProgressionHelper.add_score(self, points)
 
 func add_ship_sunk(count: int = 1) -> void:
-	ships_sunk += max(0, count)
-	if hud and hud.has_method("update_combat_stats"):
-		hud.update_combat_stats(ships_sunk, soldiers_killed)
+	LevelManagerProgressionHelper.add_ship_sunk(self, count)
 
 func add_soldier_kill(count: int = 1) -> void:
-	soldiers_killed += max(0, count)
-	if hud and hud.has_method("update_combat_stats"):
-		hud.update_combat_stats(ships_sunk, soldiers_killed)
+	LevelManagerProgressionHelper.add_soldier_kill(self, count)
 
 func add_command_xp_from_soldier_kill(kill_count: int = 1) -> void:
-	var k = max(0, kill_count)
-	if k <= 0:
-		return
-	add_merit(merit_per_soldier_kill * k)
+	LevelManagerProgressionHelper.add_command_xp_from_soldier_kill(self, kill_count)
 
 func add_player_weapon_damage(source_id: String, amount: float) -> void:
-	if source_id.is_empty():
-		return
-	if amount <= 0.0:
-		return
-	var current = float(weapon_damage_stats.get(source_id, 0.0))
-	weapon_damage_stats[source_id] = current + amount
+	LevelManagerProgressionHelper.add_player_weapon_damage(self, source_id, amount)
 
 func get_total_weapon_damage() -> float:
-	var total := 0.0
-	for key in weapon_damage_stats.keys():
-		total += float(weapon_damage_stats[key])
-	return total
+	return LevelManagerProgressionHelper.get_total_weapon_damage(self)
 
 func get_weapon_damage_rows(max_rows: int = 8) -> Array:
-	var rows: Array = []
-	for key in weapon_damage_stats.keys():
-		var dmg = float(weapon_damage_stats[key])
-		if dmg <= 0.0:
-			continue
-		rows.append({
-			"id": key,
-			"name": DAMAGE_SOURCE_NAME.get(key, key),
-			"damage": dmg
-		})
-	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a.get("damage", 0.0)) > float(b.get("damage", 0.0))
-	)
-	if rows.size() > max_rows:
-		return rows.slice(0, max_rows)
-	return rows
+	return LevelManagerProgressionHelper.get_weapon_damage_rows(self, max_rows)
 
 
 ## XP 획득 및 레벨업 처리
 func add_xp(amount: int) -> void:
-	current_xp += int(amount * xp_multiplier)
-	
-	if hud and hud.has_method("update_xp"):
-		hud.update_xp(current_xp, xp_to_next_level)
-	
-	if current_xp >= xp_to_next_level:
-		current_xp -= xp_to_next_level
-		_set_level(current_level + 1)
+	LevelManagerProgressionHelper.add_xp(self, amount)
 
 ## 공적 (Merit) 획득
 func add_merit(amount: int) -> void:
-	if merit_points >= max_merit_points: return # 이미 꽉 찼으면 무시
-	
-	merit_points = min(merit_points + amount, max_merit_points)
-	merit_changed.emit(merit_points, max_merit_points, merit_level)
-	
-	if hud and hud.has_method("update_merit"):
-		hud.update_merit(merit_points, max_merit_points, merit_level)
-		
-	if merit_points >= max_merit_points:
-		merit_full.emit()
-		print("[Command] 지휘 포인트가 가득 찼습니다! 병사 업그레이드를 시작합니다.")
-		consume_merit() # 자동 소비 및 UI 팝업
+	LevelManagerProgressionHelper.add_merit(self, amount)
 		
 func consume_merit() -> void:
 	# 공적 소비 시 병사 업그레이드 UI를 띄움
@@ -346,171 +222,50 @@ func consume_merit() -> void:
 
 
 func _show_fleet_upgrade_ui() -> void:
-	if not is_instance_valid(UpgradeManager): return
-	
-	# 지휘 업그레이드 선택지 (병사 + 해금 시 함대)
-	var choices = UpgradeManager.get_command_upgrade_choices(3)
-	if choices.is_empty():
-		# 병사 업그레이드가 더 이상 없으면 레벨만 올리고 종료
-		_finalize_merit_levelup("")
-		return
-		
-	get_tree().paused = true
-	
-	if is_instance_valid(_upgrade_ui_instance):
-		_upgrade_ui_instance.queue_free()
-		
-	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
-	add_child(_upgrade_ui_instance)
-	
-	# 지휘 업그레이드용 특별 라벨 설정
-	if _upgrade_ui_instance.has_node("VBox/TitleLabel"):
-		_upgrade_ui_instance.get_node("VBox/TitleLabel").text = "지휘 강화 (병사/함대)"
-	
-	# 지휘 레벨업은 리롤권 0개 고정
-	_upgrade_ui_instance.show_upgrades(choices, 0)
-	
-	# 전용 콜백 연결
-	_upgrade_ui_instance.upgrade_chosen.connect(_on_fleet_upgrade_chosen)
+	LevelManagerUpgradeFlowHelper.show_fleet_upgrade_ui(self)
 
 
 func _on_fleet_upgrade_chosen(upgrade_id: String) -> void:
-	# 병사 업그레이드 적용
-	UpgradeManager.apply_upgrade(upgrade_id)
-	
-	# 지휘 레벨 수치 상승 처리
-	_finalize_merit_levelup(upgrade_id)
-	
-	# UI 제거 및 게임 재개
-	if is_instance_valid(_upgrade_ui_instance):
-		_upgrade_ui_instance.queue_free()
-		_upgrade_ui_instance = null
-	
-	get_tree().paused = false
+	LevelManagerUpgradeFlowHelper.on_fleet_upgrade_chosen(self, upgrade_id)
 
 
 func _finalize_merit_levelup(upgrade_id: String) -> void:
-	merit_level += 1
-	max_merit_points = _get_merit_requirement(merit_level)
-	
-	print("[Command] Troop Upgraded! Level %d (%s)" % [merit_level, upgrade_id])
-	
-	if hud and hud.has_method("update_merit"):
-		hud.update_merit(merit_points, max_merit_points, merit_level)
+	LevelManagerUpgradeFlowHelper.finalize_merit_levelup(self, upgrade_id)
 
 
 func _calculate_next_level_xp() -> void:
-	# 레벨업 공식: base * (level ^ exponent)
-	# 조정 가능한 곡선으로 관리
-	xp_to_next_level = max(1, int(level_xp_base * pow(current_level, level_xp_exponent)))
+	LevelManagerProgressionHelper.calculate_next_level_xp(self)
 
 
 func _get_merit_requirement(level: int) -> int:
-	# 공적 레벨 요구량: base + (level - 1) * growth
-	return max(1, merit_base_points + (level - 1) * merit_growth_per_level)
+	return LevelManagerProgressionHelper.get_merit_requirement(self, level)
 
 var upgrade_ui_scene: PackedScene = preload("res://scenes/ui/upgrade_ui.tscn")
 var meta_upgrade_ui_scene: PackedScene = preload("res://scenes/ui/meta_upgrade_ui.tscn")
 var _upgrade_ui_instance: CanvasLayer = null
 
 func _set_level(new_level: int) -> void:
-	current_level = new_level # 플레이어 레벨은 제한 없음 (보급/돈 무한 가능)
-	_calculate_next_level_xp()
-	
-	level_up.emit(current_level)
-	if hud:
-		hud.update_level(current_level)
-	
-	print("[LevelUp] Level Up! Lv.%d (Next XP: %d)" % [current_level, xp_to_next_level])
-	
-	# === 레벨업 보상 ===
-	# 1. 골드 보상
-	add_score(5) # 점수 겸 골드 +5
-	
-	# 2. 선체 강화 (+20 Max HP, 최대 상한 적용)
-	var ship = UpgradeManager._get_player_ship()
-	if ship:
-		ship.max_hull_hp = minf(ship.max_hull_hp + 20.0, max_hull_hp_cap)
-		ship.hull_hp = minf(ship.hull_hp + 20.0, ship.max_hull_hp)
-		if hud: hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
-	
-	# 3. 리롤권 지급 (기본 1회 + 영구 업그레이드 보너스)
-	var reroll_bonus := 0
-	if is_instance_valid(MetaManager) and MetaManager.has_method("get_reroll_bonus"):
-		reroll_bonus = int(MetaManager.get_reroll_bonus())
-	rerolls_available = 1 + reroll_bonus
-	
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("level_up")
-	
-	_show_upgrade_ui(3) # 일반 레벨업은 3개 선택지
+	LevelManagerProgressionHelper.set_level(self, new_level)
 
 
 func _show_upgrade_ui(choice_count: int = 3) -> void:
-	if not is_instance_valid(UpgradeManager):
-		return
-	
-	var choices = UpgradeManager.get_ship_upgrade_choices(choice_count)
-	if choices.is_empty():
-		return
-	
-	# 게임 일시정지 (이미 일시정지 중일 수 있음 - 상자 획득 시)
-	get_tree().paused = true
-	
-	# UI 생성 (기존 UI가 있다면 제거)
-	if is_instance_valid(_upgrade_ui_instance):
-		_upgrade_ui_instance.queue_free()
-		
-	_upgrade_ui_instance = upgrade_ui_scene.instantiate()
-	add_child(_upgrade_ui_instance)
-	_upgrade_ui_instance.upgrade_chosen.connect(_on_upgrade_chosen)
-	_upgrade_ui_instance.reroll_requested.connect(_on_reroll_requested)
-	
-	# 상자 보상인 경우 리롤권을 더 줄 수 있음 (현재는 레벨업 로직과 동일하게 1개 유지 확인)
-	_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
+	LevelManagerUpgradeFlowHelper.show_upgrade_ui(self, choice_count)
 
 
 func _on_reroll_requested() -> void:
-	if rerolls_available > 0:
-		rerolls_available -= 1
-		
-		var choices = UpgradeManager.get_ship_upgrade_choices(3)
-		if _upgrade_ui_instance:
-			_upgrade_ui_instance.show_upgrades(choices, rerolls_available)
-			print("[Reroll] Reroll 사용! (남은 횟수: %d)" % rerolls_available)
+	LevelManagerUpgradeFlowHelper.on_reroll_requested(self)
 
 
 func _on_upgrade_chosen(upgrade_id: String) -> void:
-	# 업그레이드 적용
-	UpgradeManager.apply_upgrade(upgrade_id)
-	
-	# UI 제거
-	if is_instance_valid(_upgrade_ui_instance):
-		_upgrade_ui_instance.queue_free()
-		_upgrade_ui_instance = null
-	
-	# 게임 재개
-	get_tree().paused = false
+	LevelManagerUpgradeFlowHelper.on_upgrade_chosen(self, upgrade_id)
 
 
 func _update_difficulty() -> void:
-	if not enemy_spawner:
-		return
-		
-	# 난이도는 game_difficulty를 따름
-	var data = level_data.get(game_difficulty, level_data[max_level])
-	
-	# 스포너 설정 업데이트
-	if enemy_spawner.has_method("set_difficulty"):
-		enemy_spawner.set_difficulty(
-			data["spawn_interval"],
-			data["max_enemies"],
-			data.get("boarders", 2)
-		)
+	LevelManagerProgressionHelper.update_difficulty(self)
 
 
 func _debug_cannons() -> void:
-	var ship = get_tree().get_nodes_in_group("player")
+	var ship = SceneGroupCache.get_nodes(get_tree(), "player")
 	if ship.is_empty():
 		print("[DEBUG] 플레이어 배 없음!")
 		return
@@ -540,11 +295,100 @@ func _debug_cannons() -> void:
 		])
 	
 	# 적 수도 출력
-	var enemies = get_tree().get_nodes_in_group("enemy")
+	var enemies = SceneGroupCache.get_nodes(get_tree(), "enemy")
 	print("[DEBUG] 적 수: %d" % enemies.size())
 	for e in enemies:
 		print("[DEBUG]   적 [%s] pos=%s" % [e.name, e.global_position])
 	print("[DEBUG] ========================================")
+
+func _toggle_collision_visualizers() -> void:
+	_debug_collision_visuals_enabled = not _debug_collision_visuals_enabled
+	CollisionVisualizer.set_runtime_enabled(_debug_collision_visuals_enabled)
+	for node in get_tree().get_nodes_in_group("collision_visualizers"):
+		if node and node.has_method("_refresh_visibility"):
+			node.call("_refresh_visibility")
+	print("[DEBUG] 충돌 시각화: %s" % ("ON" if _debug_collision_visuals_enabled else "OFF"))
+
+func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_offset: float) -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_ship"):
+		return
+	enemy_spawner.debug_spawn_ship(ship_type_name, distance, lateral_offset)
+
+func _cycle_collision_visualizer_mode() -> void:
+	var mode = CollisionVisualizer.cycle_runtime_mode()
+	for node in get_tree().get_nodes_in_group("collision_visualizers"):
+		if node and node.has_method("_refresh_visibility"):
+			node.call("_refresh_visibility")
+	var mode_name := "ALL"
+	match mode:
+		CollisionVisualizer.MODE_BASE:
+			mode_name = "BASE"
+		CollisionVisualizer.MODE_SEPARATION:
+			mode_name = "SEPARATION"
+		CollisionVisualizer.MODE_GUARD:
+			mode_name = "GUARD"
+	print("[DEBUG] 충돌 시각화 모드: %s" % mode_name)
+
+func _debug_spawn_support_ship() -> void:
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	if players.is_empty():
+		print("[DEBUG] 플레이어 배 없음!")
+		return
+	var player_ship = players[0]
+	if not is_instance_valid(player_ship):
+		print("[DEBUG] 플레이어 배 유효하지 않음!")
+		return
+	if not player_ship.has_method("_spawn_or_repair_ally"):
+		print("[DEBUG] 플레이어 배에 지원함 소환 함수 없음!")
+		return
+
+	var current_support_count: int = 0
+	if player_ship.has_method("_get_support_fleet_ships"):
+		current_support_count = player_ship._get_support_fleet_ships().size()
+
+	if current_support_count >= int(player_ship.support_fleet_limit):
+		player_ship.support_fleet_limit = current_support_count + 1
+
+	player_ship._spawn_or_repair_ally()
+	print("[DEBUG] 지원함 디버그 추가: 현재 %d척 / 한계 %d" % [
+		current_support_count + 1,
+		int(player_ship.support_fleet_limit)
+	])
+
+func _debug_dump_support_fleet_state() -> void:
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	if players.is_empty():
+		print("[DEBUG] 플레이어 배 없음!")
+		return
+	var player_ship = players[0]
+	if not is_instance_valid(player_ship) or not player_ship.has_method("_get_support_fleet_ships"):
+		print("[DEBUG] 지원함 상태 확인 불가!")
+		return
+	var support_ships: Array = player_ship._get_support_fleet_ships()
+	print("[DEBUG] ===== SUPPORT FLEET STATE =====")
+	print("[DEBUG] player_pos=%s player_speed=%.2f" % [player_ship.global_position, float(player_ship.get("current_speed"))])
+	print("[DEBUG] support_count=%d limit=%d" % [support_ships.size(), int(player_ship.support_fleet_limit)])
+	for support_ship in support_ships:
+		if not is_instance_valid(support_ship):
+			continue
+		var lead_name: String = str(support_ship.get_meta("support_debug_lead_name", "none"))
+		var slot_dist: float = float(support_ship.get_meta("support_debug_slot_dist", -1.0))
+		var rel_depth: float = float(support_ship.get_meta("support_debug_rel_depth", 0.0))
+		var lead_speed: float = float(support_ship.get_meta("support_debug_lead_speed", 0.0))
+		var target_speed: float = float(support_ship.get_meta("support_debug_target_speed", 0.0))
+		var join_state: bool = bool(support_ship.get_meta("support_joining", false))
+		print("[DEBUG] %s pos=%s speed=%.2f lead=%s slot_dist=%.2f rel_depth=%.2f lead_speed=%.2f target_speed=%.2f joining=%s" % [
+			support_ship.name,
+			support_ship.global_position,
+			float(support_ship.get("current_speed")),
+			lead_name,
+			slot_dist,
+			rel_depth,
+			lead_speed,
+			target_speed,
+			join_state
+		])
+	print("[DEBUG] ===============================")
 
 
 func update_boss_hp(current: float, maximum: float) -> void:

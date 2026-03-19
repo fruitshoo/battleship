@@ -2,15 +2,17 @@
 extends Node3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
+const DEBUG_CANNON_FIRE_LOGS := true
 
 ## 함포 (Cannon)
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
-@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/muzzle_smoke.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var fire_cooldown: float = 2.0
-@export var detection_range: float = 25.0
+@export var detection_range: float = 22.0
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
 @export var team: String = "player" # "player" or "enemy"
 
@@ -33,6 +35,8 @@ var _owner_ship: Node = null
 var _cached_range_mult: float = 1.0
 var _cached_cd_mult: float = 1.0
 var _cached_dmg_mult: float = 1.0
+var _cached_crit_chance: float = 0.0
+var _cached_crit_multiplier: float = 1.5
 
 func _ready() -> void:
 	# 초기 업그레이드 적용
@@ -48,6 +52,13 @@ func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
 		_update_cached_stats()
 
 func _update_cached_stats() -> void:
+	_cached_range_mult = 1.0
+	_cached_cd_mult = 1.0
+	_cached_dmg_mult = 1.0
+	_cached_crit_chance = 0.0
+	_cached_crit_multiplier = 1.5
+	if team != "player":
+		return
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager and "UPGRADES" in upgrade_manager:
 		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
@@ -57,6 +68,8 @@ func _update_cached_stats() -> void:
 		_cached_range_mult = 1.0 + (s.get("range_pct_per_lv", 10) / 100.0) * (cannon_lv - 1)
 		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_lv", 8) / 100.0) * (cannon_lv - 1))
 		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_lv", 20) / 100.0) * (cannon_lv - 1)
+		_cached_crit_chance = maxf(0.0, (s.get("crit_pct_per_lv", 2.5) / 100.0) * (cannon_lv - 1))
+		_cached_crit_multiplier = float(s.get("crit_multiplier", 1.5))
 
 func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 	fleet_damage_mult = dmg_mult
@@ -296,20 +309,6 @@ func _execute_fire() -> void:
 	# 쿨타임 시작
 	cooldown_timer = _get_current_cooldown()
 	
-	var ball = cannonball_scene.instantiate()
-	ball.position = muzzle.global_position
-	ball.team = team
-	get_tree().root.add_child.call_deferred(ball)
-	
-	# 데미지 계산 (포탄 씬의 기본 데미지 반영 + 함대 보너스)
-	var base_dmg = ball.damage
-	base_dmg *= _cached_dmg_mult * fleet_damage_mult
-	ball.damage = base_dmg
-
-	
-	if ball.has_method("set_lifetime_multiplier"):
-		ball.set_lifetime_multiplier(_cached_range_mult)
-	
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(target_node.global_position)
 	
@@ -321,19 +320,65 @@ func _execute_fire() -> void:
 	var enemy_velocity = enemy_dir * enemy_speed
 	
 	var predicted_pos = target_node.global_position + enemy_velocity * time_to_hit
-	ball.direction = (predicted_pos - muzzle.global_position).normalized()
-	if ball.direction.is_zero_approx(): ball.direction = - global_transform.basis.z
-	ball.target_node = target_node
-	# look_at() 대신 Basis 직접 계산
-	ball.basis = Basis.looking_at(ball.direction, Vector3.UP)
+	var fire_direction = (predicted_pos - muzzle.global_position).normalized()
+	if fire_direction.is_zero_approx():
+		fire_direction = - global_transform.basis.z
+
+	var final_damage = 1.0
+	var ball = ScenePool.acquire(get_tree(), cannonball_scene)
+	get_tree().root.add_child(ball)
+	var projectile_base_damage: float = 0.0
+	if "damage" in ball:
+		projectile_base_damage = float(ball.damage)
+		final_damage = projectile_base_damage * _cached_dmg_mult * fleet_damage_mult
+	if ball.has_method("set_meta"):
+		ball.set_meta("shooter_label", name)
+	if team == "player" and "crit_chance" in ball:
+		ball.crit_chance = _cached_crit_chance
+	if team == "player" and "crit_multiplier" in ball:
+		ball.crit_multiplier = _cached_crit_multiplier
+	if ball.has_method("launch"):
+		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult)
+	else:
+		ball.position = muzzle.global_position
+		ball.team = team
+		ball.damage = final_damage
+		if team == "player":
+			ball.crit_chance = _cached_crit_chance
+			ball.crit_multiplier = _cached_crit_multiplier
+		if ball.has_method("set_meta"):
+			ball.set_meta("shooter_label", name)
+		ball.direction = fire_direction
+		ball.target_node = target_node
+		if ball.has_method("set_lifetime_multiplier"):
+			ball.set_lifetime_multiplier(_cached_range_mult)
+		ball.basis = Basis.looking_at(fire_direction, Vector3.UP)
+
+	if DEBUG_CANNON_FIRE_LOGS and OS.is_debug_build():
+		print("[CannonFire][%s#%s][team=%s] base=%.1f dmg_mult=%.2f fleet=%.2f final=%.1f range_mult=%.2f cd=%.2f crit=%.1f%% x%.1f target=%s" % [
+			name,
+			str(get_instance_id()),
+			team,
+			projectile_base_damage,
+			_cached_dmg_mult,
+			fleet_damage_mult,
+			final_damage,
+			_cached_range_mult,
+			_get_current_cooldown(),
+			_cached_crit_chance * 100.0,
+			_cached_crit_multiplier,
+			target_node.name,
+		])
 
 	# 머즐 연기 생성
 	if muzzle_smoke_scene:
-		var smoke = muzzle_smoke_scene.instantiate()
+		var smoke = ScenePool.acquire(get_tree(), muzzle_smoke_scene)
+		if smoke.has_method("configure_as_muzzle"):
+			smoke.configure_as_muzzle()
 		smoke.position = muzzle.global_position
 		# Basis.looking_at 안전 가드
-		var smoke_dir = ball.direction if not ball.direction.is_zero_approx() else Vector3.FORWARD
+		var smoke_dir = fire_direction if not fire_direction.is_zero_approx() else Vector3.FORWARD
 		smoke.basis = Basis.looking_at(smoke_dir, Vector3.UP)
-		get_tree().root.add_child.call_deferred(smoke)
-		if smoke is GPUParticles3D:
-			smoke.emitting = true
+		get_tree().root.add_child(smoke)
+		if smoke.has_method("pool_activate"):
+			smoke.pool_activate()

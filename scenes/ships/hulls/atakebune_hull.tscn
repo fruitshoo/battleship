@@ -1,8 +1,9 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://b5wbjidib2gb0"]
 
-[ext_resource type="PackedScene" uid="uid://j6r6r6r6r6r6" path="res://scenes/entities/cannon_japanese.tscn" id="cannon_scene"]
+[ext_resource type="PackedScene" path="res://scenes/entities/cannon_enemy_medium.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+[ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(4.5, 1.5, 11)
@@ -10,25 +11,25 @@ size = Vector3(4.5, 1.5, 11)
 [sub_resource type="StandardMaterial3D" id="Material_japan_dark"]
 albedo_color = Color(0.25, 0.15, 0.12, 1)
 
-[node name="AtakebuneHull" type="Node3D"]
+[node name="AtakebuneHull" type="Node3D" unique_id=1713592075]
 
-[node name="Hull" type="MeshInstance3D" parent="."]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=2058645865]
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_japan_dark")
 
-[node name="CastleStructure" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+[node name="CastleStructure" type="MeshInstance3D" parent="." unique_id=39390996]
+transform = Transform3D(0.8, 0, 0, 0, 0.5, 0, 0, 0, 0.6, 0, 1.25, 0)
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_japan_dark")
-scale = Vector3(0.8, 0.5, 0.6)
 
-[node name="Mast" parent="." instance=ExtResource("mast_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2.0)
+[node name="Mast" parent="." unique_id=1940494656 instance=ExtResource("mast_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2)
+sail_texture = ExtResource("vertical_sail")
 
-[node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
+[node name="RudderVisual" parent="." unique_id=1421969887 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 5.5)
 
-[node name="Cannons" type="Node3D" parent="."]
+[node name="Cannons" type="Node3D" parent="." unique_id=437391352]
 
-[node name="CannonFront" parent="Cannons" instance=ExtResource("cannon_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, -5.8)
+[node name="CannonFront" parent="Cannons" unique_id=1397290496 instance=ExtResource("cannon_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -5.8)
