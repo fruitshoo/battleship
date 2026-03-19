@@ -31,9 +31,9 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 
 	var ship = hud.player_ship
 	var sections: Array[Dictionary] = []
-	var lm = hud._cached_level_manager
+	var lm: Node = hud._cached_level_manager
 	if not is_instance_valid(lm):
-		lm = SceneGroupCache.get_first(hud.get_tree(), "level_manager")
+		lm = SceneGroupCache.get_first(hud.get_tree(), "level_manager") as Node
 
 	if is_instance_valid(lm):
 		sections.append({
@@ -220,7 +220,7 @@ static func _create_section(section: Dictionary) -> Control:
 	header.add_theme_constant_override("separation", 8)
 	vbox.add_child(header)
 
-	var icon_label := _create_icon_label(str(section.get("icon", "analytics")), 18, Color(0.78, 0.9, 1.0))
+	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 18, Color(0.78, 0.9, 1.0))
 	header.add_child(icon_label)
 
 	var title := Label.new()

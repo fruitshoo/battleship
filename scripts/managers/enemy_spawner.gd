@@ -177,7 +177,7 @@ func _spawn_enemy() -> void:
 		to_player_dir = to_player_dir.normalized()
 	var blockade_right = to_player_dir.cross(Vector3.UP).normalized()
 	
-	var existing_enemy_count := SceneGroupCache.get_nodes(get_tree(), "enemy").size()
+	var existing_enemy_count: int = SceneGroupCache.get_nodes(get_tree(), "enemy").size()
 	for i in range(spawn_count):
 		# 최대 적 수 초과 체크
 		if existing_enemy_count >= max_enemies:
@@ -302,7 +302,7 @@ func debug_spawn_final_boss() -> void:
 func _push_boss_hp_to_hud(boss_ship: Node) -> void:
 	if not is_instance_valid(boss_ship):
 		return
-	var lm := get_tree().root.find_child("LevelManager", true, false)
+	var lm: Node = get_tree().root.find_child("LevelManager", true, false)
 	if not is_instance_valid(lm):
 		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lm_nodes.size() > 0:

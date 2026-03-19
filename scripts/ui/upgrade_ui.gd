@@ -202,7 +202,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	
 	# 설명
 	var desc_label = Label.new()
-	var next_spec := HudUpgradeInfoHelper.build_upgrade_spec_text(upgrade_id, next_lv, data.get("stats", {}))
+	var next_spec: String = HudUpgradeInfoHelper.build_upgrade_spec_text(upgrade_id, next_lv, data.get("stats", {}))
 	if next_spec.is_empty():
 		desc_label.text = UpgradeManager.get_next_description(upgrade_id)
 	else:

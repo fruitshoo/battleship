@@ -248,7 +248,7 @@ func _process(delta: float) -> void:
 
 
 func _update_boss_arena_state(delta: float) -> void:
-	var boss_ship := _get_active_boss_ship()
+	var boss_ship: Node3D = _get_active_boss_ship()
 	if not is_instance_valid(boss_ship):
 		_boss_arena_active = false
 		_boss_arena_anchor_boss_id = -1
@@ -262,7 +262,7 @@ func _update_boss_arena_state(delta: float) -> void:
 		_boss_boundary_hidden_for_current_boss = false
 	_boss_arena_active = true
 	_boss_arena_anchor_boss_id = boss_id
-	var player_ship := SceneGroupCache.get_first(get_tree(), "player") as Node3D
+	var player_ship: Node3D = SceneGroupCache.get_first(get_tree(), "player") as Node3D
 	if is_instance_valid(player_ship):
 		_boss_arena_center = (player_ship.global_position + boss_ship.global_position) * 0.5
 	else:
@@ -274,11 +274,11 @@ func _update_boss_arena_state(delta: float) -> void:
 
 
 func _get_active_boss_ship() -> Node3D:
-	var bosses := SceneGroupCache.get_nodes(get_tree(), "boss")
+	var bosses: Array = SceneGroupCache.get_nodes(get_tree(), "boss")
 	for boss in bosses:
 		if not is_instance_valid(boss):
 			continue
-		if bool(boss.get("is_dying")) or bool(boss.get("is_sinking")):
+		if boss.get("is_dying") == true or boss.get("is_sinking") == true:
 			continue
 		return boss as Node3D
 	return null
@@ -319,7 +319,7 @@ func _rebuild_boss_boundary_markers(boss_ship: Node3D) -> void:
 		return
 	_boss_boundary_container = Node3D.new()
 	_boss_boundary_container.name = "BossBoundaryMarkers"
-	var root_3d := get_tree().current_scene as Node3D
+	var root_3d: Node3D = get_tree().current_scene as Node3D
 	if is_instance_valid(root_3d):
 		root_3d.add_child(_boss_boundary_container)
 	else:
@@ -613,14 +613,14 @@ func _get_debug_player_ship() -> Node3D:
 	var players = SceneGroupCache.get_nodes(get_tree(), "player")
 	if players.is_empty():
 		return null
-	var player_ship := players[0] as Node3D
+	var player_ship: Node3D = players[0] as Node3D
 	if not is_instance_valid(player_ship):
 		return null
 	return player_ship
 
 
 func _get_debug_player_masts() -> Array[Node]:
-	var player_ship := _get_debug_player_ship()
+	var player_ship: Node3D = _get_debug_player_ship()
 	if not is_instance_valid(player_ship):
 		return []
 	var mast_nodes: Array[Node] = []
@@ -639,18 +639,18 @@ func _show_debug_hud_message(message: String, duration: float = 0.9) -> void:
 
 
 func _debug_adjust_player_sail_damage(delta: float) -> void:
-	var masts := _get_debug_player_masts()
+	var masts: Array[Node] = _get_debug_player_masts()
 	if masts.is_empty():
 		_show_debug_hud_message("돛 디버그 대상 없음")
 		return
-	var first_mast := masts[0]
+	var first_mast: Node = masts[0]
 	var current_damage: float = 0.0
 	var current_burn: float = 0.0
 	if first_mast.has_method("get_sail_damage"):
 		current_damage = float(first_mast.get_sail_damage())
 	if first_mast.has_method("get_burn_amount"):
 		current_burn = float(first_mast.get_burn_amount())
-	var target_damage := clampf(current_damage + delta, 0.0, 1.0)
+	var target_damage: float = clampf(current_damage + delta, 0.0, 1.0)
 	for mast in masts:
 		if not is_instance_valid(mast):
 			continue
@@ -659,18 +659,18 @@ func _debug_adjust_player_sail_damage(delta: float) -> void:
 
 
 func _debug_adjust_player_sail_burn(delta: float) -> void:
-	var masts := _get_debug_player_masts()
+	var masts: Array[Node] = _get_debug_player_masts()
 	if masts.is_empty():
 		_show_debug_hud_message("돛 디버그 대상 없음")
 		return
-	var first_mast := masts[0]
+	var first_mast: Node = masts[0]
 	var current_damage: float = 0.0
 	var current_burn: float = 0.0
 	if first_mast.has_method("get_sail_damage"):
 		current_damage = float(first_mast.get_sail_damage())
 	if first_mast.has_method("get_burn_amount"):
 		current_burn = float(first_mast.get_burn_amount())
-	var target_burn := clampf(current_burn + delta, 0.0, 1.0)
+	var target_burn: float = clampf(current_burn + delta, 0.0, 1.0)
 	for mast in masts:
 		if not is_instance_valid(mast):
 			continue
@@ -682,7 +682,7 @@ func _debug_adjust_player_sail_burn(delta: float) -> void:
 
 
 func _debug_reset_player_sail_state() -> void:
-	var masts := _get_debug_player_masts()
+	var masts: Array[Node] = _get_debug_player_masts()
 	if masts.is_empty():
 		_show_debug_hud_message("돛 디버그 대상 없음")
 		return

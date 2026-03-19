@@ -31,7 +31,7 @@ static func _is_within_budget_distance(tree: SceneTree, position: Vector3, max_d
 	var camera := tree.root.get_camera_3d()
 	if is_instance_valid(camera):
 		return camera.global_position.distance_squared_to(position) <= adjusted_distance * adjusted_distance
-	var player := SceneGroupCache.get_first(tree, "player")
+	var player: Node = SceneGroupCache.get_first(tree, "player") as Node
 	if player is Node3D:
 		return (player as Node3D).global_position.distance_squared_to(position) <= adjusted_distance * adjusted_distance
 	return true

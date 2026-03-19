@@ -215,7 +215,7 @@ static func _is_support_respawn_active(player_ship) -> bool:
 
 static func _ensure_support_slot_count(hud, slot_count: int) -> void:
 	while hud.support_fleet_hud_slots.size() < slot_count:
-		var slot := _create_support_slot()
+		var slot: PanelContainer = _create_support_slot()
 		hud.support_slot_container.add_child(slot)
 		hud.support_fleet_hud_slots.append(slot)
 	while hud.support_fleet_hud_slots.size() > slot_count:

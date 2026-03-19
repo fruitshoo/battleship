@@ -273,7 +273,7 @@ func _setup_sail_debug_panel() -> void:
 	hint.add_theme_color_override("font_color", Color(0.82, 0.86, 0.92))
 	panel_box.add_child(hint)
 
-	var environment_section := _create_debug_section("환경", false)
+	var environment_section: Dictionary = _create_debug_section("환경", false)
 	panel_box.add_child(environment_section["root"])
 	var environment_status := Label.new()
 	environment_status.text = "프리셋: -"
@@ -292,7 +292,7 @@ func _setup_sail_debug_panel() -> void:
 		_apply_environment_preset(1)
 	))
 
-	var collision_section := _create_debug_section("충돌", false)
+	var collision_section: Dictionary = _create_debug_section("충돌", false)
 	panel_box.add_child(collision_section["root"])
 	var collision_status := Label.new()
 	collision_status.text = "충돌 시각화: OFF"
@@ -313,7 +313,7 @@ func _setup_sail_debug_panel() -> void:
 		_sync_debug_tools_panel_state()
 	))
 
-	var spawn_section := _create_debug_section("스폰", false)
+	var spawn_section: Dictionary = _create_debug_section("스폰", false)
 	panel_box.add_child(spawn_section["root"])
 	var spawn_row_a := HBoxContainer.new()
 	spawn_row_a.add_theme_constant_override("separation", 4)
@@ -345,7 +345,7 @@ func _setup_sail_debug_panel() -> void:
 		_invoke_level_debug_method("_debug_dump_support_fleet_state")
 	))
 
-	var misc_section := _create_debug_section("게임", false)
+	var misc_section: Dictionary = _create_debug_section("게임", false)
 	panel_box.add_child(misc_section["root"])
 	var misc_row := HBoxContainer.new()
 	misc_row.add_theme_constant_override("separation", 4)
@@ -374,22 +374,22 @@ func _setup_sail_debug_panel() -> void:
 		toggle_stat_panel()
 	))
 
-	var sail_section := _create_debug_section("돛", true)
+	var sail_section: Dictionary = _create_debug_section("돛", true)
 	panel_box.add_child(sail_section["root"])
 
-	var damage_row := _create_sail_debug_slider_row("Damage")
+	var damage_row: Dictionary = _create_sail_debug_slider_row("Damage")
 	sail_section["body"].add_child(damage_row["root"])
 	sail_debug_damage_slider = damage_row["slider"]
 	sail_debug_damage_value = damage_row["value"]
 	sail_debug_damage_slider.value_changed.connect(_on_sail_debug_damage_changed)
 
-	var burn_row := _create_sail_debug_slider_row("Burn")
+	var burn_row: Dictionary = _create_sail_debug_slider_row("Burn")
 	sail_section["body"].add_child(burn_row["root"])
 	sail_debug_burn_slider = burn_row["slider"]
 	sail_debug_burn_value = burn_row["value"]
 	sail_debug_burn_slider.value_changed.connect(_on_sail_debug_burn_changed)
 
-	var hole_row := _create_sail_debug_slider_row("Hole")
+	var hole_row: Dictionary = _create_sail_debug_slider_row("Hole")
 	sail_section["body"].add_child(hole_row["root"])
 	sail_debug_hole_slider = hole_row["slider"]
 	sail_debug_hole_value = hole_row["value"]
@@ -625,7 +625,7 @@ func _get_environment_preset_manager_for_debug() -> Node:
 
 
 func _invoke_level_debug_method(method_name: String, args: Array = []) -> void:
-	var level_manager := _get_level_manager_for_debug()
+	var level_manager: Node = _get_level_manager_for_debug()
 	if not is_instance_valid(level_manager):
 		show_gust_warning_message("LevelManager 없음", 0.8)
 		return
@@ -636,7 +636,7 @@ func _invoke_level_debug_method(method_name: String, args: Array = []) -> void:
 
 
 func _apply_environment_preset(preset_index: int) -> void:
-	var preset_manager := _get_environment_preset_manager_for_debug()
+	var preset_manager: Node = _get_environment_preset_manager_for_debug()
 	if not is_instance_valid(preset_manager) or not preset_manager.has_method("apply_preset"):
 		show_gust_warning_message("환경 프리셋 매니저 없음", 0.8)
 		return
@@ -648,10 +648,10 @@ func _sync_debug_tools_panel_state() -> void:
 	if not is_instance_valid(sail_debug_panel):
 		return
 	if is_instance_valid(debug_environment_value):
-		var preset_manager := _get_environment_preset_manager_for_debug()
-		var environment_text := "-"
+		var preset_manager: Node = _get_environment_preset_manager_for_debug()
+		var environment_text: String = "-"
 		if is_instance_valid(preset_manager):
-			var preset_index := int(preset_manager.get("current_preset"))
+			var preset_index: int = int(preset_manager.get("current_preset"))
 			environment_text = "낮" if preset_index == 0 else "밤"
 		debug_environment_value.text = "프리셋: %s" % environment_text
 	if is_instance_valid(debug_collision_value):
@@ -1027,7 +1027,7 @@ func _get_player_masts_for_debug() -> Array[Node]:
 
 
 func _apply_sail_debug_values(damage: float, burn: float, hole_strength: float = 1.0) -> void:
-	var masts := _get_player_masts_for_debug()
+	var masts: Array[Node] = _get_player_masts_for_debug()
 	if masts.is_empty():
 		show_gust_warning_message("돛 디버그 대상 없음", 0.9)
 		return
@@ -1054,10 +1054,10 @@ func _apply_sail_debug_values(damage: float, burn: float, hole_strength: float =
 func _sync_sail_debug_panel_from_player() -> void:
 	if not is_instance_valid(sail_debug_panel):
 		return
-	var masts := _get_player_masts_for_debug()
+	var masts: Array[Node] = _get_player_masts_for_debug()
 	if masts.is_empty():
 		return
-	var first_mast := masts[0]
+	var first_mast: Node = masts[0]
 	var current_damage: float = 0.0
 	var current_burn: float = 0.0
 	var current_hole: float = 1.0

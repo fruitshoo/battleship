@@ -2,6 +2,8 @@
 extends Node3D
 
 const MastVisualHelper = preload("res://scripts/props/mast_visual_helper.gd")
+const MastGeometryHelper = preload("res://scripts/props/mast_geometry_helper.gd")
+const MastWindHelper = preload("res://scripts/props/mast_wind_helper.gd")
 const SAIL_SMOKE_SCENE = preload("res://scenes/effects/fire_effect.tscn")
 const SAIL_BURN_MASK_A = preload("res://assets/vfx/masks/sail_burn_mask_a.png")
 const SAIL_BURN_MASK_B = preload("res://assets/vfx/masks/sail_burn_mask_b.png")
@@ -34,14 +36,14 @@ const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 		_apply_sail_material_settings()
 @export var sail_damage: float = 0.0:
 	set(value):
-		var target_value := clamp(value, 0.0, 1.0)
+		var target_value: float = clamp(value, 0.0, 1.0)
 		if is_equal_approx(sail_damage, target_value):
 			return
 		sail_damage = target_value
 		_apply_sail_material_settings()
 @export var burn_amount: float = 0.0:
 	set(value):
-		var target_value := clamp(value, 0.0, 1.0)
+		var target_value: float = clamp(value, 0.0, 1.0)
 		if is_equal_approx(burn_amount, target_value):
 			return
 		burn_amount = target_value
@@ -49,7 +51,7 @@ const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 		_update_sail_smoke()
 @export var hole_alpha_strength: float = 1.0:
 	set(value):
-		var target_value := clamp(value, 0.0, 2.0)
+		var target_value: float = clamp(value, 0.0, 2.0)
 		if is_equal_approx(hole_alpha_strength, target_value):
 			return
 		hole_alpha_strength = target_value
@@ -131,30 +133,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_damage_seed = float(get_instance_id() % 997) / 997.0
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
-	if is_instance_valid(mast_mesh):
-		_base_mast_mesh_position = mast_mesh.position
-		_base_mast_mesh_scale = mast_mesh.scale
-	if is_instance_valid(sail_visual):
-		_base_sail_visual_position = sail_visual.position
-	if is_instance_valid(yardarm_mesh):
-		_base_yardarm_mesh_position = yardarm_mesh.position
-		_base_yardarm_mesh_scale = yardarm_mesh.scale
-	if is_instance_valid(sail_mesh):
-		_base_sail_mesh_position = sail_mesh.position
-	if is_instance_valid(flag):
-		_base_flag_position = flag.position
-	if is_instance_valid(sail_model_root):
-		_base_model_root_position = sail_model_root.position
-		_base_model_root_scale = sail_model_root.scale
-	if is_instance_valid(yardarm_model_root):
-		_base_yardarm_model_position = yardarm_model_root.position
-		_base_yardarm_model_scale = yardarm_model_root.scale
-	if is_instance_valid(mast_model_root):
-		_base_mast_model_position = mast_model_root.position
-		_base_mast_model_scale = mast_model_root.scale
-		_base_mast_model_bounds = _compute_mesh_tree_aabb(mast_model_root)
-		_has_mast_model_bounds = _base_mast_model_bounds.size.y > 0.001
-	_base_mast_top_y = _get_current_mast_top_y(1.0)
+	MastGeometryHelper.capture_base_state(self)
 	_apply_mast_geometry()
 	_apply_sail_geometry()
 	_apply_sail_material_settings()
@@ -195,13 +174,13 @@ func _apply_sail_material_settings() -> void:
 	MastVisualHelper.apply_sail_material_settings(self, SAIL_BURN_MASK_A, SAIL_BURN_MASK_B, SAIL_BURN_MASK_C)
 
 func add_sail_damage(amount: float) -> void:
-	var target_damage := clamp(sail_damage + maxf(amount, 0.0), 0.0, 1.0)
+	var target_damage: float = clamp(sail_damage + maxf(amount, 0.0), 0.0, 1.0)
 	if is_equal_approx(sail_damage, target_damage):
 		return
 	sail_damage = target_damage
 
 func repair_sail_damage(amount: float) -> void:
-	var target_damage := clamp(sail_damage - maxf(amount, 0.0), 0.0, 1.0)
+	var target_damage: float = clamp(sail_damage - maxf(amount, 0.0), 0.0, 1.0)
 	if is_equal_approx(sail_damage, target_damage):
 		return
 	sail_damage = target_damage
@@ -210,7 +189,7 @@ func get_sail_damage() -> float:
 	return sail_damage
 
 func set_burn_amount(value: float) -> void:
-	var target_burn := clamp(value, 0.0, 1.0)
+	var target_burn: float = clamp(value, 0.0, 1.0)
 	if is_equal_approx(burn_amount, target_burn):
 		return
 	burn_amount = target_burn
@@ -219,7 +198,7 @@ func get_burn_amount() -> float:
 	return burn_amount
 
 func set_hole_alpha_strength(value: float) -> void:
-	var target_strength := clamp(value, 0.0, 2.0)
+	var target_strength: float = clamp(value, 0.0, 2.0)
 	if is_equal_approx(hole_alpha_strength, target_strength):
 		return
 	hole_alpha_strength = target_strength
@@ -234,172 +213,34 @@ func _update_sail_smoke() -> void:
 	MastVisualHelper.update_sail_smoke(self, SAIL_SMOKE_SCENE)
 
 func _update_sail_wind_visual() -> void:
-	if not is_instance_valid(sail_visual):
-		return
-	sail_visual.rotation.y = deg_to_rad(-sail_angle)
-
-	if not is_instance_valid(_cached_wind_manager):
-		_cached_wind_manager = get_node_or_null("/root/WindManager")
-	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"):
-		_apply_wind_strength_to_sails(0.0)
-		return
-
-	var wind_dir: Vector2 = _cached_wind_manager.get_wind_direction()
-	var sail_fwd := -sail_visual.global_transform.basis.z
-	var sail_fwd_2d := Vector2(sail_fwd.x, sail_fwd.z).normalized()
-	_current_wind_intake = max(0.0, wind_dir.dot(sail_fwd_2d)) * max_wind_intake
-	_apply_wind_strength_to_sails(_current_wind_intake)
+	MastWindHelper.update_sail_wind_visual(self)
 
 func _apply_wind_strength_to_sails(wind_strength_value: float) -> void:
-	if is_equal_approx(_last_applied_wind_strength, wind_strength_value):
-		return
-	_last_applied_wind_strength = wind_strength_value
-	for mesh in _get_sail_meshes():
-		mesh.set_instance_shader_parameter("wind_strength", wind_strength_value)
+	MastWindHelper.apply_wind_strength_to_sails(self, wind_strength_value)
 
 func _apply_mast_geometry() -> void:
-	if is_instance_valid(mast_mesh) and mast_mesh.mesh is CylinderMesh:
-		var mast_cylinder := mast_mesh.mesh as CylinderMesh
-		var base_bottom_y := _base_mast_mesh_position.y - (mast_cylinder.height * _base_mast_mesh_scale.y * 0.5)
-		var new_half_height := mast_cylinder.height * _base_mast_mesh_scale.y * mast_height_scale * 0.5
-		mast_mesh.scale = Vector3(
-			_base_mast_mesh_scale.x,
-			_base_mast_mesh_scale.y * mast_height_scale,
-			_base_mast_mesh_scale.z
-		)
-		mast_mesh.position = _base_mast_mesh_position
-		mast_mesh.position.y = base_bottom_y + new_half_height
-	if is_instance_valid(mast_model_root):
-		mast_model_root.scale = Vector3(
-			_base_mast_model_scale.x,
-			_base_mast_model_scale.y * mast_height_scale,
-			_base_mast_model_scale.z
-		)
-		mast_model_root.position = _base_mast_model_position
-		if _has_mast_model_bounds:
-			var base_bottom_y := _base_mast_model_position.y + (_base_mast_model_bounds.position.y * _base_mast_model_scale.y)
-			mast_model_root.position.y = base_bottom_y - (_base_mast_model_bounds.position.y * mast_model_root.scale.y)
-	var mast_top_delta := _get_current_mast_top_y(mast_height_scale) - _base_mast_top_y
-	if is_instance_valid(sail_visual):
-		sail_visual.position = _base_sail_visual_position
-		sail_visual.position.y += mast_top_delta
+	MastGeometryHelper.apply_mast_geometry(self)
 
 func _apply_sail_geometry() -> void:
-	var target_size := Vector2(max(sail_size.x, 0.1), max(sail_size.y, 0.1))
-	if is_instance_valid(yardarm_mesh):
-		yardarm_mesh.position = _base_yardarm_mesh_position + yardarm_offset
-		yardarm_mesh.scale = Vector3(
-			_base_yardarm_mesh_scale.x * yardarm_scale.x,
-			_base_yardarm_mesh_scale.y * yardarm_scale.y,
-			_base_yardarm_mesh_scale.z * yardarm_scale.z
-		)
-	var default_mesh := sail_mesh if is_instance_valid(sail_mesh) else get_node_or_null("SailVisual/SailMesh") as MeshInstance3D
-	if is_instance_valid(default_mesh) and default_mesh.mesh is PlaneMesh:
-		var plane_mesh := default_mesh.mesh.duplicate() as PlaneMesh
-		plane_mesh.size = target_size
-		default_mesh.mesh = plane_mesh
-		var top_anchor_y := _base_sail_mesh_position.y + (BASE_SAIL_SIZE.y * 0.5)
-		default_mesh.position = _base_sail_mesh_position
-		default_mesh.position.y = top_anchor_y - (target_size.y * 0.5)
-		default_mesh.position += sail_offset
-	if is_instance_valid(flag):
-		var top_anchor_y := _base_sail_mesh_position.y + (BASE_SAIL_SIZE.y * 0.5)
-		var base_flag_offset := _base_flag_position.y - top_anchor_y
-		flag.position = _base_flag_position
-		flag.position.y = top_anchor_y + base_flag_offset
-		flag.position += sail_offset
-	var model_root := sail_model_root if is_instance_valid(sail_model_root) else get_node_or_null("SailVisual/sail2") as Node3D
-	if is_instance_valid(model_root):
-		model_root.scale = Vector3(
-			_base_model_root_scale.x * (target_size.x / BASE_SAIL_SIZE.x),
-			_base_model_root_scale.y * (target_size.y / BASE_SAIL_SIZE.y),
-			_base_model_root_scale.z
-		)
-		model_root.position = _base_model_root_position
-		model_root.position.y -= (target_size.y - BASE_SAIL_SIZE.y) * 0.5
-		model_root.position += sail_offset
-	var yardarm_root := yardarm_model_root if is_instance_valid(yardarm_model_root) else get_node_or_null("SailVisual/yardarm2") as Node3D
-	if is_instance_valid(yardarm_root):
-		yardarm_root.position = _base_yardarm_model_position + yardarm_offset
-		yardarm_root.scale = Vector3(
-			_base_yardarm_model_scale.x * yardarm_scale.x,
-			_base_yardarm_model_scale.y * yardarm_scale.y,
-			_base_yardarm_model_scale.z * yardarm_scale.z
-		)
-	for mesh in _get_sail_meshes():
-		var mat := _ensure_sail_material(mesh)
-		if mat != null:
-			_apply_deform_bounds(mesh, mat)
+	MastGeometryHelper.apply_sail_geometry(self)
 
 func _get_current_mast_top_y(height_scale: float) -> float:
-	if is_instance_valid(mast_mesh) and mast_mesh.mesh is CylinderMesh:
-		var mast_cylinder := mast_mesh.mesh as CylinderMesh
-		var base_bottom_y := _base_mast_mesh_position.y - (mast_cylinder.height * _base_mast_mesh_scale.y * 0.5)
-		return base_bottom_y + (mast_cylinder.height * _base_mast_mesh_scale.y * height_scale)
-	if _has_mast_model_bounds:
-		var scaled_top := _base_mast_model_position.y + (_base_mast_model_bounds.position.y + _base_mast_model_bounds.size.y) * (_base_mast_model_scale.y * height_scale)
-		return scaled_top
-	return _base_sail_visual_position.y
+	return MastGeometryHelper.get_current_mast_top_y(self, height_scale)
 
 func _get_sail_meshes() -> Array[MeshInstance3D]:
-	var meshes: Array[MeshInstance3D] = []
-	var default_mesh := sail_mesh if is_instance_valid(sail_mesh) else get_node_or_null("SailVisual/SailMesh") as MeshInstance3D
-	if is_instance_valid(default_mesh):
-		meshes.append(default_mesh)
-	var model_root := sail_model_root if is_instance_valid(sail_model_root) else get_node_or_null("SailVisual/sail2") as Node3D
-	if is_instance_valid(model_root):
-		var model_mesh := _find_first_mesh_instance(model_root)
-		if is_instance_valid(model_mesh):
-			meshes.append(model_mesh)
-	return meshes
+	return MastGeometryHelper.get_sail_meshes(self)
 
 func _find_first_mesh_instance(node: Node) -> MeshInstance3D:
-	if node is MeshInstance3D:
-		return node as MeshInstance3D
-	for child in node.get_children():
-		var found := _find_first_mesh_instance(child)
-		if is_instance_valid(found):
-			return found
-	return null
+	return MastGeometryHelper.find_first_mesh_instance(node)
 
 func _compute_mesh_tree_aabb(root: Node3D) -> AABB:
-	var found_any := false
-	var combined := AABB()
-	for child in _collect_mesh_instances(root):
-		if child.mesh == null:
-			continue
-		var child_aabb := child.mesh.get_aabb()
-		var global_corners := _aabb_corners(child_aabb)
-		for i in range(global_corners.size()):
-			var local_point := root.to_local(child.to_global(global_corners[i]))
-			if not found_any:
-				combined = AABB(local_point, Vector3.ZERO)
-				found_any = true
-			else:
-				combined = combined.expand(local_point)
-	return combined if found_any else AABB()
+	return MastGeometryHelper.compute_mesh_tree_aabb(root)
 
 func _collect_mesh_instances(root: Node) -> Array[MeshInstance3D]:
-	var meshes: Array[MeshInstance3D] = []
-	if root is MeshInstance3D:
-		meshes.append(root as MeshInstance3D)
-	for child in root.get_children():
-		meshes.append_array(_collect_mesh_instances(child))
-	return meshes
+	return MastGeometryHelper.collect_mesh_instances(root)
 
 func _aabb_corners(aabb: AABB) -> Array[Vector3]:
-	var p := aabb.position
-	var s := aabb.size
-	return [
-		p,
-		p + Vector3(s.x, 0, 0),
-		p + Vector3(0, s.y, 0),
-		p + Vector3(0, 0, s.z),
-		p + Vector3(s.x, s.y, 0),
-		p + Vector3(s.x, 0, s.z),
-		p + Vector3(0, s.y, s.z),
-		p + s,
-	]
+	return MastGeometryHelper.aabb_corners(aabb)
 
 func _ensure_sail_material(mesh: MeshInstance3D) -> ShaderMaterial:
 	return MastVisualHelper.ensure_sail_material(self, mesh)
