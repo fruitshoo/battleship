@@ -25,7 +25,27 @@ signal merit_full_action_completed() # 지휘 포인트 가득 참 후속 처리
 @export var level_xp_exponent: float = 1.10 ## 레벨업 필요 XP 성장 곡선 지수
 @export var merit_base_points: int = 50 ## 공적 레벨 1 기본 요구치
 @export var merit_growth_per_level: int = 10 ## 공적 레벨당 증가치
+@export var soldier_kill_xp_reward: int = 5 ## 일반 병사 처치 시 획득 XP
 @export var merit_per_soldier_kill: int = 1 ## 적 병사 1명 처치 시 획득 지휘 포인트
+@export var drowned_soldier_kill_xp_reward: int = 3 ## 적 병사를 수장시켰을 때 획득 XP
+@export var drowned_soldier_kill_merit_reward: int = 0 ## 적 병사를 수장시켰을 때 획득 지휘 포인트
+@export var melee_kill_xp_bonus: int = 2 ## 백병전(검/창/작살) 처치 시 추가 XP
+@export var melee_kill_merit_bonus: int = 1 ## 백병전(검/창/작살) 처치 시 추가 지휘 포인트
+@export var boarding_capture_score_reward: int = 70 ## 나포 성공 시 추가 점수
+@export var boarding_capture_xp_reward: int = 25 ## 나포 성공 시 추가 XP
+@export var boarding_capture_merit_reward: int = 15 ## 나포 성공 시 추가 지휘 포인트
+@export_group("Boss Arena")
+@export var mid_boss_arena_half_extents: Vector2 = Vector2(112.0, 84.0)
+@export var final_boss_arena_half_extents: Vector2 = Vector2(136.0, 98.0)
+@export_range(0.5, 0.95, 0.01) var boss_arena_safe_ratio: float = 0.74
+@export_range(0.0, 0.5, 0.01) var boss_arena_headwind_strength: float = 0.18
+@export_range(0.0, 4.0, 0.05) var boss_arena_current_strength: float = 1.25
+@export_range(0.0, 1.0, 0.01) var boss_arena_warning_threshold: float = 0.22
+@export var boss_boundary_hull_scene: PackedScene = preload("res://scenes/ships/hulls/kobayabune_hull.tscn")
+@export_range(10.0, 40.0, 0.5) var boss_boundary_spacing: float = 18.0
+@export_range(0.6, 2.4, 0.05) var boss_boundary_visual_scale: float = 1.6
+@export_range(0.0, 1.0, 0.01) var boss_boundary_height: float = 0.2
+@export_range(10.0, 180.0, 1.0) var boss_boundary_duration: float = 60.0
 
 var current_level: int = 1
 var current_xp: int = 0
@@ -37,13 +57,23 @@ var current_score: int = 0
 var current_time: float = 0.0
 var enemies_killed: int = 0
 var ships_sunk: int = 0
+var ships_derelicted: int = 0
 var soldiers_killed: int = 0
+var soldiers_slain: int = 0
+var soldiers_drowned: int = 0
 var weapon_damage_stats: Dictionary = {}
 var _boss_triggered: bool = false
 var _boss_phase_active: bool = false
 var _victory_triggered: bool = false
 var rerolls_available: int = 0
 var _debug_collision_visuals_enabled: bool = false
+var _boss_arena_active: bool = false
+var _boss_arena_anchor_boss_id: int = -1
+var _boss_arena_center: Vector3 = Vector3.ZERO
+var _boss_arena_half_extents_runtime: Vector2 = Vector2.ZERO
+var _boss_boundary_container: Node3D = null
+var _boss_boundary_elapsed: float = 0.0
+var _boss_boundary_hidden_for_current_boss: bool = false
 
 const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
@@ -127,6 +157,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not OS.is_debug_build(): return # 이 디버그 키들은 릴리즈 빌드에서는 작동하지 않음
 	if event is InputEventKey and event.pressed:
+		# Alternate debug shortcuts for macOS / non-function-key keyboards.
+		# Use physical keys so they still work while Korean input is active.
+		if event.ctrl_pressed and event.shift_pressed:
+			match event.physical_keycode:
+				KEY_J:
+					_debug_adjust_player_sail_damage(0.15)
+					return
+				KEY_K:
+					_debug_adjust_player_sail_damage(-0.15)
+					return
+				KEY_U:
+					_debug_adjust_player_sail_burn(0.15)
+					return
+				KEY_I:
+					_debug_adjust_player_sail_burn(-0.15)
+					return
+				KEY_R:
+					_debug_reset_player_sail_state()
+					return
 		match event.keycode:
 			KEY_F1: # 강제 레벨업
 				print("[DEBUG] 강제 레벨업!")
@@ -141,10 +190,26 @@ func _unhandled_input(event: InputEvent) -> void:
 				_debug_spawn_test_ship("sekibune_cannon", 20.0, 10.0)
 			KEY_F6: # 충돌 시각화 모드 순환
 				_cycle_collision_visualizer_mode()
+			KEY_F7: # 중간 보스 디버그 소환
+				_debug_spawn_mid_boss()
+			KEY_F8: # 최종 보스 디버그 소환
+				_debug_spawn_final_boss()
 			KEY_F9: # 지원함 디버그 추가
 				_debug_spawn_support_ship()
 			KEY_F10: # 지원함 추종 상태 덤프
 				_debug_dump_support_fleet_state()
+			KEY_F11: # 돛 손상 디버그 조절 / Ctrl로 초기화
+				if event.ctrl_pressed:
+					_debug_reset_player_sail_state()
+				elif event.shift_pressed:
+					_debug_adjust_player_sail_damage(-0.15)
+				else:
+					_debug_adjust_player_sail_damage(0.15)
+			KEY_F12: # 돛 burn 디버그 조절
+				if event.shift_pressed:
+					_debug_adjust_player_sail_burn(-0.15)
+				else:
+					_debug_adjust_player_sail_burn(0.15)
 			KEY_M: # 메타 업그레이드 상점 (테스트용)
 				show_meta_shop()
 
@@ -181,14 +246,151 @@ func _process(delta: float) -> void:
 		if DEBUG_LEVEL_LOGS:
 			print("[Difficulty] 난이도 상승! Level %d (적 강화)" % game_difficulty)
 
+
+func _update_boss_arena_state(delta: float) -> void:
+	var boss_ship := _get_active_boss_ship()
+	if not is_instance_valid(boss_ship):
+		_boss_arena_active = false
+		_boss_arena_anchor_boss_id = -1
+		_boss_boundary_elapsed = 0.0
+		_boss_boundary_hidden_for_current_boss = false
+		_clear_boss_boundary_markers()
+		return
+	var boss_id: int = boss_ship.get_instance_id()
+	if _boss_arena_anchor_boss_id != boss_id:
+		_boss_boundary_elapsed = 0.0
+		_boss_boundary_hidden_for_current_boss = false
+	_boss_arena_active = true
+	_boss_arena_anchor_boss_id = boss_id
+	var player_ship := SceneGroupCache.get_first(get_tree(), "player") as Node3D
+	if is_instance_valid(player_ship):
+		_boss_arena_center = (player_ship.global_position + boss_ship.global_position) * 0.5
+	else:
+		_boss_arena_center = boss_ship.global_position
+	_boss_arena_center.y = 0.0
+	var boss_tier: int = int(boss_ship.get("tier")) if boss_ship.get("tier") != null else 1
+	_boss_arena_half_extents_runtime = final_boss_arena_half_extents if boss_tier >= 2 else mid_boss_arena_half_extents
+	_clear_boss_boundary_markers()
+
+
+func _get_active_boss_ship() -> Node3D:
+	var bosses := SceneGroupCache.get_nodes(get_tree(), "boss")
+	for boss in bosses:
+		if not is_instance_valid(boss):
+			continue
+		if bool(boss.get("is_dying")) or bool(boss.get("is_sinking")):
+			continue
+		return boss as Node3D
+	return null
+
+
+func is_boss_arena_active() -> bool:
+	return false
+
+
+func get_boss_arena_pressure(world_pos: Vector3) -> float:
+	return 0.0
+
+
+func get_boss_arena_current(world_pos: Vector3) -> Vector3:
+	return Vector3.ZERO
+
+
+func get_boss_arena_headwind_multiplier(world_pos: Vector3, forward_dir: Vector3) -> float:
+	return 1.0
+
+
+func get_boss_arena_display_wind_direction(world_pos: Vector3, base_wind_dir: Vector2) -> Vector2:
+	return base_wind_dir.normalized()
+
+func get_boss_arena_warning_text(world_pos: Vector3) -> String:
+	return ""
+
+
+func _clear_boss_boundary_markers() -> void:
+	if is_instance_valid(_boss_boundary_container):
+		_boss_boundary_container.queue_free()
+	_boss_boundary_container = null
+
+
+func _rebuild_boss_boundary_markers(boss_ship: Node3D) -> void:
+	_clear_boss_boundary_markers()
+	if not is_instance_valid(boss_boundary_hull_scene) or not is_instance_valid(boss_ship):
+		return
+	_boss_boundary_container = Node3D.new()
+	_boss_boundary_container.name = "BossBoundaryMarkers"
+	var root_3d := get_tree().current_scene as Node3D
+	if is_instance_valid(root_3d):
+		root_3d.add_child(_boss_boundary_container)
+	else:
+		get_parent().add_child(_boss_boundary_container)
+
+	var arena_forward: Vector3 = boss_ship.global_position - _boss_arena_center
+	arena_forward.y = 0.0
+	if arena_forward.length_squared() <= 0.0001:
+		arena_forward = Vector3(0.0, 0.0, -1.0)
+	else:
+		arena_forward = arena_forward.normalized()
+	var arena_rear: Vector3 = -arena_forward
+	var arena_right: Vector3 = arena_forward.cross(Vector3.UP).normalized()
+
+	var rear_half_width: float = _boss_arena_half_extents_runtime.x * 0.86
+	var rear_depth: float = _boss_arena_half_extents_runtime.y * 0.94
+	var flank_x: float = _boss_arena_half_extents_runtime.x * 0.96
+	var flank_start: float = _boss_arena_half_extents_runtime.y * 0.28
+	var flank_end: float = _boss_arena_half_extents_runtime.y * 0.82
+
+	var x: float = -rear_half_width
+	while x <= rear_half_width + 0.1:
+		var rear_pos: Vector3 = _boss_arena_center + arena_rear * rear_depth + arena_right * x
+		_spawn_boss_boundary_marker(rear_pos)
+		x += boss_boundary_spacing
+
+	var dist: float = flank_start
+	while dist <= flank_end + 0.1:
+		var left_pos: Vector3 = _boss_arena_center + arena_rear * dist - arena_right * flank_x
+		var right_pos: Vector3 = _boss_arena_center + arena_rear * dist + arena_right * flank_x
+		_spawn_boss_boundary_marker(left_pos)
+		_spawn_boss_boundary_marker(right_pos)
+		dist += boss_boundary_spacing
+
+
+func _spawn_boss_boundary_marker(world_pos: Vector3) -> void:
+	if not is_instance_valid(_boss_boundary_container) or not is_instance_valid(boss_boundary_hull_scene):
+		return
+	var marker := Node3D.new()
+	marker.position = Vector3(world_pos.x, boss_boundary_height, world_pos.z)
+	marker.scale = Vector3.ONE * boss_boundary_visual_scale
+	_boss_boundary_container.add_child(marker)
+
+	var hull_visual := boss_boundary_hull_scene.instantiate()
+	marker.add_child(hull_visual)
+	_disable_boundary_processing_recursive(hull_visual)
+
+	marker.look_at(_boss_arena_center, Vector3.UP)
+	marker.rotate_y(PI * 0.5)
+
+
+func _disable_boundary_processing_recursive(node: Node) -> void:
+	node.set_process(false)
+	node.set_physics_process(false)
+	node.set_process_input(false)
+	node.set_process_unhandled_input(false)
+	node.set_process_unhandled_key_input(false)
+	for child in node.get_children():
+		_disable_boundary_processing_recursive(child)
+
 func add_score(points: int) -> void:
 	LevelManagerProgressionHelper.add_score(self, points)
 
 func add_ship_sunk(count: int = 1) -> void:
 	LevelManagerProgressionHelper.add_ship_sunk(self, count)
 
-func add_soldier_kill(count: int = 1) -> void:
-	LevelManagerProgressionHelper.add_soldier_kill(self, count)
+func add_ship_derelict(count: int = 1) -> void:
+	LevelManagerProgressionHelper.add_ship_derelict(self, count)
+
+func add_soldier_kill(count: int = 1, cause: String = "combat") -> void:
+	LevelManagerProgressionHelper.add_soldier_kill(self, count, cause)
 
 func add_command_xp_from_soldier_kill(kill_count: int = 1) -> void:
 	LevelManagerProgressionHelper.add_command_xp_from_soldier_kill(self, kill_count)
@@ -314,6 +516,22 @@ func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_off
 		return
 	enemy_spawner.debug_spawn_ship(ship_type_name, distance, lateral_offset)
 
+
+func _debug_spawn_mid_boss() -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_mid_boss"):
+		return
+	enemy_spawner.debug_spawn_mid_boss()
+
+
+func _debug_spawn_final_boss() -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_final_boss"):
+		return
+	_boss_triggered = true
+	_boss_phase_active = true
+	current_time = maxf(current_time, boss_spawn_time)
+	enemy_spawner.debug_spawn_final_boss()
+
+
 func _cycle_collision_visualizer_mode() -> void:
 	var mode = CollisionVisualizer.cycle_runtime_mode()
 	for node in get_tree().get_nodes_in_group("collision_visualizers"):
@@ -389,6 +607,94 @@ func _debug_dump_support_fleet_state() -> void:
 			join_state
 		])
 	print("[DEBUG] ===============================")
+
+
+func _get_debug_player_ship() -> Node3D:
+	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	if players.is_empty():
+		return null
+	var player_ship := players[0] as Node3D
+	if not is_instance_valid(player_ship):
+		return null
+	return player_ship
+
+
+func _get_debug_player_masts() -> Array[Node]:
+	var player_ship := _get_debug_player_ship()
+	if not is_instance_valid(player_ship):
+		return []
+	var mast_nodes: Array[Node] = []
+	var raw_masts = player_ship.get("masts")
+	if raw_masts is Array:
+		for mast in raw_masts:
+			if is_instance_valid(mast):
+				mast_nodes.append(mast)
+	return mast_nodes
+
+
+func _show_debug_hud_message(message: String, duration: float = 0.9) -> void:
+	if hud and hud.has_method("show_gust_warning_message"):
+		hud.show_gust_warning_message(message, duration)
+	print("[DEBUG] %s" % message)
+
+
+func _debug_adjust_player_sail_damage(delta: float) -> void:
+	var masts := _get_debug_player_masts()
+	if masts.is_empty():
+		_show_debug_hud_message("돛 디버그 대상 없음")
+		return
+	var first_mast := masts[0]
+	var current_damage: float = 0.0
+	var current_burn: float = 0.0
+	if first_mast.has_method("get_sail_damage"):
+		current_damage = float(first_mast.get_sail_damage())
+	if first_mast.has_method("get_burn_amount"):
+		current_burn = float(first_mast.get_burn_amount())
+	var target_damage := clampf(current_damage + delta, 0.0, 1.0)
+	for mast in masts:
+		if not is_instance_valid(mast):
+			continue
+		mast.set("sail_damage", target_damage)
+	_show_debug_hud_message("돛 손상 %.2f | burn %.2f" % [target_damage, current_burn])
+
+
+func _debug_adjust_player_sail_burn(delta: float) -> void:
+	var masts := _get_debug_player_masts()
+	if masts.is_empty():
+		_show_debug_hud_message("돛 디버그 대상 없음")
+		return
+	var first_mast := masts[0]
+	var current_damage: float = 0.0
+	var current_burn: float = 0.0
+	if first_mast.has_method("get_sail_damage"):
+		current_damage = float(first_mast.get_sail_damage())
+	if first_mast.has_method("get_burn_amount"):
+		current_burn = float(first_mast.get_burn_amount())
+	var target_burn := clampf(current_burn + delta, 0.0, 1.0)
+	for mast in masts:
+		if not is_instance_valid(mast):
+			continue
+		if mast.has_method("set_burn_amount"):
+			mast.set_burn_amount(target_burn)
+		else:
+			mast.set("burn_amount", target_burn)
+	_show_debug_hud_message("돛 손상 %.2f | burn %.2f" % [current_damage, target_burn])
+
+
+func _debug_reset_player_sail_state() -> void:
+	var masts := _get_debug_player_masts()
+	if masts.is_empty():
+		_show_debug_hud_message("돛 디버그 대상 없음")
+		return
+	for mast in masts:
+		if not is_instance_valid(mast):
+			continue
+		mast.set("sail_damage", 0.0)
+		if mast.has_method("set_burn_amount"):
+			mast.set_burn_amount(0.0)
+		else:
+			mast.set("burn_amount", 0.0)
+	_show_debug_hud_message("돛 손상 초기화")
 
 
 func update_boss_hp(current: float, maximum: float) -> void:

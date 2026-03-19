@@ -5,6 +5,7 @@ const MastVisualHelper = preload("res://scripts/props/mast_visual_helper.gd")
 const SAIL_SMOKE_SCENE = preload("res://scenes/effects/fire_effect.tscn")
 const SAIL_BURN_MASK_A = preload("res://assets/vfx/masks/sail_burn_mask_a.png")
 const SAIL_BURN_MASK_B = preload("res://assets/vfx/masks/sail_burn_mask_b.png")
+const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 
 ## 돛대 (Mast) 오브젝트
 ## 자체적으로 돛 각도 회전 및 펄럭임 제어
@@ -33,13 +34,26 @@ const SAIL_BURN_MASK_B = preload("res://assets/vfx/masks/sail_burn_mask_b.png")
 		_apply_sail_material_settings()
 @export var sail_damage: float = 0.0:
 	set(value):
-		sail_damage = clamp(value, 0.0, 1.0)
+		var target_value := clamp(value, 0.0, 1.0)
+		if is_equal_approx(sail_damage, target_value):
+			return
+		sail_damage = target_value
 		_apply_sail_material_settings()
 @export var burn_amount: float = 0.0:
 	set(value):
-		burn_amount = clamp(value, 0.0, 1.0)
+		var target_value := clamp(value, 0.0, 1.0)
+		if is_equal_approx(burn_amount, target_value):
+			return
+		burn_amount = target_value
 		_apply_sail_material_settings()
 		_update_sail_smoke()
+@export var hole_alpha_strength: float = 1.0:
+	set(value):
+		var target_value := clamp(value, 0.0, 2.0)
+		if is_equal_approx(hole_alpha_strength, target_value):
+			return
+		hole_alpha_strength = target_value
+		_apply_sail_material_settings()
 @export var sail_uv_scale: Vector2 = Vector2.ONE:
 	set(value):
 		sail_uv_scale = value
@@ -107,6 +121,7 @@ var _damage_seed: float = 0.0
 var _sail_smoke_instance: Node3D = null
 var _cached_wind_manager: Node = null
 var _current_wind_intake: float = 0.0
+var _last_applied_wind_strength: float = -1.0
 
 func _enter_tree() -> void:
 	# Apply the instance's exported sail settings as soon as the scene enters the tree,
@@ -147,6 +162,8 @@ func _ready() -> void:
 	_update_sail_wind_visual()
 
 func set_sail_angle(angle: float) -> void:
+	if is_equal_approx(sail_angle, angle):
+		return
 	sail_angle = angle
 	_update_sail_wind_visual()
 
@@ -175,22 +192,40 @@ func configure_sail_uv(swap_axes: bool = false, flip_u: bool = false, flip_v: bo
 	_apply_sail_material_settings()
 
 func _apply_sail_material_settings() -> void:
-	MastVisualHelper.apply_sail_material_settings(self, SAIL_BURN_MASK_A, SAIL_BURN_MASK_B)
+	MastVisualHelper.apply_sail_material_settings(self, SAIL_BURN_MASK_A, SAIL_BURN_MASK_B, SAIL_BURN_MASK_C)
 
 func add_sail_damage(amount: float) -> void:
-	sail_damage = clamp(sail_damage + maxf(amount, 0.0), 0.0, 1.0)
+	var target_damage := clamp(sail_damage + maxf(amount, 0.0), 0.0, 1.0)
+	if is_equal_approx(sail_damage, target_damage):
+		return
+	sail_damage = target_damage
 
 func repair_sail_damage(amount: float) -> void:
-	sail_damage = clamp(sail_damage - maxf(amount, 0.0), 0.0, 1.0)
+	var target_damage := clamp(sail_damage - maxf(amount, 0.0), 0.0, 1.0)
+	if is_equal_approx(sail_damage, target_damage):
+		return
+	sail_damage = target_damage
 
 func get_sail_damage() -> float:
 	return sail_damage
 
 func set_burn_amount(value: float) -> void:
-	burn_amount = clamp(value, 0.0, 1.0)
+	var target_burn := clamp(value, 0.0, 1.0)
+	if is_equal_approx(burn_amount, target_burn):
+		return
+	burn_amount = target_burn
 
 func get_burn_amount() -> float:
 	return burn_amount
+
+func set_hole_alpha_strength(value: float) -> void:
+	var target_strength := clamp(value, 0.0, 2.0)
+	if is_equal_approx(hole_alpha_strength, target_strength):
+		return
+	hole_alpha_strength = target_strength
+
+func get_hole_alpha_strength() -> float:
+	return hole_alpha_strength
 
 func _ensure_sail_smoke() -> Node3D:
 	return MastVisualHelper.ensure_sail_smoke(self, SAIL_SMOKE_SCENE)
@@ -216,6 +251,9 @@ func _update_sail_wind_visual() -> void:
 	_apply_wind_strength_to_sails(_current_wind_intake)
 
 func _apply_wind_strength_to_sails(wind_strength_value: float) -> void:
+	if is_equal_approx(_last_applied_wind_strength, wind_strength_value):
+		return
+	_last_applied_wind_strength = wind_strength_value
 	for mesh in _get_sail_meshes():
 		mesh.set_instance_shader_parameter("wind_strength", wind_strength_value)
 

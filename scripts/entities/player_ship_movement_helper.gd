@@ -60,6 +60,7 @@ static func update_movement(ship, delta: float) -> void:
 		target_speed += ship.rowing_speed
 	target_speed *= get_boarding_drag_multiplier(ship)
 	target_speed *= ship.speed_mult
+	var forward = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
 	if target_speed > ship.current_speed:
 		var accel: float = ship.acceleration
 		if is_actively_rowing and "rowing_acceleration_mult" in ship:
@@ -67,7 +68,6 @@ static func update_movement(ship, delta: float) -> void:
 		ship.current_speed = move_toward(ship.current_speed, target_speed, accel * delta)
 	else:
 		ship.current_speed = move_toward(ship.current_speed, target_speed, ship.deceleration * delta)
-	var forward = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
 	var velocity = forward * ship.current_speed
 	var sep = calculate_separation(ship)
 	velocity += sep

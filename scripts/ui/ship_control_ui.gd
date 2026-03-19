@@ -51,6 +51,6 @@ func _update_wind_indicator() -> void:
 	if compass_wheel:
 		compass_wheel.rotation = cam_yaw
 
-	var wind_dir = WindManager.get_wind_direction()
+	var wind_dir: Vector2 = WindManager.get_wind_direction()
 	var wind_angle_rad = atan2(wind_dir.x, -wind_dir.y)
 	wind_arrow.rotation = wind_angle_rad + cam_yaw

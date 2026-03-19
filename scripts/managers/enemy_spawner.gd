@@ -57,6 +57,8 @@ func _spawn_boss() -> void:
 	get_parent().add_child(boss)
 	boss.global_position = spawn_pos
 	boss.look_at(player.global_position, Vector3.UP)
+	_prime_enemy_momentum(boss, true)
+	_push_boss_hp_to_hud(boss)
 	print("[Boss] 최종 보스 소환 완료!")
 
 
@@ -122,6 +124,11 @@ func _check_enemy_reposition_incremental(enemies: Array) -> void:
 			# 앞쪽에 다시 스폰 (거리 리셋, 기차놀이 방지)
 			var spawn_pos = _get_biased_spawn_position()
 			var player_forward = - player.global_transform.basis.z if player else Vector3.FORWARD
+			player_forward.y = 0.0
+			if player_forward.length_squared() <= 0.0001:
+				player_forward = Vector3.FORWARD
+			else:
+				player_forward = player_forward.normalized()
 			
 			# 약간의 위치 오프셋 추가 (다른 배와 겹침 방지)
 			var offset_right = player_forward.cross(Vector3.UP).normalized()
@@ -129,9 +136,8 @@ func _check_enemy_reposition_incremental(enemies: Array) -> void:
 			
 			enemy.global_position = spawn_pos
 			
-			if enemy.has_method("look_at"):
-				var look_target = spawn_pos - player_forward * 10.0
-				enemy.look_at(look_target, Vector3.UP)
+			if enemy.has_method("look_at") and is_instance_valid(player):
+				enemy.look_at(player.global_position, Vector3.UP)
 			
 				if DEBUG_SPAWNER_LOGS:
 					print("[Spawner] 멀어진 적함을 플레이어 전방 차단진으로 재배치(Recycle) 했습니다.")
@@ -158,7 +164,18 @@ func _spawn_enemy() -> void:
 	# 스폰 위치 그룹의 중심점 계산 (전방 편향)
 	var center_pos = _get_biased_spawn_position()
 	var player_forward = - player.global_transform.basis.z if player else Vector3.FORWARD
-	var blockade_right = player_forward.cross(Vector3.UP).normalized()
+	player_forward.y = 0.0
+	if player_forward.length_squared() <= 0.0001:
+		player_forward = Vector3.FORWARD
+	else:
+		player_forward = player_forward.normalized()
+	var to_player_dir = (player.global_position - center_pos) if is_instance_valid(player) else -player_forward
+	to_player_dir.y = 0.0
+	if to_player_dir.length_squared() <= 0.0001:
+		to_player_dir = -player_forward
+	else:
+		to_player_dir = to_player_dir.normalized()
+	var blockade_right = to_player_dir.cross(Vector3.UP).normalized()
 	
 	var existing_enemy_count := SceneGroupCache.get_nodes(get_tree(), "enemy").size()
 	for i in range(spawn_count):
@@ -187,13 +204,14 @@ func _spawn_enemy() -> void:
 			
 		# 초기 회전: 아직 트리에 없을 수 있으므로 look_at_from_position() 사용
 		if is_instance_valid(player):
-			var look_target = spawn_pos - player_forward * 10.0
-			enemy.look_at_from_position(spawn_pos, look_target, Vector3.UP)
+			enemy.look_at_from_position(spawn_pos, player.global_position, Vector3.UP)
 		else:
 			enemy.position = spawn_pos
 		
 		# Main 씬에 추가
 		get_parent().add_child(enemy)
+		enemy.global_position = spawn_pos
+		_prime_enemy_momentum(enemy)
 		existing_enemy_count += 1
 		
 		# 레벨 기반 스탯 설정 (이동 속도와 HP는 함선 씬 고유 스탯을 사용하도록 수정)
@@ -258,8 +276,76 @@ func _spawn_elite_ship() -> void:
 	get_parent().add_child(elite)
 	elite.global_position = spawn_pos
 	elite.look_at(player.global_position, Vector3.UP)
+	_prime_enemy_momentum(elite, true)
+	_push_boss_hp_to_hud(elite)
+	_spawn_elite_escorts(spawn_pos)
 	
-	print("[Event] 중간 보스(아타케부네) 출현!")
+	print("[Event] 중간 보스 편대 출현!")
+
+
+func debug_spawn_mid_boss() -> void:
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		return
+	_spawn_elite_ship()
+
+
+func debug_spawn_final_boss() -> void:
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		return
+	trigger_boss_event()
+
+
+func _push_boss_hp_to_hud(boss_ship: Node) -> void:
+	if not is_instance_valid(boss_ship):
+		return
+	var lm := get_tree().root.find_child("LevelManager", true, false)
+	if not is_instance_valid(lm):
+		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
+		if lm_nodes.size() > 0:
+			lm = lm_nodes[0]
+	if is_instance_valid(lm) and lm.has_method("update_boss_hp"):
+		var current_hp: float = float(boss_ship.get("hull_hp"))
+		var maximum_hp: float = float(boss_ship.get("max_hull_hp"))
+		lm.call_deferred("update_boss_hp", current_hp, maximum_hp)
+
+
+func _spawn_elite_escorts(flagship_pos: Vector3) -> void:
+	if not enemy_scene or not is_instance_valid(player):
+		return
+
+	var player_forward: Vector3 = -player.global_transform.basis.z
+	player_forward.y = 0.0
+	if player_forward.length_squared() <= 0.0001:
+		player_forward = Vector3.FORWARD
+	else:
+		player_forward = player_forward.normalized()
+	var player_right: Vector3 = player_forward.cross(Vector3.UP).normalized()
+
+	var escort_layout: Array[Dictionary] = [
+		{"ship_type": "sekibune_cannon", "lateral": -12.0, "back": 8.0},
+		{"ship_type": "kobayabune_melee", "lateral": 12.0, "back": 10.0},
+	]
+
+	for escort_info in escort_layout:
+		var escort = enemy_scene.instantiate()
+		if not is_instance_valid(escort):
+			continue
+		if "ship_type" in escort:
+			escort.ship_type = String(escort_info.get("ship_type", "kobayabune_melee"))
+
+		var escort_pos: Vector3 = flagship_pos
+		escort_pos += player_right * float(escort_info.get("lateral", 0.0))
+		escort_pos += player_forward * -float(escort_info.get("back", 0.0))
+		escort_pos.y = 0.0
+
+		get_parent().add_child(escort)
+		escort.global_position = escort_pos
+		escort.look_at(player.global_position, Vector3.UP)
+		_prime_enemy_momentum(escort)
 
 func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_offset: float = 0.0) -> Node3D:
 	if not enemy_scene or not is_instance_valid(player):
@@ -277,5 +363,30 @@ func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_of
 	get_parent().add_child(enemy)
 	enemy.global_position = spawn_pos
 	enemy.look_at(player.global_position, Vector3.UP)
+	_prime_enemy_momentum(enemy)
 	print("[DEBUG] 적 테스트 소환: %s" % ship_type_name)
 	return enemy
+
+func _prime_enemy_momentum(enemy: Node3D, heavy_spawn: bool = false) -> void:
+	if not is_instance_valid(enemy):
+		return
+	var base_move_speed: float = 0.0
+	if enemy.get("move_speed") != null:
+		base_move_speed = float(enemy.get("move_speed"))
+	elif enemy.get("max_speed") != null:
+		base_move_speed = float(enemy.get("max_speed"))
+	var player_speed: float = 0.0
+	if is_instance_valid(player) and player.get("current_speed") != null:
+		player_speed = float(player.get("current_speed"))
+	var spawn_speed_floor: float = base_move_speed * (0.55 if not heavy_spawn else 0.45)
+	var inherited_speed: float = player_speed * 0.8
+	var initial_speed: float = maxf(spawn_speed_floor, inherited_speed)
+	initial_speed = minf(initial_speed, maxf(base_move_speed * (1.1 if not heavy_spawn else 1.0), 0.1))
+	if "current_speed" in enemy:
+		enemy.current_speed = initial_speed
+	if "_last_ai_speed" in enemy:
+		enemy._last_ai_speed = initial_speed
+	if "stamina" in enemy and "max_stamina" in enemy:
+		enemy.stamina = maxf(float(enemy.stamina), float(enemy.max_stamina) * 0.85)
+	if "rudder_angle" in enemy:
+		enemy.rudder_angle = 0.0

@@ -16,6 +16,8 @@ static func become_derelict(ship) -> void:
 		if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_merit"):
 			ship.cached_lm.add_merit(20)
 			ship._merit_granted = true
+	if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_ship_derelict"):
+		ship.cached_lm.add_ship_derelict(1)
 
 	ship._set_wake_state(false)
 
@@ -77,6 +79,8 @@ static func check_offscreen_despawn(ship) -> void:
 
 static func drop_floating_loot(ship) -> void:
 	if not ship.loot_scene:
+		return
+	if randf() > float(ship.floating_loot_drop_chance):
 		return
 
 	var loot = ship.loot_scene.instantiate()

@@ -13,7 +13,7 @@ static func initialize(lm: Node) -> void:
 		lm.hud.update_xp(lm.current_xp, lm.xp_to_next_level)
 		lm.hud.update_merit(lm.merit_points, lm.max_merit_points, lm.merit_level)
 		if lm.hud.has_method("update_combat_stats"):
-			lm.hud.update_combat_stats(lm.ships_sunk, lm.soldiers_killed)
+			lm.hud.update_combat_stats(lm.ships_sunk, lm.ships_derelicted, lm.soldiers_killed, lm.soldiers_slain, lm.soldiers_drowned)
 		if lm.hud.has_method("update_difficulty_ui"):
 			lm.hud.update_difficulty_ui(lm.game_difficulty)
 

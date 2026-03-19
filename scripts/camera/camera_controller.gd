@@ -160,7 +160,6 @@ func _update_dynamic_fog() -> void:
 	# 줌 변화가 없으면 실행 건너뜀: GPU re-upload 방지
 	if abs(current_zoom - _last_zoom) < 0.5: return
 	_last_zoom = current_zoom
-	
 	# 전투에 적당한 줌아웃 위치에서는 시야를 먼저 가리지 않도록,
 	# 기본 시작/종료 거리를 확보한 뒤 줌에 따라 더 뒤로 민다.
 	environment.fog_depth_begin = maxf(fog_begin_min, current_zoom * fog_begin_zoom_multiplier)

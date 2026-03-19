@@ -1,6 +1,8 @@
 extends RefCounted
 
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
+const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const SUPPORT_SHIP_ICON := "\ue532"
 
 # Top-line HUD text
 static func update_level(hud, val: int) -> void:
@@ -12,8 +14,8 @@ static func update_score(hud, val: int) -> void:
 		var total_gold = SaveManager.gold if is_instance_valid(SaveManager) else val
 		hud.score_label.text = "[Gold] %d (Total %d)" % [val, total_gold]
 
-static func update_combat_stats(hud, ship_sunk: int, soldiers_killed: int) -> void:
-	var text = "[전과] 격침 %d | 병사 %d" % [ship_sunk, soldiers_killed]
+static func update_combat_stats(hud, ship_sunk: int, ships_derelicted: int, soldiers_killed: int, _soldiers_slain: int, _soldiers_drowned: int) -> void:
+	var text = "[전과] 격침 %d | 나포 %d | 병사 %d" % [ship_sunk, ships_derelicted, soldiers_killed]
 	if hud._last_combat_stats_text == text:
 		return
 	hud._last_combat_stats_text = text
@@ -29,13 +31,7 @@ static func update_difficulty_ui(hud, val: int) -> void:
 
 static func update_crew_status(hud, count: int, max_count: int = 4) -> void:
 	if hud.crew_label:
-		var icons = char(0xe7ef) + " "
-		for i in range(max_count):
-			if i < count:
-				icons += char(0xe061)
-			else:
-				icons += char(0xe836)
-		hud.crew_label.text = icons
+		hud.crew_label.text = "병사 %d / %d" % [count, max_count]
 
 static func update_timer(hud) -> void:
 	if hud.timer_label:
@@ -101,6 +97,79 @@ static func update_speed_display(hud) -> void:
 			hud.speed_display.text = speed_text
 
 # Crew and combat
+static func update_force_panel(hud) -> void:
+	if not is_instance_valid(hud.player_ship):
+		return
+	_update_crew_force_status(hud)
+	_update_support_force_status(hud)
+
+static func _update_crew_force_status(hud) -> void:
+	var soldiers_node = hud.player_ship.get_node_or_null("Soldiers")
+	var alive_count: int = 0
+	var general_count: int = 0
+	var spearman_count: int = 0
+	var fire_pot_count: int = 0
+	var repeater_count: int = 0
+	var singigeon_count: int = 0
+	if soldiers_node:
+		for soldier in soldiers_node.get_children():
+			if soldier.get("current_state") != null and int(soldier.current_state) != 4 and soldier.get("team") == "player":
+				alive_count += 1
+				var role: String = str(soldier.get("crew_role")) if soldier.get("crew_role") != null else str(soldier.get_meta("crew_role", "general"))
+				match role:
+					"spearman":
+						spearman_count += 1
+					"fire_pot":
+						fire_pot_count += 1
+					"repeating_crossbow":
+						repeater_count += 1
+					"singigeon":
+						singigeon_count += 1
+					_:
+						general_count += 1
+	var max_val: int = int(hud.player_ship.get("max_crew_count")) if hud.player_ship.get("max_crew_count") != null else 4
+	update_crew_status(hud, alive_count, max_val)
+	if hud.crew_status_bar:
+		hud.crew_status_bar.max_value = maxf(float(max_val), 1.0)
+		hud.crew_status_bar.value = maxf(0.0, float(max_val - alive_count))
+	if hud.crew_composition_label:
+		hud.crew_composition_label.text = "[편성] 일반 %d | 창병 %d | 화통 %d | 연노 %d | 신기전 %d" % [general_count, spearman_count, fire_pot_count, repeater_count, singigeon_count]
+
+static func _update_support_force_status(hud) -> void:
+	if not hud.support_slot_container or not is_instance_valid(hud.player_ship):
+		return
+	var support_ships: Array = []
+	if hud.player_ship.has_method("_get_support_fleet_ships"):
+		support_ships = hud.player_ship._get_support_fleet_ships()
+	var support_limit: int = int(hud.player_ship.support_fleet_limit) if "support_fleet_limit" in hud.player_ship else 0
+	var support_unlocked: bool = support_ships.size() > 0
+	if is_instance_valid(UpgradeManager) and "current_levels" in UpgradeManager:
+		support_unlocked = support_unlocked or int(UpgradeManager.current_levels.get("fleet_signal", 0)) > 0
+	if support_limit <= 0 and not support_unlocked:
+		if is_instance_valid(hud.support_status_label) and is_instance_valid(hud.support_status_label.get_parent()):
+			hud.support_status_label.get_parent().visible = false
+		return
+	if is_instance_valid(hud.support_status_label) and is_instance_valid(hud.support_status_label.get_parent()):
+		hud.support_status_label.get_parent().visible = true
+	support_limit = maxi(support_limit, support_ships.size())
+	_ensure_support_slot_count(hud, support_limit)
+	if hud.support_status_label:
+		hud.support_status_label.text = "지원함 %d/%d" % [support_ships.size(), support_limit]
+
+	var next_respawn_text: String = ""
+	if support_ships.size() < support_limit and _is_support_respawn_active(hud.player_ship):
+		var interval: float = float(hud.player_ship.support_fleet_respawn_interval)
+		var timer: float = float(hud.player_ship.support_fleet_respawn_timer)
+		next_respawn_text = "%ds" % maxi(0, int(ceili(maxf(0.0, interval - timer))))
+
+	for i in range(hud.support_fleet_hud_slots.size()):
+		var slot: PanelContainer = hud.support_fleet_hud_slots[i]
+		if not is_instance_valid(slot):
+			continue
+		var ship = support_ships[i] if i < support_ships.size() else null
+		var timer_text: String = next_respawn_text if i == support_ships.size() else ""
+		_update_support_slot(slot, ship, timer_text)
+
 static func update_crew_count(hud) -> void:
 	if Engine.get_process_frames() % 30 != 0:
 		return
@@ -134,6 +203,127 @@ static func update_crew_count(hud) -> void:
 		update_crew_status(hud, alive_count, max_val)
 		if hud.crew_composition_label:
 			hud.crew_composition_label.text = "[편성] 일반 %d | 창병 %d | 화통 %d | 연노 %d | 신기전 %d" % [general_count, spearman_count, fire_pot_count, repeater_count, singigeon_count]
+
+static func _is_support_respawn_active(player_ship) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	if not is_instance_valid(UpgradeManager) or "current_levels" not in UpgradeManager:
+		return false
+	if bool(player_ship.get("is_sinking")) or bool(player_ship.get("is_dying")):
+		return false
+	return int(UpgradeManager.current_levels.get("fleet_signal", 0)) > 0
+
+static func _ensure_support_slot_count(hud, slot_count: int) -> void:
+	while hud.support_fleet_hud_slots.size() < slot_count:
+		var slot := _create_support_slot()
+		hud.support_slot_container.add_child(slot)
+		hud.support_fleet_hud_slots.append(slot)
+	while hud.support_fleet_hud_slots.size() > slot_count:
+		var last_slot: PanelContainer = hud.support_fleet_hud_slots.pop_back()
+		if is_instance_valid(last_slot):
+			last_slot.queue_free()
+
+static func _create_support_slot() -> PanelContainer:
+	var slot := PanelContainer.new()
+	slot.custom_minimum_size = Vector2(34, 34)
+	var slot_style := StyleBoxFlat.new()
+	slot_style.bg_color = Color(0.07, 0.09, 0.12, 0.88)
+	slot_style.border_color = Color(0.88, 0.72, 0.32, 0.52)
+	slot_style.set_border_width_all(1)
+	slot_style.set_corner_radius_all(6)
+	slot.add_theme_stylebox_override("panel", slot_style)
+
+	var root := Control.new()
+	root.name = "Root"
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slot.add_child(root)
+
+	var damage_fill := ColorRect.new()
+	damage_fill.name = "DamageFill"
+	damage_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	damage_fill.anchor_left = 0.0
+	damage_fill.anchor_right = 1.0
+	damage_fill.anchor_top = 1.0
+	damage_fill.anchor_bottom = 1.0
+	damage_fill.offset_left = 0.0
+	damage_fill.offset_right = 0.0
+	damage_fill.offset_top = 0.0
+	damage_fill.offset_bottom = 0.0
+	damage_fill.color = Color(0.92, 0.14, 0.14, 0.78)
+	root.add_child(damage_fill)
+
+	var dead_overlay := ColorRect.new()
+	dead_overlay.name = "DeadOverlay"
+	dead_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dead_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dead_overlay.color = Color(0.08, 0.08, 0.08, 0.72)
+	dead_overlay.visible = false
+	root.add_child(dead_overlay)
+
+	var icon := Label.new()
+	icon.name = "Icon"
+	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	icon.add_theme_font_size_override("font_size", 22)
+	icon.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+	if MATERIAL_SYMBOLS_FONT:
+		icon.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
+	icon.text = SUPPORT_SHIP_ICON
+	root.add_child(icon)
+
+	var timer := Label.new()
+	timer.name = "Timer"
+	timer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	timer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	timer.add_theme_font_size_override("font_size", 10)
+	timer.add_theme_color_override("font_color", Color(0.9, 0.9, 0.92))
+	timer.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.03, 0.95))
+	timer.add_theme_constant_override("outline_size", 3)
+	timer.visible = false
+	root.add_child(timer)
+
+	return slot
+
+static func _update_support_slot(slot: PanelContainer, ship, timer_text: String = "") -> void:
+	var slot_style: StyleBoxFlat = slot.get_theme_stylebox("panel") as StyleBoxFlat
+	var damage_fill: ColorRect = slot.get_node("Root/DamageFill") as ColorRect
+	var dead_overlay: ColorRect = slot.get_node("Root/DeadOverlay") as ColorRect
+	var icon: Label = slot.get_node("Root/Icon") as Label
+	var timer: Label = slot.get_node("Root/Timer") as Label
+	if not is_instance_valid(icon) or not is_instance_valid(dead_overlay) or not is_instance_valid(damage_fill) or not is_instance_valid(timer):
+		return
+	if is_instance_valid(ship) and ship.get("hull_hp") != null and ship.get("max_hull_hp") != null:
+		var max_hp: float = maxf(float(ship.max_hull_hp), 1.0)
+		var hull_hp: float = clampf(float(ship.hull_hp), 0.0, max_hp)
+		var lost_ratio: float = clampf(1.0 - (hull_hp / max_hp), 0.0, 1.0)
+		damage_fill.visible = lost_ratio > 0.01
+		damage_fill.anchor_top = 1.0 - lost_ratio
+		damage_fill.anchor_bottom = 1.0
+		damage_fill.offset_top = 0.0
+		damage_fill.offset_bottom = 0.0
+		dead_overlay.visible = false
+		icon.visible = true
+		icon.text = SUPPORT_SHIP_ICON
+		icon.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		timer.visible = false
+		timer.text = ""
+		if slot_style:
+			slot_style.bg_color = Color(0.07, 0.09, 0.12, 0.88)
+			slot_style.border_color = Color(0.88, 0.72, 0.32, 0.52)
+	else:
+		damage_fill.visible = false
+		dead_overlay.visible = true
+		icon.visible = true
+		icon.text = SUPPORT_SHIP_ICON
+		icon.add_theme_color_override("font_color", Color(0.52, 0.55, 0.6))
+		timer.visible = not timer_text.is_empty()
+		timer.text = timer_text
+		if slot_style:
+			slot_style.bg_color = Color(0.05, 0.05, 0.07, 0.88)
+			slot_style.border_color = Color(0.38, 0.38, 0.42, 0.42)
 
 static func update_hull_display(hud) -> void:
 	if is_instance_valid(hud.player_ship) and hud.player_ship.get("hull_hp") != null:

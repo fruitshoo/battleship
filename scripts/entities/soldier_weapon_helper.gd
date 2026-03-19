@@ -74,15 +74,9 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 		elif soldier.is_ranged_only:
 			soldier._set_active_weapon("bow")
 		elif cross_ship_close:
-			# 인접한 적선과 붙었을 때도 거리가 남아 있으면 활/연노를 유지해 교전 공백을 줄인다.
-			var cross_ship_melee_switch_distance: float = maxf(
-				soldier.weapon_switch_distance,
-				soldier.cross_ship_melee_switch_distance
-			)
-			if dist_xz <= cross_ship_melee_switch_distance:
-				soldier._set_active_weapon("sword")
-			else:
-				soldier._set_active_weapon("bow")
+			# 배끼리 이미 백병전 거리까지 붙었다면, 일반 병사는 활보다 검을 우선해
+			# 갑판 위에서 멀뚱히 사격만 하다 녹는 상황을 줄인다.
+			soldier._set_active_weapon("sword")
 		elif dist_xz <= soldier.weapon_switch_distance:
 			soldier._set_active_weapon("sword")
 		else:

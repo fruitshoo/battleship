@@ -84,14 +84,15 @@ static func get_support_fleet_ships(ship) -> Array:
 	return support_ships
 
 static func get_offscreen_ally_spawn_position(ship) -> Vector3:
-	var fallback_forward: Vector3 = -ship.global_transform.basis.z
-	fallback_forward.y = 0.0
-	if fallback_forward.length_squared() <= 0.0001:
-		fallback_forward = Vector3.FORWARD
+	var forward_dir: Vector3 = -ship.global_transform.basis.z
+	forward_dir.y = 0.0
+	if forward_dir.length_squared() <= 0.0001:
+		forward_dir = Vector3.FORWARD
 	else:
-		fallback_forward = fallback_forward.normalized()
-	var fallback_right: Vector3 = fallback_forward.cross(Vector3.UP).normalized()
-	var fallback_pos: Vector3 = ship.global_position + fallback_right * randf_range(-35.0, 35.0) - fallback_forward * 55.0
+		forward_dir = forward_dir.normalized()
+	var backward_dir: Vector3 = -forward_dir
+	var right_dir: Vector3 = forward_dir.cross(Vector3.UP).normalized()
+	var fallback_pos: Vector3 = ship.global_position + backward_dir * 62.0 + right_dir * randf_range(-18.0, 18.0)
 	fallback_pos.y = 0.0
 
 	var cam: Camera3D = ship.get_viewport().get_camera_3d()
@@ -99,47 +100,19 @@ static func get_offscreen_ally_spawn_position(ship) -> Vector3:
 		return fallback_pos
 
 	var viewport_rect: Rect2 = ship.get_viewport().get_visible_rect()
-	var wind_dir_2d: Vector2 = Vector2.ZERO
-	if is_instance_valid(ship._cached_wind_manager) and ship._cached_wind_manager.has_method("get_wind_direction"):
-		wind_dir_2d = ship._cached_wind_manager.get_wind_direction()
-	else:
-		var wind_manager: Node = ship.get_node_or_null("/root/WindManager")
-		if is_instance_valid(wind_manager) and wind_manager.has_method("get_wind_direction"):
-			wind_dir_2d = wind_manager.get_wind_direction()
-
-	if wind_dir_2d.length_squared() > 0.0001:
-		var wind_flow_dir: Vector3 = Vector3(wind_dir_2d.x, 0.0, wind_dir_2d.y).normalized()
-		var lateral_dir: Vector3 = wind_flow_dir.cross(Vector3.UP).normalized()
-		var base_dist: float = randf_range(58.0, 72.0)
-		var lateral_offset: float = randf_range(-16.0, 16.0)
-		var candidate: Vector3 = ship.global_position - wind_flow_dir * base_dist + lateral_dir * lateral_offset
+	var candidate: Vector3 = fallback_pos
+	if not _is_world_position_offscreen(cam, viewport_rect, candidate):
+		candidate = ship.global_position + backward_dir * 84.0 + right_dir * randf_range(-22.0, 22.0)
 		candidate.y = 0.0
 
-		if not _is_world_position_offscreen(cam, viewport_rect, candidate):
-			candidate -= wind_flow_dir * randf_range(18.0, 26.0)
-			candidate.y = 0.0
+	if not _is_world_position_offscreen(cam, viewport_rect, candidate):
+		candidate = ship.global_position + backward_dir * 104.0 + right_dir * randf_range(-28.0, 28.0)
+		candidate.y = 0.0
 
-		if _is_world_position_offscreen(cam, viewport_rect, candidate):
-			return candidate
+	if _is_world_position_offscreen(cam, viewport_rect, candidate):
+		return candidate
 
-	var use_left_side: bool = randf() < 0.5
-	var sample_x: float = -96.0 if use_left_side else viewport_rect.size.x + 96.0
-	var sample_y: float = viewport_rect.size.y * randf_range(0.48, 0.66)
-	var projected_pos: Vector3 = _sample_ocean_plane_from_screen(cam, Vector2(sample_x, sample_y))
-	if projected_pos == Vector3.ZERO:
-		return fallback_pos
-
-	var to_spawn: Vector3 = projected_pos - ship.global_position
-	to_spawn.y = 0.0
-	if to_spawn.length_squared() <= 0.0001:
-		return fallback_pos
-
-	var dist: float = to_spawn.length()
-	var dir: Vector3 = to_spawn / dist
-	var clamped_dist: float = clampf(dist, 48.0, 72.0)
-	projected_pos = ship.global_position + dir * clamped_dist
-	projected_pos.y = 0.0
-	return projected_pos
+	return fallback_pos
 
 static func update_support_fleet_respawn(ship, delta: float) -> void:
 	if ship.is_sinking or ship.is_dying:
@@ -166,17 +139,3 @@ static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, wo
 		return true
 	var screen_pos: Vector2 = cam.unproject_position(world_pos)
 	return not viewport_rect.has_point(screen_pos)
-
-static func _sample_ocean_plane_from_screen(cam: Camera3D, screen_pos: Vector2) -> Vector3:
-	var ray_origin: Vector3 = cam.project_ray_origin(screen_pos)
-	var ray_dir: Vector3 = cam.project_ray_normal(screen_pos)
-	if absf(ray_dir.y) <= 0.0001:
-		return Vector3.ZERO
-
-	var t: float = -ray_origin.y / ray_dir.y
-	if t <= 0.0:
-		return Vector3.ZERO
-
-	var world_pos: Vector3 = ray_origin + ray_dir * t
-	world_pos.y = 0.0
-	return world_pos

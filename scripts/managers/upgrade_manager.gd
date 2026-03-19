@@ -53,7 +53,14 @@ const CREW_UPGRADE_IDS: Array[String] = [
 	"fire_pot",
 	"repeating_crossbow",
 ]
-const FLEET_UPGRADE_IDS: Array[String] = [
+const SUPPORT_SHIP_UPGRADE_IDS: Array[String] = [
+	"fleet_cannon",
+	"fleet_hull",
+]
+const SUPPORT_CREW_UPGRADE_IDS: Array[String] = [
+	"fleet_crew",
+]
+const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
 	"fleet_cannon",
 	"fleet_hull",
 	"fleet_crew",
@@ -189,16 +196,22 @@ func refresh_hud_relic_icons() -> void:
 				hud.add_relic_icon(relic_icon)
 
 func get_ship_upgrade_choices(count: int = 3) -> Array:
-	var choices = _collect_choices_from_ids(SHIP_UPGRADE_IDS, count)
+	var ship_pool: Array[String] = SHIP_UPGRADE_IDS.duplicate()
+	if _is_fleet_progress_available():
+		ship_pool.append_array(SUPPORT_SHIP_UPGRADE_IDS)
+	var choices = _collect_choices_from_ids(ship_pool, count)
 	_maybe_add_rare_fleet_upgrade(choices, count)
 	_fill_with_fallbacks(choices, count)
-	_sort_choices_by_preferred_order(choices, SHIP_UPGRADE_IDS)
+	var preferred_order: Array[String] = ship_pool.duplicate()
+	preferred_order.append(RARE_FLEET_UPGRADE_ID)
+	preferred_order.append_array(["supply", "gold"])
+	_sort_choices_by_preferred_order(choices, preferred_order)
 	return choices
 
 func get_command_upgrade_choices(count: int = 3) -> Array:
 	var command_pool: Array[String] = CREW_UPGRADE_IDS.duplicate()
 	if _is_fleet_progress_available():
-		for upgrade_id in FLEET_UPGRADE_IDS:
+		for upgrade_id in SUPPORT_CREW_UPGRADE_IDS:
 			command_pool.append(upgrade_id)
 	var choices = _collect_choices_from_ids(command_pool, count)
 	_sort_choices_by_preferred_order(choices, command_pool)
@@ -208,7 +221,7 @@ func _is_fleet_progress_available() -> bool:
 	# 지원 함대를 해금했거나 이미 함대 강화가 시작됐으면 지휘 선택지에 함대 강화를 노출한다.
 	if int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0:
 		return true
-	for upgrade_id in FLEET_UPGRADE_IDS:
+	for upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
 		if int(current_levels.get(upgrade_id, 0)) > 0:
 			return true
 	var tree = get_tree()
@@ -354,7 +367,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	upgrade_applied.emit(upgrade_id, new_level)
 	
 	# 함대 업그레이드인 경우 현재 활성화된 모든 미니언에 즉시 적용
-	if UPGRADES[upgrade_id].get("category", -1) == Category.FLEET: # Category.FLEET
+	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
 		var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
 		for m in minions:
 			apply_fleet_upgrades_to_ship(m)

@@ -11,13 +11,13 @@ const SAIL_SMOKE_BASE_AMOUNT := 3
 # This helper intentionally keeps all sail visual state in one place so `mast.gd`
 # can focus on scene geometry and transform logic.
 
-static func apply_sail_material_settings(mast: Node3D, burn_mask_a: Texture2D, burn_mask_b: Texture2D) -> void:
+static func apply_sail_material_settings(mast: Node3D, burn_mask_a: Texture2D, burn_mask_b: Texture2D, burn_mask_c: Texture2D) -> void:
 	for mesh in mast._get_sail_meshes():
 		var mat := ensure_sail_material(mast, mesh)
 		if mat == null:
 			continue
 		apply_deform_bounds(mesh, mat)
-		_apply_sail_shader_parameters(mast, mat, burn_mask_a, burn_mask_b)
+		_apply_sail_shader_parameters(mast, mat, burn_mask_a, burn_mask_b, burn_mask_c)
 
 # Sail smoke
 static func ensure_sail_smoke(mast: Node3D, smoke_scene: PackedScene) -> Node3D:
@@ -84,16 +84,18 @@ static func apply_deform_bounds(mesh: MeshInstance3D, mat: ShaderMaterial) -> vo
 	mat.set_shader_parameter("deform_bounds_min", aabb.position)
 	mat.set_shader_parameter("deform_bounds_size", size)
 
-static func _apply_sail_shader_parameters(mast: Node3D, mat: ShaderMaterial, burn_mask_a: Texture2D, burn_mask_b: Texture2D) -> void:
+static func _apply_sail_shader_parameters(mast: Node3D, mat: ShaderMaterial, burn_mask_a: Texture2D, burn_mask_b: Texture2D, burn_mask_c: Texture2D) -> void:
 	mat.set_shader_parameter("use_sail_texture", mast.use_sail_texture and mast.sail_texture != null)
 	mat.set_shader_parameter("sail_texture", mast.sail_texture)
 	mat.set_shader_parameter("burn_mask_texture_a", burn_mask_a)
 	mat.set_shader_parameter("burn_mask_texture_b", burn_mask_b)
+	mat.set_shader_parameter("burn_mask_texture_c", burn_mask_c)
 	mat.set_shader_parameter("swap_uv_axes", mast.swap_sail_uv_axes)
 	mat.set_shader_parameter("flip_u", mast.flip_sail_u)
 	mat.set_shader_parameter("flip_v", mast.flip_sail_v)
 	mat.set_shader_parameter("sail_damage", mast.sail_damage)
 	mat.set_shader_parameter("burn_amount", mast.burn_amount)
+	mat.set_shader_parameter("hole_alpha_strength", mast.hole_alpha_strength)
 	mat.set_shader_parameter("damage_seed", mast._damage_seed)
 	mat.set_shader_parameter("sail_uv_scale", mast.sail_uv_scale)
 	mat.set_shader_parameter("sail_uv_offset", mast.sail_uv_offset)

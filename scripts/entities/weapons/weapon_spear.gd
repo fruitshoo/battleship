@@ -22,7 +22,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var final_damage = damage * (crit_multiplier if is_crit else 1.0)
 	
 	if target.has_method("take_damage"):
-		target.take_damage(final_damage, attacker.global_position)
+		target.take_damage(final_damage, attacker.global_position, "spear")
 		if is_crit and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("critical_hit", hit_pos, randf_range(0.9, 1.1))
 			

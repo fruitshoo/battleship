@@ -8,6 +8,7 @@ signal boss_died
 
 @export var move_speed: float = 3.0
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
+@export_range(0.0, 1.0, 0.01) var orbit_inward_bias: float = 0.34 # 선회 중에도 플레이어 쪽으로 얼마나 파고들지
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_enemy_heavy.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/singigeon_launcher.tscn")
 @export var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
@@ -66,6 +67,10 @@ func _ready() -> void:
 		if stats.has("move_speed"): move_speed = stats["move_speed"]
 		if stats.has("tier"): tier = stats["tier"]
 		if stats.has("orbit_distance"): orbit_distance = stats["orbit_distance"]
+		if tier == 1:
+			orbit_inward_bias = 0.42
+		else:
+			orbit_inward_bias = 0.32
 
 	# 선체(Hull) 씬 인스턴스화 및 추가
 	if is_instance_valid(hull_scene):
@@ -88,6 +93,8 @@ func _ready() -> void:
 		
 	_setup_weapons()
 	_setup_soldiers()
+	_update_boss_hp_hud()
+	call_deferred("_update_boss_hp_hud")
 
 func _setup_weapons() -> void:
 	# 다수의 대포 배치
@@ -100,10 +107,6 @@ func _setup_weapons() -> void:
 		_spawn_boss_cannon(cannons_node, Vector3(0, 0.8, -5.0), 0)
 		_spawn_boss_cannon(cannons_node, Vector3(-2.8, 0.8, 0), 90)
 		_spawn_boss_cannon(cannons_node, Vector3(2.8, 0.8, 0), -90)
-		
-		# 중간 보스는 체력 하향 조절
-		max_hull_hp = 1800.0
-		hull_hp = max_hull_hp
 	else:
 		# 최종 보스: 기존의 고화력 세팅 (좌우 각 3문 + 전방 신기전)
 		for i in range(3):
@@ -198,7 +201,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		# 플레이어 주변을 시계 방향으로 선회
 		var side_dir = Vector3(-to_player.z, 0, to_player.x)
-		move_dir = side_dir
+		move_dir = (side_dir + to_player * orbit_inward_bias).normalized()
 		
 	# === 이동 및 회전 (Separation 및 Hard Collision 포함) ===
 	# 1. Separation (부드러운 충돌 방지)
@@ -296,13 +299,28 @@ func _find_player() -> void:
 				
 	target = closest_player
 
-	# HUD에 보스 체력 업데이트 (LevelManager를 통해)
+	# 타겟 갱신과 무관하게 HUD 체력바는 즉시 동기화한다.
+	_update_boss_hp_hud()
+
+func _update_boss_hp_hud() -> void:
+	if not is_instance_valid(cached_lm):
+		cached_lm = get_tree().root.find_child("LevelManager", true, false)
+		if not cached_lm:
+			var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
+			if lm_nodes.size() > 0:
+				cached_lm = lm_nodes[0]
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
-		cached_lm.update_boss_hp(hull_hp, max_hull_hp)
+		cached_lm.update_boss_hp(maxf(hull_hp, 0.0), max_hull_hp)
+
+func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
+	super.take_damage(amount, hit_position, damage_source)
+	_update_boss_hp_hud()
 
 func die() -> void:
 	if is_dying: return
 	is_dying = true
+	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
+		cached_lm.update_boss_hp(0.0, max_hull_hp)
 	
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
 	_evacuate_player_soldiers_as_survivors()

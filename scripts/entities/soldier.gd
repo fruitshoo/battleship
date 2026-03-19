@@ -48,6 +48,7 @@ enum State {
 			_update_team_color()
 			_update_weapon_stats()
 @export_enum("general", "spearman", "fire_pot", "repeating_crossbow", "singigeon") var crew_role: String = "general"
+@export var is_captain: bool = false
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
 @export var weapon_switch_distance: float = 4.0 # 무기 교체 거리 (이내면 검, 밖이면 활)하향 (10 -> 4)
 @export var cross_ship_melee_switch_distance: float = 6.8 # 인접 적선과 교전 시 근접 무기로 전환하는 거리
@@ -82,6 +83,9 @@ var is_boarder_on_player_ship: bool = false
 var chaos_duration_timer: float = 8.0 # 최대 8초간 약탈 후 도망감
 var chaos_tick_timer: float = 0.0 # 1초마다 데미지 틱
 var chaos_damage_per_tick: float = 5.0 # 상향: 초당 5의 화재 피해 (배 체력 비례)
+var _base_max_health_stat: float = 0.0
+var _base_attack_damage_stat: float = 0.0
+var _base_defense_stat: float = 0.0
 
 const CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 11.5
 const CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 13.5
@@ -138,6 +142,7 @@ func _ready() -> void:
 				defense += float(_meta_manager_init.get_crew_defense_bonus())
 		
 	current_health = max_health
+	_cache_base_combat_stats()
 	
 	# 부모 노드 구조에 따라 배 참조 찾기
 	# 구조: Ship -> Soldiers -> Soldier
@@ -204,6 +209,43 @@ func _ready() -> void:
 	if is_instance_valid(_cached_upgrade_manager):
 		if _cached_upgrade_manager.has_signal("upgrade_applied"):
 			_cached_upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
+
+func _cache_base_combat_stats() -> void:
+	_base_max_health_stat = max_health
+	_base_attack_damage_stat = attack_damage
+	_base_defense_stat = defense
+
+func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_multiplier: float = 1.0, defense_bonus: float = 0.0) -> void:
+	if _base_max_health_stat <= 0.0:
+		_cache_base_combat_stats()
+
+	var previous_max_health: float = maxf(max_health, 0.01)
+	var health_ratio: float = clampf(current_health / previous_max_health, 0.0, 1.0)
+
+	is_captain = enabled
+	set_meta("is_captain", enabled)
+
+	if enabled:
+		max_health = _base_max_health_stat * maxf(health_multiplier, 1.0)
+		attack_damage = _base_attack_damage_stat * maxf(attack_multiplier, 1.0)
+		defense = _base_defense_stat + maxf(defense_bonus, 0.0)
+		is_melee_only = true
+		is_ranged_only = false
+	else:
+		max_health = _base_max_health_stat
+		attack_damage = _base_attack_damage_stat
+		defense = _base_defense_stat
+		is_melee_only = false
+
+	current_health = minf(max_health, maxf(0.0, max_health * health_ratio))
+
+	if is_inside_tree():
+		_update_weapon_stats()
+		if enabled:
+			_set_active_weapon("sword")
+		else:
+			_apply_role_loadout()
+		_update_role_visual()
 
 func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
 	if upgrade_id in ["crew_attack", "crew_defense"]:
@@ -314,6 +356,8 @@ func _update_team_color() -> void:
 func _physics_process(delta: float) -> void:
 	# 바다에 빠지면 사망 (글로벌 Y < -5)
 	if is_inside_tree() and global_position.y < -5.0:
+		set_meta("last_death_cause", "drowned")
+		set_meta("last_damage_source", "drowned")
 		# 바다에 빠질 때 작은 물보라 이펙트 재생
 		var water_explosion_scene = preload("res://scenes/effects/water_burst.tscn")
 		if water_explosion_scene:
@@ -491,9 +535,12 @@ func find_nearest_enemy() -> Node3D:
 	var all_soldiers = get_soldiers_cached(get_tree())
 	var nearest_on_ship: Node3D = null
 	var nearest_distance_on_ship: float = INF
+	var nearest_ranged_on_ship: Node3D = null
+	var nearest_distance_ranged_on_ship: float = INF
 	
 	var nearest_global: Node3D = null
 	var nearest_distance_global: float = INF
+	var is_player_boarder: bool = team == "player" and is_instance_valid(home_ship) and home_ship != owned_ship
 	
 	var detection_range_sq = detection_range * detection_range
 	
@@ -527,6 +574,9 @@ func find_nearest_enemy() -> Node3D:
 			if dist_sq_xz < nearest_distance_on_ship:
 				nearest_distance_on_ship = dist_sq_xz
 				nearest_on_ship = other
+			if is_player_boarder and bool(other.get("is_ranged_only")) and dist_sq_xz < nearest_distance_ranged_on_ship:
+				nearest_distance_ranged_on_ship = dist_sq_xz
+				nearest_ranged_on_ship = other
 		
 		# 2. 전역 탐지 범위 체크
 		# - 원거리 병사나 사거리 긴 무기는 항시 전역 탐지 허용
@@ -534,7 +584,8 @@ func find_nearest_enemy() -> Node3D:
 		var is_ranged = is_ranged_only or (current_weapon and current_weapon.get("max_range") != null and current_weapon.get("max_range") > 5.0)
 		var can_cross_ship_engage = false
 		if is_instance_valid(owned_ship) and is_instance_valid(other_ship) and owned_ship != other_ship:
-			can_cross_ship_engage = _is_ship_pair_in_melee_range(other_ship) and dist_sq_xz < (CROSS_SHIP_ENGAGE_MAX_DISTANCE * CROSS_SHIP_ENGAGE_MAX_DISTANCE)
+			var engage_distance: float = _get_cross_ship_engage_max_distance(other_ship)
+			can_cross_ship_engage = _is_ship_pair_in_melee_range(other_ship) and dist_sq_xz < (engage_distance * engage_distance)
 		else:
 			can_cross_ship_engage = dist_sq_xz < 16.0 # 같은 배는 기존 근접 우선 기준 유지
 		
@@ -544,6 +595,8 @@ func find_nearest_enemy() -> Node3D:
 				nearest_global = other
 	
 	# [중요] 근접 공격용 타겟 우선순위: 같은 배 우선 -> 아주 가까운 전역 적
+	if is_player_boarder and nearest_ranged_on_ship:
+		return nearest_ranged_on_ship
 	if is_melee_only:
 		return nearest_on_ship if nearest_on_ship else nearest_global
 		
@@ -558,7 +611,34 @@ func _is_ship_pair_in_melee_range(other_ship: Node3D) -> bool:
 	if not is_instance_valid(owned_ship) or not is_instance_valid(other_ship):
 		return false
 	var ship_diff_xz = Vector2(owned_ship.global_position.x - other_ship.global_position.x, owned_ship.global_position.z - other_ship.global_position.z)
-	return ship_diff_xz.length_squared() <= (CROSS_SHIP_ENGAGE_SHIP_DISTANCE * CROSS_SHIP_ENGAGE_SHIP_DISTANCE)
+	var ship_pair_distance: float = _get_cross_ship_engage_ship_distance(other_ship)
+	return ship_diff_xz.length_squared() <= (ship_pair_distance * ship_pair_distance)
+
+
+func _get_cross_ship_engage_ship_distance(other_ship: Node3D) -> float:
+	var base_distance: float = CROSS_SHIP_ENGAGE_SHIP_DISTANCE
+	if not is_instance_valid(owned_ship) or not is_instance_valid(other_ship):
+		return base_distance
+
+	var my_half_ext: Vector2 = _get_ship_deck_half_extents(owned_ship)
+	var other_half_ext: Vector2 = _get_ship_deck_half_extents(other_ship)
+	var combined_length: float = my_half_ext.y + other_half_ext.y
+	var size_bonus: float = maxf(0.0, combined_length - 3.4) * 0.42
+	return base_distance + clampf(size_bonus, 0.0, 7.5)
+
+
+func _get_cross_ship_engage_max_distance(other_ship: Node3D) -> float:
+	var base_distance: float = CROSS_SHIP_ENGAGE_MAX_DISTANCE
+	if not is_instance_valid(owned_ship) or not is_instance_valid(other_ship):
+		return base_distance
+
+	var my_half_ext: Vector2 = _get_ship_deck_half_extents(owned_ship)
+	var other_half_ext: Vector2 = _get_ship_deck_half_extents(other_ship)
+	var combined_width: float = my_half_ext.x + other_half_ext.x
+	var combined_length: float = my_half_ext.y + other_half_ext.y
+	var width_bonus: float = maxf(0.0, combined_width - 2.4) * 0.45
+	var length_bonus: float = maxf(0.0, combined_length - 3.4) * 0.36
+	return base_distance + clampf(width_bonus + length_bonus, 0.0, 7.0)
 
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:

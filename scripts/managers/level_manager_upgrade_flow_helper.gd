@@ -17,7 +17,7 @@ static func show_fleet_upgrade_ui(lm: Node) -> void:
 
 	lm._upgrade_ui_instance = lm.upgrade_ui_scene.instantiate()
 	lm.add_child(lm._upgrade_ui_instance)
-	lm._upgrade_ui_instance.get_node("VBox/TitleLabel").text = "지휘 강화 (병사/함대)"
+	lm._upgrade_ui_instance.get_node("VBox/TitleLabel").text = "지휘 강화 (병사)"
 
 	lm._upgrade_ui_instance.show_upgrades(choices, 0)
 	lm._upgrade_ui_instance.upgrade_chosen.connect(lm._on_fleet_upgrade_chosen)

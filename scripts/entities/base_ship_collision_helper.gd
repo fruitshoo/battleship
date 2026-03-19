@@ -50,8 +50,11 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			other_radius = other.base_collision_radius * other.width_multiplier + (other.base_collision_radius * other.length_multiplier - other.base_collision_radius * other.width_multiplier) * absf(other_fwd.dot(-dir))
 		var coll_dist = my_radius + other_radius
 		var is_engagement_pair = ship._is_engagement_pair(other)
+		var is_player_support_pair = _is_player_support_pair(ship, other)
 		if is_engagement_pair:
 			coll_dist *= 0.90
+		elif is_player_support_pair:
+			coll_dist *= 0.92
 
 		if dist < coll_dist:
 			var compression = coll_dist - dist
@@ -68,22 +71,37 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			var high_speed_head_on = head_on_pair and approach_speed >= ship.min_ramming_speed * 0.85
 			if is_engagement_pair and head_on_pair:
 				repulsion_strength *= 0.18
+			elif is_player_support_pair:
+				repulsion_strength *= 0.42
 			elif high_speed_head_on:
 				repulsion_strength *= 0.12
 			var penetration_ratio = compression / maxf(coll_dist, 0.001)
 			if penetration_ratio > 0.22:
-				if high_speed_head_on:
+				if is_player_support_pair:
+					repulsion_strength = maxf(repulsion_strength, 18.0)
+				elif high_speed_head_on:
 					repulsion_strength = maxf(repulsion_strength, 26.0)
 				else:
 					repulsion_strength = maxf(repulsion_strength, 72.0)
 			var repulsion_force = -dir * (compression * repulsion_strength)
+			if is_player_support_pair:
+				var my_right = my_fwd.cross(Vector3.UP)
+				my_right.y = 0.0
+				if my_right.length_squared() <= 0.0001:
+					my_right = Vector3(dir.z, 0.0, -dir.x)
+				my_right = my_right.normalized()
+				var side_sign = signf(diff.dot(my_right))
+				if absf(side_sign) < 0.5:
+					side_sign = 1.0 if ship.get_instance_id() < other.get_instance_id() else -1.0
+				var lateral_escape = my_right * side_sign * compression * 12.0
+				repulsion_force = (repulsion_force * 0.35) + lateral_escape
 			if (is_engagement_pair and head_on_pair) or high_speed_head_on:
 				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
 				if backward_component < 0.0:
 					repulsion_force -= my_fwd * backward_component
 			force += repulsion_force
 
-			if ship.current_speed > 0.5:
+			if ship.current_speed > 0.5 and not is_player_support_pair:
 				var forward_alignment = absf(my_fwd.dot(dir))
 				if forward_alignment < 0.76 and penetration_ratio > 0.05:
 					var slide_brake := lerpf(0.04, 0.16, clampf((penetration_ratio - 0.05) / 0.25, 0.0, 1.0))
@@ -101,10 +119,22 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 					else:
 						ship.current_speed = lerp(ship.current_speed, 0.0, 0.1)
 
-			if approach_speed >= ship.min_ramming_speed:
+			if approach_speed >= ship.min_ramming_speed and not is_player_support_pair:
 				ship.apply_ramming_damage(other, approach_speed)
 
 	return force
+
+
+static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(other_ship):
+		return false
+	if str(ship.get("team")) != "player" or str(other_ship.get("team")) != "player":
+		return false
+	var ship_is_support: bool = ship.has_meta("support_fleet_ship") and ship.get_meta("support_fleet_ship", false) == true
+	var other_is_support: bool = other_ship.has_meta("support_fleet_ship") and other_ship.get_meta("support_fleet_ship", false) == true
+	var ship_is_player: bool = ship.get("is_player_controlled") == true
+	var other_is_player: bool = other_ship.get("is_player_controlled") == true
+	return (ship_is_support and other_is_player) or (other_is_support and ship_is_player)
 
 
 static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> void:

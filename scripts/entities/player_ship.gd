@@ -51,7 +51,11 @@ var rowing_locked: bool = false
 @export var stamina_drain_rate: float = 10.0 # 노 젓기 시 스태미나 소모 속도 완화
 @export var stamina_recovery_rate: float = 6.5
 
-@export var max_crew_count: int = 4 # 아군 병사 정원
+@export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
+@export_range(0, 1, 1) var captain_count: int = 1
+@export_range(1.0, 3.0, 0.05) var captain_health_multiplier: float = 1.65
+@export_range(1.0, 3.0, 0.05) var captain_attack_multiplier: float = 1.4
+@export_range(0.0, 10.0, 0.5) var captain_defense_bonus: float = 2.0
 @export var support_fleet_limit: int = 1
 @export var support_fleet_respawn_interval: float = 30.0
 var support_fleet_respawn_timer: float = 0.0
@@ -63,7 +67,7 @@ var _cached_wind_manager: Node = null
 
 # 부착된 선원(병사) 정보 (동적)# 길군악(노동요) 재생 상태
 var _gilgunak_playing: bool = false
-var current_crew_count: int = 4
+var current_crew_count: int = 5
 
 var _flap_timer: float = 0.0
 var _wave_timer: float = 2.0
@@ -85,7 +89,19 @@ static func _get_ships_cached(tree: SceneTree) -> Array:
 
 # === 병사 자동 보충 ===
 @export var crew_respawn_interval: float = 12.0 # 보충 주기 (초)
+@export_range(1, 20, 1) var survivor_merit_reward: int = 5
 var crew_respawn_timer: float = 0.0
+
+# === 자동 공세 월선 (보수적 전술 판단) ===
+@export_group("Auto Raid")
+@export var auto_raid_enabled: bool = true
+@export_range(0.1, 2.0, 0.05) var auto_raid_eval_interval: float = 0.35
+@export_range(1, 3, 1) var auto_raid_max_boarders: int = 2
+@export_range(1, 8, 1) var auto_raid_min_defenders: int = 3
+@export_range(8.0, 28.0, 0.5) var auto_raid_threat_range: float = 18.0
+@export_range(0.0, 1.0, 0.01) var auto_raid_min_hull_ratio: float = 0.45
+var auto_raid_eval_timer: float = 0.0
+var auto_raid_target: Node3D = null
 
 # === 방어 무기 (화통) 로직 변수 ===
 var fire_pot_cooldown_timer: float = 0.0
@@ -153,6 +169,7 @@ func _ready() -> void:
 		add_to_group("player")
 	
 	_cache_references()
+	_sync_player_crew_roster()
 	if not has_meta("base_support_fleet_limit"):
 		set_meta("base_support_fleet_limit", support_fleet_limit)
 	if not has_meta("base_support_fleet_respawn_interval"):
@@ -214,6 +231,7 @@ func _physics_process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_support_fleet_respawn(delta)
 	_update_crew_respawn(delta)
+	_update_auto_boarding_raid(delta)
 	_update_fire_pot_logic(delta)
 	
 	if is_boarding:
@@ -277,6 +295,9 @@ func _update_crew_respawn(delta: float) -> void:
 			print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
 	else:
 		crew_respawn_timer = 0.0 # 정원이 차면 타이머 초기화
+
+func _update_auto_boarding_raid(delta: float) -> void:
+	PlayerShipCrewHelper.update_auto_boarding_raid(self, delta)
 
 func _update_support_fleet_respawn(delta: float) -> void:
 	PlayerShipSupportHelper.update_support_fleet_respawn(self, delta)

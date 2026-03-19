@@ -1,6 +1,13 @@
 extends RefCounted
 class_name SoldierLifecycleHelper
 
+const MELEE_DAMAGE_SOURCES := {
+	"sword": true,
+	"spear": true,
+	"trident": true,
+	"harpoon": true,
+}
+
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
 	if soldier.current_state == soldier.State.DEAD:
@@ -17,6 +24,8 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 	var total_reduction: float = clampf(quality_reduction + cover_reduction, 0.0, 0.9)
 	var final_damage: float = maxf(mitigated_damage * (1.0 - total_reduction), 1.0)
 	soldier.current_health -= final_damage
+	soldier.set_meta("last_damage_source", damage_source)
+	soldier.set_meta("last_death_cause", "combat")
 
 	if not damage_source.is_empty() and soldier.team == "enemy":
 		if soldier._cached_level_manager and soldier._cached_level_manager.has_method("add_player_weapon_damage"):
@@ -95,15 +104,7 @@ static func die(soldier) -> void:
 		soldier.home_ship.call_deferred("check_derelict_status")
 
 	if soldier.team == "enemy":
-		if soldier._cached_level_manager and soldier._cached_level_manager.has_method("add_xp"):
-			soldier._cached_level_manager.add_xp(5)
-		if soldier._cached_level_manager and soldier._cached_level_manager.has_method("add_soldier_kill"):
-			soldier._cached_level_manager.add_soldier_kill(1)
-		if soldier._cached_level_manager:
-			if soldier._cached_level_manager.has_method("add_command_xp_from_soldier_kill"):
-				soldier._cached_level_manager.add_command_xp_from_soldier_kill(1)
-			elif soldier._cached_level_manager.has_method("add_merit"):
-				soldier._cached_level_manager.add_merit(1)
+		_apply_enemy_kill_rewards(soldier)
 
 	var death_position: Vector3 = soldier.global_position
 	var tree: SceneTree = soldier.get_tree()
@@ -130,3 +131,49 @@ static func die(soldier) -> void:
 		soldier.get_node("CollisionShape3D").set_deferred("disabled", true)
 
 	soldier.visible = false
+
+
+static func _apply_melee_kill_bonus(soldier) -> void:
+	var last_damage_source: String = String(soldier.get_meta("last_damage_source", ""))
+	if not MELEE_DAMAGE_SOURCES.has(last_damage_source):
+		return
+
+	var lm = soldier._cached_level_manager
+	if not is_instance_valid(lm):
+		return
+
+	var xp_bonus: int = max(0, int(lm.get("melee_kill_xp_bonus")))
+	var merit_bonus: int = max(0, int(lm.get("melee_kill_merit_bonus")))
+	if xp_bonus > 0 and lm.has_method("add_xp"):
+		lm.add_xp(xp_bonus)
+	if merit_bonus > 0 and lm.has_method("add_merit"):
+		lm.add_merit(merit_bonus)
+
+
+static func _apply_enemy_kill_rewards(soldier) -> void:
+	var lm = soldier._cached_level_manager
+	if not is_instance_valid(lm):
+		return
+
+	var death_cause: String = String(soldier.get_meta("last_death_cause", "combat"))
+	if death_cause == "drowned":
+		var drown_xp: int = max(0, int(lm.get("drowned_soldier_kill_xp_reward")))
+		var drown_merit: int = max(0, int(lm.get("drowned_soldier_kill_merit_reward")))
+		if drown_xp > 0 and lm.has_method("add_xp"):
+			lm.add_xp(drown_xp)
+		if drown_merit > 0 and lm.has_method("add_merit"):
+			lm.add_merit(drown_merit)
+		if lm.has_method("add_soldier_kill"):
+			lm.add_soldier_kill(1, "drowned")
+		return
+
+	var combat_xp: int = max(0, int(lm.get("soldier_kill_xp_reward")))
+	if combat_xp > 0 and lm.has_method("add_xp"):
+		lm.add_xp(combat_xp)
+	if lm.has_method("add_soldier_kill"):
+		lm.add_soldier_kill(1, "combat")
+	if lm.has_method("add_command_xp_from_soldier_kill"):
+		lm.add_command_xp_from_soldier_kill(1)
+	elif lm.has_method("add_merit"):
+		lm.add_merit(max(0, int(lm.get("merit_per_soldier_kill"))))
+	_apply_melee_kill_bonus(soldier)

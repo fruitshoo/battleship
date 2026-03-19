@@ -26,15 +26,15 @@ static func is_ship_upgrade(hud, upgrade_id: String) -> bool:
 static func is_crew_upgrade(hud, upgrade_id: String) -> bool:
 	return upgrade_id in hud.CREW_UPGRADE_IDS
 
-static func is_support_upgrade(upgrade_id: String) -> bool:
-	return upgrade_id in ["fleet_signal", "fleet_cannon", "fleet_hull", "fleet_crew"]
+static func get_upgrade_track_name(hud, upgrade_id: String) -> String:
+	if is_crew_upgrade(hud, upgrade_id):
+		return "병사"
+	if is_ship_upgrade(hud, upgrade_id):
+		return "함선"
+	return "강화"
 
 static func build_upgrade_tooltip_text(hud, upgrade_id: String, level: int) -> String:
-	var track_name = "함선"
-	if is_support_upgrade(upgrade_id):
-		track_name = "지원함"
-	elif is_crew_upgrade(hud, upgrade_id):
-		track_name = "병사"
+	var track_name = get_upgrade_track_name(hud, upgrade_id)
 	var name = upgrade_id
 	var desc = ""
 	var stats: Dictionary = {}

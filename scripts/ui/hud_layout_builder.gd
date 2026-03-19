@@ -20,13 +20,13 @@ static func setup_new_layout(hud) -> void:
 	setup_boarding_ui(hud)
 
 # Shared helpers
-static func move_label_to_container(label: Label, container: Control) -> void:
-	if not is_instance_valid(label) or not is_instance_valid(container):
+static func move_label_to_container(node: Control, container: Control) -> void:
+	if not is_instance_valid(node) or not is_instance_valid(container):
 		return
-	var current_parent = label.get_parent()
+	var current_parent = node.get_parent()
 	if current_parent:
-		current_parent.remove_child(label)
-	container.add_child(label)
+		current_parent.remove_child(node)
+	container.add_child(node)
 
 # Top row
 static func setup_top_left_layout(hud) -> void:
@@ -73,7 +73,7 @@ static func setup_top_left_layout(hud) -> void:
 	hud.combat_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hud.combat_stats_label.add_theme_font_size_override("font_size", 12)
 	hud.combat_stats_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
-	hud.combat_stats_label.text = "[전과] 격침 0 | 병사 0"
+	hud.combat_stats_label.text = "[전과] 격침 0 | 나포 0 | 병사 0"
 	hud.top_left_container.add_child(hud.combat_stats_label)
 
 	if hud.difficulty_label:
@@ -259,19 +259,86 @@ static func setup_bottom_left_layout(hud) -> void:
 	hud.bottom_left_container.offset_bottom = -24
 	hud.bottom_left_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	hud.crew_label = hud._ensure_hud_label(hud.crew_label, "CrewLabel", "")
+	var force_box: VBoxContainer = null
+	var crew_row: VBoxContainer = null
+	var support_row: HBoxContainer = null
+	if hud.force_panel == null:
+		hud.force_panel = PanelContainer.new()
+		hud.force_panel.name = "ForcePanel"
+		var force_style = StyleBoxFlat.new()
+		force_style.bg_color = Color(0.02, 0.03, 0.06, 0.72)
+		force_style.border_color = Color(0.72, 0.82, 0.92, 0.22)
+		force_style.set_border_width_all(1)
+		force_style.set_corner_radius_all(8)
+		force_style.content_margin_left = 10
+		force_style.content_margin_right = 10
+		force_style.content_margin_top = 8
+		force_style.content_margin_bottom = 8
+		hud.force_panel.add_theme_stylebox_override("panel", force_style)
+		hud.bottom_left_container.add_child(hud.force_panel)
 
-	if hud.crew_label:
-		move_label_to_container(hud.crew_label, hud.bottom_left_container)
-		hud.crew_label.add_theme_font_size_override("font_size", 18)
-		if MATERIAL_SYMBOLS_FONT:
-			hud.crew_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
+		force_box = VBoxContainer.new()
+		force_box.name = "ForceBox"
+		force_box.add_theme_constant_override("separation", 6)
+		hud.force_panel.add_child(force_box)
+
+		crew_row = VBoxContainer.new()
+		crew_row.name = "CrewRow"
+		crew_row.add_theme_constant_override("separation", 4)
+		force_box.add_child(crew_row)
+
+		support_row = HBoxContainer.new()
+		support_row.name = "SupportRow"
+		support_row.add_theme_constant_override("separation", 8)
+		force_box.add_child(support_row)
+	else:
+		force_box = hud.force_panel.get_node_or_null("ForceBox") as VBoxContainer
+		crew_row = hud.force_panel.get_node_or_null("ForceBox/CrewRow") as VBoxContainer
+		support_row = hud.force_panel.get_node_or_null("ForceBox/SupportRow") as HBoxContainer
+
+	if hud.crew_label and crew_row:
+		move_label_to_container(hud.crew_label, crew_row)
+		hud.crew_label.add_theme_font_size_override("font_size", 16)
+		hud.crew_label.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
 	if hud.crew_composition_label == null:
 		hud.crew_composition_label = Label.new()
 		hud.crew_composition_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		hud.crew_composition_label.add_theme_font_size_override("font_size", 11)
 		hud.crew_composition_label.add_theme_color_override("font_color", Color(0.82, 0.85, 0.9))
 		hud.crew_composition_label.text = "[편성] 일반 4 | 창병 0 | 화통 0 | 연노 0 | 신기전 0"
-		hud.bottom_left_container.add_child(hud.crew_composition_label)
+	if crew_row and hud.crew_composition_label.get_parent() != crew_row:
+		move_label_to_container(hud.crew_composition_label, crew_row)
+
+	if hud.crew_status_bar == null:
+		hud.crew_status_bar = ProgressBar.new()
+		hud.crew_status_bar.custom_minimum_size = Vector2(220, 8)
+		hud.crew_status_bar.max_value = 1.0
+		hud.crew_status_bar.show_percentage = false
+		var crew_bg = StyleBoxFlat.new()
+		crew_bg.bg_color = Color(0.08, 0.08, 0.1, 0.82)
+		crew_bg.set_corner_radius_all(3)
+		var crew_fg = StyleBoxFlat.new()
+		crew_fg.bg_color = Color(0.92, 0.28, 0.28, 0.88)
+		crew_fg.set_corner_radius_all(3)
+		hud.crew_status_bar.add_theme_stylebox_override("background", crew_bg)
+		hud.crew_status_bar.add_theme_stylebox_override("fill", crew_fg)
+	if crew_row and hud.crew_status_bar.get_parent() != crew_row:
+		move_label_to_container(hud.crew_status_bar, crew_row)
+
+	if hud.support_status_label == null:
+		hud.support_status_label = Label.new()
+		hud.support_status_label.text = "지원함 0/0"
+		hud.support_status_label.add_theme_font_size_override("font_size", 13)
+		hud.support_status_label.add_theme_color_override("font_color", Color(0.9, 0.93, 0.98))
+	if support_row and hud.support_status_label.get_parent() != support_row:
+		move_label_to_container(hud.support_status_label, support_row)
+
+	if hud.support_slot_container == null:
+		hud.support_slot_container = HBoxContainer.new()
+		hud.support_slot_container.name = "SupportSlots"
+		hud.support_slot_container.add_theme_constant_override("separation", 6)
+	if support_row and hud.support_slot_container.get_parent() != support_row:
+		move_label_to_container(hud.support_slot_container, support_row)
 
 	hud.hp_bar = ProgressBar.new()
 	hud.hp_bar.custom_minimum_size = Vector2(240, 24)

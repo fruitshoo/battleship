@@ -108,7 +108,6 @@ func _process(_delta: float) -> void:
 	
 	var new_x = round(target_pos.x / grid_size) * grid_size
 	var new_z = round(target_pos.z / grid_size) * grid_size
-	
 	if abs(global_position.x - new_x) > 0.1 or abs(global_position.z - new_z) > 0.1:
 		global_position.x = new_x
 		global_position.z = new_z

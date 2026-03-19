@@ -59,6 +59,19 @@ static func update_rowing_audio(ship, delta: float) -> void:
 
 static func capture_derelict_ship(ship) -> void:
 	print("[Capture] 폐선 나포 성공! 보상을 획득합니다.")
+	if is_instance_valid(ship._cached_level_manager):
+		var score_reward: int = max(0, int(ship._cached_level_manager.get("boarding_capture_score_reward")))
+		var xp_reward: int = max(0, int(ship._cached_level_manager.get("boarding_capture_xp_reward")))
+		var merit_reward: int = max(0, int(ship._cached_level_manager.get("boarding_capture_merit_reward")))
+		if score_reward > 0 and ship._cached_level_manager.has_method("add_score"):
+			ship._cached_level_manager.add_score(score_reward)
+		if xp_reward > 0 and ship._cached_level_manager.has_method("add_xp"):
+			ship._cached_level_manager.add_xp(xp_reward)
+		if merit_reward > 0 and ship._cached_level_manager.has_method("add_merit"):
+			ship._cached_level_manager.add_merit(merit_reward)
+		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
+			ship._cached_hud.show_message("나포 성공! XP +%d / 지휘 +%d" % [xp_reward, merit_reward], 2.4)
+
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if soldiers_node:
 		for child in soldiers_node.get_children():

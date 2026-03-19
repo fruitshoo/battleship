@@ -7,6 +7,7 @@ const HudLayoutBuilder = preload("res://scripts/ui/hud_layout_builder.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud_update_helper.gd")
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.gd")
 const HudStatPanelHelper = preload("res://scripts/ui/hud_stat_panel_helper.gd")
+const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 
 ## 게임 HUD
@@ -29,6 +30,7 @@ var _gust_warning_timer: float = 0.0
 var player_ship: Node3D = null
 var _player_lookup_cooldown: float = 0.0
 var _cached_level_manager: Node = null
+var _cached_environment_preset_manager: Node = null
 
 # Layout references
 var hp_bar: ProgressBar = null
@@ -46,6 +48,22 @@ var speed_bar: ProgressBar = null
 var speed_bar_label: Label = null
 var weapon_track = null
 var support_track = null
+var force_panel: PanelContainer = null
+var crew_status_bar: ProgressBar = null
+var support_status_label: Label = null
+var support_slot_container: HBoxContainer = null
+var support_fleet_hud_slots: Array[PanelContainer] = []
+var sail_debug_panel: PanelContainer = null
+var sail_debug_toggle_button: Button = null
+var sail_debug_damage_slider: HSlider = null
+var sail_debug_burn_slider: HSlider = null
+var sail_debug_hole_slider: HSlider = null
+var sail_debug_damage_value: Label = null
+var sail_debug_burn_value: Label = null
+var sail_debug_hole_value: Label = null
+var debug_environment_value: Label = null
+var debug_collision_value: Label = null
+var _sail_debug_ui_syncing: bool = false
 
 # Boarding UI
 var boarding_ui: VBoxContainer = null
@@ -65,6 +83,7 @@ var _speed_visual_value: float = 0.0
 var _last_difficulty_text: String = ""
 var _last_combat_stats_text: String = ""
 var _relic_refresh_retry_left: float = 0.0
+var _sail_debug_sync_left: float = 0.0
 
 # Relic and stat UI
 var relic_bar = null
@@ -124,6 +143,7 @@ func _ready() -> void:
 	update_level(1)
 	update_score(0)
 	update_crew_status(4)
+	_setup_sail_debug_panel()
 	if gust_warning:
 		gust_warning.visible = false
 	call_deferred("_refresh_owned_relic_icons")
@@ -190,8 +210,333 @@ func _setup_top_xp_bar() -> void:
 func _setup_new_layout() -> void:
 	HudLayoutBuilder.setup_new_layout(self)
 
+func _setup_sail_debug_panel() -> void:
+	if not OS.is_debug_build():
+		return
+	if is_instance_valid(sail_debug_panel):
+		return
+	sail_debug_toggle_button = Button.new()
+	sail_debug_toggle_button.name = "DebugToolsToggle"
+	sail_debug_toggle_button.text = "Debug"
+	sail_debug_toggle_button.custom_minimum_size = Vector2(72, 30)
+	sail_debug_toggle_button.pressed.connect(func() -> void:
+		if not is_instance_valid(sail_debug_panel):
+			return
+		sail_debug_panel.visible = not sail_debug_panel.visible
+		_update_sail_debug_toggle_button_text()
+		if sail_debug_panel.visible:
+			_sync_sail_debug_panel_from_player()
+			_sync_debug_tools_panel_state()
+	)
+	if is_instance_valid(bottom_right_container):
+		bottom_right_container.add_child(sail_debug_toggle_button)
+	else:
+		add_child(sail_debug_toggle_button)
+		sail_debug_toggle_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		sail_debug_toggle_button.offset_right = -24
+		sail_debug_toggle_button.offset_bottom = -24
+
+	sail_debug_panel = PanelContainer.new()
+	sail_debug_panel.name = "SailDebugPanel"
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.03, 0.05, 0.09, 0.88)
+	panel_style.border_color = Color(0.86, 0.90, 0.96, 0.26)
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(10)
+	panel_style.content_margin_left = 10
+	panel_style.content_margin_right = 10
+	panel_style.content_margin_top = 8
+	panel_style.content_margin_bottom = 8
+	sail_debug_panel.add_theme_stylebox_override("panel", panel_style)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(232, 280)
+	scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	sail_debug_panel.add_child(scroll)
+
+	var panel_box := VBoxContainer.new()
+	panel_box.custom_minimum_size = Vector2(212, 0)
+	panel_box.add_theme_constant_override("separation", 6)
+	scroll.add_child(panel_box)
+
+	var title := Label.new()
+	title.text = "Debug Tools"
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", Color(1.0, 0.95, 0.82))
+	panel_box.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "기존 F키 기능을 버튼으로 모아둔 패널"
+	hint.add_theme_font_size_override("font_size", 10)
+	hint.add_theme_color_override("font_color", Color(0.82, 0.86, 0.92))
+	panel_box.add_child(hint)
+
+	var environment_section := _create_debug_section("환경", false)
+	panel_box.add_child(environment_section["root"])
+	var environment_status := Label.new()
+	environment_status.text = "프리셋: -"
+	environment_status.add_theme_font_size_override("font_size", 11)
+	environment_status.add_theme_color_override("font_color", Color(0.90, 0.94, 1.0))
+	environment_section["body"].add_child(environment_status)
+	debug_environment_value = environment_status
+
+	var environment_row := HBoxContainer.new()
+	environment_row.add_theme_constant_override("separation", 6)
+	environment_section["body"].add_child(environment_row)
+	environment_row.add_child(_create_debug_action_button("낮", func() -> void:
+		_apply_environment_preset(0)
+	))
+	environment_row.add_child(_create_debug_action_button("밤", func() -> void:
+		_apply_environment_preset(1)
+	))
+
+	var collision_section := _create_debug_section("충돌", false)
+	panel_box.add_child(collision_section["root"])
+	var collision_status := Label.new()
+	collision_status.text = "충돌 시각화: OFF"
+	collision_status.add_theme_font_size_override("font_size", 11)
+	collision_status.add_theme_color_override("font_color", Color(0.90, 0.94, 1.0))
+	collision_section["body"].add_child(collision_status)
+	debug_collision_value = collision_status
+
+	var collision_row := HBoxContainer.new()
+	collision_row.add_theme_constant_override("separation", 6)
+	collision_section["body"].add_child(collision_row)
+	collision_row.add_child(_create_debug_action_button("표시 토글", func() -> void:
+		_invoke_level_debug_method("_toggle_collision_visualizers")
+		_sync_debug_tools_panel_state()
+	))
+	collision_row.add_child(_create_debug_action_button("모드 순환", func() -> void:
+		_invoke_level_debug_method("_cycle_collision_visualizer_mode")
+		_sync_debug_tools_panel_state()
+	))
+
+	var spawn_section := _create_debug_section("스폰", false)
+	panel_box.add_child(spawn_section["root"])
+	var spawn_row_a := HBoxContainer.new()
+	spawn_row_a.add_theme_constant_override("separation", 4)
+	spawn_section["body"].add_child(spawn_row_a)
+	spawn_row_a.add_child(_create_debug_action_button("세키 근접", func() -> void:
+		_invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_melee", 40.0, -12.0])
+	))
+	spawn_row_a.add_child(_create_debug_action_button("세키 포격", func() -> void:
+		_invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_cannon", 40.0, 12.0])
+	))
+
+	var spawn_row_b := HBoxContainer.new()
+	spawn_row_b.add_theme_constant_override("separation", 4)
+	spawn_section["body"].add_child(spawn_row_b)
+	spawn_row_b.add_child(_create_debug_action_button("중간보스", func() -> void:
+		_invoke_level_debug_method("_debug_spawn_mid_boss")
+	))
+	spawn_row_b.add_child(_create_debug_action_button("최종보스", func() -> void:
+		_invoke_level_debug_method("_debug_spawn_final_boss")
+	))
+
+	var spawn_row_c := HBoxContainer.new()
+	spawn_row_c.add_theme_constant_override("separation", 4)
+	spawn_section["body"].add_child(spawn_row_c)
+	spawn_row_c.add_child(_create_debug_action_button("지원함 추가", func() -> void:
+		_invoke_level_debug_method("_debug_spawn_support_ship")
+	))
+	spawn_row_c.add_child(_create_debug_action_button("지원함 덤프", func() -> void:
+		_invoke_level_debug_method("_debug_dump_support_fleet_state")
+	))
+
+	var misc_section := _create_debug_section("게임", false)
+	panel_box.add_child(misc_section["root"])
+	var misc_row := HBoxContainer.new()
+	misc_row.add_theme_constant_override("separation", 4)
+	misc_section["body"].add_child(misc_row)
+	misc_row.add_child(_create_debug_action_button("강제 레벨업", func() -> void:
+		_invoke_level_debug_method("add_xp", [9999])
+	))
+	misc_row.add_child(_create_debug_action_button("메타샵", func() -> void:
+		_invoke_level_debug_method("show_meta_shop")
+	))
+
+	var misc_row_b := HBoxContainer.new()
+	misc_row_b.add_theme_constant_override("separation", 4)
+	misc_section["body"].add_child(misc_row_b)
+	misc_row_b.add_child(_create_debug_action_button("대포 디버그", func() -> void:
+		_invoke_level_debug_method("_debug_cannons")
+	))
+	misc_row_b.add_child(_create_debug_action_button("체력바 토글", func() -> void:
+		toggle_ship_health_bars()
+	))
+
+	var misc_row_c := HBoxContainer.new()
+	misc_row_c.add_theme_constant_override("separation", 4)
+	misc_section["body"].add_child(misc_row_c)
+	misc_row_c.add_child(_create_debug_action_button("통계 패널", func() -> void:
+		toggle_stat_panel()
+	))
+
+	var sail_section := _create_debug_section("돛", true)
+	panel_box.add_child(sail_section["root"])
+
+	var damage_row := _create_sail_debug_slider_row("Damage")
+	sail_section["body"].add_child(damage_row["root"])
+	sail_debug_damage_slider = damage_row["slider"]
+	sail_debug_damage_value = damage_row["value"]
+	sail_debug_damage_slider.value_changed.connect(_on_sail_debug_damage_changed)
+
+	var burn_row := _create_sail_debug_slider_row("Burn")
+	sail_section["body"].add_child(burn_row["root"])
+	sail_debug_burn_slider = burn_row["slider"]
+	sail_debug_burn_value = burn_row["value"]
+	sail_debug_burn_slider.value_changed.connect(_on_sail_debug_burn_changed)
+
+	var hole_row := _create_sail_debug_slider_row("Hole")
+	sail_section["body"].add_child(hole_row["root"])
+	sail_debug_hole_slider = hole_row["slider"]
+	sail_debug_hole_value = hole_row["value"]
+	sail_debug_hole_slider.max_value = 2.0
+	sail_debug_hole_slider.step = 0.01
+	sail_debug_hole_slider.value = 1.0
+	sail_debug_hole_slider.value_changed.connect(_on_sail_debug_hole_changed)
+
+	var preset_row := HBoxContainer.new()
+	preset_row.add_theme_constant_override("separation", 4)
+	sail_section["body"].add_child(preset_row)
+	for preset in [
+		{"label": "Clean", "damage": 0.0, "burn": 0.0},
+		{"label": "Scorch", "damage": 0.22, "burn": 0.18, "hole": 0.5},
+		{"label": "Fray", "damage": 0.55, "burn": 0.32, "hole": 1.0},
+		{"label": "Burn", "damage": 0.88, "burn": 0.70, "hole": 1.4},
+	]:
+		var preset_button := Button.new()
+		preset_button.text = str(preset["label"])
+		preset_button.custom_minimum_size = Vector2(0, 26)
+		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preset_button.pressed.connect(func() -> void:
+			_apply_sail_debug_values(float(preset["damage"]), float(preset["burn"]), float(preset.get("hole", 1.0)))
+		)
+		preset_row.add_child(preset_button)
+
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 6)
+	sail_section["body"].add_child(action_row)
+
+	var sync_button := Button.new()
+	sync_button.text = "Sync"
+	sync_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sync_button.pressed.connect(_sync_sail_debug_panel_from_player)
+	action_row.add_child(sync_button)
+
+	var reset_button := Button.new()
+	reset_button.text = "Reset"
+	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset_button.pressed.connect(func() -> void:
+		_apply_sail_debug_values(0.0, 0.0, 1.0)
+	)
+	action_row.add_child(reset_button)
+
+	if is_instance_valid(bottom_right_container):
+		bottom_right_container.add_child(sail_debug_panel)
+	else:
+		add_child(sail_debug_panel)
+		sail_debug_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		sail_debug_panel.offset_right = -24
+		sail_debug_panel.offset_bottom = -120
+	sail_debug_panel.visible = false
+	_sync_sail_debug_panel_from_player()
+	_sync_debug_tools_panel_state()
+	_update_sail_debug_toggle_button_text()
+
+
+func _create_debug_section(title_text: String, expanded: bool) -> Dictionary:
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 4)
+
+	var toggle := Button.new()
+	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	toggle.flat = true
+	toggle.text = ""
+	toggle.add_theme_font_size_override("font_size", 11)
+	toggle.add_theme_color_override("font_color", Color(1.0, 0.84, 0.54))
+	root.add_child(toggle)
+
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 6)
+	body.visible = expanded
+	root.add_child(body)
+
+	toggle.pressed.connect(func() -> void:
+		body.visible = not body.visible
+		_update_debug_section_button_text(toggle, title_text, body.visible)
+	)
+	_update_debug_section_button_text(toggle, title_text, expanded)
+
+	return {
+		"root": root,
+		"toggle": toggle,
+		"body": body,
+	}
+
+
+func _update_debug_section_button_text(button: Button, title_text: String, expanded: bool) -> void:
+	button.text = "%s %s" % ["▾" if expanded else "▸", title_text]
+
+
+func _create_debug_action_button(button_text: String, callback: Callable) -> Button:
+	var button := Button.new()
+	button.text = button_text
+	button.custom_minimum_size = Vector2(0, 28)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(callback)
+	return button
+
+
+func _update_sail_debug_toggle_button_text() -> void:
+	if not is_instance_valid(sail_debug_toggle_button):
+		return
+	sail_debug_toggle_button.text = "Debug 닫기" if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible else "Debug 열기"
+
+func _create_sail_debug_slider_row(title_text: String) -> Dictionary:
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 2)
+
+	var header := HBoxContainer.new()
+	var title := Label.new()
+	title.text = title_text
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 11)
+	title.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+	header.add_child(title)
+
+	var value := Label.new()
+	value.text = "0.00"
+	value.custom_minimum_size.x = 38
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value.add_theme_font_size_override("font_size", 11)
+	value.add_theme_color_override("font_color", Color(1.0, 0.88, 0.58))
+	header.add_child(value)
+	root.add_child(header)
+
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.01
+	slider.value = 0.0
+	root.add_child(slider)
+
+	return {
+		"root": root,
+		"slider": slider,
+		"value": value,
+	}
+
 func _process(delta: float) -> void:
 	_sync_game_time(delta)
+	if _gust_warning_timer > 0.0:
+		_gust_warning_timer = maxf(0.0, _gust_warning_timer - delta)
+		if gust_warning:
+			gust_warning.visible = true
+	elif gust_warning and gust_warning.visible:
+		gust_warning.visible = false
 	_player_lookup_cooldown = maxf(0.0, _player_lookup_cooldown - delta)
 	if not is_instance_valid(player_ship):
 		_try_resolve_player_ship()
@@ -203,6 +548,12 @@ func _process(delta: float) -> void:
 		if owned_relics is Array and relic_bar.current_relic_count < owned_relics.size():
 			_relic_refresh_retry_left = 0.5
 			_refresh_owned_relic_icons()
+	if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible:
+		_sail_debug_sync_left = maxf(0.0, _sail_debug_sync_left - delta)
+		if _sail_debug_sync_left <= 0.0:
+			_sail_debug_sync_left = 0.2
+			_sync_sail_debug_panel_from_player()
+			_sync_debug_tools_panel_state()
 	if show_ship_health_bars:
 		_update_ship_health_bars(true)
 	_hud_refresh_left -= delta
@@ -210,7 +561,7 @@ func _process(delta: float) -> void:
 		_hud_refresh_left = hud_refresh_interval
 		_update_timer()
 		_update_speed_display()
-		_update_crew_count()
+		_update_force_panel()
 		_update_hull_display()
 		_update_stamina_display()
 		_update_boarding_display()
@@ -260,14 +611,72 @@ func _try_resolve_player_ship() -> void:
 		player_ship = players[0]
 
 
+func _get_level_manager_for_debug() -> Node:
+	if not is_instance_valid(_cached_level_manager):
+		_cached_level_manager = SceneGroupCache.get_first(get_tree(), "level_manager")
+	return _cached_level_manager
+
+
+func _get_environment_preset_manager_for_debug() -> Node:
+	if is_instance_valid(_cached_environment_preset_manager):
+		return _cached_environment_preset_manager
+	_cached_environment_preset_manager = get_tree().root.find_child("EnvironmentPresetManager", true, false)
+	return _cached_environment_preset_manager
+
+
+func _invoke_level_debug_method(method_name: String, args: Array = []) -> void:
+	var level_manager := _get_level_manager_for_debug()
+	if not is_instance_valid(level_manager):
+		show_gust_warning_message("LevelManager 없음", 0.8)
+		return
+	if not level_manager.has_method(method_name):
+		show_gust_warning_message("디버그 메서드 없음: %s" % method_name, 0.8)
+		return
+	level_manager.callv(method_name, args)
+
+
+func _apply_environment_preset(preset_index: int) -> void:
+	var preset_manager := _get_environment_preset_manager_for_debug()
+	if not is_instance_valid(preset_manager) or not preset_manager.has_method("apply_preset"):
+		show_gust_warning_message("환경 프리셋 매니저 없음", 0.8)
+		return
+	preset_manager.call("apply_preset", preset_index)
+	_sync_debug_tools_panel_state()
+
+
+func _sync_debug_tools_panel_state() -> void:
+	if not is_instance_valid(sail_debug_panel):
+		return
+	if is_instance_valid(debug_environment_value):
+		var preset_manager := _get_environment_preset_manager_for_debug()
+		var environment_text := "-"
+		if is_instance_valid(preset_manager):
+			var preset_index := int(preset_manager.get("current_preset"))
+			environment_text = "낮" if preset_index == 0 else "밤"
+		debug_environment_value.text = "프리셋: %s" % environment_text
+	if is_instance_valid(debug_collision_value):
+		var collision_text := "OFF"
+		if CollisionVisualizer.runtime_enabled:
+			var mode_name := "ALL"
+			match CollisionVisualizer.runtime_mode:
+				CollisionVisualizer.MODE_BASE:
+					mode_name = "BASE"
+				CollisionVisualizer.MODE_SEPARATION:
+					mode_name = "SEPARATION"
+				CollisionVisualizer.MODE_GUARD:
+					mode_name = "GUARD"
+			collision_text = "ON (%s)" % mode_name
+		debug_collision_value.text = "충돌 시각화: %s" % collision_text
+
+
 func update_level(val: int) -> void:
 	HudUpdateHelper.update_level(self, val)
 
 func update_score(val: int) -> void:
 	HudUpdateHelper.update_score(self, val)
 
-func update_combat_stats(ship_sunk: int, soldiers_killed: int) -> void:
-	HudUpdateHelper.update_combat_stats(self, ship_sunk, soldiers_killed)
+func update_combat_stats(ship_sunk: int, ships_derelicted: int, soldiers_killed: int, soldiers_slain: int, soldiers_drowned: int) -> void:
+	HudUpdateHelper.update_combat_stats(self, ship_sunk, ships_derelicted, soldiers_killed, soldiers_slain, soldiers_drowned)
 
 func update_difficulty_ui(val: int) -> void:
 	HudUpdateHelper.update_difficulty_ui(self, val)
@@ -283,6 +692,9 @@ func _update_speed_display() -> void:
 
 func _update_crew_count() -> void:
 	HudUpdateHelper.update_crew_count(self)
+
+func _update_force_panel() -> void:
+	HudUpdateHelper.update_force_panel(self)
 
 func update_hull_hp(current: float, maximum: float) -> void:
 	if hp_bar:
@@ -590,6 +1002,109 @@ func show_game_over() -> void:
 
 func update_boss_hp(current: float, maximum: float) -> void:
 	HudUpdateHelper.update_boss_hp(self, current, maximum)
+
+
+func show_gust_warning_message(message: String, duration: float = 0.35) -> void:
+	if not gust_warning:
+		return
+	gust_warning.text = message
+	gust_warning.visible = true
+	_gust_warning_timer = maxf(_gust_warning_timer, duration)
+
+
+func _get_player_masts_for_debug() -> Array[Node]:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		return []
+	var mast_nodes: Array[Node] = []
+	var raw_masts = player_ship.get("masts")
+	if raw_masts is Array:
+		for mast in raw_masts:
+			if is_instance_valid(mast):
+				mast_nodes.append(mast)
+	return mast_nodes
+
+
+func _apply_sail_debug_values(damage: float, burn: float, hole_strength: float = 1.0) -> void:
+	var masts := _get_player_masts_for_debug()
+	if masts.is_empty():
+		show_gust_warning_message("돛 디버그 대상 없음", 0.9)
+		return
+	if is_instance_valid(player_ship):
+		player_ship.set_meta("debug_sail_burn_override_active", true)
+		player_ship.set_meta("debug_sail_burn_override_value", burn)
+	var target_damage := clampf(damage, 0.0, 1.0)
+	var target_burn := clampf(burn, 0.0, 1.0)
+	var target_hole := clampf(hole_strength, 0.0, 2.0)
+	for mast in masts:
+		mast.set("sail_damage", target_damage)
+		if mast.has_method("set_burn_amount"):
+			mast.set_burn_amount(target_burn)
+		else:
+			mast.set("burn_amount", target_burn)
+		if mast.has_method("set_hole_alpha_strength"):
+			mast.set_hole_alpha_strength(target_hole)
+		else:
+			mast.set("hole_alpha_strength", target_hole)
+	_sync_sail_debug_panel_from_player()
+	show_gust_warning_message("돛 손상 %.2f | burn %.2f | hole %.2f" % [target_damage, target_burn, target_hole], 0.7)
+
+
+func _sync_sail_debug_panel_from_player() -> void:
+	if not is_instance_valid(sail_debug_panel):
+		return
+	var masts := _get_player_masts_for_debug()
+	if masts.is_empty():
+		return
+	var first_mast := masts[0]
+	var current_damage: float = 0.0
+	var current_burn: float = 0.0
+	var current_hole: float = 1.0
+	if first_mast.has_method("get_sail_damage"):
+		current_damage = float(first_mast.get_sail_damage())
+	if first_mast.has_method("get_burn_amount"):
+		current_burn = float(first_mast.get_burn_amount())
+	if first_mast.has_method("get_hole_alpha_strength"):
+		current_hole = float(first_mast.get_hole_alpha_strength())
+	_sail_debug_ui_syncing = true
+	if is_instance_valid(sail_debug_damage_slider):
+		sail_debug_damage_slider.value = current_damage
+	if is_instance_valid(sail_debug_burn_slider):
+		sail_debug_burn_slider.value = current_burn
+	if is_instance_valid(sail_debug_hole_slider):
+		sail_debug_hole_slider.value = current_hole
+	if is_instance_valid(sail_debug_damage_value):
+		sail_debug_damage_value.text = "%.2f" % current_damage
+	if is_instance_valid(sail_debug_burn_value):
+		sail_debug_burn_value.text = "%.2f" % current_burn
+	if is_instance_valid(sail_debug_hole_value):
+		sail_debug_hole_value.text = "%.2f" % current_hole
+	_sail_debug_ui_syncing = false
+
+
+func _on_sail_debug_damage_changed(value: float) -> void:
+	if _sail_debug_ui_syncing:
+		return
+	var burn_value: float = sail_debug_burn_slider.value if is_instance_valid(sail_debug_burn_slider) else 0.0
+	var hole_value: float = sail_debug_hole_slider.value if is_instance_valid(sail_debug_hole_slider) else 1.0
+	_apply_sail_debug_values(value, burn_value, hole_value)
+
+
+func _on_sail_debug_burn_changed(value: float) -> void:
+	if _sail_debug_ui_syncing:
+		return
+	var damage_value: float = sail_debug_damage_slider.value if is_instance_valid(sail_debug_damage_slider) else 0.0
+	var hole_value: float = sail_debug_hole_slider.value if is_instance_valid(sail_debug_hole_slider) else 1.0
+	_apply_sail_debug_values(damage_value, value, hole_value)
+
+
+func _on_sail_debug_hole_changed(value: float) -> void:
+	if _sail_debug_ui_syncing:
+		return
+	var damage_value: float = sail_debug_damage_slider.value if is_instance_valid(sail_debug_damage_slider) else 0.0
+	var burn_value: float = sail_debug_burn_slider.value if is_instance_valid(sail_debug_burn_slider) else 0.0
+	_apply_sail_debug_values(damage_value, burn_value, value)
 
 
 func show_victory() -> void:

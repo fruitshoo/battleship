@@ -107,6 +107,7 @@ var _hull_half_extents: Vector2 = Vector2(1.5, 4.0) # X:반폭, Y:반길이
 @export var water_splash_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 @export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
+@export_range(0.0, 1.0, 0.01) var floating_loot_drop_chance: float = 0.65
 @export var survivor_scene: PackedScene = preload("res://scenes/effects/survivor.tscn")
 var _fire_instance: Node3D = null
 
@@ -709,8 +710,12 @@ func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> 
 	if damage_source == "leak":
 		return
 	var source_mult: float = 0.0
-	if damage_source.begins_with("cannon") or damage_source == "janggun" or damage_source.begins_with("ramming"):
+	var is_ramming_hit: bool = damage_source.begins_with("ramming")
+	if damage_source.begins_with("cannon") or damage_source == "janggun":
 		source_mult = 1.0
+	elif is_ramming_hit:
+		# 충각은 선체 전반에 큰 충격을 주기 때문에 돛 손상도 대포보다 약간 더 잘 보이게 한다.
+		source_mult = 1.35
 	elif damage_source.contains("ballista") or damage_source.contains("singigeon") or damage_source.contains("fire"):
 		source_mult = 0.75
 	elif damage_source.is_empty() or damage_source == "unknown":
@@ -720,6 +725,8 @@ func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> 
 	if source_mult <= 0.0:
 		return
 	var sail_damage_delta: float = clamp((final_damage / 220.0) * source_mult, 0.01, 0.12)
+	if is_ramming_hit:
+		sail_damage_delta = clamp(sail_damage_delta * 1.2, 0.02, 0.18)
 	var intact_masts: Array[Node] = []
 	for mast in masts:
 		if is_instance_valid(mast) and mast.has_method("add_sail_damage"):

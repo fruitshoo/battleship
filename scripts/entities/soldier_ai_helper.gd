@@ -93,7 +93,8 @@ static func state_move(soldier) -> void:
 		if not soldier._is_ship_pair_in_melee_range(target_ship):
 			soldier._change_state(soldier.State.IDLE)
 			return
-		if distance_xz > soldier.CROSS_SHIP_ENGAGE_MAX_DISTANCE:
+		var engage_distance: float = soldier._get_cross_ship_engage_max_distance(target_ship)
+		if distance_xz > engage_distance:
 			soldier._change_state(soldier.State.IDLE)
 			return
 

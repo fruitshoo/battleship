@@ -31,6 +31,22 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 
 	var ship = hud.player_ship
 	var sections: Array[Dictionary] = []
+	var lm = hud._cached_level_manager
+	if not is_instance_valid(lm):
+		lm = SceneGroupCache.get_first(hud.get_tree(), "level_manager")
+
+	if is_instance_valid(lm):
+		sections.append({
+			"title": "전과",
+			"icon": "analytics",
+			"rows": [
+				{"icon": "directions_boat", "label": "격침", "value": str(int(lm.get("ships_sunk")))},
+				{"icon": "sailing", "label": "나포(폐선화)", "value": str(int(lm.get("ships_derelicted")))},
+				{"icon": "groups", "label": "병사 처치", "value": str(int(lm.get("soldiers_killed")))},
+				{"icon": "swords", "label": "전투 사살", "value": str(int(lm.get("soldiers_slain")))},
+				{"icon": "water", "label": "수장", "value": str(int(lm.get("soldiers_drowned")))},
+			],
+		})
 
 	var hull_hp: float = _get_float(ship, "hull_hp", 0.0)
 	var max_hull_hp: float = _get_float(ship, "max_hull_hp", 0.0)

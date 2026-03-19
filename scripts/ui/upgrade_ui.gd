@@ -19,6 +19,21 @@ var reroll_button: Button = null
 var _focused_index: int = 0
 var _input_lock_timer: float = 0.0
 
+func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
+	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
+		return "병사"
+	if upgrade_id in UpgradeManager.SHIP_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS or upgrade_id == UpgradeManager.RARE_FLEET_UPGRADE_ID:
+		return "함선"
+	var category_name_map := {
+		UpgradeManager.Category.ANTI_SHIP: "함포",
+		UpgradeManager.Category.ANTI_PERSONNEL: "병사",
+		UpgradeManager.Category.HULL: "선체",
+		UpgradeManager.Category.SEAMANSHIP: "항해",
+		UpgradeManager.Category.SPECIAL: "특수",
+		UpgradeManager.Category.FLEET: "지원함",
+	}
+	return str(category_name_map.get(category, "강화"))
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 작동
 	visible = false
@@ -157,15 +172,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	
 	# 카테고리 라벨
 	var cat_label = Label.new()
-	var category_name_map := {
-		UpgradeManager.Category.ANTI_SHIP: "함포",
-		UpgradeManager.Category.ANTI_PERSONNEL: "병사",
-		UpgradeManager.Category.HULL: "선체",
-		UpgradeManager.Category.SEAMANSHIP: "항해",
-		UpgradeManager.Category.SPECIAL: "특수",
-		UpgradeManager.Category.FLEET: "지원함",
-	}
-	cat_label.text = "[" + str(category_name_map.get(data["category"], "강화")) + "]"
+	cat_label.text = "[%s]" % _get_upgrade_track_label(upgrade_id, int(data["category"]))
 	cat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cat_label.add_theme_font_size_override("font_size", 12)
 	var cat_color = color.lerp(Color.WHITE, 0.4)

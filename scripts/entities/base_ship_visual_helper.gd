@@ -134,7 +134,9 @@ static func update_sail_visual(ship) -> void:
 	if ship == null:
 		return
 	var burn_ratio: float = 0.0
-	if ship.is_burning:
+	if ship.has_meta("debug_sail_burn_override_active") and bool(ship.get_meta("debug_sail_burn_override_active")):
+		burn_ratio = clampf(float(ship.get_meta("debug_sail_burn_override_value", 0.0)), 0.0, 1.0)
+	elif ship.is_burning:
 		var fire_ratio: float = 0.0
 		if "fire_threshold" in ship and float(ship.fire_threshold) > 0.0:
 			fire_ratio = clampf(float(ship.fire_build_up) / float(ship.fire_threshold), 0.0, 1.0)

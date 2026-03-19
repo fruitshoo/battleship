@@ -1,6 +1,7 @@
 extends RefCounted
 
 const ROLE_MARKER_NAME := "RoleMarker"
+const CAPTAIN_MARKER_NAME := "CaptainMarker"
 const TEAM_MATERIAL_META := "team_material_instance"
 
 
@@ -18,10 +19,28 @@ static func ensure_role_marker(soldier) -> MeshInstance3D:
 	return marker
 
 
+static func ensure_captain_marker(soldier) -> MeshInstance3D:
+	var marker := soldier.get_node_or_null(CAPTAIN_MARKER_NAME) as MeshInstance3D
+	if marker != null:
+		return marker
+	marker = MeshInstance3D.new()
+	marker.name = CAPTAIN_MARKER_NAME
+	marker.position = Vector3(0.0, 1.5, 0.0)
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.16
+	mesh.bottom_radius = 0.16
+	mesh.height = 0.05
+	mesh.radial_segments = 12
+	marker.mesh = mesh
+	soldier.add_child(marker)
+	return marker
+
+
 static func update_role_visual(soldier) -> void:
 	var marker = ensure_role_marker(soldier)
 	if marker == null:
 		return
+	var captain_marker = ensure_captain_marker(soldier)
 
 	var material := StandardMaterial3D.new()
 	material.resource_local_to_scene = true
@@ -66,6 +85,19 @@ static func update_role_visual(soldier) -> void:
 			material.emission_energy_multiplier = 0.0
 
 	marker.material_override = material
+
+	if captain_marker != null:
+		var captain_material := StandardMaterial3D.new()
+		captain_material.resource_local_to_scene = true
+		captain_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		captain_material.emission_enabled = true
+		captain_material.albedo_color = Color(1.0, 0.82, 0.28, 0.95)
+		captain_material.emission = Color(1.0, 0.76, 0.22, 1.0)
+		captain_material.emission_energy_multiplier = 0.55
+		captain_marker.visible = bool(soldier.get("is_captain"))
+		captain_marker.rotation_degrees = Vector3.ZERO
+		captain_marker.scale = Vector3(1.0, 1.0, 1.0)
+		captain_marker.material_override = captain_material
 
 
 static func update_team_color(soldier) -> void:

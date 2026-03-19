@@ -2,9 +2,9 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cpam7sjd0dp8k"
-path.s3tc="res://.godot/imported/sail_burn_mask_b.png-07854db008d26374be80545e2d7ea608.s3tc.ctex"
-path.etc2="res://.godot/imported/sail_burn_mask_b.png-07854db008d26374be80545e2d7ea608.etc2.ctex"
+uid="uid://dfds5i3xuhjlk"
+path.s3tc="res://.godot/imported/sail_burn_mask_c.png-861bf48444d5c3e2a6490501b8e5942e.s3tc.ctex"
+path.etc2="res://.godot/imported/sail_burn_mask_c.png-861bf48444d5c3e2a6490501b8e5942e.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -12,8 +12,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/vfx/masks/sail_burn_mask_b.png"
-dest_files=["res://.godot/imported/sail_burn_mask_b.png-07854db008d26374be80545e2d7ea608.s3tc.ctex", "res://.godot/imported/sail_burn_mask_b.png-07854db008d26374be80545e2d7ea608.etc2.ctex"]
+source_file="res://assets/vfx/masks/sail_burn_mask_c.png"
+dest_files=["res://.godot/imported/sail_burn_mask_c.png-861bf48444d5c3e2a6490501b8e5942e.s3tc.ctex", "res://.godot/imported/sail_burn_mask_c.png-861bf48444d5c3e2a6490501b8e5942e.etc2.ctex"]
 
 [params]
 

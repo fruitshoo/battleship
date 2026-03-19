@@ -16,12 +16,22 @@ static func add_score(lm: Node, points: int) -> void:
 static func add_ship_sunk(lm: Node, count: int = 1) -> void:
 	lm.ships_sunk += max(0, count)
 	if lm.hud and lm.hud.has_method("update_combat_stats"):
-		lm.hud.update_combat_stats(lm.ships_sunk, lm.soldiers_killed)
+		lm.hud.update_combat_stats(lm.ships_sunk, lm.ships_derelicted, lm.soldiers_killed, lm.soldiers_slain, lm.soldiers_drowned)
 
-static func add_soldier_kill(lm: Node, count: int = 1) -> void:
-	lm.soldiers_killed += max(0, count)
+static func add_ship_derelict(lm: Node, count: int = 1) -> void:
+	lm.ships_derelicted += max(0, count)
 	if lm.hud and lm.hud.has_method("update_combat_stats"):
-		lm.hud.update_combat_stats(lm.ships_sunk, lm.soldiers_killed)
+		lm.hud.update_combat_stats(lm.ships_sunk, lm.ships_derelicted, lm.soldiers_killed, lm.soldiers_slain, lm.soldiers_drowned)
+
+static func add_soldier_kill(lm: Node, count: int = 1, cause: String = "combat") -> void:
+	var total: int = max(0, count)
+	lm.soldiers_killed += total
+	if cause == "drowned":
+		lm.soldiers_drowned += total
+	else:
+		lm.soldiers_slain += total
+	if lm.hud and lm.hud.has_method("update_combat_stats"):
+		lm.hud.update_combat_stats(lm.ships_sunk, lm.ships_derelicted, lm.soldiers_killed, lm.soldiers_slain, lm.soldiers_drowned)
 
 static func add_command_xp_from_soldier_kill(lm: Node, kill_count: int = 1) -> void:
 	var k: int = max(0, kill_count)

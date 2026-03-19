@@ -610,6 +610,17 @@ func capture_ship() -> void:
 	_update_children_team_for_capture()
 	_refresh_deck_light()
 	_apply_minion_visuals()
+
+	if is_instance_valid(cached_lm):
+		var capture_score_reward: int = max(0, int(cached_lm.get("boarding_capture_score_reward")))
+		var capture_xp_reward: int = max(0, int(cached_lm.get("boarding_capture_xp_reward")))
+		var capture_merit_reward: int = max(0, int(cached_lm.get("boarding_capture_merit_reward")))
+		if capture_score_reward > 0 and cached_lm.has_method("add_score"):
+			cached_lm.add_score(capture_score_reward)
+		if capture_xp_reward > 0 and cached_lm.has_method("add_xp"):
+			cached_lm.add_xp(capture_xp_reward)
+		if capture_merit_reward > 0 and cached_lm.has_method("add_merit"):
+			cached_lm.add_merit(capture_merit_reward)
 	
 	if is_instance_valid(cached_lm) and cached_lm.has_method("show_message"):
 		cached_lm.show_message("적군 함선을 나포했습니다!", 3.0)
