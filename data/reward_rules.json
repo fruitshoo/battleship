@@ -1,0 +1,19 @@
+{
+  "soldier_kill": {
+    "xp": 5,
+    "merit": 1
+  },
+  "soldier_drowned": {
+    "xp": 3,
+    "merit": 0
+  },
+  "melee_bonus": {
+    "xp": 2,
+    "merit": 1
+  },
+  "boarding_capture": {
+    "score": 70,
+    "xp": 25,
+    "merit": 15
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "general": {
+    "spawn_interval": 5.2,
+    "min_spawn_distance": 50.0,
+    "max_spawn_distance": 70.0,
+    "max_distance_limit": 115.0,
+    "reposition_check_interval": 1.0
+  },
+  "formation": {
+    "blockade_chance": 0.8,
+    "blockade_min_ships": 2,
+    "blockade_max_ships": 3,
+    "blockade_spacing": 15.0
+  },
+  "enemy_mix": {
+    "cannon_chance_start_time": 75.0,
+    "cannon_chance_ramp_duration": 165.0,
+    "cannon_chance_max": 0.45
+  },
+  "elite": {
+    "spawn_interval": 120.0,
+    "max_elite_spawns": 4
+  },
+  "mid_boss_escort": [
+    "sekibune_cannon",
+    "kobayabune_melee"
+  ]
+}

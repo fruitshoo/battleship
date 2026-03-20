@@ -5,6 +5,8 @@ const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_
 const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
 const LevelManagerUpgradeFlowHelper = preload("res://scripts/managers/level_manager_upgrade_flow_helper.gd")
 const DEBUG_LEVEL_LOGS := false
+const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
+const REWARD_RULES_DATA_PATH := "res://data/reward_rules.json"
 
 ## 레벨 매니저 (Level Manager)
 ## 게임 시간 경과에 따라 난이도(레벨)를 관리하고 스포너에게 지시
@@ -65,7 +67,8 @@ var weapon_damage_stats: Dictionary = {}
 var _boss_triggered: bool = false
 var _boss_phase_active: bool = false
 var _victory_triggered: bool = false
-var rerolls_available: int = 0
+var ship_rerolls_available: int = 0
+var crew_rerolls_available: int = 0
 var _debug_collision_visuals_enabled: bool = false
 var _boss_arena_active: bool = false
 var _boss_arena_anchor_boss_id: int = -1
@@ -124,12 +127,128 @@ var level_data = {
 
 func _ready() -> void:
 	add_to_group("level_manager")
+	_load_level_progression_data()
+	_load_reward_rules_data()
 	if is_instance_valid(MetaManager) and MetaManager.has_method("get_xp_gain_multiplier"):
 		xp_multiplier = float(MetaManager.get_xp_gain_multiplier())
 	_calculate_next_level_xp()
 	max_merit_points = _get_merit_requirement(merit_level)
 	merit_points = clamp(merit_points, 0, max_merit_points)
 	LevelManagerStartupHelper.initialize(self)
+
+
+func _load_level_progression_data() -> void:
+	if not FileAccess.file_exists(LEVEL_PROGRESSION_DATA_PATH):
+		return
+
+	var file: FileAccess = FileAccess.open(LEVEL_PROGRESSION_DATA_PATH, FileAccess.READ)
+	if file == null:
+		push_warning("[LevelManager] level_progression.json을 열 수 없어 기본값을 사용합니다.")
+		return
+
+	var raw_text: String = file.get_as_text()
+	var parsed: Variant = JSON.parse_string(raw_text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_warning("[LevelManager] level_progression.json 파싱 실패. 기본값을 사용합니다.")
+		return
+
+	var root: Dictionary = parsed as Dictionary
+	_apply_level_progression_root(root)
+
+
+func _apply_level_progression_root(root: Dictionary) -> void:
+	var levels_variant: Variant = root.get("levels", {})
+	if typeof(levels_variant) == TYPE_DICTIONARY:
+		var loaded_levels: Dictionary = _parse_level_progression_levels(levels_variant as Dictionary)
+		if not loaded_levels.is_empty():
+			level_data = loaded_levels
+			max_level = _get_highest_level_key(level_data)
+
+	var xp_curve_variant: Variant = root.get("xp_curve", {})
+	if typeof(xp_curve_variant) == TYPE_DICTIONARY:
+		var xp_curve: Dictionary = xp_curve_variant as Dictionary
+		level_xp_base = float(xp_curve.get("level_xp_base", level_xp_base))
+		level_xp_exponent = float(xp_curve.get("level_xp_exponent", level_xp_exponent))
+
+	var merit_curve_variant: Variant = root.get("merit_curve", {})
+	if typeof(merit_curve_variant) == TYPE_DICTIONARY:
+		var merit_curve: Dictionary = merit_curve_variant as Dictionary
+		merit_base_points = int(merit_curve.get("merit_base_points", merit_base_points))
+		merit_growth_per_level = int(merit_curve.get("merit_growth_per_level", merit_growth_per_level))
+
+
+func _parse_level_progression_levels(levels_root: Dictionary) -> Dictionary:
+	var parsed_levels: Dictionary = {}
+	for key_variant in levels_root.keys():
+		var key_text: String = str(key_variant)
+		if not key_text.is_valid_int():
+			continue
+		var level_index: int = int(key_text)
+		var row_variant: Variant = levels_root[key_variant]
+		if typeof(row_variant) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_variant as Dictionary
+		parsed_levels[level_index] = {
+			"spawn_interval": float(row.get("spawn_interval", 5.0)),
+			"max_enemies": int(row.get("max_enemies", 3)),
+			"boarders": int(row.get("boarders", 1))
+		}
+	return parsed_levels
+
+
+func _get_highest_level_key(levels: Dictionary) -> int:
+	var highest: int = 1
+	for key_variant in levels.keys():
+		var level_key: int = int(key_variant)
+		if level_key > highest:
+			highest = level_key
+	return highest
+
+
+func _load_reward_rules_data() -> void:
+	if not FileAccess.file_exists(REWARD_RULES_DATA_PATH):
+		return
+
+	var file: FileAccess = FileAccess.open(REWARD_RULES_DATA_PATH, FileAccess.READ)
+	if file == null:
+		push_warning("[LevelManager] reward_rules.json을 열 수 없어 기본값을 사용합니다.")
+		return
+
+	var raw_text: String = file.get_as_text()
+	var parsed: Variant = JSON.parse_string(raw_text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_warning("[LevelManager] reward_rules.json 파싱 실패. 기본값을 사용합니다.")
+		return
+
+	var root: Dictionary = parsed as Dictionary
+	_apply_reward_rules_root(root)
+
+
+func _apply_reward_rules_root(root: Dictionary) -> void:
+	var soldier_kill_variant: Variant = root.get("soldier_kill", {})
+	if typeof(soldier_kill_variant) == TYPE_DICTIONARY:
+		var soldier_kill: Dictionary = soldier_kill_variant as Dictionary
+		soldier_kill_xp_reward = int(soldier_kill.get("xp", soldier_kill_xp_reward))
+		merit_per_soldier_kill = int(soldier_kill.get("merit", merit_per_soldier_kill))
+
+	var drowned_variant: Variant = root.get("soldier_drowned", {})
+	if typeof(drowned_variant) == TYPE_DICTIONARY:
+		var soldier_drowned: Dictionary = drowned_variant as Dictionary
+		drowned_soldier_kill_xp_reward = int(soldier_drowned.get("xp", drowned_soldier_kill_xp_reward))
+		drowned_soldier_kill_merit_reward = int(soldier_drowned.get("merit", drowned_soldier_kill_merit_reward))
+
+	var melee_variant: Variant = root.get("melee_bonus", {})
+	if typeof(melee_variant) == TYPE_DICTIONARY:
+		var melee_bonus: Dictionary = melee_variant as Dictionary
+		melee_kill_xp_bonus = int(melee_bonus.get("xp", melee_kill_xp_bonus))
+		melee_kill_merit_bonus = int(melee_bonus.get("merit", melee_kill_merit_bonus))
+
+	var capture_variant: Variant = root.get("boarding_capture", {})
+	if typeof(capture_variant) == TYPE_DICTIONARY:
+		var boarding_capture: Dictionary = capture_variant as Dictionary
+		boarding_capture_score_reward = int(boarding_capture.get("score", boarding_capture_score_reward))
+		boarding_capture_xp_reward = int(boarding_capture.get("xp", boarding_capture_xp_reward))
+		boarding_capture_merit_reward = int(boarding_capture.get("merit", boarding_capture_merit_reward))
 
 func _run_startup_prewarm_async() -> void:
 	await LevelManagerStartupHelper.run_startup_prewarm_async(self)
@@ -415,6 +534,10 @@ func add_merit(amount: int) -> void:
 		
 func consume_merit() -> void:
 	# 공적 소비 시 병사 업그레이드 UI를 띄움
+	var reroll_bonus: int = 0
+	if is_instance_valid(MetaManager) and MetaManager.has_method("get_reroll_bonus"):
+		reroll_bonus = int(MetaManager.get_reroll_bonus())
+	crew_rerolls_available = 1 + reroll_bonus
 	_show_fleet_upgrade_ui()
 	
 	merit_points = 0
@@ -429,6 +552,9 @@ func _show_fleet_upgrade_ui() -> void:
 
 func _on_fleet_upgrade_chosen(upgrade_id: String) -> void:
 	LevelManagerUpgradeFlowHelper.on_fleet_upgrade_chosen(self, upgrade_id)
+
+func _on_fleet_reroll_requested() -> void:
+	LevelManagerUpgradeFlowHelper.on_fleet_reroll_requested(self)
 
 
 func _finalize_merit_levelup(upgrade_id: String) -> void:
