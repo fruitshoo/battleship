@@ -2,6 +2,7 @@ extends RefCounted
 
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SUPPORT_SHIP_ICON := "\ue532"
 
 # Top-line HUD text
@@ -49,20 +50,20 @@ static func _apply_speed_bar_state(hud, speed_state: String) -> void:
 		return
 	hud.speed_mode_icon.texture = SAIL_MODE_ICON
 	if speed_state == "rowing":
-		hud.speed_mode_icon.modulate = Color(1.0, 0.85, 0.3, 1.0)
+		hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_GOLD
 	elif speed_state == "locked":
-		hud.speed_mode_icon.modulate = Color(0.72, 0.72, 0.76, 1.0)
+		hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_MUTED
 	else:
-		hud.speed_mode_icon.modulate = Color(0.86, 0.93, 1.0, 1.0)
+		hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_BLUE
 	var fill = hud.speed_bar.get_theme_stylebox("fill")
 	if fill is StyleBoxFlat:
 		var fill_box := fill as StyleBoxFlat
 		if speed_state == "rowing":
-			fill_box.bg_color = Color(1.0, 0.8, 0.2, 0.92)
+			fill_box.bg_color = NavalUiTheme.STATUS_WARN
 		elif speed_state == "locked":
-			fill_box.bg_color = Color(0.75, 0.3, 0.3, 0.92)
+			fill_box.bg_color = Color(0.52, 0.40, 0.32, 0.92)
 		else:
-			fill_box.bg_color = Color(0.2, 0.7, 1.0, 0.92)
+			fill_box.bg_color = NavalUiTheme.STATUS_ACTIVE_BLUE
 
 static func update_speed_display(hud) -> void:
 	if not is_instance_valid(hud.player_ship):
@@ -226,11 +227,7 @@ static func _ensure_support_slot_count(hud, slot_count: int) -> void:
 static func _create_support_slot() -> PanelContainer:
 	var slot := PanelContainer.new()
 	slot.custom_minimum_size = Vector2(34, 34)
-	var slot_style := StyleBoxFlat.new()
-	slot_style.bg_color = Color(0.07, 0.09, 0.12, 0.88)
-	slot_style.border_color = Color(0.88, 0.72, 0.32, 0.52)
-	slot_style.set_border_width_all(1)
-	slot_style.set_corner_radius_all(6)
+	var slot_style := NavalUiTheme.make_slot_style(NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM, 6)
 	slot.add_theme_stylebox_override("panel", slot_style)
 
 	var root := Control.new()
@@ -250,7 +247,7 @@ static func _create_support_slot() -> PanelContainer:
 	damage_fill.offset_right = 0.0
 	damage_fill.offset_top = 0.0
 	damage_fill.offset_bottom = 0.0
-	damage_fill.color = Color(0.92, 0.14, 0.14, 0.78)
+	damage_fill.color = Color(0.92, 0.24, 0.24, 0.78)
 	root.add_child(damage_fill)
 
 	var dead_overlay := ColorRect.new()
@@ -267,7 +264,7 @@ static func _create_support_slot() -> PanelContainer:
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon.add_theme_font_size_override("font_size", 22)
-	icon.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+	icon.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 	if MATERIAL_SYMBOLS_FONT:
 		icon.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
 	icon.text = SUPPORT_SHIP_ICON
@@ -278,9 +275,7 @@ static func _create_support_slot() -> PanelContainer:
 	timer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	timer.add_theme_font_size_override("font_size", 10)
-	timer.add_theme_color_override("font_color", Color(0.9, 0.9, 0.92))
-	timer.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.03, 0.95))
+	NavalUiTheme.style_overlay_value(timer, 10)
 	timer.add_theme_constant_override("outline_size", 3)
 	timer.visible = false
 	root.add_child(timer)
@@ -307,23 +302,23 @@ static func _update_support_slot(slot: PanelContainer, ship, timer_text: String 
 		dead_overlay.visible = false
 		icon.visible = true
 		icon.text = SUPPORT_SHIP_ICON
-		icon.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		icon.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 		timer.visible = false
 		timer.text = ""
 		if slot_style:
-			slot_style.bg_color = Color(0.07, 0.09, 0.12, 0.88)
-			slot_style.border_color = Color(0.88, 0.72, 0.32, 0.52)
+			slot_style.bg_color = NavalUiTheme.PANEL_BG_DARK
+			slot_style.border_color = NavalUiTheme.BORDER_GOLD_DIM
 	else:
 		damage_fill.visible = false
 		dead_overlay.visible = true
 		icon.visible = true
 		icon.text = SUPPORT_SHIP_ICON
-		icon.add_theme_color_override("font_color", Color(0.52, 0.55, 0.6))
+		icon.add_theme_color_override("font_color", NavalUiTheme.TEXT_MUTED)
 		timer.visible = not timer_text.is_empty()
 		timer.text = timer_text
 		if slot_style:
-			slot_style.bg_color = Color(0.05, 0.05, 0.07, 0.88)
-			slot_style.border_color = Color(0.38, 0.38, 0.42, 0.42)
+			slot_style.bg_color = Color(0.06, 0.07, 0.09, 0.9)
+			slot_style.border_color = NavalUiTheme.STATUS_DEAD
 
 static func update_hull_display(hud) -> void:
 	if is_instance_valid(hud.player_ship) and hud.player_ship.get("hull_hp") != null:
@@ -355,7 +350,7 @@ static func update_boarding_display(hud) -> void:
 			hud.boarding_bar.value = 100
 			var fill_active = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
 			if fill_active:
-				fill_active.bg_color = Color(0.2, 0.8, 1.0, 0.8)
+				fill_active.bg_color = NavalUiTheme.STATUS_ACTIVE_BLUE
 	else:
 		hud.boarding_ui.visible = false
 
@@ -439,11 +434,11 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 	var fill_style: StyleBoxFlat = hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
 	if is_instance_valid(fill_style):
 		if ratio > 0.6:
-			fill_style.bg_color = Color(0.24, 0.86, 0.34, 0.95)
+			fill_style.bg_color = NavalUiTheme.STATUS_GOOD
 		elif ratio > 0.3:
-			fill_style.bg_color = Color(0.96, 0.78, 0.18, 0.95)
+			fill_style.bg_color = NavalUiTheme.STATUS_WARN
 		else:
-			fill_style.bg_color = Color(0.92, 0.24, 0.24, 0.95)
+			fill_style.bg_color = NavalUiTheme.STATUS_DANGER
 	return true
 
 static func _cleanup_stale_ship_hp_bars(hud, active_ids: Dictionary) -> void:
@@ -485,12 +480,12 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	var bg_style: StyleBoxFlat = StyleBoxFlat.new()
 	bg_style.bg_color = Color(0.03, 0.04, 0.06, 0.72)
 	bg_style.set_border_width_all(1)
-	bg_style.border_color = Color(0.28, 0.78, 1.0, 0.95) if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
+	bg_style.border_color = NavalUiTheme.STATUS_ACTIVE_BLUE if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
 	bg_style.set_corner_radius_all(3)
 	hp_bar.add_theme_stylebox_override("background", bg_style)
 
 	var fill_style: StyleBoxFlat = StyleBoxFlat.new()
-	fill_style.bg_color = Color(0.24, 0.86, 0.34, 0.95)
+	fill_style.bg_color = NavalUiTheme.STATUS_GOOD
 	fill_style.set_corner_radius_all(2)
 	hp_bar.add_theme_stylebox_override("fill", fill_style)
 

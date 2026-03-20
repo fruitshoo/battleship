@@ -1,5 +1,7 @@
 extends PanelContainer
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+
 signal return_requested
 
 var subtitle_label: Label = null
@@ -18,18 +20,7 @@ func _ready() -> void:
 	offset_right = 180.0
 	offset_bottom = 150.0
 
-	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.05, 0.06, 0.08, 0.92)
-	panel_style.border_width_left = 2
-	panel_style.border_width_top = 2
-	panel_style.border_width_right = 2
-	panel_style.border_width_bottom = 2
-	panel_style.border_color = Color(0.86, 0.32, 0.24, 0.9)
-	panel_style.set_corner_radius_all(12)
-	panel_style.content_margin_left = 18.0
-	panel_style.content_margin_top = 16.0
-	panel_style.content_margin_right = 18.0
-	panel_style.content_margin_bottom = 16.0
+	var panel_style = NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG, NavalUiTheme.BORDER_GOLD, 12, 2, 18.0, 16.0, 18.0, 16.0)
 	add_theme_stylebox_override("panel", panel_style)
 
 	var vbox = VBoxContainer.new()
@@ -40,8 +31,7 @@ func _ready() -> void:
 	subtitle_label = Label.new()
 	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	subtitle_label.add_theme_font_size_override("font_size", 14)
-	subtitle_label.add_theme_color_override("font_color", Color(0.83, 0.86, 0.89))
+	NavalUiTheme.style_body(subtitle_label, 14)
 	subtitle_label.text = "함선이 침몰했습니다. 항구로 복귀합니다."
 	vbox.add_child(subtitle_label)
 
@@ -49,6 +39,7 @@ func _ready() -> void:
 	return_button.process_mode = Node.PROCESS_MODE_ALWAYS
 	return_button.custom_minimum_size = Vector2(220.0, 42.0)
 	return_button.text = "메인 메뉴로"
+	NavalUiTheme.apply_hud_button(return_button, 15)
 	return_button.pressed.connect(_request_return)
 	vbox.add_child(return_button)
 

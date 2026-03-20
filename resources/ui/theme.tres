@@ -1,62 +1,62 @@
 [gd_resource type="Theme" format=3 uid="uid://vloxxb0s8llf"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
-bg_color = Color(0.25, 0.35, 0.45, 0.9)
+bg_color = Color(0.16, 0.23, 0.31, 0.92)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.8, 0.6, 0.2, 1)
+border_color = Color(0.82, 0.69, 0.42, 0.96)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
-bg_color = Color(0.18, 0.25, 0.35, 0.9)
+bg_color = Color(0.10, 0.16, 0.22, 0.88)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.1, 0.15, 0.2, 1)
+border_color = Color(0.55, 0.47, 0.27, 0.86)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
-bg_color = Color(0.1, 0.15, 0.2, 0.9)
+bg_color = Color(0.08, 0.12, 0.17, 0.96)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.5, 0.4, 0.1, 1)
+border_color = Color(0.93, 0.84, 0.56, 0.96)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0.08, 0.1, 0.15, 0.8)
+bg_color = Color(0.07, 0.11, 0.16, 0.82)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.3, 0.4, 0.5, 0.5)
+border_color = Color(0.80, 0.68, 0.41, 0.52)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_bg"]
-bg_color = Color(0.1, 0.1, 0.1, 0.5)
+bg_color = Color(0.06, 0.08, 0.11, 0.82)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_fg"]
-bg_color = Color(0.2, 0.6, 0.3, 1)
+bg_color = Color(0.92, 0.75, 0.28, 0.94)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
@@ -66,8 +66,8 @@ corner_radius_bottom_left = 4
 Button/styles/hover = SubResource("StyleBoxFlat_button_hover")
 Button/styles/normal = SubResource("StyleBoxFlat_button_normal")
 Button/styles/pressed = SubResource("StyleBoxFlat_button_pressed")
-Label/colors/font_color = Color(0.9, 0.9, 0.9, 1)
-Label/colors/font_shadow_color = Color(0, 0, 0, 0.5)
+Label/colors/font_color = Color(0.95, 0.94, 0.90, 1)
+Label/colors/font_shadow_color = Color(0.06, 0.09, 0.12, 0.85)
 Label/constants/shadow_offset_x = 1
 Label/constants/shadow_offset_y = 1
 Panel/styles/panel = SubResource("StyleBoxFlat_panel")

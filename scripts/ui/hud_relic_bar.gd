@@ -1,6 +1,7 @@
 extends MarginContainer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SLOT_SIZE := Vector2(40, 40)
 
 var relic_container: HBoxContainer = null
@@ -31,11 +32,11 @@ func add_icon(icon_data) -> PanelContainer:
 	slot_bg.add_theme_stylebox_override("panel", slot_sb)
 
 	var tween = create_tween()
-	tween.tween_property(slot_sb, "border_color", Color(1, 0.8, 0.2, 1.0), 0.2)
+	tween.tween_property(slot_sb, "border_color", NavalUiTheme.BORDER_GOLD, 0.2)
 	if icon_control:
 		tween.parallel().tween_property(icon_control, "scale", Vector2(1.2, 1.2), 0.2)
 		tween.tween_property(icon_control, "scale", Vector2(1.0, 1.0), 0.2)
-	tween.tween_property(slot_sb, "border_color", Color(0.6, 0.5, 0.1, 0.8), 0.5)
+	tween.tween_property(slot_sb, "border_color", NavalUiTheme.BORDER_GOLD_DIM, 0.5)
 
 	current_relic_count += 1
 	return slot_bg
@@ -44,14 +45,7 @@ func _create_slot(icon_data) -> PanelContainer:
 	var slot_bg = PanelContainer.new()
 	slot_bg.custom_minimum_size = SLOT_SIZE
 
-	var slot_sb = StyleBoxFlat.new()
-	slot_sb.bg_color = Color(0, 0, 0, 0.5)
-	slot_sb.set_corner_radius_all(4)
-	slot_sb.border_width_bottom = 1
-	slot_sb.border_width_top = 1
-	slot_sb.border_width_left = 1
-	slot_sb.border_width_right = 1
-	slot_sb.border_color = Color(0.3, 0.3, 0.3, 0.8)
+	var slot_sb := NavalUiTheme.make_slot_style(NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM, 6)
 	slot_bg.add_theme_stylebox_override("panel", slot_sb)
 
 	var icon_texture := _resolve_icon_texture(icon_data)
@@ -69,6 +63,7 @@ func _create_slot(icon_data) -> PanelContainer:
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon_label.add_theme_font_size_override("font_size", 24)
+	icon_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 	icon_label.text = str(_extract_icon_data(icon_data))
 	if MATERIAL_SYMBOLS_FONT:
 		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)

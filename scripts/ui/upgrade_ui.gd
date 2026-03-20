@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.gd")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 ## 업그레이드 선택 UI
 ## 레벨업 시 3개의 카드를 표시, 플레이어가 하나를 선택
@@ -37,6 +38,14 @@ func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 작동
 	visible = false
+	_apply_theme()
+
+func _apply_theme() -> void:
+	if is_instance_valid(background):
+		background.color = Color(0.02, 0.03, 0.05, 0.72)
+	if is_instance_valid(title_label):
+		NavalUiTheme.style_heading(title_label, 24)
+		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 func _process(delta: float) -> void:
 	if _input_lock_timer > 0:
@@ -148,20 +157,22 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	
 	# 스타일
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.1, 0.18, 0.95)
-	style.border_color = color
-	style.border_width_top = 3
-	style.border_width_bottom = 3
-	style.border_width_left = 3
-	style.border_width_right = 3
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_left = 12
-	style.corner_radius_bottom_right = 12
+	style.bg_color = NavalUiTheme.PANEL_BG
+	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.35)
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.corner_radius_top_left = 14
+	style.corner_radius_top_right = 14
+	style.corner_radius_bottom_left = 14
+	style.corner_radius_bottom_right = 14
 	style.content_margin_left = 16
 	style.content_margin_right = 16
 	style.content_margin_top = 16
 	style.content_margin_bottom = 16
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
+	style.shadow_size = 6
 	card.add_theme_stylebox_override("panel", style)
 	
 	# 내부 VBox
@@ -174,8 +185,8 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	var cat_label = Label.new()
 	cat_label.text = "[%s]" % _get_upgrade_track_label(upgrade_id, int(data["category"]))
 	cat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cat_label.add_theme_font_size_override("font_size", 12)
-	var cat_color = color.lerp(Color.WHITE, 0.4)
+	var cat_color = color.lerp(NavalUiTheme.TEXT_GOLD, 0.55)
+	NavalUiTheme.style_muted(cat_label, 12)
 	cat_label.add_theme_color_override("font_color", cat_color)
 	vbox.add_child(cat_label)
 	
@@ -185,14 +196,15 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", 22)
 	name_label.add_theme_color_override("font_color", color)
+	name_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+	name_label.add_theme_constant_override("outline_size", 3)
 	vbox.add_child(name_label)
 	
 	# 레벨 라벨
 	var level_label = Label.new()
 	level_label.text = "Lv.%d → Lv.%d" % [current_lv, next_lv] if current_lv > 0 else "NEW!"
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	level_label.add_theme_font_size_override("font_size", 14)
-	level_label.add_theme_color_override("font_color", Color(1, 0.85, 0.4))
+	NavalUiTheme.style_gold(level_label, 14)
 	vbox.add_child(level_label)
 	
 	# 구분선
@@ -209,8 +221,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 		desc_label.text = "다음 효과: " + next_spec
 	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_label.add_theme_font_size_override("font_size", 15)
-	desc_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+	NavalUiTheme.style_body(desc_label, 15)
 	vbox.add_child(desc_label)
 	
 	# 여백
@@ -222,7 +233,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	var button = Button.new()
 	button.text = "선택"
 	button.custom_minimum_size = Vector2(0, 40)
-	button.add_theme_font_size_override("font_size", 18)
+	NavalUiTheme.apply_hud_button(button, 18)
 	button.pressed.connect(_on_choice_pressed.bind(upgrade_id))
 	vbox.add_child(button)
 	
@@ -254,16 +265,16 @@ func _on_choice_pressed(upgrade_id: String) -> void:
 
 
 func _on_card_hover(card: PanelContainer, style: StyleBoxFlat, color: Color) -> void:
-	style.bg_color = Color(0.12, 0.15, 0.25, 0.98)
-	style.border_color = color.lightened(0.3)
+	style.bg_color = NavalUiTheme.PANEL_BG_SOFT
+	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.55).lightened(0.1)
 	# 스케일 효과
 	var tween = create_tween()
 	tween.tween_property(card, "scale", Vector2(1.05, 1.05), 0.1)
 
 
 func _on_card_unhover(card: PanelContainer, style: StyleBoxFlat, color: Color) -> void:
-	style.bg_color = Color(0.08, 0.1, 0.18, 0.95)
-	style.border_color = color
+	style.bg_color = NavalUiTheme.PANEL_BG
+	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.35)
 	var tween = create_tween()
 	tween.tween_property(card, "scale", Vector2(1.0, 1.0), 0.1)
 
@@ -273,19 +284,7 @@ func _update_reroll_button(count: int) -> void:
 		reroll_button = Button.new()
 		reroll_button.custom_minimum_size = Vector2(180, 50)
 		reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		
-		# 스타일 설정 (강조색)
-		var style_normal = StyleBoxFlat.new()
-		style_normal.bg_color = Color(0.4, 0.2, 0.6, 0.9)
-		style_normal.corner_radius_top_left = 8
-		style_normal.corner_radius_top_right = 8
-		style_normal.corner_radius_bottom_left = 8
-		style_normal.corner_radius_bottom_right = 8
-		reroll_button.add_theme_stylebox_override("normal", style_normal)
-		
-		var style_hover = style_normal.duplicate()
-		style_hover.bg_color = Color(0.5, 0.3, 0.7, 1.0)
-		reroll_button.add_theme_stylebox_override("hover", style_hover)
+		NavalUiTheme.apply_hud_button(reroll_button, 16)
 		
 		reroll_button.pressed.connect(_on_reroll_pressed)
 		

@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dyex137etnigk"]
 
 [ext_resource type="Script" uid="uid://c7t702ax2pk7e" path="res://scripts/ui/ship_control_ui.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/wind_compass_art.gd" id="2_wind_art"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_round"]
 bg_color = Color(0.05, 0.08, 0.15, 0.8)
@@ -72,6 +73,9 @@ offset_bottom = 90.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_round")
+
+[node name="Art" type="Node2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=137842191]
+script = ExtResource("2_wind_art")
 
 [node name="NorthLabel" type="Label" parent="WindPanel/WindIndicator/CompassWheel" unique_id=1269305894]
 anchors_preset = 8
@@ -145,6 +149,14 @@ vertical_alignment = 1
 unique_name_in_owner = true
 position = Vector2(90, 90)
 
+[node name="Tail" type="Polygon2D" parent="WindPanel/WindIndicator/Arrow" unique_id=27811832]
+color = Color(0.63, 0.56, 0.4, 0.8)
+polygon = PackedVector2Array(-7, 8, 7, 8, 0, 30)
+
+[node name="Glow" type="Polygon2D" parent="WindPanel/WindIndicator/Arrow" unique_id=188490712]
+color = Color(0.97, 0.79, 0.36, 0.16)
+polygon = PackedVector2Array(-16, -48, 16, -48, 0, -82)
+
 [node name="Shaft" type="ColorRect" parent="WindPanel/WindIndicator/Arrow" unique_id=1656703153]
 offset_left = -4.0
 offset_top = -50.0
@@ -155,3 +167,7 @@ color = Color(1, 0.4, 0.2, 1)
 [node name="Head" type="Polygon2D" parent="WindPanel/WindIndicator/Arrow" unique_id=990344716]
 color = Color(1, 0.4, 0.2, 1)
 polygon = PackedVector2Array(-12, -50, 12, -50, 0, -70)
+
+[node name="CenterCap" type="Polygon2D" parent="WindPanel/WindIndicator/Arrow" unique_id=692025442]
+color = Color(0.92, 0.85, 0.66, 1)
+polygon = PackedVector2Array(-6, 0, -4.24264, -4.24264, 0, -6, 4.24264, -4.24264, 6, 0, 4.24264, 4.24264, 0, 6, -4.24264, 4.24264)

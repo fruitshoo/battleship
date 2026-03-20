@@ -1,6 +1,7 @@
 extends VBoxContainer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 var slot_container: HFlowContainer = null
 var slots: Array[PanelContainer] = []
@@ -10,7 +11,7 @@ var _slot_border_color: Color = Color(0.3, 0.3, 0.3, 0.8)
 func setup_track(title_text: String, title_color: Color, slot_panel_bg: Color, slot_border_color: Color, slot_count: int = 0) -> void:
 	var title = Label.new()
 	title.text = title_text
-	title.add_theme_font_size_override("font_size", 12)
+	NavalUiTheme.style_heading(title, 12)
 	title.add_theme_color_override("font_color", title_color)
 	add_child(title)
 
@@ -50,7 +51,7 @@ func update_slot(slot_idx: int, upgrade_id: String, level: int, icon_text: Strin
 		slot.add_theme_stylebox_override("panel", slot_sb)
 		var tween = create_tween()
 		tween.tween_property(slot_sb, "border_color", icon_color, 0.2)
-		tween.tween_property(slot_sb, "border_color", Color(0.35, 0.35, 0.35, 0.8), 0.5)
+		tween.tween_property(slot_sb, "border_color", NavalUiTheme.BORDER_GOLD_DIM, 0.5)
 	return slot
 
 func _ensure_slot(slot_idx: int) -> void:
@@ -65,13 +66,7 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	slot_bg.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	var slot_sb = StyleBoxFlat.new()
-	slot_sb.bg_color = panel_bg
-	slot_sb.set_corner_radius_all(4)
-	slot_sb.border_width_bottom = 1
-	slot_sb.border_width_top = 1
-	slot_sb.border_width_left = 1
-	slot_sb.border_width_right = 1
-	slot_sb.border_color = border_color
+	slot_sb = NavalUiTheme.make_slot_style(panel_bg, border_color, 6)
 	slot_bg.add_theme_stylebox_override("panel", slot_sb)
 
 	var icon_label = Label.new()
@@ -88,9 +83,7 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	level_label_overlay.text = "1"
 	level_label_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	level_label_overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	level_label_overlay.add_theme_font_size_override("font_size", 10)
-	level_label_overlay.add_theme_color_override("font_outline_color", Color.BLACK)
-	level_label_overlay.add_theme_constant_override("outline_size", 3)
+	NavalUiTheme.style_overlay_value(level_label_overlay, 10)
 	level_label_overlay.visible = false
 	level_label_overlay.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	level_label_overlay.offset_left = -16

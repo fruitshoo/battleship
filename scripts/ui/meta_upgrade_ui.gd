@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const PLAYER_BASE_MOVE_SPEED := 6.0
 const PLAYER_BASE_HULL_HP := 200.0
 const SOLDIER_BASE_HEALTH := 70.0
@@ -31,9 +32,21 @@ var _card_buttons: Dictionary = {}
 func _ready() -> void:
 	title_label.text = title_text
 	close_button.text = close_button_text
+	_apply_theme()
 	close_button.pressed.connect(_on_close_pressed)
 	buy_button.pressed.connect(_on_buy_pressed)
 	update_ui()
+
+func _apply_theme() -> void:
+	NavalUiTheme.style_heading(title_label, 22)
+	NavalUiTheme.style_gold(gold_label, 16)
+	NavalUiTheme.style_heading(selected_name_label, 20)
+	NavalUiTheme.style_gold(selected_level_label, 14)
+	NavalUiTheme.style_body(selected_desc_label, 13)
+	NavalUiTheme.style_body(selected_effect_label, 13)
+	NavalUiTheme.style_gold(cost_label, 15)
+	NavalUiTheme.apply_hud_button(buy_button, 15)
+	NavalUiTheme.apply_hud_button(close_button, 15)
 
 func update_ui() -> void:
 	gold_label.text = "보유 골드 %d G" % SaveManager.gold
@@ -95,8 +108,7 @@ func _create_upgrade_card(id: String) -> Button:
 	title.text = str(data.get("name", id))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color(0.96, 0.94, 0.88))
+	NavalUiTheme.style_body(title, 12)
 	layout.add_child(title)
 
 	var icon_frame := PanelContainer.new()
@@ -122,18 +134,18 @@ func _create_upgrade_card(id: String) -> Button:
 	for i in range(max_level):
 		var pip := ColorRect.new()
 		pip.custom_minimum_size = Vector2(14, 6)
-		pip.color = Color(0.56, 0.18, 0.35, 0.95) if i < level else Color(0.20, 0.16, 0.18, 0.95)
+		pip.color = NavalUiTheme.TEXT_GOLD if i < level else Color(0.20, 0.16, 0.18, 0.95)
 		pips.add_child(pip)
 
 	var cost := Label.new()
 	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost.add_theme_font_size_override("font_size", 11)
+	NavalUiTheme.style_gold(cost, 11)
 	if level >= max_level:
 		cost.text = "MAX"
 		cost.add_theme_color_override("font_color", Color(0.72, 0.90, 0.52))
 	else:
 		cost.text = "%d G" % MetaManager.get_upgrade_cost(id)
-		cost.add_theme_color_override("font_color", Color(0.98, 0.83, 0.38))
+		cost.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
 	layout.add_child(cost)
 
 	return card
@@ -141,14 +153,14 @@ func _create_upgrade_card(id: String) -> Button:
 func _make_card_style(id: String, selected: bool, disabled: bool = false) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	var accent := _get_upgrade_color(id)
-	style.bg_color = Color(0.29, 0.31, 0.36, 0.96) if not selected else Color(0.24, 0.36, 0.64, 0.98)
+	style.bg_color = NavalUiTheme.PANEL_BG_SOFT if not selected else Color(0.20, 0.29, 0.41, 0.98)
 	if disabled:
 		style.bg_color = style.bg_color.darkened(0.25)
 	style.border_width_left = 2
 	style.border_width_top = 2
 	style.border_width_right = 2
 	style.border_width_bottom = 2
-	style.border_color = accent.lightened(0.15) if selected else Color(0.78, 0.62, 0.30, 0.92)
+	style.border_color = accent.lerp(NavalUiTheme.BORDER_GOLD, 0.4).lightened(0.08) if selected else NavalUiTheme.BORDER_GOLD_DIM
 	style.set_corner_radius_all(8)
 	style.shadow_color = Color(0, 0, 0, 0.22)
 	style.shadow_size = 2
@@ -156,7 +168,7 @@ func _make_card_style(id: String, selected: bool, disabled: bool = false) -> Sty
 
 func _make_icon_frame_style(id: String) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.08, 0.12, 0.95)
+	style.bg_color = NavalUiTheme.PANEL_BG_DARK
 	style.border_width_left = 2
 	style.border_width_top = 2
 	style.border_width_right = 2
@@ -206,7 +218,7 @@ func _update_detail_panel() -> void:
 		buy_button.disabled = true
 	else:
 		cost_label.text = "비용 %d G" % cost
-		cost_label.add_theme_color_override("font_color", Color(0.98, 0.83, 0.38))
+		cost_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
 		buy_button.text = "구입"
 		buy_button.disabled = SaveManager.gold < cost
 

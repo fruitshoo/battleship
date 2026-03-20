@@ -7,6 +7,7 @@ const HudLayoutBuilder = preload("res://scripts/ui/hud_layout_builder.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud_update_helper.gd")
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.gd")
 const HudStatPanelHelper = preload("res://scripts/ui/hud_stat_panel_helper.gd")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 
@@ -135,6 +136,7 @@ const CREW_UPGRADE_IDS := [
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_apply_overlay_theme()
 	_setup_top_xp_bar()
 	_setup_new_layout()
 	_setup_game_over_overlay()
@@ -147,6 +149,21 @@ func _ready() -> void:
 	if gust_warning:
 		gust_warning.visible = false
 	call_deferred("_refresh_owned_relic_icons")
+
+
+func _apply_overlay_theme() -> void:
+	if is_instance_valid(gust_warning):
+		NavalUiTheme.style_accent(gust_warning, 22)
+		gust_warning.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+		gust_warning.add_theme_constant_override("outline_size", 4)
+	if is_instance_valid(game_over_label):
+		game_over_label.add_theme_color_override("font_color", Color(0.84, 0.34, 0.28, 1.0))
+		game_over_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+		game_over_label.add_theme_constant_override("outline_size", 4)
+	if is_instance_valid(victory_label):
+		victory_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
+		victory_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+		victory_label.add_theme_constant_override("outline_size", 4)
 
 func _ensure_hud_label(existing: Label, node_name: String, default_text: String) -> Label:
 	if is_instance_valid(existing):
@@ -169,14 +186,7 @@ func _setup_top_xp_bar() -> void:
 	xp_bar.show_percentage = false
 	xp_bar.z_index = 10
 
-	var sb_bg = StyleBoxFlat.new()
-	sb_bg.bg_color = Color(0, 0, 0, 0.3)
-	xp_bar.add_theme_stylebox_override("background", sb_bg)
-
-	var sb_fg = StyleBoxFlat.new()
-	sb_fg.bg_color = Color(0.2, 0.7, 1.0, 0.9)
-	sb_fg.set_border_width_all(0)
-	xp_bar.add_theme_stylebox_override("fill", sb_fg)
+	NavalUiTheme.apply_progress_bar(xp_bar, Color(0.06, 0.08, 0.11, 0.82), Color(0.58, 0.77, 0.92, 0.94), 0)
 
 	merit_bar = ProgressBar.new()
 	merit_bar.name = "TopMeritBar"
@@ -188,21 +198,13 @@ func _setup_top_xp_bar() -> void:
 	merit_bar.show_percentage = false
 	merit_bar.z_index = 10
 
-	var mb_bg = StyleBoxFlat.new()
-	mb_bg.bg_color = Color(0, 0, 0, 0.3)
-	merit_bar.add_theme_stylebox_override("background", mb_bg)
-
-	var mb_fg = StyleBoxFlat.new()
-	mb_fg.bg_color = Color(1.0, 0.8, 0.2, 0.9)
-	mb_fg.set_border_width_all(0)
-	merit_bar.add_theme_stylebox_override("fill", mb_fg)
+	NavalUiTheme.apply_progress_bar(merit_bar, Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0)
 
 	merit_label = Label.new()
 	merit_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	merit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	merit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	merit_label.add_theme_font_size_override("font_size", 10)
-	merit_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	NavalUiTheme.style_overlay_value(merit_label, 10)
 	merit_label.add_theme_constant_override("outline_size", 3)
 	merit_label.text = "지휘 포인트 (병영 강화 대기)"
 	merit_bar.add_child(merit_label)
@@ -219,6 +221,7 @@ func _setup_sail_debug_panel() -> void:
 	sail_debug_toggle_button.name = "DebugToolsToggle"
 	sail_debug_toggle_button.text = "Debug"
 	sail_debug_toggle_button.custom_minimum_size = Vector2(72, 30)
+	NavalUiTheme.apply_hud_button(sail_debug_toggle_button, 11)
 	sail_debug_toggle_button.pressed.connect(func() -> void:
 		if not is_instance_valid(sail_debug_panel):
 			return
@@ -238,15 +241,7 @@ func _setup_sail_debug_panel() -> void:
 
 	sail_debug_panel = PanelContainer.new()
 	sail_debug_panel.name = "SailDebugPanel"
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.03, 0.05, 0.09, 0.88)
-	panel_style.border_color = Color(0.86, 0.90, 0.96, 0.26)
-	panel_style.set_border_width_all(1)
-	panel_style.set_corner_radius_all(10)
-	panel_style.content_margin_left = 10
-	panel_style.content_margin_right = 10
-	panel_style.content_margin_top = 8
-	panel_style.content_margin_bottom = 8
+	var panel_style := NavalUiTheme.make_hud_panel_style()
 	sail_debug_panel.add_theme_stylebox_override("panel", panel_style)
 
 	var scroll := ScrollContainer.new()
@@ -263,22 +258,19 @@ func _setup_sail_debug_panel() -> void:
 
 	var title := Label.new()
 	title.text = "Debug Tools"
-	title.add_theme_font_size_override("font_size", 13)
-	title.add_theme_color_override("font_color", Color(1.0, 0.95, 0.82))
+	NavalUiTheme.style_heading(title, 13)
 	panel_box.add_child(title)
 
 	var hint := Label.new()
 	hint.text = "기존 F키 기능을 버튼으로 모아둔 패널"
-	hint.add_theme_font_size_override("font_size", 10)
-	hint.add_theme_color_override("font_color", Color(0.82, 0.86, 0.92))
+	NavalUiTheme.style_muted(hint, 10)
 	panel_box.add_child(hint)
 
 	var environment_section: Dictionary = _create_debug_section("환경", false)
 	panel_box.add_child(environment_section["root"])
 	var environment_status := Label.new()
 	environment_status.text = "프리셋: -"
-	environment_status.add_theme_font_size_override("font_size", 11)
-	environment_status.add_theme_color_override("font_color", Color(0.90, 0.94, 1.0))
+	NavalUiTheme.style_body(environment_status, 11)
 	environment_section["body"].add_child(environment_status)
 	debug_environment_value = environment_status
 
@@ -296,8 +288,7 @@ func _setup_sail_debug_panel() -> void:
 	panel_box.add_child(collision_section["root"])
 	var collision_status := Label.new()
 	collision_status.text = "충돌 시각화: OFF"
-	collision_status.add_theme_font_size_override("font_size", 11)
-	collision_status.add_theme_color_override("font_color", Color(0.90, 0.94, 1.0))
+	NavalUiTheme.style_body(collision_status, 11)
 	collision_section["body"].add_child(collision_status)
 	debug_collision_value = collision_status
 
@@ -411,6 +402,7 @@ func _setup_sail_debug_panel() -> void:
 		preset_button.text = str(preset["label"])
 		preset_button.custom_minimum_size = Vector2(0, 26)
 		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		NavalUiTheme.apply_hud_button(preset_button, 11)
 		preset_button.pressed.connect(func() -> void:
 			_apply_sail_debug_values(float(preset["damage"]), float(preset["burn"]), float(preset.get("hole", 1.0)))
 		)
@@ -423,12 +415,14 @@ func _setup_sail_debug_panel() -> void:
 	var sync_button := Button.new()
 	sync_button.text = "Sync"
 	sync_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	NavalUiTheme.apply_hud_button(sync_button, 11)
 	sync_button.pressed.connect(_sync_sail_debug_panel_from_player)
 	action_row.add_child(sync_button)
 
 	var reset_button := Button.new()
 	reset_button.text = "Reset"
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	NavalUiTheme.apply_hud_button(reset_button, 11)
 	reset_button.pressed.connect(func() -> void:
 		_apply_sail_debug_values(0.0, 0.0, 1.0)
 	)
@@ -456,7 +450,7 @@ func _create_debug_section(title_text: String, expanded: bool) -> Dictionary:
 	toggle.flat = true
 	toggle.text = ""
 	toggle.add_theme_font_size_override("font_size", 11)
-	toggle.add_theme_color_override("font_color", Color(1.0, 0.84, 0.54))
+	toggle.add_theme_color_override("font_color", NavalUiTheme.TEXT_ACCENT)
 	root.add_child(toggle)
 
 	var body := VBoxContainer.new()
@@ -486,6 +480,7 @@ func _create_debug_action_button(button_text: String, callback: Callable) -> But
 	button.text = button_text
 	button.custom_minimum_size = Vector2(0, 28)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	NavalUiTheme.apply_hud_button(button, 11)
 	button.pressed.connect(callback)
 	return button
 
@@ -503,16 +498,14 @@ func _create_sail_debug_slider_row(title_text: String) -> Dictionary:
 	var title := Label.new()
 	title.text = title_text
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 11)
-	title.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+	NavalUiTheme.style_body(title, 11)
 	header.add_child(title)
 
 	var value := Label.new()
 	value.text = "0.00"
 	value.custom_minimum_size.x = 38
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	value.add_theme_font_size_override("font_size", 11)
-	value.add_theme_color_override("font_color", Color(1.0, 0.88, 0.58))
+	NavalUiTheme.style_accent(value, 11)
 	header.add_child(value)
 	root.add_child(header)
 
@@ -593,7 +586,7 @@ func _attach_level_label_to_xp_bar() -> void:
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	level_label.add_theme_font_size_override("font_size", 14)
-	level_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	level_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	level_label.add_theme_constant_override("outline_size", 4)
 
 func _try_resolve_player_ship() -> void:
@@ -710,11 +703,11 @@ func update_hull_hp(current: float, maximum: float) -> void:
 		var fill_style = hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
 		if fill_style:
 			if ratio > 0.6:
-				fill_style.bg_color = Color(0.2, 0.8, 0.3, 0.9)
+				fill_style.bg_color = NavalUiTheme.STATUS_GOOD
 			elif ratio > 0.3:
-				fill_style.bg_color = Color(0.9, 0.7, 0.1, 0.9)
+				fill_style.bg_color = NavalUiTheme.STATUS_WARN
 			else:
-				fill_style.bg_color = Color(0.9, 0.2, 0.2, 0.9)
+				fill_style.bg_color = NavalUiTheme.STATUS_DANGER
 
 func update_stamina(current: float, maximum: float) -> void:
 	if stamina_bar:
@@ -724,9 +717,9 @@ func update_stamina(current: float, maximum: float) -> void:
 		var fill_style = stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
 		if fill_style:
 			if current < 1.0:
-				fill_style.bg_color = Color(0.6, 0.1, 0.1, 0.9)
+				fill_style.bg_color = NavalUiTheme.STATUS_DANGER
 			else:
-				fill_style.bg_color = Color(1.0, 0.8, 0.2, 0.9)
+				fill_style.bg_color = NavalUiTheme.STATUS_WARN
 
 func update_xp(current: int, maximum: int) -> void:
 	if xp_bar:
@@ -743,18 +736,18 @@ func update_merit(current: int, maximum: int, level: int = 1) -> void:
 		if merit_label:
 			if current >= maximum:
 				merit_label.text = "[ 병영 LEVEL UP! ]"
-				merit_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.4))
+				merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
 
 				var style = merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
 				if style:
-					style.bg_color = Color(1.0, 1.0, 0.5, 1.0)
+					style.bg_color = Color(1.0, 0.94, 0.58, 1.0)
 			else:
 				merit_label.text = "지휘 Lv.%d (%d / %d)" % [level, current, maximum]
-				merit_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+				merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 
 				var style_normal = merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
 				if style_normal:
-					style_normal.bg_color = Color(1.0, 0.8, 0.2, 0.9)
+					style_normal.bg_color = NavalUiTheme.STATUS_WARN
 
 func add_relic_icon(icon_data) -> void:
 	if relic_bar == null:
@@ -768,7 +761,7 @@ func add_relic_icon(icon_data) -> void:
 			relic_description = str(icon_data.get("description", ""))
 		var tooltip_text: String = "[%s]\n%s" % [relic_name, relic_description]
 		slot.set_meta("tooltip_text", tooltip_text.strip_edges())
-		slot.set_meta("tooltip_color", Color(0.92, 0.78, 0.28, 1.0))
+		slot.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
 		if not bool(slot.get_meta("hover_bound", false)):
 			_bind_upgrade_slot_hover(slot)
 			slot.set_meta("hover_bound", true)

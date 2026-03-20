@@ -1,5 +1,7 @@
 extends PanelContainer
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+
 const MIN_WIDTH: float = 320.0
 const OFFSET := Vector2(18.0, 16.0)
 
@@ -14,8 +16,8 @@ func _ready() -> void:
 	modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 	var tip_style = StyleBoxFlat.new()
-	tip_style.bg_color = Color(0.03, 0.045, 0.075, 0.96)
-	tip_style.border_color = Color(0.9, 0.85, 0.6, 0.9)
+	tip_style.bg_color = NavalUiTheme.PANEL_BG
+	tip_style.border_color = NavalUiTheme.BORDER_GOLD_SOFT
 	tip_style.border_width_top = 1
 	tip_style.border_width_bottom = 1
 	tip_style.border_width_left = 1
@@ -33,7 +35,9 @@ func _ready() -> void:
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label.add_theme_font_size_override("font_size", 12)
 	_label.add_theme_constant_override("line_spacing", 2)
-	_label.add_theme_color_override("font_color", Color(0.96, 0.96, 0.96))
+	_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_BODY)
+	_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+	_label.add_theme_constant_override("outline_size", 2)
 	_label.custom_minimum_size = Vector2(MIN_WIDTH - 24.0, 0.0)
 	add_child(_label)
 
@@ -83,7 +87,7 @@ func _apply_theme(accent_color: Color) -> void:
 	var style_copy = (tip_style as StyleBoxFlat).duplicate()
 	var accent = accent_color.lerp(Color.WHITE, 0.15)
 	accent.a = 0.95
-	style_copy.border_color = accent
+	style_copy.border_color = accent.lerp(NavalUiTheme.BORDER_GOLD, 0.3)
 	add_theme_stylebox_override("panel", style_copy)
 
 func _finish_hide() -> void:

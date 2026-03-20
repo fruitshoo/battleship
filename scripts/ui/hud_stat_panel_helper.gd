@@ -3,6 +3,7 @@ extends RefCounted
 const PLAYER_CANNON_BASE_DAMAGE := 25.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 static func update_stat_panel(hud) -> void:
 	if not is_instance_valid(hud.stat_panel):
@@ -201,15 +202,7 @@ static func _create_section(section: Dictionary) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.05, 0.08, 0.12, 0.76)
-	panel_style.border_color = Color(0.38, 0.55, 0.72, 0.34)
-	panel_style.set_border_width_all(1)
-	panel_style.set_corner_radius_all(8)
-	panel_style.content_margin_left = 10
-	panel_style.content_margin_right = 10
-	panel_style.content_margin_top = 8
-	panel_style.content_margin_bottom = 8
+	var panel_style := NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_DIM, 10, 1, 10.0, 8.0, 10.0, 8.0)
 	panel.add_theme_stylebox_override("panel", panel_style)
 
 	var vbox := VBoxContainer.new()
@@ -220,13 +213,12 @@ static func _create_section(section: Dictionary) -> Control:
 	header.add_theme_constant_override("separation", 8)
 	vbox.add_child(header)
 
-	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 18, Color(0.78, 0.9, 1.0))
+	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 18, NavalUiTheme.TEXT_ACCENT)
 	header.add_child(icon_label)
 
 	var title := Label.new()
 	title.text = str(section.get("title", ""))
-	title.add_theme_font_size_override("font_size", 14)
-	title.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0))
+	NavalUiTheme.style_heading(title, 14)
 	header.add_child(title)
 
 	var separator := HSeparator.new()
@@ -243,22 +235,19 @@ static func _create_stat_row(row: Dictionary) -> Control:
 	row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row_box.add_theme_constant_override("separation", 8)
 
-	row_box.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 16, Color(0.68, 0.85, 1.0)))
+	row_box.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 16, NavalUiTheme.TEXT_BLUE))
 
 	var label := Label.new()
 	label.text = str(row.get("label", ""))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.9))
+	NavalUiTheme.style_body(label, 12)
 	row_box.add_child(label)
 
 	var value := Label.new()
 	value.text = str(row.get("value", ""))
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	value.add_theme_font_size_override("font_size", 12)
-	value.add_theme_color_override("font_color", Color(0.94, 0.96, 0.99))
-	value.add_theme_color_override("font_outline_color", Color(0.03, 0.05, 0.08, 0.85))
-	value.add_theme_constant_override("outline_size", 2)
+	NavalUiTheme.style_overlay_value(value, 12)
+	value.add_theme_constant_override("outline_size", 3)
 	row_box.add_child(value)
 
 	return row_box
