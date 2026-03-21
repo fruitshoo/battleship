@@ -73,6 +73,7 @@
 			"name": "발리스타",
 			"category": 1,
 			"description": "후방 발리스타 장착",
+			"disabled": true,
 			"max_level": 5,
 			"color": "cc6619",
 			"stats": {

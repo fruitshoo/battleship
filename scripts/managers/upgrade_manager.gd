@@ -1,7 +1,7 @@
 @tool
 extends Node
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
-const RelicDataResource = preload("res://scripts/resources/relic_data.gd")
+const RelicDataResource = preload("res://scripts/resource_types/relic_data.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
@@ -30,16 +30,15 @@ var current_levels: Dictionary = {}
 var acquired_relics: Array[String] = []
 
 # 프리로드
-var soldier_scene: PackedScene = preload("res://scenes/soldier.tscn")
-var cannon_scene: PackedScene = preload("res://scenes/entities/cannon_joseon.tscn")
+var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
+var cannon_scene: PackedScene = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
 var cannonball_joseon_scene: PackedScene = preload("res://scenes/projectiles/cannonball_joseon.tscn")
-var janggun_scene: PackedScene = preload("res://scenes/entities/janggun_launcher.tscn")
-var ballista_scene: PackedScene = preload("res://scenes/entities/ballista_launcher.tscn")
+var janggun_scene: PackedScene = preload("res://scenes/entities/launchers/janggun_launcher.tscn")
+var ballista_scene: PackedScene = preload("res://scenes/entities/launchers/ballista_launcher.tscn")
 
 const SHIP_UPGRADE_IDS: Array[String] = [
 	"cannon",
 	"janggun",
-	"ballista",
 	"hull_defense",
 	"sailing",
 	"rowing",
@@ -130,18 +129,26 @@ func _load_relics_from_resources() -> bool:
 	while file_name != "":
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
 			var resource_path := "%s/%s" % [RELIC_DATA_DIR, file_name]
-			var relic_res = load(resource_path)
-			if relic_res is RelicData:
-				var relic_data := relic_res as RelicData
-				if relic_data.relic_id.is_empty():
+			var relic_res: Resource = load(resource_path)
+			if relic_res != null and relic_res.get_script() == RelicDataResource:
+				var relic_id: String = String(relic_res.get("relic_id"))
+				if relic_id.is_empty():
 					file_name = dir.get_next()
 					continue
-				RELICS[relic_data.relic_id] = {
-					"name": relic_data.relic_name,
-					"description": relic_data.description,
-					"icon": relic_data.icon,
-					"icon_texture": relic_data.icon_texture.resource_path if relic_data.icon_texture != null else "",
-					"alert_msg": relic_data.alert_msg,
+				var relic_name: String = String(relic_res.get("relic_name"))
+				var relic_description: String = String(relic_res.get("description"))
+				var relic_icon: String = String(relic_res.get("icon"))
+				var relic_alert_msg: String = String(relic_res.get("alert_msg"))
+				var icon_texture_variant: Variant = relic_res.get("icon_texture")
+				var icon_texture_path: String = ""
+				if icon_texture_variant is Texture2D:
+					icon_texture_path = (icon_texture_variant as Texture2D).resource_path
+				RELICS[relic_id] = {
+					"name": relic_name,
+					"description": relic_description,
+					"icon": relic_icon,
+					"icon_texture": icon_texture_path,
+					"alert_msg": relic_alert_msg,
 					"resource_path": resource_path,
 				}
 		file_name = dir.get_next()
@@ -251,6 +258,8 @@ func get_player_crew_roster(total_crew: int) -> Dictionary:
 func _is_upgrade_available(upgrade_id: String) -> bool:
 	if upgrade_id not in UPGRADES:
 		return false
+	if UPGRADES[upgrade_id].get("disabled", false) == true:
+		return false
 	return int(current_levels.get(upgrade_id, 0)) < int(UPGRADES[upgrade_id].get("max_level", 0))
 
 func _maybe_add_rare_fleet_upgrade(choices: Array, count: int) -> void:
@@ -294,6 +303,8 @@ func get_random_choices(count: int = 3, category_filter: int = -1) -> Array:
 			continue
 			
 		var u = UPGRADES[id]
+		if u.get("disabled", false) == true:
+			continue
 		# 카테고리 필터링 (있을 경우)
 		if category_filter != -1 and u.get("category", -1) != category_filter:
 			continue
@@ -346,6 +357,8 @@ func _sort_choices_by_preferred_order(choices: Array, preferred_ids: Array[Strin
 func apply_upgrade(upgrade_id: String) -> void:
 	if upgrade_id not in UPGRADES:
 		return
+	if UPGRADES[upgrade_id].get("disabled", false) == true:
+		return
 	if current_levels[upgrade_id] >= UPGRADES[upgrade_id]["max_level"]:
 		return
 	
@@ -375,7 +388,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
-	var ship_ui_ids = ["cannon", "janggun", "ballista", "hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal", "fleet_cannon", "fleet_hull", "supply", "gold"]
+	var ship_ui_ids = ["cannon", "janggun", "hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal", "fleet_cannon", "fleet_hull", "supply", "gold"]
 	var crew_ui_ids = ["crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
@@ -405,19 +418,7 @@ func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
 	print("[Spearman] 창병 편성 갱신! (%d명)" % spearmen)
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
-	if not ballista_scene: return
-	
-	# 이미 팔우노가 있는지 확인
-	if ship.has_node("BallistaLauncher"):
-		return
-		
-	var ballista = ballista_scene.instantiate()
-	ballista.name = "BallistaLauncher"
-	# 함선 후방 적절한 위치에 배치 (보통 꼬리 쪽 중앙)
-	# Ship.tscn의 돛이나 다른 오브젝트와 안 겹치도록 조정
-	ballista.position = Vector3(0, 1.3, 3.5)
-	ship.add_child(ballista)
-	print("[Upgrade] 팔우노(Ballista) 장착 완료.")
+	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")
 
 func _apply_crew_attack(ship: Node3D, _level: int) -> void:
 	var soldiers = _get_player_soldiers(ship)

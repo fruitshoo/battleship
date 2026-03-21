@@ -18,6 +18,7 @@ const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 var level_label: Label = null
 var score_label: Label = null
 var timer_label: Label = null
+var capture_opportunity_label: Label = null
 var difficulty_label: Label = null
 var crew_label: Label = null
 var xp_bar: ProgressBar = null
@@ -77,6 +78,7 @@ var merit_label: Label = null
 
 # Cached text/state
 var _last_timer_str: String = ""
+var _last_capture_opportunity_text: String = ""
 var _last_speed_str: String = ""
 var _last_speed_ratio: float = -1.0
 var _last_speed_mode: String = ""
@@ -107,6 +109,10 @@ var support_container: Container = null
 var support_slots: Array[PanelContainer] = []
 var active_supports: Dictionary = {} # 병사 업그레이드 ID -> 슬롯 인덱스
 var combat_stats_label: Label = null
+var combat_stats_row: HBoxContainer = null
+var combat_sunk_value_label: Label = null
+var combat_derelict_value_label: Label = null
+var combat_soldier_value_label: Label = null
 var crew_composition_label: Label = null
 var upgrade_tooltip_panel = null
 var _tooltip_slot_ref: PanelContainer = null
@@ -124,7 +130,7 @@ const SHIP_HP_BAR_HEIGHT: float = 10.0
 const SHIP_HP_BAR_OFFSET_Y: float = 34.0
 
 const SHIP_UPGRADE_IDS := [
-	"cannon", "janggun", "ballista",
+	"cannon", "janggun",
 	"hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal",
 	"fleet_cannon", "fleet_hull", "supply", "gold"
 ]
@@ -558,6 +564,7 @@ func _process(delta: float) -> void:
 		_update_hull_display()
 		_update_stamina_display()
 		_update_boarding_display()
+		_update_capture_opportunity_display()
 		_update_ship_health_bars(false)
 	if show_stat_panel:
 		_stat_refresh_left -= delta
@@ -976,6 +983,9 @@ func _update_stamina_display() -> void:
 
 func _update_boarding_display() -> void:
 	HudUpdateHelper.update_boarding_display(self)
+
+func _update_capture_opportunity_display() -> void:
+	HudUpdateHelper.update_capture_opportunity_display(self)
 
 
 func show_game_over() -> void:
