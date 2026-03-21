@@ -18,8 +18,9 @@ static func show_fleet_upgrade_ui(lm: Node) -> void:
 	lm._upgrade_ui_instance = lm.upgrade_ui_scene.instantiate()
 	lm.add_child(lm._upgrade_ui_instance)
 	lm._upgrade_ui_instance.get_node("VBox/TitleLabel").text = "지휘 강화 (병사)"
+	lm._upgrade_ui_instance.reroll_requested.connect(lm._on_fleet_reroll_requested)
 
-	lm._upgrade_ui_instance.show_upgrades(choices, 0)
+	lm._upgrade_ui_instance.show_upgrades(choices, lm.crew_rerolls_available)
 	lm._upgrade_ui_instance.upgrade_chosen.connect(lm._on_fleet_upgrade_chosen)
 
 static func on_fleet_upgrade_chosen(lm: Node, upgrade_id: String) -> void:
@@ -41,6 +42,16 @@ static func finalize_merit_levelup(lm: Node, upgrade_id: String) -> void:
 	if lm.hud and lm.hud.has_method("update_merit"):
 		lm.hud.update_merit(lm.merit_points, lm.max_merit_points, lm.merit_level)
 
+static func on_fleet_reroll_requested(lm: Node) -> void:
+	if lm.crew_rerolls_available <= 0:
+		return
+
+	lm.crew_rerolls_available -= 1
+	var choices = UpgradeManager.get_command_upgrade_choices(3)
+	if lm._upgrade_ui_instance:
+		lm._upgrade_ui_instance.show_upgrades(choices, lm.crew_rerolls_available)
+		print("[Reroll] 병사 리롤 사용! (남은 횟수: %d)" % lm.crew_rerolls_available)
+
 static func show_upgrade_ui(lm: Node, choice_count: int = 3) -> void:
 	if not is_instance_valid(UpgradeManager):
 		return
@@ -58,17 +69,17 @@ static func show_upgrade_ui(lm: Node, choice_count: int = 3) -> void:
 	lm.add_child(lm._upgrade_ui_instance)
 	lm._upgrade_ui_instance.upgrade_chosen.connect(lm._on_upgrade_chosen)
 	lm._upgrade_ui_instance.reroll_requested.connect(lm._on_reroll_requested)
-	lm._upgrade_ui_instance.show_upgrades(choices, lm.rerolls_available)
+	lm._upgrade_ui_instance.show_upgrades(choices, lm.ship_rerolls_available)
 
 static func on_reroll_requested(lm: Node) -> void:
-	if lm.rerolls_available <= 0:
+	if lm.ship_rerolls_available <= 0:
 		return
 
-	lm.rerolls_available -= 1
+	lm.ship_rerolls_available -= 1
 	var choices = UpgradeManager.get_ship_upgrade_choices(3)
 	if lm._upgrade_ui_instance:
-		lm._upgrade_ui_instance.show_upgrades(choices, lm.rerolls_available)
-		print("[Reroll] Reroll 사용! (남은 횟수: %d)" % lm.rerolls_available)
+		lm._upgrade_ui_instance.show_upgrades(choices, lm.ship_rerolls_available)
+		print("[Reroll] Reroll 사용! (남은 횟수: %d)" % lm.ship_rerolls_available)
 
 static func on_upgrade_chosen(lm: Node, upgrade_id: String) -> void:
 	UpgradeManager.apply_upgrade(upgrade_id)

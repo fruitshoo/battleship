@@ -1,9 +1,0 @@
-[gd_scene format=3]
-
-[ext_resource type="PackedScene" path="res://scenes/entities/cannon_japanese.tscn" id="1_base"]
-[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball_enemy_light.tscn" id="2_ball"]
-
-[node name="CannonEnemyLight" instance=ExtResource("1_base")]
-cannonball_scene = ExtResource("2_ball")
-fire_cooldown = 2.9
-detection_range = 15.0

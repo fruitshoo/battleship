@@ -1,92 +1,114 @@
 {
-    "kobayabune_melee": {
-        "name": "Kobayabune Raider",
-        "hull_hp": 70,
-        "move_speed": 7.0,
-        "boarders": 3,
-        "has_cannons": false,
-        "soldier_type": "melee",
-        "deck_height": 0.32,
-        "combat_role": "charger",
-        "allow_boarding": true,
-        "preferred_range": 3.8,
-        "range_tolerance": 0.8,
-        "retreat_distance": 3.0
-    },
-    "sekibune_melee": {
-        "name": "Melee Sekibune",
-        "hull_hp": 100,
-        "move_speed": 6.0,
-        "boarders": 4,
-        "has_cannons": false,
-        "soldier_type": "melee",
-        "collision_fit_scale": 0.84,
-        "separation_pad_scale": 0.5,
-        "deck_height": 0.4,
-        "combat_role": "charger",
-        "allow_boarding": true,
-        "preferred_range": 4.5,
-        "range_tolerance": 1.0,
-        "retreat_distance": 3.5
-    },
-    "sekibune_cannon": {
-        "name": "Cannon Sekibune",
-        "hull_hp": 100,
-        "move_speed": 4.5,
-        "boarders": 3,
-        "has_cannons": true,
-        "soldier_type": "ranged",
-        "collision_fit_scale": 0.84,
-        "separation_pad_scale": 0.5,
-        "deck_height": 0.4,
-        "combat_role": "gunner",
-        "allow_boarding": false,
-        "preferred_range": 14.0,
-        "range_tolerance": 2.5,
-        "retreat_distance": 8.5
-    },
-    "atakebune_mid": {
-        "name": "Mid-Boss Atakebune",
-        "hull_hp": 900,
-        "move_speed": 3.0,
-        "tier": 1,
-        "orbit_distance": 24.0,
-        "soldier_type": "general",
-        "deck_height": 0.75,
-        "combat_role": "gunner",
-        "allow_boarding": false,
-        "preferred_range": 14.0,
-        "range_tolerance": 2.5,
-        "retreat_distance": 7.0
-    },
-    "atakebune_final": {
-        "name": "Final Boss Atakebune",
-        "hull_hp": 4500,
-        "move_speed": 2.5,
-        "tier": 2,
-        "orbit_distance": 28.0,
-        "soldier_type": "general",
-        "deck_height": 0.75,
-        "combat_role": "gunner",
-        "allow_boarding": false,
-        "preferred_range": 16.0,
-        "range_tolerance": 2.5,
-        "retreat_distance": 9.0
-    },
-    "maengseon_ally": {
-        "name": "Maengseon Ally",
-        "hull_hp": 150,
-        "move_speed": 4.5,
-        "boarders": 4,
-        "has_cannons": true,
-        "soldier_type": "general",
-        "deck_height": 0.4
-    },
-    "panokseon_player": {
-        "name": "Player Panokseon",
-        "hull_hp": 200,
-        "move_speed": 6.0,
-        "boarders": 4,
-        "deck_height": 0.5
-    }
+	"kobayabune_melee": {
+		"name": "Kobayabune Raider",
+		"hull_hp": 70,
+		"move_speed": 7.0,
+		"boarders": 3,
+		"has_cannons": false,
+		"soldier_type": "melee",
+		"crew_composition": {
+			"melee": 3,
+			"general": 1
+		},
+		"deck_height": 0.32,
+		"combat_role": "charger",
+		"allow_boarding": true,
+		"preferred_range": 3.8,
+		"range_tolerance": 0.8,
+		"retreat_distance": 3.0
+	},
+	"sekibune_melee": {
+		"name": "Melee Sekibune",
+		"hull_hp": 100,
+		"move_speed": 6.0,
+		"boarders": 4,
+		"has_cannons": false,
+		"soldier_type": "melee",
+		"crew_composition": {
+			"melee": 3,
+			"general": 1
+		},
+		"collision_fit_scale": 0.84,
+		"separation_pad_scale": 0.5,
+		"deck_height": 0.4,
+		"combat_role": "charger",
+		"allow_boarding": true,
+		"preferred_range": 4.5,
+		"range_tolerance": 1.0,
+		"retreat_distance": 3.5
+	},
+	"sekibune_cannon": {
+		"name": "Cannon Sekibune",
+		"hull_hp": 100,
+		"move_speed": 4.5,
+		"boarders": 3,
+		"has_cannons": true,
+		"soldier_type": "ranged",
+		"crew_composition": {
+			"ranged": 2,
+			"general": 2
+		},
+		"collision_fit_scale": 0.84,
+		"separation_pad_scale": 0.5,
+		"deck_height": 0.4,
+		"combat_role": "gunner",
+		"allow_boarding": false,
+		"preferred_range": 14.0,
+		"range_tolerance": 2.5,
+		"retreat_distance": 8.5
+	},
+	"atakebune_mid": {
+		"name": "Mid-Boss Atakebune",
+		"hull_hp": 900,
+		"move_speed": 3.0,
+		"tier": 1,
+		"orbit_distance": 24.0,
+		"soldier_type": "general",
+		"crew_composition": {
+			"general": 2,
+			"melee": 1,
+			"ranged": 1
+		},
+		"deck_height": 0.75,
+		"combat_role": "gunner",
+		"allow_boarding": false,
+		"preferred_range": 14.0,
+		"range_tolerance": 2.5,
+		"retreat_distance": 7.0
+	},
+	"atakebune_final": {
+		"name": "Final Boss Atakebune",
+		"hull_hp": 4500,
+		"move_speed": 2.5,
+		"tier": 2,
+		"orbit_distance": 28.0,
+		"soldier_type": "general",
+		"crew_composition": {
+			"general": 2,
+			"melee": 1,
+			"ranged": 1
+		},
+		"deck_height": 0.75,
+		"combat_role": "gunner",
+		"allow_boarding": false,
+		"preferred_range": 16.0,
+		"range_tolerance": 2.5,
+		"retreat_distance": 9.0
+	},
+	"maengseon_ally": {
+		"name": "Maengseon Ally",
+		"hull_hp": 150,
+		"move_speed": 4.5,
+		"boarders": 4,
+		"has_cannons": true,
+		"soldier_type": "general",
+		"deck_height": 0.4
+	},
+	"panokseon_player": {
+		"name": "Player Panokseon",
+		"hull_hp": 200,
+		"move_speed": 6.0,
+		"boarders": 4,
+		"deck_height": 0.5
+	}
 }

@@ -1,4 +1,5 @@
 extends "res://scripts/entities/weapons/weapon.gd"
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -13,7 +14,7 @@ func _ready() -> void:
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return
 	
-	var arrow = arrow_scene.instantiate() as Node3D
+	var arrow = ScenePool.acquire(attacker.get_tree(), arrow_scene) as Node3D
 	# 발사 위치는 활(또는 병사 가슴 위치) 부근으로 약간 보정
 	var spawn_pos = attacker.global_position
 	spawn_pos.y += 0.8
@@ -50,37 +51,32 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 			ship_vel = s_dir * s_speed
 			
 	var total_vel = local_vel + ship_vel
-	current_target_pos += total_vel * time_to_reach * 0.85 # 85% 예측
+	current_target_pos += total_vel * time_to_reach * 0.92 # 예측을 조금 더 적극적으로
 
 	
 	# 약간의 오차 (흩뿌림) 적용 - 기존보다 하향하여 명중률 상승 (-0.2 ~ 0.2)
-	current_target_pos.x += randf_range(-0.2, 0.2)
-	current_target_pos.z += randf_range(-0.2, 0.2)
-	
-	# 데이터 설정 (SceneTree에 추가하기 전에 설정하여 _ready에서 사용 가능하게 함)
-	if "start_pos" in arrow: arrow.start_pos = spawn_pos
-	if "target_pos" in arrow: arrow.target_pos = current_target_pos
-	if "target_node" in arrow: arrow.target_node = target # 목표 노드 전달 (강제 명중 판정용)
-	if "speed" in arrow: arrow.speed = arrow_speed # 속도 강제 동기화
+	current_target_pos.x += randf_range(-0.12, 0.12)
+	current_target_pos.z += randf_range(-0.12, 0.12)
 	
 	var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
-	if "damage" in arrow: arrow.damage = damage * dmg_mult
-	
-	# 병사 팀 정보 전달
-	if "team" in arrow:
-		if "team" in attacker:
-			arrow.team = attacker.get("team")
-	if "damage_source" in arrow:
-		arrow.damage_source = "bow"
-			
-	# 거리에 따른 곡선 조절
-	if "arc_height" in arrow:
-		var dist = spawn_pos.distance_to(current_target_pos)
-		arrow.arc_height = clamp(dist * 0.3, 1.0, 5.0)
+	var team_name: String = str(attacker.get("team")) if "team" in attacker else "player"
+	var dist = spawn_pos.distance_to(current_target_pos)
+	var final_arc_height: float = clamp(dist * 0.3, 1.0, 5.0)
 	
 	# 레벨 매니저 또는 부모 트리에 추가 (이 시점에 _ready 실행됨)
 	var spawn_parent = _resolve_spawn_parent(attacker.get_tree())
 	spawn_parent.add_child(arrow)
+	if arrow.has_method("launch"):
+		arrow.launch(
+			spawn_pos,
+			current_target_pos,
+			target,
+			team_name,
+			damage * dmg_mult,
+			"bow",
+			arrow_speed,
+			final_arc_height
+		)
 		
 	# 위치 및 방향 최종 보정
 	arrow.global_position = spawn_pos

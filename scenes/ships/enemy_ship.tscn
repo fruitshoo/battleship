@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://dhgl16b2bfb5i"]
+
+[ext_resource type="Script" path="res://scripts/entities/ships/chaser_ship.gd" id="1_chaser"]
+[ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
+[ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
+[ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_proximity"]
+size = Vector3(3.6, 2.2, 8.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape_hit"]
+size = Vector3(3, 2, 8)
+
+[node name="EnemyShip" type="Area3D" unique_id=2138341481 groups=["enemy"]]
+collision_layer = 4
+collision_mask = 2
+script = ExtResource("1_chaser")
+max_speed = 6.0
+length_multiplier = 0.939
+width_multiplier = 0.43700000000000006
+floating_offset = 0.5
+max_hull_hp = 100.0
+
+[node name="ProximityArea" type="Area3D" parent="." unique_id=694699390 groups=["ship_proximity"]]
+collision_layer = 4
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=1935515166]
+shape = SubResource("BoxShape_proximity")
+
+[node name="HitArea" type="Area3D" parent="." unique_id=1043851433 groups=["ship_hitbox"]]
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=240060993]
+shape = SubResource("BoxShape_hit")
+
+[node name="Soldiers" type="Node3D" parent="." unique_id=470013572]
+
+[node name="Archer1" parent="Soldiers" unique_id=438727161 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+team = "enemy"
+
+[node name="Archer2" parent="Soldiers" unique_id=1097590409 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+team = "enemy"
+
+[node name="Archer3" parent="Soldiers" unique_id=2073146356 instance=ExtResource("2_soldier")]
+team = "enemy"
+
+[node name="WakeTrail" parent="." unique_id=1464356147 instance=ExtResource("3_wake_trail")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
+
+[node name="CollisionVisualizer" type="Node3D" parent="." unique_id=1919619224]
+script = ExtResource("sys_vis_script")
+
+[connection signal="area_entered" from="ProximityArea" to="." method="_on_area_entered"]
+[connection signal="body_entered" from="ProximityArea" to="." method="_on_body_entered"]

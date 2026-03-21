@@ -7,7 +7,7 @@
 [ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="5_attributes"]
 [ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="5_spawner"]
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
-[ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/player_ship.tscn" id="10_choun"]
+[ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
@@ -28,8 +28,16 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 0.642788, 0.766044, 0, -0.766044, 0.642788, 0, 35, 45)
 environment = ExtResource("1_h2yge")
 attributes = ExtResource("5_attributes")
+fov = 56.0
 script = ExtResource("4_o6xl0")
 target_path = NodePath("../PlayerShip")
+pitch_degrees = -42.0
+lead_distance = 6.2
+offset = Vector3(0, 18, 24)
+zoom_speed = 3.2
+min_zoom = 18.0
+max_zoom = 66.0
+zoom_smooth_speed = 24.0
 
 [node name="EnemySpawner" type="Node" parent="." unique_id=2113834434]
 script = ExtResource("5_spawner")

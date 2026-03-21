@@ -24,6 +24,8 @@ const GAME_SCENE_PATH := "res://scenes/main.tscn"
 @onready var quit_button: Button = $Margin/Frame/Layout/RightColumn/Buttons/QuitButton
 
 var _modal_open: bool = false
+var _menu_buttons: Array[Button] = []
+var _focused_button_index: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -34,8 +36,63 @@ func _ready() -> void:
 	options_button.pressed.connect(_on_options_pressed)
 	quit_button.pressed.connect(_on_quit_pressed)
 	quit_button.visible = OS.get_name() != "Web"
+	_menu_buttons = [start_button, meta_button, options_button]
+	if quit_button.visible:
+		_menu_buttons.append(quit_button)
 	_refresh_gold_label()
 	SaveManager.apply_settings()
+	_focus_first_menu_button()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _modal_open:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_event: InputEventKey = event
+		match key_event.physical_keycode:
+			KEY_W, KEY_A:
+				_move_menu_focus(-1)
+				get_viewport().set_input_as_handled()
+			KEY_S, KEY_D:
+				_move_menu_focus(1)
+				get_viewport().set_input_as_handled()
+			KEY_SPACE:
+				_activate_focused_menu_button()
+				get_viewport().set_input_as_handled()
+
+
+func _focus_first_menu_button() -> void:
+	for i in range(_menu_buttons.size()):
+		var button: Button = _menu_buttons[i]
+		if is_instance_valid(button) and button.visible and not button.disabled:
+			_focused_button_index = i
+			button.grab_focus()
+			return
+
+
+func _move_menu_focus(direction: int) -> void:
+	if _menu_buttons.is_empty():
+		return
+	var button_count: int = _menu_buttons.size()
+	for step in range(1, button_count + 1):
+		var next_index: int = posmod(_focused_button_index + direction * step, button_count)
+		var button: Button = _menu_buttons[next_index]
+		if is_instance_valid(button) and button.visible and not button.disabled:
+			_focused_button_index = next_index
+			button.grab_focus()
+			return
+
+
+func _activate_focused_menu_button() -> void:
+	if _menu_buttons.is_empty():
+		return
+	if _focused_button_index < 0 or _focused_button_index >= _menu_buttons.size():
+		_focus_first_menu_button()
+		return
+	var button: Button = _menu_buttons[_focused_button_index]
+	if not is_instance_valid(button) or not button.visible or button.disabled:
+		return
+	button.emit_signal("pressed")
 
 func _apply_background_settings() -> void:
 	if is_instance_valid(background_image):
@@ -75,6 +132,8 @@ func _set_buttons_disabled(disabled: bool) -> void:
 	meta_button.disabled = disabled
 	options_button.disabled = disabled
 	quit_button.disabled = disabled
+	if not disabled:
+		_focus_first_menu_button()
 
 func _on_start_pressed() -> void:
 	if _modal_open:

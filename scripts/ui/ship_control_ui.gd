@@ -104,10 +104,18 @@ func _apply_theme() -> void:
 		arrow_shaft.offset_bottom = 4.0
 	if is_instance_valid(arrow_head):
 		arrow_head.color = arrow_color
-		arrow_head.polygon = PackedVector2Array(-9, -46, 9, -46, 0, -66)
+		arrow_head.polygon = PackedVector2Array([
+			Vector2(-9, -46),
+			Vector2(9, -46),
+			Vector2(0, -66),
+		])
 	if is_instance_valid(arrow_tail):
 		arrow_tail.color = arrow_tail_color
-		arrow_tail.polygon = PackedVector2Array(-5, 6, 5, 6, 0, 22)
+		arrow_tail.polygon = PackedVector2Array([
+			Vector2(-5, 6),
+			Vector2(5, 6),
+			Vector2(0, 22),
+		])
 	if is_instance_valid(arrow_glow):
 		arrow_glow.color = Color(0.96, 0.82, 0.42, 0.06)
 		arrow_glow.visible = false

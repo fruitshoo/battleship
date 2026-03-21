@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b5wbjidib2gb0"]
 
-[ext_resource type="PackedScene" path="res://scenes/entities/cannon_enemy_medium.tscn" id="cannon_scene"]
+[ext_resource type="PackedScene" path="res://scenes/entities/launchers/cannon_enemy_medium.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
@@ -25,6 +25,8 @@ surface_material_override/0 = SubResource("Material_japan_dark")
 [node name="Mast" parent="." unique_id=1940494656 instance=ExtResource("mast_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2)
 sail_texture = ExtResource("vertical_sail")
+sail_uv_scale = Vector2(0.945, 10)
+sail_uv_offset = Vector2(0.02, 0.26)
 
 [node name="RudderVisual" parent="." unique_id=1421969887 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 5.5)

@@ -54,6 +54,8 @@ var _last_faced_dir: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	global_position = start_pos
+	monitoring = false
+	monitorable = false
 	_life_left = lifetime
 	_lock_on_left = maxf(0.0, lock_on_delay)
 	_homing_left = maxf(0.0, homing_duration)
@@ -91,9 +93,6 @@ func _ready() -> void:
 		
 		audio_manager.play_sfx(sfx_name, global_position, randf_range(0.9, 1.1))
 	
-	area_entered.connect(_on_hit)
-	body_entered.connect(_on_hit)
-
 func _physics_process(delta: float) -> void:
 	if has_exploded:
 		return

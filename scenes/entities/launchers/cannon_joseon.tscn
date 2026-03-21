@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://c6r6r6r6r6r6"]
+
+[ext_resource type="Script" path="res://scripts/entities/launchers/cannon.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball_joseon.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://blknmmdm7x4ch" path="res://assets/models/props/cannon/cannon.glb" id="3_model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_detection"]
+size = Vector3(10, 5, 30)
+
+[node name="CannonJoseon" type="Node3D"]
+script = ExtResource("1")
+cannonball_scene = ExtResource("2")
+fire_cooldown = 2.5
+detection_range = 24.0
+
+[node name="CannonModel" parent="." instance=ExtResource("3_model")]
+transform = Transform3D(-0.7, 0, -1.0569706e-07, 0, 0.7, 0, 1.0569706e-07, 0, -0.7, 0, 0, 0)
+
+[node name="Muzzle" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9208505, -1.2203976)
+
+[node name="DetectionArea" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -15)
+collision_layer = 0
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea"]
+shape = SubResource("BoxShape_detection")

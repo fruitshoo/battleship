@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://o87wm0hgwlmn"]
 
-[ext_resource type="PackedScene" uid="uid://urin2213gxp6" path="res://scenes/entities/props/square_shield.tscn" id="3_xr3xt"]
+[ext_resource type="PackedScene" uid="uid://urin2213gxp6" path="res://scenes/props/square_shield.tscn" id="3_xr3xt"]
 [ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="4_0irex"]
 [ext_resource type="Texture2D" uid="uid://cpd4hpqapp43q" path="res://assets/models/props/sail/horizon_sail.png" id="horizon_sail"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
@@ -20,6 +20,8 @@ surface_material_override/0 = SubResource("Material_wood_light")
 
 [node name="Mast" parent="." unique_id=1395988195 instance=ExtResource("mast_scene")]
 sail_texture = ExtResource("horizon_sail")
+sail_uv_scale = Vector2(1, 2.01)
+sail_uv_offset = Vector2(0, 0)
 
 [node name="RudderVisual" parent="." unique_id=1685454611 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.2194414)

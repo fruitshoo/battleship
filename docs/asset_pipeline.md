@@ -76,7 +76,7 @@ Each asset folder should contain:
 
 Runtime entry scenes go under:
 
-- `scenes/entities/props/`
+- `scenes/props/`
 
 Examples:
 
@@ -133,4 +133,4 @@ Not safe to remove blindly:
 1. New shared-atlas props use `gltf separate`.
 2. Existing `glb` props stay as-is until they need re-export.
 3. Re-export old `glb` assets one by one and remove compatibility texture files afterward.
-4. Keep stable gameplay entry scenes in `scenes/entities/props/` even if the underlying import format changes.
+4. Keep stable gameplay entry scenes in `scenes/props/` even if the underlying import format changes.

@@ -11,7 +11,39 @@
     "blockade_chance": 0.8,
     "blockade_min_ships": 2,
     "blockade_max_ships": 3,
-    "blockade_spacing": 15.0
+    "blockade_spacing": 15.0,
+    "blockade_patterns": [
+      {
+        "name": "hunter_pair",
+        "ships": [
+          { "ship_type": "kobayabune_melee", "role": "vanguard" },
+          { "ship_type": "sekibune_cannon", "role": "gunline" }
+        ]
+      },
+      {
+        "name": "raider_pair",
+        "ships": [
+          { "ship_type": "kobayabune_melee", "role": "vanguard" },
+          { "ship_type": "kobayabune_melee", "role": "flanker" }
+        ]
+      },
+      {
+        "name": "crossfire_trio",
+        "ships": [
+          { "ship_type": "sekibune_cannon", "role": "gunline" },
+          { "ship_type": "kobayabune_melee", "role": "vanguard" },
+          { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+        ]
+      },
+      {
+        "name": "breaker_trio",
+        "ships": [
+          { "ship_type": "kobayabune_melee", "role": "flanker" },
+          { "ship_type": "kobayabune_melee", "role": "vanguard" },
+          { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+        ]
+      }
+    ]
   },
   "enemy_mix": {
     "cannon_chance_start_time": 75.0,
@@ -23,7 +55,7 @@
     "max_elite_spawns": 4
   },
   "mid_boss_escort": [
-    { "ship_type": "sekibune_cannon", "lateral": -12.0, "back": 8.0 },
-    { "ship_type": "kobayabune_melee", "lateral": 12.0, "back": 10.0 }
+    { "ship_type": "sekibune_cannon", "role": "gunline", "lateral": -12.0, "back": 8.0 },
+    { "ship_type": "kobayabune_melee", "role": "vanguard", "lateral": 12.0, "back": 10.0 }
   ]
 }

@@ -2,6 +2,7 @@ extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
+const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
 
 ## 화살 (Arrow)
 ## 병사가 쏘는 원거리 투사체
@@ -9,6 +10,7 @@ const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 @export var damage: float = 15.0
 @export var speed: float = 25.0 # 초당 이동 거리 (이전 20.0 -> 8.0 -> 14.0 -> 16.0 -> 25.0)
 @export var arc_height: float = 2.0 # 포물선 최대 높이
+@export var terminal_hit_radius: float = 3.8
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -20,31 +22,95 @@ var fire_damage: float = 0.0
 
 var progress: float = 0.0
 var duration: float = 1.0
+var _is_releasing: bool = false
+var _rotation_update_timer: float = 0.0
 
 func _ready() -> void:
-	# 초기화: 소환 시점에 설정된 위치 데이터로 계산
-	var distance = start_pos.distance_to(target_pos)
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 48
+
+func launch(
+	spawn_position: Vector3,
+	final_target_pos: Vector3,
+	final_target_node: Node3D,
+	fire_team: String,
+	final_damage: float,
+	final_damage_source: String,
+	arrow_speed: float,
+	final_arc_height: float
+) -> void:
+	start_pos = spawn_position
+	target_pos = final_target_pos
+	target_node = final_target_node
+	team = fire_team
+	damage = final_damage
+	damage_source = final_damage_source
+	speed = arrow_speed
+	arc_height = final_arc_height
+	progress = 0.0
+	_is_releasing = false
+	_rotation_update_timer = 0.0
+	visible = true
+	process_mode = Node.PROCESS_MODE_INHERIT
+	monitoring = false
+	monitorable = false
+
+	var distance: float = start_pos.distance_to(target_pos)
 	duration = distance / speed
-	if duration < 0.2: duration = 0.2
-	
+	if duration < 0.2:
+		duration = 0.2
+
 	global_position = start_pos
-	
-	# 신호 연결
-	area_entered.connect(_on_area_entered)
-	body_entered.connect(_on_body_entered)
+	var look_target: Vector3 = target_pos
+	var up_vec := Vector3.UP
+	if abs((look_target - global_position).normalized().y) > 0.999:
+		up_vec = Vector3.RIGHT
+	look_at(look_target, up_vec)
+
+func pool_reset() -> void:
+	progress = 0.0
+	duration = 1.0
+	start_pos = Vector3.ZERO
+	target_pos = Vector3.ZERO
+	target_node = null
+	team = "player"
+	damage_source = "bow"
+	is_fire_arrow = false
+	fire_damage = 0.0
+	_is_releasing = false
+	_rotation_update_timer = 0.0
+	visible = false
+	process_mode = Node.PROCESS_MODE_DISABLED
+	monitoring = false
+	monitorable = false
+
+func _release_self() -> void:
+	if _is_releasing:
+		return
+	_is_releasing = true
+	if is_inside_tree():
+		set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+		call_deferred("_finalize_release")
+	else:
+		process_mode = Node.PROCESS_MODE_DISABLED
+		ScenePool.release(self)
+
+func _finalize_release() -> void:
+	if not is_instance_valid(self):
+		return
+	ScenePool.release(self)
 
 func _physics_process(delta: float) -> void:
+	if _is_releasing:
+		return
 	progress += delta / duration
 	
 	if progress >= 1.0:
-		# 도달 시 강제 타격 판정 (트리거 충돌 무시 현상 방지)
-		if is_instance_valid(target_node) and not target_node.is_queued_for_deletion():
-			# 목표물이 아직 주변에 있다면 (이동 중일 수 있으므로 반경 3.0m 이내 허용)
-			if global_position.distance_to(target_node.global_position) < 3.0:
-				_check_hit(target_node)
-				
 		global_position = target_pos
-		queue_free()
+		_resolve_terminal_hit()
+		_release_self()
 		return
 	
 	# 수평 이동 (LERP)
@@ -54,8 +120,10 @@ func _physics_process(delta: float) -> void:
 	var y_offset = sin(PI * progress) * arc_height
 	current_pos.y += y_offset
 	
-	# 회전 (진행 방향 응시)
-	if (current_pos - global_position).length_squared() > 0.001:
+	# 아주 작은 탄체라 매 physics frame 회전까지 할 필요는 없다.
+	_rotation_update_timer += delta
+	if _rotation_update_timer >= 0.05 and (current_pos - global_position).length_squared() > 0.001:
+		_rotation_update_timer = 0.0
 		var dir = (current_pos - global_position).normalized()
 		var up_vec = Vector3.UP
 		if abs(dir.y) > 0.999:
@@ -70,10 +138,9 @@ func _physics_process(delta: float) -> void:
 
 func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
-	var water_explosion_scene = preload("res://scenes/effects/water_burst.tscn")
-	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
+	if WATER_BURST_SCENE and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
 		var pos = global_position
-		var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
+		var explosion = ScenePool.acquire(get_tree(), WATER_BURST_SCENE)
 		if explosion.has_method("configure_as_small"):
 			explosion.configure_as_small()
 		explosion.position = Vector3(pos.x, 0.05, pos.z)
@@ -85,34 +152,18 @@ func _splash_and_sink() -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("water_splash_small", global_position, randf_range(0.9, 1.2))
 		
-	queue_free()
+	_release_self()
 
-func _on_area_entered(area: Area3D) -> void:
-	_check_hit(area)
-
-func _on_body_entered(body: Node3D) -> void:
-	_check_hit(body)
-
-func _check_hit(target: Node) -> void:
-	# 자신과 같은 팀이면 무시
-	if target.is_in_group("soldiers"):
-		if target.get("team") == team:
-			return
-		
-		# 적군 병사 피격
-		if target.has_method("take_damage"):
-			target.take_damage(damage, global_position, damage_source)
-			# 불화살 이펙트 소환 등 가능
-			queue_free()
-	
-	# 적 배 피격 (HitArea 등 하위 노드에서 부모 함선까지 자동 해석)
-	var potential_ship = HitTargetResolver.resolve_ship_from_node(target)
-	if potential_ship:
-		var is_sinking = potential_ship.get("is_sinking") == true
-		if is_sinking:
-			queue_free()
-			return
-		
-		# 활/연노는 선체를 공격하지 않는다.
-		# 배와 스치거나 히트박스를 지나가더라도 무시하고 계속 날아가 병사만 노린다.
+func _resolve_terminal_hit() -> void:
+	if not is_instance_valid(target_node):
 		return
+	if target_node.is_queued_for_deletion():
+		return
+	if not target_node.is_in_group("soldiers"):
+		return
+	if target_node.get("team") == team:
+		return
+	if global_position.distance_to(target_node.global_position) > terminal_hit_radius:
+		return
+	if target_node.has_method("take_damage"):
+		target_node.take_damage(damage, global_position, damage_source)

@@ -71,14 +71,64 @@ static func setup_top_left_layout(hud) -> void:
 
 	hud.combat_stats_label = Label.new()
 	hud.combat_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	NavalUiTheme.style_body(hud.combat_stats_label, 12)
-	hud.combat_stats_label.text = "[전과] 격침 0 | 나포 0 | 병사 0"
+	NavalUiTheme.style_muted(hud.combat_stats_label, 12)
+	hud.combat_stats_label.text = "[전과]"
 	hud.top_left_container.add_child(hud.combat_stats_label)
+
+	hud.combat_stats_row = HBoxContainer.new()
+	hud.combat_stats_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	hud.combat_stats_row.add_theme_constant_override("separation", 8)
+	hud.top_left_container.add_child(hud.combat_stats_row)
+
+	var sunk_chip: PanelContainer = _create_combat_stat_chip(hud, "directions_boat", NavalUiTheme.TEXT_BLUE, "combat_sunk_value_label", "0")
+	var derelict_chip: PanelContainer = _create_combat_stat_chip(hud, "sailing", NavalUiTheme.TEXT_GOLD, "combat_derelict_value_label", "0")
+	var soldier_chip: PanelContainer = _create_combat_stat_chip(hud, "groups", NavalUiTheme.TEXT_ACCENT, "combat_soldier_value_label", "0")
+	sunk_chip.set_meta("tooltip_text", "격침: 적 함선을 침몰시킨 횟수")
+	sunk_chip.set_meta("tooltip_color", NavalUiTheme.TEXT_BLUE)
+	derelict_chip.set_meta("tooltip_text", "나포(폐선화): 적 병사를 모두 제거해 폐선 상태로 만든 횟수")
+	derelict_chip.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
+	soldier_chip.set_meta("tooltip_text", "병사 처치: 전투 사살과 수장을 포함한 적 병사 총 처치 수")
+	soldier_chip.set_meta("tooltip_color", NavalUiTheme.TEXT_ACCENT)
+	hud._bind_upgrade_slot_hover(sunk_chip)
+	hud._bind_upgrade_slot_hover(derelict_chip)
+	hud._bind_upgrade_slot_hover(soldier_chip)
+	hud.combat_stats_row.add_child(sunk_chip)
+	hud.combat_stats_row.add_child(derelict_chip)
+	hud.combat_stats_row.add_child(soldier_chip)
 
 	if hud.difficulty_label:
 		move_label_to_container(hud.difficulty_label, hud.top_left_container)
 		hud.difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		NavalUiTheme.style_muted(hud.difficulty_label, 12)
+
+static func _create_combat_stat_chip(hud, icon_name: String, icon_color: Color, value_property_name: String, initial_text: String) -> PanelContainer:
+	var chip := PanelContainer.new()
+	var chip_style := NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_DIM, 9, 1, 8.0, 5.0, 8.0, 5.0)
+	chip.add_theme_stylebox_override("panel", chip_style)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 5)
+	chip.add_child(row)
+
+	var icon_label := Label.new()
+	icon_label.custom_minimum_size = Vector2(16, 16)
+	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	icon_label.add_theme_font_size_override("font_size", 14)
+	icon_label.add_theme_color_override("font_color", icon_color)
+	if MATERIAL_SYMBOLS_FONT:
+		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
+	icon_label.text = icon_name
+	row.add_child(icon_label)
+
+	var value_label := Label.new()
+	value_label.text = initial_text
+	NavalUiTheme.style_overlay_value(value_label, 12)
+	value_label.add_theme_constant_override("outline_size", 3)
+	row.add_child(value_label)
+
+	hud.set(value_property_name, value_label)
+	return chip
 
 static func setup_top_center_layout(hud) -> void:
 	if hud == null:
@@ -93,12 +143,27 @@ static func setup_top_center_layout(hud) -> void:
 	var time_sb := NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_SOFT, 12, 1, 16.0, 4.0, 16.0, 4.0)
 	top_center_container.add_theme_stylebox_override("panel", time_sb)
 
-	move_label_to_container(hud.timer_label, top_center_container)
+	var top_center_box := VBoxContainer.new()
+	top_center_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_center_box.add_theme_constant_override("separation", 1)
+	top_center_container.add_child(top_center_box)
+
+	move_label_to_container(hud.timer_label, top_center_box)
 	hud.timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hud.timer_label.add_theme_font_size_override("font_size", 22)
 	hud.timer_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 	hud.timer_label.add_theme_color_override("font_shadow_color", NavalUiTheme.OUTLINE_DARK)
 	hud.timer_label.add_theme_constant_override("shadow_outline_size", 2)
+
+	hud.capture_opportunity_label = Label.new()
+	hud.capture_opportunity_label.name = "CaptureOpportunityLabel"
+	hud.capture_opportunity_label.text = ""
+	hud.capture_opportunity_label.visible = false
+	hud.capture_opportunity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NavalUiTheme.style_gold(hud.capture_opportunity_label, 11)
+	hud.capture_opportunity_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+	hud.capture_opportunity_label.add_theme_constant_override("outline_size", 3)
+	top_center_box.add_child(hud.capture_opportunity_label)
 
 # Right side
 static func setup_top_right_layout(hud) -> void:

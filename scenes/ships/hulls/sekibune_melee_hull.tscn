@@ -18,6 +18,8 @@ surface_material_override/0 = SubResource("Material_japan_wood")
 
 [node name="Mast" parent="." instance=ExtResource("mast_scene")]
 sail_texture = ExtResource("vertical_sail")
+sail_uv_scale = Vector2(0.945, 10)
+sail_uv_offset = Vector2(0.02, 0.26)
 
 [node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.5)

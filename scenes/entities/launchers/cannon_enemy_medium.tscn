@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/entities/launchers/cannon_japanese.tscn" id="1_base"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball_enemy_medium.tscn" id="2_ball"]
+
+[node name="CannonEnemyMedium" instance=ExtResource("1_base")]
+cannonball_scene = ExtResource("2_ball")
+fire_cooldown = 2.8
+detection_range = 17.0

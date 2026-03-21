@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cnr7kfcyhyssw"]
 
-[ext_resource type="PackedScene" path="res://scenes/entities/props/round_shield.tscn" id="4_77l81"]
-[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/cannon_joseon.tscn" id="cannon_scene"]
+[ext_resource type="PackedScene" path="res://scenes/props/round_shield.tscn" id="4_77l81"]
+[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
 [ext_resource type="Texture2D" uid="uid://cpd4hpqapp43q" path="res://assets/models/props/sail/horizon_sail.png" id="horizon_sail"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]

@@ -118,6 +118,9 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 		var smoke = ScenePool.acquire(get_tree(), impact_smoke_scene)
 		if smoke.has_method("configure_as_hit"):
 			smoke.configure_as_hit()
+		if smoke.has_method("set_intensity"):
+			var hit_intensity: float = 1.0 + (0.22 if _is_crit else 0.0)
+			smoke.set_intensity(clampf(hit_intensity, 1.0, 1.35))
 		get_tree().root.add_child(smoke)
 		smoke.global_position = global_position
 		# 연기는 위쪽으로 퍼지게.
@@ -278,6 +281,8 @@ func _spawn_water_explosion() -> void:
 	var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
 	if explosion.has_method("configure_as_splash"):
 		explosion.configure_as_splash()
+	if explosion.has_method("set_intensity"):
+		explosion.set_intensity(0.95)
 	# 수면 높이에 맞춘 위치를 한 번에 설정
 	# 대포알은 root에 추가되므로 position이 global_position과 동일하며, 
 	# 씬 트리에 없는 노드의 global_position을 건드리면 에러가 발생하므로 position 사용.

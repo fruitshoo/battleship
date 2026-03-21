@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://j6r6r6r6r6r6"]
+
+[ext_resource type="Script" path="res://scripts/entities/launchers/cannon.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball_japanese.tscn" id="2"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_japanese"]
+top_radius = 0.15
+bottom_radius = 0.22
+height = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Material_japanese"]
+albedo_color = Color(0.12, 0.12, 0.15, 1)
+metallic = 0.7
+roughness = 0.5
+
+[sub_resource type="BoxShape3D" id="BoxShape_detection"]
+size = Vector3(10, 5, 30)
+
+[node name="CannonJapanese" type="Node3D"]
+script = ExtResource("1")
+cannonball_scene = ExtResource("2")
+fire_cooldown = 2.6
+detection_range = 15.0
+
+[node name="Barrel" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, -0.3)
+mesh = SubResource("CylinderMesh_japanese")
+surface_material_override/0 = SubResource("Material_japanese")
+
+[node name="Muzzle" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.9)
+
+[node name="DetectionArea" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -15)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea"]
+shape = SubResource("BoxShape_detection")

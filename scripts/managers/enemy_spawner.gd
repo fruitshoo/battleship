@@ -6,7 +6,7 @@ const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 ## 적 생성 관리자 (Enemy Spawner)
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
 
-@export var enemy_scene: PackedScene = preload("res://scenes/enemy_ship.tscn")
+@export var enemy_scene: PackedScene = preload("res://scenes/ships/enemy_ship.tscn")
 @export var spawn_interval: float = 5.2 # 생성 주기 (초)
 @export var min_spawn_distance: float = 50.0 # 최소 생성 거리 (화면 안으로 더 빨리 들어오게 조정)
 @export var max_spawn_distance: float = 70.0 # 최대 생성 거리
@@ -15,7 +15,7 @@ const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 @export var max_distance_limit: float = 115.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
 
-@export var boss_scene: PackedScene = preload("res://scenes/entities/boss_ship.tscn")
+@export var boss_scene: PackedScene = preload("res://scenes/ships/boss_ship.tscn")
 
 var timer: float = 0.0
 var reposition_timer: float = 0.0
@@ -31,12 +31,36 @@ var blockade_chance: float = 0.8
 var blockade_min_ships: int = 2
 var blockade_max_ships: int = 3
 var blockade_spacing: float = 15.0
+var blockade_patterns: Dictionary = {
+	2: [
+		[
+			{"ship_type": "kobayabune_melee", "role": "vanguard"},
+			{"ship_type": "sekibune_cannon", "role": "gunline"},
+		],
+		[
+			{"ship_type": "kobayabune_melee", "role": "vanguard"},
+			{"ship_type": "kobayabune_melee", "role": "flanker"},
+		],
+	],
+	3: [
+		[
+			{"ship_type": "sekibune_cannon", "role": "gunline"},
+			{"ship_type": "kobayabune_melee", "role": "vanguard"},
+			{"ship_type": "sekibune_cannon", "role": "pressure_gunner"},
+		],
+		[
+			{"ship_type": "kobayabune_melee", "role": "flanker"},
+			{"ship_type": "kobayabune_melee", "role": "vanguard"},
+			{"ship_type": "sekibune_cannon", "role": "pressure_gunner"},
+		],
+	]
+}
 var cannon_chance_start_time: float = 75.0
 var cannon_chance_ramp_duration: float = 165.0
 var cannon_chance_max: float = 0.45
 var mid_boss_escort_layout: Array[Dictionary] = [
-	{"ship_type": "sekibune_cannon", "lateral": -12.0, "back": 8.0},
-	{"ship_type": "kobayabune_melee", "lateral": 12.0, "back": 10.0},
+	{"ship_type": "sekibune_cannon", "role": "gunline", "lateral": -12.0, "back": 8.0},
+	{"ship_type": "kobayabune_melee", "role": "vanguard", "lateral": 12.0, "back": 10.0},
 ]
 
 
@@ -191,23 +215,19 @@ func _spawn_enemy() -> void:
 	var blockade_right = to_player_dir.cross(Vector3.UP).normalized()
 	
 	var existing_enemy_count: int = SceneGroupCache.get_nodes(get_tree(), "enemy").size()
+	var blockade_template: Array[Dictionary] = []
+	if is_blockade:
+		blockade_template = _pick_blockade_template(spawn_count)
 	for i in range(spawn_count):
 		# 최대 적 수 초과 체크
 		if existing_enemy_count >= max_enemies:
 			break
 			
 		var enemy = enemy_scene.instantiate()
-		
-		# 시간 경과에 따른 함종 결정
-		var elapsed_sec = (Time.get_ticks_msec() - start_time) / 1000.0
-		var cannon_chance: float = clamp((elapsed_sec - cannon_chance_start_time) / maxf(cannon_chance_ramp_duration, 0.01), 0.0, cannon_chance_max)
-		
-		# JSON 기반 함종 할당
-		# 근접형은 더 작은 kobayabune, 원거리형은 sekibune, 엘리트는 atakebune
-		if randf() > cannon_chance:
-			if "ship_type" in enemy: enemy.ship_type = "kobayabune_melee"
-		else:
-			if "ship_type" in enemy: enemy.ship_type = "sekibune_cannon"
+		var slot_info: Dictionary = _get_spawn_slot_info(blockade_template, i)
+		if slot_info.is_empty():
+			slot_info = _build_default_spawn_slot_info()
+		_apply_spawn_slot_info(enemy, slot_info)
 		
 		# 차단진일 경우 가로로 배치 (간격 15m)
 		var spawn_pos = center_pos
@@ -342,8 +362,7 @@ func _spawn_elite_escorts(flagship_pos: Vector3) -> void:
 		var escort = enemy_scene.instantiate()
 		if not is_instance_valid(escort):
 			continue
-		if "ship_type" in escort:
-			escort.ship_type = String(escort_info.get("ship_type", "kobayabune_melee"))
+		_apply_spawn_slot_info(escort, escort_info)
 
 		var escort_pos: Vector3 = flagship_pos
 		escort_pos += player_right * float(escort_info.get("lateral", 0.0))
@@ -393,6 +412,11 @@ func _apply_enemy_spawn_rules_root(root: Dictionary) -> void:
 		blockade_min_ships = int(formation.get("blockade_min_ships", blockade_min_ships))
 		blockade_max_ships = int(formation.get("blockade_max_ships", blockade_max_ships))
 		blockade_spacing = float(formation.get("blockade_spacing", blockade_spacing))
+		var patterns_variant: Variant = formation.get("blockade_patterns", [])
+		if typeof(patterns_variant) == TYPE_ARRAY:
+			var parsed_patterns: Dictionary = _parse_blockade_patterns(patterns_variant as Array)
+			if not parsed_patterns.is_empty():
+				blockade_patterns = parsed_patterns
 
 	var mix_variant: Variant = root.get("enemy_mix", {})
 	if typeof(mix_variant) == TYPE_DICTIONARY:
@@ -416,11 +440,93 @@ func _apply_enemy_spawn_rules_root(root: Dictionary) -> void:
 			var entry: Dictionary = entry_variant as Dictionary
 			parsed_escorts.append({
 				"ship_type": String(entry.get("ship_type", "kobayabune_melee")),
+				"role": String(entry.get("role", "")),
 				"lateral": float(entry.get("lateral", 0.0)),
 				"back": float(entry.get("back", 0.0))
 			})
 		if not parsed_escorts.is_empty():
 			mid_boss_escort_layout = parsed_escorts
+
+
+func _build_default_spawn_slot_info() -> Dictionary:
+	var elapsed_sec: float = (Time.get_ticks_msec() - start_time) / 1000.0
+	var cannon_chance: float = clamp((elapsed_sec - cannon_chance_start_time) / maxf(cannon_chance_ramp_duration, 0.01), 0.0, cannon_chance_max)
+	if randf() > cannon_chance:
+		return {"ship_type": "kobayabune_melee", "role": "vanguard"}
+	return {"ship_type": "sekibune_cannon", "role": "gunline"}
+
+
+func _apply_spawn_slot_info(enemy: Node, slot_info: Dictionary) -> void:
+	if not is_instance_valid(enemy):
+		return
+	if "ship_type" in enemy:
+		enemy.ship_type = String(slot_info.get("ship_type", "kobayabune_melee"))
+	if "formation_role_name" in enemy:
+		enemy.formation_role_name = String(slot_info.get("role", ""))
+	enemy.set_meta("enemy_formation_role", String(slot_info.get("role", "")))
+	enemy.set_meta("enemy_formation_label", String(slot_info.get("label", "")))
+
+
+func _pick_blockade_template(spawn_count: int) -> Array[Dictionary]:
+	var empty_result: Array[Dictionary] = []
+	var options_variant: Variant = blockade_patterns.get(spawn_count, [])
+	if typeof(options_variant) != TYPE_ARRAY:
+		return empty_result
+	var options: Array = options_variant as Array
+	if options.is_empty():
+		return empty_result
+	var picked_variant: Variant = options.pick_random()
+	if typeof(picked_variant) != TYPE_ARRAY:
+		return empty_result
+	var picked: Array = picked_variant as Array
+	var parsed: Array[Dictionary] = []
+	for entry_variant in picked:
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			continue
+		parsed.append(entry_variant as Dictionary)
+	return parsed
+
+
+func _get_spawn_slot_info(template: Array[Dictionary], index: int) -> Dictionary:
+	if index < 0 or index >= template.size():
+		return {}
+	return template[index]
+
+
+func _parse_blockade_patterns(raw_patterns: Array) -> Dictionary:
+	var parsed: Dictionary = {}
+	for pattern_variant in raw_patterns:
+		if typeof(pattern_variant) != TYPE_DICTIONARY:
+			continue
+		var pattern: Dictionary = pattern_variant as Dictionary
+		var ships_variant: Variant = pattern.get("ships", [])
+		if typeof(ships_variant) != TYPE_ARRAY:
+			continue
+		var ships: Array = ships_variant as Array
+		if ships.is_empty():
+			continue
+		var parsed_slots: Array[Dictionary] = []
+		for slot_variant in ships:
+			if typeof(slot_variant) != TYPE_DICTIONARY:
+				continue
+			var slot: Dictionary = slot_variant as Dictionary
+			parsed_slots.append({
+				"ship_type": String(slot.get("ship_type", "kobayabune_melee")),
+				"role": String(slot.get("role", "")),
+				"label": String(pattern.get("name", ""))
+			})
+		if parsed_slots.is_empty():
+			continue
+		var slot_count: int = parsed_slots.size()
+		if not parsed.has(slot_count):
+			parsed[slot_count] = []
+		var grouped_variant: Variant = parsed.get(slot_count, [])
+		if typeof(grouped_variant) != TYPE_ARRAY:
+			continue
+		var grouped: Array = grouped_variant as Array
+		grouped.append(parsed_slots)
+		parsed[slot_count] = grouped
+	return parsed
 
 func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_offset: float = 0.0) -> Node3D:
 	if not enemy_scene or not is_instance_valid(player):

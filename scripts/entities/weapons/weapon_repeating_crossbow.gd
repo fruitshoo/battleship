@@ -1,4 +1,5 @@
 extends "res://scripts/entities/weapons/weapon.gd"
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -57,7 +58,6 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		var spawn_pos = attacker.global_position
 		spawn_pos.y += 0.8
 		
-		var arrow = arrow_scene.instantiate() as Node3D
 		var current_target_pos = target.global_position
 		current_target_pos.y += 0.5
 		
@@ -83,33 +83,32 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 				ship_vel = s_dir * s_speed
 				
 		var total_vel = local_vel + ship_vel
-		current_target_pos += total_vel * time_to_reach * 0.85
+		current_target_pos += total_vel * time_to_reach * 0.92
 		
 		# 약간의 오차 (흩뿌림) 적용 - 연사 시 오차를 더 크게 (현실감)
-		current_target_pos.x += randf_range(-0.4, 0.4)
-		current_target_pos.z += randf_range(-0.4, 0.4)
-		
-		# 데이터 설정
-		if "start_pos" in arrow: arrow.start_pos = spawn_pos
-		if "target_pos" in arrow: arrow.target_pos = current_target_pos
-		if "target_node" in arrow: arrow.target_node = target
-		if "speed" in arrow: arrow.speed = arrow_speed
+		current_target_pos.x += randf_range(-0.22, 0.22)
+		current_target_pos.z += randf_range(-0.22, 0.22)
 		
 		var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
-		if "damage" in arrow: arrow.damage = damage * dmg_mult
-		
-		if "team" in arrow and "team" in attacker:
-			arrow.team = attacker.get("team")
-		if "damage_source" in arrow:
-			arrow.damage_source = "repeating_crossbow"
-			
-		if "arc_height" in arrow:
-			var dist = spawn_pos.distance_to(current_target_pos)
-			arrow.arc_height = clamp(dist * 0.2, 0.5, 3.0) # 연노는 궤적이 더 낮음 (빠석궁)
+		var team_name: String = str(attacker.get("team")) if "team" in attacker else "player"
+		var dist = spawn_pos.distance_to(current_target_pos)
+		var final_arc_height: float = clamp(dist * 0.2, 0.5, 3.0) # 연노는 궤적이 더 낮음 (빠석궁)
 		
 		# 씬 트리에 추가
 		var spawn_parent = _resolve_spawn_parent(attacker.get_tree())
+		var arrow = ScenePool.acquire(attacker.get_tree(), arrow_scene) as Node3D
 		spawn_parent.add_child(arrow)
+		if arrow.has_method("launch"):
+			arrow.launch(
+				spawn_pos,
+				current_target_pos,
+				target,
+				team_name,
+				damage * dmg_mult,
+				"repeating_crossbow",
+				arrow_speed,
+				final_arc_height
+			)
 			
 		arrow.global_position = spawn_pos
 		arrow.look_at(current_target_pos, Vector3.UP)

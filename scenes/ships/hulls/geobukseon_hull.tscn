@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/cannon_joseon.tscn" id="cannon_scene"]
+[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="Texture2D" path="res://assets/models/props/sail/horizon_sail.png" id="horizon_sail"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
@@ -41,6 +41,8 @@ scale = Vector3(0.2, 0.2, 0.2)
 visible = false # Geobukseon often lowered mast in battle
 use_sail_texture = true
 sail_texture = ExtResource("horizon_sail")
+sail_uv_scale = Vector2(1, 2.01)
+sail_uv_offset = Vector2(0, 0)
 
 [node name="RudderVisual" parent="." instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 4.0)

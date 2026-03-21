@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://dm1th7lnodv3x"]
+
+[ext_resource type="Script" path="res://scripts/entities/launchers/cannon.gd" id="1"]
+[ext_resource type="PackedScene" uid="uid://blknmmdm7x4ch" path="res://assets/models/props/cannon/cannon.glb" id="2_diech"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_detection"]
+size = Vector3(10, 5, 30)
+
+[node name="Cannon" type="Node3D" unique_id=2056286122]
+script = ExtResource("1")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=234675379]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9208505, -1.2203976)
+
+[node name="DetectionArea" type="Area3D" parent="." unique_id=739132103]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -15)
+collision_layer = 0
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea" unique_id=245402452]
+shape = SubResource("BoxShape_detection")
+
+[node name="CannonModel" parent="." unique_id=770169237 instance=ExtResource("2_diech")]
+transform = Transform3D(-0.7, 0, -1.0569706e-07, 0, 0.7, 0, 1.0569706e-07, 0, -0.7, 0, 0, 0)

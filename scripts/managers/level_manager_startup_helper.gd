@@ -2,6 +2,7 @@ class_name LevelManagerStartupHelper
 extends RefCounted
 
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 static func initialize(lm: Node) -> void:
 	if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("reset_run_upgrades"):
@@ -17,8 +18,8 @@ static func initialize(lm: Node) -> void:
 		if lm.hud.has_method("update_difficulty_ui"):
 			lm.hud.update_difficulty_ui(lm.game_difficulty)
 
-	# 시작 차단 없이 예열은 백그라운드에서 진행한다.
-	lm.call_deferred("_run_startup_prewarm_async")
+	# 시작 직후 짧은 로딩 오버레이 안에서 예열을 끝내 첫 전투 끊김을 줄인다.
+	lm.call_deferred("_prewarm_shaders", true)
 
 	# 초요기/일성정시는 현재 시작 기본 렐릭으로 장착한다.
 	lm.get_tree().create_timer(0.1).timeout.connect(func():
@@ -39,13 +40,29 @@ static func run_startup_prewarm_async(lm: Node) -> void:
 static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> void:
 	var loading_layer: CanvasLayer = null
 	var bg: ColorRect = null
+	var loading_label: Label = null
 	if show_blocking_overlay:
 		loading_layer = CanvasLayer.new()
 		loading_layer.layer = 120
+		loading_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 		bg = ColorRect.new()
 		bg.color = Color.BLACK
 		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		bg.mouse_filter = Control.MOUSE_FILTER_STOP
 		loading_layer.add_child(bg)
+		loading_label = Label.new()
+		loading_label.text = "로딩 중"
+		loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		loading_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		loading_label.set_anchors_preset(Control.PRESET_CENTER)
+		loading_label.position = Vector2(-120.0, -16.0)
+		loading_label.size = Vector2(240.0, 32.0)
+		loading_label.add_theme_font_size_override("font_size", 24)
+		loading_label.add_theme_color_override("font_color", Color(0.93, 0.9, 0.82, 0.96))
+		loading_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.45))
+		loading_label.add_theme_constant_override("shadow_offset_x", 2)
+		loading_label.add_theme_constant_override("shadow_offset_y", 2)
+		loading_layer.add_child(loading_label)
 		lm.add_child(loading_layer)
 
 	var scenes_to_warm = [
@@ -54,6 +71,11 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 		preload("res://scenes/effects/fire_effect.tscn"),
 		preload("res://scenes/effects/fire_pot_explosion.tscn"),
 		preload("res://scenes/effects/water_burst.tscn"),
+		preload("res://scenes/projectiles/cannonball_joseon.tscn"),
+		preload("res://scenes/projectiles/cannonball_japanese.tscn"),
+		preload("res://scenes/projectiles/cannonball_enemy_light.tscn"),
+		preload("res://scenes/projectiles/cannonball_enemy_medium.tscn"),
+		preload("res://scenes/projectiles/cannonball_enemy_heavy.tscn"),
 	]
 
 	var container := Node3D.new()
@@ -68,11 +90,15 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 			_mark_prewarm_recursive(inst)
 			container.add_child(inst)
 			_prime_visual_resources(inst)
+			if scene.resource_path.contains("cannonball") or scene.resource_path.contains("impact_puff") or scene.resource_path.contains("water_burst"):
+				_prewarm_scene_pool_instance(lm.get_tree(), scene)
 			if not show_blocking_overlay:
 				await lm.get_tree().process_frame
 
 	if not AudioManager.is_prewarm_finished:
 		await AudioManager.prewarm_finished
+
+	_prewarm_audio_playback()
 
 	for i in range(2):
 		await lm.get_tree().process_frame
@@ -106,3 +132,23 @@ static func _prime_visual_resources(node: Node) -> void:
 
 	for child in node.get_children():
 		_prime_visual_resources(child)
+
+static func _prewarm_scene_pool_instance(tree: SceneTree, scene: PackedScene) -> void:
+	if tree == null or scene == null:
+		return
+	var inst := ScenePool.acquire(tree, scene)
+	if not is_instance_valid(inst):
+		return
+	if not inst.is_inside_tree():
+		tree.root.add_child(inst)
+		if inst is Node3D:
+			(inst as Node3D).visible = false
+	if inst.has_method("pool_reset"):
+		inst.call("pool_reset")
+	ScenePool.release(inst)
+
+static func _prewarm_audio_playback() -> void:
+	if not is_instance_valid(AudioManager):
+		return
+	for key in ["cannon_fire", "cannon_fuse", "cannon_reload"]:
+		AudioManager.play_sfx(key, null, 1.0, -80.0)

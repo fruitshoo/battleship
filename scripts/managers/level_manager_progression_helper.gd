@@ -115,7 +115,7 @@ static func set_level(lm: Node, new_level: int) -> void:
 	var reroll_bonus: int = 0
 	if is_instance_valid(MetaManager) and MetaManager.has_method("get_reroll_bonus"):
 		reroll_bonus = int(MetaManager.get_reroll_bonus())
-	lm.rerolls_available = 1 + reroll_bonus
+	lm.ship_rerolls_available = 1 + reroll_bonus
 
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("level_up")

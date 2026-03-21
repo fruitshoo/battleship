@@ -12,6 +12,7 @@ signal reroll_requested()
 @onready var background: ColorRect = $Background
 @onready var title_label: Label = $VBox/TitleLabel
 @onready var cards_container: HBoxContainer = $VBox/CardsContainer
+@onready var footer_row: HBoxContainer = $VBox/FooterRow
 
 var card_buttons: Array = []
 var card_ids: Array[String] = []
@@ -294,7 +295,7 @@ func _update_reroll_button(count: int) -> void:
 			_update_focus()
 		)
 		
-		$VBox.add_child(reroll_button)
+		footer_row.add_child(reroll_button)
 	
 	reroll_button.text = "Reroll (%d)" % count
 	reroll_button.disabled = count <= 0

@@ -20,19 +20,15 @@ var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.t
 
 var has_exploded: bool = false
 var velocity: Vector3 = Vector3.ZERO
+var _life_left: float = 0.0
+var _rotation_update_timer: float = 0.0
 
 func _ready() -> void:
-	# 충돌 시그널
-	body_entered.connect(_on_body_entered)
-	area_entered.connect(_on_area_entered)
-	
+	monitoring = false
+	monitorable = false
 	start_pos = global_position
-	
-	# 수명 종료 시 자동 기폭 (안전장치)
-	get_tree().create_timer(lifetime).timeout.connect(func():
-		if not has_exploded:
-			explode()
-	)
+	_life_left = lifetime
+	_rotation_update_timer = 0.0
 
 func setup_flight(start: Vector3, target: Vector3, flight_time: float = 1.0, arc: float = 3.0) -> void:
 	start_pos = start
@@ -48,6 +44,10 @@ func setup_flight(start: Vector3, target: Vector3, flight_time: float = 1.0, arc
 
 func _physics_process(delta: float) -> void:
 	if has_exploded: return
+	_life_left -= delta
+	if _life_left <= 0.0:
+		explode()
+		return
 	
 	time_alive += delta
 	var t = min(time_alive / flight_duration, 1.0)
@@ -56,12 +56,14 @@ func _physics_process(delta: float) -> void:
 	var current_pos = start_pos.lerp(target_pos, t)
 	current_pos.y += sin(t * PI) * arc_height
 	
-	# 이동 방향으로 look_at
 	var last_pos = global_position
 	global_position = current_pos
 	
+	# 작은 투사체라 회전 갱신 빈도를 낮춰도 충분히 자연스럽다.
+	_rotation_update_timer += delta
 	var frame_dir = current_pos - last_pos
-	if frame_dir.length_squared() > 0.001:
+	if _rotation_update_timer >= 0.05 and frame_dir.length_squared() > 0.001:
+		_rotation_update_timer = 0.0
 		var dir = frame_dir.normalized()
 		var up_vec = Vector3.UP
 		if abs(dir.y) > 0.999:
@@ -73,19 +75,6 @@ func _physics_process(delta: float) -> void:
 		$Visual.rotate_x(15.0 * delta)
 	
 	if t >= 1.0:
-		explode()
-
-func _on_body_entered(body: Node3D) -> void:
-	_check_impact(body)
-
-func _on_area_entered(area: Area3D) -> void:
-	_check_impact(area)
-
-func _check_impact(target: Node3D) -> void:
-	if has_exploded: return
-	
-	# 바닥, 다른 배, 혹은 적과 직접 충돌 시
-	if target.is_in_group("ocean") or target.is_in_group("ship") or target.is_in_group("enemy"):
 		explode()
 
 func explode() -> void:
