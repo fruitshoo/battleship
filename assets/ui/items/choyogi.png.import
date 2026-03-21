@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b81pqjo7tug50"
-path="res://.godot/imported/choyogi.png-0141368833cc668f4faed61cc032af47.ctex"
+path="res://.godot/imported/choyogi.png-b4623d22e8bffb1a01e917d7a2d87de0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/relics/choyogi.png"
-dest_files=["res://.godot/imported/choyogi.png-0141368833cc668f4faed61cc032af47.ctex"]
+source_file="res://assets/ui/items/choyogi.png"
+dest_files=["res://.godot/imported/choyogi.png-b4623d22e8bffb1a01e917d7a2d87de0.ctex"]
 
 [params]
 

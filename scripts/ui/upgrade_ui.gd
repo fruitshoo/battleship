@@ -64,14 +64,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_left") or (event is InputEventKey and event.keycode == KEY_A and event.pressed):
 		_focused_index = maxi(0, _focused_index - 1)
 		_update_focus()
-		get_viewport().set_input_as_handled()
+		if get_viewport(): get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_right") or (event is InputEventKey and event.keycode == KEY_D and event.pressed):
 		var max_index = card_ids.size() - 1
 		if reroll_button and not reroll_button.disabled:
 			max_index += 1 # 리롤 버튼 포함
 		_focused_index = mini(max_index, _focused_index + 1)
 		_update_focus()
-		get_viewport().set_input_as_handled()
+		if get_viewport(): get_viewport().set_input_as_handled()
 		
 	# Space나 Enter로 선택
 	elif event.is_action_pressed("ui_accept") or (event is InputEventKey and event.keycode == KEY_SPACE and event.pressed):
@@ -79,7 +79,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_choice_pressed(card_ids[_focused_index])
 		elif _focused_index == card_ids.size() and reroll_button and not reroll_button.disabled:
 			_on_reroll_pressed()
-		get_viewport().set_input_as_handled()
+		if get_viewport(): get_viewport().set_input_as_handled()
 
 func _update_focus() -> void:
 	# 사운드 재생 (이동음)

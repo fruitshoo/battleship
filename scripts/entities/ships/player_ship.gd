@@ -183,10 +183,10 @@ func _cache_references() -> void:
 		
 	_cached_um = get_tree().root.find_child("UpgradeManager", true, false)
 	if is_player_controlled and is_instance_valid(_cached_um):
-		if _cached_um.has_method("equip_owned_relics"):
-			_cached_um.call_deferred("equip_owned_relics")
-		if _cached_um.has_method("refresh_hud_relic_icons"):
-			_cached_um.call_deferred("refresh_hud_relic_icons")
+		if _cached_um.has_method("equip_owned_items"):
+			_cached_um.call_deferred("equip_owned_items")
+		if _cached_um.has_method("refresh_hud_item_icons"):
+			_cached_um.call_deferred("refresh_hud_item_icons")
 
 
 func _process(_delta: float) -> void:

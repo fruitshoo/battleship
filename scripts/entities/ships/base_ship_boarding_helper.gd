@@ -120,7 +120,7 @@ static func transfer_one_soldier(ship) -> void:
 				else:
 					ally_count_on_deck += 1
 
-		if enemy_count_on_deck > 0 and ally_count_on_deck > enemy_count_on_deck:
+		if enemy_count_on_deck > 0 and ally_count_on_deck <= enemy_count_on_deck:
 			return
 
 		for child in soldiers:

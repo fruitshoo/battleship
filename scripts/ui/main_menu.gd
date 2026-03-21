@@ -52,13 +52,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		match key_event.physical_keycode:
 			KEY_W, KEY_A:
 				_move_menu_focus(-1)
-				get_viewport().set_input_as_handled()
+				if get_viewport(): get_viewport().set_input_as_handled()
 			KEY_S, KEY_D:
 				_move_menu_focus(1)
-				get_viewport().set_input_as_handled()
+				if get_viewport(): get_viewport().set_input_as_handled()
 			KEY_SPACE:
 				_activate_focused_menu_button()
-				get_viewport().set_input_as_handled()
+				if get_viewport(): get_viewport().set_input_as_handled()
 
 
 func _focus_first_menu_button() -> void:

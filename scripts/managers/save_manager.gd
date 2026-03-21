@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS := {
 
 var gold: int = 0
 var meta_upgrades: Dictionary = {}
-var relics: Array[String] = []
+var items: Array[String] = []
 var settings: Dictionary = {}
 
 func _ready() -> void:
@@ -26,7 +26,7 @@ func save_game() -> void:
 	var config = ConfigFile.new()
 	config.set_value("player", "gold", gold)
 	config.set_value("player", "meta_upgrades", meta_upgrades)
-	config.set_value("player", "relics", relics)
+	config.set_value("player", "items", items)
 	config.set_value("player", "settings", settings)
 	
 	var err = config.save(SAVE_PATH)
@@ -78,17 +78,17 @@ func set_upgrade_level(id: String, level: int) -> void:
 	meta_upgrades[id] = level
 	save_game()
 
-func has_relic(relic_id: String) -> bool:
-	return relics.has(relic_id)
+func has_item(item_id: String) -> bool:
+	return items.has(item_id)
 
-func add_relic(relic_id: String) -> void:
-	if relics.has(relic_id):
+func add_item(item_id: String) -> void:
+	if items.has(item_id):
 		return
-	relics.append(relic_id)
+	items.append(item_id)
 	save_game()
 
-func get_relics() -> Array[String]:
-	return relics.duplicate()
+func get_items() -> Array[String]:
+	return items.duplicate()
 
 func get_setting(id: String, fallback = null):
 	if settings.is_empty():
@@ -109,17 +109,17 @@ func set_setting(id: String, value, save_now: bool = true) -> void:
 func _reset_to_defaults() -> void:
 	gold = 0
 	meta_upgrades = {}
-	relics = []
+	items = []
 	settings = DEFAULT_SETTINGS.duplicate(true)
 
 func _apply_loaded_config(config: ConfigFile) -> void:
 	gold = int(config.get_value("player", "gold", 0))
 	meta_upgrades = config.get_value("player", "meta_upgrades", {})
-	var loaded_relics = config.get_value("player", "relics", [])
-	relics = []
-	if loaded_relics is Array:
-		for relic_id in loaded_relics:
-			relics.append(String(relic_id))
+	var loaded_items = config.get_value("player", "items", [])
+	items = []
+	if loaded_items is Array:
+		for item_id in loaded_items:
+			items.append(String(item_id))
 	var loaded_settings = config.get_value("player", "settings", {})
 	settings = DEFAULT_SETTINGS.duplicate(true)
 	if loaded_settings is Dictionary:

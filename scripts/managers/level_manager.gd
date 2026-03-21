@@ -7,6 +7,7 @@ const LevelManagerUpgradeFlowHelper = preload("res://scripts/managers/level_mana
 const DEBUG_LEVEL_LOGS := false
 const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
 const REWARD_RULES_DATA_PATH := "res://data/reward_rules.json"
+const PAUSE_MENU_SCENE := preload("res://scenes/ui/pause_menu.tscn")
 
 ## 레벨 매니저 (Level Manager)
 ## 게임 시간 경과에 따라 난이도(레벨)를 관리하고 스포너에게 지시
@@ -264,15 +265,22 @@ func _prime_visual_resources(node: Node) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if not get_tree().paused:
+			var pause_menu = PAUSE_MENU_SCENE.instantiate()
+			add_child(pause_menu)
+		if get_viewport(): get_viewport().set_input_as_handled()
+		return
+		
 	if event.is_action_pressed("toggle_ship_health_bars"):
 		if hud and hud.has_method("toggle_ship_health_bars"):
 			hud.toggle_ship_health_bars()
-		get_viewport().set_input_as_handled()
+		if get_viewport(): get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("toggle_stat_panel"):
 		if hud and hud.has_method("toggle_stat_panel"):
 			hud.toggle_stat_panel()
-		get_viewport().set_input_as_handled()
+		if get_viewport(): get_viewport().set_input_as_handled()
 		return
 	if not OS.is_debug_build(): return # 이 디버그 키들은 릴리즈 빌드에서는 작동하지 않음
 	if event is InputEventKey and event.pressed:

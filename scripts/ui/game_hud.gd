@@ -85,11 +85,11 @@ var _last_speed_mode: String = ""
 var _speed_visual_value: float = 0.0
 var _last_difficulty_text: String = ""
 var _last_combat_stats_text: String = ""
-var _relic_refresh_retry_left: float = 0.0
+var _item_refresh_retry_left: float = 0.0
 var _sail_debug_sync_left: float = 0.0
 
-# Relic and stat UI
-var relic_bar = null
+# Item and stat UI
+var item_bar = null
 var ship_hp_overlay: Control = null
 var ship_hp_bars: Dictionary = {}
 @export var show_ship_health_bars: bool = true
@@ -154,7 +154,7 @@ func _ready() -> void:
 	_setup_sail_debug_panel()
 	if gust_warning:
 		gust_warning.visible = false
-	call_deferred("_refresh_owned_relic_icons")
+	call_deferred("_refresh_owned_item_icons")
 
 
 func _apply_overlay_theme() -> void:
@@ -541,12 +541,12 @@ func _process(delta: float) -> void:
 		_try_resolve_player_ship()
 	_update_upgrade_tooltip_state(delta)
 	_update_upgrade_tooltip_position()
-	_relic_refresh_retry_left = maxf(0.0, _relic_refresh_retry_left - delta)
-	if _relic_refresh_retry_left <= 0.0 and relic_bar and is_instance_valid(UpgradeManager):
-		var owned_relics = UpgradeManager.acquired_relics if "acquired_relics" in UpgradeManager else []
-		if owned_relics is Array and relic_bar.current_relic_count < owned_relics.size():
-			_relic_refresh_retry_left = 0.5
-			_refresh_owned_relic_icons()
+	_item_refresh_retry_left = maxf(0.0, _item_refresh_retry_left - delta)
+	if _item_refresh_retry_left <= 0.0 and item_bar and is_instance_valid(UpgradeManager):
+		var owned_items = UpgradeManager.acquired_items if "acquired_items" in UpgradeManager else []
+		if owned_items is Array and item_bar.current_item_count < owned_items.size():
+			_item_refresh_retry_left = 0.5
+			_refresh_owned_item_icons()
 	if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible:
 		_sail_debug_sync_left = maxf(0.0, _sail_debug_sync_left - delta)
 		if _sail_debug_sync_left <= 0.0:
@@ -756,32 +756,32 @@ func update_merit(current: int, maximum: int, level: int = 1) -> void:
 				if style_normal:
 					style_normal.bg_color = NavalUiTheme.STATUS_WARN
 
-func add_relic_icon(icon_data) -> void:
-	if relic_bar == null:
+func add_item_icon(icon_data) -> void:
+	if item_bar == null:
 		return
-	var slot: PanelContainer = relic_bar.add_icon(icon_data)
+	var slot: PanelContainer = item_bar.add_icon(icon_data)
 	if is_instance_valid(slot):
-		var relic_name: String = ""
-		var relic_description: String = ""
+		var item_name: String = ""
+		var item_description: String = ""
 		if icon_data is Dictionary:
-			relic_name = str(icon_data.get("name", "렐릭"))
-			relic_description = str(icon_data.get("description", ""))
-		var tooltip_text: String = "[%s]\n%s" % [relic_name, relic_description]
+			item_name = str(icon_data.get("name", "아이템"))
+			item_description = str(icon_data.get("description", ""))
+		var tooltip_text: String = "[%s]\n%s" % [item_name, item_description]
 		slot.set_meta("tooltip_text", tooltip_text.strip_edges())
 		slot.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
 		if not bool(slot.get_meta("hover_bound", false)):
 			_bind_upgrade_slot_hover(slot)
 			slot.set_meta("hover_bound", true)
 
-func clear_relic_icons() -> void:
-	if relic_bar == null:
+func clear_item_icons() -> void:
+	if item_bar == null:
 		return
-	if relic_bar.has_method("clear_icons"):
-		relic_bar.clear_icons()
+	if item_bar.has_method("clear_icons"):
+		item_bar.clear_icons()
 
-func _refresh_owned_relic_icons() -> void:
-	if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("refresh_hud_relic_icons"):
-		UpgradeManager.refresh_hud_relic_icons()
+func _refresh_owned_item_icons() -> void:
+	if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("refresh_hud_item_icons"):
+		UpgradeManager.refresh_hud_item_icons()
 
 
 func _setup_ship_hp_overlay() -> void:

@@ -249,32 +249,32 @@
 			}
 		}
 	},
-		"relics": {
+		"items": {
 			"sextant": {
 				"name": "육분의",
 				"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
 				"icon": "explore",
-				"alert_msg": "!! 렐릭 획득: 육분의 !!\n(자동 항해 활성화)"
+				"alert_msg": "!! 아이템 획득: 육분의 !!\n(자동 항해 활성화)"
 			},
 			"boss_heart": {
 				"name": "보스의 심장",
-				"description": "임시 보스 드롭 렐릭입니다.",
+				"description": "임시 보스 드롭 전리품입니다.",
 				"icon": "favorite",
-				"alert_msg": "!! 렐릭 획득: 보스의 심장 !!"
+				"alert_msg": "!! 전리품 획득: 보스의 심장 !!"
 			},
 			"choyogi": {
 				"name": "초요기",
 				"description": "황색 바탕의 초요기 군기입니다.",
-				"icon_texture": "res://assets/ui/relics/choyogi.png",
+				"icon_texture": "res://assets/ui/items/choyogi.png",
 				"icon": "flag",
-				"alert_msg": "!! 렐릭 획득: 초요기 !!"
+				"alert_msg": "!! 아이템 획득: 초요기 !!"
 			},
 			"ilseongjeongsiui": {
 				"name": "일성정시",
-				"description": "천체 관측기 일성정시의 권위를 담은 렐릭입니다.",
-				"icon_texture": "res://assets/ui/relics/ilseongjeongsiui.png",
+				"description": "천체 관측기 일성정시의 권위를 담은 전리품입니다.",
+				"icon_texture": "res://assets/ui/items/ilseongjeongsiui.png",
 				"icon": "explore",
-				"alert_msg": "!! 렐릭 획득: 일성정시 !!"
+				"alert_msg": "!! 전리품 획득: 일성정시 !!"
 			}
 		}
 	}

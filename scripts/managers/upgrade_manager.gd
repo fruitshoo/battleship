@@ -1,7 +1,7 @@
 @tool
 extends Node
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
-const RelicDataResource = preload("res://scripts/resource_types/relic_data.gd")
+const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
@@ -16,18 +16,18 @@ enum Category {ANTI_SHIP, ANTI_PERSONNEL, HULL, SEAMANSHIP, SPECIAL, FLEET}
 # 업그레이드 정의 (JSON에서 로드됨)
 var UPGRADES = {}
 
-# 렐릭 정의 (리소스에서 로드됨, JSON은 fallback)
-var RELICS = {}
+# 아이템 정의 (리소스에서 로드됨, JSON은 fallback)
+var ITEMS = {}
 
 const DATA_PATH = "res://data/upgrades.json"
-const RELIC_DATA_DIR = "res://resources/relics"
+const ITEM_DATA_DIR = "res://resources/items"
 
 
 # 현재 업그레이드 레벨 추적
 var current_levels: Dictionary = {}
 
-# 획득한 렐릭(유물) 목록
-var acquired_relics: Array[String] = []
+# 획득한 아이템(아이템) 목록
+var acquired_items: Array[String] = []
 
 # 프리로드
 var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
@@ -77,19 +77,19 @@ func _ready() -> void:
 	
 	for key in UPGRADES:
 		current_levels[key] = 0
-	_sync_relics_from_save()
+	_sync_items_from_save()
 
 func reset_run_upgrades() -> void:
 	for key in UPGRADES:
 		current_levels[key] = 0
 
-func _sync_relics_from_save() -> void:
+func _sync_items_from_save() -> void:
 	if Engine.is_editor_hint():
 		return
-	if is_instance_valid(SaveManager) and SaveManager.has_method("get_relics"):
-		acquired_relics = SaveManager.get_relics()
+	if is_instance_valid(SaveManager) and SaveManager.has_method("get_items"):
+		acquired_items = SaveManager.get_items()
 
-## 데이터 로드 (업그레이드는 JSON, 렐릭은 리소스 우선)
+## 데이터 로드 (업그레이드는 JSON, 아이템은 리소스 우선)
 func _load_data_from_json() -> void:
 	if not FileAccess.file_exists(DATA_PATH):
 		push_error("UpgradeManager: 데이터 파일을 찾을 수 없습니다: %s" % DATA_PATH)
@@ -113,14 +113,14 @@ func _load_data_from_json() -> void:
 			if UPGRADES[key].has("color"):
 				UPGRADES[key]["color"] = Color.from_string(UPGRADES[key]["color"], Color.WHITE)
 				
-	if not _load_relics_from_resources() and data.has("relics"):
-		RELICS = data["relics"]
+	if not _load_items_from_resources() and data.has("items"):
+		ITEMS = data["items"]
 
-	print("[UpgradeManager] 데이터를 성공적으로 로드했습니다: %d개의 업그레이드, %d개의 렐릭" % [UPGRADES.size(), RELICS.size()])
+	print("[UpgradeManager] 데이터를 성공적으로 로드했습니다: %d개의 업그레이드, %d개의 아이템" % [UPGRADES.size(), ITEMS.size()])
 
-func _load_relics_from_resources() -> bool:
-	RELICS.clear()
-	var dir := DirAccess.open(RELIC_DATA_DIR)
+func _load_items_from_resources() -> bool:
+	ITEMS.clear()
+	var dir := DirAccess.open(ITEM_DATA_DIR)
 	if dir == null:
 		return false
 
@@ -128,33 +128,33 @@ func _load_relics_from_resources() -> bool:
 	var file_name := dir.get_next()
 	while file_name != "":
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
-			var resource_path := "%s/%s" % [RELIC_DATA_DIR, file_name]
-			var relic_res: Resource = load(resource_path)
-			if relic_res != null and relic_res.get_script() == RelicDataResource:
-				var relic_id: String = String(relic_res.get("relic_id"))
-				if relic_id.is_empty():
+			var resource_path := "%s/%s" % [ITEM_DATA_DIR, file_name]
+			var item_res: Resource = load(resource_path)
+			if item_res != null and item_res.get_script() == ItemDataResource:
+				var item_id: String = String(item_res.get("item_id"))
+				if item_id.is_empty():
 					file_name = dir.get_next()
 					continue
-				var relic_name: String = String(relic_res.get("relic_name"))
-				var relic_description: String = String(relic_res.get("description"))
-				var relic_icon: String = String(relic_res.get("icon"))
-				var relic_alert_msg: String = String(relic_res.get("alert_msg"))
-				var icon_texture_variant: Variant = relic_res.get("icon_texture")
+				var item_name: String = String(item_res.get("item_name"))
+				var item_description: String = String(item_res.get("description"))
+				var item_icon: String = String(item_res.get("icon"))
+				var item_alert_msg: String = String(item_res.get("alert_msg"))
+				var icon_texture_variant: Variant = item_res.get("icon_texture")
 				var icon_texture_path: String = ""
 				if icon_texture_variant is Texture2D:
 					icon_texture_path = (icon_texture_variant as Texture2D).resource_path
-				RELICS[relic_id] = {
-					"name": relic_name,
-					"description": relic_description,
-					"icon": relic_icon,
+				ITEMS[item_id] = {
+					"name": item_name,
+					"description": item_description,
+					"icon": item_icon,
 					"icon_texture": icon_texture_path,
-					"alert_msg": relic_alert_msg,
+					"alert_msg": item_alert_msg,
 					"resource_path": resource_path,
 				}
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
-	return not RELICS.is_empty()
+	return not ITEMS.is_empty()
 
 ## 게임 시작 시 기본 무기 지급
 func initialize_default_weapons() -> void:
@@ -169,38 +169,38 @@ func initialize_default_weapons() -> void:
 	if hud and hud.has_method("update_weapon_ui"):
 		hud.update_weapon_ui("cannon", 1)
 
-func equip_owned_relics() -> void:
-	_sync_relics_from_save()
+func equip_owned_items() -> void:
+	_sync_items_from_save()
 	var ship = _get_player_ship()
 	if not ship:
 		return
-	for relic_id in acquired_relics:
-		if relic_id not in RELICS:
+	for item_id in acquired_items:
+		if item_id not in ITEMS:
 			continue
-		_apply_relic_to_ship(relic_id, ship)
-	refresh_hud_relic_icons()
+		_apply_item_to_ship(item_id, ship)
+	refresh_hud_item_icons()
 
-func refresh_hud_relic_icons() -> void:
-	_sync_relics_from_save()
+func refresh_hud_item_icons() -> void:
+	_sync_items_from_save()
 	var ship = _get_player_ship()
 	if not ship:
 		return
-	for relic_id in acquired_relics:
-		if relic_id in RELICS:
-			_apply_relic_to_ship(relic_id, ship)
+	for item_id in acquired_items:
+		if item_id in ITEMS:
+			_apply_item_to_ship(item_id, ship)
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
 	if not hud:
 		return
-	if hud.has_method("clear_relic_icons"):
-		hud.clear_relic_icons()
-	for relic_id in acquired_relics:
-		if relic_id not in RELICS:
+	if hud.has_method("clear_item_icons"):
+		hud.clear_item_icons()
+	for item_id in acquired_items:
+		if item_id not in ITEMS:
 			continue
-		var relic_data = RELICS[relic_id]
-		if hud.has_method("add_relic_icon"):
-			var relic_icon: Dictionary = _get_relic_icon_payload(relic_id, relic_data)
-			if not relic_icon.is_empty():
-				hud.add_relic_icon(relic_icon)
+		var item_data = ITEMS[item_id]
+		if hud.has_method("add_item_icon"):
+			var item_icon: Dictionary = _get_item_icon_payload(item_id, item_data)
+			if not item_icon.is_empty():
+				hud.add_item_icon(item_icon)
 
 func get_ship_upgrade_choices(count: int = 3) -> Array:
 	var ship_pool: Array[String] = SHIP_UPGRADE_IDS.duplicate()
@@ -811,103 +811,103 @@ func _get_player_ship() -> Node3D:
 		return players[0]
 	return null
 
-func _apply_relic_to_ship(relic_id: String, ship: Node3D) -> void:
-	var method_name = "_apply_relic_%s" % relic_id
+func _apply_item_to_ship(item_id: String, ship: Node3D) -> void:
+	var method_name = "_apply_item_%s" % item_id
 	if has_method(method_name):
 		call(method_name, ship)
 
 
-func add_relic(relic_id: String) -> void:
-	if relic_id not in RELICS:
-		push_warning("UpgradeManager: 존재하지 않는 렐릭 ID입니다 - %s" % relic_id)
+func add_item(item_id: String) -> void:
+	if item_id not in ITEMS:
+		push_warning("UpgradeManager: 존재하지 않는 아이템 ID입니다 - %s" % item_id)
 		return
 
-	if acquired_relics.has(relic_id):
+	if acquired_items.has(item_id):
 		var existing_ship = _get_player_ship()
 		if existing_ship:
-			# 이미 획득한 렐릭이어도 현재 본선에는 효과를 재적용한다.
-			_apply_relic_to_ship(relic_id, existing_ship)
-			refresh_hud_relic_icons()
+			# 이미 획득한 아이템이어도 현재 본선에는 효과를 재적용한다.
+			_apply_item_to_ship(item_id, existing_ship)
+			refresh_hud_item_icons()
 		return
 	
-	acquired_relics.append(relic_id)
-	if is_instance_valid(SaveManager) and SaveManager.has_method("add_relic"):
-		SaveManager.add_relic(relic_id)
+	acquired_items.append(item_id)
+	if is_instance_valid(SaveManager) and SaveManager.has_method("add_item"):
+		SaveManager.add_item(item_id)
 
-	var relic_data = RELICS[relic_id]
+	var item_data = ITEMS[item_id]
 	var ship = _get_player_ship()
 	if ship:
-		_apply_relic_to_ship(relic_id, ship)
-		refresh_hud_relic_icons()
+		_apply_item_to_ship(item_id, ship)
+		refresh_hud_item_icons()
 		var hud = ship._find_hud() if ship.has_method("_find_hud") else null
-		if hud and "alert_msg" in relic_data and hud.has_method("show_message"):
-			hud.show_message(relic_data["alert_msg"], 3.0)
+		if hud and "alert_msg" in item_data and hud.has_method("show_message"):
+			hud.show_message(item_data["alert_msg"], 3.0)
 			
-	print("[Relic] %s 획득! - %s" % [relic_data["name"], relic_data["description"]])
+	print("[Item] %s 획득! - %s" % [item_data["name"], item_data["description"]])
 
-func grant_final_boss_relic() -> void:
-	if acquired_relics.has("choyogi") == false:
-		add_relic("choyogi")
+func grant_final_boss_item() -> void:
+	if acquired_items.has("choyogi") == false:
+		add_item("choyogi")
 		return
-	if acquired_relics.has("ilseongjeongsiui") == false:
-		add_relic("ilseongjeongsiui")
+	if acquired_items.has("ilseongjeongsiui") == false:
+		add_item("ilseongjeongsiui")
 		return
-	add_relic("boss_heart")
+	add_item("boss_heart")
 
-	# === 렐릭 적용 함수들 ===
+	# === 아이템 적용 함수들 ===
 
-func _apply_relic_sextant(ship: Node3D) -> void:
+func _apply_item_sextant(ship: Node3D) -> void:
 	if "has_sextant" in ship:
 		ship.has_sextant = true
 
-func _apply_relic_boss_heart(ship: Node3D) -> void:
-	if ship.has_meta("relic_boss_heart_applied"):
+func _apply_item_boss_heart(ship: Node3D) -> void:
+	if ship.has_meta("item_boss_heart_applied"):
 		return
-	ship.set_meta("relic_boss_heart_applied", true)
+	ship.set_meta("item_boss_heart_applied", true)
 	if "max_hull_hp" in ship:
 		ship.max_hull_hp += 60.0
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.hull_hp + 60.0, ship.max_hull_hp)
 	if "hull_defense" in ship:
 		ship.hull_defense += 2.0
-	_update_relic_ship_hud(ship)
+	_update_item_ship_hud(ship)
 
-func _apply_relic_choyogi(ship: Node3D) -> void:
-	if ship.has_meta("relic_choyogi_applied"):
+func _apply_item_choyogi(ship: Node3D) -> void:
+	if ship.has_meta("item_choyogi_applied"):
 		return
-	ship.set_meta("relic_choyogi_applied", true)
+	ship.set_meta("item_choyogi_applied", true)
 	_refresh_support_fleet_upgrade_state(ship)
 	if ship.has_method("_spawn_or_repair_ally"):
 		ship.call_deferred("_spawn_or_repair_ally")
 
-func _apply_relic_ilseongjeongsiui(ship: Node3D) -> void:
-	if ship.has_meta("relic_ilseongjeongsiui_applied"):
+func _apply_item_ilseongjeongsiui(ship: Node3D) -> void:
+	if ship.has_meta("item_ilseongjeongsiui_applied"):
 		return
-	ship.set_meta("relic_ilseongjeongsiui_applied", true)
+	ship.set_meta("item_ilseongjeongsiui_applied", true)
 	if "has_sextant" in ship:
 		ship.has_sextant = true
 
-func _update_relic_ship_hud(ship: Node3D) -> void:
+func _update_item_ship_hud(ship: Node3D) -> void:
 	if not ship.has_method("_find_hud"):
 		return
 	var hud = ship._find_hud()
 	if hud and hud.has_method("update_hull_hp") and "hull_hp" in ship and "max_hull_hp" in ship:
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 
-func _get_relic_icon_payload(relic_id: String, relic_data: Dictionary) -> Dictionary:
+func _get_item_icon_payload(item_id: String, item_data: Dictionary) -> Dictionary:
 	var payload: Dictionary = {
-		"relic_id": relic_id,
-		"name": str(relic_data.get("name", relic_id)),
-		"description": str(relic_data.get("description", "")),
+		"item_id": item_id,
+		"name": str(item_data.get("name", item_id)),
+		"description": str(item_data.get("description", "")),
 		"icon_data": null,
 	}
-	if "icon_texture" in relic_data:
-		var icon_texture_path: String = String(relic_data["icon_texture"])
+	if "icon_texture" in item_data:
+		var icon_texture_path: String = String(item_data["icon_texture"])
 		if not icon_texture_path.is_empty():
 			payload["icon_data"] = icon_texture_path
 			return payload
-	if "icon" in relic_data:
-		payload["icon_data"] = relic_data["icon"]
+	if "icon" in item_data:
+		payload["icon_data"] = item_data["icon"]
 	return payload
 
 
@@ -968,11 +968,11 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 		var base_limit: int = int(ship.get_meta("base_support_fleet_limit", ship.support_fleet_limit))
 		if not ship.has_meta("base_support_fleet_limit"):
 			ship.set_meta("base_support_fleet_limit", base_limit)
-		var relic_bonus: int = 1 if bool(ship.get_meta("relic_choyogi_applied", false)) else 0
+		var item_bonus: int = 1 if bool(ship.get_meta("item_choyogi_applied", false)) else 0
 		var upgrade_bonus: int = 0
 		if level >= int(stats.get("limit_add_level", 5)):
 			upgrade_bonus = int(stats.get("limit_add", 1))
-		ship.support_fleet_limit = base_limit + relic_bonus + upgrade_bonus
+		ship.support_fleet_limit = base_limit + item_bonus + upgrade_bonus
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:

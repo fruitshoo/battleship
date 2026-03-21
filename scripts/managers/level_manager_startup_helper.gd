@@ -21,17 +21,17 @@ static func initialize(lm: Node) -> void:
 	# 시작 직후 짧은 로딩 오버레이 안에서 예열을 끝내 첫 전투 끊김을 줄인다.
 	lm.call_deferred("_prewarm_shaders", true)
 
-	# 초요기/일성정시는 현재 시작 기본 렐릭으로 장착한다.
+	# 초요기/일성정시는 현재 시작 기본 아이템으로 장착한다.
 	lm.get_tree().create_timer(0.1).timeout.connect(func():
 		if is_instance_valid(UpgradeManager):
 			UpgradeManager.initialize_default_weapons()
 		if is_instance_valid(UpgradeManager):
-			if not (is_instance_valid(SaveManager) and SaveManager.has_method("has_relic") and SaveManager.has_relic("choyogi")):
-				UpgradeManager.add_relic("choyogi")
-			if not (is_instance_valid(SaveManager) and SaveManager.has_method("has_relic") and SaveManager.has_relic("ilseongjeongsiui")):
-				UpgradeManager.add_relic("ilseongjeongsiui")
-			if UpgradeManager.has_method("equip_owned_relics"):
-				UpgradeManager.equip_owned_relics()
+			if not (is_instance_valid(SaveManager) and SaveManager.has_method("has_item") and SaveManager.has_item("choyogi")):
+				UpgradeManager.add_item("choyogi")
+			if not (is_instance_valid(SaveManager) and SaveManager.has_method("has_item") and SaveManager.has_item("ilseongjeongsiui")):
+				UpgradeManager.add_item("ilseongjeongsiui")
+			if UpgradeManager.has_method("equip_owned_items"):
+				UpgradeManager.equip_owned_items()
 	)
 
 static func run_startup_prewarm_async(lm: Node) -> void:
@@ -71,11 +71,16 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 		preload("res://scenes/effects/fire_effect.tscn"),
 		preload("res://scenes/effects/fire_pot_explosion.tscn"),
 		preload("res://scenes/effects/water_burst.tscn"),
+		preload("res://scenes/projectiles/cannonball.tscn"),
 		preload("res://scenes/projectiles/cannonball_joseon.tscn"),
 		preload("res://scenes/projectiles/cannonball_japanese.tscn"),
 		preload("res://scenes/projectiles/cannonball_enemy_light.tscn"),
 		preload("res://scenes/projectiles/cannonball_enemy_medium.tscn"),
 		preload("res://scenes/projectiles/cannonball_enemy_heavy.tscn"),
+		preload("res://scenes/projectiles/arrow.tscn"),
+		preload("res://scenes/projectiles/ballista_bolt.tscn"),
+		preload("res://scenes/projectiles/janggun_missile.tscn"),
+		preload("res://scenes/projectiles/singigeon_rocket.tscn"),
 	]
 
 	var container := Node3D.new()
@@ -150,5 +155,6 @@ static func _prewarm_scene_pool_instance(tree: SceneTree, scene: PackedScene) ->
 static func _prewarm_audio_playback() -> void:
 	if not is_instance_valid(AudioManager):
 		return
-	for key in ["cannon_fire", "cannon_fuse", "cannon_reload"]:
-		AudioManager.play_sfx(key, null, 1.0, -80.0)
+	for key in ["cannon_fire", "cannon_fuse", "cannon_reload", "impact_wood", "wood_break", "water_splash_large"]:
+		# Use Vector3.ZERO to explicitly prewarm the 3D AudioStreamPlayer pool and Godot's spatial audio
+		AudioManager.play_sfx(key, Vector3.ZERO, 1.0, -80.0)

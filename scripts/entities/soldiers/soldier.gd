@@ -31,7 +31,7 @@ enum State {
 	set(value):
 		max_health = value
 		current_health = max_health
-@export var detection_range: float = 21.0 # 적 탐지 범위 (이 밖의 적은 무시)
+@export var detection_range: float = 35.0 # 적 탐지 범위 (이 밖의 적은 무시)
 @export var crit_chance: float = 0.1 # 크리티컬 확률 (10%)
 @export var crit_multiplier: float = 2.0 # 크리티컬 데미지 배율
 @export var attack_damage: float = 12.0: # 기본 공격력 (근접/원거리 공용)
@@ -91,8 +91,8 @@ var _base_max_health_stat: float = 0.0
 var _base_attack_damage_stat: float = 0.0
 var _base_defense_stat: float = 0.0
 
-const CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 11.5
-const CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 13.5
+const CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 14.5
+const CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 16.5
 const RANGED_DAMAGE_SOURCES := {
 	"bow": true,
 	"repeating_crossbow": true,

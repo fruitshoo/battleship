@@ -1,7 +1,7 @@
 extends RefCounted
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const HudRelicBar = preload("res://scripts/ui/hud_relic_bar.gd")
+const HudItemBar = preload("res://scripts/ui/hud_item_bar.gd")
 const HudUpgradeTrack = preload("res://scripts/ui/hud_upgrade_track.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
@@ -274,9 +274,9 @@ static func setup_bottom_right_layout(hud) -> void:
 	hud.bottom_right_container.offset_bottom = -24
 	hud.bottom_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	hud.bottom_right_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	if hud.relic_bar == null:
-		hud.relic_bar = HudRelicBar.new()
-		hud.bottom_right_container.add_child(hud.relic_bar)
+	if hud.item_bar == null:
+		hud.item_bar = HudItemBar.new()
+		hud.bottom_right_container.add_child(hud.item_bar)
 
 static func setup_bottom_left_layout(hud) -> void:
 	if hud == null:

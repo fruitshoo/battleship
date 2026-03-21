@@ -170,15 +170,15 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		],
 	})
 
-	var relic_names: Array[String] = _get_relic_names()
-	if not relic_names.is_empty():
-		var relic_rows: Array[Dictionary] = []
-		for relic_name in relic_names:
-			relic_rows.append({"icon": "auto_awesome", "label": "렐릭", "value": relic_name})
+	var item_names: Array[String] = _get_item_names()
+	if not item_names.is_empty():
+		var item_rows: Array[Dictionary] = []
+		for item_name in item_names:
+			item_rows.append({"icon": "auto_awesome", "label": "아이템", "value": item_name})
 		sections.append({
-			"title": "렐릭",
+			"title": "아이템",
 			"icon": "diamond",
-			"rows": relic_rows,
+			"rows": item_rows,
 		})
 
 	return sections
@@ -363,19 +363,19 @@ static func _collect_crew_stats(ship) -> Dictionary:
 	result["bow_damage"] = ranged_damage
 	return result
 
-static func _get_relic_names() -> Array[String]:
-	var relic_names: Array[String] = []
+static func _get_item_names() -> Array[String]:
+	var item_names: Array[String] = []
 	if not is_instance_valid(UpgradeManager):
-		return relic_names
-	var acquired = UpgradeManager.get("acquired_relics")
-	var relics = UpgradeManager.get("RELICS")
-	if not (acquired is Array) or not (relics is Dictionary):
-		return relic_names
-	for relic_id in acquired:
-		var relic_data = relics.get(relic_id, {})
-		if relic_data is Dictionary:
-			relic_names.append(str(relic_data.get("name", relic_id)))
-	return relic_names
+		return item_names
+	var acquired = UpgradeManager.get("acquired_items")
+	var items = UpgradeManager.get("ITEMS")
+	if not (acquired is Array) or not (items is Dictionary):
+		return item_names
+	for item_id in acquired:
+		var item_data = items.get(item_id, {})
+		if item_data is Dictionary:
+			item_names.append(str(item_data.get("name", item_id)))
+	return item_names
 
 static func _get_float(obj, property_name: String, default_value: float) -> float:
 	if obj == null:

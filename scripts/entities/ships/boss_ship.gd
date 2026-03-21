@@ -397,9 +397,9 @@ func die() -> void:
 			cached_lm.show_victory()
 	)
 	
-	# 렐릭은 최종 보스(tier 2 이상)만 드롭한다.
-	if tier >= 2 and is_instance_valid(UpgradeManager) and UpgradeManager.has_method("grant_final_boss_relic"):
-		UpgradeManager.grant_final_boss_relic()
+	# 아이템은 최종 보스(tier 2 이상)만 드롭한다.
+	if tier >= 2 and is_instance_valid(UpgradeManager) and UpgradeManager.has_method("grant_final_boss_item"):
+		UpgradeManager.grant_final_boss_item()
 	
 	# 생존자 대량 스폰 (보스 격침 보너스: 3~5명)
 	if survivor_scene:

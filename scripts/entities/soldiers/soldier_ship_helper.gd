@@ -98,8 +98,8 @@ static func get_cross_ship_engage_ship_distance(soldier, other_ship: Node3D) -> 
 	var my_half_ext: Vector2 = get_ship_deck_half_extents(soldier, soldier.owned_ship)
 	var other_half_ext: Vector2 = get_ship_deck_half_extents(soldier, other_ship)
 	var combined_length: float = my_half_ext.y + other_half_ext.y
-	var size_bonus: float = maxf(0.0, combined_length - 3.4) * 0.42
-	return base_distance + clampf(size_bonus, 0.0, 7.5)
+	var size_bonus: float = maxf(0.0, combined_length - 3.4) * 0.6
+	return base_distance + clampf(size_bonus, 0.0, 15.0)
 
 
 static func get_cross_ship_engage_max_distance(soldier, other_ship: Node3D) -> float:
@@ -111,9 +111,9 @@ static func get_cross_ship_engage_max_distance(soldier, other_ship: Node3D) -> f
 	var other_half_ext: Vector2 = get_ship_deck_half_extents(soldier, other_ship)
 	var combined_width: float = my_half_ext.x + other_half_ext.x
 	var combined_length: float = my_half_ext.y + other_half_ext.y
-	var width_bonus: float = maxf(0.0, combined_width - 2.4) * 0.45
-	var length_bonus: float = maxf(0.0, combined_length - 3.4) * 0.36
-	return base_distance + clampf(width_bonus + length_bonus, 0.0, 7.0)
+	var width_bonus: float = maxf(0.0, combined_width - 2.4) * 0.6
+	var length_bonus: float = maxf(0.0, combined_length - 3.4) * 0.5
+	return base_distance + clampf(width_bonus + length_bonus, 0.0, 20.0)
 
 
 static func get_cross_ship_contact_point_local(soldier, other_ship: Node3D) -> Vector3:
@@ -154,7 +154,7 @@ static func is_in_cross_ship_contact_zone(soldier, other_ship: Node3D) -> bool:
 		return false
 	var soldier_local: Vector3 = soldier.owned_ship.to_local(soldier.global_position)
 	var diff_xz := Vector2(soldier_local.x - contact_local.x, soldier_local.z - contact_local.z)
-	var zone_radius: float = clampf(get_cross_ship_engage_max_distance(soldier, other_ship) * 0.26, 2.6, 4.0)
+	var zone_radius: float = clampf(get_cross_ship_engage_max_distance(soldier, other_ship) * 0.35, 3.0, 9.0)
 	return diff_xz.length_squared() <= (zone_radius * zone_radius)
 
 

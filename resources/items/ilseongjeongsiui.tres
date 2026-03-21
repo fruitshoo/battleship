@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemDataResource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resource_types/item_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/items/ilseongjeongsiui.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+item_id = "ilseongjeongsiui"
+item_name = "일성정시의"
+description = "부유물 발견 범위가 넓어지고 부유물에서 나오는 재화가 50% 증가합니다."
+icon = "star"
+icon_texture = ExtResource("2")
+alert_msg = "!! 전리품 획득: 일성정시의 !!\n(부유물 범위 증가 / 보상 +50%)"

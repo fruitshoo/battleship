@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDataResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resource_types/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+item_id = "boss_heart"
+item_name = "보스의 심장"
+description = "격파한 보스의 잔향이 선체에 스며듭니다. 선체 내구와 방어력이 증가합니다."
+icon = "favorite"
+alert_msg = "!! 전리품 획득: 보스의 심장 !!\n(최대 선체 HP/방어력 증가)"

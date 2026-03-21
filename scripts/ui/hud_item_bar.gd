@@ -4,29 +4,29 @@ const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutline
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SLOT_SIZE := Vector2(40, 40)
 
-var relic_container: HBoxContainer = null
-var current_relic_count: int = 0
+var item_container: HBoxContainer = null
+var current_item_count: int = 0
 
 func _ready() -> void:
 	add_theme_constant_override("margin_top", 10)
-	relic_container = HBoxContainer.new()
-	relic_container.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	relic_container.add_theme_constant_override("separation", 8)
-	add_child(relic_container)
+	item_container = HBoxContainer.new()
+	item_container.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	item_container.add_theme_constant_override("separation", 8)
+	add_child(item_container)
 
 func clear_icons() -> void:
-	if not is_instance_valid(relic_container):
+	if not is_instance_valid(item_container):
 		return
-	for child in relic_container.get_children():
+	for child in item_container.get_children():
 		child.queue_free()
-	current_relic_count = 0
+	current_item_count = 0
 
 func add_icon(icon_data) -> PanelContainer:
-	if current_relic_count >= 5 or not is_instance_valid(relic_container):
+	if current_item_count >= 5 or not is_instance_valid(item_container):
 		return null
 
 	var slot_bg: PanelContainer = _create_slot(icon_data)
-	relic_container.add_child(slot_bg)
+	item_container.add_child(slot_bg)
 	var icon_control := slot_bg.get_child(0) as Control
 	var slot_sb := slot_bg.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
 	slot_bg.add_theme_stylebox_override("panel", slot_sb)
@@ -38,7 +38,7 @@ func add_icon(icon_data) -> PanelContainer:
 		tween.tween_property(icon_control, "scale", Vector2(1.0, 1.0), 0.2)
 	tween.tween_property(slot_sb, "border_color", NavalUiTheme.BORDER_GOLD_DIM, 0.5)
 
-	current_relic_count += 1
+	current_item_count += 1
 	return slot_bg
 
 func _create_slot(icon_data) -> PanelContainer:
