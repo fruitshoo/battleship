@@ -7,9 +7,14 @@ const HudLayoutBuilder = preload("res://scripts/ui/hud_layout_builder.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud_update_helper.gd")
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.gd")
 const HudStatPanelHelper = preload("res://scripts/ui/hud_stat_panel_helper.gd")
+const HudDebugPanelHelper = preload("res://scripts/ui/hud_debug_panel_helper.gd")
+const HudDistanceDebugHelper = preload("res://scripts/ui/hud_distance_debug_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
+const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
+const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
+const CANNON_CLOSE_RANGE_MIN_MULTIPLIER: float = 0.55
 
 ## 게임 HUD
 ## 현재 HUD는 런타임에 레이아웃을 조립하며, 이 스크립트는 상태 보관과 갱신 허브 역할을 맡는다.
@@ -19,6 +24,7 @@ var level_label: Label = null
 var score_label: Label = null
 var timer_label: Label = null
 var capture_opportunity_label: Label = null
+var debug_distance_label: Label = null
 var difficulty_label: Label = null
 var crew_label: Label = null
 var xp_bar: ProgressBar = null
@@ -63,9 +69,18 @@ var sail_debug_hole_slider: HSlider = null
 var sail_debug_damage_value: Label = null
 var sail_debug_burn_value: Label = null
 var sail_debug_hole_value: Label = null
+var debug_ship_status_value: Label = null
+var debug_ship_config_value: Label = null
+var debug_enemy_fleet_value: Label = null
+var debug_ship_hull_slider: HSlider = null
+var debug_ship_hull_value: Label = null
+var debug_ship_stamina_slider: HSlider = null
+var debug_ship_stamina_value: Label = null
 var debug_environment_value: Label = null
 var debug_collision_value: Label = null
+var debug_distance_value: Label = null
 var _sail_debug_ui_syncing: bool = false
+var _ship_debug_ui_syncing: bool = false
 
 # Boarding UI
 var boarding_ui: VBoxContainer = null
@@ -87,6 +102,7 @@ var _last_difficulty_text: String = ""
 var _last_combat_stats_text: String = ""
 var _item_refresh_retry_left: float = 0.0
 var _sail_debug_sync_left: float = 0.0
+var _distance_debug_refresh_left: float = 0.0
 
 # Item and stat UI
 var item_bar = null
@@ -219,276 +235,7 @@ func _setup_new_layout() -> void:
 	HudLayoutBuilder.setup_new_layout(self)
 
 func _setup_sail_debug_panel() -> void:
-	if not OS.is_debug_build():
-		return
-	if is_instance_valid(sail_debug_panel):
-		return
-	sail_debug_toggle_button = Button.new()
-	sail_debug_toggle_button.name = "DebugToolsToggle"
-	sail_debug_toggle_button.text = "Debug"
-	sail_debug_toggle_button.custom_minimum_size = Vector2(72, 30)
-	NavalUiTheme.apply_hud_button(sail_debug_toggle_button, 11)
-	sail_debug_toggle_button.pressed.connect(func() -> void:
-		if not is_instance_valid(sail_debug_panel):
-			return
-		sail_debug_panel.visible = not sail_debug_panel.visible
-		_update_sail_debug_toggle_button_text()
-		if sail_debug_panel.visible:
-			_sync_sail_debug_panel_from_player()
-			_sync_debug_tools_panel_state()
-	)
-	if is_instance_valid(bottom_right_container):
-		bottom_right_container.add_child(sail_debug_toggle_button)
-	else:
-		add_child(sail_debug_toggle_button)
-		sail_debug_toggle_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-		sail_debug_toggle_button.offset_right = -24
-		sail_debug_toggle_button.offset_bottom = -24
-
-	sail_debug_panel = PanelContainer.new()
-	sail_debug_panel.name = "SailDebugPanel"
-	var panel_style := NavalUiTheme.make_hud_panel_style()
-	sail_debug_panel.add_theme_stylebox_override("panel", panel_style)
-
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(232, 280)
-	scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	sail_debug_panel.add_child(scroll)
-
-	var panel_box := VBoxContainer.new()
-	panel_box.custom_minimum_size = Vector2(212, 0)
-	panel_box.add_theme_constant_override("separation", 6)
-	scroll.add_child(panel_box)
-
-	var title := Label.new()
-	title.text = "Debug Tools"
-	NavalUiTheme.style_heading(title, 13)
-	panel_box.add_child(title)
-
-	var hint := Label.new()
-	hint.text = "기존 F키 기능을 버튼으로 모아둔 패널"
-	NavalUiTheme.style_muted(hint, 10)
-	panel_box.add_child(hint)
-
-	var environment_section: Dictionary = _create_debug_section("환경", false)
-	panel_box.add_child(environment_section["root"])
-	var environment_status := Label.new()
-	environment_status.text = "프리셋: -"
-	NavalUiTheme.style_body(environment_status, 11)
-	environment_section["body"].add_child(environment_status)
-	debug_environment_value = environment_status
-
-	var environment_row := HBoxContainer.new()
-	environment_row.add_theme_constant_override("separation", 6)
-	environment_section["body"].add_child(environment_row)
-	environment_row.add_child(_create_debug_action_button("낮", func() -> void:
-		_apply_environment_preset(0)
-	))
-	environment_row.add_child(_create_debug_action_button("밤", func() -> void:
-		_apply_environment_preset(1)
-	))
-
-	var collision_section: Dictionary = _create_debug_section("충돌", false)
-	panel_box.add_child(collision_section["root"])
-	var collision_status := Label.new()
-	collision_status.text = "충돌 시각화: OFF"
-	NavalUiTheme.style_body(collision_status, 11)
-	collision_section["body"].add_child(collision_status)
-	debug_collision_value = collision_status
-
-	var collision_row := HBoxContainer.new()
-	collision_row.add_theme_constant_override("separation", 6)
-	collision_section["body"].add_child(collision_row)
-	collision_row.add_child(_create_debug_action_button("표시 토글", func() -> void:
-		_invoke_level_debug_method("_toggle_collision_visualizers")
-		_sync_debug_tools_panel_state()
-	))
-	collision_row.add_child(_create_debug_action_button("모드 순환", func() -> void:
-		_invoke_level_debug_method("_cycle_collision_visualizer_mode")
-		_sync_debug_tools_panel_state()
-	))
-
-	var spawn_section: Dictionary = _create_debug_section("스폰", false)
-	panel_box.add_child(spawn_section["root"])
-	var spawn_row_a := HBoxContainer.new()
-	spawn_row_a.add_theme_constant_override("separation", 4)
-	spawn_section["body"].add_child(spawn_row_a)
-	spawn_row_a.add_child(_create_debug_action_button("세키 근접", func() -> void:
-		_invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_melee", 40.0, -12.0])
-	))
-	spawn_row_a.add_child(_create_debug_action_button("세키 포격", func() -> void:
-		_invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_cannon", 40.0, 12.0])
-	))
-
-	var spawn_row_b := HBoxContainer.new()
-	spawn_row_b.add_theme_constant_override("separation", 4)
-	spawn_section["body"].add_child(spawn_row_b)
-	spawn_row_b.add_child(_create_debug_action_button("중간보스", func() -> void:
-		_invoke_level_debug_method("_debug_spawn_mid_boss")
-	))
-	spawn_row_b.add_child(_create_debug_action_button("최종보스", func() -> void:
-		_invoke_level_debug_method("_debug_spawn_final_boss")
-	))
-
-	var spawn_row_c := HBoxContainer.new()
-	spawn_row_c.add_theme_constant_override("separation", 4)
-	spawn_section["body"].add_child(spawn_row_c)
-	spawn_row_c.add_child(_create_debug_action_button("지원함 추가", func() -> void:
-		_invoke_level_debug_method("_debug_spawn_support_ship")
-	))
-	spawn_row_c.add_child(_create_debug_action_button("지원함 덤프", func() -> void:
-		_invoke_level_debug_method("_debug_dump_support_fleet_state")
-	))
-
-	var misc_section: Dictionary = _create_debug_section("게임", false)
-	panel_box.add_child(misc_section["root"])
-	var misc_row := HBoxContainer.new()
-	misc_row.add_theme_constant_override("separation", 4)
-	misc_section["body"].add_child(misc_row)
-	misc_row.add_child(_create_debug_action_button("강제 레벨업", func() -> void:
-		_invoke_level_debug_method("add_xp", [9999])
-	))
-	misc_row.add_child(_create_debug_action_button("메타샵", func() -> void:
-		_invoke_level_debug_method("show_meta_shop")
-	))
-
-	var misc_row_b := HBoxContainer.new()
-	misc_row_b.add_theme_constant_override("separation", 4)
-	misc_section["body"].add_child(misc_row_b)
-	misc_row_b.add_child(_create_debug_action_button("대포 디버그", func() -> void:
-		_invoke_level_debug_method("_debug_cannons")
-	))
-	misc_row_b.add_child(_create_debug_action_button("체력바 토글", func() -> void:
-		toggle_ship_health_bars()
-	))
-
-	var misc_row_c := HBoxContainer.new()
-	misc_row_c.add_theme_constant_override("separation", 4)
-	misc_section["body"].add_child(misc_row_c)
-	misc_row_c.add_child(_create_debug_action_button("통계 패널", func() -> void:
-		toggle_stat_panel()
-	))
-
-	var sail_section: Dictionary = _create_debug_section("돛", true)
-	panel_box.add_child(sail_section["root"])
-
-	var damage_row: Dictionary = _create_sail_debug_slider_row("Damage")
-	sail_section["body"].add_child(damage_row["root"])
-	sail_debug_damage_slider = damage_row["slider"]
-	sail_debug_damage_value = damage_row["value"]
-	sail_debug_damage_slider.value_changed.connect(_on_sail_debug_damage_changed)
-
-	var burn_row: Dictionary = _create_sail_debug_slider_row("Burn")
-	sail_section["body"].add_child(burn_row["root"])
-	sail_debug_burn_slider = burn_row["slider"]
-	sail_debug_burn_value = burn_row["value"]
-	sail_debug_burn_slider.value_changed.connect(_on_sail_debug_burn_changed)
-
-	var hole_row: Dictionary = _create_sail_debug_slider_row("Hole")
-	sail_section["body"].add_child(hole_row["root"])
-	sail_debug_hole_slider = hole_row["slider"]
-	sail_debug_hole_value = hole_row["value"]
-	sail_debug_hole_slider.max_value = 2.0
-	sail_debug_hole_slider.step = 0.01
-	sail_debug_hole_slider.value = 1.0
-	sail_debug_hole_slider.value_changed.connect(_on_sail_debug_hole_changed)
-
-	var preset_row := HBoxContainer.new()
-	preset_row.add_theme_constant_override("separation", 4)
-	sail_section["body"].add_child(preset_row)
-	for preset in [
-		{"label": "Clean", "damage": 0.0, "burn": 0.0},
-		{"label": "Scorch", "damage": 0.22, "burn": 0.18, "hole": 0.5},
-		{"label": "Fray", "damage": 0.55, "burn": 0.32, "hole": 1.0},
-		{"label": "Burn", "damage": 0.88, "burn": 0.70, "hole": 1.4},
-	]:
-		var preset_button := Button.new()
-		preset_button.text = str(preset["label"])
-		preset_button.custom_minimum_size = Vector2(0, 26)
-		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		NavalUiTheme.apply_hud_button(preset_button, 11)
-		preset_button.pressed.connect(func() -> void:
-			_apply_sail_debug_values(float(preset["damage"]), float(preset["burn"]), float(preset.get("hole", 1.0)))
-		)
-		preset_row.add_child(preset_button)
-
-	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 6)
-	sail_section["body"].add_child(action_row)
-
-	var sync_button := Button.new()
-	sync_button.text = "Sync"
-	sync_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	NavalUiTheme.apply_hud_button(sync_button, 11)
-	sync_button.pressed.connect(_sync_sail_debug_panel_from_player)
-	action_row.add_child(sync_button)
-
-	var reset_button := Button.new()
-	reset_button.text = "Reset"
-	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	NavalUiTheme.apply_hud_button(reset_button, 11)
-	reset_button.pressed.connect(func() -> void:
-		_apply_sail_debug_values(0.0, 0.0, 1.0)
-	)
-	action_row.add_child(reset_button)
-
-	if is_instance_valid(bottom_right_container):
-		bottom_right_container.add_child(sail_debug_panel)
-	else:
-		add_child(sail_debug_panel)
-		sail_debug_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-		sail_debug_panel.offset_right = -24
-		sail_debug_panel.offset_bottom = -120
-	sail_debug_panel.visible = false
-	_sync_sail_debug_panel_from_player()
-	_sync_debug_tools_panel_state()
-	_update_sail_debug_toggle_button_text()
-
-
-func _create_debug_section(title_text: String, expanded: bool) -> Dictionary:
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 4)
-
-	var toggle := Button.new()
-	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	toggle.flat = true
-	toggle.text = ""
-	toggle.add_theme_font_size_override("font_size", 11)
-	toggle.add_theme_color_override("font_color", NavalUiTheme.TEXT_ACCENT)
-	root.add_child(toggle)
-
-	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 6)
-	body.visible = expanded
-	root.add_child(body)
-
-	toggle.pressed.connect(func() -> void:
-		body.visible = not body.visible
-		_update_debug_section_button_text(toggle, title_text, body.visible)
-	)
-	_update_debug_section_button_text(toggle, title_text, expanded)
-
-	return {
-		"root": root,
-		"toggle": toggle,
-		"body": body,
-	}
-
-
-func _update_debug_section_button_text(button: Button, title_text: String, expanded: bool) -> void:
-	button.text = "%s %s" % ["▾" if expanded else "▸", title_text]
-
-
-func _create_debug_action_button(button_text: String, callback: Callable) -> Button:
-	var button := Button.new()
-	button.text = button_text
-	button.custom_minimum_size = Vector2(0, 28)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	NavalUiTheme.apply_hud_button(button, 11)
-	button.pressed.connect(callback)
-	return button
+	HudDebugPanelHelper.setup_debug_panel(self)
 
 
 func _update_sail_debug_toggle_button_text() -> void:
@@ -496,37 +243,259 @@ func _update_sail_debug_toggle_button_text() -> void:
 		return
 	sail_debug_toggle_button.text = "Debug 닫기" if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible else "Debug 열기"
 
-func _create_sail_debug_slider_row(title_text: String) -> Dictionary:
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 2)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = title_text
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	NavalUiTheme.style_body(title, 11)
-	header.add_child(title)
+func _sync_ship_debug_panel_from_player() -> void:
+	if not is_instance_valid(debug_ship_status_value):
+		return
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		debug_ship_status_value.text = "함선 상태: 플레이어 배 없음"
+		return
 
-	var value := Label.new()
-	value.text = "0.00"
-	value.custom_minimum_size.x = 38
-	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	NavalUiTheme.style_accent(value, 11)
-	header.add_child(value)
-	root.add_child(header)
+	var hull_hp_value: float = float(player_ship.get("hull_hp"))
+	var max_hull_hp_value: float = maxf(0.01, float(player_ship.get("max_hull_hp")))
+	var stamina_value: float = float(player_ship.get("rowing_stamina")) if player_ship.get("rowing_stamina") != null else 0.0
+	var max_stamina_value: float = maxf(0.01, float(player_ship.get("max_rowing_stamina"))) if player_ship.get("max_rowing_stamina") != null else 1.0
+	var crew_count: int = int(player_ship.get("current_crew_count")) if player_ship.get("current_crew_count") != null else 0
+	var max_crew_count_value: int = int(player_ship.get("max_crew_count")) if player_ship.get("max_crew_count") != null else 0
+	var speed_value: float = float(player_ship.get("current_speed")) if player_ship.get("current_speed") != null else 0.0
+	var fire_state: String = "화재" if player_ship.get("is_burning") == true else "정상"
+	debug_ship_status_value.text = "선체 %.0f/%.0f | 스태미나 %.0f/%.0f | 선원 %d/%d | 속도 %.1f | %s" % [
+		hull_hp_value,
+		max_hull_hp_value,
+		stamina_value,
+		max_stamina_value,
+		crew_count,
+		max_crew_count_value,
+		speed_value,
+		fire_state
+	]
+	if is_instance_valid(debug_ship_config_value):
+		var support_limit: int = int(player_ship.get("support_fleet_limit")) if player_ship.get("support_fleet_limit") != null else 0
+		var captain_count_value: int = int(player_ship.get("captain_count")) if player_ship.get("captain_count") != null else 0
+		var rowing_state: String = "ON" if player_ship.get("is_rowing") == true else "OFF"
+		var max_speed_value: float = float(player_ship.get("max_speed")) if player_ship.get("max_speed") != null else 0.0
+		var turn_rate_value: float = float(player_ship.get("turn_rate")) if player_ship.get("turn_rate") != null else 0.0
+		var hull_defense_value: float = float(player_ship.get("hull_defense")) if player_ship.get("hull_defense") != null else 0.0
+		var crew_respawn_interval_value: float = float(player_ship.get("crew_respawn_interval")) if player_ship.get("crew_respawn_interval") != null else 0.0
+		var boarding_capture_duration_value: float = float(player_ship.get("boarding_capture_duration")) if player_ship.get("boarding_capture_duration") != null else 0.0
+		debug_ship_config_value.text = "설정: 정원 %d | 장군 %d | 지원한도 %d | 노젓기 %s | 속도 %.1f | 선회 %.0f | 방어 %.0f | 보충 %.0f | 장악 %.1f" % [
+			max_crew_count_value,
+			captain_count_value,
+			support_limit,
+			rowing_state,
+			max_speed_value,
+			turn_rate_value,
+			hull_defense_value,
+			crew_respawn_interval_value,
+			boarding_capture_duration_value
+		]
+	if is_instance_valid(debug_enemy_fleet_value):
+		var nearest_enemy: Node3D = _find_nearest_enemy_ship_for_distance_debug()
+		if is_instance_valid(nearest_enemy):
+			var ship_type_text: String = str(nearest_enemy.get("ship_type"))
+			var fleet_class_text: String = str(nearest_enemy.get_meta("enemy_fleet_class", ""))
+			var formation_type_text: String = str(nearest_enemy.get_meta("enemy_formation_type", ""))
+			var formation_label_text: String = str(nearest_enemy.get_meta("enemy_formation_label", ""))
+			var role_text: String = str(nearest_enemy.get_meta("enemy_formation_role", ""))
+			var parts: Array[String] = []
+			if not ship_type_text.is_empty():
+				parts.append(ship_type_text)
+			if not fleet_class_text.is_empty():
+				parts.append("편대 %s" % fleet_class_text)
+			if not formation_label_text.is_empty():
+				parts.append("이름 %s" % formation_label_text)
+			if not formation_type_text.is_empty():
+				parts.append("진형 %s" % formation_type_text)
+			if not role_text.is_empty():
+				parts.append("역할 %s" % role_text)
+			debug_enemy_fleet_value.text = "근처 편대: %s" % (" | ".join(parts) if not parts.is_empty() else "정보 없음")
+		else:
+			debug_enemy_fleet_value.text = "근처 편대: 근처 적선 없음"
 
-	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.01
-	slider.value = 0.0
-	root.add_child(slider)
+	_ship_debug_ui_syncing = true
+	if is_instance_valid(debug_ship_hull_slider):
+		debug_ship_hull_slider.value = clampf(hull_hp_value / max_hull_hp_value, 0.0, 1.0)
+	if is_instance_valid(debug_ship_hull_value):
+		debug_ship_hull_value.text = "%.2f" % clampf(hull_hp_value / max_hull_hp_value, 0.0, 1.0)
+	if is_instance_valid(debug_ship_stamina_slider):
+		debug_ship_stamina_slider.value = clampf(stamina_value / max_stamina_value, 0.0, 1.0)
+	if is_instance_valid(debug_ship_stamina_value):
+		debug_ship_stamina_value.text = "%.2f" % clampf(stamina_value / max_stamina_value, 0.0, 1.0)
+	_ship_debug_ui_syncing = false
 
-	return {
-		"root": root,
-		"slider": slider,
-		"value": value,
-	}
+
+func _on_debug_ship_hull_changed(value: float) -> void:
+	if _ship_debug_ui_syncing:
+		return
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		return
+	var max_hull_hp_value: float = maxf(0.01, float(player_ship.get("max_hull_hp")))
+	player_ship.set("hull_hp", clampf(value, 0.0, 1.0) * max_hull_hp_value)
+	_sync_ship_debug_panel_from_player()
+
+
+func _on_debug_ship_stamina_changed(value: float) -> void:
+	if _ship_debug_ui_syncing:
+		return
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		return
+	if player_ship.get("rowing_stamina") == null or player_ship.get("max_rowing_stamina") == null:
+		return
+	var max_stamina_value: float = maxf(0.01, float(player_ship.get("max_rowing_stamina")))
+	player_ship.set("rowing_stamina", clampf(value, 0.0, 1.0) * max_stamina_value)
+	_sync_ship_debug_panel_from_player()
+
+
+func _refill_player_crew_for_debug() -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	if player_ship.has_method("_sync_player_crew_roster"):
+		player_ship.call("_sync_player_crew_roster")
+	if player_ship.get("crew_respawn_timer") != null and player_ship.get("crew_respawn_interval") != null:
+		player_ship.set("crew_respawn_timer", float(player_ship.get("crew_respawn_interval")))
+	if player_ship.has_method("_update_crew_count"):
+		player_ship.call("_update_crew_count")
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("선원 보충", 0.7)
+
+
+func _spawn_support_ship_for_debug() -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	if player_ship.has_method("_spawn_or_repair_ally"):
+		player_ship.call("_spawn_or_repair_ally")
+		show_gust_warning_message("지원함 호출", 0.7)
+
+
+func _stop_player_ship_for_debug() -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	player_ship.set("current_speed", 0.0)
+	if player_ship.get("is_rowing") != null:
+		player_ship.set("is_rowing", false)
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("함선 정지", 0.7)
+
+
+func _toggle_player_ship_fire_for_debug() -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	var is_burning_now: bool = player_ship.get("is_burning") == true
+	player_ship.set("is_burning", not is_burning_now)
+	if player_ship.get("fire_build_up") != null and player_ship.get("fire_threshold") != null:
+		if is_burning_now:
+			player_ship.set("fire_build_up", 0.0)
+		else:
+			player_ship.set("fire_build_up", float(player_ship.get("fire_threshold")))
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("화재 %s" % ("해제" if is_burning_now else "적용"), 0.7)
+
+
+func _toggle_player_rowing_for_debug() -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	var next_rowing: bool = not (player_ship.get("is_rowing") == true)
+	if player_ship.has_method("set_rowing"):
+		player_ship.call("set_rowing", next_rowing)
+	else:
+		player_ship.set("is_rowing", next_rowing)
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("노젓기 %s" % ("ON" if next_rowing else "OFF"), 0.7)
+
+
+func _auto_adjust_player_sail_for_debug() -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	if player_ship.has_method("_auto_adjust_sail"):
+		player_ship.call("_auto_adjust_sail", 0.35)
+	show_gust_warning_message("돛 정렬", 0.7)
+
+
+func _adjust_player_crew_capacity_for_debug(delta_amount: int) -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	var current_value: int = int(player_ship.get("max_crew_count")) if player_ship.get("max_crew_count") != null else 0
+	var next_value: int = clampi(current_value + delta_amount, 1, 12)
+	player_ship.set("max_crew_count", next_value)
+	var captain_value: int = int(player_ship.get("captain_count")) if player_ship.get("captain_count") != null else 0
+	if captain_value > next_value:
+		player_ship.set("captain_count", next_value)
+	if player_ship.has_method("_sync_player_crew_roster"):
+		player_ship.call("_sync_player_crew_roster")
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("정원 %d" % next_value, 0.7)
+
+
+func _adjust_player_captain_count_for_debug(delta_amount: int) -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	var max_crew_count_value: int = int(player_ship.get("max_crew_count")) if player_ship.get("max_crew_count") != null else 0
+	var current_value: int = int(player_ship.get("captain_count")) if player_ship.get("captain_count") != null else 0
+	var next_value: int = clampi(current_value + delta_amount, 0, max_crew_count_value)
+	player_ship.set("captain_count", next_value)
+	if player_ship.has_method("_sync_player_crew_roster"):
+		player_ship.call("_sync_player_crew_roster")
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("장군 %d" % next_value, 0.7)
+
+
+func _adjust_player_support_limit_for_debug(delta_amount: int) -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	var current_value: int = int(player_ship.get("support_fleet_limit")) if player_ship.get("support_fleet_limit") != null else 0
+	var next_value: int = clampi(current_value + delta_amount, 0, 4)
+	player_ship.set("support_fleet_limit", next_value)
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("지원한도 %d" % next_value, 0.7)
+
+
+func _adjust_player_ship_float_for_debug(property_name: String, delta_value: float, min_value: float, max_value: float, label: String) -> void:
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		show_gust_warning_message("플레이어 배 없음", 0.8)
+		return
+	if player_ship.get(property_name) == null:
+		show_gust_warning_message("속성 없음: %s" % property_name, 0.8)
+		return
+	var current_value: float = float(player_ship.get(property_name))
+	var next_value: float = clampf(current_value + delta_value, min_value, max_value)
+	player_ship.set(property_name, next_value)
+	_sync_ship_debug_panel_from_player()
+	show_gust_warning_message("%s %.1f" % [label, next_value], 0.7)
 
 func _process(delta: float) -> void:
 	_sync_game_time(delta)
@@ -565,6 +534,7 @@ func _process(delta: float) -> void:
 		_update_stamina_display()
 		_update_boarding_display()
 		_update_capture_opportunity_display()
+		_update_distance_debug_display()
 		_update_ship_health_bars(false)
 	if show_stat_panel:
 		_stat_refresh_left -= delta
@@ -667,6 +637,45 @@ func _sync_debug_tools_panel_state() -> void:
 					mode_name = "GUARD"
 			collision_text = "ON (%s)" % mode_name
 		debug_collision_value.text = "충돌 시각화: %s" % collision_text
+	if is_instance_valid(debug_distance_value):
+		debug_distance_value.text = "거리 표시: %s" % ("ON" if DistanceDebugVisualizer.runtime_enabled else "OFF")
+	_sync_ship_debug_panel_from_player()
+
+
+func _toggle_distance_debug() -> void:
+	HudDistanceDebugHelper.toggle_distance_debug(self)
+
+
+func _ensure_distance_debug_visualizer() -> void:
+	HudDistanceDebugHelper.ensure_distance_debug_visualizer(self)
+
+
+func _update_distance_debug_display() -> void:
+	HudDistanceDebugHelper.update_distance_debug_display(self)
+
+
+func _find_nearest_enemy_ship_for_distance_debug() -> Node3D:
+	return HudDistanceDebugHelper.find_nearest_enemy_ship_for_distance_debug(self)
+
+
+func _get_planar_distance(a: Vector3, b: Vector3) -> float:
+	return HudDistanceDebugHelper.get_planar_distance(a, b)
+
+
+func _get_ship_pair_melee_distance_debug(player: Node3D, other_ship: Node3D) -> float:
+	return HudDistanceDebugHelper.get_ship_pair_melee_distance_debug(self, player, other_ship)
+
+
+func _get_player_cannon_range_for_debug() -> float:
+	return HudDistanceDebugHelper.get_player_cannon_range_for_debug(self)
+
+
+func _get_cannon_efficiency_for_debug(planar_distance: float) -> float:
+	return HudDistanceDebugHelper.get_cannon_efficiency_for_debug(self, planar_distance)
+
+
+func _get_ship_deck_half_extents_for_debug(ship: Node3D) -> Vector2:
+	return HudDistanceDebugHelper.get_ship_deck_half_extents_for_debug(ship)
 
 
 func update_level(val: int) -> void:
