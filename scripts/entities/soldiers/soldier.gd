@@ -589,6 +589,9 @@ func _is_in_cross_ship_contact_zone(other_ship: Node3D) -> bool:
 func _find_cross_ship_muster_target() -> Vector3:
 	return SoldierShipHelper.find_cross_ship_muster_target(self)
 
+func _find_ship_duty_target() -> Vector3:
+	return SoldierShipHelper.find_ship_duty_target(self)
+
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:
 	SoldierBoardingHelper.try_evacuate_to_home(self)

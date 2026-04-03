@@ -27,6 +27,12 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 				_move_toward_point(soldier, muster_target, 0.9)
 				return
 
+		if soldier.has_method("_find_ship_duty_target"):
+			var duty_target: Vector3 = soldier._find_ship_duty_target()
+			if duty_target != Vector3.INF:
+				_move_toward_point(soldier, duty_target, 0.75)
+				return
+
 	if soldier.wander_timer > 0:
 		soldier.wander_timer -= delta
 	else:
@@ -58,6 +64,12 @@ static func state_wander(soldier, run_heavy_logic: bool) -> void:
 			var muster_target: Vector3 = soldier._find_cross_ship_muster_target()
 			if muster_target != Vector3.INF:
 				_move_toward_point(soldier, muster_target, 0.85)
+				return
+
+		if soldier.has_method("_find_ship_duty_target"):
+			var duty_target: Vector3 = soldier._find_ship_duty_target()
+			if duty_target != Vector3.INF:
+				_move_toward_point(soldier, duty_target, 0.7)
 				return
 
 	if not is_instance_valid(soldier.owned_ship):
