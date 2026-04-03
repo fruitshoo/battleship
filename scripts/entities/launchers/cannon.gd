@@ -39,6 +39,7 @@ var _cached_cd_mult: float = 1.0
 var _cached_dmg_mult: float = 1.0
 var _cached_crit_chance: float = 0.0
 var _cached_crit_multiplier: float = 1.5
+var _cached_ammo_type: String = "roundshot"
 
 func _ready() -> void:
 	# 초기 업그레이드 적용
@@ -136,6 +137,13 @@ func _resolve_owner_ship() -> Node:
 
 func _get_current_range() -> float:
 	return detection_range * _cached_range_mult
+
+func _get_current_ammo_type() -> String:
+	if team != "player":
+		return "roundshot"
+	if is_instance_valid(_owner_ship) and _owner_ship.get("current_cannon_ammo") != null:
+		_cached_ammo_type = str(_owner_ship.get("current_cannon_ammo"))
+	return _cached_ammo_type
 
 func _enemy_team_tag() -> String:
 	return "enemy" if team == "player" else "player"
@@ -336,6 +344,7 @@ func _execute_fire() -> void:
 		fire_direction = - global_transform.basis.z
 
 	var final_damage = 1.0
+	var ammo_type: String = _get_current_ammo_type()
 	var ball = ScenePool.acquire(get_tree(), cannonball_scene)
 	get_tree().root.add_child(ball)
 	var projectile_base_damage: float = 0.0
@@ -349,11 +358,13 @@ func _execute_fire() -> void:
 	if team == "player" and "crit_multiplier" in ball:
 		ball.crit_multiplier = _cached_crit_multiplier
 	if ball.has_method("launch"):
-		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult)
+		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult, ammo_type)
 	else:
 		ball.position = muzzle.global_position
 		ball.team = team
 		ball.damage = final_damage
+		if "ammo_type" in ball:
+			ball.ammo_type = ammo_type
 		if team == "player":
 			ball.crit_chance = _cached_crit_chance
 			ball.crit_multiplier = _cached_crit_multiplier

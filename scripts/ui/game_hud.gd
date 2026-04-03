@@ -25,6 +25,7 @@ var level_label: Label = null
 var score_label: Label = null
 var timer_label: Label = null
 var capture_opportunity_label: Label = null
+var ammo_mode_label: Label = null
 var debug_distance_label: Label = null
 var difficulty_label: Label = null
 var crew_label: Label = null
@@ -95,6 +96,7 @@ var merit_label: Label = null
 # Cached text/state
 var _last_timer_str: String = ""
 var _last_capture_opportunity_text: String = ""
+var _last_ammo_mode_text: String = ""
 var _last_speed_str: String = ""
 var _last_speed_ratio: float = -1.0
 var _last_speed_mode: String = ""
@@ -333,6 +335,7 @@ func _process(delta: float) -> void:
 		_update_stamina_display()
 		_update_boarding_display()
 		_update_capture_opportunity_display()
+		_update_ammo_mode_display()
 		_update_distance_debug_display()
 		_update_ship_health_bars(false)
 	if show_stat_panel:
@@ -794,6 +797,28 @@ func _update_boarding_display() -> void:
 
 func _update_capture_opportunity_display() -> void:
 	HudUpdateHelper.update_capture_opportunity_display(self)
+
+
+func _update_ammo_mode_display() -> void:
+	if not is_instance_valid(ammo_mode_label):
+		return
+	if not is_instance_valid(player_ship):
+		_try_resolve_player_ship()
+	if not is_instance_valid(player_ship):
+		if ammo_mode_label.visible:
+			ammo_mode_label.visible = false
+		return
+	var ammo_key: String = str(player_ship.get("current_cannon_ammo")) if player_ship.get("current_cannon_ammo") != null else "roundshot"
+	var ammo_text: String = "탄종: 실선탄"
+	match ammo_key:
+		"chainshot":
+			ammo_text = "탄종: 사슬탄"
+		"grapeshot":
+			ammo_text = "탄종: 포도탄"
+	if _last_ammo_mode_text != ammo_text:
+		_last_ammo_mode_text = ammo_text
+		ammo_mode_label.text = ammo_text
+	ammo_mode_label.visible = true
 
 
 func show_game_over() -> void:

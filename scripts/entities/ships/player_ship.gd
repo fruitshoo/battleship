@@ -61,6 +61,7 @@ var rowing_locked: bool = false
 @export var support_fleet_limit: int = 1
 @export var support_fleet_respawn_interval: float = 30.0
 var support_fleet_respawn_timer: float = 0.0
+@export_enum("roundshot", "chainshot", "grapeshot") var current_cannon_ammo: String = "roundshot"
 
 @onready var ship_audio: AudioStreamPlayer3D = $ShipAudio
 
@@ -259,6 +260,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_sinking or is_dying or not is_player_controlled: return
 	
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_G:
+			cycle_cannon_ammo()
+			return
 		# 치트키: F2 누르면 바로 지휘(병영) 레벨업
 		if OS.is_debug_build() and event.keycode == KEY_F2:
 			if is_instance_valid(_cached_level_manager):
@@ -409,6 +413,26 @@ func set_rowing(active: bool) -> void:
 ## 노 젓기 토글
 func toggle_rowing() -> void:
 	is_rowing = not is_rowing
+
+
+func cycle_cannon_ammo() -> void:
+	var ammo_order: Array[String] = ["roundshot", "chainshot", "grapeshot"]
+	var current_index: int = ammo_order.find(current_cannon_ammo)
+	if current_index < 0:
+		current_index = 0
+	current_cannon_ammo = ammo_order[(current_index + 1) % ammo_order.size()]
+	if _cached_hud and _cached_hud.has_method("show_message"):
+		_cached_hud.show_message("탄종: %s" % _get_cannon_ammo_display_name(), 1.1)
+
+
+func _get_cannon_ammo_display_name() -> String:
+	match current_cannon_ammo:
+		"chainshot":
+			return "사슬탄"
+		"grapeshot":
+			return "포도탄"
+		_:
+			return "실선탄"
 
 
 ## === 선체 내구도 시스템 ===

@@ -165,6 +165,16 @@ static func setup_top_center_layout(hud) -> void:
 	hud.capture_opportunity_label.add_theme_constant_override("outline_size", 3)
 	top_center_box.add_child(hud.capture_opportunity_label)
 
+	hud.ammo_mode_label = Label.new()
+	hud.ammo_mode_label.name = "AmmoModeLabel"
+	hud.ammo_mode_label.text = "탄종: 실선탄"
+	hud.ammo_mode_label.visible = true
+	hud.ammo_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NavalUiTheme.style_muted(hud.ammo_mode_label, 10)
+	hud.ammo_mode_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+	hud.ammo_mode_label.add_theme_constant_override("outline_size", 3)
+	top_center_box.add_child(hud.ammo_mode_label)
+
 	hud.debug_distance_label = Label.new()
 	hud.debug_distance_label.name = "DebugDistanceLabel"
 	hud.debug_distance_label.text = ""

@@ -759,7 +759,9 @@ func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> 
 		return
 	var source_mult: float = 0.0
 	var is_ramming_hit: bool = damage_source.begins_with("ramming")
-	if damage_source.begins_with("cannon") or damage_source == "janggun":
+	if damage_source.contains("chain"):
+		source_mult = 1.55
+	elif damage_source.begins_with("cannon") or damage_source == "janggun":
 		source_mult = 1.0
 	elif is_ramming_hit:
 		# 충각은 선체 전반에 큰 충격을 주기 때문에 돛 손상도 대포보다 약간 더 잘 보이게 한다.

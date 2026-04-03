@@ -41,6 +41,8 @@ static func apply_rudder_damage_from_hit(ship, final_damage: float, hit_position
 	var source_mult: float = 0.0
 	if damage_source.begins_with("ramming"):
 		source_mult = 0.7
+	elif damage_source.contains("chain"):
+		source_mult = 0.34
 	elif damage_source.contains("cannon"):
 		source_mult = 0.18
 	elif damage_source.contains("ballista") or damage_source.contains("singigeon") or damage_source.contains("fire"):

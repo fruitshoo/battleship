@@ -5,6 +5,7 @@ const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 const CLOSE_RANGE_HULL_FALLOFF_DISTANCE: float = 8.0
 const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
+const GRAPESHOT_MAX_EFFECTIVE_DISTANCE: float = 13.5
 
 ## 대포알 (Cannonball)
 ## 정해진 방향으로 전진하며, 적과 충돌 시 적을 파괴함
@@ -24,6 +25,7 @@ var team: String = "player"
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
 var shooter_label: String = ""
+var ammo_type: String = "roundshot"
 var launch_origin: Vector3 = Vector3.ZERO
 var time_alive: float = 0.0
 var _life_left: float = 0.0
@@ -45,11 +47,12 @@ func get_base_damage() -> float:
 func pool_capacity() -> int:
 	return 24
 
-func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3, target: Node3D, final_damage: float, lifetime_mult: float = 1.0) -> void:
+func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3, target: Node3D, final_damage: float, lifetime_mult: float = 1.0, next_ammo_type: String = "roundshot") -> void:
 	global_position = spawn_position
 	team = fire_team
 	damage = final_damage
 	target_node = target
+	ammo_type = next_ammo_type
 	shooter_label = ""
 	launch_origin = spawn_position
 	time_alive = 0.0
@@ -82,6 +85,7 @@ func pool_reset() -> void:
 	time_alive = 0.0
 	_life_left = 0.0
 	target_node = null
+	ammo_type = "roundshot"
 	shooter_label = ""
 	launch_origin = Vector3.ZERO
 	damage = _base_damage
@@ -247,20 +251,16 @@ func _check_hit(target: Node) -> void:
 		# 적중 처리
 		var is_crit = randf() < crit_chance
 		var final_damage = damage * (crit_multiplier if is_crit else 1.0)
-		var close_range_hull_mult: float = _get_close_range_hull_multiplier(ship)
-		final_damage *= close_range_hull_mult
+		var source_id: String = _build_damage_source_id(is_crit)
+		final_damage *= _get_hull_damage_multiplier_for_ammo(ship)
 		
 		if ship.has_method("take_damage"):
-			var source_id = ""
-			if team == "player":
-				source_id = "cannon_crit" if is_crit else "cannon"
-			elif team == "enemy":
-				source_id = "enemy_cannon_crit" if is_crit else "enemy_cannon"
 			if shooter_label.is_empty() and has_meta("shooter_label"):
 				shooter_label = str(get_meta("shooter_label"))
 			if not shooter_label.is_empty():
 				source_id += ":%s" % shooter_label
 			ship.take_damage(final_damage, global_position, source_id)
+		_apply_crew_damage_for_ammo(ship, global_position)
 		
 		_spawn_effects(is_crit)
 		_release_self()
@@ -279,6 +279,74 @@ func _check_hit(target: Node) -> void:
 		
 		# 어떤 경우든 부딪히면 삭제
 		_release_self()
+
+
+func _build_damage_source_id(is_crit: bool) -> String:
+	var ammo_suffix: String = ""
+	match ammo_type:
+		"chainshot":
+			ammo_suffix = "_chain"
+		"grapeshot":
+			ammo_suffix = "_grape"
+		_:
+			ammo_suffix = ""
+	if team == "player":
+		return "cannon%s%s" % [ammo_suffix, "_crit" if is_crit else ""]
+	return "enemy_cannon%s%s" % [ammo_suffix, "_crit" if is_crit else ""]
+
+
+func _get_hull_damage_multiplier_for_ammo(ship: Node3D) -> float:
+	match ammo_type:
+		"chainshot":
+			return 0.35
+		"grapeshot":
+			var planar_distance: float = _get_planar_distance_to(ship.global_position)
+			if planar_distance > GRAPESHOT_MAX_EFFECTIVE_DISTANCE:
+				return 0.03
+			var close_t: float = clampf(1.0 - (planar_distance / GRAPESHOT_MAX_EFFECTIVE_DISTANCE), 0.0, 1.0)
+			return lerpf(0.03, 0.12, close_t)
+		_:
+			var close_range_hull_mult: float = _get_close_range_hull_multiplier(ship)
+			return close_range_hull_mult
+
+
+func _apply_crew_damage_for_ammo(ship: Node3D, hit_pos: Vector3) -> void:
+	if ammo_type != "grapeshot":
+		return
+	var planar_distance: float = _get_planar_distance_to(ship.global_position)
+	if planar_distance > GRAPESHOT_MAX_EFFECTIVE_DISTANCE:
+		return
+	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
+	if not is_instance_valid(soldiers_node):
+		return
+	var enemy_soldiers: Array[Node] = []
+	for child in soldiers_node.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.get("current_state") == 4:
+			continue
+		if str(child.get("team")) == team:
+			continue
+		enemy_soldiers.append(child)
+	if enemy_soldiers.is_empty():
+		return
+
+	enemy_soldiers.sort_custom(func(a: Node, b: Node) -> bool:
+		return a.global_position.distance_squared_to(hit_pos) < b.global_position.distance_squared_to(hit_pos)
+	)
+	var close_t: float = clampf(1.0 - (planar_distance / GRAPESHOT_MAX_EFFECTIVE_DISTANCE), 0.0, 1.0)
+	var target_count: int = maxi(1, mini(enemy_soldiers.size(), int(round(lerpf(2.0, 5.0, close_t)))))
+	var soldier_damage: float = damage * lerpf(0.45, 0.9, close_t)
+	for i in range(target_count):
+		var soldier: Node = enemy_soldiers[i]
+		if soldier.has_method("take_damage"):
+			soldier.take_damage(soldier_damage, hit_pos, "grapeshot")
+
+
+func _get_planar_distance_to(target_pos: Vector3) -> float:
+	var planar_delta: Vector3 = target_pos - global_position
+	planar_delta.y = 0.0
+	return planar_delta.length()
 
 
 func _get_close_range_hull_multiplier(ship: Node3D) -> float:
