@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 팔우노 화살 (Ballista Bolt)
 ## 고속으로 비행하며 다수의 대상을 관통하고 강력한 넉백을 줍니다.
@@ -14,12 +15,27 @@ var direction: Vector3 = Vector3.FORWARD
 var pierce_count: int = 0
 var hit_list: Array[Node] = []
 
+var _life_left: float = 0.0
+
 func _ready() -> void:
+	# 시그널은 한 번만 연결
 	area_entered.connect(_on_area_entered)
 	body_entered.connect(_on_body_entered)
-	get_tree().create_timer(lifetime).timeout.connect(queue_free)
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 40
+
+func pool_reset() -> void:
+	pierce_count = 0
+	hit_list.clear()
+	_life_left = lifetime
 
 func _physics_process(delta: float) -> void:
+	_life_left -= delta
+	if _life_left <= 0.0:
+		ScenePool.release(self)
+		return
 	global_position += direction * speed * delta
 
 func _on_area_entered(area: Area3D) -> void:
@@ -66,7 +82,7 @@ func _check_hit(target: Node) -> void:
 			
 		# 일정 횟수 이상 관통하면 소멸
 		if pierce_count >= max_pierce:
-			queue_free()
+			ScenePool.release(self)
 
 func _apply_knockback(soldier: Node3D) -> void:
 	if not is_instance_valid(soldier): return

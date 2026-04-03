@@ -1,7 +1,7 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://cm4c0u30p0035"]
 
-[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_water"]
-[ext_resource type="Script" path="res://scripts/effects/water_burst.gd" id="2_script"]
+[ext_resource type="Texture2D" uid="uid://bjesxwfjdqo6x" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_water"]
+[ext_resource type="Script" uid="uid://dowesoy8yplyl" path="res://scripts/effects/water_burst.gd" id="2_script"]
 
 [sub_resource type="Gradient" id="Gradient_water"]
 offsets = PackedFloat32Array(0, 0.15, 0.6, 1)
@@ -40,10 +40,9 @@ particles_anim_loop = false
 material = SubResource("StandardMaterial3D_water")
 size = Vector2(1.5, 1.5)
 
-[node name="WaterBurst" type="GPUParticles3D"]
+[node name="WaterBurst" type="GPUParticles3D" unique_id=537832488]
 emitting = false
 amount = 10
-lifetime = 1.0
 one_shot = true
 explosiveness = 0.95
 randomness = 0.5
@@ -54,7 +53,7 @@ process_material = SubResource("ParticleProcessMaterial_water")
 draw_pass_1 = SubResource("QuadMesh_water")
 script = ExtResource("2_script")
 
-[node name="SecondaryBurst" type="GPUParticles3D" parent="."]
+[node name="SecondaryBurst" type="GPUParticles3D" parent="." unique_id=1551724802]
 emitting = false
 amount = 1
 lifetime = 1.6

@@ -120,7 +120,7 @@ func fire(target: Node3D) -> void:
 		return
 	cooldown_timer = fire_cooldown * _cached_cd_mult
 	
-	var bolt = bolt_scene.instantiate()
+	var bolt = ScenePool.acquire(get_tree(), bolt_scene)
 	var spawn_pos = muzzle.global_position if is_instance_valid(muzzle) else (global_position + Vector3(0, 0.5, 0))
 	# 아직 트리에 없는 발사체는 global_position 대신 루트 기준 로컬 position을 먼저 설정한다.
 	bolt.position = spawn_pos

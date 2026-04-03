@@ -114,6 +114,7 @@ var _hull_half_extents: Vector2 = Vector2(1.5, 4.0) # X:반폭, Y:반길이
 
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 @export var water_splash_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
+@export var impact_puff_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 @export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
 @export_range(0.0, 1.0, 0.01) var floating_loot_drop_chance: float = 0.65

@@ -11,6 +11,7 @@ var team: String = "player"
 
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
+const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
 const ENEMY_SHIP_SCENE = preload("res://scenes/ships/enemy_ship.tscn")
 const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
 const JOSEON_CANNON_SCENE = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
@@ -149,6 +150,7 @@ func _ready() -> void:
 			_update_editor_hull()
 		return
 
+	_apply_soldier_rules_data()
 	super._ready()
 	fire_effect_offset = Vector3(0, 1.0, 0.0)
 	print("[Ship] Total masts connected: ", masts.size())
@@ -175,6 +177,16 @@ func _ready() -> void:
 		set_meta("base_support_fleet_limit", support_fleet_limit)
 	if not has_meta("base_support_fleet_respawn_interval"):
 		set_meta("base_support_fleet_respawn_interval", support_fleet_respawn_interval)
+
+
+func _apply_soldier_rules_data() -> void:
+	var captain_rules: Dictionary = SoldierRulesData.get_section("captain")
+	if captain_rules.is_empty():
+		return
+	captain_count = clampi(int(captain_rules.get("count", captain_count)), 0, max_crew_count)
+	captain_health_multiplier = float(captain_rules.get("health_multiplier", captain_health_multiplier))
+	captain_attack_multiplier = float(captain_rules.get("attack_multiplier", captain_attack_multiplier))
+	captain_defense_bonus = float(captain_rules.get("defense_bonus", captain_defense_bonus))
 
 func _cache_references() -> void:
 	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)

@@ -230,7 +230,7 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 		cd = 3.0
 	ship.fire_pot_cooldown_timer = cd
 
-	var pot = ship.fire_pot_scene.instantiate()
+	var pot = ship.ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
 	var target_pos = target.global_position
 	target_pos.x += randf_range(-1.2, 1.2)
 	target_pos.z += randf_range(-1.2, 1.2)

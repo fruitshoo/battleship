@@ -15,6 +15,7 @@ const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 @export var arc_height: float = 8.0
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
+@export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
 
 var start_pos: Vector3 = Vector3.ZERO
@@ -28,32 +29,44 @@ var janggun_lv: int = 0
 var team: String = "player"
 
 func _ready() -> void:
-	# 업그레이드 수치 반영 (DoT, 디버프 강화)
-	dot_damage += janggun_lv * 1.5
-	speed_debuff = maxf(0.2, speed_debuff - janggun_lv * 0.05)
-	turn_debuff = maxf(0.2, turn_debuff - janggun_lv * 0.05)
+	# 시그널은 한 번만 연결
+	area_entered.connect(_on_hit)
+	body_entered.connect(_on_hit)
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 15
+
+func pool_reset() -> void:
+	is_stuck = false
+	is_sinking = false
+	progress = 0.0
+	target_ship = null
 	
-	var distance = start_pos.distance_to(target_pos)
-	duration = distance / speed
+	# 초기화 시 모니터링 다시 켜기
+	monitoring = true
+	monitorable = true
 	
-	# 근거리에서 채찍처럼 꽂히는 현상 방지를 위해 최소 비행 시간 확보 (0.5 -> 0.7)
-	if duration < 0.7: duration = 0.7
-	
-	# 거리에 따라 포물선 높이 조절 (근거리는 낮게, 원거리는 높게)
-	# 10m당 1m 상승, 최소 1.5m ~ 최대 8m
-	arc_height = clamp(distance * 0.12, 1.5, 8.0)
+	# 수치 반영
+	_update_stats()
 	
 	global_position = start_pos
 	
-	# 즉시 목표 방향 바라보기 (초기 회전 오류 방지)
+	var distance = start_pos.distance_to(target_pos)
+	duration = distance / speed
+	if duration < 0.7: duration = 0.7
+	arc_height = clamp(distance * 0.12, 1.5, 8.0)
+	
 	if start_pos.distance_squared_to(target_pos) > 0.1:
 		look_at(target_pos, Vector3.UP)
 	
-	# 발사 연출 (Screen Shake + Muzzle Effects)
 	_play_launch_vfx()
-	
-	area_entered.connect(_on_hit)
-	body_entered.connect(_on_hit)
+
+func _update_stats() -> void:
+	# 업그레이드 수치 반영 (DoT, 디버프 강화)
+	dot_damage = 3.0 + janggun_lv * 1.5
+	speed_debuff = maxf(0.2, 0.7 - janggun_lv * 0.05)
+	turn_debuff = maxf(0.2, 0.6 - janggun_lv * 0.05)
 
 func _physics_process(delta: float) -> void:
 	if is_stuck or is_sinking: return
@@ -133,9 +146,8 @@ func _unstick() -> void:
 	if is_instance_valid(target_ship) and target_ship.has_method("remove_leak"):
 		target_ship.remove_leak(dot_damage)
 	
-	queue_free()
+	ScenePool.release(self)
 
-@export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 
 func _splash_and_sink() -> void:
 	if is_sinking: return
@@ -159,7 +171,7 @@ func _splash_and_sink() -> void:
 	
 	var tween = create_tween()
 	tween.tween_property(self , "position:y", position.y - 2.0, 1.0)
-	tween.tween_callback(queue_free)
+	tween.tween_callback(func(): ScenePool.release(self))
 
 func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트

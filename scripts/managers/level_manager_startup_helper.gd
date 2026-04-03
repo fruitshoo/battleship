@@ -86,8 +86,10 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 	var container := Node3D.new()
 	container.name = "ShaderPrewarmer"
 	lm.add_child(container)
-	container.position = Vector3(0, -1000, 0)
-	container.scale = Vector3.ONE
+	# 카메라 근처 혹은 렌더링 가능한 범위 내에 두어야 쉐이더가 인스턴싱됨 (프러스텀 컬링 방지)
+	container.position = Vector3(0, 5, -5) 
+	container.scale = Vector3(0.01, 0.01, 0.01) # 아주 작게 만들어 화면엔 안 보이게 함
+	container.visible = true
 
 	for scene in scenes_to_warm:
 		if scene:
@@ -95,8 +97,8 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 			_mark_prewarm_recursive(inst)
 			container.add_child(inst)
 			_prime_visual_resources(inst)
-			if scene.resource_path.contains("cannonball") or scene.resource_path.contains("impact_puff") or scene.resource_path.contains("water_burst"):
-				_prewarm_scene_pool_instance(lm.get_tree(), scene)
+			# 모든 전투 관련 씬을 풀에 미리 등록
+			_prewarm_scene_pool_instance(lm.get_tree(), scene)
 			if not show_blocking_overlay:
 				await lm.get_tree().process_frame
 
@@ -124,16 +126,20 @@ static func _mark_prewarm_recursive(node: Node) -> void:
 static func _prime_visual_resources(node: Node) -> void:
 	if node is GPUParticles3D:
 		var gpu := node as GPUParticles3D
-		gpu.emitting = false
-		gpu.process_material = gpu.process_material
+		gpu.emitting = true # 실제 방출을 시도해야 파이프라인이 생성됨
+		gpu.one_shot = true
+		gpu.restart()
 	elif node is CPUParticles3D:
 		var cpu := node as CPUParticles3D
-		cpu.emitting = false
-		cpu.process_material = cpu.process_material
+		cpu.emitting = true
+		cpu.one_shot = true
+		cpu.restart()
 	elif node is MeshInstance3D:
 		var mesh_inst := node as MeshInstance3D
-		mesh_inst.mesh = mesh_inst.mesh
-		mesh_inst.material_override = mesh_inst.material_override
+		# 렌더링 강제 유도
+		mesh_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if mesh_inst.mesh:
+			var _m = mesh_inst.mesh
 
 	for child in node.get_children():
 		_prime_visual_resources(child)

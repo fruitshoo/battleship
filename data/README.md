@@ -5,13 +5,13 @@
 현재 사용 중인 파일:
 - `ship_stats.json`
 - `upgrades.json`
-
-추가 후보:
 - `level_progression.json`
 - `reward_rules.json`
 - `enemy_spawn_rules.json`
-- `boss_rules.json`
 - `soldier_rules.json`
+
+추가 후보:
+- `boss_rules.json`
 
 ## Recommended 1st Phase
 
@@ -33,6 +33,14 @@
 - 차단진 편성 규칙
 - 함종 비율 변화
 - 엘리트/중간보스 호위 구성
+
+## Recommended 2nd Phase
+
+4. `soldier_rules.json`
+- 병사 기본 체력, 공격력, 이동속도
+- 탐지/무기 전환 거리
+- cross-ship 교전 기준 거리
+- 플레이어 장군(captain) 기본 보정
 
 ## Example Files
 

@@ -1,6 +1,7 @@
 extends CharacterBody3D
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
@@ -91,8 +92,8 @@ var _base_max_health_stat: float = 0.0
 var _base_attack_damage_stat: float = 0.0
 var _base_defense_stat: float = 0.0
 
-const CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 14.5
-const CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 16.5
+var CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 14.5
+var CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 16.5
 const RANGED_DAMAGE_SOURCES := {
 	"bow": true,
 	"repeating_crossbow": true,
@@ -134,6 +135,7 @@ static func get_ships_cached(tree: SceneTree, team_name: String) -> Array:
 
 
 func _ready() -> void:
+	_apply_soldier_rules_data()
 	# 영구 업그레이드 보너스 적용 (아군 전용)
 	if team == "player":
 		var _meta_manager_init = get_node_or_null("/root/MetaManager")
@@ -213,6 +215,25 @@ func _ready() -> void:
 	if is_instance_valid(_cached_upgrade_manager):
 		if _cached_upgrade_manager.has_signal("upgrade_applied"):
 			_cached_upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
+
+
+func _apply_soldier_rules_data() -> void:
+	var base_rules: Dictionary = SoldierRulesData.get_section("base")
+	if not base_rules.is_empty():
+		max_health = float(base_rules.get("max_health", max_health))
+		detection_range = float(base_rules.get("detection_range", detection_range))
+		crit_chance = float(base_rules.get("crit_chance", crit_chance))
+		crit_multiplier = float(base_rules.get("crit_multiplier", crit_multiplier))
+		attack_damage = float(base_rules.get("attack_damage", attack_damage))
+		defense = float(base_rules.get("defense", defense))
+		move_speed = float(base_rules.get("move_speed", move_speed))
+
+	var combat_ranges: Dictionary = SoldierRulesData.get_section("combat_ranges")
+	if not combat_ranges.is_empty():
+		weapon_switch_distance = float(combat_ranges.get("weapon_switch_distance", weapon_switch_distance))
+		cross_ship_melee_switch_distance = float(combat_ranges.get("cross_ship_melee_switch_distance", cross_ship_melee_switch_distance))
+		CROSS_SHIP_ENGAGE_MAX_DISTANCE = float(combat_ranges.get("cross_ship_engage_max_distance", CROSS_SHIP_ENGAGE_MAX_DISTANCE))
+		CROSS_SHIP_ENGAGE_SHIP_DISTANCE = float(combat_ranges.get("cross_ship_engage_ship_distance", CROSS_SHIP_ENGAGE_SHIP_DISTANCE))
 
 func _cache_base_combat_stats() -> void:
 	_base_max_health_stat = max_health

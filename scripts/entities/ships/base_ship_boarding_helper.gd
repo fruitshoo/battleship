@@ -123,6 +123,10 @@ static func transfer_one_soldier(ship) -> void:
 		if enemy_count_on_deck > 0 and ally_count_on_deck <= enemy_count_on_deck:
 			return
 
+		# 적 함선인 경우 최소한 한 명은 배를 지키기 위해 남겨둠
+		if team_prop == "enemy" and ally_count_on_deck <= 1:
+			return
+
 		for child in soldiers:
 			if child.get("current_state") != 4 and child.get("team") == team_prop:
 				s = child

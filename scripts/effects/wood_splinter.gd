@@ -10,6 +10,8 @@ var _active: bool = false
 func _ready() -> void:
 	pool_reset()
 
+
+
 func pool_capacity() -> int:
 	return 14
 
@@ -49,26 +51,27 @@ func _process(delta: float) -> void:
 func set_amount_by_damage(damage: float) -> void:
 	if not cubes or not planks: return
 	
-	var total: int = 5
+	var total: int = 4
 	if damage >= 30.0:
-		total = randi_range(16, 24)
+		total = randi_range(6, 9) # 더욱 하향
 	elif damage >= 10.0:
-		total = randi_range(8, 12)
+		total = randi_range(3, 5) # 더욱 하향
 	elif damage > 3.0:
-		total = randi_range(4, 7)
+		total = randi_range(2, 3) # 더욱 하향
 		
+	# 큰 박스(Planks) 비중을 더 줄여 부하 최소화
 	cubes.amount = max(1, int(total * 0.8))
 	planks.amount = max(1, int(total * 0.2))
 	
-	var scale_mult = clamp(damage / 10.0, 0.4, 1.2)
+	var scale_mult = clamp(damage / 10.0, 0.4, 1.0) # 최대 배율 소폭 하향
 	var cubes_mat = _ensure_local_process_material(cubes)
 	if cubes_mat:
-		cubes_mat.scale_min = 0.3 * scale_mult
-		cubes_mat.scale_max = 0.8 * scale_mult
+		cubes_mat.scale_min = 0.2 * scale_mult # 0.3 -> 0.2
+		cubes_mat.scale_max = 0.5 * scale_mult # 0.8 -> 0.5
 	var planks_mat = _ensure_local_process_material(planks)
 	if planks_mat:
-		planks_mat.scale_min = 0.3 * scale_mult
-		planks_mat.scale_max = 1.0 * scale_mult
+		planks_mat.scale_min = 0.2 * scale_mult # 0.3 -> 0.2
+		planks_mat.scale_max = 0.7 * scale_mult # 1.0 -> 0.7
 
 func _ensure_local_process_material(particles: GPUParticles3D) -> ParticleProcessMaterial:
 	if not particles or not (particles.process_material is ParticleProcessMaterial):

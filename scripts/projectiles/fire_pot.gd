@@ -1,5 +1,6 @@
 extends Area3D
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 화통 (Fire Pot)
 ## 포물선으로 날아가 착탄 시 폭발하며 범위 데미지(화염)를 줍니다.
@@ -24,9 +25,17 @@ var _life_left: float = 0.0
 var _rotation_update_timer: float = 0.0
 
 func _ready() -> void:
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 20
+
+func pool_reset() -> void:
 	monitoring = false
 	monitorable = false
-	start_pos = global_position
+	has_exploded = false
+	time_alive = 0.0
+	velocity = Vector3.ZERO
 	_life_left = lifetime
 	_rotation_update_timer = 0.0
 
@@ -83,20 +92,20 @@ func explode() -> void:
 	
 	# 1. 폭발 이펙트 
 	if explosion_scene and VfxBudget.allow_spawn(get_tree(), "fire_pot_explosion", global_position, 3, 65.0):
-		var expl = explosion_scene.instantiate()
+		var expl = ScenePool.acquire(get_tree(), explosion_scene)
 		expl.position = global_position
 		get_tree().root.add_child.call_deferred(expl)
 	
 	# 2. 바닥 잔여 화염 이펙트 (1.5초)
 	if fire_effect_scene and VfxBudget.allow_spawn(get_tree(), "fire_effect", global_position, 2, 55.0):
-		var fire = fire_effect_scene.instantiate()
+		var fire = ScenePool.acquire(get_tree(), fire_effect_scene)
 		fire.position = global_position
 		if fire is GPUParticles3D:
 			fire.emitting = true
 		get_tree().root.add_child.call_deferred(fire)
 		
 		var timer = get_tree().create_timer(1.5)
-		timer.timeout.connect(func(): if is_instance_valid(fire): fire.queue_free())
+		timer.timeout.connect(func(): if is_instance_valid(fire): ScenePool.release(fire))
 	
 	# 3. 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -106,8 +115,8 @@ func explode() -> void:
 	# 4. 범위 데미지 처리 (물리 질의)
 	_apply_area_damage()
 	
-	# 자신 삭제
-	queue_free()
+	# 자신 삭제를 객체 풀 반납으로 변경
+	ScenePool.release(self)
 
 func _apply_area_damage() -> void:
 	var space_state = get_world_3d().direct_space_state

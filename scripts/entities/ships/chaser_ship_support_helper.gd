@@ -83,7 +83,7 @@ static func drop_floating_loot(ship) -> void:
 	if randf() > float(ship.floating_loot_drop_chance):
 		return
 
-	var loot = ship.loot_scene.instantiate()
+	var loot = ship.ScenePool.acquire(ship.get_tree(), ship.loot_scene)
 	var offset_x = randf_range(-1.2, 1.2)
 	var offset_z = randf_range(-1.2, 1.2)
 	var spawn_pos = Vector3(ship.global_position.x + offset_x, 0.5, ship.global_position.z + offset_z)
@@ -92,7 +92,7 @@ static func drop_floating_loot(ship) -> void:
 	loot.set_deferred("global_position", spawn_pos)
 
 	if ship.survivor_scene and randf() < 0.3:
-		var survivor = ship.survivor_scene.instantiate()
+		var survivor = ship.ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
 		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
 		var survivor_pos = ship.global_position + s_offset
 		ship.get_tree().root.add_child.call_deferred(survivor)
@@ -113,7 +113,7 @@ static func evacuate_player_soldiers_as_survivors(ship) -> void:
 			var spawn_pos = child.global_position
 			spawn_pos.y = 0.5
 
-			var survivor = ship.survivor_scene.instantiate()
+			var survivor = ship.ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
 			ship.get_tree().root.add_child.call_deferred(survivor)
 			survivor.set_deferred("global_position", spawn_pos)
 
@@ -166,13 +166,3 @@ static func evacuate_soldiers_to_home(ship) -> void:
 		print("[Evacuation] 총 %d명의 병사가 원래 배로 복귀했습니다." % returned_count)
 
 
-static func update_enemy_reinforcement(ship, delta: float) -> void:
-	if ship.get("deck_is_contested") == true:
-		return
-	var alive_count = ship.get_alive_crew_count()
-	if alive_count < ship.max_crew:
-		ship.enemy_respawn_timer += delta
-		if ship.enemy_respawn_timer >= ship.enemy_respawn_interval:
-			ship.enemy_respawn_timer = 0.0
-			ship._spawn_one_soldier("enemy")
-			print("[Reinforcement] 적 함선에 병사가 보충되었습니다. (현재: %d)" % (alive_count + 1))

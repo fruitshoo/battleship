@@ -74,7 +74,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if get_viewport(): get_viewport().set_input_as_handled()
 		
 	# Space나 Enter로 선택
-	elif event.is_action_pressed("ui_accept") or (event is InputEventKey and event.keycode == KEY_SPACE and event.pressed):
+	elif event.is_action_pressed("ui_accept") or (event is InputEventKey and event.keycode == KEY_SPACE and event.pressed and not event.is_echo()):
 		if _focused_index < card_ids.size():
 			_on_choice_pressed(card_ids[_focused_index])
 		elif _focused_index == card_ids.size() and reroll_button and not reroll_button.disabled:
@@ -250,11 +250,15 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 
 
 func _on_choice_pressed(upgrade_id: String) -> void:
+	if card_ids.is_empty(): return
+	var chosen_id = upgrade_id
+	card_ids.clear() # 두 번 눌리는 것 방지
+	
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("ui_click", null, 1.0, -4.0)
 	
 	# 시그널 발생
-	upgrade_chosen.emit(upgrade_id)
+	upgrade_chosen.emit(chosen_id)
 	
 	# 페이드아웃
 	var tween = create_tween().set_parallel(true)

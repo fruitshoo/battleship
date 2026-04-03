@@ -122,7 +122,7 @@ func fire(target: Node3D) -> void:
 	# 5레벨 체계: 쿨다운 감소폭 상향 (레벨당 1.4초 감소, 5레벨에서 약 5초대 도달)
 	cooldown_timer = maxf(5.0, fire_cooldown - janggun_lv * 1.4)
 	
-	var missile = missile_scene.instantiate()
+	var missile = ScenePool.acquire(get_tree(), missile_scene)
 	missile.start_pos = global_position + Vector3(0, 1.0, 0)
 	
 	# 예측 사격 (Predictive Aiming)

@@ -1,5 +1,6 @@
 extends Area3D
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 생존자(Survivor) 시스템
 ## 적함 침몰 시 발생하며, 플레이어가 다가가면 자석처럼 끌려와 병사로 합류함
@@ -26,6 +27,24 @@ var _player_search_timer: float = 0.0
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
 func _ready() -> void:
+	# 획득 이벤트 연결 (한 번만 수행)
+	if not body_entered.is_connected(_on_body_entered):
+		body_entered.connect(_on_body_entered)
+	if not area_entered.is_connected(_on_area_entered):
+		area_entered.connect(_on_area_entered)
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 60
+
+func pool_reset() -> void:
+	time_alive = 0.0
+	is_collected = false
+	is_expiring = false
+	target_player = null
+	current_magnet_speed = 0.0
+	_player_search_timer = randf_range(0.0, player_search_interval)
+	
 	base_y = global_position.y
 	if base_y < 0.2: base_y = 0.5
 	
@@ -46,10 +65,6 @@ func _ready() -> void:
 		# 컬링 방지 마진 추가
 		visual.extra_cull_margin = 1.0
 		
-	# 획득 이벤트 연결
-	body_entered.connect(_on_body_entered)
-	area_entered.connect(_on_area_entered)
-	
 	# OceanPlane 캐싱
 	_cached_ocean = get_tree().get_first_node_in_group("ocean")
 	_cached_um = get_node_or_null("/root/UpgradeManager")
@@ -113,7 +128,7 @@ func _expire_and_free() -> void:
 	tween.tween_property(self , "position:y", position.y - 2.0, 4.0)
 	if visual:
 		tween.tween_property(visual, "scale", Vector3.ZERO, 4.0)
-	tween.chain().tween_callback(queue_free)
+	tween.chain().tween_callback(func(): ScenePool.release(self))
 
 
 func _apply_floating(delta: float) -> void:
@@ -239,6 +254,6 @@ func _finish_collection() -> void:
 		tween.set_parallel(true)
 		tween.tween_property(visual, "scale", Vector3.ZERO, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 		tween.tween_property(visual, "position:y", position.y + 2.0, 0.3)
-		tween.chain().tween_callback(queue_free)
+		tween.chain().tween_callback(func(): ScenePool.release(self))
 	else:
-		queue_free()
+		ScenePool.release(self)

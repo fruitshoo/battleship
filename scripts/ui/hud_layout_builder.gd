@@ -165,6 +165,16 @@ static func setup_top_center_layout(hud) -> void:
 	hud.capture_opportunity_label.add_theme_constant_override("outline_size", 3)
 	top_center_box.add_child(hud.capture_opportunity_label)
 
+	hud.debug_distance_label = Label.new()
+	hud.debug_distance_label.name = "DebugDistanceLabel"
+	hud.debug_distance_label.text = ""
+	hud.debug_distance_label.visible = false
+	hud.debug_distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NavalUiTheme.style_muted(hud.debug_distance_label, 10)
+	hud.debug_distance_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+	hud.debug_distance_label.add_theme_constant_override("outline_size", 3)
+	top_center_box.add_child(hud.debug_distance_label)
+
 # Right side
 static func setup_top_right_layout(hud) -> void:
 	if hud == null:

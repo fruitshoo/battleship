@@ -1,5 +1,6 @@
 extends Area3D
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 부유물(Floating Loot) 시스템
 ## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
@@ -30,9 +31,24 @@ var _player_search_timer: float = 0.0
 @onready var visual: Node3D = $Visual if has_node("Visual") else ($MeshInstance3D if has_node("MeshInstance3D") else self)
 
 func _ready() -> void:
-	# 생성 직후의 높이를 base_y로 캡처 (보통 0.5 근처)
+	# 획득 이벤트 연결 (한 번만 수행)
+	body_entered.connect(_on_body_entered)
+	area_entered.connect(_on_area_entered)
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 80
+
+func pool_reset() -> void:
+	time_alive = 0.0
+	is_collected = false
+	is_expiring = false
+	target_player = null
+	current_magnet_speed = 0.0
+	_player_search_timer = randf_range(0.0, player_search_interval)
+	
 	base_y = global_position.y
-	if base_y < 0.2: base_y = 0.5 # 비정상적으로 낮게 잡혔을 경우 보정
+	if base_y < 0.2: base_y = 0.5
 	
 	# 초기에는 크기를 0으로 시작해서 나타남 (스폰 연출)
 	if visual:
@@ -62,10 +78,6 @@ func _ready() -> void:
 	_cached_lm = get_tree().root.find_child("LevelManager", true, false)
 	if not _cached_lm:
 		_cached_lm = SceneGroupCache.get_first(get_tree(), "level_manager")
-	
-	# 획득 이벤트 연결
-	body_entered.connect(_on_body_entered)
-	area_entered.connect(_on_area_entered)
 	
 	# UpgradeManager 캐싱
 	_cached_um = get_node_or_null("/root/UpgradeManager")
@@ -132,7 +144,7 @@ func _expire_and_free() -> void:
 	tween.tween_property(self , "position:y", position.y - 2.0, 3.0)
 	if visual:
 		tween.tween_property(visual, "scale", Vector3.ZERO, 3.0)
-	tween.chain().tween_callback(queue_free)
+	tween.chain().tween_callback(func(): ScenePool.release(self))
 
 
 func _apply_floating(delta: float) -> void:
@@ -260,6 +272,6 @@ func _collect_loot() -> void:
 	if visual:
 		var tween = create_tween()
 		tween.tween_property(visual, "scale", Vector3.ZERO, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-		tween.tween_callback(queue_free)
+		tween.tween_callback(func(): ScenePool.release(self))
 	else:
-		queue_free()
+		ScenePool.release(self)

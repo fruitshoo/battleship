@@ -89,3 +89,10 @@ static func on_upgrade_chosen(lm: Node, upgrade_id: String) -> void:
 		lm._upgrade_ui_instance = null
 
 	lm.get_tree().paused = false
+	
+	# 만약 획득한 경험치가 너무 많아 여전히 다음 레벨 요구치를 넘는다면 
+	# UI가 닫히고 게임이 재개된 바로 다음 프레임에 곧바로 다시 레벨업을 띄운다
+	if lm.get("current_xp") != null and lm.get("xp_to_next_level") != null:
+		if lm.current_xp >= lm.xp_to_next_level:
+			Callable(LevelManagerProgressionHelper, "add_xp").call_deferred(lm, 0)
+

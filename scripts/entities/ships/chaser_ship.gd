@@ -49,8 +49,6 @@ var _leak_tick_timer: float = 0.0
 var minion_respawn_timer: float = 0.0
 
 @export var max_crew: int = 6 # 적선 최대 정원
-var enemy_respawn_timer: float = 0.0
-@export var enemy_respawn_interval: float = 12.0 # 적군 충원 간격 (12초)
 var enemy_crew_composition: Array[String] = []
 var _enemy_crew_spawn_index: int = 0
 
@@ -561,13 +559,10 @@ func _process(delta: float) -> void:
 		
 	if team == "player":
 		_update_minion_respawn(delta)
-	elif team == "enemy" and not is_derelict:
-		_update_enemy_reinforcement(delta)
 
 	_update_leaking_damage(delta)
 
-func _update_enemy_reinforcement(delta: float) -> void:
-	ChaserShipSupportHelper.update_enemy_reinforcement(self, delta)
+
 
 func _update_leaking_damage(delta: float) -> void:
 	if leaking_rate <= 0.0:

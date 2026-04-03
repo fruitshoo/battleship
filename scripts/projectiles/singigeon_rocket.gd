@@ -1,6 +1,7 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 신기전 로켓 (Singigeon Rocket)
@@ -53,9 +54,16 @@ var _last_collision_check_pos: Vector3 = Vector3.ZERO
 var _last_faced_dir: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
+	pool_reset()
+
+func pool_capacity() -> int:
+	return 100
+
+func pool_reset() -> void:
 	global_position = start_pos
 	monitoring = false
 	monitorable = false
+	has_exploded = false
 	_life_left = lifetime
 	_lock_on_left = maxf(0.0, lock_on_delay)
 	_homing_left = maxf(0.0, homing_duration)
@@ -101,7 +109,7 @@ func _physics_process(delta: float) -> void:
 	_life_left -= delta
 	if _life_left <= 0.0:
 		_explode()
-		queue_free()
+		ScenePool.release(self)
 		return
 
 	if _lock_on_left > 0.0:
@@ -299,7 +307,7 @@ func _on_hit(target: Node) -> void:
 	# 직격 + 주변 스플래시 피해
 	var primary_target: Node3D = hit_obj as Node3D
 	_explode(primary_target)
-	queue_free()
+	ScenePool.release(self)
 
 func _apply_damage(target_node: Node, scale: float = 1.0) -> void:
 	if not is_instance_valid(target_node): return

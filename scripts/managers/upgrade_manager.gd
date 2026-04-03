@@ -411,11 +411,15 @@ func get_next_description(upgrade_id: String) -> String:
 
 # === 업그레이드 적용 함수들 ===
 
-func _apply_crew_numbers(ship: Node3D, _level: int) -> void:
-	var spearmen = get_specialist_unit_count("crew_numbers")
+func _apply_crew_numbers(ship: Node3D, level: int) -> void:
+	var stats = UPGRADES["crew_numbers"].get("stats", {})
+	var thresholds = stats.get("specialist_levels", [1, 3, 5])
+	if level in thresholds:
+		ship.max_crew_count += 1
+
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[Spearman] 창병 편성 갱신! (%d명)" % spearmen)
+	print("[Spearman] 창병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
 	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")
@@ -693,13 +697,15 @@ func _apply_singigeon(ship: Node3D, level: int) -> void:
 	var launcher = ship.get_node_or_null("SingijeonLauncher")
 	if is_instance_valid(launcher):
 		launcher.queue_free()
-	var rocketeers = get_specialist_unit_count("singigeon", level)
+	
+	var stats = UPGRADES["singigeon"].get("stats", {})
+	var thresholds = stats.get("specialist_levels", [1, 3, 5])
+	if level in thresholds:
+		ship.max_crew_count += 1
+		
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	var soldiers = _get_player_soldiers(ship)
-	for sol in soldiers:
-		_apply_current_stats_to_soldier(sol)
-	print("[Singigeon] 신기전병 편성 갱신! (Lv.%d, %d명)" % [level, rocketeers])
+	print("[Singigeon] 신기전병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
 
 
 func _apply_janggun(ship: Node3D, level: int) -> void:
@@ -712,23 +718,28 @@ func _apply_janggun(ship: Node3D, level: int) -> void:
 		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
 
 
-func _apply_fire_pot(_ship: Node3D, level: int) -> void:
-	var throwers = get_specialist_unit_count("fire_pot", level)
-	if _ship.has_method("_sync_player_crew_roster"):
-		_ship._sync_player_crew_roster()
-	print("[FirePot] 화통병 편성 갱신! (Lv.%d, %d명)" % [level, throwers])
+func _apply_fire_pot(ship: Node3D, level: int) -> void:
+	var stats = UPGRADES["fire_pot"].get("stats", {})
+	var thresholds = stats.get("specialist_levels", [1, 3, 5])
+	if level in thresholds:
+		ship.max_crew_count += 1
+		
+	if ship.has_method("_sync_player_crew_roster"):
+		ship._sync_player_crew_roster()
+	print("[FirePot] 화통병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
 
 
 var repeating_crossbow_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_repeating_crossbow.tscn")
 
 func _apply_repeating_crossbow(ship: Node3D, level: int) -> void:
-	var repeaters = get_specialist_unit_count("repeating_crossbow", level)
+	var stats = UPGRADES["repeating_crossbow"].get("stats", {})
+	var thresholds = stats.get("specialist_levels", [1, 3, 5])
+	if level in thresholds:
+		ship.max_crew_count += 1
+		
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	var soldiers = _get_player_soldiers(ship)
-	for sol in soldiers:
-		_apply_current_stats_to_soldier(sol)
-	print("[RepeatingCrossbow] 연노병 편성 갱신! (Lv.%d, %d명)" % [level, repeaters])
+	print("[RepeatingCrossbow] 연노병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
 
 
 func _apply_supply(ship: Node3D, _level: int) -> void:

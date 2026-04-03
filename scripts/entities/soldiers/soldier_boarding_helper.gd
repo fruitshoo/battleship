@@ -67,7 +67,7 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 
 static func teleport_to_ship(soldier, _target_ship: Node3D) -> void:
 	if soldier.SURVIVOR_SCENE:
-		var survivor = soldier.SURVIVOR_SCENE.instantiate()
+		var survivor = soldier.ScenePool.acquire(soldier.get_tree(), soldier.SURVIVOR_SCENE)
 		soldier.get_tree().root.add_child.call_deferred(survivor)
 		var spawn_pos: Vector3 = soldier.global_position
 		spawn_pos.y = 0.5

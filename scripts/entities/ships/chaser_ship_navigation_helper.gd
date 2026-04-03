@@ -5,9 +5,33 @@ static func _is_gunner(ship) -> bool:
 	return int(ship.combat_role) == int(ship.CombatRole.GUNNER)
 
 
+static func _get_ship_deck_half_extents(ship) -> Vector2:
+	if not is_instance_valid(ship):
+		return Vector2(2.0, 3.5)
+	if ship.has_method("get_deck_half_extents"):
+		var ext: Variant = ship.call("get_deck_half_extents")
+		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
+			return ext
+	if ship.has_method("get_collision_half_extents"):
+		var ext: Variant = ship.call("get_collision_half_extents")
+		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
+			return ext
+	return Vector2(
+		float(ship.get("base_collision_radius")) * float(ship.get("width_multiplier")),
+		float(ship.get("base_collision_radius")) * float(ship.get("length_multiplier"))
+	)
+
+
 static func _build_boarding_slots(ship, target_node: Node3D, target_pos: Vector3, target_forward: Vector3, target_right: Vector3) -> Array:
 	var collision_dist: float = ship.get_collision_distance_to(target_node)
-	var side_offset_dist: float = clampf(collision_dist * 0.93, 5.0, 8.6)
+	var my_half_ext: Vector2 = _get_ship_deck_half_extents(ship)
+	var target_half_ext: Vector2 = _get_ship_deck_half_extents(target_node)
+	var combined_half_width: float = my_half_ext.x + target_half_ext.x
+	var side_offset_dist: float = clampf(
+		maxf(collision_dist * 0.86, combined_half_width * 0.72),
+		maxf(2.9, combined_half_width * 0.58),
+		maxf(8.6, combined_half_width * 1.6)
+	)
 	var bow_lead_dist: float = clampf(collision_dist * 0.68, 4.8, 7.2)
 	var mid_lead_dist: float = clampf(collision_dist * 0.40, 2.8, 5.0)
 	var rel_forward: float = (ship.global_position - target_pos).dot(target_forward)
@@ -24,7 +48,7 @@ static func _build_boarding_slots(ship, target_node: Node3D, target_pos: Vector3
 		},
 		{
 			"id": "starboard_bow",
-			"side_sign": -1.0,
+			"side_sign": - 1.0,
 			"point": target_pos - target_right * side_offset_dist + target_forward * bow_lead_dist,
 			"heading": target_pos - target_right * side_offset_dist + target_forward * (bow_lead_dist + 15.0),
 			"bias": bow_bias,
@@ -38,7 +62,7 @@ static func _build_boarding_slots(ship, target_node: Node3D, target_pos: Vector3
 		},
 		{
 			"id": "starboard_mid",
-			"side_sign": -1.0,
+			"side_sign": - 1.0,
 			"point": target_pos - target_right * side_offset_dist + target_forward * mid_lead_dist,
 			"heading": target_pos - target_right * side_offset_dist + target_forward * (mid_lead_dist + 12.0),
 			"bias": mid_bias,
@@ -53,7 +77,7 @@ static func _score_boarding_slot(ship, target_node: Node3D, slot: Dictionary) ->
 	var current_slot_id: String = String(ship.get_meta("boarding_slot_id", ""))
 	var current_side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 	var slot_side_sign: float = float(slot["side_sign"])
-	var ship_forward: Vector3 = -ship.global_transform.basis.z
+	var ship_forward: Vector3 = - ship.global_transform.basis.z
 	ship_forward.y = 0.0
 	if ship_forward.length_squared() > 0.001:
 		ship_forward = ship_forward.normalized()
@@ -79,7 +103,7 @@ static func _score_boarding_slot(ship, target_node: Node3D, slot: Dictionary) ->
 			continue
 		if other.get("team") != ship.team:
 			continue
-		if not bool(other.get("allow_boarding")):
+		if other.get("allow_boarding") != true:
 			continue
 		if other.get("target") != target_node:
 			continue
@@ -104,7 +128,25 @@ static func _classify_boarding_approach(rel_forward: float, rel_side: float) -> 
 	return "front"
 
 
-static func _build_side_follow_navigation(ship, target_pos: Vector3, target_forward: Vector3, target_right: Vector3, rel_forward: float, rel_side: float, collision_dist: float, dist_to_target: float, tight_hold: bool = false) -> Dictionary:
+static func _classify_boarding_approach_smoothed(ship, rel_forward: float, rel_side: float) -> String:
+	var current_mode: String = String(ship.get_meta("boarding_approach_mode", ""))
+	var abs_forward: float = absf(rel_forward)
+	var abs_side: float = absf(rel_side)
+
+	if current_mode == "rear":
+		if rel_forward <= -0.6:
+			return "rear"
+	elif current_mode == "side":
+		if abs_side >= maxf(2.0, abs_forward * 0.52):
+			return "side"
+	elif current_mode == "front":
+		if rel_forward > -0.4 and abs_side < maxf(3.2, abs_forward * 0.82):
+			return "front"
+
+	return _classify_boarding_approach(rel_forward, rel_side)
+
+
+static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos: Vector3, target_forward: Vector3, target_right: Vector3, rel_forward: float, rel_side: float, collision_dist: float, dist_to_target: float, tight_hold: bool = false) -> Dictionary:
 	var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 	if absf(side_sign) < 0.5:
 		side_sign = 1.0 if rel_side >= 0.0 else -1.0
@@ -112,7 +154,14 @@ static func _build_side_follow_navigation(ship, target_pos: Vector3, target_forw
 	if ship.has_meta("boarding_slot_id"):
 		ship.remove_meta("boarding_slot_id")
 
-	var side_offset_dist: float = clampf(collision_dist * (0.64 if tight_hold else 0.93), 3.2, 8.6)
+	var my_half_ext: Vector2 = _get_ship_deck_half_extents(ship)
+	var target_half_ext: Vector2 = _get_ship_deck_half_extents(target_node)
+	var combined_half_width: float = my_half_ext.x + target_half_ext.x
+	var side_offset_dist: float = clampf(
+		maxf(collision_dist * (0.58 if tight_hold else 0.86), combined_half_width * (0.58 if tight_hold else 0.72)),
+		maxf(2.4 if tight_hold else 2.9, combined_half_width * (0.46 if tight_hold else 0.58)),
+		maxf(8.6, combined_half_width * 1.6)
+	)
 	var side_anchor: Vector3 = target_pos + target_right * side_sign * side_offset_dist
 	var along_track_offset: float
 	if tight_hold:
@@ -170,7 +219,7 @@ static func _choose_boarding_slot(ship, target_node: Node3D, target_pos: Vector3
 
 
 static func _is_target_deck_contested(target_node: Node3D) -> bool:
-	return bool(target_node.get("deck_is_contested"))
+	return target_node.get("deck_is_contested") == true
 
 
 static func _is_target_deck_overrun(target_node: Node3D) -> bool:
@@ -225,7 +274,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	var to_target_flat: Vector3 = target_pos - ship.global_position
 	to_target_flat.y = 0.0
 	if to_target_flat.length_squared() <= 0.001:
-		to_target_flat = -ship.global_transform.basis.z
+		to_target_flat = - ship.global_transform.basis.z
 	var dir_to_target: Vector3 = to_target_flat.normalized()
 
 	if yield_overrun_target:
@@ -261,7 +310,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			heading_point = target_pos
 			desired_speed_mult = 0.18
 	elif ship.allow_boarding and dist_to_target < 18.0:
-		var target_forward: Vector3 = -target_node.global_transform.basis.z
+		var target_forward: Vector3 = - target_node.global_transform.basis.z
 		target_forward.y = 0.0
 		if target_forward.length_squared() > 0.001:
 			target_forward = target_forward.normalized()
@@ -270,7 +319,8 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			rel_vector.y = 0.0
 			var rel_forward: float = rel_vector.dot(target_forward)
 			var rel_side: float = rel_vector.dot(target_right)
-			var approach_mode: String = _classify_boarding_approach(rel_forward, rel_side)
+			var approach_mode: String = _classify_boarding_approach_smoothed(ship, rel_forward, rel_side)
+			ship.set_meta("boarding_approach_mode", approach_mode)
 			var collision_dist: float = ship.get_collision_distance_to(target_node)
 			var post_impact_follow_timer: float = float(ship.get_meta("post_impact_follow_timer", 0.0))
 			var current_side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
@@ -292,7 +342,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 				ship.set_meta("post_impact_follow_timer", post_impact_follow_timer)
 
 			if post_impact_follow_timer > 0.0:
-				var follow_nav: Dictionary = _build_side_follow_navigation(ship, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, true)
+				var follow_nav: Dictionary = _build_side_follow_navigation(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, true)
 				desired_point = follow_nav["desired_point"]
 				heading_point = follow_nav["heading_point"]
 				desired_speed_mult = follow_nav["desired_speed_mult"]
@@ -307,7 +357,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 				desired_speed_mult = 1.04 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.94
 				permit_sprint = dist_to_target > 7.0
 			elif approach_mode == "side":
-				var side_nav: Dictionary = _build_side_follow_navigation(ship, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, side_alignment_locked)
+				var side_nav: Dictionary = _build_side_follow_navigation(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, side_alignment_locked)
 				desired_point = side_nav["desired_point"]
 				heading_point = side_nav["heading_point"]
 				desired_speed_mult = side_nav["desired_speed_mult"]
@@ -334,6 +384,8 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			ship.remove_meta("boarding_slot_id")
 		if ship.has_meta("boarding_side_sign"):
 			ship.remove_meta("boarding_side_sign")
+		if ship.has_meta("boarding_approach_mode"):
+			ship.remove_meta("boarding_approach_mode")
 
 	return {
 		"target_pos": target_pos,

@@ -405,7 +405,7 @@ func die() -> void:
 	if survivor_scene:
 		var count = randi_range(3, 5)
 		for i in range(count):
-			var survivor = survivor_scene.instantiate()
+			var survivor = ScenePool.acquire(get_tree(), survivor_scene)
 			get_tree().root.add_child.call_deferred(survivor)
 			var offset = Vector3(randf_range(-4.0, 4.0), 0.5, randf_range(-4.0, 4.0))
 			survivor.set_deferred("global_position", global_position + offset)
@@ -427,7 +427,7 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 			var spawn_pos = child.global_position
 			spawn_pos.y = 0.5 # 수면 높이
 			
-			var survivor = survivor_scene.instantiate()
+			var survivor = ScenePool.acquire(get_tree(), survivor_scene)
 			get_tree().root.add_child.call_deferred(survivor)
 			survivor.set_deferred("global_position", spawn_pos)
 			

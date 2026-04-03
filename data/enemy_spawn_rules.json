@@ -1,48 +1,94 @@
 {
   "general": {
-    "spawn_interval": 5.2,
+    "spawn_interval": 5.8,
     "min_spawn_distance": 50.0,
     "max_spawn_distance": 70.0,
-    "max_enemies": 3,
+    "max_enemies": 2,
     "max_distance_limit": 115.0,
     "reposition_check_interval": 1.0
   },
   "formation": {
-    "blockade_chance": 0.8,
-    "blockade_min_ships": 2,
-    "blockade_max_ships": 3,
-    "blockade_spacing": 15.0,
-    "blockade_patterns": [
-      {
-        "name": "hunter_pair",
-        "ships": [
-          { "ship_type": "kobayabune_melee", "role": "vanguard" },
-          { "ship_type": "sekibune_cannon", "role": "gunline" }
-        ]
-      },
-      {
-        "name": "raider_pair",
-        "ships": [
-          { "ship_type": "kobayabune_melee", "role": "vanguard" },
-          { "ship_type": "kobayabune_melee", "role": "flanker" }
-        ]
-      },
-      {
-        "name": "crossfire_trio",
-        "ships": [
-          { "ship_type": "sekibune_cannon", "role": "gunline" },
-          { "ship_type": "kobayabune_melee", "role": "vanguard" },
-          { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
-        ]
-      },
-      {
-        "name": "breaker_trio",
-        "ships": [
-          { "ship_type": "kobayabune_melee", "role": "flanker" },
-          { "ship_type": "kobayabune_melee", "role": "vanguard" },
-          { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
-        ]
-      }
+    "blockade_spacing": 14.0,
+    "fleet_templates": {
+      "light": [
+        {
+          "name": "light_raiders",
+          "formation_type": "column",
+          "ships": [
+            { "ship_type": "kobayabune_melee", "role": "flanker" },
+            { "ship_type": "kobayabune_melee", "role": "vanguard" }
+          ]
+        },
+        {
+          "name": "light_hunters",
+          "formation_type": "wedge",
+          "ships": [
+            { "ship_type": "kobayabune_melee", "role": "vanguard" },
+            { "ship_type": "sekibune_melee", "role": "vanguard" }
+          ]
+        },
+        {
+          "name": "light_swarm",
+          "formation_type": "wedge",
+          "ships": [
+            { "ship_type": "kobayabune_melee", "role": "flanker" },
+            { "ship_type": "kobayabune_melee", "role": "vanguard" },
+            { "ship_type": "kobayabune_melee", "role": "flanker" }
+          ]
+        }
+      ],
+      "heavy": [
+        {
+          "name": "cannon_line",
+          "formation_type": "line_abreast",
+          "ships": [
+            { "ship_type": "sekibune_cannon", "role": "gunline" },
+            { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+          ]
+        },
+        {
+          "name": "assault_line",
+          "formation_type": "echelon",
+          "ships": [
+            { "ship_type": "sekibune_melee", "role": "vanguard" },
+            { "ship_type": "sekibune_cannon", "role": "gunline" }
+          ]
+        }
+      ],
+      "mixed": [
+        {
+          "name": "mixed_assault",
+          "formation_type": "wedge",
+          "ships": [
+            { "ship_type": "kobayabune_melee", "role": "flanker" },
+            { "ship_type": "sekibune_melee", "role": "vanguard" },
+            { "ship_type": "sekibune_cannon", "role": "gunline" }
+          ]
+        },
+        {
+          "name": "mixed_crossfire",
+          "formation_type": "line_abreast",
+          "ships": [
+            { "ship_type": "sekibune_cannon", "role": "gunline" },
+            { "ship_type": "kobayabune_melee", "role": "vanguard" },
+            { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+          ]
+        },
+        {
+          "name": "mixed_breaker",
+          "formation_type": "echelon",
+          "ships": [
+            { "ship_type": "sekibune_melee", "role": "vanguard" },
+            { "ship_type": "kobayabune_melee", "role": "flanker" },
+            { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+          ]
+        }
+      ]
+    },
+    "fleet_progression": [
+      { "start_time": 0.0, "end_time": 120.0, "light_weight": 0.8, "mixed_weight": 0.2, "heavy_weight": 0.0 },
+      { "start_time": 120.0, "end_time": 300.0, "light_weight": 0.45, "mixed_weight": 0.45, "heavy_weight": 0.10 },
+      { "start_time": 300.0, "end_time": 9999.0, "light_weight": 0.20, "mixed_weight": 0.50, "heavy_weight": 0.30 }
     ]
   },
   "enemy_mix": {

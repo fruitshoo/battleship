@@ -283,7 +283,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if get_viewport(): get_viewport().set_input_as_handled()
 		return
 	if not OS.is_debug_build(): return # 이 디버그 키들은 릴리즈 빌드에서는 작동하지 않음
-	if event is InputEventKey and event.pressed:
+	if event is InputEventKey and event.pressed and not event.is_echo():
 		# Alternate debug shortcuts for macOS / non-function-key keyboards.
 		# Use physical keys so they still work while Korean input is active.
 		if event.ctrl_pressed and event.shift_pressed:
@@ -583,6 +583,9 @@ var _upgrade_ui_instance: CanvasLayer = null
 func _set_level(new_level: int) -> void:
 	LevelManagerProgressionHelper.set_level(self, new_level)
 
+func _debug_force_fleet_level_up() -> void:
+	LevelManagerUpgradeFlowHelper.show_fleet_upgrade_ui(self)
+
 
 func _show_upgrade_ui(choice_count: int = 3) -> void:
 	LevelManagerUpgradeFlowHelper.show_upgrade_ui(self, choice_count)
@@ -649,6 +652,12 @@ func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_off
 	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_ship"):
 		return
 	enemy_spawner.debug_spawn_ship(ship_type_name, distance, lateral_offset)
+
+
+func _debug_spawn_fleet(fleet_class: String) -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_fleet"):
+		return
+	enemy_spawner.debug_spawn_fleet(fleet_class)
 
 
 func _debug_spawn_mid_boss() -> void:

@@ -1,4 +1,5 @@
 extends "res://scripts/entities/weapons/weapon.gd"
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
 @export var launch_cooldown: float = 5.0
@@ -26,7 +27,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not rocket_scene:
 		return
 
-	var rocket = rocket_scene.instantiate() as Node3D
+	var rocket = ScenePool.acquire(attacker.get_tree(), rocket_scene) as Node3D
 	if rocket == null:
 		return
 

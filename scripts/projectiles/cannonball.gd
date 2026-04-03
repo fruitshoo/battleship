@@ -3,6 +3,9 @@ const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd"
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
+const CLOSE_RANGE_HULL_FALLOFF_DISTANCE: float = 8.0
+const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
+
 ## 대포알 (Cannonball)
 ## 정해진 방향으로 전진하며, 적과 충돌 시 적을 파괴함
 
@@ -21,6 +24,7 @@ var team: String = "player"
 var direction: Vector3 = Vector3.FORWARD
 var target_node: Node3D = null
 var shooter_label: String = ""
+var launch_origin: Vector3 = Vector3.ZERO
 var time_alive: float = 0.0
 var _life_left: float = 0.0
 var _signals_connected: bool = false
@@ -47,6 +51,7 @@ func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3,
 	damage = final_damage
 	target_node = target
 	shooter_label = ""
+	launch_origin = spawn_position
 	time_alive = 0.0
 	has_hit = false
 	_is_releasing = false
@@ -57,8 +62,8 @@ func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3,
 	_life_left = lifetime
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
-	monitoring = true
-	monitorable = true
+	monitoring = false
+	monitorable = false
 	if team == "player":
 		collision_mask = 4
 	else:
@@ -78,6 +83,7 @@ func pool_reset() -> void:
 	_life_left = 0.0
 	target_node = null
 	shooter_label = ""
+	launch_origin = Vector3.ZERO
 	damage = _base_damage
 	crit_chance = _base_crit_chance
 	crit_multiplier = _base_crit_multiplier
@@ -195,7 +201,7 @@ func _physics_process(delta: float) -> void:
 	# CCD (Continuous Collision Detection)
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(global_position, next_pos, collision_mask)
-	query.collide_with_areas = false
+	query.collide_with_areas = true
 	query.collide_with_bodies = true
 	
 	var result = space_state.intersect_ray(query)
@@ -241,6 +247,8 @@ func _check_hit(target: Node) -> void:
 		# 적중 처리
 		var is_crit = randf() < crit_chance
 		var final_damage = damage * (crit_multiplier if is_crit else 1.0)
+		var close_range_hull_mult: float = _get_close_range_hull_multiplier(ship)
+		final_damage *= close_range_hull_mult
 		
 		if ship.has_method("take_damage"):
 			var source_id = ""
@@ -271,6 +279,21 @@ func _check_hit(target: Node) -> void:
 		
 		# 어떤 경우든 부딪히면 삭제
 		_release_self()
+
+
+func _get_close_range_hull_multiplier(ship: Node3D) -> float:
+	if not is_instance_valid(ship):
+		return 1.0
+	if launch_origin == Vector3.ZERO:
+		return 1.0
+	var planar_distance: float = Vector2(
+		ship.global_position.x - launch_origin.x,
+		ship.global_position.z - launch_origin.z
+	).length()
+	if planar_distance >= CLOSE_RANGE_HULL_FALLOFF_DISTANCE:
+		return 1.0
+	var t: float = clampf(planar_distance / CLOSE_RANGE_HULL_FALLOFF_DISTANCE, 0.0, 1.0)
+	return lerpf(CLOSE_RANGE_HULL_MIN_MULTIPLIER, 1.0, t)
 
 func _spawn_water_explosion() -> void:
 	if not is_inside_tree() or not water_explosion_scene: return

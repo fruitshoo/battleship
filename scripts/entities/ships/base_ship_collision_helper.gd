@@ -170,7 +170,9 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	if cam and cam.has_method("shake"):
 		cam.shake(clamp(impact_speed * 0.05, 0.2, 0.6), 0.3)
 
-	spawn_ship_collision_effects(ship, impact_pos, impact_speed)
+	# 이펙트 중복 생성 방지: 두 배가 동시에 충돌을 감지하므로 instance_id가 낮은 쪽에서만 이펙트 생성
+	if ship.get_instance_id() < other.get_instance_id():
+		spawn_ship_collision_effects(ship, impact_pos, impact_speed)
 	ship.apply_ramming_aoe(clamp(impact_speed * 1.5, 5.0, 20.0), impact_pos)
 
 	if ship.DEBUG_COMBAT_LOGS:
@@ -182,26 +184,27 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 	if not ship.is_inside_tree():
 		return
 
-	var splash_pos := impact_pos
-	splash_pos.y = 0.2
-	if ship.water_splash_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_splash", splash_pos, 3, 90.0):
-		var splash = ship.ScenePool.acquire(ship.get_tree(), ship.water_splash_scene)
-		if splash.has_method("configure_as_splash"):
-			splash.configure_as_splash()
-		if splash.has_method("set_intensity"):
-			var splash_intensity: float = clampf(impact_speed / 8.5, 0.9, 1.8)
-			splash.set_intensity(splash_intensity)
-		ship.get_tree().root.add_child(splash)
-		splash.position = splash_pos
-		if splash.has_method("pool_activate"):
-			splash.pool_activate()
-
-	if ship.wood_splinter_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_splinter", impact_pos, 4, 85.0):
+	# 우드 스플린터 (파편) - 충격 시 수면 효과 대신 나무 파편이 튀도록 함
+	if ship.wood_splinter_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_splinter", impact_pos, 4, 80.0):
 		var splinter = ship.ScenePool.acquire(ship.get_tree(), ship.wood_splinter_scene)
 		ship.get_tree().root.add_child(splinter)
-		splinter.position = impact_pos + Vector3(0.0, 0.6, 0.0)
+		splinter.global_position = impact_pos + Vector3(0, 0.4, 0)
 		splinter.rotation.y = randf() * TAU
 		if splinter.has_method("set_amount_by_damage"):
-			splinter.set_amount_by_damage(maxf(impact_speed * 4.0, 12.0))
+			# 충격 속도에 비례하여 파편 양 조절 (기존 5.0에서 2.8로 낮춤)
+			var pseudo_damage = impact_speed * 2.8
+			splinter.set_amount_by_damage(pseudo_damage)
 		if splinter.has_method("pool_activate"):
 			splinter.pool_activate()
+
+	# 임팩트 퍼프 (연기/먼지)
+	if ship.impact_puff_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_smoke", impact_pos, 4, 85.0):
+		var smoke = ship.ScenePool.acquire(ship.get_tree(), ship.impact_puff_scene)
+		ship.get_tree().root.add_child(smoke)
+		smoke.position = impact_pos + Vector3(0.0, 0.6, 0.0)
+		if smoke.has_method("configure_as_muzzle"):
+			smoke.configure_as_muzzle()
+		if smoke.has_method("set_intensity"):
+			smoke.set_intensity(clampf(impact_speed / 6.5, 0.9, 1.6))
+		if smoke.has_method("pool_activate"):
+			smoke.pool_activate()
