@@ -62,6 +62,8 @@ static func process_physics(ship, delta: float) -> void:
 			ship._check_offscreen_despawn()
 		return
 
+	ship.update_crew_allocation_state(delta)
+
 	if do_logic_update:
 		update_logic_throttled(ship)
 
@@ -115,11 +117,11 @@ static func process_physics(ship, delta: float) -> void:
 		close_turn_blend = clamp(1.0 - (dist_to_target / ship.ai_close_turn_soft_radius), 0.0, 1.0)
 	var close_turn_factor = lerp(1.0, ship.ai_close_turn_scale, close_turn_blend)
 	desired_rudder *= close_turn_factor
-	var rudder_speed_adjusted = ship.ai_rudder_response_speed
+	var rudder_speed_adjusted = ship.ai_rudder_response_speed * ship.get_rudder_response_multiplier()
 	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
 
 	var leak_speed_mult = clamp(1.0 - (ship.leaking_rate * 0.05), 0.3, 1.0)
-	var desired_speed = ship.move_speed * leak_speed_mult * desired_speed_mult
+	var desired_speed = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier()
 
 	if not _is_gunner(ship) and dist_to_target < 4.4:
 		var slow_factor = clamp((dist_to_target - 1.4) / 3.0, 0.88, 1.0)
@@ -146,11 +148,11 @@ static func process_physics(ship, delta: float) -> void:
 	else:
 		ship.current_speed = move_toward(ship.current_speed, desired_speed, ship.deceleration * delta)
 
-	var wind_mult: float = _calculate_sail_drive_multiplier(ship)
+	var wind_mult: float = _calculate_sail_drive_multiplier(ship) * ship.get_shiphandling_multiplier()
 	if ship.current_speed > 0.1:
 		var speed_ratio = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 		var turn_scale = ship.ai_turn_authority * close_turn_factor
-		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * speed_ratio * ship.turn_mult * turn_scale * delta
+		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_scale * delta
 		var max_turn_this_frame = ship.ai_max_turn_rate * delta
 		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
 		ship.rotation.y -= deg_to_rad(actual_turn)

@@ -236,6 +236,7 @@ func _physics_process(delta: float) -> void:
 		_handle_input(delta)
 	if has_sextant:
 		_auto_adjust_sail(delta)
+	update_crew_allocation_state(delta)
 	_update_movement(delta)
 	_update_steering(delta)
 	_update_rowing_stamina(delta)
@@ -341,13 +342,14 @@ func _toggle_fleet_formation() -> void:
 ## 러더 조향 입력 처리
 ## direction: -1.0 (왼쪽), 1.0 (오른쪽), 0.0 (중립)
 func steer(direction: float, delta: float) -> void:
+	var rudder_response_mult: float = get_rudder_response_multiplier()
 	if direction < -0.1:
-		rudder_angle = move_toward(rudder_angle, -45.0, rudder_speed * delta)
+		rudder_angle = move_toward(rudder_angle, -45.0, rudder_speed * rudder_response_mult * delta)
 	elif direction > 0.1:
-		rudder_angle = move_toward(rudder_angle, 45.0, rudder_speed * delta)
+		rudder_angle = move_toward(rudder_angle, 45.0, rudder_speed * rudder_response_mult * delta)
 	else:
 		# 입력이 없으면 러더 자동 복귀
-		rudder_angle = move_toward(rudder_angle, 0.0, rudder_return_speed * delta)
+		rudder_angle = move_toward(rudder_angle, 0.0, rudder_return_speed * rudder_response_mult * delta)
 
 func _auto_adjust_sail(delta: float) -> void:
 	PlayerShipMovementHelper.auto_adjust_sail(self, delta)

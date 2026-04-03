@@ -267,7 +267,10 @@ func _is_ship_occupied_by_enemy(target_ship: Node3D) -> bool:
 
 func _get_current_cooldown() -> float:
 	# 캐시된 업그레이드 배율 * 함대 배율
-	return fire_cooldown * _cached_cd_mult * fleet_cooldown_mult
+	var cooldown_mult: float = _cached_cd_mult * fleet_cooldown_mult
+	if is_instance_valid(_owner_ship) and _owner_ship.has_method("get_gunnery_reload_multiplier"):
+		cooldown_mult *= float(_owner_ship.call("get_gunnery_reload_multiplier"))
+	return fire_cooldown * cooldown_mult
 
 func _get_target_scan_interval(has_valid_target: bool) -> float:
 	var base_interval: float = target_scan_interval

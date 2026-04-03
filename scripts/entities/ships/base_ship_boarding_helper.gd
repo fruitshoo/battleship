@@ -62,7 +62,8 @@ static func process_boarding_common(ship, delta: float) -> void:
 		ship.boarding_prep_timer += delta
 	else:
 		ship.boarding_timer += delta
-		if ship.boarding_timer >= ship.boarding_interval:
+		var effective_interval: float = ship.get_effective_boarding_interval() if ship.has_method("get_effective_boarding_interval") else ship.boarding_interval
+		if ship.boarding_timer >= effective_interval:
 			ship.boarding_timer = 0.0
 			transfer_one_soldier(ship)
 

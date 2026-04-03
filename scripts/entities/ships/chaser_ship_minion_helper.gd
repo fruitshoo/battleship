@@ -154,12 +154,12 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var blended_target_rot = lerp_angle(player_head_rot, target_head_rot, rotation_blend)
 	var angle_diff = wrapf(blended_target_rot - ship.rotation.y, -PI, PI)
 	var desired_rudder = clamp(-rad_to_deg(angle_diff) * 2.0, -45.0, 45.0)
-	var rudder_speed_adjusted = 120.0
+	var rudder_speed_adjusted = 120.0 * ship.get_rudder_response_multiplier()
 	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
 
 	if final_move_speed > 0.1:
 		var speed_ratio = final_move_speed / ship.max_speed
-		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * speed_ratio * ship.turn_mult * delta
+		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * delta
 		ship.rotation.y -= deg_to_rad(actual_turn)
 	else:
 		if dist_to_target <= 1.5:

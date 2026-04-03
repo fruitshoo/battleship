@@ -61,6 +61,7 @@ static func update_movement(ship, delta: float) -> void:
 		target_speed += ship.rowing_speed
 	elif is_exhausted_rowing:
 		target_speed += ship.rowing_speed * float(ship.exhausted_rowing_speed_ratio)
+	target_speed *= ship.get_shiphandling_multiplier()
 	target_speed *= get_boarding_drag_multiplier(ship)
 	target_speed *= ship.speed_mult
 	var forward = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
@@ -88,7 +89,7 @@ static func update_steering(ship, delta: float) -> void:
 	if ship.current_speed < 0.1:
 		return
 	var speed_ratio = ship.current_speed / ship.max_speed
-	var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * speed_ratio * ship.turn_mult * delta
+	var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * delta
 	ship.rotation.y -= deg_to_rad(actual_turn)
 
 static func calculate_sail_speed(ship) -> float:
@@ -117,7 +118,7 @@ static func calculate_sail_speed(ship) -> float:
 		print("Thrust: ", thrust)
 		print("Current Speed: ", ship.current_speed)
 		print("=====================")
-	return thrust * ship.max_speed * wind_str * ship.sail_efficiency_mult
+	return thrust * ship.max_speed * wind_str * ship.sail_efficiency_mult * ship.get_shiphandling_multiplier()
 
 static func update_oar_visual(ship, delta: float) -> void:
 	var has_oars = ship.oar_pivot_left or ship.oar_pivot_right

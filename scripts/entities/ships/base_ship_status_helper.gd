@@ -97,12 +97,16 @@ static func update_boarding_state(ship, delta: float) -> void:
 	ship.deck_is_overrun = overrun
 
 	if overrun:
-		ship.boarding_capture_progress = minf(float(ship.boarding_capture_duration), ship.boarding_capture_progress + delta)
+		var attacker_ship: Node = ship.boarding_attacker if is_instance_valid(ship.boarding_attacker) else null
+		var effective_capture_duration: float = ship.boarding_capture_duration
+		if ship.has_method("get_effective_boarding_capture_duration"):
+			effective_capture_duration = float(ship.call("get_effective_boarding_capture_duration", attacker_ship))
+		ship.boarding_capture_progress = minf(effective_capture_duration, ship.boarding_capture_progress + delta)
 		if ship_team == "player" and not ship._deck_overrun_announced:
 			ship._deck_overrun_announced = true
 			if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
 				ship._cached_hud.show_message("적이 갑판을 장악했습니다!", 1.75)
-		if ship_team == "player" and ship.boarding_capture_progress >= float(ship.boarding_capture_duration):
+		if ship_team == "player" and ship.boarding_capture_progress >= effective_capture_duration:
 			ship.boarding_capture_progress = 0.0
 			var capture_tick_damage: float = maxf(float(ship.boarding_capture_damage_tick), float(ship.max_hull_hp) * 0.12)
 			ship.take_damage(capture_tick_damage, ship.global_position, "boarding_capture")

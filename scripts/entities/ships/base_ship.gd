@@ -6,6 +6,8 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const BaseShipCollisionHelper = preload("res://scripts/entities/ships/base_ship_collision_helper.gd")
 const BaseShipBoardingHelper = preload("res://scripts/entities/ships/base_ship_boarding_helper.gd")
+const BaseShipCrewHelper = preload("res://scripts/entities/ships/base_ship_crew_helper.gd")
+const BaseShipRudderHelper = preload("res://scripts/entities/ships/base_ship_rudder_helper.gd")
 const BaseShipStatusHelper = preload("res://scripts/entities/ships/base_ship_status_helper.gd")
 const BaseShipVisualHelper = preload("res://scripts/entities/ships/base_ship_visual_helper.gd")
 const DEBUG_COMBAT_LOGS := false
@@ -35,6 +37,10 @@ const DEBUG_DAMAGE_LOGS := false
 
 # === 러더(키) 관련 ===
 @export var rudder_angle: float = 0.0 # 러더 각도 (-45 ~ 45도)
+@export_range(10.0, 200.0, 1.0) var rudder_max_health: float = 100.0
+var rudder_health: float = 100.0
+@export_range(0.1, 0.9, 0.05) var rudder_critical_threshold: float = 0.35
+var _rudder_critical_announced: bool = false
 
 @export var bobbing_amplitude: float = 0.3
 @export var bobbing_speed: float = 1.0
@@ -51,6 +57,14 @@ var speed_mult: float = 1.0
 var turn_mult: float = 1.0
 var tilt_offset: float = 0.0
 var stuck_objects: Array[Node3D] = []
+var combat_crew_alloc: int = 0
+var shiphandling_crew_alloc: int = 0
+var gunnery_crew_alloc: int = 0
+var combat_crew_ratio: float = 0.34
+var shiphandling_crew_ratio: float = 0.33
+var gunnery_crew_ratio: float = 0.33
+var _crew_allocation_eval_left: float = 0.0
+@export_range(0.1, 1.5, 0.05) var crew_allocation_eval_interval: float = 0.35
 
 # === 선체 내구도 ===
 @export var max_hull_hp: float = 200.0 # 스케일 상향 (100 -> 200)
@@ -157,6 +171,7 @@ func _ready() -> void:
 	add_to_group("ships")
 	
 	hull_hp = max_hull_hp
+	rudder_health = rudder_max_health
 	
 	# 돛대, 타륜 등의 레퍼런스 캐싱 (에디터/런타임 공통)
 	_cache_hull_references(self )
@@ -678,6 +693,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	var final_damage = maxf(amount - hull_defense, 1.0)
 	hull_hp -= final_damage
 	_apply_sail_damage_from_hit(final_damage, damage_source)
+	_apply_rudder_damage_from_hit(final_damage, hit_position, damage_source)
 	
 	if DEBUG_DAMAGE_LOGS and OS.is_debug_build():
 		var source_label: String = damage_source if not damage_source.is_empty() else "unknown"
@@ -768,6 +784,70 @@ func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> 
 	var chosen_index: int = randi() % intact_masts.size()
 	var chosen_mast: Node = intact_masts[chosen_index]
 	chosen_mast.call("add_sail_damage", sail_damage_delta)
+
+
+func update_crew_allocation_state(delta: float) -> void:
+	BaseShipCrewHelper.update_crew_allocation_state(self, delta)
+
+
+func get_shiphandling_multiplier() -> float:
+	return BaseShipCrewHelper.get_shiphandling_multiplier(self)
+
+
+func get_gunnery_reload_multiplier() -> float:
+	return BaseShipCrewHelper.get_gunnery_reload_multiplier(self)
+
+
+func get_combat_effectiveness_multiplier() -> float:
+	return BaseShipCrewHelper.get_combat_effectiveness_multiplier(self)
+
+
+func get_effective_boarding_interval() -> float:
+	return BaseShipCrewHelper.get_effective_boarding_interval(self)
+
+
+func get_effective_boarding_capture_duration(attacker_ship: Node = null) -> float:
+	return BaseShipCrewHelper.get_effective_boarding_capture_duration(self, attacker_ship)
+
+
+func _estimate_available_crew_count() -> int:
+	return BaseShipCrewHelper.estimate_available_crew_count(self)
+
+
+func _is_in_gunnery_posture() -> bool:
+	return BaseShipCrewHelper.is_in_gunnery_posture(self)
+
+
+func _get_ship_cannon_range_for_allocation() -> float:
+	return BaseShipCrewHelper.get_ship_cannon_range_for_allocation(self)
+
+
+func _get_nearest_enemy_ship_distance_for_allocation() -> float:
+	return BaseShipCrewHelper.get_nearest_enemy_ship_distance_for_allocation(self)
+
+
+func apply_rudder_damage(amount: float) -> void:
+	BaseShipRudderHelper.apply_rudder_damage(self, amount)
+
+
+func get_rudder_health_ratio() -> float:
+	return BaseShipRudderHelper.get_rudder_health_ratio(self)
+
+
+func get_rudder_turn_multiplier() -> float:
+	return BaseShipRudderHelper.get_rudder_turn_multiplier(self)
+
+
+func get_rudder_response_multiplier() -> float:
+	return BaseShipRudderHelper.get_rudder_response_multiplier(self)
+
+
+func _apply_rudder_damage_from_hit(final_damage: float, hit_position: Vector3, damage_source: String) -> void:
+	BaseShipRudderHelper.apply_rudder_damage_from_hit(self, final_damage, hit_position, damage_source)
+
+
+func _get_stern_hit_factor(hit_position: Vector3) -> float:
+	return BaseShipRudderHelper.get_stern_hit_factor(self, hit_position)
 
 func _flash_damage(amount: float = 10.0) -> void:
 	var shake_mult = clamp(amount / 10.0, 0.15, 2.0)

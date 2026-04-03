@@ -9,6 +9,7 @@ const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.g
 const HudStatPanelHelper = preload("res://scripts/ui/hud_stat_panel_helper.gd")
 const HudDebugPanelHelper = preload("res://scripts/ui/hud_debug_panel_helper.gd")
 const HudDistanceDebugHelper = preload("res://scripts/ui/hud_distance_debug_helper.gd")
+const HudShipDebugHelper = preload("res://scripts/ui/hud_ship_debug_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
@@ -245,257 +246,55 @@ func _update_sail_debug_toggle_button_text() -> void:
 
 
 func _sync_ship_debug_panel_from_player() -> void:
-	if not is_instance_valid(debug_ship_status_value):
-		return
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		debug_ship_status_value.text = "함선 상태: 플레이어 배 없음"
-		return
-
-	var hull_hp_value: float = float(player_ship.get("hull_hp"))
-	var max_hull_hp_value: float = maxf(0.01, float(player_ship.get("max_hull_hp")))
-	var stamina_value: float = float(player_ship.get("rowing_stamina")) if player_ship.get("rowing_stamina") != null else 0.0
-	var max_stamina_value: float = maxf(0.01, float(player_ship.get("max_rowing_stamina"))) if player_ship.get("max_rowing_stamina") != null else 1.0
-	var crew_count: int = int(player_ship.get("current_crew_count")) if player_ship.get("current_crew_count") != null else 0
-	var max_crew_count_value: int = int(player_ship.get("max_crew_count")) if player_ship.get("max_crew_count") != null else 0
-	var speed_value: float = float(player_ship.get("current_speed")) if player_ship.get("current_speed") != null else 0.0
-	var fire_state: String = "화재" if player_ship.get("is_burning") == true else "정상"
-	debug_ship_status_value.text = "선체 %.0f/%.0f | 스태미나 %.0f/%.0f | 선원 %d/%d | 속도 %.1f | %s" % [
-		hull_hp_value,
-		max_hull_hp_value,
-		stamina_value,
-		max_stamina_value,
-		crew_count,
-		max_crew_count_value,
-		speed_value,
-		fire_state
-	]
-	if is_instance_valid(debug_ship_config_value):
-		var support_limit: int = int(player_ship.get("support_fleet_limit")) if player_ship.get("support_fleet_limit") != null else 0
-		var captain_count_value: int = int(player_ship.get("captain_count")) if player_ship.get("captain_count") != null else 0
-		var rowing_state: String = "ON" if player_ship.get("is_rowing") == true else "OFF"
-		var max_speed_value: float = float(player_ship.get("max_speed")) if player_ship.get("max_speed") != null else 0.0
-		var turn_rate_value: float = float(player_ship.get("turn_rate")) if player_ship.get("turn_rate") != null else 0.0
-		var hull_defense_value: float = float(player_ship.get("hull_defense")) if player_ship.get("hull_defense") != null else 0.0
-		var crew_respawn_interval_value: float = float(player_ship.get("crew_respawn_interval")) if player_ship.get("crew_respawn_interval") != null else 0.0
-		var boarding_capture_duration_value: float = float(player_ship.get("boarding_capture_duration")) if player_ship.get("boarding_capture_duration") != null else 0.0
-		debug_ship_config_value.text = "설정: 정원 %d | 장군 %d | 지원한도 %d | 노젓기 %s | 속도 %.1f | 선회 %.0f | 방어 %.0f | 보충 %.0f | 장악 %.1f" % [
-			max_crew_count_value,
-			captain_count_value,
-			support_limit,
-			rowing_state,
-			max_speed_value,
-			turn_rate_value,
-			hull_defense_value,
-			crew_respawn_interval_value,
-			boarding_capture_duration_value
-		]
-	if is_instance_valid(debug_enemy_fleet_value):
-		var nearest_enemy: Node3D = _find_nearest_enemy_ship_for_distance_debug()
-		if is_instance_valid(nearest_enemy):
-			var ship_type_text: String = str(nearest_enemy.get("ship_type"))
-			var fleet_class_text: String = str(nearest_enemy.get_meta("enemy_fleet_class", ""))
-			var formation_type_text: String = str(nearest_enemy.get_meta("enemy_formation_type", ""))
-			var formation_label_text: String = str(nearest_enemy.get_meta("enemy_formation_label", ""))
-			var role_text: String = str(nearest_enemy.get_meta("enemy_formation_role", ""))
-			var parts: Array[String] = []
-			if not ship_type_text.is_empty():
-				parts.append(ship_type_text)
-			if not fleet_class_text.is_empty():
-				parts.append("편대 %s" % fleet_class_text)
-			if not formation_label_text.is_empty():
-				parts.append("이름 %s" % formation_label_text)
-			if not formation_type_text.is_empty():
-				parts.append("진형 %s" % formation_type_text)
-			if not role_text.is_empty():
-				parts.append("역할 %s" % role_text)
-			debug_enemy_fleet_value.text = "근처 편대: %s" % (" | ".join(parts) if not parts.is_empty() else "정보 없음")
-		else:
-			debug_enemy_fleet_value.text = "근처 편대: 근처 적선 없음"
-
-	_ship_debug_ui_syncing = true
-	if is_instance_valid(debug_ship_hull_slider):
-		debug_ship_hull_slider.value = clampf(hull_hp_value / max_hull_hp_value, 0.0, 1.0)
-	if is_instance_valid(debug_ship_hull_value):
-		debug_ship_hull_value.text = "%.2f" % clampf(hull_hp_value / max_hull_hp_value, 0.0, 1.0)
-	if is_instance_valid(debug_ship_stamina_slider):
-		debug_ship_stamina_slider.value = clampf(stamina_value / max_stamina_value, 0.0, 1.0)
-	if is_instance_valid(debug_ship_stamina_value):
-		debug_ship_stamina_value.text = "%.2f" % clampf(stamina_value / max_stamina_value, 0.0, 1.0)
-	_ship_debug_ui_syncing = false
+	HudShipDebugHelper.sync_ship_debug_panel_from_player(self)
 
 
 func _on_debug_ship_hull_changed(value: float) -> void:
-	if _ship_debug_ui_syncing:
-		return
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		return
-	var max_hull_hp_value: float = maxf(0.01, float(player_ship.get("max_hull_hp")))
-	player_ship.set("hull_hp", clampf(value, 0.0, 1.0) * max_hull_hp_value)
-	_sync_ship_debug_panel_from_player()
+	HudShipDebugHelper.on_debug_ship_hull_changed(self, value)
 
 
 func _on_debug_ship_stamina_changed(value: float) -> void:
-	if _ship_debug_ui_syncing:
-		return
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		return
-	if player_ship.get("rowing_stamina") == null or player_ship.get("max_rowing_stamina") == null:
-		return
-	var max_stamina_value: float = maxf(0.01, float(player_ship.get("max_rowing_stamina")))
-	player_ship.set("rowing_stamina", clampf(value, 0.0, 1.0) * max_stamina_value)
-	_sync_ship_debug_panel_from_player()
+	HudShipDebugHelper.on_debug_ship_stamina_changed(self, value)
 
 
 func _refill_player_crew_for_debug() -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	if player_ship.has_method("_sync_player_crew_roster"):
-		player_ship.call("_sync_player_crew_roster")
-	if player_ship.get("crew_respawn_timer") != null and player_ship.get("crew_respawn_interval") != null:
-		player_ship.set("crew_respawn_timer", float(player_ship.get("crew_respawn_interval")))
-	if player_ship.has_method("_update_crew_count"):
-		player_ship.call("_update_crew_count")
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("선원 보충", 0.7)
+	HudShipDebugHelper.refill_player_crew_for_debug(self)
 
 
 func _spawn_support_ship_for_debug() -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	if player_ship.has_method("_spawn_or_repair_ally"):
-		player_ship.call("_spawn_or_repair_ally")
-		show_gust_warning_message("지원함 호출", 0.7)
+	HudShipDebugHelper.spawn_support_ship_for_debug(self)
 
 
 func _stop_player_ship_for_debug() -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	player_ship.set("current_speed", 0.0)
-	if player_ship.get("is_rowing") != null:
-		player_ship.set("is_rowing", false)
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("함선 정지", 0.7)
+	HudShipDebugHelper.stop_player_ship_for_debug(self)
 
 
 func _toggle_player_ship_fire_for_debug() -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	var is_burning_now: bool = player_ship.get("is_burning") == true
-	player_ship.set("is_burning", not is_burning_now)
-	if player_ship.get("fire_build_up") != null and player_ship.get("fire_threshold") != null:
-		if is_burning_now:
-			player_ship.set("fire_build_up", 0.0)
-		else:
-			player_ship.set("fire_build_up", float(player_ship.get("fire_threshold")))
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("화재 %s" % ("해제" if is_burning_now else "적용"), 0.7)
+	HudShipDebugHelper.toggle_player_ship_fire_for_debug(self)
 
 
 func _toggle_player_rowing_for_debug() -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	var next_rowing: bool = not (player_ship.get("is_rowing") == true)
-	if player_ship.has_method("set_rowing"):
-		player_ship.call("set_rowing", next_rowing)
-	else:
-		player_ship.set("is_rowing", next_rowing)
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("노젓기 %s" % ("ON" if next_rowing else "OFF"), 0.7)
+	HudShipDebugHelper.toggle_player_rowing_for_debug(self)
 
 
 func _auto_adjust_player_sail_for_debug() -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	if player_ship.has_method("_auto_adjust_sail"):
-		player_ship.call("_auto_adjust_sail", 0.35)
-	show_gust_warning_message("돛 정렬", 0.7)
+	HudShipDebugHelper.auto_adjust_player_sail_for_debug(self)
 
 
 func _adjust_player_crew_capacity_for_debug(delta_amount: int) -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	var current_value: int = int(player_ship.get("max_crew_count")) if player_ship.get("max_crew_count") != null else 0
-	var next_value: int = clampi(current_value + delta_amount, 1, 12)
-	player_ship.set("max_crew_count", next_value)
-	var captain_value: int = int(player_ship.get("captain_count")) if player_ship.get("captain_count") != null else 0
-	if captain_value > next_value:
-		player_ship.set("captain_count", next_value)
-	if player_ship.has_method("_sync_player_crew_roster"):
-		player_ship.call("_sync_player_crew_roster")
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("정원 %d" % next_value, 0.7)
+	HudShipDebugHelper.adjust_player_crew_capacity_for_debug(self, delta_amount)
 
 
 func _adjust_player_captain_count_for_debug(delta_amount: int) -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	var max_crew_count_value: int = int(player_ship.get("max_crew_count")) if player_ship.get("max_crew_count") != null else 0
-	var current_value: int = int(player_ship.get("captain_count")) if player_ship.get("captain_count") != null else 0
-	var next_value: int = clampi(current_value + delta_amount, 0, max_crew_count_value)
-	player_ship.set("captain_count", next_value)
-	if player_ship.has_method("_sync_player_crew_roster"):
-		player_ship.call("_sync_player_crew_roster")
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("장군 %d" % next_value, 0.7)
+	HudShipDebugHelper.adjust_player_captain_count_for_debug(self, delta_amount)
 
 
 func _adjust_player_support_limit_for_debug(delta_amount: int) -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	var current_value: int = int(player_ship.get("support_fleet_limit")) if player_ship.get("support_fleet_limit") != null else 0
-	var next_value: int = clampi(current_value + delta_amount, 0, 4)
-	player_ship.set("support_fleet_limit", next_value)
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("지원한도 %d" % next_value, 0.7)
+	HudShipDebugHelper.adjust_player_support_limit_for_debug(self, delta_amount)
 
 
 func _adjust_player_ship_float_for_debug(property_name: String, delta_value: float, min_value: float, max_value: float, label: String) -> void:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		show_gust_warning_message("플레이어 배 없음", 0.8)
-		return
-	if player_ship.get(property_name) == null:
-		show_gust_warning_message("속성 없음: %s" % property_name, 0.8)
-		return
-	var current_value: float = float(player_ship.get(property_name))
-	var next_value: float = clampf(current_value + delta_value, min_value, max_value)
-	player_ship.set(property_name, next_value)
-	_sync_ship_debug_panel_from_player()
-	show_gust_warning_message("%s %.1f" % [label, next_value], 0.7)
+	HudShipDebugHelper.adjust_player_ship_float_for_debug(self, property_name, delta_value, min_value, max_value, label)
 
 func _process(delta: float) -> void:
 	_sync_game_time(delta)
