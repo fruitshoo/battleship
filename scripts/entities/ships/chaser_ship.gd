@@ -77,6 +77,8 @@ var stamina: float = 100.0
 var max_stamina: float = 100.0
 var is_sprinting: bool = false
 var sprint_multiplier: float = 1.5
+var fire_pot_cooldown_timer: float = 0.0
+var fire_pot_scene: PackedScene = preload("res://scenes/projectiles/fire_pot.tscn")
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_minion_list: Array = []
@@ -170,7 +172,7 @@ func _load_enemy_crew_composition_from_stats(stats: Dictionary) -> void:
 		return
 
 	var composition: Dictionary = composition_variant as Dictionary
-	var ordered_types: Array[String] = ["general", "melee", "ranged"]
+	var ordered_types: Array[String] = ["general", "melee", "ranged", "fire_pot"]
 	for soldier_type_name in ordered_types:
 		var count: int = int(composition.get(soldier_type_name, 0))
 		for _i in range(maxi(count, 0)):
@@ -201,6 +203,8 @@ func _configure_spawned_soldier(soldier, soldier_type_name: String) -> void:
 			soldier.is_melee_only = true
 		"ranged":
 			soldier.is_ranged_only = true
+		"fire_pot":
+			soldier.crew_role = "fire_pot"
 
 	if soldier.is_node_ready():
 		soldier._apply_role_loadout()
@@ -551,6 +555,7 @@ func _process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
 	_update_boarding_state(delta)
+	_update_enemy_fire_pot_logic(delta)
 	
 	if is_derelict:
 		leaking_rate += 0.2 * delta
@@ -572,6 +577,10 @@ func _update_leaking_damage(delta: float) -> void:
 	while _leak_tick_timer >= 1.0:
 		_leak_tick_timer -= 1.0
 		take_damage(leaking_rate, global_position, "leak")
+
+
+func _update_enemy_fire_pot_logic(delta: float) -> void:
+	ChaserShipSupportHelper.update_enemy_fire_pot_logic(self, delta)
 
 
 func _physics_process(delta: float) -> void:

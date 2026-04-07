@@ -25,8 +25,9 @@
 		"has_cannons": false,
 		"soldier_type": "melee",
 		"crew_composition": {
-			"melee": 3,
-			"general": 1
+			"melee": 2,
+			"general": 1,
+			"fire_pot": 1
 		},
 		"collision_fit_scale": 0.84,
 		"separation_pad_scale": 0.5,
@@ -46,7 +47,8 @@
 		"soldier_type": "ranged",
 		"crew_composition": {
 			"ranged": 2,
-			"general": 2
+			"general": 1,
+			"fire_pot": 1
 		},
 		"collision_fit_scale": 0.84,
 		"separation_pad_scale": 0.5,
@@ -65,9 +67,10 @@
 		"orbit_distance": 24.0,
 		"soldier_type": "general",
 		"crew_composition": {
-			"general": 2,
+			"general": 1,
 			"melee": 1,
-			"ranged": 1
+			"ranged": 1,
+			"fire_pot": 1
 		},
 		"deck_height": 0.75,
 		"combat_role": "gunner",
@@ -84,9 +87,10 @@
 		"orbit_distance": 28.0,
 		"soldier_type": "general",
 		"crew_composition": {
-			"general": 2,
+			"general": 1,
 			"melee": 1,
-			"ranged": 1
+			"ranged": 1,
+			"fire_pot": 1
 		},
 		"deck_height": 0.75,
 		"combat_role": "gunner",

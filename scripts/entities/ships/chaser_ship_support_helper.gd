@@ -5,6 +5,75 @@ const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
 const DERELICT_OFFSCREEN_DESPAWN_DISTANCE: float = 42.0
 const DERELICT_HARD_DESPAWN_DISTANCE: float = 150.0
+const ENEMY_FIRE_POT_BASE_COOLDOWN: float = 7.5
+const ENEMY_FIRE_POT_MIN_RANGE: float = 7.0
+const ENEMY_FIRE_POT_MAX_RANGE: float = 18.0
+const ENEMY_FIRE_POT_DAMAGE: float = 11.0
+const ENEMY_FIRE_POT_RADIUS: float = 2.6
+
+static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
+	if ship.is_dying or ship.is_sinking or ship.is_derelict:
+		return
+	if ship.fire_pot_cooldown_timer > 0.0:
+		ship.fire_pot_cooldown_timer = maxf(0.0, ship.fire_pot_cooldown_timer - delta)
+	if ship.fire_pot_cooldown_timer > 0.0:
+		return
+	if not is_instance_valid(ship.fire_pot_scene):
+		return
+	var target: Node3D = ship.get("target")
+	if not is_instance_valid(target):
+		return
+	if target.get("team") != "player":
+		return
+	if target.get("is_dying") or target.get("is_sinking"):
+		return
+	if ship.is_boarding:
+		return
+	var dist: float = ship.global_position.distance_to(target.global_position)
+	if dist < ENEMY_FIRE_POT_MIN_RANGE or dist > ENEMY_FIRE_POT_MAX_RANGE:
+		return
+	var tosser = _find_fire_pot_tosser(ship)
+	if not is_instance_valid(tosser):
+		return
+
+	var start_pos: Vector3 = tosser.global_position + Vector3(0.0, 1.0, 0.0)
+	var target_pos: Vector3 = _get_fire_pot_target_pos(target)
+	var pot = ship.ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
+	pot.damage = ENEMY_FIRE_POT_DAMAGE
+	pot.explosion_radius = ENEMY_FIRE_POT_RADIUS
+	pot.team = ship.team
+	ship.get_tree().root.add_child.call_deferred(pot)
+	pot.set_deferred("global_position", start_pos)
+	pot.call_deferred("setup_flight", start_pos, target_pos, 0.95, 3.8)
+	tosser.look_at(Vector3(target_pos.x, tosser.global_position.y, target_pos.z), Vector3.UP)
+	ship.fire_pot_cooldown_timer = ENEMY_FIRE_POT_BASE_COOLDOWN + randf_range(-0.8, 1.0)
+
+
+static func _find_fire_pot_tosser(ship):
+	var soldiers_node = ship.get_node_or_null("Soldiers")
+	if not soldiers_node:
+		return null
+	for child in soldiers_node.get_children():
+		if child.get("current_state") == 4:
+			continue
+		if child.get("team") != ship.team:
+			continue
+		if str(child.get("crew_role", "")) == "fire_pot":
+			return child
+	return null
+
+
+static func _get_fire_pot_target_pos(target_ship: Node3D) -> Vector3:
+	var target_pos: Vector3 = target_ship.global_position + Vector3(0.0, 1.8, 0.0)
+	var masts: Array = target_ship.get("masts")
+	if masts != null and not masts.is_empty():
+		for mast in masts:
+			if is_instance_valid(mast):
+				target_pos = mast.global_position + Vector3(randf_range(-0.4, 0.4), 1.6, randf_range(-0.4, 0.4))
+				break
+	target_pos.x += randf_range(-0.6, 0.6)
+	target_pos.z += randf_range(-0.6, 0.6)
+	return target_pos
 
 static func become_derelict(ship) -> void:
 	ship.is_derelict = true
