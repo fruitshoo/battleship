@@ -64,6 +64,13 @@ uniform float normal_epsilon : hint_range(0.001, 1.0) = 0.01;
 uniform float normal_smoothness_dist : hint_range(0.0, 1000.0) = 50.0;
 uniform float max_depth : hint_range(0.1, 50.0, 0.1) = 10.0;
 
+// PLAYER-CENTERED DISTANCE HAZE
+uniform vec3 player_center_ws = vec3(0.0, 0.0, 0.0);
+uniform float clarity_radius : hint_range(0.0, 500.0, 0.1) = 18.0;
+uniform float haze_radius : hint_range(0.0, 800.0, 0.1) = 52.0;
+uniform float distance_haze_strength : hint_range(0.0, 1.0, 0.01) = 0.46;
+uniform vec3 distance_haze_color : source_color = vec3(0.44, 0.58, 0.7);
+
 vec3 screen(vec3 base, vec3 blend){
 	return 1.0 - (1.0 - base) * (1.0 - blend);
 }
@@ -313,17 +320,26 @@ void fragment() {
 	vec2 world_uv = world_vert.xz / uv_scale;
 	vec2 uv_movement = movement_direction * TIME * movement_strength;
 	
+    float horiz_dist = distance(world_vert.xz, player_center_ws.xz);
+    float haze_range = max(0.001, haze_radius - clarity_radius);
+    float distance_haze = clamp((horiz_dist - clarity_radius) / haze_range, 0.0, 1.0);
+    distance_haze = smoothstep(0.0, 1.0, distance_haze);
+
 	vec3 n1 = texture(normalmap_a, world_uv + uv_movement).rgb;
 	vec3 n2 = texture(normalmap_b, world_uv - uv_movement * 0.5).rgb;
 	
 	// 부적절한 일반 덧셈 대신 올바른 노멀 믹스
 	vec3 normal_blend = mix(n1, n2, 0.5);
+    normal_blend = mix(normal_blend, vec3(0.5, 0.5, 1.0), distance_haze * 0.82);
 	
     float basic_fresnel_real = fresnel(3.0, NORMAL, VIEW);
 
     // 최종 알베도 색상 혼합 (+ 프레넬)
     vec3 water_base = mix(water_color, primary_color.rgb, basic_fresnel_real * 0.5);
     vec3 final_albedo = water_base + (basic_fresnel_real * 0.2);
+
+    // Player-centered haze for quarter-view readability.
+    final_albedo = mix(final_albedo, distance_haze_color, distance_haze * distance_haze_strength);
 
     // -------------------------------------------------------------------------
     // UNDERWATER FOG (수중 안개/탁도)
@@ -414,7 +430,8 @@ void fragment() {
     ALPHA = clamp(1.0 - (beers_blend * 0.85) + water_transparency + foam_mask_primary, 0.0, 1.0);
 
     // Make foam rougher
-    ROUGHNESS = mix(roughness, 0.8, foam_mask_primary + foam_mask_shadow);
+    ROUGHNESS = mix(roughness, roughness + 0.18, distance_haze);
+    ROUGHNESS = mix(ROUGHNESS, 0.8, foam_mask_primary + foam_mask_shadow);
 
     SPECULAR = specular;
     METALLIC = metallic;

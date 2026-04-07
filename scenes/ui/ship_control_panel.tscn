@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://dyex137etnigk"]
 
-[ext_resource type="Script" uid="uid://c7t702ax2pk7e" path="res://scripts/ui/ship_control_ui.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/ui/wind_compass_art.gd" id="2_wind_art"]
+[ext_resource type="Script" path="res://scripts/ui/hud/ship_control_ui.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/hud/wind_compass_art.gd" id="2_wind_art"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_round"]
 bg_color = Color(0.05, 0.08, 0.15, 0.8)

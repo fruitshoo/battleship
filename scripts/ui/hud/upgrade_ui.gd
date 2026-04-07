@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-const HudUpgradeInfoHelper = preload("res://scripts/ui/hud_upgrade_info_helper.gd")
+const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 ## 업그레이드 선택 UI

@@ -109,7 +109,7 @@ Recommendation:
 - `assets/shaders/caustics/foam.png`
 - size: `640x640`
 - source size: about `970 KB`
-- used by: `resources/materials/water_04.tres`
+- used by: `resources/materials/water.tres`
 - import already uses VRAM compression
 
 Recommendation:

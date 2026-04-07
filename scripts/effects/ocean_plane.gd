@@ -8,12 +8,21 @@ const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 @export var grid_size: float = 50.0 # 50미터 단위로 이동 (바다 축소 대응)
 
 var _target: Node3D = null
+var _shader_material: ShaderMaterial = null
 
 func _ready() -> void:
 	# Y는 항상 0 (수면)으로 고정
 	global_position.y = 0.0
 	add_to_group("ocean")
+	_resolve_shader_material()
 	_sync_shader_params()
+
+func _resolve_shader_material() -> void:
+	var mat = material_override
+	if not mat and mesh:
+		mat = mesh.surface_get_material(0)
+	if mat is ShaderMaterial:
+		_shader_material = mat
 
 # === CPU 파도 연산용 파라미터 ===
 var sea_height: float = 0.6
@@ -23,17 +32,15 @@ var sea_freq: float = 0.16
 var iter_geometry: int = 2 # CPU 최적화를 위해 반복 횟수(octaves)를 2로 제한
 
 func _sync_shader_params() -> void:
-	var mat = material_override
-	if not mat and mesh:
-		mat = mesh.surface_get_material(0)
-	if mat is ShaderMaterial:
-		var h = mat.get_shader_parameter("sea_height")
+	_resolve_shader_material()
+	if _shader_material:
+		var h = _shader_material.get_shader_parameter("sea_height")
 		if h != null: sea_height = h
-		var c = mat.get_shader_parameter("sea_choppy")
+		var c = _shader_material.get_shader_parameter("sea_choppy")
 		if c != null: sea_choppy = c
-		var s = mat.get_shader_parameter("sea_speed")
+		var s = _shader_material.get_shader_parameter("sea_speed")
 		if s != null: sea_speed = s
-		var f = mat.get_shader_parameter("sea_freq")
+		var f = _shader_material.get_shader_parameter("sea_freq")
 		if f != null: sea_freq = f
 
 # GPU 셰이더의 hash12 이식
@@ -111,3 +118,6 @@ func _process(_delta: float) -> void:
 	if abs(global_position.x - new_x) > 0.1 or abs(global_position.z - new_z) > 0.1:
 		global_position.x = new_x
 		global_position.z = new_z
+
+	if _shader_material:
+		_shader_material.set_shader_parameter("player_center_ws", _target.global_position)

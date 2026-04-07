@@ -217,11 +217,16 @@ helper가 나뉘어 있습니다.
 HUD/메뉴 동작
 
 대표 파일:
-- [game_hud.gd](/Users/shk/Godot/battleship/scripts/ui/game_hud.gd)
-- [main_menu.gd](/Users/shk/Godot/battleship/scripts/ui/main_menu.gd)
-- [upgrade_ui.gd](/Users/shk/Godot/battleship/scripts/ui/upgrade_ui.gd)
-- [ship_control_ui.gd](/Users/shk/Godot/battleship/scripts/ui/ship_control_ui.gd)
+- [game_hud.gd](/Users/shk/Godot/battleship/scripts/ui/hud/game_hud.gd)
+- [main_menu.gd](/Users/shk/Godot/battleship/scripts/ui/menus/main_menu.gd)
+- [upgrade_ui.gd](/Users/shk/Godot/battleship/scripts/ui/hud/upgrade_ui.gd)
+- [ship_control_ui.gd](/Users/shk/Godot/battleship/scripts/ui/hud/ship_control_ui.gd)
 - [naval_ui_theme.gd](/Users/shk/Godot/battleship/scripts/ui/naval_ui_theme.gd)
+
+현재는 아래처럼 나뉩니다.
+- `scripts/ui/hud/`
+- `scripts/ui/menus/`
+- `scripts/ui/naval_ui_theme.gd`
 
 ---
 

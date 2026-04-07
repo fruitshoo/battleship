@@ -5,8 +5,6 @@ const MastVisualHelper = preload("res://scripts/props/mast_visual_helper.gd")
 const MastGeometryHelper = preload("res://scripts/props/mast_geometry_helper.gd")
 const MastWindHelper = preload("res://scripts/props/mast_wind_helper.gd")
 const SAIL_SMOKE_SCENE = preload("res://scenes/effects/fire_effect.tscn")
-const SAIL_BURN_MASK_A = preload("res://assets/vfx/masks/sail_burn_mask_a.png")
-const SAIL_BURN_MASK_B = preload("res://assets/vfx/masks/sail_burn_mask_b.png")
 const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 
 ## 돛대 (Mast) 오브젝트
@@ -171,7 +169,7 @@ func configure_sail_uv(swap_axes: bool = false, flip_u: bool = false, flip_v: bo
 	_apply_sail_material_settings()
 
 func _apply_sail_material_settings() -> void:
-	MastVisualHelper.apply_sail_material_settings(self, SAIL_BURN_MASK_A, SAIL_BURN_MASK_B, SAIL_BURN_MASK_C)
+	MastVisualHelper.apply_sail_material_settings(self, SAIL_BURN_MASK_C)
 
 func add_sail_damage(amount: float) -> void:
 	var target_damage: float = clamp(sail_damage + maxf(amount, 0.0), 0.0, 1.0)

@@ -85,7 +85,7 @@ static func check_offscreen_despawn(ship) -> void:
 		ship.queue_free()
 		return
 
-	var cam := ship.get_viewport().get_camera_3d()
+	var cam: Camera3D = ship.get_viewport().get_camera_3d()
 	if not is_instance_valid(cam):
 		return
 	var viewport_rect: Rect2 = ship.get_viewport().get_visible_rect()
@@ -188,4 +188,3 @@ static func evacuate_soldiers_to_home(ship) -> void:
 
 	if returned_count > 0:
 		print("[Evacuation] 총 %d명의 병사가 원래 배로 복귀했습니다." % returned_count)
-
