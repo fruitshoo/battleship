@@ -1,7 +1,7 @@
 {
 	"kobayabune_melee": {
 		"name": "Kobayabune Raider",
-		"hull_hp": 70,
+		"hull_hp": 100,
 		"move_speed": 7.0,
 		"boarders": 3,
 		"has_cannons": false,
@@ -19,7 +19,7 @@
 	},
 	"sekibune_melee": {
 		"name": "Melee Sekibune",
-		"hull_hp": 100,
+		"hull_hp": 145,
 		"move_speed": 6.0,
 		"boarders": 4,
 		"has_cannons": false,
@@ -39,7 +39,7 @@
 	},
 	"sekibune_cannon": {
 		"name": "Cannon Sekibune",
-		"hull_hp": 100,
+		"hull_hp": 145,
 		"move_speed": 4.5,
 		"boarders": 3,
 		"has_cannons": true,
@@ -59,7 +59,7 @@
 	},
 	"atakebune_mid": {
 		"name": "Mid-Boss Atakebune",
-		"hull_hp": 900,
+		"hull_hp": 1170,
 		"move_speed": 3.0,
 		"tier": 1,
 		"orbit_distance": 24.0,
@@ -78,7 +78,7 @@
 	},
 	"atakebune_final": {
 		"name": "Final Boss Atakebune",
-		"hull_hp": 4500,
+		"hull_hp": 5800,
 		"move_speed": 2.5,
 		"tier": 2,
 		"orbit_distance": 28.0,
@@ -97,7 +97,7 @@
 	},
 	"maengseon_ally": {
 		"name": "Maengseon Ally",
-		"hull_hp": 150,
+		"hull_hp": 200,
 		"move_speed": 4.5,
 		"boarders": 4,
 		"has_cannons": true,
@@ -106,7 +106,7 @@
 	},
 	"panokseon_player": {
 		"name": "Player Panokseon",
-		"hull_hp": 200,
+		"hull_hp": 270,
 		"move_speed": 6.0,
 		"boarders": 4,
 		"deck_height": 0.5

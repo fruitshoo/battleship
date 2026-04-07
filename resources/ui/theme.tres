@@ -13,7 +13,7 @@ corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
-bg_color = Color(0.10, 0.16, 0.22, 0.88)
+bg_color = Color(0.1, 0.16, 0.22, 0.88)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -42,7 +42,7 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.80, 0.68, 0.41, 0.52)
+border_color = Color(0.8, 0.68, 0.41, 0.52)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
@@ -66,7 +66,7 @@ corner_radius_bottom_left = 4
 Button/styles/hover = SubResource("StyleBoxFlat_button_hover")
 Button/styles/normal = SubResource("StyleBoxFlat_button_normal")
 Button/styles/pressed = SubResource("StyleBoxFlat_button_pressed")
-Label/colors/font_color = Color(0.95, 0.94, 0.90, 1)
+Label/colors/font_color = Color(0.95, 0.94, 0.9, 1)
 Label/colors/font_shadow_color = Color(0.06, 0.09, 0.12, 0.85)
 Label/constants/shadow_offset_x = 1
 Label/constants/shadow_offset_y = 1

@@ -2,9 +2,9 @@ extends RefCounted
 
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const SUPPORT_FLEET_ICON = preload("res://assets/ui/support_fleet/support_fleet_bow_icon.png")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
-const SUPPORT_SHIP_ICON := "\ue532"
 const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
 const CAPTURE_HINT_CREW_RATIO: float = 0.34
 const CAPTURE_HINT_CREW_MAX: int = 2
@@ -115,40 +115,10 @@ static func update_speed_display(hud) -> void:
 static func update_force_panel(hud) -> void:
 	if not is_instance_valid(hud.player_ship):
 		return
-	_update_crew_force_status(hud)
 	_update_support_force_status(hud)
 
 static func _update_crew_force_status(hud) -> void:
-	var soldiers_node = hud.player_ship.get_node_or_null("Soldiers")
-	var alive_count: int = 0
-	var general_count: int = 0
-	var spearman_count: int = 0
-	var fire_pot_count: int = 0
-	var repeater_count: int = 0
-	var singigeon_count: int = 0
-	if soldiers_node:
-		for soldier in soldiers_node.get_children():
-			if soldier.get("current_state") != null and int(soldier.current_state) != 4 and soldier.get("team") == "player":
-				alive_count += 1
-				var role: String = str(soldier.get("crew_role")) if soldier.get("crew_role") != null else str(soldier.get_meta("crew_role", "general"))
-				match role:
-					"spearman":
-						spearman_count += 1
-					"fire_pot":
-						fire_pot_count += 1
-					"repeating_crossbow":
-						repeater_count += 1
-					"singigeon":
-						singigeon_count += 1
-					_:
-						general_count += 1
-	var max_val: int = int(hud.player_ship.get("max_crew_count")) if hud.player_ship.get("max_crew_count") != null else 4
-	update_crew_status(hud, alive_count, max_val)
-	if hud.crew_status_bar:
-		hud.crew_status_bar.max_value = maxf(float(max_val), 1.0)
-		hud.crew_status_bar.value = maxf(0.0, float(max_val - alive_count))
-	if hud.crew_composition_label:
-		hud.crew_composition_label.text = "[편성] 일반 %d | 창병 %d | 화통 %d | 연노 %d | 신기전 %d" % [general_count, spearman_count, fire_pot_count, repeater_count, singigeon_count]
+	pass
 
 static func _update_support_force_status(hud) -> void:
 	if not hud.support_slot_container or not is_instance_valid(hud.player_ship):
@@ -156,68 +126,21 @@ static func _update_support_force_status(hud) -> void:
 	var support_ships: Array = []
 	if hud.player_ship.has_method("_get_support_fleet_ships"):
 		support_ships = hud.player_ship._get_support_fleet_ships()
-	var support_limit: int = int(hud.player_ship.support_fleet_limit) if "support_fleet_limit" in hud.player_ship else 0
-	var support_unlocked: bool = support_ships.size() > 0
-	if is_instance_valid(UpgradeManager) and "current_levels" in UpgradeManager:
-		support_unlocked = support_unlocked or int(UpgradeManager.current_levels.get("fleet_signal", 0)) > 0
-	if support_limit <= 0 and not support_unlocked:
-		if is_instance_valid(hud.support_status_label) and is_instance_valid(hud.support_status_label.get_parent()):
-			hud.support_status_label.get_parent().visible = false
-		return
-	if is_instance_valid(hud.support_status_label) and is_instance_valid(hud.support_status_label.get_parent()):
-		hud.support_status_label.get_parent().visible = true
-	support_limit = maxi(support_limit, support_ships.size())
-	_ensure_support_slot_count(hud, support_limit)
-	if hud.support_status_label:
-		hud.support_status_label.text = "지원함 %d/%d" % [support_ships.size(), support_limit]
-
-	var next_respawn_text: String = ""
-	if support_ships.size() < support_limit and _is_support_respawn_active(hud.player_ship):
-		var interval: float = float(hud.player_ship.support_fleet_respawn_interval)
-		var timer: float = float(hud.player_ship.support_fleet_respawn_timer)
-		next_respawn_text = "%ds" % maxi(0, int(ceili(maxf(0.0, interval - timer))))
+	_ensure_support_slot_count(hud, support_ships.size())
 
 	for i in range(hud.support_fleet_hud_slots.size()):
 		var slot: PanelContainer = hud.support_fleet_hud_slots[i]
 		if not is_instance_valid(slot):
 			continue
 		var ship = support_ships[i] if i < support_ships.size() else null
-		var timer_text: String = next_respawn_text if i == support_ships.size() else ""
-		_update_support_slot(slot, ship, timer_text)
+		_update_support_slot(slot, ship, "")
 
 static func update_crew_count(hud) -> void:
 	if Engine.get_process_frames() % 30 != 0:
 		return
 	if not is_instance_valid(hud.player_ship):
 		return
-	var soldiers_node = hud.player_ship.get_node_or_null("Soldiers")
-	if soldiers_node:
-		var alive_count = 0
-		var general_count = 0
-		var spearman_count = 0
-		var fire_pot_count = 0
-		var repeater_count = 0
-		var singigeon_count = 0
-		for soldier in soldiers_node.get_children():
-			if soldier.get("current_state") != null and soldier.current_state != 4:
-				if soldier.get("team") == "player":
-					alive_count += 1
-					var role = String(soldier.get("crew_role")) if soldier.get("crew_role") != null else String(soldier.get_meta("crew_role", "general"))
-					match role:
-						"spearman":
-							spearman_count += 1
-						"fire_pot":
-							fire_pot_count += 1
-						"repeating_crossbow":
-							repeater_count += 1
-						"singigeon":
-							singigeon_count += 1
-						_:
-							general_count += 1
-		var max_val = hud.player_ship.get("max_crew_count") if hud.player_ship.get("max_crew_count") != null else 4
-		update_crew_status(hud, alive_count, max_val)
-		if hud.crew_composition_label:
-			hud.crew_composition_label.text = "[편성] 일반 %d | 창병 %d | 화통 %d | 연노 %d | 신기전 %d" % [general_count, spearman_count, fire_pot_count, repeater_count, singigeon_count]
+	pass
 
 static func _is_support_respawn_active(player_ship) -> bool:
 	if not is_instance_valid(player_ship):
@@ -240,8 +163,18 @@ static func _ensure_support_slot_count(hud, slot_count: int) -> void:
 
 static func _create_support_slot() -> PanelContainer:
 	var slot := PanelContainer.new()
-	slot.custom_minimum_size = Vector2(34, 34)
-	var slot_style := NavalUiTheme.make_slot_style(NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM, 6)
+	slot.custom_minimum_size = Vector2(76, 76)
+	var slot_style := StyleBoxFlat.new()
+	slot_style.bg_color = Color(0.05, 0.07, 0.10, 0.90)
+	slot_style.border_color = Color(0.84, 0.68, 0.35, 0.90)
+	slot_style.border_width_left = 2
+	slot_style.border_width_top = 2
+	slot_style.border_width_right = 2
+	slot_style.border_width_bottom = 2
+	slot_style.corner_radius_top_left = 38
+	slot_style.corner_radius_top_right = 38
+	slot_style.corner_radius_bottom_right = 38
+	slot_style.corner_radius_bottom_left = 38
 	slot.add_theme_stylebox_override("panel", slot_style)
 
 	var root := Control.new()
@@ -250,7 +183,7 @@ static func _create_support_slot() -> PanelContainer:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	slot.add_child(root)
 
-	var damage_fill := ColorRect.new()
+	var damage_fill := Panel.new()
 	damage_fill.name = "DamageFill"
 	damage_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	damage_fill.anchor_left = 0.0
@@ -261,27 +194,45 @@ static func _create_support_slot() -> PanelContainer:
 	damage_fill.offset_right = 0.0
 	damage_fill.offset_top = 0.0
 	damage_fill.offset_bottom = 0.0
-	damage_fill.color = Color(0.92, 0.24, 0.24, 0.78)
+	var damage_style := StyleBoxFlat.new()
+	damage_style.bg_color = Color(0.92, 0.24, 0.24, 0.76)
+	damage_style.corner_radius_top_left = 38
+	damage_style.corner_radius_top_right = 38
+	damage_style.corner_radius_bottom_right = 38
+	damage_style.corner_radius_bottom_left = 38
+	damage_fill.add_theme_stylebox_override("panel", damage_style)
 	root.add_child(damage_fill)
 
-	var dead_overlay := ColorRect.new()
+	var dead_overlay := Panel.new()
 	dead_overlay.name = "DeadOverlay"
 	dead_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dead_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dead_overlay.color = Color(0.08, 0.08, 0.08, 0.72)
+	var dead_style := StyleBoxFlat.new()
+	dead_style.bg_color = Color(0.08, 0.08, 0.08, 0.72)
+	dead_style.corner_radius_top_left = 38
+	dead_style.corner_radius_top_right = 38
+	dead_style.corner_radius_bottom_right = 38
+	dead_style.corner_radius_bottom_left = 38
+	dead_overlay.add_theme_stylebox_override("panel", dead_style)
 	dead_overlay.visible = false
 	root.add_child(dead_overlay)
 
-	var icon := Label.new()
+	var icon := TextureRect.new()
 	icon.name = "Icon"
-	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	icon.add_theme_font_size_override("font_size", 22)
-	icon.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
-	if MATERIAL_SYMBOLS_FONT:
-		icon.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
-	icon.text = SUPPORT_SHIP_ICON
+	icon.anchor_left = 0.0
+	icon.anchor_top = 0.0
+	icon.anchor_right = 1.0
+	icon.anchor_bottom = 1.0
+	icon.offset_left = 4.0
+	icon.offset_top = 4.0
+	icon.offset_right = -4.0
+	icon.offset_bottom = -4.0
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.custom_minimum_size = Vector2(68, 68)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.texture = SUPPORT_FLEET_ICON
+	icon.modulate = NavalUiTheme.TEXT_MAIN
 	root.add_child(icon)
 
 	var timer := Label.new()
@@ -300,7 +251,7 @@ static func _update_support_slot(slot: PanelContainer, ship, timer_text: String 
 	var slot_style: StyleBoxFlat = slot.get_theme_stylebox("panel") as StyleBoxFlat
 	var damage_fill: ColorRect = slot.get_node("Root/DamageFill") as ColorRect
 	var dead_overlay: ColorRect = slot.get_node("Root/DeadOverlay") as ColorRect
-	var icon: Label = slot.get_node("Root/Icon") as Label
+	var icon: TextureRect = slot.get_node("Root/Icon") as TextureRect
 	var timer: Label = slot.get_node("Root/Timer") as Label
 	if not is_instance_valid(icon) or not is_instance_valid(dead_overlay) or not is_instance_valid(damage_fill) or not is_instance_valid(timer):
 		return
@@ -315,8 +266,8 @@ static func _update_support_slot(slot: PanelContainer, ship, timer_text: String 
 		damage_fill.offset_bottom = 0.0
 		dead_overlay.visible = false
 		icon.visible = true
-		icon.text = SUPPORT_SHIP_ICON
-		icon.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
+		icon.texture = SUPPORT_FLEET_ICON
+		icon.modulate = NavalUiTheme.TEXT_MAIN
 		timer.visible = false
 		timer.text = ""
 		if slot_style:
@@ -326,8 +277,8 @@ static func _update_support_slot(slot: PanelContainer, ship, timer_text: String 
 		damage_fill.visible = false
 		dead_overlay.visible = true
 		icon.visible = true
-		icon.text = SUPPORT_SHIP_ICON
-		icon.add_theme_color_override("font_color", NavalUiTheme.TEXT_MUTED)
+		icon.texture = SUPPORT_FLEET_ICON
+		icon.modulate = Color(0.62, 0.66, 0.72, 0.82)
 		timer.visible = not timer_text.is_empty()
 		timer.text = timer_text
 		if slot_style:

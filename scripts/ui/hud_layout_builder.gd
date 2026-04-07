@@ -309,69 +309,20 @@ static func setup_bottom_left_layout(hud) -> void:
 	hud.bottom_left_container.offset_left = 24
 	hud.bottom_left_container.offset_bottom = -24
 	hud.bottom_left_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	hud.crew_label = hud._ensure_hud_label(hud.crew_label, "CrewLabel", "")
-	var force_box: VBoxContainer = null
-	var crew_row: VBoxContainer = null
-	var support_row: HBoxContainer = null
-	if hud.force_panel == null:
-		hud.force_panel = PanelContainer.new()
-		hud.force_panel.name = "ForcePanel"
-		var force_style := NavalUiTheme.make_hud_panel_style()
-		hud.force_panel.add_theme_stylebox_override("panel", force_style)
-		hud.bottom_left_container.add_child(hud.force_panel)
-
-		force_box = VBoxContainer.new()
-		force_box.name = "ForceBox"
-		force_box.add_theme_constant_override("separation", 6)
-		hud.force_panel.add_child(force_box)
-
-		crew_row = VBoxContainer.new()
-		crew_row.name = "CrewRow"
-		crew_row.add_theme_constant_override("separation", 4)
-		force_box.add_child(crew_row)
-
-		support_row = HBoxContainer.new()
-		support_row.name = "SupportRow"
-		support_row.add_theme_constant_override("separation", 8)
-		force_box.add_child(support_row)
-	else:
-		force_box = hud.force_panel.get_node_or_null("ForceBox") as VBoxContainer
-		crew_row = hud.force_panel.get_node_or_null("ForceBox/CrewRow") as VBoxContainer
-		support_row = hud.force_panel.get_node_or_null("ForceBox/SupportRow") as HBoxContainer
-
-	if hud.crew_label and crew_row:
-		move_label_to_container(hud.crew_label, crew_row)
-		NavalUiTheme.style_heading(hud.crew_label, 16)
-	if hud.crew_composition_label == null:
-		hud.crew_composition_label = Label.new()
-		hud.crew_composition_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		NavalUiTheme.style_body(hud.crew_composition_label, 11)
-		hud.crew_composition_label.text = "[편성] 일반 4 | 창병 0 | 화통 0 | 연노 0 | 신기전 0"
-	if crew_row and hud.crew_composition_label.get_parent() != crew_row:
-		move_label_to_container(hud.crew_composition_label, crew_row)
-
-	if hud.crew_status_bar == null:
-		hud.crew_status_bar = ProgressBar.new()
-		hud.crew_status_bar.custom_minimum_size = Vector2(220, 8)
-		hud.crew_status_bar.max_value = 1.0
-		hud.crew_status_bar.show_percentage = false
-		NavalUiTheme.apply_progress_bar(hud.crew_status_bar, Color(0.06, 0.08, 0.11, 0.92), Color(0.79, 0.28, 0.28, 0.9), 3)
-	if crew_row and hud.crew_status_bar.get_parent() != crew_row:
-		move_label_to_container(hud.crew_status_bar, crew_row)
-
-	if hud.support_status_label == null:
-		hud.support_status_label = Label.new()
-		hud.support_status_label.text = "지원함 0/0"
-		NavalUiTheme.style_body(hud.support_status_label, 13)
-	if support_row and hud.support_status_label.get_parent() != support_row:
-		move_label_to_container(hud.support_status_label, support_row)
+	if hud.support_row == null:
+		hud.support_row = HBoxContainer.new()
+		hud.support_row.name = "SupportRow"
+		hud.support_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		hud.support_row.add_theme_constant_override("separation", 10)
+	if hud.support_row.get_parent() != hud.bottom_left_container:
+		move_label_to_container(hud.support_row, hud.bottom_left_container)
 
 	if hud.support_slot_container == null:
-		hud.support_slot_container = HBoxContainer.new()
+		hud.support_slot_container = VBoxContainer.new()
 		hud.support_slot_container.name = "SupportSlots"
 		hud.support_slot_container.add_theme_constant_override("separation", 6)
-	if support_row and hud.support_slot_container.get_parent() != support_row:
-		move_label_to_container(hud.support_slot_container, support_row)
+	if hud.support_slot_container.get_parent() != hud.support_row:
+		move_label_to_container(hud.support_slot_container, hud.support_row)
 
 	hud.hp_bar = ProgressBar.new()
 	hud.hp_bar.custom_minimum_size = Vector2(240, 24)

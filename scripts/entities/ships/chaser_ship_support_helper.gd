@@ -1,9 +1,15 @@
 extends RefCounted
 class_name ChaserShipSupportHelper
 
+const DERELICT_NONBLOCKING_DELAY: float = 1.25
+const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
+const DERELICT_OFFSCREEN_DESPAWN_DISTANCE: float = 42.0
+const DERELICT_HARD_DESPAWN_DISTANCE: float = 150.0
+
 static func become_derelict(ship) -> void:
 	ship.is_derelict = true
 	ship.set_meta("derelict_nonblocking", false)
+	ship.set_meta("derelict_started_at", Time.get_ticks_msec() / 1000.0)
 
 	if not is_instance_valid(ship.cached_lm):
 		ship.cached_lm = ship.get_tree().root.find_child("LevelManager", true, false)
@@ -37,14 +43,9 @@ static func become_derelict(ship) -> void:
 	tilt_tween.set_parallel(true)
 	tilt_tween.tween_property(ship, "position:y", ship.base_y - 1.0, 2.0)
 
-	ship.get_tree().create_timer(1.25).timeout.connect(func():
+	ship.get_tree().create_timer(DERELICT_NONBLOCKING_DELAY).timeout.connect(func():
 		if is_instance_valid(ship) and ship.is_derelict and not ship.is_sinking:
 			ship.set_meta("derelict_nonblocking", true)
-	)
-
-	ship.get_tree().create_timer(2.5).timeout.connect(func():
-		if is_instance_valid(ship) and not ship.is_sinking:
-			sink_derelict(ship)
 	)
 
 
@@ -66,15 +67,38 @@ static func sink_derelict(ship) -> void:
 
 
 static func check_offscreen_despawn(ship) -> void:
+	if not ship.is_derelict or ship.is_sinking:
+		return
 	var players = ship.SceneGroupCache.get_nodes(ship.get_tree(), "player")
 	if players.is_empty():
 		return
 	var p = players[0]
 
+	var started_at: float = float(ship.get_meta("derelict_started_at", 0.0))
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now - started_at < DERELICT_MIN_VISIBLE_LIFETIME:
+		return
+
 	var dist = ship.global_position.distance_to(p.global_position)
-	if dist > 150.0:
+	if dist > DERELICT_HARD_DESPAWN_DISTANCE:
 		print("[Ship] 폐선이 완전히 표류하여 사라집니다.")
 		ship.queue_free()
+		return
+
+	var cam := ship.get_viewport().get_camera_3d()
+	if not is_instance_valid(cam):
+		return
+	var viewport_rect: Rect2 = ship.get_viewport().get_visible_rect()
+	if _is_world_position_offscreen(cam, viewport_rect, ship.global_position) and dist > DERELICT_OFFSCREEN_DESPAWN_DISTANCE:
+		print("[Ship] 화면 밖 폐선이 정리됩니다.")
+		ship.queue_free()
+
+
+static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, world_pos: Vector3) -> bool:
+	if cam.is_position_behind(world_pos):
+		return true
+	var screen_pos: Vector2 = cam.unproject_position(world_pos)
+	return not viewport_rect.has_point(screen_pos)
 
 
 static func drop_floating_loot(ship) -> void:
@@ -164,5 +188,4 @@ static func evacuate_soldiers_to_home(ship) -> void:
 
 	if returned_count > 0:
 		print("[Evacuation] 총 %d명의 병사가 원래 배로 복귀했습니다." % returned_count)
-
 

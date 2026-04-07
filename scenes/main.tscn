@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cw5vsucpn0xa"]
 
 [ext_resource type="Environment" uid="uid://d3wyl5ks17fd8" path="res://resources/environment/world_environment.tres" id="1_h2yge"]
-[ext_resource type="PackedScene" path="res://scenes/ui/ship_control_panel.tscn" id="3"]
+[ext_resource type="PackedScene" uid="uid://dyex137etnigk" path="res://scenes/ui/ship_control_panel.tscn" id="3"]
 [ext_resource type="Theme" uid="uid://vloxxb0s8llf" path="res://resources/ui/theme.tres" id="4_1bvp3"]
 [ext_resource type="Script" uid="uid://c1jpt1wfonqye" path="res://scripts/camera/camera_controller.gd" id="4_o6xl0"]
 [ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="5_attributes"]
@@ -10,7 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
-[ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
+[ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_choun"]
 size = Vector3(8, 8, 8)
@@ -28,7 +28,6 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 0.642788, 0.766044, 0, -0.766044, 0.642788, 0, 35, 45)
 environment = ExtResource("1_h2yge")
 attributes = ExtResource("5_attributes")
-fov = 56.0
 script = ExtResource("4_o6xl0")
 target_path = NodePath("../PlayerShip")
 pitch_degrees = -42.0

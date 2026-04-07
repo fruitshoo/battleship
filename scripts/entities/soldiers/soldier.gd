@@ -4,6 +4,7 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
+const SoldierShipDutyHelper = preload("res://scripts/entities/soldiers/soldier_ship_duty_helper.gd")
 const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
@@ -590,7 +591,7 @@ func _find_cross_ship_muster_target() -> Vector3:
 	return SoldierShipHelper.find_cross_ship_muster_target(self)
 
 func _find_ship_duty_target() -> Vector3:
-	return SoldierShipHelper.find_ship_duty_target(self)
+	return SoldierShipDutyHelper.find_ship_duty_target(self)
 
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:
