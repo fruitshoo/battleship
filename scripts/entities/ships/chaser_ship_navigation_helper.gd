@@ -2,7 +2,33 @@ extends RefCounted
 class_name ChaserShipNavigationHelper
 
 static func _is_gunner(ship) -> bool:
+	if ship.has_method("is_gunner_role"):
+		return bool(ship.call("is_gunner_role"))
 	return int(ship.combat_role) == int(ship.CombatRole.GUNNER)
+
+
+static func _can_board(ship) -> bool:
+	if ship.has_method("can_board_targets"):
+		return bool(ship.call("can_board_targets"))
+	return bool(ship.allow_boarding)
+
+
+static func _preferred_range(ship) -> float:
+	if ship.has_method("get_preferred_engagement_range"):
+		return float(ship.call("get_preferred_engagement_range"))
+	return float(ship.preferred_combat_range)
+
+
+static func _range_tolerance(ship) -> float:
+	if ship.has_method("get_engagement_range_tolerance"):
+		return float(ship.call("get_engagement_range_tolerance"))
+	return float(ship.combat_range_tolerance)
+
+
+static func _retreat_range(ship) -> float:
+	if ship.has_method("get_retreat_engagement_distance"):
+		return float(ship.call("get_retreat_engagement_distance"))
+	return float(ship.retreat_distance)
 
 
 static func _get_ship_deck_half_extents(ship) -> Vector2:
@@ -103,7 +129,10 @@ static func _score_boarding_slot(ship, target_node: Node3D, slot: Dictionary) ->
 			continue
 		if other.get("team") != ship.team:
 			continue
-		if other.get("allow_boarding") != true:
+		var other_can_board: bool = bool(other.get("allow_boarding"))
+		if other.has_method("can_board_targets"):
+			other_can_board = bool(other.call("can_board_targets"))
+		if other_can_board != true:
 			continue
 		if other.get("target") != target_node:
 			continue
@@ -295,9 +324,9 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 
 	if _is_gunner(ship):
 		permit_sprint = false
-		var preferred_range: float = ship.preferred_combat_range
-		var tolerance: float = ship.combat_range_tolerance
-		var retreat_range: float = ship.retreat_distance
+		var preferred_range: float = _preferred_range(ship)
+		var tolerance: float = _range_tolerance(ship)
+		var retreat_range: float = _retreat_range(ship)
 		if dist_to_target > preferred_range + tolerance:
 			desired_point = target_pos - dir_to_target * preferred_range
 			desired_speed_mult = 0.95
@@ -309,7 +338,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			desired_point = ship.global_position
 			heading_point = target_pos
 			desired_speed_mult = 0.18
-	elif ship.allow_boarding and dist_to_target < 18.0:
+	elif _can_board(ship) and dist_to_target < 18.0:
 		var target_forward: Vector3 = - target_node.global_transform.basis.z
 		target_forward.y = 0.0
 		if target_forward.length_squared() > 0.001:

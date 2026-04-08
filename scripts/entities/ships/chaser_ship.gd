@@ -116,6 +116,35 @@ var _merit_granted: bool = false # 공적 중복 획득 방지
 func get_radius() -> float:
 	return 2.5 # 대략적인 선체 반경 (상황에 맞게 조정)
 
+
+func is_gunner_role() -> bool:
+	return int(combat_role) == int(CombatRole.GUNNER)
+
+
+func is_charger_role() -> bool:
+	return not is_gunner_role()
+
+
+func can_board_targets() -> bool:
+	return allow_boarding
+
+
+func can_use_fire_pot_attack() -> bool:
+	return false
+
+
+func get_preferred_engagement_range() -> float:
+	return preferred_combat_range
+
+
+func get_engagement_range_tolerance() -> float:
+	return combat_range_tolerance
+
+
+func get_retreat_engagement_distance() -> float:
+	return retreat_distance
+
+
 func _become_derelict() -> void:
 	is_boarding = false
 	_clear_ropes()
@@ -580,6 +609,8 @@ func _update_leaking_damage(delta: float) -> void:
 
 
 func _update_enemy_fire_pot_logic(delta: float) -> void:
+	if not can_use_fire_pot_attack():
+		return
 	ChaserShipSupportHelper.update_enemy_fire_pot_logic(self, delta)
 
 
@@ -621,7 +652,7 @@ func _calculate_separation() -> Vector3:
 		var dist = sqrt(dist_sq)
 		var coll_dist = get_collision_distance_to(other)
 		# 현재 추격 타겟과는 접촉 직전까지 분리력을 제거해 정박/충돌이 가능하도록 함
-		if combat_role == CombatRole.CHARGER and is_instance_valid(target) and other == target and dist < coll_dist + 1.2:
+		if is_charger_role() and is_instance_valid(target) and other == target and dist < coll_dist + 1.2:
 			continue
 		var separation_trigger_dist = coll_dist + (0.18 * separation_pad_scale)
 		
@@ -919,14 +950,14 @@ func repair_ship(percent: float) -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
-	if not allow_boarding:
+	if not can_board_targets():
 		return
 	# 플레이어와 충돌했는지 확인 (StaticBody/CharacterBody 등)
 	if body.is_in_group("player") or (body.get_parent() and body.get_parent().is_in_group("player")):
 		_board_ship(body)
 
 func _on_area_entered(area: Area3D) -> void:
-	if not allow_boarding:
+	if not can_board_targets():
 		return
 	# 피격용 히트박스는 도선 트리거에서 제외
 	if area.is_in_group("ship_hitbox"):
@@ -946,7 +977,7 @@ func remove_stuck_object(_obj: Node3D, _s_mult: float, _t_mult: float) -> void:
 	if tilt_offset < 0.01: tilt_offset = 0.0
 
 func _board_ship(target_ship: Node3D) -> void:
-	if not allow_boarding:
+	if not can_board_targets():
 		return
 	if is_dying or is_boarding: return
 	

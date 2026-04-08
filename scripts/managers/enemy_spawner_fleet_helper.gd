@@ -79,6 +79,28 @@ static func apply_spawn_slot_info(enemy: Node, slot_info: Dictionary) -> void:
 	enemy.set_meta("enemy_formation_type", str(slot_info.get("formation_type", "")))
 
 
+static func infer_role_for_ship_type(ship_type_name: String) -> String:
+	var type_lower: String = ship_type_name.strip_edges().to_lower()
+	if type_lower.contains("cannon") or type_lower.contains("atakebune"):
+		return "gunline"
+	if type_lower == "sekibune_melee":
+		return "firepot"
+	return "vanguard"
+
+
+static func pick_enemy_scene(spawner, slot_info: Dictionary) -> PackedScene:
+	var ship_type_name: String = str(slot_info.get("ship_type", "")).strip_edges().to_lower()
+	var role_name: String = str(slot_info.get("role", "")).strip_edges().to_lower()
+	if role_name.is_empty():
+		role_name = infer_role_for_ship_type(ship_type_name)
+
+	if role_name == "gunline" or role_name == "pressure_gunner" or ship_type_name.contains("cannon") or ship_type_name.contains("atakebune"):
+		return spawner.enemy_gunner_scene if is_instance_valid(spawner.enemy_gunner_scene) else spawner.enemy_scene
+	if role_name == "firepot" or ship_type_name == "sekibune_melee":
+		return spawner.enemy_firepot_scene if is_instance_valid(spawner.enemy_firepot_scene) else spawner.enemy_scene
+	return spawner.enemy_melee_scene if is_instance_valid(spawner.enemy_melee_scene) else spawner.enemy_scene
+
+
 static func pick_fleet_template(spawner, remaining_slots: int) -> Array[Dictionary]:
 	var empty_result: Array[Dictionary] = []
 	var fleet_class: String = pick_fleet_class_for_time(spawner)

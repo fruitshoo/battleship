@@ -4,7 +4,15 @@ class_name ChaserShipAiHelper
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
 
 static func _is_gunner(ship) -> bool:
+	if ship.has_method("is_gunner_role"):
+		return bool(ship.call("is_gunner_role"))
 	return int(ship.combat_role) == int(ship.CombatRole.GUNNER)
+
+
+static func _can_board(ship) -> bool:
+	if ship.has_method("can_board_targets"):
+		return bool(ship.call("can_board_targets"))
+	return bool(ship.allow_boarding)
 
 
 static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) -> float:
@@ -88,7 +96,7 @@ static func process_physics(ship, delta: float) -> void:
 	var permit_sprint: bool = nav["permit_sprint"]
 	var dir_to_target: Vector3 = nav["dir_to_target"]
 
-	if not _is_gunner(ship) and ship.allow_boarding and dist_to_target <= ship.max_boarding_distance + 0.35:
+	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.max_boarding_distance + 0.35:
 		if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", ship.target):
 			if ship.has_method("_board_ship"):
 				ship.call("_board_ship", ship.target)

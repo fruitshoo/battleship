@@ -8,6 +8,9 @@ const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
 
 @export var enemy_scene: PackedScene = preload("res://scenes/ships/enemy_ship.tscn")
+@export var enemy_melee_scene: PackedScene = preload("res://scenes/ships/enemy_melee_ship.tscn")
+@export var enemy_gunner_scene: PackedScene = preload("res://scenes/ships/enemy_gunner_ship.tscn")
+@export var enemy_firepot_scene: PackedScene = preload("res://scenes/ships/enemy_firepot_ship.tscn")
 @export var spawn_interval: float = 5.2 # 생성 주기 (초)
 @export var min_spawn_distance: float = 50.0 # 최소 생성 거리 (화면 안으로 더 빨리 들어오게 조정)
 @export var max_spawn_distance: float = 70.0 # 최대 생성 거리
@@ -213,10 +216,13 @@ func _spawn_enemy_from_template(fleet_template: Array[Dictionary], remaining_slo
 	var blockade_right = to_player_dir.cross(Vector3.UP).normalized()
 	
 	for i in range(spawn_count):
-		var enemy = enemy_scene.instantiate()
 		var slot_info: Dictionary = _get_spawn_slot_info(fleet_template, i)
 		if slot_info.is_empty():
 			slot_info = _build_default_spawn_slot_info()
+		var enemy_scene_for_slot: PackedScene = _pick_enemy_scene_for_slot(slot_info)
+		if not is_instance_valid(enemy_scene_for_slot):
+			enemy_scene_for_slot = enemy_scene
+		var enemy = enemy_scene_for_slot.instantiate()
 		_apply_spawn_slot_info(enemy, slot_info)
 		
 		# 차단진일 경우 가로로 배치 (간격 15m)
@@ -359,7 +365,10 @@ func _spawn_elite_escorts(flagship_pos: Vector3) -> void:
 	var player_right: Vector3 = player_forward.cross(Vector3.UP).normalized()
 
 	for escort_info in mid_boss_escort_layout:
-		var escort = enemy_scene.instantiate()
+		var escort_scene: PackedScene = _pick_enemy_scene_for_slot(escort_info)
+		if not is_instance_valid(escort_scene):
+			escort_scene = enemy_scene
+		var escort = escort_scene.instantiate()
 		if not is_instance_valid(escort):
 			continue
 		_apply_spawn_slot_info(escort, escort_info)
@@ -467,7 +476,14 @@ func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_of
 	if not enemy_scene or not is_instance_valid(player):
 		return null
 
-	var enemy = enemy_scene.instantiate()
+	var slot_info: Dictionary = {
+		"ship_type": ship_type_name,
+		"role": _infer_role_for_ship_type(ship_type_name)
+	}
+	var debug_scene: PackedScene = _pick_enemy_scene_for_slot(slot_info)
+	if not is_instance_valid(debug_scene):
+		debug_scene = enemy_scene
+	var enemy = debug_scene.instantiate()
 	if "ship_type" in enemy:
 		enemy.ship_type = ship_type_name
 
@@ -482,6 +498,12 @@ func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_of
 	_prime_enemy_momentum(enemy)
 	print("[DEBUG] 적 테스트 소환: %s" % ship_type_name)
 	return enemy
+
+func _pick_enemy_scene_for_slot(slot_info: Dictionary) -> PackedScene:
+	return EnemySpawnerFleetHelper.pick_enemy_scene(self, slot_info)
+
+func _infer_role_for_ship_type(ship_type_name: String) -> String:
+	return EnemySpawnerFleetHelper.infer_role_for_ship_type(ship_type_name)
 
 func _prime_enemy_momentum(enemy: Node3D, heavy_spawn: bool = false) -> void:
 	if not is_instance_valid(enemy):

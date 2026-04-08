@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://dbgt8puv1j3pw"]
+
+[ext_resource type="PackedScene" path="res://scenes/ships/enemy_ship.tscn" id="1_enemy_base"]
+[ext_resource type="Script" path="res://scripts/entities/ships/enemy_firepot_ship.gd" id="2_enemy_firepot_script"]
+
+[node name="EnemyFirepotShip" instance=ExtResource("1_enemy_base")]
+script = ExtResource("2_enemy_firepot_script")
+preferred_combat_range = 4.8
+combat_range_tolerance = 1.2
+retreat_distance = 3.8
+allow_boarding = true

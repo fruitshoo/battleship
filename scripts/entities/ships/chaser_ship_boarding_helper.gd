@@ -126,7 +126,10 @@ static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vecto
 static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: float) -> void:
 	if not is_instance_valid(other_ship):
 		return
-	if ship.get("allow_boarding") and ship.get("target") == other_ship:
+	var can_board: bool = bool(ship.get("allow_boarding"))
+	if ship.has_method("can_board_targets"):
+		can_board = bool(ship.call("can_board_targets"))
+	if can_board and ship.get("target") == other_ship:
 		var rel_vector: Vector3 = ship.global_position - other_ship.global_position
 		rel_vector.y = 0.0
 		var target_forward: Vector3 = -other_ship.global_transform.basis.z
