@@ -16,6 +16,10 @@ func _ready() -> void:
 	call_deferred("_configure_preview")
 
 
+func _process(_delta: float) -> void:
+	_refresh_debug_labels()
+
+
 func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_clear_existing_preview_enemies()
@@ -65,6 +69,8 @@ func _spawn_scenario(label_text: String, anchor: Vector3, player: Node3D, distan
 		_remove_fire_pot_role(enemy)
 
 	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0))
+	var debug_label := PreviewHarnessHelper.add_billboard_label(enemy, "", Vector3(0.0, 4.8, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)
+	debug_label.name = "DebugLabel"
 
 
 func _remove_fire_pot_role(enemy: Node) -> void:
@@ -81,3 +87,46 @@ func _remove_fire_pot_role(enemy: Node) -> void:
 		else:
 			soldier.set("crew_role", "general")
 			soldier.set_meta("crew_role", "general")
+
+
+func _refresh_debug_labels() -> void:
+	var player: Node3D = get_node_or_null("PlayerShip")
+	for child in get_children():
+		if not (child is Node3D) or not child.has_meta("firepot_preview_spawn"):
+			continue
+		var debug_label: Label3D = child.get_node_or_null("DebugLabel")
+		if not is_instance_valid(debug_label):
+			continue
+		debug_label.text = _build_debug_text(child as Node3D, player)
+
+
+func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
+	var has_target := false
+	var in_range := false
+	var has_tosser := false
+	var cooldown := 0.0
+
+	if "target" in enemy:
+		has_target = is_instance_valid(enemy.target)
+	if "fire_pot_cooldown_timer" in enemy:
+		cooldown = float(enemy.fire_pot_cooldown_timer)
+
+	if is_instance_valid(player):
+		var dist: float = enemy.global_position.distance_to(player.global_position)
+		in_range = dist >= 7.0 and dist <= 18.0
+
+	var soldiers_node := enemy.get_node_or_null("Soldiers")
+	if is_instance_valid(soldiers_node):
+		for soldier in soldiers_node.get_children():
+			if not is_instance_valid(soldier):
+				continue
+			if str(soldier.get("crew_role")) == "fire_pot" and int(soldier.get("current_state")) != 4:
+				has_tosser = true
+				break
+
+	return "target:%s range:%s tosser:%s cd:%.1f" % [
+		"Y" if has_target else "N",
+		"Y" if in_range else "N",
+		"Y" if has_tosser else "N",
+		cooldown,
+	]

@@ -21,6 +21,10 @@ func _ready() -> void:
 	call_deferred("_configure_preview")
 
 
+func _process(_delta: float) -> void:
+	_refresh_enemy_debug_labels()
+
+
 func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_clear_existing_preview_enemies()
@@ -74,6 +78,8 @@ func _spawn_enemy(label_text: String, world_pos: Vector3, player: Node3D) -> voi
 		enemy.target = player
 
 	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0))
+	var debug_label := PreviewHarnessHelper.add_billboard_label(enemy, "", Vector3(0.0, 4.7, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)
+	debug_label.name = "DebugLabel"
 
 
 func _get_target_state_name() -> String:
@@ -84,3 +90,22 @@ func _get_target_state_name() -> String:
 			return "Overrun"
 		_:
 			return "Clear"
+
+
+func _refresh_enemy_debug_labels() -> void:
+	for child in get_children():
+		if not (child is Node3D) or not child.has_meta("boarding_navigation_preview_spawn"):
+			continue
+		var debug_label: Label3D = child.get_node_or_null("DebugLabel")
+		if not is_instance_valid(debug_label):
+			continue
+		debug_label.text = _build_enemy_debug_text(child)
+
+
+func _build_enemy_debug_text(enemy: Node) -> String:
+	var mode: String = String(enemy.get_meta("boarding_approach_mode", "-"))
+	var slot: String = String(enemy.get_meta("boarding_slot_id", "-"))
+	var side_value: float = float(enemy.get_meta("boarding_side_sign", 0.0))
+	var side_text := "R" if side_value < -0.5 else ("L" if side_value > 0.5 else "-")
+	var boarding_text := "Y" if bool(enemy.get("is_boarding")) else "N"
+	return "mode:%s slot:%s side:%s board:%s" % [mode, slot, side_text, boarding_text]
