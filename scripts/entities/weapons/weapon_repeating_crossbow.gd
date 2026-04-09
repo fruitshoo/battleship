@@ -70,7 +70,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		if time_to_reach < 0.2:
 			time_to_reach = 0.2
 			
-		var local_vel = target.get("velocity") if "velocity" in target else Vector3.ZERO
+		var local_vel: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
 		
 		var ship = _resolve_parent_ship(target)
 			
@@ -78,9 +78,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		if ship and ship.has_method("get_current_speed_value"):
 			var s_speed = ship.get_current_speed_value()
 			if s_speed > 0.1:
-				var s_dir = - ship.global_transform.basis.z.normalized()
-				if "move_dir" in ship and typeof(ship.get("move_dir")) == TYPE_VECTOR3:
-					s_dir = ship.get("move_dir").normalized()
+				var s_dir = ship.get_move_direction_value() if ship.has_method("get_move_direction_value") else -ship.global_transform.basis.z.normalized()
 				ship_vel = s_dir * s_speed
 				
 		var total_vel = local_vel + ship_vel
