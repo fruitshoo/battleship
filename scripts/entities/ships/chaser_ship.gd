@@ -108,6 +108,9 @@ var cached_lm: Node = null
 var separation_force: Vector3 = Vector3.ZERO
 var separation_timer: float = 0.0
 var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
+@export_range(0.05, 0.5, 0.01) var ai_logic_update_interval: float = 0.2
+@export_range(0.0, 0.15, 0.01) var ai_logic_update_jitter: float = 0.05
+var _ai_logic_update_interval_runtime: float = 0.2
 
 # 도선 로직 변수 (base_ship.gd에서 상속)
 var has_rammed: bool = false # 중복 데미지 방지
@@ -409,6 +412,7 @@ func _ready() -> void:
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
 	_sync_contact_area_layers()
 	_set_contact_areas_enabled(true)
+	_configure_ai_logic_throttle()
 
 func _sync_contact_area_layers(layer_override: int = -1) -> void:
 	var current_layer: int = layer_override
@@ -634,6 +638,20 @@ func _physics_process(delta: float) -> void:
 
 func _update_logic_throttled() -> void:
 	ChaserShipAiHelper.update_logic_throttled(self)
+
+
+func _configure_ai_logic_throttle() -> void:
+	var seed_value: int = abs(hash("%s:%s:%s" % [str(get_instance_id()), ship_type, formation_role_name]))
+	var phase: float = float(seed_value % 1000) / 1000.0
+	var jitter_sign: float = -1.0 if (seed_value % 2) == 0 else 1.0
+	var jitter_scale: float = float(seed_value % 500) / 500.0
+	var jitter: float = ai_logic_update_jitter * jitter_sign * jitter_scale
+	_ai_logic_update_interval_runtime = clampf(ai_logic_update_interval + jitter, 0.06, 0.5)
+	logic_timer = _ai_logic_update_interval_runtime * phase
+
+
+func get_ai_logic_update_interval() -> float:
+	return _ai_logic_update_interval_runtime
 
 ## 주변 함선들로부터 멀어지려는 힘 계산
 func _calculate_separation() -> Vector3:

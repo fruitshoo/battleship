@@ -45,7 +45,7 @@ static func process_physics(ship, delta: float) -> void:
 	ship.logic_timer -= delta
 	var do_logic_update = false
 	if ship.logic_timer <= 0:
-		ship.logic_timer = 0.2
+		ship.logic_timer = _get_logic_update_interval(ship)
 		do_logic_update = true
 	if ship.has_meta("post_impact_follow_timer"):
 		var follow_timer: float = maxf(0.0, float(ship.get_meta("post_impact_follow_timer")) - delta)
@@ -205,6 +205,12 @@ static func update_logic_throttled(ship) -> void:
 		ship.separation_force = Vector3.ZERO
 		return
 	ship.separation_force = ship._calculate_separation()
+
+
+static func _get_logic_update_interval(ship) -> float:
+	if ship.has_method("get_ai_logic_update_interval"):
+		return maxf(0.06, float(ship.call("get_ai_logic_update_interval")))
+	return 0.2
 
 
 static func find_player(ship) -> void:
