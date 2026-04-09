@@ -99,6 +99,20 @@ static func has_preview_crew_role(ship: Node, role_name: String) -> bool:
 	return false
 
 
+static func set_preview_deck_light_enabled(ship: Node, enabled: bool) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("set_preview_deck_light_enabled"):
+		ship.call("set_preview_deck_light_enabled", enabled)
+		return true
+	if "enable_deck_light" in ship:
+		ship.set("enable_deck_light", enabled)
+		if ship.has_method("_refresh_deck_light"):
+			ship.call("_refresh_deck_light")
+		return true
+	return false
+
+
 static func add_billboard_label(parent: Node, text: String, position: Vector3, modulate: Color, font_size: int = 40) -> Label3D:
 	var label := Label3D.new()
 	label.text = text

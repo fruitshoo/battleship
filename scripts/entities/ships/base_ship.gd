@@ -605,6 +605,11 @@ func replace_preview_crew_role(from_role: String, to_role: String = "general") -
 			child.set("crew_role", normalized_to)
 			child.set_meta("crew_role", normalized_to)
 
+
+func set_preview_deck_light_enabled(enabled: bool) -> void:
+	enable_deck_light = enabled
+	_refresh_deck_light()
+
 ## 병사가 사망할 때마다 호출되어, 배의 폐선 여부를 이벤트 방식으로 검사
 func check_derelict_status() -> void:
 	BaseShipStatusHelper.check_derelict_status(self)

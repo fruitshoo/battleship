@@ -15,6 +15,7 @@ enum Scenario {
 	PROJECTILE_STRESS,
 	FULL_COMBAT,
 	OVERLAY_COMPARE,
+	VISUAL_COMPARE,
 }
 
 @export var scenario: Scenario = Scenario.FULL_COMBAT
@@ -108,6 +109,10 @@ func _apply_scenario() -> void:
 			_spawn_ship_density(player)
 			_spawn_projectile_stress(player)
 		Scenario.OVERLAY_COMPARE:
+			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
+			_spawn_ship_density(player)
+			_spawn_projectile_stress(player)
+		Scenario.VISUAL_COMPARE:
 			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 			_spawn_ship_density(player)
 			_spawn_projectile_stress(player)
@@ -226,17 +231,16 @@ func _ensure_overlay() -> void:
 
 
 func _configure_compare_state() -> void:
-	if scenario != Scenario.OVERLAY_COMPARE:
+	if scenario not in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE]:
 		return
 	_compare_phase_index = 0
 	_compare_phase_elapsed = 0.0
 	_compare_phase_samples = [[], []]
-	_set_stat_panel_enabled(false)
-	_set_distance_debug_enabled(false)
+	_set_compare_phase_enabled(false)
 
 
 func _track_compare_sample(delta: float) -> void:
-	if scenario != Scenario.OVERLAY_COMPARE:
+	if scenario not in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE]:
 		return
 	var phase_samples: Array = _compare_phase_samples[_compare_phase_index]
 	phase_samples.append(delta)
@@ -245,8 +249,7 @@ func _track_compare_sample(delta: float) -> void:
 	if _compare_phase_index == 0 and _compare_phase_elapsed >= compare_phase_seconds:
 		_compare_phase_index = 1
 		_compare_phase_elapsed = 0.0
-		_set_stat_panel_enabled(true)
-		_set_distance_debug_enabled(true)
+		_set_compare_phase_enabled(true)
 
 
 func _track_frame_sample(delta: float) -> void:
@@ -258,7 +261,7 @@ func _track_frame_sample(delta: float) -> void:
 func _update_overlay() -> void:
 	if not is_instance_valid(_overlay_label):
 		return
-	if scenario == Scenario.OVERLAY_COMPARE:
+	if scenario in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE]:
 		_overlay_label.text = _build_compare_overlay_text()
 		return
 	var sample_count := _frame_samples.size()
@@ -293,7 +296,9 @@ func _build_compare_overlay_text() -> String:
 	var baseline: Dictionary = _summarize_phase_samples(0)
 	var overlay: Dictionary = _summarize_phase_samples(1)
 	var phase_name := "baseline" if _compare_phase_index == 0 else "overlay"
-	return "scenario:overlay_compare phase:%s\nbase fps:%d avg:%.2fms | overlay fps:%d avg:%.2fms | delta:%.2fms\nstat:%s distance:%s ships:%d soldiers:%d projectiles:%d" % [
+	var scenario_name := "overlay_compare" if scenario == Scenario.OVERLAY_COMPARE else "visual_compare"
+	return "scenario:%s phase:%s\nbase fps:%d avg:%.2fms | overlay fps:%d avg:%.2fms | delta:%.2fms\nstat:%s distance:%s deck_light:%s ships:%d soldiers:%d projectiles:%d" % [
+		scenario_name,
 		phase_name,
 		int(float(baseline.get("fps", 0.0))),
 		float(baseline.get("avg_ms", 0.0)),
@@ -302,6 +307,7 @@ func _build_compare_overlay_text() -> String:
 		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
 		"ON" if bool(baseline.get("stat_enabled", false)) or bool(overlay.get("stat_enabled", false)) else "OFF",
 		"ON" if bool(baseline.get("distance_enabled", false)) or bool(overlay.get("distance_enabled", false)) else "OFF",
+		"ON" if bool(overlay.get("deck_light_enabled", false)) or bool(baseline.get("deck_light_enabled", false)) else "OFF",
 		_count_ships(),
 		_count_soldiers(),
 		_count_projectiles(),
@@ -325,17 +331,24 @@ func _summarize_phase_samples(phase_index: int) -> Dictionary:
 		"sample_count": sample_count,
 		"stat_enabled": phase_index == 1,
 		"distance_enabled": phase_index == 1,
+		"deck_light_enabled": phase_index == 1,
 	}
 
 
-func _set_stat_panel_enabled(enabled: bool) -> void:
+func _set_compare_phase_enabled(enabled: bool) -> void:
 	var hud: Node = get_node_or_null("GameHUD")
 	if not is_instance_valid(hud):
 		return
 	if "show_stat_panel" in hud:
 		hud.set("show_stat_panel", enabled)
+	if scenario == Scenario.VISUAL_COMPARE and "show_ship_health_bars" in hud:
+		hud.set("show_ship_health_bars", enabled)
 	if hud.has_method("_update_stat_panel"):
 		hud.call("_update_stat_panel")
+	_set_distance_debug_enabled(enabled)
+	_set_ship_visuals_enabled(enabled)
+	if scenario == Scenario.VISUAL_COMPARE and hud.has_method("_update_ship_health_bars"):
+		hud.call("_update_ship_health_bars", false)
 
 
 func _set_distance_debug_enabled(enabled: bool) -> void:
@@ -346,6 +359,13 @@ func _set_distance_debug_enabled(enabled: bool) -> void:
 		hud.call("_toggle_distance_debug")
 	if enabled and hud.has_method("_ensure_distance_debug_visualizer"):
 		hud.call("_ensure_distance_debug_visualizer")
+
+
+func _set_ship_visuals_enabled(enabled: bool) -> void:
+	for ship in get_tree().get_nodes_in_group("ships"):
+		if not is_instance_valid(ship):
+			continue
+		PreviewHarnessHelper.set_preview_deck_light_enabled(ship, enabled)
 
 
 func _get_scenario_name() -> String:
@@ -360,6 +380,8 @@ func _get_scenario_name() -> String:
 			return "full_combat"
 		Scenario.OVERLAY_COMPARE:
 			return "overlay_compare"
+		Scenario.VISUAL_COMPARE:
+			return "visual_compare"
 		_:
 			return "idle"
 

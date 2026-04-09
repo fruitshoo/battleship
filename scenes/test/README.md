@@ -38,6 +38,7 @@
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
   Supports `overlay_compare` for stat panel and distance debug cost checks.
+  Supports `visual_compare` for deck light and moving-ship visual cost checks.
 
 ## Sandbox
 
