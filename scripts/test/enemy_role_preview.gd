@@ -15,6 +15,10 @@ func _ready() -> void:
 	call_deferred("_configure_preview")
 
 
+func _process(_delta: float) -> void:
+	_refresh_debug_labels()
+
+
 func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_clear_existing_preview_enemies()
@@ -51,3 +55,23 @@ func _spawn_role_ship(label_text: String, scene: PackedScene, world_pos: Vector3
 		ship.look_at(player.global_position, Vector3.UP)
 
 	PreviewHarnessHelper.add_billboard_label(ship, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0), 48)
+	var debug_label := PreviewHarnessHelper.add_billboard_label(ship, "", Vector3(0.0, 4.8, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)
+	debug_label.name = "DebugLabel"
+
+
+func _refresh_debug_labels() -> void:
+	for child in get_children():
+		if not (child is Node3D) or not child.has_meta("role_preview_spawn"):
+			continue
+		var debug_label: Label3D = child.get_node_or_null("DebugLabel")
+		if not is_instance_valid(debug_label):
+			continue
+		debug_label.text = _build_debug_text(child)
+
+
+func _build_debug_text(ship: Node) -> String:
+	var role_text := "gunner" if bool(ship.call("is_gunner_role")) else "charger"
+	var range_text := "%.1f" % float(ship.get("preferred_combat_range"))
+	var board_text := "Y" if bool(ship.call("can_board_targets")) else "N"
+	var firepot_text := "Y" if bool(ship.call("can_use_fire_pot_attack")) else "N"
+	return "role:%s rng:%s board:%s pot:%s" % [role_text, range_text, board_text, firepot_text]

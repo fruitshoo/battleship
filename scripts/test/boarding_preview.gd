@@ -13,6 +13,10 @@ func _ready() -> void:
 	call_deferred("_configure_preview")
 
 
+func _process(_delta: float) -> void:
+	_refresh_debug_labels()
+
+
 func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_clear_existing_preview_enemy()
@@ -39,5 +43,37 @@ func _spawn_boarding_enemy() -> void:
 	var forward := -player.global_basis.z.normalized()
 	enemy.global_position = player.global_position + right * enemy_lateral_offset + forward * enemy_forward_offset
 	enemy.look_at(player.global_position, Vector3.UP)
+	PreviewHarnessHelper.assign_preview_target(enemy, player)
 
 	PreviewHarnessHelper.add_billboard_label(enemy, "Boarding Target", Vector3(0.0, 6.0, 0.0), Color(1.0, 0.92, 0.8, 1.0), 48)
+	var debug_label := PreviewHarnessHelper.add_billboard_label(enemy, "", Vector3(0.0, 4.8, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)
+	debug_label.name = "DebugLabel"
+
+
+func _refresh_debug_labels() -> void:
+	var player: Node3D = get_node_or_null("PlayerShip")
+	for child in get_children():
+		if not (child is Node3D) or not child.has_meta("boarding_preview_spawn"):
+			continue
+		var debug_label: Label3D = child.get_node_or_null("DebugLabel")
+		if not is_instance_valid(debug_label):
+			continue
+		debug_label.text = _build_debug_text(child, player)
+
+
+func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
+	var has_target := is_instance_valid(enemy.get("target"))
+	var planar_distance := 0.0
+	if is_instance_valid(player):
+		planar_distance = Vector2(
+			player.global_position.x - enemy.global_position.x,
+			player.global_position.z - enemy.global_position.z
+		).length()
+	var boarding_text := "Y" if bool(enemy.get("is_boarding")) else "N"
+	var prep_text := "%.1f" % float(enemy.get("boarding_prep_timer"))
+	return "target:%s dist:%.1f board:%s prep:%s" % [
+		"Y" if has_target else "N",
+		planar_distance,
+		boarding_text,
+		prep_text,
+	]
