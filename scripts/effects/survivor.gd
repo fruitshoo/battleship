@@ -1,5 +1,5 @@
 extends Area3D
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 생존자(Survivor) 시스템
@@ -149,7 +149,7 @@ func _apply_floating(delta: float) -> void:
 
 
 func _find_target_player() -> void:
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 	var closest_dist = INF
 	var closest_p = null
 	

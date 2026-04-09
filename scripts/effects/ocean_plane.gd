@@ -1,5 +1,5 @@
 extends MeshInstance3D
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 ## 플레이어를 따라다니는 수면 평면
 ## 작은 메시 하나로 무한 바다처럼 보이게 하는 표준 기법 (포그로 경계 숨김)
@@ -106,7 +106,7 @@ func get_wave_height(global_pos: Vector3) -> float:
 func _process(_delta: float) -> void:
 	# 타겟이 없으면 매 프레임 찾기 시도 (초기화 타이밍 문제 해결)
 	if not is_instance_valid(_target):
-		_target = SceneGroupCache.get_first(get_tree(), "player") as Node3D
+		_target = EntityRegistry.get_first_ship_by_team("player") as Node3D
 		if not is_instance_valid(_target):
 			return # 타겟 찾을 때까지 대기
 	

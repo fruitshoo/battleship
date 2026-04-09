@@ -1,6 +1,6 @@
 extends Node3D
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 ## 보물 상자 (Treasure Chest)
 ## 플레이어가 닿으면 특별한 업그레이드 보상을 제공
@@ -24,7 +24,7 @@ func _process(_delta: float) -> void:
 	if _is_collected: return
 	
 	# 플레이어 탐지 (Area3D가 없으므로 거리 체크)
-	var p = SceneGroupCache.get_first(get_tree(), "player") as Node3D
+	var p = EntityRegistry.get_first_ship_by_team("player") as Node3D
 	if is_instance_valid(p) and global_position.distance_to(p.global_position) < collection_range:
 		_collect()
 

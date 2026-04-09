@@ -1,7 +1,6 @@
 @tool
 extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
@@ -233,11 +232,7 @@ func _is_fleet_progress_available() -> bool:
 	for upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
 		if int(current_levels.get(upgrade_id, 0)) > 0:
 			return true
-	var tree = get_tree()
-	if tree == null:
-		return false
-	var minions = SceneGroupCache.get_nodes(tree, "captured_minion")
-	return not minions.is_empty()
+	return EntityRegistry.count_captured_minions() > 0
 
 func _collect_choices_from_ids(ids: Array[String], count: int) -> Array:
 	var available: Array = []
@@ -383,7 +378,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	
 	# 함대 업그레이드인 경우 현재 활성화된 모든 미니언에 즉시 적용
 	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
-		var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
+		var minions = EntityRegistry.get_captured_minions()
 		for m in minions:
 			apply_fleet_upgrades_to_ship(m)
 	
