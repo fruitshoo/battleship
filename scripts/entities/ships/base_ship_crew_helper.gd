@@ -136,3 +136,71 @@ static func get_nearest_enemy_ship_distance_for_allocation(ship) -> float:
 	if nearest_distance_sq == INF:
 		return -1.0
 	return sqrt(nearest_distance_sq)
+
+
+static func build_debug_crew_snapshot(ship) -> Dictionary:
+	var result: Dictionary = {
+		"alive_count": 0,
+		"general_count": 0,
+		"spearman_count": 0,
+		"fire_pot_count": 0,
+		"repeater_count": 0,
+		"singigeon_count": 0,
+		"sample_hp": 0.0,
+		"sample_defense": 0.0,
+		"sword_damage": 0.0,
+		"bow_damage": 0.0,
+		"crit_chance": 0.0,
+		"crit_multiplier": 1.0,
+	}
+	if not is_instance_valid(ship):
+		return result
+
+	var soldiers: Array = EntityRegistry.get_soldiers_by_ship(ship)
+	if soldiers.is_empty():
+		return result
+
+	var sample_soldier = null
+	for child in soldiers:
+		if not is_instance_valid(child):
+			continue
+		var team_tag: String = str(child.get("team"))
+		if team_tag != "player":
+			continue
+		var state_value = child.get("current_state")
+		if state_value != null and int(state_value) == 4:
+			continue
+		result["alive_count"] = int(result.get("alive_count", 0)) + 1
+		var role: String = "general"
+		if child.get("crew_role") != null:
+			role = str(child.get("crew_role"))
+		match role:
+			"spearman":
+				result["spearman_count"] = int(result.get("spearman_count", 0)) + 1
+			"fire_pot":
+				result["fire_pot_count"] = int(result.get("fire_pot_count", 0)) + 1
+			"repeating_crossbow":
+				result["repeater_count"] = int(result.get("repeater_count", 0)) + 1
+			"singigeon":
+				result["singigeon_count"] = int(result.get("singigeon_count", 0)) + 1
+			_:
+				result["general_count"] = int(result.get("general_count", 0)) + 1
+		if sample_soldier == null or role == "general":
+			sample_soldier = child
+
+	if sample_soldier == null:
+		return result
+
+	result["sample_hp"] = float(sample_soldier.get("max_health")) if sample_soldier.get("max_health") != null else 0.0
+	var defense_bonus: float = 0.0
+	if sample_soldier.get_meta("defense_flat_bonus") != null:
+		defense_bonus = float(sample_soldier.get_meta("defense_flat_bonus"))
+	result["sample_defense"] = float(sample_soldier.get("defense")) if sample_soldier.get("defense") != null else 0.0
+	result["sample_defense"] += defense_bonus
+	result["crit_chance"] = float(sample_soldier.get("crit_chance")) if sample_soldier.get("crit_chance") != null else 0.0
+	result["crit_multiplier"] = float(sample_soldier.get("crit_multiplier")) if sample_soldier.get("crit_multiplier") != null else 1.0
+	if sample_soldier.get("weapon_sword") != null:
+		result["sword_damage"] = float(sample_soldier.get("weapon_sword").get("damage")) if sample_soldier.get("weapon_sword").get("damage") != null else 0.0
+	if sample_soldier.get("weapon_bow") != null:
+		result["bow_damage"] = float(sample_soldier.get("weapon_bow").get("damage")) if sample_soldier.get("weapon_bow").get("damage") != null else 0.0
+	return result

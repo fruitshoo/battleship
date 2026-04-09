@@ -577,6 +577,10 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		"gunnery_crew_ratio": gunnery_crew_ratio,
 	}
 
+
+func get_debug_crew_snapshot() -> Dictionary:
+	return BaseShipCrewHelper.build_debug_crew_snapshot(self)
+
 func get_boarding_attacker_ship() -> Node3D:
 	return boarding_attacker if is_instance_valid(boarding_attacker) else null
 

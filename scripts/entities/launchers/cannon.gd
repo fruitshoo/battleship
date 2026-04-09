@@ -144,6 +144,51 @@ func _get_current_ammo_type() -> String:
 		_cached_ammo_type = str(_owner_ship.get("current_cannon_ammo"))
 	return _cached_ammo_type
 
+
+func get_debug_cannon_snapshot() -> Dictionary:
+	var projectile_stats: Dictionary = _get_projectile_stats_snapshot()
+	var base_damage: float = float(projectile_stats.get("damage", 0.0))
+	if base_damage <= 1.0 and team == "player":
+		base_damage = 25.0
+	var cannon_damage: float = base_damage * _cached_dmg_mult * fleet_damage_mult
+	var current_cooldown: float = _get_current_cooldown()
+	var expected_shot_damage: float = cannon_damage * (1.0 + _cached_crit_chance * (_cached_crit_multiplier - 1.0))
+	return {
+		"team": team,
+		"count": 1,
+		"range": _get_current_range(),
+		"cooldown": current_cooldown,
+		"base_damage": base_damage,
+		"damage": cannon_damage,
+		"damage_mult": _cached_dmg_mult,
+		"fleet_damage_mult": fleet_damage_mult,
+		"crit_chance": _cached_crit_chance,
+		"crit_multiplier": _cached_crit_multiplier,
+		"expected_dps": expected_shot_damage / current_cooldown if current_cooldown > 0.0 else 0.0,
+		"ammo_type": _get_current_ammo_type(),
+		"projectile_stats": projectile_stats,
+	}
+
+
+func _get_projectile_stats_snapshot() -> Dictionary:
+	var stats: Dictionary = {
+		"damage": 0.0,
+		"crit_chance": 0.0,
+		"crit_multiplier": 1.0,
+	}
+	var projectile_scene = cannonball_scene
+	if not (projectile_scene is PackedScene):
+		return stats
+	var projectile = (projectile_scene as PackedScene).instantiate()
+	if projectile == null:
+		return stats
+	stats["damage"] = float(projectile.get("damage")) if projectile.get("damage") != null else 0.0
+	stats["crit_chance"] = float(projectile.get("crit_chance")) if projectile.get("crit_chance") != null else 0.0
+	stats["crit_multiplier"] = float(projectile.get("crit_multiplier")) if projectile.get("crit_multiplier") != null else 1.0
+	if projectile is Node:
+		(projectile as Node).free()
+	return stats
+
 func _enemy_team_tag() -> String:
 	return "enemy" if team == "player" else "player"
 

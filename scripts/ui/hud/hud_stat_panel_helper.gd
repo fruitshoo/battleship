@@ -50,9 +50,10 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			],
 		})
 
-	var hull_hp: float = _get_float(ship, "hull_hp", 0.0)
-	var max_hull_hp: float = _get_float(ship, "max_hull_hp", 0.0)
-	var hull_defense: float = _get_float(ship, "hull_defense", 0.0)
+	var ship_snapshot: Dictionary = ship.call("get_debug_ship_state_snapshot") if ship.has_method("get_debug_ship_state_snapshot") else {}
+	var hull_hp: float = float(ship_snapshot.get("hull_hp", 0.0))
+	var max_hull_hp: float = float(ship_snapshot.get("max_hull_hp", 0.0))
+	var hull_defense: float = float(ship_snapshot.get("hull_defense", 0.0))
 	sections.append({
 		"title": "선체",
 		"icon": "shield",
@@ -62,15 +63,15 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		],
 	})
 
-	var current_speed: float = _get_float(ship, "current_speed", 0.0)
-	var max_speed: float = _get_float(ship, "max_speed", 0.0)
+	var current_speed: float = float(ship_snapshot.get("current_speed", 0.0))
+	var max_speed: float = float(ship_snapshot.get("max_speed", 0.0))
 	var sail_efficiency_mult: float = _get_float(ship, "sail_efficiency_mult", 1.0)
 	var sail_turn_speed: float = _get_float(ship, "sail_turn_speed", PLAYER_SAIL_TURN_SPEED)
 	var rowing_speed: float = _get_float(ship, "rowing_speed", 0.0)
 	var rowing_acceleration_mult: float = _get_float(ship, "rowing_acceleration_mult", 1.0)
-	var max_rowing_stamina: float = _get_float(ship, "max_rowing_stamina", 100.0)
+	var max_rowing_stamina: float = float(ship_snapshot.get("max_rowing_stamina", 100.0))
 	var rudder_turn_speed: float = _get_float(ship, "rudder_turn_speed", 0.0)
-	var rowing_stamina: float = _get_float(ship, "rowing_stamina", 0.0)
+	var rowing_stamina: float = float(ship_snapshot.get("rowing_stamina", 0.0))
 	var stamina_drain_rate: float = _get_float(ship, "stamina_drain_rate", 0.0)
 	var stamina_recovery_rate: float = _get_float(ship, "stamina_recovery_rate", 0.0)
 	sections.append({
@@ -105,27 +106,16 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			for child in cannons_node.get_children():
 				if is_instance_valid(child):
 					cannon_count += 1
-		if primary_cannon.has_method("_get_current_range"):
-			cannon_range = float(primary_cannon.call("_get_current_range"))
-		else:
-			cannon_range = _get_float(primary_cannon, "detection_range", 0.0)
-		if primary_cannon.has_method("_get_current_cooldown"):
-			cannon_cooldown = float(primary_cannon.call("_get_current_cooldown"))
-		else:
-			cannon_cooldown = _get_float(primary_cannon, "fire_cooldown", 0.0)
-		var projectile_stats: Dictionary = _get_cannon_projectile_stats(primary_cannon)
-		var base_damage: float = float(projectile_stats.get("damage", 0.0))
-		if base_damage <= 1.0 and str(primary_cannon.get("team")) == "player":
-			base_damage = PLAYER_CANNON_BASE_DAMAGE
-		cannon_base_damage = base_damage
-		cannon_crit_chance = _get_float(primary_cannon, "_cached_crit_chance", float(projectile_stats.get("crit_chance", 0.0)))
-		cannon_crit_multiplier = _get_float(primary_cannon, "_cached_crit_multiplier", float(projectile_stats.get("crit_multiplier", 1.0)))
-		cannon_damage_mult = _get_float(primary_cannon, "_cached_dmg_mult", 1.0)
-		cannon_fleet_mult = _get_float(primary_cannon, "fleet_damage_mult", 1.0)
-		cannon_damage = base_damage * cannon_damage_mult * cannon_fleet_mult
-		var expected_shot_damage: float = cannon_damage * (1.0 + cannon_crit_chance * (cannon_crit_multiplier - 1.0))
-		if cannon_cooldown > 0.0:
-			cannon_expected_dps = expected_shot_damage / cannon_cooldown
+		var cannon_snapshot: Dictionary = primary_cannon.call("get_debug_cannon_snapshot") if primary_cannon.has_method("get_debug_cannon_snapshot") else {}
+		cannon_range = float(cannon_snapshot.get("range", 0.0))
+		cannon_cooldown = float(cannon_snapshot.get("cooldown", 0.0))
+		cannon_base_damage = float(cannon_snapshot.get("base_damage", 0.0))
+		cannon_damage = float(cannon_snapshot.get("damage", 0.0))
+		cannon_damage_mult = float(cannon_snapshot.get("damage_mult", 1.0))
+		cannon_fleet_mult = float(cannon_snapshot.get("fleet_damage_mult", 1.0))
+		cannon_crit_chance = float(cannon_snapshot.get("crit_chance", 0.0))
+		cannon_crit_multiplier = float(cannon_snapshot.get("crit_multiplier", 1.0))
+		cannon_expected_dps = float(cannon_snapshot.get("expected_dps", 0.0))
 	sections.append({
 		"title": "대포",
 		"icon": "sports_baseball",
@@ -140,7 +130,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		],
 	})
 
-	var crew_stats: Dictionary = _collect_crew_stats(ship)
+	var crew_stats: Dictionary = ship.call("get_debug_crew_snapshot") if ship.has_method("get_debug_crew_snapshot") else _collect_crew_stats(ship)
 	sections.append({
 		"title": "병사",
 		"icon": "groups",
