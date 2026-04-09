@@ -10,6 +10,7 @@ const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.
 @export var smoke_wait_frames_after_attach: int = 2
 @export var smoke_wait_frames_after_spawn: int = 3
 @export var smoke_spawn_boss: bool = true
+@export var smoke_spawn_final_boss: bool = false
 
 var _failures: Array[String] = []
 var _loaded_scripts: int = 0
@@ -99,10 +100,15 @@ func _run_runtime_smoke() -> void:
 		_failures.append("preview base is missing EnemySpawner")
 	else:
 		var spawned_boss: Node3D = null
+		var spawned_final_boss: Node3D = null
 		if smoke_spawn_boss and spawner.has_method("debug_spawn_mid_boss"):
 			spawned_boss = spawner.call("debug_spawn_mid_boss") as Node3D
 			await _wait_frames(smoke_wait_frames_after_spawn)
 		_validate_spawned_boss(spawned_boss)
+		if smoke_spawn_final_boss and spawner.has_method("debug_spawn_final_boss"):
+			spawned_final_boss = spawner.call("debug_spawn_final_boss") as Node3D
+			await _wait_frames(smoke_wait_frames_after_spawn)
+		_validate_spawned_final_boss(spawned_final_boss)
 
 	_validate_registry_smoke(player_ship)
 
@@ -151,6 +157,22 @@ func _validate_spawned_boss(spawned_boss: Node3D) -> void:
 	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_boss)
 	if not registered_enemy:
 		_failures.append("mid boss instance was not registered in enemy team bucket")
+
+
+func _validate_spawned_final_boss(spawned_boss: Node3D) -> void:
+	if not smoke_spawn_final_boss:
+		return
+	if not is_instance_valid(spawned_boss):
+		_failures.append("final boss spawn returned null")
+		return
+	var boss_team := str(spawned_boss.get("team"))
+	if boss_team != "enemy":
+		_failures.append("final boss team contract failed: %s" % boss_team)
+	if not spawned_boss.is_in_group("boss"):
+		_failures.append("final boss is missing boss group tag")
+	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_boss)
+	if not registered_enemy:
+		_failures.append("final boss instance was not registered in enemy team bucket")
 
 
 func _report_and_quit() -> void:
