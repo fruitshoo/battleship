@@ -58,8 +58,8 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 		if diff.length_squared() > safe_probe * safe_probe:
 			continue
 
-		var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
-		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
+		var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else "enemy"
+		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else "enemy"
 		var emit_collision_event: bool = ship_team != other_team
 		corrected_pos = apply_ship_collision_guard(ship, other, prev_pos, corrected_pos, safe_ratio, ship.current_speed, emit_collision_event)
 		check_count += 1
@@ -126,10 +126,9 @@ static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vecto
 static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: float) -> void:
 	if not is_instance_valid(other_ship):
 		return
-	var can_board: bool = bool(ship.get("allow_boarding"))
-	if ship.has_method("can_board_targets"):
-		can_board = bool(ship.call("can_board_targets"))
-	if can_board and ship.get("target") == other_ship:
+	var can_board: bool = ship.has_method("can_board_targets") and ship.can_board_targets()
+	var current_target: Node3D = ship.get_target_ship() if ship.has_method("get_target_ship") else null
+	if can_board and current_target == other_ship:
 		var rel_vector: Vector3 = ship.global_position - other_ship.global_position
 		rel_vector.y = 0.0
 		var target_forward: Vector3 = -other_ship.global_transform.basis.z
