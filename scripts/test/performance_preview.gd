@@ -443,7 +443,7 @@ func _set_distance_debug_enabled(enabled: bool) -> void:
 
 
 func _set_ship_visuals_enabled(enabled: bool) -> void:
-	for ship in get_tree().get_nodes_in_group("ships"):
+	for ship in EntityRegistry.get_ships():
 		if not is_instance_valid(ship):
 			continue
 		PreviewHarnessHelper.set_preview_deck_light_enabled(ship, enabled)

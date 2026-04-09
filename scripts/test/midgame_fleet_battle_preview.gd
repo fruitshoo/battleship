@@ -357,7 +357,7 @@ func _set_compare_phase_enabled(enabled: bool) -> void:
 		hud.call("_toggle_distance_debug")
 	if enabled and hud.has_method("_ensure_distance_debug_visualizer"):
 		hud.call("_ensure_distance_debug_visualizer")
-	for ship in get_tree().get_nodes_in_group("ships"):
+	for ship in EntityRegistry.get_ships():
 		if not is_instance_valid(ship):
 			continue
 		PreviewHarnessHelper.set_preview_deck_light_enabled(ship, enabled)
