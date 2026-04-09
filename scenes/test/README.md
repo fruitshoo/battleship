@@ -54,6 +54,7 @@
 - `project_contract_sweep.tscn`
   Project-wide load sweep plus a small runtime smoke check for registry and startup contracts.
   Script: `scripts/test/project_contract_sweep.gd`
+  Wrapper: `scripts/test/run_project_contract_sweep.sh`
 
 ## Helper Scripts
 
@@ -63,3 +64,5 @@
   Shared label text formatting and simple state snapshot helpers.
 - `scripts/test/project_contract_sweep.gd`
   Loads scripts and scenes headless, then runs a small runtime smoke check against preview base.
+- `scripts/test/run_project_contract_sweep.sh`
+  Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
