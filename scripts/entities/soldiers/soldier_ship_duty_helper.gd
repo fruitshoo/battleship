@@ -3,23 +3,24 @@ class_name SoldierShipDutyHelper
 
 
 static func find_ship_duty_target(soldier) -> Vector3:
-	if not is_instance_valid(soldier.owned_ship):
+	var owned_ship: Node3D = soldier.get_owned_ship_node() if soldier.has_method("get_owned_ship_node") else null
+	if not is_instance_valid(owned_ship):
 		return Vector3.INF
-	if str(soldier.owned_ship.get("team")) != soldier.team:
+	if owned_ship.get_team_tag() != soldier.team:
 		return Vector3.INF
 	if soldier.current_target != null:
 		return Vector3.INF
 	if soldier.is_captain:
 		return Vector3.INF
-	if soldier.owned_ship.get("deck_is_contested") == true or soldier.owned_ship.get("deck_is_overrun") == true:
+	if owned_ship.deck_is_contested == true or owned_ship.deck_is_overrun == true:
 		return Vector3.INF
 
-	var half_ext: Vector2 = SoldierShipHelper.get_ship_deck_half_extents(soldier, soldier.owned_ship)
-	var gunnery_ratio: float = float(soldier.owned_ship.get("gunnery_crew_ratio")) if soldier.owned_ship.get("gunnery_crew_ratio") != null else 0.0
-	var handling_ratio: float = float(soldier.owned_ship.get("shiphandling_crew_ratio")) if soldier.owned_ship.get("shiphandling_crew_ratio") != null else 0.0
-	var current_speed: float = float(soldier.owned_ship.get("current_speed")) if soldier.owned_ship.get("current_speed") != null else 0.0
-	var rowing_active: bool = soldier.owned_ship.get("is_rowing") == true
-	var rudder_angle: float = float(soldier.owned_ship.get("rudder_angle")) if soldier.owned_ship.get("rudder_angle") != null else 0.0
+	var half_ext: Vector2 = SoldierShipHelper.get_ship_deck_half_extents(soldier, owned_ship)
+	var gunnery_ratio: float = float(owned_ship.gunnery_crew_ratio)
+	var handling_ratio: float = float(owned_ship.shiphandling_crew_ratio)
+	var current_speed: float = owned_ship.get_current_speed_value()
+	var rowing_active: bool = "is_rowing" in owned_ship and owned_ship.get("is_rowing") == true
+	var rudder_angle: float = float(owned_ship.rudder_angle)
 	var bias_sign: float = -1.0 if int(soldier.get_instance_id()) % 2 == 0 else 1.0
 	var local_target: Vector3 = Vector3.INF
 
@@ -41,17 +42,20 @@ static func find_ship_duty_target(soldier) -> Vector3:
 	if local_target == Vector3.INF:
 		return Vector3.INF
 
-	var ship_local_pos: Vector3 = soldier.owned_ship.to_local(soldier.global_position)
+	var ship_local_pos: Vector3 = owned_ship.to_local(soldier.global_position)
 	var local_diff: Vector2 = Vector2(ship_local_pos.x - local_target.x, ship_local_pos.z - local_target.z)
 	if local_diff.length_squared() <= 1.2:
 		return Vector3.INF
 
-	var target_global: Vector3 = soldier.owned_ship.to_global(local_target)
+	var target_global: Vector3 = owned_ship.to_global(local_target)
 	target_global.y = soldier.global_position.y
 	return target_global
 
 
 static func _get_enemy_side_sign(soldier, fallback_sign: float) -> float:
+	var owned_ship: Node3D = soldier.get_owned_ship_node() if soldier.has_method("get_owned_ship_node") else null
+	if not is_instance_valid(owned_ship):
+		return fallback_sign
 	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
 	var opposing_ships: Array = soldier.get_ships_cached(soldier.get_tree(), opposing_team)
 	var best_ship: Node3D = null
@@ -59,9 +63,9 @@ static func _get_enemy_side_sign(soldier, fallback_sign: float) -> float:
 	for other_ship in opposing_ships:
 		if not is_instance_valid(other_ship):
 			continue
-		if other_ship.get("is_dying") == true or other_ship.get("is_sinking") == true:
+		if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
 			continue
-		var planar_delta: Vector3 = other_ship.global_position - soldier.owned_ship.global_position
+		var planar_delta: Vector3 = other_ship.global_position - owned_ship.global_position
 		planar_delta.y = 0.0
 		var dist_sq: float = planar_delta.length_squared()
 		if dist_sq < best_distance_sq:
@@ -69,7 +73,7 @@ static func _get_enemy_side_sign(soldier, fallback_sign: float) -> float:
 			best_ship = other_ship
 	if not is_instance_valid(best_ship):
 		return fallback_sign
-	var enemy_local: Vector3 = soldier.owned_ship.to_local(best_ship.global_position)
+	var enemy_local: Vector3 = owned_ship.to_local(best_ship.global_position)
 	if absf(enemy_local.x) <= 0.2:
 		return fallback_sign
 	return 1.0 if enemy_local.x >= 0.0 else -1.0

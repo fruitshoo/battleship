@@ -119,16 +119,16 @@ static func state_move(soldier) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	if soldier.current_target.get("current_state") == soldier.State.DEAD:
+	if soldier.current_target.has_method("get_current_state_value") and soldier.current_target.get_current_state_value() == soldier.State.DEAD:
 		soldier.current_target = null
 		if _try_muster_to_cross_ship_contact(soldier, 1.0):
 			return
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	var target_ship = soldier.current_target.get("owned_ship")
+	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
-		if target_ship.get("is_dying") == true or target_ship.get("is_sinking") == true:
+		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
 			soldier.current_target = null
 			if _try_muster_to_cross_ship_contact(soldier, 1.0):
 				return
@@ -139,7 +139,7 @@ static func state_move(soldier) -> void:
 	var pos_target_2d = Vector2(soldier.current_target.global_position.x, soldier.current_target.global_position.z)
 	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
 
-	if is_instance_valid(soldier.owned_ship) and soldier.current_target.get("owned_ship") != soldier.owned_ship:
+	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
 		if not soldier._is_ship_pair_in_melee_range(target_ship):
 			soldier._change_state(soldier.State.IDLE)
 			return
@@ -181,16 +181,16 @@ static func state_attack(soldier) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	if soldier.current_target.get("current_state") == soldier.State.DEAD or soldier.current_target.get("team") == soldier.team:
+	if (soldier.current_target.has_method("get_current_state_value") and soldier.current_target.get_current_state_value() == soldier.State.DEAD) or soldier.current_target.get_team_tag() == soldier.team:
 		soldier.current_target = null
 		if _try_muster_to_cross_ship_contact(soldier, 0.95):
 			return
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	var target_ship = soldier.current_target.get("owned_ship")
+	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
-		if target_ship.get("is_dying") == true or target_ship.get("is_sinking") == true:
+		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
 			soldier.current_target = null
 			if _try_muster_to_cross_ship_contact(soldier, 0.95):
 				return
@@ -201,7 +201,7 @@ static func state_attack(soldier) -> void:
 	var pos_target_2d = Vector2(soldier.current_target.global_position.x, soldier.current_target.global_position.z)
 	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
 
-	if is_instance_valid(soldier.owned_ship) and soldier.current_target.get("owned_ship") != soldier.owned_ship:
+	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
 		if not soldier._is_ship_pair_in_melee_range(target_ship):
 			soldier._change_state(soldier.State.IDLE)
 			return

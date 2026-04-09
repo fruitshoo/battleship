@@ -24,9 +24,9 @@ static func find_nearest_enemy(soldier) -> Node3D:
 	for other in local_soldiers:
 		if other == soldier or not is_instance_valid(other):
 			continue
-		if other.get("current_state") == soldier.State.DEAD:
+		if other.has_method("get_current_state_value") and other.get_current_state_value() == soldier.State.DEAD:
 			continue
-		if other.get("team") == soldier.team:
+		if other.get_team_tag() == soldier.team:
 			continue
 
 		var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
@@ -51,7 +51,7 @@ static func find_nearest_enemy(soldier) -> Node3D:
 	for other_ship in opposing_ships:
 		if not is_instance_valid(other_ship) or other_ship == soldier.owned_ship:
 			continue
-		if other_ship.get("is_dying") == true or other_ship.get("is_sinking") == true:
+		if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
 			continue
 		if is_instance_valid(soldier.owned_ship):
 			var ship_diff_xz := Vector2(
@@ -67,7 +67,7 @@ static func find_nearest_enemy(soldier) -> Node3D:
 		for other in ship_soldiers:
 			if not is_instance_valid(other):
 				continue
-			if other.get("current_state") == soldier.State.DEAD or other.get("team") == soldier.team:
+			if (other.has_method("get_current_state_value") and other.get_current_state_value() == soldier.State.DEAD) or other.get_team_tag() == soldier.team:
 				continue
 
 			var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
@@ -186,7 +186,7 @@ static func is_in_cross_ship_contact_zone(soldier, other_ship: Node3D) -> bool:
 static func find_cross_ship_muster_target(soldier) -> Vector3:
 	if not is_instance_valid(soldier.owned_ship):
 		return Vector3.INF
-	if str(soldier.owned_ship.get("team")) != soldier.team:
+	if soldier.owned_ship.get_team_tag() != soldier.team:
 		return Vector3.INF
 	if soldier.is_ranged_only:
 		return Vector3.INF
@@ -201,7 +201,7 @@ static func find_cross_ship_muster_target(soldier) -> Vector3:
 	for other_ship in opposing_ships:
 		if not is_instance_valid(other_ship) or other_ship == soldier.owned_ship:
 			continue
-		if other_ship.get("is_dying") == true or other_ship.get("is_sinking") == true:
+		if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
 			continue
 		if not is_ship_pair_in_melee_range(soldier, other_ship):
 			continue

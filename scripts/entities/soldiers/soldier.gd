@@ -402,11 +402,17 @@ func set_team(new_team: String) -> void:
 func get_team_tag() -> String:
 	return team
 
+func get_current_state_value() -> int:
+	return current_state
+
 func is_combat_disabled() -> bool:
 	return current_state == State.DEAD
 
 func is_dead() -> bool:
 	return current_state == State.DEAD
+
+func get_owned_ship_node() -> Node3D:
+	return owned_ship if is_instance_valid(owned_ship) else null
 
 func _update_team_color() -> void:
 	SoldierVisualHelper.update_team_color(self)
