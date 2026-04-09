@@ -1,7 +1,6 @@
 @tool
 extends Node3D
 class_name BaseShip
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
@@ -467,6 +466,9 @@ func is_player_team() -> bool:
 
 func is_enemy_team() -> bool:
 	return get_team_tag() == "enemy"
+
+func get_boarding_attacker_ship() -> Node3D:
+	return boarding_attacker if is_instance_valid(boarding_attacker) else null
 
 func _get_team_collision_layer(team_tag: String) -> int:
 	return 2 if team_tag == "player" else 4

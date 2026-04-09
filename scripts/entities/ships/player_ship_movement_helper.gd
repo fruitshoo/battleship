@@ -25,7 +25,7 @@ static func calculate_separation(ship) -> Vector3:
 			continue
 		if ship.is_boarding and other == ship.boarding_target:
 			continue
-		if other.get("boarding_attacker") == ship:
+		if other.has_method("get_boarding_attacker_ship") and other.get_boarding_attacker_ship() == ship:
 			continue
 		var offset = other.global_position - ship.global_position
 		offset.y = 0.0

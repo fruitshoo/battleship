@@ -1,6 +1,5 @@
 extends Node3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const DEBUG_COMBAT_LOGS := false
 
 ## 장군전 발사기 (Janggun Launcher)
@@ -96,10 +95,9 @@ func fire(target: Node3D) -> void:
 		return
 	if not _is_owner_combat_ready():
 		return
-	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true:
+	if not is_instance_valid(target) or (target.has_method("is_combat_disabled") and target.is_combat_disabled()):
 		return
-	var target_hp = target.get("hull_hp")
-	if target_hp != null and float(target_hp) <= 0.0:
+	if target.has_method("get_hull_hp_value") and float(target.get_hull_hp_value()) <= 0.0:
 		return
 	
 	var um = get_node_or_null("/root/UpgradeManager")

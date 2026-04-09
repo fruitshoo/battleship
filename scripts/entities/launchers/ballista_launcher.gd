@@ -1,6 +1,5 @@
 extends Node3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 ## 팔우노 (Ballista Launcher)
 ## 적 병사를 조준하여 강력한 관통 화살을 발사합니다.

@@ -493,7 +493,7 @@ func die() -> void:
 	_evacuate_player_soldiers_as_survivors()
 	
 	# 밧줄 및 도선 공격자 정보 제거
-	if is_instance_valid(boarding_target) and boarding_target.get("boarding_attacker") == self:
+	if is_instance_valid(boarding_target) and boarding_target.has_method("get_boarding_attacker_ship") and boarding_target.get_boarding_attacker_ship() == self:
 		boarding_target.set("boarding_attacker", null)
 	_clear_ropes()
 	
@@ -708,7 +708,7 @@ func _calculate_separation() -> Vector3:
 		# 도선 중인 상대와는 분리력(Separation)을 적용하지 않음 (가까이 붙어야 하므로)
 		if is_boarding and other == boarding_target:
 			continue
-		if other.get("boarding_attacker") == self:
+		if other.has_method("get_boarding_attacker_ship") and other.get_boarding_attacker_ship() == self:
 			continue
 
 		var offset = global_position - other.global_position

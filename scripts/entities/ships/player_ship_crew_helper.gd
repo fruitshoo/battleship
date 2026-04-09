@@ -200,7 +200,7 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 	var fp_lv = ship._cached_um.current_levels.get("fire_pot", 0)
 	if fp_lv <= 0:
 		return
-	if not is_instance_valid(ship.boarding_attacker) or ship.boarding_attacker.get("is_dying") or ship.boarding_attacker.get("is_sinking"):
+	if not is_instance_valid(ship.boarding_attacker) or (ship.boarding_attacker.has_method("is_combat_disabled") and ship.boarding_attacker.is_combat_disabled()):
 		return
 
 	var target = ship.boarding_attacker

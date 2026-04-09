@@ -2,7 +2,6 @@
 extends Node3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
@@ -226,9 +225,10 @@ func _is_target_valid(target: Node3D) -> bool:
 	
 	# 도선 중이거나 폐선인 배인지 최종 체크
 	if target.has_method("is_combat_disabled") and target.is_combat_disabled(): return false
-	var attacker = target.get("boarding_attacker")
-	if is_instance_valid(attacker) and attacker.has_method("get_team_tag") and attacker.get_team_tag() == team:
-		return false
+	if target.has_method("get_boarding_attacker_ship"):
+		var attacker: Node3D = target.get_boarding_attacker_ship()
+		if is_instance_valid(attacker) and attacker.has_method("get_team_tag") and attacker.get_team_tag() == team:
+			return false
 		
 	if _is_ship_occupied_by_friendly(target): return false
 	return true
