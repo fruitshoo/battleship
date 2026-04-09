@@ -34,6 +34,9 @@
 - `cannon_range_preview.tscn`
   Cannon range and active-slot preview across close, ideal, edge, and out distances.
   Script: `scripts/test/cannon_range_preview.gd`
+- `performance_preview.tscn`
+  FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
+  Script: `scripts/test/performance_preview.gd`
 
 ## Sandbox
 

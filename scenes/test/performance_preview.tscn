@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/performance_preview.gd" id="2_script"]
+
+[node name="PerformancePreview" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+scenario = 4
