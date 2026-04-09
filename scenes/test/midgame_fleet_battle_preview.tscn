@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/midgame_fleet_battle_preview.gd" id="2_script"]
+
+[node name="MidgameFleetBattlePreview" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+auto_open_debug_panel = true
+open_stat_panel = true
+stop_regular_spawns = true
+enable_distance_debug = false
+midgame_time_seconds = 240.0
+midgame_difficulty = 6
+level_duration = 30.0
+initial_wave_delay = 0.75
+wave_interval = 7.0
+wave_limit = 6
+wave_plan = PackedStringArray("mixed", "heavy", "mixed", "heavy", "mixed", "heavy")
+open_deck_for_combat = true

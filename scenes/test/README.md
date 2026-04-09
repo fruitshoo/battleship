@@ -40,6 +40,9 @@
   Supports `overlay_compare` for stat panel and distance debug cost checks.
   Supports `visual_compare` for deck light and moving-ship visual cost checks.
   Supports `projectile_compare` for cannonball, arrow, and fire pot cost checks.
+- `midgame_fleet_battle_preview.tscn`
+  Midgame fleet battle harness that stages repeating mixed and heavy waves at a fixed combat state.
+  Script: `scripts/test/midgame_fleet_battle_preview.gd`
 
 ## Sandbox
 
