@@ -1,6 +1,7 @@
 extends Node3D
 
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
+const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true
@@ -16,46 +17,13 @@ func _ready() -> void:
 
 
 func _configure_preview() -> void:
-	_open_debug_panel()
-	_disable_regular_spawns()
+	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_clear_existing_preview_enemies()
 	_spawn_firepot_scenarios()
 
 
-func _open_debug_panel() -> void:
-	var hud: Node = get_node_or_null("GameHUD")
-	if not is_instance_valid(hud) or not auto_open_debug_panel:
-		return
-	var panel: Variant = hud.get("sail_debug_panel")
-	if panel is Control:
-		panel.visible = true
-		if hud.has_method("_update_sail_debug_toggle_button_text"):
-			hud.call("_update_sail_debug_toggle_button_text")
-		if hud.has_method("_sync_debug_tools_panel_state"):
-			hud.call("_sync_debug_tools_panel_state")
-
-
-func _disable_regular_spawns() -> void:
-	var level_manager: Node = get_node_or_null("LevelManager")
-	if is_instance_valid(level_manager):
-		if "boss_spawn_time" in level_manager:
-			level_manager.set("boss_spawn_time", 99999.0)
-		if "survival_victory_time" in level_manager:
-			level_manager.set("survival_victory_time", 99999.0)
-
-	var spawner: Node = get_node_or_null("EnemySpawner")
-	if not is_instance_valid(spawner):
-		return
-	if stop_regular_spawns and "regular_spawn_stopped" in spawner:
-		spawner.set("regular_spawn_stopped", true)
-	if "elite_spawn_count" in spawner and "max_elite_spawns" in spawner:
-		spawner.set("elite_spawn_count", int(spawner.get("max_elite_spawns")))
-
-
 func _clear_existing_preview_enemies() -> void:
-	for child in get_children():
-		if child is Node3D and child.is_in_group("enemy") and child.has_meta("firepot_preview_spawn"):
-			child.queue_free()
+	PreviewHarnessHelper.clear_preview_enemies(self, "firepot_preview_spawn")
 
 
 func _spawn_firepot_scenarios() -> void:
@@ -96,14 +64,7 @@ func _spawn_scenario(label_text: String, anchor: Vector3, player: Node3D, distan
 	if not keep_tosser:
 		_remove_fire_pot_role(enemy)
 
-	var label := Label3D.new()
-	label.text = label_text
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.font_size = 40
-	label.outline_size = 8
-	label.modulate = Color(1.0, 0.95, 0.8, 1.0)
-	label.position = Vector3(0.0, 6.0, 0.0)
-	enemy.add_child(label)
+	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0))
 
 
 func _remove_fire_pot_role(enemy: Node) -> void:
