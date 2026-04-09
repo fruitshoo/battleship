@@ -108,6 +108,7 @@ var current_bgm_name: String = ""
 signal prewarm_finished
 var is_prewarm_finished: bool = false
 @export var enable_playback_warmup: bool = false
+@export var mute_sfx_until_prewarm_finished: bool = true
 var _essential_warm_keys: Array[String] = [
 	"cannon_fire",
 	"impact_wood",
@@ -331,6 +332,9 @@ func _print_bus_status() -> void:
 func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
 	# 1. 리소스 확인 및 동적 로드
 	var stream = _load_stream_for_playback(stream_name)
+	if not is_prewarm_finished and mute_sfx_until_prewarm_finished:
+		# 시작 예열 중에는 실제 재생만 막고 캐시는 유지한다.
+		return
 	
 	# 2. 리소스가 없으면 디버그용 비프음 재생 (선택사항)
 	if not stream:
