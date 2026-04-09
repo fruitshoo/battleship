@@ -516,6 +516,67 @@ func is_player_team() -> bool:
 func is_enemy_team() -> bool:
 	return get_team_tag() == "enemy"
 
+
+func get_debug_ship_state_snapshot() -> Dictionary:
+	var rowing_stamina_value: float = 0.0
+	var max_rowing_stamina_value: float = 1.0
+	var current_crew_count_value: int = 0
+	var support_fleet_limit_value: int = 0
+	var captain_count_value: int = 0
+	var is_rowing_value: bool = false
+	var crew_respawn_interval_value: float = 0.0
+
+	if "rowing_stamina" in self:
+		var rowing_stamina_variant: Variant = get("rowing_stamina")
+		if rowing_stamina_variant != null:
+			rowing_stamina_value = float(rowing_stamina_variant)
+	if "max_rowing_stamina" in self:
+		var max_rowing_stamina_variant: Variant = get("max_rowing_stamina")
+		if max_rowing_stamina_variant != null:
+			max_rowing_stamina_value = maxf(0.01, float(max_rowing_stamina_variant))
+	if "current_crew_count" in self:
+		var current_crew_count_variant: Variant = get("current_crew_count")
+		if current_crew_count_variant != null:
+			current_crew_count_value = max(0, int(current_crew_count_variant))
+	if "support_fleet_limit" in self:
+		var support_fleet_limit_variant: Variant = get("support_fleet_limit")
+		if support_fleet_limit_variant != null:
+			support_fleet_limit_value = max(0, int(support_fleet_limit_variant))
+	if "captain_count" in self:
+		var captain_count_variant: Variant = get("captain_count")
+		if captain_count_variant != null:
+			captain_count_value = max(0, int(captain_count_variant))
+	if "is_rowing" in self:
+		is_rowing_value = bool(get("is_rowing"))
+	if "crew_respawn_interval" in self:
+		var crew_respawn_interval_variant: Variant = get("crew_respawn_interval")
+		if crew_respawn_interval_variant != null:
+			crew_respawn_interval_value = float(crew_respawn_interval_variant)
+
+	return {
+		"hull_hp": hull_hp,
+		"max_hull_hp": max_hull_hp,
+		"rowing_stamina": rowing_stamina_value,
+		"max_rowing_stamina": max_rowing_stamina_value,
+		"current_crew_count": current_crew_count_value,
+		"max_crew_count": max(0, int(get("max_crew_count")) if "max_crew_count" in self and get("max_crew_count") != null else 0),
+		"current_speed": current_speed,
+		"is_burning": is_burning,
+		"support_fleet_limit": support_fleet_limit_value,
+		"captain_count": captain_count_value,
+		"is_rowing": is_rowing_value,
+		"max_speed": max_speed,
+		"turn_rate": turn_rate,
+		"hull_defense": hull_defense,
+		"fire_build_up": fire_build_up,
+		"fire_threshold": fire_threshold,
+		"crew_respawn_interval": crew_respawn_interval_value,
+		"boarding_capture_duration": boarding_capture_duration,
+		"combat_crew_ratio": combat_crew_ratio,
+		"shiphandling_crew_ratio": shiphandling_crew_ratio,
+		"gunnery_crew_ratio": gunnery_crew_ratio,
+	}
+
 func get_boarding_attacker_ship() -> Node3D:
 	return boarding_attacker if is_instance_valid(boarding_attacker) else null
 
