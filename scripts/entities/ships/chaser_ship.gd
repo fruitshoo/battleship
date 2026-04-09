@@ -134,6 +134,9 @@ func is_charger_role() -> bool:
 func can_board_targets() -> bool:
 	return allow_boarding
 
+func get_target_ship() -> Node3D:
+	return target if is_instance_valid(target) else null
+
 
 func can_use_fire_pot_attack() -> bool:
 	return false

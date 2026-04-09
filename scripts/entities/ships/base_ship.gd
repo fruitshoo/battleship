@@ -461,6 +461,9 @@ func is_combat_disabled() -> bool:
 func get_hull_hp_value() -> float:
 	return hull_hp
 
+func get_current_speed_value() -> float:
+	return current_speed
+
 func is_sinking_or_dying() -> bool:
 	return is_sinking or is_dying
 

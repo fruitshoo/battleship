@@ -1,6 +1,70 @@
 extends RefCounted
 class_name ChaserShipNavigationHelper
 
+static func _team_tag(node: Node) -> String:
+	if not is_instance_valid(node):
+		return ""
+	if node.has_method("get_team_tag"):
+		return node.get_team_tag()
+	if "team" in node:
+		return str(node.get("team"))
+	return ""
+
+
+static func _is_sinking_or_dying(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return true
+	if node.has_method("is_sinking_or_dying"):
+		return node.is_sinking_or_dying()
+	return bool(node.get("is_dying")) or bool(node.get("is_sinking"))
+
+
+static func _is_boarding_ship(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.has_method("is_boarding_ship"):
+		return node.is_boarding_ship()
+	return bool(node.get("is_boarding"))
+
+
+static func _boarding_target_ship(node: Node) -> Node3D:
+	if not is_instance_valid(node):
+		return null
+	if node.has_method("get_boarding_target_ship"):
+		return node.get_boarding_target_ship()
+	if "boarding_target" in node:
+		return node.get("boarding_target")
+	return null
+
+
+static func _target_ship(node: Node) -> Node3D:
+	if not is_instance_valid(node):
+		return null
+	if node.has_method("get_target_ship"):
+		return node.get_target_ship()
+	if "target" in node:
+		return node.get("target")
+	return null
+
+
+static func _can_board_node(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.has_method("can_board_targets"):
+		return bool(node.call("can_board_targets"))
+	return bool(node.get("allow_boarding"))
+
+
+static func _current_speed(node: Node) -> float:
+	if not is_instance_valid(node):
+		return 0.0
+	if node.has_method("get_current_speed_value"):
+		return float(node.get_current_speed_value())
+	if "current_speed" in node:
+		var speed: Variant = node.get("current_speed")
+		return float(speed) if speed != null else 0.0
+	return 0.0
+
 static func _is_gunner(ship) -> bool:
 	if ship.has_method("is_gunner_role"):
 		return bool(ship.call("is_gunner_role"))
@@ -8,9 +72,7 @@ static func _is_gunner(ship) -> bool:
 
 
 static func _can_board(ship) -> bool:
-	if ship.has_method("can_board_targets"):
-		return bool(ship.call("can_board_targets"))
-	return bool(ship.allow_boarding)
+	return _can_board_node(ship)
 
 
 static func _preferred_range(ship) -> float:
@@ -127,14 +189,12 @@ static func _score_boarding_slot(ship, target_node: Node3D, slot: Dictionary) ->
 		var other = other_variant
 		if other == ship or not is_instance_valid(other):
 			continue
-		if other.get("team") != ship.team:
+		if _team_tag(other) != _team_tag(ship):
 			continue
-		var other_can_board: bool = bool(other.get("allow_boarding"))
-		if other.has_method("can_board_targets"):
-			other_can_board = bool(other.call("can_board_targets"))
+		var other_can_board: bool = _can_board_node(other)
 		if other_can_board != true:
 			continue
-		if other.get("target") != target_node:
+		if _target_ship(other) != target_node:
 			continue
 
 		var other_dist: float = other.global_position.distance_to(slot_point)
@@ -266,17 +326,17 @@ static func _has_closer_allied_attacker(ship, target_node: Node3D, dist_to_targe
 		var other = other_variant
 		if other == ship or not is_instance_valid(other):
 			continue
-		if other.get("team") != ship.team:
+		if _team_tag(other) != _team_tag(ship):
 			continue
-		if other.get("is_dying") == true or other.get("is_sinking") == true:
+		if _is_sinking_or_dying(other):
 			continue
-		var is_same_target: bool = other.get("target") == target_node or other.get("boarding_target") == target_node
+		var is_same_target: bool = _target_ship(other) == target_node or _boarding_target_ship(other) == target_node
 		if not is_same_target:
 			continue
 		var other_dist: float = other.global_position.distance_to(target_node.global_position)
 		if other_dist <= dist_to_target - 1.25:
 			return true
-		if other.get("is_boarding") == true and other.get("boarding_target") == target_node:
+		if _is_boarding_ship(other) and _boarding_target_ship(other) == target_node:
 			return true
 	return false
 
@@ -289,8 +349,8 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	var yield_overrun_target: bool = target_deck_overrun and _has_closer_allied_attacker(ship, target_node, dist_to_target)
 
 	if dist_to_target >= 25.0:
-		var target_speed = target_node.get("current_speed")
-		if target_speed:
+		var target_speed: float = _current_speed(target_node)
+		if target_speed > 0.0:
 			var lead_forward = Vector3(-sin(target_node.rotation.y), 0, -cos(target_node.rotation.y))
 			var time_to_reach = min(dist_to_target / ship.move_speed, 3.0)
 			target_pos += lead_forward * target_speed * time_to_reach
