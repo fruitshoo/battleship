@@ -83,8 +83,9 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	arrow.look_at(current_target_pos, Vector3.UP)
 	
 	# 활 쏘는 소리
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("arrow_shoot", attacker.global_position, randf_range(0.9, 1.1))
+	var audio_manager = attacker.get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager):
+		audio_manager.play_sfx("arrow_shoot", attacker.global_position, randf_range(0.9, 1.1))
 
 func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 	var current = node

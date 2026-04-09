@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://xbd1hcgmpq23"]
 
-[ext_resource type="Script" path="res://scripts/entities/ships/player_ship.gd" id="1"]
+[ext_resource type="Script" uid="uid://cy7yako2yokck" path="res://scripts/entities/ships/player_ship.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
 [ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
 [ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
@@ -12,8 +12,6 @@ size = Vector3(4, 3, 9)
 [node name="PlayerShip" type="Node3D" unique_id=2118299445]
 script = ExtResource("1")
 floating_offset = 0.5
-
-[node name="HullScene" parent="." unique_id=29881526 instance=ExtResource("hull_scene")]
 
 [node name="ProximityArea" type="Area3D" parent="." unique_id=244065699 groups=["ship_proximity"]]
 collision_layer = 2
@@ -51,3 +49,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
 
 [node name="CollisionVisualizer" type="Node3D" parent="." unique_id=2033846630]
 script = ExtResource("sys_vis_script")
+
+[node name="PanokseonHull" parent="." unique_id=2050703077 instance=ExtResource("hull_scene")]

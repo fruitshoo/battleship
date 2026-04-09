@@ -376,8 +376,9 @@ func _ready() -> void:
 		add_to_group("captured_minion")
 		_apply_minion_visuals()
 		_equip_minion_cannons()
-		if is_instance_valid(UpgradeManager):
-			UpgradeManager.apply_fleet_upgrades_to_ship(self )
+		var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+		if is_instance_valid(upgrade_manager):
+			upgrade_manager.apply_fleet_upgrades_to_ship(self )
 	else:
 		if is_in_group("captured_minion"):
 			remove_from_group("captured_minion")
@@ -773,8 +774,9 @@ func capture_ship() -> void:
 	
 	# ✅ 나포함 무장 자동 장착 및 현재 함대 업그레이드 적용
 	_equip_minion_cannons()
-	if is_instance_valid(UpgradeManager):
-		UpgradeManager.apply_fleet_upgrades_to_ship(self )
+	upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager):
+		upgrade_manager.apply_fleet_upgrades_to_ship(self )
 		
 	print("[Capture] 나포 성공! 함대에 합류합니다. (target: %s)" % str(target))
 

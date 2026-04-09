@@ -20,8 +20,15 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 		return
 	if not is_instance_valid(ship.fire_pot_scene):
 		return
-	var target: Node3D = ship.get("target")
+	var raw_target = ship.get("target")
+	if not is_instance_valid(raw_target):
+		if "target" in ship:
+			ship.target = null
+		return
+	var target: Node3D = raw_target as Node3D
 	if not is_instance_valid(target):
+		if "target" in ship:
+			ship.target = null
 		return
 	if target.get("team") != "player":
 		return
@@ -58,7 +65,7 @@ static func _find_fire_pot_tosser(ship):
 			continue
 		if child.get("team") != ship.team:
 			continue
-		if str(child.get("crew_role", "")) == "fire_pot":
+		if str(child.get("crew_role")) == "fire_pot":
 			return child
 	return null
 

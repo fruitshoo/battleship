@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://bfupeiqcpx0ji"]
 
-[ext_resource type="PackedScene" path="res://scenes/ships/enemy_ship.tscn" id="1_enemy_base"]
+[ext_resource type="PackedScene" uid="uid://dhgl16b2bfb5i" path="res://scenes/ships/enemy_ship.tscn" id="1_enemy_base"]
 [ext_resource type="Script" path="res://scripts/entities/ships/enemy_gunner_ship.gd" id="2_enemy_gunner_script"]
 
-[node name="EnemyGunnerShip" instance=ExtResource("1_enemy_base")]
+[node name="EnemyGunnerShip" unique_id=1910346140 instance=ExtResource("1_enemy_base")]
 script = ExtResource("2_enemy_gunner_script")
 combat_role = 1
 preferred_combat_range = 14.0

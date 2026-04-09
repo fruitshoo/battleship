@@ -203,6 +203,8 @@ func _cache_references() -> void:
 
 
 func _process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	if is_sinking or is_dying:
 		return
 	_update_sail_visual()
