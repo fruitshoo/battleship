@@ -68,6 +68,7 @@ var attack_timer: float = 0.0
 var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
+var combat_timer: float = 0.0 # 전투/사격 체크 스로틀링용
 var home_ground_timer: float = 0.0 # 홈그라운드 체력 재생 타이머
 var _is_jumping: bool = false # 점프/도선 중인지 여부
 
@@ -84,6 +85,9 @@ var _cached_level_manager: Node = null
 var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용
 var _lod_dist_to_player: float = 0.0
 var _lod_is_combat_priority: bool = false
+var _cached_nearest_enemy: Node3D = null
+var _nearest_enemy_cache_timer: float = 0.0
+var _nearest_enemy_cache_interval_runtime: float = 0.2
 
 # === 도선 약탈 및 방화 (Boarding Chaos) 페널티 ===
 var is_boarder_on_player_ship: bool = false
@@ -208,6 +212,8 @@ func _ready() -> void:
 	
 	# AI 실행 시점 분산 (Staggering)
 	decision_timer = randf_range(0.0, 0.2)
+	combat_timer = randf_range(0.0, 0.12)
+	_nearest_enemy_cache_timer = randf_range(0.0, 0.18)
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
 	add_to_group("soldiers")
@@ -456,6 +462,16 @@ func _physics_process(delta: float) -> void:
 			
 		decision_timer = throttle_time + randf_range(0.0, 0.05)
 		run_heavy_logic = true
+		_refresh_nearest_enemy_cache(true)
+
+	_nearest_enemy_cache_timer -= delta
+
+	combat_timer -= delta
+	var run_combat_logic: bool = false
+	if combat_timer <= 0:
+		var combat_throttle_time = _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
+		combat_timer = combat_throttle_time + randf_range(0.0, 0.04)
+		run_combat_logic = true
 		
 	# === 아군 홈그라운드(수비) 버프 로직 ===
 	if team == "player" and current_state != State.DEAD:
@@ -511,9 +527,9 @@ func _physics_process(delta: float) -> void:
 	# 공격 쿨다운 (캐싱된 업그레이드 수치 사용)
 	if attack_timer > 0:
 		attack_timer -= delta
-	
-	# 원거리 사격 및 무기 스위칭 체크 (스로틀링)
-	if run_heavy_logic and current_state != State.DEAD:
+
+	# 원거리 사격 및 무기 스위칭 체크 (전투 스케줄)
+	if current_state != State.DEAD and run_combat_logic:
 		var nearest = find_nearest_enemy()
 		SoldierWeaponHelper.update_combat_weapon_choice(self, nearest)
 
@@ -564,7 +580,9 @@ func _perform_attack() -> void:
 
 ## 가장 가까운 적 찾기 (탐지 범위 및 동일 함선 우선순위 적용)
 func find_nearest_enemy() -> Node3D:
-	return SoldierShipHelper.find_nearest_enemy(self)
+	if _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
+		return _cached_nearest_enemy
+	return _refresh_nearest_enemy_cache(true)
 
 ## 전이 로직은 통제됨 (개별 나포 기회 체크 삭제)
 func _check_ship_capture_opportunity() -> void:
@@ -699,6 +717,37 @@ func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, co
 	if dist_to_player > 28.0:
 		return 0.32
 	return throttle_time
+
+func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> float:
+	if combat_priority:
+		if dist_to_player > 65.0:
+			return 0.28
+		if dist_to_player > 45.0:
+			return 0.2
+		if dist_to_player > 28.0:
+			return 0.14
+		return 0.08
+
+	if dist_to_player > 80.0:
+		return 0.95
+	if dist_to_player > 60.0:
+		return 0.7
+	if dist_to_player > 40.0:
+		return 0.46
+	if dist_to_player > 28.0:
+		return 0.28
+	return 0.16
+
+func _get_nearest_enemy_cache_interval() -> float:
+	return _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
+
+func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
+	if not force and _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
+		return _cached_nearest_enemy
+	_cached_nearest_enemy = SoldierShipHelper.find_nearest_enemy(self)
+	_nearest_enemy_cache_interval_runtime = _get_nearest_enemy_cache_interval()
+	_nearest_enemy_cache_timer = _nearest_enemy_cache_interval_runtime
+	return _cached_nearest_enemy
 
 func _is_far_lod_sleep_candidate() -> bool:
 	if _lod_is_combat_priority:
