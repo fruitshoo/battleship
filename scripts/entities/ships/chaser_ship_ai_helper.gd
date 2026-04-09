@@ -16,6 +16,32 @@ static func _can_board(ship) -> bool:
 	return bool(ship.allow_boarding)
 
 
+static func _target_ship(ship) -> Node3D:
+	if not is_instance_valid(ship):
+		return null
+	if ship.has_method("get_target_ship"):
+		return ship.get_target_ship()
+	if "target" in ship:
+		return ship.get("target")
+	return null
+
+
+static func _is_sinking_or_dying(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return true
+	if node.has_method("is_sinking_or_dying"):
+		return node.is_sinking_or_dying()
+	return bool(node.get("is_dying")) or bool(node.get("is_sinking"))
+
+
+static func _is_player_controlled(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.has_method("is_player_controlled_ship"):
+		return node.is_player_controlled_ship()
+	return bool(node.get("is_player_controlled"))
+
+
 static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) -> float:
 	if not is_instance_valid(ship._cached_wind_manager):
 		return 1.0
@@ -38,7 +64,7 @@ static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) ->
 static func process_physics(ship, delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
-	if ship.is_dying:
+	if ship.has_method("is_combat_disabled") and ship.is_combat_disabled():
 		return
 
 	update_wave_sounds(ship, delta)
@@ -83,7 +109,7 @@ static func process_physics(ship, delta: float) -> void:
 	if do_logic_update:
 		update_logic_throttled(ship)
 
-	if ship.team == "player":
+	if ship.get_team_tag() == "player":
 		ship._process_minion_ai(delta)
 		return
 
@@ -91,11 +117,12 @@ static func process_physics(ship, delta: float) -> void:
 		ship._process_boarding(delta)
 		return
 
-	if not is_instance_valid(ship.target):
+	if not is_instance_valid(_target_ship(ship)):
 		ship._set_wake_state(false)
 		return
+	var current_target: Node3D = _target_ship(ship)
 
-	var nav := ChaserShipNavigationHelper.build_navigation(ship, ship.target)
+	var nav := ChaserShipNavigationHelper.build_navigation(ship, current_target)
 	var target_pos: Vector3 = nav["target_pos"]
 	var desired_point: Vector3 = nav["desired_point"]
 	var heading_point: Vector3 = nav["heading_point"]
@@ -105,9 +132,9 @@ static func process_physics(ship, delta: float) -> void:
 	var dir_to_target: Vector3 = nav["dir_to_target"]
 
 	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.max_boarding_distance + 0.35:
-		if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", ship.target):
+		if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target):
 			if ship.has_method("_board_ship"):
-				ship.call("_board_ship", ship.target)
+				ship.call("_board_ship", current_target)
 				if ship.is_boarding:
 					ship._process_boarding(delta)
 					return
@@ -191,9 +218,9 @@ static func process_physics(ship, delta: float) -> void:
 	var next_pos = prev_pos + velocity * delta
 	# Allow visible impact with the target, but stop the AI from tunneling so deep
 	# that ships overlap past the midline before the collision reads as a hit.
-	if is_instance_valid(ship.target):
-		next_pos = ship._apply_ship_collision_guard(ship.target, prev_pos, next_pos, 0.88, velocity.length())
-	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, ship.target)
+	if is_instance_valid(current_target):
+		next_pos = ship._apply_ship_collision_guard(current_target, prev_pos, next_pos, 0.88, velocity.length())
+	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, current_target)
 	ship.global_position = next_pos
 
 	ship._update_rudder_visual()
@@ -206,7 +233,7 @@ static func process_physics(ship, delta: float) -> void:
 
 
 static func update_logic_throttled(ship) -> void:
-	if not is_instance_valid(ship.target) or ship.target.get("is_sinking"):
+	if not is_instance_valid(_target_ship(ship)) or _is_sinking_or_dying(_target_ship(ship)):
 		ship.target = null
 		find_player(ship)
 
@@ -228,7 +255,7 @@ static func find_player(ship) -> void:
 
 	if ship.team == "player":
 		for p in players:
-			if p.get("is_player_controlled") == true:
+			if _is_player_controlled(p):
 				ship.target = p
 				break
 		return
@@ -238,10 +265,10 @@ static func find_player(ship) -> void:
 	for p in players:
 		if p == ship:
 			continue
-		if not p.get("is_sinking") and not p.get("is_dead"):
+		if not _is_sinking_or_dying(p):
 			var dist = ship.global_position.distance_squared_to(p.global_position)
 			var weight = 1.0
-			if p.get("is_player_controlled") == true:
+			if _is_player_controlled(p):
 				weight = 0.8
 			var weighted_dist = dist * weight
 			if weighted_dist < closest_dist:
