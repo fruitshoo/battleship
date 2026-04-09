@@ -5,6 +5,7 @@ const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_regist
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const ProjectContractBootstrapHelper = preload("res://scripts/test/project_contract_bootstrap_helper.gd")
 const ProjectContractHudHelper = preload("res://scripts/test/project_contract_hud_helper.gd")
+const ProjectContractRecoveryHelper = preload("res://scripts/test/project_contract_recovery_helper.gd")
 const ProjectContractSaveHelper = preload("res://scripts/test/project_contract_save_helper.gd")
 const ProjectContractSceneWiringHelper = preload("res://scripts/test/project_contract_scene_wiring_helper.gd")
 
@@ -285,128 +286,12 @@ func _run_bootstrap_contract_smoke() -> void:
 
 
 func _run_recovery_effect_contract_smoke() -> void:
-	var packed := load(smoke_scene_path) as PackedScene
-	if packed == null:
-		_failures.append("recovery effect smoke scene load failed: %s" % smoke_scene_path)
-		return
-
-	var smoke_root := packed.instantiate()
-	if smoke_root == null:
-		_failures.append("recovery effect smoke scene instantiate failed: %s" % smoke_scene_path)
-		return
-
-	add_child(smoke_root)
-	PreviewHarnessHelper.setup_common(smoke_root, false, true)
-	await _wait_frames(smoke_wait_frames_after_attach)
-
-	var player_ship: Node3D = smoke_root.get_node_or_null("PlayerShip") as Node3D
-	var level_manager: Node = LevelManagerRegistry.get_level_manager(get_tree())
-	if not is_instance_valid(player_ship):
-		_failures.append("recovery effect smoke missing PlayerShip")
-		smoke_root.queue_free()
-		await _wait_frames(1)
-		return
-	if not is_instance_valid(level_manager):
-		_failures.append("recovery effect smoke missing LevelManager")
-		smoke_root.queue_free()
-		await _wait_frames(1)
-		return
-
-	await _run_floating_loot_smoke(smoke_root, player_ship, level_manager)
-	await _run_survivor_smoke(smoke_root, player_ship)
-	await _run_treasure_chest_smoke(smoke_root, player_ship)
-
-	smoke_root.queue_free()
-	await _wait_frames(1)
-
-
-func _run_floating_loot_smoke(smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
-	var loot_scene := load("res://scenes/effects/floating_loot.tscn") as PackedScene
-	if loot_scene == null:
-		_failures.append("recovery loot smoke scene load failed")
-		return
-	var loot := loot_scene.instantiate()
-	if loot == null:
-		_failures.append("recovery loot smoke instantiate failed")
-		return
-	smoke_root.add_child(loot)
-	if loot is Node3D:
-		(loot as Node3D).global_position = player_ship.global_position + Vector3(1.5, 0.0, 0.0)
-	await _wait_frames(1)
-
-	var score_before: int = int(level_manager.get("current_score"))
-	var hull_before: float = float(player_ship.get("hull_hp")) if player_ship.get("hull_hp") != null else 0.0
-	if player_ship.get("max_hull_hp") != null:
-		player_ship.set("hull_hp", maxf(1.0, float(player_ship.get("max_hull_hp")) * 0.4))
-		hull_before = float(player_ship.get("hull_hp"))
-	if player_ship.get("rowing_stamina") != null:
-		player_ship.set("rowing_stamina", 0.0)
-	loot.set("target_player", player_ship)
-	loot.call("_collect_by_proximity")
-	await _wait_frames(2)
-
-	if loot.get("is_collected") != true:
-		_failures.append("recovery loot smoke did not mark loot collected")
-	if int(level_manager.get("current_score")) <= score_before:
-		_failures.append("recovery loot smoke did not grant score")
-	if player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) <= hull_before:
-		_failures.append("recovery loot smoke did not repair player hull")
-
-
-func _run_survivor_smoke(smoke_root: Node, player_ship: Node3D) -> void:
-	var survivor_scene := load("res://scenes/effects/survivor.tscn") as PackedScene
-	if survivor_scene == null:
-		_failures.append("recovery survivor smoke scene load failed")
-		return
-	var survivor := survivor_scene.instantiate()
-	if survivor == null:
-		_failures.append("recovery survivor smoke instantiate failed")
-		return
-	smoke_root.add_child(survivor)
-	if survivor is Node3D:
-		(survivor as Node3D).global_position = player_ship.global_position + Vector3(-1.5, 0.0, 0.0)
-	await _wait_frames(1)
-
-	if player_ship.get("max_crew_count") != null and player_ship.has_method("get_debug_crew_snapshot"):
-		var crew_snapshot: Dictionary = player_ship.call("get_debug_crew_snapshot")
-		var alive_before_fill: int = int(crew_snapshot.get("alive_count", 0))
-		player_ship.set("max_crew_count", max(alive_before_fill + 1, int(player_ship.get("max_crew_count"))))
-
-	var alive_before: int = 0
-	if player_ship.has_method("get_debug_crew_snapshot"):
-		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
-	survivor.call("_try_collect", player_ship)
-	await _wait_frames(2)
-	var alive_after: int = alive_before
-	if player_ship.has_method("get_debug_crew_snapshot"):
-		alive_after = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
-
-	if survivor.get("is_collected") != true:
-		_failures.append("recovery survivor smoke did not mark survivor collected")
-	if alive_after <= alive_before:
-		_failures.append("recovery survivor smoke did not add crew")
-
-
-func _run_treasure_chest_smoke(smoke_root: Node, player_ship: Node3D) -> void:
-	var chest_scene := load("res://scenes/effects/treasure_chest.tscn") as PackedScene
-	if chest_scene == null:
-		_failures.append("recovery treasure smoke scene load failed")
-		return
-	var chest := chest_scene.instantiate()
-	if chest == null:
-		_failures.append("recovery treasure smoke instantiate failed")
-		return
-	smoke_root.add_child(chest)
-	if chest is Node3D:
-		(chest as Node3D).global_position = player_ship.global_position + Vector3(0.0, 0.0, 1.0)
-	await _wait_frames(1)
-
-	chest.call("_collect")
-	await _wait_frames(1)
-	if chest.get("_is_collected") != true:
-		_failures.append("recovery treasure smoke did not mark chest collected")
-	if not chest.is_queued_for_deletion():
-		_failures.append("recovery treasure smoke did not queue chest for deletion")
+	await ProjectContractRecoveryHelper.run_recovery_effect_contract_smoke(
+		self,
+		_failures,
+		smoke_scene_path,
+		smoke_wait_frames_after_attach
+	)
 
 
 func _run_single_smoke_pass(packed: PackedScene, spawn_method: String, label: String) -> void:
