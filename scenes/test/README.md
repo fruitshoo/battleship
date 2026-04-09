@@ -92,3 +92,6 @@
 - `scripts/test/run_ship_load_chain_breakdown.sh`
   Uses the generic load probe to compare ship script/scene resources such as `base_ship.gd`, `chaser_ship.gd`, `player_ship.gd`, and a few preload candidates.
   Useful for spotting whether leak budget is coming from a script preload chain or from an individual referenced scene.
+- `scripts/test/run_chaser_script_isolation.sh`
+  Compares lightweight `extends base_ship` isolation scripts against the real `chaser_ship.gd`.
+  Useful for checking whether the leak comes from helper preloads, top-level declarations, or something unique to the full chaser script.

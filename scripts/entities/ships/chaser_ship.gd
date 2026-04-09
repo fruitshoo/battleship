@@ -7,17 +7,21 @@ const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_sh
 const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship_minion_helper.gd")
 const ChaserShipSupportHelper = preload("res://scripts/entities/ships/chaser_ship_support_helper.gd")
 const ChaserShipAiHelper = preload("res://scripts/entities/ships/chaser_ship_ai_helper.gd")
+const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
+const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
+const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
+const DEFAULT_FIRE_POT_SCENE_PATH := "res://scenes/projectiles/fire_pot.tscn"
 
 ## 추적선 (Chaser Ship)
 ## 플레이어를 단순 추적하고, 충돌 시 병사를 도선(Boarding)시키고 자폭
 
 @export var team: String = "enemy" # "enemy" or "player"
 @export var move_speed: float = 3.5
-@export var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
+@export var soldier_scene: PackedScene
 @export var boarders_count: int = 4 # 도선시킬 병사 수 (상향: 2 -> 4)
 
-@export var cannon_scene: PackedScene = preload("res://scenes/entities/launchers/cannon_enemy_light.tscn")
-@export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/sekibune_hull.tscn")
+@export var cannon_scene: PackedScene
+@export var hull_scene: PackedScene
 @export var preferred_soldier_type: String = "general" ## "general", "melee", "ranged"
 enum CombatRole {CHARGER, GUNNER}
 @export var combat_role: CombatRole = CombatRole.CHARGER
@@ -79,7 +83,7 @@ var max_stamina: float = 100.0
 var is_sprinting: bool = false
 var sprint_multiplier: float = 1.5
 var fire_pot_cooldown_timer: float = 0.0
-var fire_pot_scene: PackedScene = preload("res://scenes/projectiles/fire_pot.tscn")
+var fire_pot_scene: PackedScene = null
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_minion_list: Array = []
@@ -345,6 +349,7 @@ func _ready() -> void:
 		return
 
 	# JSON 데이터 로드 및 적용
+	_ensure_runtime_scene_refs()
 	var stats = load_ship_stats(ship_type)
 	if not stats.is_empty():
 		if stats.has("hull_hp"): max_hull_hp = stats["hull_hp"]
@@ -418,6 +423,22 @@ func _ready() -> void:
 	_sync_contact_area_layers()
 	_set_contact_areas_enabled(true)
 	_configure_ai_logic_throttle()
+
+
+func _ensure_runtime_scene_refs() -> void:
+	if soldier_scene == null:
+		soldier_scene = _load_packed_scene(DEFAULT_SOLDIER_SCENE_PATH)
+	if cannon_scene == null:
+		cannon_scene = _load_packed_scene(DEFAULT_CANNON_SCENE_PATH)
+	if hull_scene == null:
+		hull_scene = _load_packed_scene(DEFAULT_HULL_SCENE_PATH)
+	if fire_pot_scene == null:
+		fire_pot_scene = _load_packed_scene(DEFAULT_FIRE_POT_SCENE_PATH)
+
+
+func _load_packed_scene(path: String) -> PackedScene:
+	var loaded_resource: Resource = load(path)
+	return loaded_resource as PackedScene if loaded_resource is PackedScene else null
 
 func _sync_contact_area_layers(layer_override: int = -1) -> void:
 	var current_layer: int = layer_override
