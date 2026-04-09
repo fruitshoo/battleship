@@ -11,7 +11,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	var neighbors = EntityRegistry.get_ships()
 
 	for other in neighbors:
-		if other == ship or not is_instance_valid(other) or other.get("is_dying") or other.get("is_sinking"):
+		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
 			continue
 		if bool(other.get_meta("derelict_nonblocking", false)):
 			continue
@@ -130,7 +130,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(other_ship):
 		return false
-	if str(ship.get("team")) != "player" or str(other_ship.get("team")) != "player":
+	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
 	var ship_is_support: bool = ship.has_meta("support_fleet_ship") and ship.get_meta("support_fleet_ship", false) == true
 	var other_is_support: bool = other_ship.has_meta("support_fleet_ship") and other_ship.get_meta("support_fleet_ship", false) == true
