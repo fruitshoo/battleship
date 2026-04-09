@@ -205,4 +205,14 @@ func _count_soldiers() -> int:
 
 
 func _count_projectiles() -> int:
-	return get_tree().get_nodes_in_group("projectiles").size()
+	return _count_projectiles_recursive(get_tree().root)
+
+
+func _count_projectiles_recursive(node: Node) -> int:
+	if not is_instance_valid(node):
+		return 0
+	var count := 1 if str(node.scene_file_path).begins_with("res://scenes/projectiles/") else 0
+	for child in node.get_children():
+		if child is Node:
+			count += _count_projectiles_recursive(child)
+	return count
