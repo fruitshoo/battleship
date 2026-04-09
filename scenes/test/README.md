@@ -89,3 +89,6 @@
 - `scripts/test/run_player_ship_load_vs_instance.sh`
   Uses the generic scene load probe to compare `player_ship.tscn` load-only versus instantiate leak totals.
   Useful for separating scene resource leak from runtime bootstrap leak.
+- `scripts/test/run_ship_load_chain_breakdown.sh`
+  Uses the generic load probe to compare ship script/scene resources such as `base_ship.gd`, `chaser_ship.gd`, `player_ship.gd`, and a few preload candidates.
+  Useful for spotting whether leak budget is coming from a script preload chain or from an individual referenced scene.
