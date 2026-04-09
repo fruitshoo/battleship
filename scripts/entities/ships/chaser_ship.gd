@@ -98,7 +98,7 @@ static func get_minions_cached(tree: SceneTree) -> Array:
 static func get_ships_cached(tree: SceneTree) -> Array:
 	var current_frame = Engine.get_physics_frames()
 	if current_frame != _last_ships_cache_frame:
-		_cached_ships_list = tree.get_nodes_in_group("ships")
+		_cached_ships_list = EntityRegistry.get_ships()
 		_last_ships_cache_frame = current_frame
 	return _cached_ships_list
 

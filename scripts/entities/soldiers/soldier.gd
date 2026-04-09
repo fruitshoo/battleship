@@ -1,5 +1,6 @@
 extends CharacterBody3D
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
@@ -114,7 +115,7 @@ static var _last_enemy_cache_frame: int = -1
 static func get_soldiers_cached(tree: SceneTree) -> Array:
 	var f = Engine.get_physics_frames()
 	if f != _last_soldier_cache_frame:
-		_cached_soldiers = SceneGroupCache.get_nodes(tree, "soldiers")
+		_cached_soldiers = EntityRegistry.get_soldiers()
 		_last_soldier_cache_frame = f
 	return _cached_soldiers
 
@@ -216,6 +217,12 @@ func _ready() -> void:
 	if is_instance_valid(_cached_upgrade_manager):
 		if _cached_upgrade_manager.has_signal("upgrade_applied"):
 			_cached_upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
+
+	EntityRegistry.register_soldier(self)
+
+
+func _exit_tree() -> void:
+	EntityRegistry.unregister_soldier(self)
 
 
 func _apply_soldier_rules_data() -> void:

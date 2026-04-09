@@ -2,6 +2,7 @@
 extends Node3D
 class_name BaseShip
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const BaseShipCollisionHelper = preload("res://scripts/entities/ships/base_ship_collision_helper.gd")
@@ -183,6 +184,11 @@ func _ready() -> void:
 	# 런타임 전용 로직
 	_cache_common_references()
 	_refresh_deck_light()
+	EntityRegistry.register_ship(self)
+
+
+func _exit_tree() -> void:
+	EntityRegistry.unregister_ship(self)
 
 func _ensure_collision_profile() -> void:
 	# 기존 씬의 export 수치를 유지하면서 프로파일을 기본 소스로 승격한다.

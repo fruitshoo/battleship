@@ -8,6 +8,7 @@ const ARROW_SCENE := preload("res://scenes/projectiles/arrow.tscn")
 const FIRE_POT_SCENE := preload("res://scenes/projectiles/fire_pot.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
@@ -491,11 +492,11 @@ func _get_projectile_kind_name(projectile_kind: int) -> String:
 
 
 func _count_ships() -> int:
-	return get_tree().get_nodes_in_group("ships").size()
+	return EntityRegistry.count_ships()
 
 
 func _count_soldiers() -> int:
-	return get_tree().get_nodes_in_group("soldiers").size()
+	return EntityRegistry.count_soldiers()
 
 
 func _count_projectiles() -> int:
