@@ -1,6 +1,7 @@
 extends RefCounted
 class_name BaseShipStatusHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
 
 static func update_fire_effect(ship) -> void:
@@ -45,13 +46,13 @@ static func check_derelict_status(ship) -> void:
 	var all_crew_dead = true
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if soldiers_node:
-		for child in soldiers_node.get_children():
+		for child in EntityRegistry.get_soldiers_by_ship(ship):
 			if child.get("current_state") != 4:
 				all_crew_dead = false
 				break
 
 	if all_crew_dead:
-		var all_soldiers = ship.SceneGroupCache.get_nodes(ship.get_tree(), "soldiers")
+		var all_soldiers = EntityRegistry.get_soldiers()
 		for s in all_soldiers:
 			if s.get("home_ship") == ship and s.get("current_state") != 4:
 				all_crew_dead = false
@@ -77,17 +78,15 @@ static func update_boarding_state(ship, delta: float) -> void:
 	var ship_team: String = "enemy"
 	if ship_team_variant != null:
 		ship_team = String(ship_team_variant)
-	var soldiers_node = ship.get_node_or_null("Soldiers")
 	var friendly_count: int = 0
 	var hostile_count: int = 0
-	if soldiers_node:
-		for child in soldiers_node.get_children():
-			if child.get("current_state") == 4:
-				continue
-			if String(child.get("team")) == ship_team:
-				friendly_count += 1
-			else:
-				hostile_count += 1
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
+		if child.get("current_state") == 4:
+			continue
+		if String(child.get("team")) == ship_team:
+			friendly_count += 1
+		else:
+			hostile_count += 1
 
 	var contested: bool = hostile_count > 0
 	var overrun: bool = hostile_count > 0 and friendly_count <= 0

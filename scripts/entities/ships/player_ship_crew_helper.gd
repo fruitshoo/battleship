@@ -2,6 +2,7 @@ extends RefCounted
 
 const RAID_SWITCH_BUFFER: float = 2.0
 const RAID_MAX_ACTIVE_THREATS: int = 1
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 static func get_desired_player_captain_count(ship) -> int:
@@ -79,7 +80,7 @@ static func sync_player_crew_roster(ship) -> void:
 		ship.CREW_ROLE_REPEATING_CROSSBOW: [],
 		ship.CREW_ROLE_SINGIGEON: [],
 	}
-	for child in soldiers_node.get_children():
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
 		if child.get("current_state") == 4 or child.get("team") != "player":
 			continue
 		if is_captain(ship, child):
@@ -119,9 +120,9 @@ static func add_survivor(ship) -> bool:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if not soldiers_node:
 		return false
-
 	var alive_count = 0
-	for child in soldiers_node.get_children():
+	var soldiers = EntityRegistry.get_soldiers_by_ship(ship)
+	for child in soldiers:
 		if child.get("current_state") != 4:
 			alive_count += 1
 		else:
@@ -149,7 +150,7 @@ static func add_survivor(ship) -> bool:
 		ship.CREW_ROLE_SINGIGEON: 0,
 	}
 	var current_captains: int = 0
-	for child in soldiers_node.get_children():
+	for child in soldiers:
 		if child.get("current_state") == 4 or child.get("team") != "player":
 			continue
 		if is_captain(ship, child):
@@ -208,12 +209,8 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 	if dist > 15.0:
 		return
 
-	var soldiers_node = ship.get_node_or_null("Soldiers")
-	if not soldiers_node:
-		return
-
 	var tosser = null
-	for child in soldiers_node.get_children():
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
 		if child.get("current_state") != 4 and child.get("team") == "player" and get_soldier_role(ship, child) == ship.CREW_ROLE_FIRE_POT:
 			tosser = child
 			break

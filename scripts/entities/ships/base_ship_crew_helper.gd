@@ -1,6 +1,8 @@
 extends RefCounted
 class_name BaseShipCrewHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+
 static func update_crew_allocation_state(ship, delta: float) -> void:
 	ship._crew_allocation_eval_left -= delta
 	if ship._crew_allocation_eval_left > 0.0:
@@ -68,11 +70,11 @@ static func get_effective_boarding_capture_duration(ship, attacker_ship: Node = 
 
 
 static func estimate_available_crew_count(ship) -> int:
-	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
-	if is_instance_valid(soldiers_node):
+	var soldiers: Array = EntityRegistry.get_soldiers_by_ship(ship)
+	if not soldiers.is_empty():
 		var alive_count: int = 0
 		var own_team: String = str(ship.get("team"))
-		for child in soldiers_node.get_children():
+		for child in soldiers:
 			if not is_instance_valid(child):
 				continue
 			if child.get("team") != own_team:
@@ -119,11 +121,10 @@ static func get_ship_cannon_range_for_allocation(ship) -> float:
 static func get_nearest_enemy_ship_distance_for_allocation(ship) -> float:
 	var own_team: String = str(ship.get("team"))
 	var nearest_distance_sq: float = INF
-	var all_ships: Array = ship.SceneGroupCache.get_nodes(ship.get_tree(), "ships")
+	var opposing_team: String = "enemy" if own_team == "player" else "player"
+	var all_ships: Array = EntityRegistry.get_ships_by_team(opposing_team)
 	for other in all_ships:
 		if not is_instance_valid(other) or other == ship:
-			continue
-		if str(other.get("team")) == own_team:
 			continue
 		if other.get("is_dying") == true or other.get("is_sinking") == true:
 			continue
