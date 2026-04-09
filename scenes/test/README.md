@@ -45,6 +45,8 @@
   Supports `visual_compare` to compare lean battle load against full debug/visual load.
   Prints phase summaries with average and p95 frame time.
   Script: `scripts/test/midgame_fleet_battle_preview.gd`
+  Wrapper: `scripts/test/run_midgame_performance_compare.sh`
+  The wrapper auto-quits after the compare report, fails on common runtime errors, and can gate deltas with `MIDGAME_MAX_DELTA_AVG_MS` and `MIDGAME_MAX_DELTA_P95_MS`.
 
 ## Sandbox
 

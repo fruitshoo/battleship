@@ -27,6 +27,7 @@ enum BattleMode {
 @export var compare_warmup_seconds: float = 0.5
 @export var compare_phase_seconds: float = 0.35
 @export var auto_print_compare_results: bool = true
+@export var auto_quit_delay_seconds: float = 0.05
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
@@ -401,6 +402,8 @@ func _print_compare_final_report() -> void:
 		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
 		overlay_p95 - baseline_p95,
 	])
+	if _should_auto_quit_after_report():
+		call_deferred("_quit_after_compare_report")
 
 
 func _get_phase_p95_ms(phase_index: int) -> float:
@@ -411,3 +414,18 @@ func _get_phase_p95_ms(phase_index: int) -> float:
 	sorted_samples.sort()
 	var p95_index := clampi(int(ceil(float(sorted_samples.size()) * 0.95)) - 1, 0, sorted_samples.size() - 1)
 	return float(sorted_samples[p95_index]) * 1000.0
+
+
+func _should_auto_quit_after_report() -> bool:
+	return _env_flag_enabled("BATTLESHIP_MIDGAME_AUTO_QUIT")
+
+
+func _quit_after_compare_report() -> void:
+	if auto_quit_delay_seconds > 0.0:
+		await get_tree().create_timer(auto_quit_delay_seconds).timeout
+	get_tree().quit(0)
+
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"
