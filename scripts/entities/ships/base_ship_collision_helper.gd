@@ -2,6 +2,7 @@ extends RefCounted
 class_name BaseShipCollisionHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if bool(ship.get_meta("derelict_nonblocking", false)):
@@ -20,9 +21,9 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		diff.y = 0.0
 		var dist_sq = diff.length_squared()
 		var my_half = ship.get_collision_half_extents()
-		var other_base_radius: float = other.get_base_collision_radius_value() if other.has_method("get_base_collision_radius_value") else other.get("base_collision_radius")
-		var other_width_mult: float = other.get_collision_width_multiplier_value() if other.has_method("get_collision_width_multiplier_value") else other.get("width_multiplier")
-		var other_length_mult: float = other.get_collision_length_multiplier_value() if other.has_method("get_collision_length_multiplier_value") else other.get("length_multiplier")
+		var other_base_radius: float = NodeContractHelper.get_base_collision_radius_value(other)
+		var other_width_mult: float = NodeContractHelper.get_collision_width_multiplier_value(other)
+		var other_length_mult: float = NodeContractHelper.get_collision_length_multiplier_value(other)
 		var other_half = Vector2(
 			other_base_radius * other_width_mult,
 			other_base_radius * other_length_mult
@@ -137,8 +138,8 @@ static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
 		return false
 	var ship_is_support: bool = ship.has_meta("support_fleet_ship") and ship.get_meta("support_fleet_ship", false) == true
 	var other_is_support: bool = other_ship.has_meta("support_fleet_ship") and other_ship.get_meta("support_fleet_ship", false) == true
-	var ship_is_player: bool = ship.get("is_player_controlled") == true
-	var other_is_player: bool = other_ship.get("is_player_controlled") == true
+	var ship_is_player: bool = NodeContractHelper.is_player_controlled_ship(ship)
+	var other_is_player: bool = NodeContractHelper.is_player_controlled_ship(other_ship)
 	return (ship_is_support and other_is_player) or (other_is_support and ship_is_player)
 
 

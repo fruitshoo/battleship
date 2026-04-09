@@ -10,6 +10,7 @@ const BaseShipCrewHelper = preload("res://scripts/entities/ships/base_ship_crew_
 const BaseShipRudderHelper = preload("res://scripts/entities/ships/base_ship_rudder_helper.gd")
 const BaseShipStatusHelper = preload("res://scripts/entities/ships/base_ship_status_helper.gd")
 const BaseShipVisualHelper = preload("res://scripts/entities/ships/base_ship_visual_helper.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
 
@@ -268,9 +269,9 @@ func get_collision_distance_to(other: Node3D) -> float:
 	if other.has_method("get_directional_collision_radius"):
 		other_radius = float(other.call("get_directional_collision_radius", -dir))
 	else:
-		var other_base = other.get("base_collision_radius") if "base_collision_radius" in other else 4.5
-		var other_w = other.get("width_multiplier") if "width_multiplier" in other else 1.0
-		var other_l = other.get("length_multiplier") if "length_multiplier" in other else 1.0
+		var other_base = NodeContractHelper.get_base_collision_radius_value(other)
+		var other_w = NodeContractHelper.get_collision_width_multiplier_value(other)
+		var other_l = NodeContractHelper.get_collision_length_multiplier_value(other)
 		var other_fwd = -other.global_transform.basis.z
 		other_fwd.y = 0.0
 		if other_fwd.length_squared() > 0.0001:
@@ -753,10 +754,10 @@ func _calculate_boarding_pull() -> Vector3:
 		if target_node.has_method("get_current_speed_value"):
 			target_vel = target_fwd * target_node.get_current_speed_value()
 		else:
-			target_vel = target_fwd * target_node.get("current_speed")
+			target_vel = target_fwd * NodeContractHelper.get_current_speed_value(target_node)
 	else:
 		target_fwd = - target_node.global_transform.basis.z
-		target_vel = target_fwd * target_node.get("current_speed")
+		target_vel = target_fwd * NodeContractHelper.get_current_speed_value(target_node)
 	
 	var my_fwd = - global_transform.basis.z
 	my_vel = my_fwd * current_speed
@@ -788,14 +789,8 @@ func _is_engagement_pair(other: Node3D) -> bool:
 	if has_method("get_target_ship"):
 		my_target = get_target_ship()
 	var my_boarding_target = get_boarding_target_ship()
-	var other_target: Node3D = null
-	if other.has_method("get_target_ship"):
-		other_target = other.get_target_ship()
-	var other_boarding_target: Node3D = null
-	if other.has_method("get_boarding_target_ship"):
-		other_boarding_target = other.get_boarding_target_ship()
-	elif "boarding_target" in other:
-		other_boarding_target = other.get("boarding_target")
+	var other_target: Node3D = NodeContractHelper.get_target_ship(other)
+	var other_boarding_target: Node3D = NodeContractHelper.get_boarding_target_ship(other)
 	return my_target == other \
 		or my_boarding_target == other \
 		or other_target == self \
@@ -1126,7 +1121,7 @@ func _get_boarding_alignment_state(target_ship: Node3D) -> Dictionary:
 	var target_contact_dot: float = target_fwd.dot(-dir)
 	var parallel_dot: float = my_fwd.dot(target_fwd)
 
-	var target_speed = target_ship.get_current_speed_value() if target_ship.has_method("get_current_speed_value") else target_ship.get("current_speed") if "current_speed" in target_ship else 0.0
+	var target_speed = NodeContractHelper.get_current_speed_value(target_ship)
 	var my_vel = my_fwd * current_speed
 	var target_vel = target_fwd * target_speed
 	var closing_speed = absf((my_vel - target_vel).dot(dir))

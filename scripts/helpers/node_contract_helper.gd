@@ -64,3 +64,73 @@ static func get_owned_ship_node(node: Node) -> Node3D:
 		if is_instance_valid(owned_ship_value) and owned_ship_value is Node3D:
 			return owned_ship_value
 	return null
+
+
+static func get_boarding_target_ship(node: Node) -> Node3D:
+	if not is_instance_valid(node):
+		return null
+	if node.has_method("get_boarding_target_ship"):
+		return node.get_boarding_target_ship()
+	if "boarding_target" in node:
+		var target_value: Variant = node.get("boarding_target")
+		if is_instance_valid(target_value) and target_value is Node3D:
+			return target_value
+	return null
+
+
+static func get_target_ship(node: Node) -> Node3D:
+	if not is_instance_valid(node):
+		return null
+	if node.has_method("get_target_ship"):
+		return node.get_target_ship()
+	if "target" in node:
+		var target_value: Variant = node.get("target")
+		if is_instance_valid(target_value) and target_value is Node3D:
+			return target_value
+	return null
+
+
+static func get_base_collision_radius_value(node: Node) -> float:
+	if not is_instance_valid(node):
+		return 4.5
+	if node.has_method("get_base_collision_radius_value"):
+		return float(node.get_base_collision_radius_value())
+	if "base_collision_radius" in node:
+		var value: Variant = node.get("base_collision_radius")
+		if value != null:
+			return float(value)
+	return 4.5
+
+
+static func get_collision_width_multiplier_value(node: Node) -> float:
+	if not is_instance_valid(node):
+		return 1.0
+	if node.has_method("get_collision_width_multiplier_value"):
+		return float(node.get_collision_width_multiplier_value())
+	if "width_multiplier" in node:
+		var value: Variant = node.get("width_multiplier")
+		if value != null:
+			return float(value)
+	return 1.0
+
+
+static func get_collision_length_multiplier_value(node: Node) -> float:
+	if not is_instance_valid(node):
+		return 1.0
+	if node.has_method("get_collision_length_multiplier_value"):
+		return float(node.get_collision_length_multiplier_value())
+	if "length_multiplier" in node:
+		var value: Variant = node.get("length_multiplier")
+		if value != null:
+			return float(value)
+	return 1.0
+
+
+static func is_player_controlled_ship(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.has_method("is_player_controlled_ship"):
+		return node.is_player_controlled_ship()
+	if "is_player_controlled" in node:
+		return bool(node.get("is_player_controlled"))
+	return false
