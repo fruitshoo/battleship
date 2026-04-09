@@ -461,6 +461,15 @@ func is_combat_disabled() -> bool:
 func get_hull_hp_value() -> float:
 	return hull_hp
 
+func get_base_collision_radius_value() -> float:
+	return base_collision_radius
+
+func get_collision_width_multiplier_value() -> float:
+	return width_multiplier
+
+func get_collision_length_multiplier_value() -> float:
+	return length_multiplier
+
 func get_current_speed_value() -> float:
 	return current_speed
 

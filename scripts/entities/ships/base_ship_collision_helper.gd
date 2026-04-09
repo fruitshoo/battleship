@@ -20,9 +20,12 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		diff.y = 0.0
 		var dist_sq = diff.length_squared()
 		var my_half = ship.get_collision_half_extents()
+		var other_base_radius: float = other.get_base_collision_radius_value() if other.has_method("get_base_collision_radius_value") else other.get("base_collision_radius")
+		var other_width_mult: float = other.get_collision_width_multiplier_value() if other.has_method("get_collision_width_multiplier_value") else other.get("width_multiplier")
+		var other_length_mult: float = other.get_collision_length_multiplier_value() if other.has_method("get_collision_length_multiplier_value") else other.get("length_multiplier")
 		var other_half = Vector2(
-			other.base_collision_radius * other.width_multiplier,
-			other.base_collision_radius * other.length_multiplier
+			other_base_radius * other_width_mult,
+			other_base_radius * other_length_mult
 		)
 		var broad_phase_dist = maxf(my_half.x, my_half.y) + maxf(other_half.x, other_half.y) + ship.broad_phase_padding
 
@@ -49,7 +52,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		if other.has_method("get_directional_collision_radius"):
 			other_radius = float(other.call("get_directional_collision_radius", -dir))
 		else:
-			other_radius = other.base_collision_radius * other.width_multiplier + (other.base_collision_radius * other.length_multiplier - other.base_collision_radius * other.width_multiplier) * absf(other_fwd.dot(-dir))
+			other_radius = other_base_radius * other_width_mult + (other_base_radius * other_length_mult - other_base_radius * other_width_mult) * absf(other_fwd.dot(-dir))
 		var coll_dist = my_radius + other_radius
 		var is_engagement_pair = ship._is_engagement_pair(other)
 		var is_player_support_pair = _is_player_support_pair(ship, other)
