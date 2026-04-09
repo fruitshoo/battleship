@@ -74,3 +74,9 @@
 - `scripts/test/run_player_ship_leak_compare.sh`
   Compares `player_ship.tscn` leak totals with normal startup and with support-fleet autosummon disabled via probe-only env flag.
   Useful for checking how much of the bootstrap leak budget comes from support fleet initialization.
+- `scenes/test/player_ship_component_probe.tscn`
+  Auto-quitting probe scene that instantiates `player_ship.tscn` and can strip `Soldiers`, `WakeTrail`, or hull children via env flags before the ship enters the tree.
+  Script: `scripts/test/player_ship_component_probe.gd`
+- `scripts/test/run_player_ship_component_breakdown.sh`
+  Runs the component probe as baseline, then compares `no_support`, `no_soldiers`, `no_wake`, `no_hull`, and fully stripped variants.
+  Useful for narrowing which `player_ship` subsystems contribute most to leak totals.
