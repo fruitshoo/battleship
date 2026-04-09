@@ -464,6 +464,17 @@ func get_hull_hp_value() -> float:
 func get_current_speed_value() -> float:
 	return current_speed
 
+func get_target_ship() -> Node3D:
+	if "target" in self:
+		var target_value: Variant = get("target")
+		return target_value if is_instance_valid(target_value) else null
+	return null
+
+func get_ship_type_value() -> String:
+	if "ship_type" in self and get("ship_type") != null:
+		return str(get("ship_type"))
+	return ""
+
 func is_sinking_or_dying() -> bool:
 	return is_sinking or is_dying
 
@@ -718,9 +729,16 @@ func _calculate_boarding_pull() -> Vector3:
 	var final_damping_force = Vector3.ZERO
 	var target_vel = Vector3.ZERO
 	var my_vel = Vector3.ZERO
+	var target_fwd = Vector3.ZERO
 	
 	if "current_speed" in target_node:
-		var target_fwd = - target_node.global_transform.basis.z
+		target_fwd = - target_node.global_transform.basis.z
+		if target_node.has_method("get_current_speed_value"):
+			target_vel = target_fwd * target_node.get_current_speed_value()
+		else:
+			target_vel = target_fwd * target_node.get("current_speed")
+	else:
+		target_fwd = - target_node.global_transform.basis.z
 		target_vel = target_fwd * target_node.get("current_speed")
 	
 	var my_fwd = - global_transform.basis.z
@@ -750,12 +768,12 @@ func _is_engagement_pair(other: Node3D) -> bool:
 	if not is_instance_valid(other):
 		return false
 	var my_target: Node3D = null
-	if "target" in self:
-		my_target = get("target")
+	if has_method("get_target_ship"):
+		my_target = get_target_ship()
 	var my_boarding_target = get_boarding_target_ship()
 	var other_target: Node3D = null
-	if "target" in other:
-		other_target = other.get("target")
+	if other.has_method("get_target_ship"):
+		other_target = other.get_target_ship()
 	var other_boarding_target: Node3D = null
 	if other.has_method("get_boarding_target_ship"):
 		other_boarding_target = other.get_boarding_target_ship()
@@ -810,8 +828,8 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	if DEBUG_DAMAGE_LOGS and OS.is_debug_build():
 		var source_label: String = damage_source if not damage_source.is_empty() else "unknown"
 		var ship_label: String = name
-		if "ship_type" in self and get("ship_type") != null and not str(get("ship_type")).is_empty():
-			ship_label += "/" + str(get("ship_type"))
+		if not get_ship_type_value().is_empty():
+			ship_label += "/" + get_ship_type_value()
 		print("[DamageLog][%s][%s] source=%s raw=%.1f defense=%.1f final=%.1f hp=%.1f->%.1f" % [
 			ship_label,
 			get_team_tag(),
@@ -1091,7 +1109,7 @@ func _get_boarding_alignment_state(target_ship: Node3D) -> Dictionary:
 	var target_contact_dot: float = target_fwd.dot(-dir)
 	var parallel_dot: float = my_fwd.dot(target_fwd)
 
-	var target_speed = target_ship.get("current_speed") if "current_speed" in target_ship else 0.0
+	var target_speed = target_ship.get_current_speed_value() if target_ship.has_method("get_current_speed_value") else target_ship.get("current_speed") if "current_speed" in target_ship else 0.0
 	var my_vel = my_fwd * current_speed
 	var target_vel = target_fwd * target_speed
 	var closing_speed = absf((my_vel - target_vel).dot(dir))

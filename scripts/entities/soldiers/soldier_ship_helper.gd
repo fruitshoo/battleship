@@ -186,7 +186,8 @@ static func is_in_cross_ship_contact_zone(soldier, other_ship: Node3D) -> bool:
 static func find_cross_ship_muster_target(soldier) -> Vector3:
 	if not is_instance_valid(soldier.owned_ship):
 		return Vector3.INF
-	if soldier.owned_ship.get_team_tag() != soldier.team:
+	var owned_team: String = soldier.owned_ship.get_team_tag() if soldier.owned_ship.has_method("get_team_tag") else str(soldier.owned_ship.get("team"))
+	if owned_team != soldier.team:
 		return Vector3.INF
 	if soldier.is_ranged_only:
 		return Vector3.INF
