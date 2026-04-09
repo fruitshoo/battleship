@@ -4,6 +4,7 @@ extends RefCounted
 static var _ships: Array[Node] = []
 static var _soldiers: Array[Node] = []
 static var _projectiles: Array[Node] = []
+static var _soldiers_by_ship: Dictionary = {}
 
 
 static func register_ship(ship: Node) -> void:
@@ -22,10 +23,19 @@ static func register_soldier(soldier: Node) -> void:
 		return
 	if not _soldiers.has(soldier):
 		_soldiers.append(soldier)
+	_register_soldier_ship_bucket(soldier, soldier.get("owned_ship"))
 
 
 static func unregister_soldier(soldier: Node) -> void:
+	_unregister_soldier_ship_bucket(soldier, soldier.get("owned_ship"))
 	_unregister_node(_soldiers, soldier)
+
+
+static func move_soldier_ship(soldier: Node, old_ship: Node, new_ship: Node) -> void:
+	if not is_instance_valid(soldier):
+		return
+	_unregister_soldier_ship_bucket(soldier, old_ship)
+	_register_soldier_ship_bucket(soldier, new_ship)
 
 
 static func get_ships() -> Array:
@@ -34,6 +44,18 @@ static func get_ships() -> Array:
 
 static func get_soldiers() -> Array:
 	return _compact_nodes(_soldiers)
+
+
+static func get_soldiers_by_ship(ship: Node) -> Array:
+	if not is_instance_valid(ship):
+		return []
+	var ship_id: int = ship.get_instance_id()
+	var bucket: Array = _soldiers_by_ship.get(ship_id, [])
+	return _compact_nodes(bucket)
+
+
+static func count_soldiers_by_ship(ship: Node) -> int:
+	return get_soldiers_by_ship(ship).size()
 
 
 static func count_ships() -> int:
@@ -92,6 +114,30 @@ static func _compact_nodes(collection: Array) -> Array:
 		if not is_instance_valid(collection[index]):
 			collection.remove_at(index)
 	return collection.duplicate()
+
+
+static func _register_soldier_ship_bucket(soldier: Node, ship: Node) -> void:
+	if not is_instance_valid(soldier) or not is_instance_valid(ship):
+		return
+	var ship_id: int = ship.get_instance_id()
+	var bucket: Array = _soldiers_by_ship.get(ship_id, [])
+	if not bucket.has(soldier):
+		bucket.append(soldier)
+	_soldiers_by_ship[ship_id] = bucket
+
+
+static func _unregister_soldier_ship_bucket(soldier: Node, ship: Node) -> void:
+	if not is_instance_valid(soldier) or not is_instance_valid(ship):
+		return
+	var ship_id: int = ship.get_instance_id()
+	if not _soldiers_by_ship.has(ship_id):
+		return
+	var bucket: Array = _soldiers_by_ship[ship_id]
+	_unregister_node(bucket, soldier)
+	if bucket.is_empty():
+		_soldiers_by_ship.erase(ship_id)
+	else:
+		_soldiers_by_ship[ship_id] = bucket
 
 
 static func _matches_team(node: Node, normalized_team: String) -> bool:

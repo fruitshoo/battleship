@@ -79,7 +79,15 @@ var weapon_sword: Node3D = null
 var weapon_bow: Node3D = null
 
 # 소속 배 및 매니저 참조
-var owned_ship: Node3D = null
+var _owned_ship: Node3D = null
+var owned_ship: Node3D:
+	get:
+		return _owned_ship
+	set(value):
+		var previous_ship: Node3D = _owned_ship
+		_owned_ship = value
+		if is_inside_tree():
+			EntityRegistry.move_soldier_ship(self, previous_ship, _owned_ship)
 var home_ship: Node3D = null # 최초 소속된 플레이어 배 (나포함 침몰 시 복귀용)
 var _cached_level_manager: Node = null
 var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용

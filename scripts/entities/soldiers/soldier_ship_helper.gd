@@ -1,9 +1,15 @@
 extends RefCounted
 class_name SoldierShipHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+
 
 static func find_nearest_enemy(soldier) -> Node3D:
-	var all_soldiers = soldier.get_soldiers_cached(soldier.get_tree())
+	var local_soldiers: Array = []
+	if is_instance_valid(soldier.owned_ship):
+		local_soldiers = EntityRegistry.get_soldiers_by_ship(soldier.owned_ship)
+	if local_soldiers.is_empty():
+		local_soldiers = soldier.get_soldiers_cached(soldier.get_tree())
 	var nearest_on_ship: Node3D = null
 	var nearest_distance_on_ship: float = INF
 	var nearest_ranged_on_ship: Node3D = null
@@ -15,21 +21,39 @@ static func find_nearest_enemy(soldier) -> Node3D:
 
 	var detection_range_sq: float = soldier.detection_range * soldier.detection_range
 
-	for other in all_soldiers:
+	for other in local_soldiers:
 		if other == soldier or not is_instance_valid(other):
 			continue
-
 		if other.get("current_state") == soldier.State.DEAD:
 			continue
-
 		if other.get("team") == soldier.team:
 			continue
 
-		var other_ship = other.get("owned_ship")
-		if is_instance_valid(other_ship) and (other_ship.get("is_dying") == true or other_ship.get("is_sinking") == true):
+		var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
+		var dist_sq_xz: float = pos_diff_xz.length_squared()
+		if dist_sq_xz > detection_range_sq:
 			continue
 
-		if is_instance_valid(soldier.owned_ship) and is_instance_valid(other_ship) and soldier.owned_ship != other_ship:
+		if dist_sq_xz < nearest_distance_on_ship:
+			nearest_distance_on_ship = dist_sq_xz
+			nearest_on_ship = other
+		if is_player_boarder and other.get("is_ranged_only") == true and dist_sq_xz < nearest_distance_ranged_on_ship:
+			nearest_distance_ranged_on_ship = dist_sq_xz
+			nearest_ranged_on_ship = other
+		if soldier.is_melee_only:
+			continue
+		if dist_sq_xz < nearest_distance_global:
+			nearest_distance_global = dist_sq_xz
+			nearest_global = other
+
+	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
+	var opposing_ships: Array = EntityRegistry.get_ships_by_team(opposing_team)
+	for other_ship in opposing_ships:
+		if not is_instance_valid(other_ship) or other_ship == soldier.owned_ship:
+			continue
+		if other_ship.get("is_dying") == true or other_ship.get("is_sinking") == true:
+			continue
+		if is_instance_valid(soldier.owned_ship):
 			var ship_diff_xz := Vector2(
 				soldier.owned_ship.global_position.x - other_ship.global_position.x,
 				soldier.owned_ship.global_position.z - other_ship.global_position.z
@@ -37,40 +61,41 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			if ship_diff_xz.length_squared() > 1600.0:
 				continue
 
-		var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
-		var dist_sq_xz: float = pos_diff_xz.length_squared()
-		if dist_sq_xz > detection_range_sq:
+		var ship_soldiers: Array = EntityRegistry.get_soldiers_by_ship(other_ship)
+		if ship_soldiers.is_empty():
 			continue
+		for other in ship_soldiers:
+			if not is_instance_valid(other):
+				continue
+			if other.get("current_state") == soldier.State.DEAD or other.get("team") == soldier.team:
+				continue
 
-		if is_instance_valid(soldier.owned_ship) and other_ship == soldier.owned_ship:
-			if dist_sq_xz < nearest_distance_on_ship:
-				nearest_distance_on_ship = dist_sq_xz
-				nearest_on_ship = other
-			if is_player_boarder and other.get("is_ranged_only") == true and dist_sq_xz < nearest_distance_ranged_on_ship:
-				nearest_distance_ranged_on_ship = dist_sq_xz
-				nearest_ranged_on_ship = other
+			var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
+			var dist_sq_xz: float = pos_diff_xz.length_squared()
+			if dist_sq_xz > detection_range_sq:
+				continue
 
-		var is_ranged: bool = soldier.is_ranged_only or (soldier.current_weapon and soldier.current_weapon.get("max_range") != null and soldier.current_weapon.get("max_range") > 5.0)
-		var can_cross_ship_engage: bool = false
-		if is_instance_valid(soldier.owned_ship) and is_instance_valid(other_ship) and soldier.owned_ship != other_ship:
-			var engage_distance: float = get_cross_ship_engage_max_distance(soldier, other_ship)
-			var self_in_contact_zone: bool = is_in_cross_ship_contact_zone(soldier, other_ship)
-			var other_in_contact_zone: bool = true
-			if other.has_method("_is_in_cross_ship_contact_zone"):
-				other_in_contact_zone = other.call("_is_in_cross_ship_contact_zone", soldier.owned_ship) == true
-			can_cross_ship_engage = (
-				is_ship_pair_in_melee_range(soldier, other_ship)
-				and self_in_contact_zone
-				and other_in_contact_zone
-				and dist_sq_xz < (engage_distance * engage_distance)
-			)
-		else:
-			can_cross_ship_engage = dist_sq_xz < 16.0
+			var is_ranged: bool = soldier.is_ranged_only or (soldier.current_weapon and soldier.current_weapon.get("max_range") != null and soldier.current_weapon.get("max_range") > 5.0)
+			var can_cross_ship_engage: bool = false
+			if is_instance_valid(soldier.owned_ship):
+				var engage_distance: float = get_cross_ship_engage_max_distance(soldier, other_ship)
+				var self_in_contact_zone: bool = is_in_cross_ship_contact_zone(soldier, other_ship)
+				var other_in_contact_zone: bool = true
+				if other.has_method("_is_in_cross_ship_contact_zone"):
+					other_in_contact_zone = other.call("_is_in_cross_ship_contact_zone", soldier.owned_ship) == true
+				can_cross_ship_engage = (
+					is_ship_pair_in_melee_range(soldier, other_ship)
+					and self_in_contact_zone
+					and other_in_contact_zone
+					and dist_sq_xz < (engage_distance * engage_distance)
+				)
+			else:
+				can_cross_ship_engage = dist_sq_xz < 16.0
 
-		if is_ranged or can_cross_ship_engage:
-			if dist_sq_xz < nearest_distance_global:
-				nearest_distance_global = dist_sq_xz
-				nearest_global = other
+			if is_ranged or can_cross_ship_engage:
+				if dist_sq_xz < nearest_distance_global:
+					nearest_distance_global = dist_sq_xz
+					nearest_global = other
 
 	if is_player_boarder and nearest_ranged_on_ship:
 		return nearest_ranged_on_ship
