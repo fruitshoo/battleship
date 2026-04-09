@@ -40,6 +40,8 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 	var loading_layer: CanvasLayer = null
 	var bg: ColorRect = null
 	var loading_label: Label = null
+	if is_instance_valid(AudioManager) and AudioManager.has_method("set_startup_sfx_muted"):
+		AudioManager.set_startup_sfx_muted(true)
 	if show_blocking_overlay:
 		loading_layer = CanvasLayer.new()
 		loading_layer.layer = 120
@@ -109,6 +111,8 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 
 	container.queue_free()
 	print("[Resource] 쉐이더 예열 및 오디오 캐싱 완료")
+	if is_instance_valid(AudioManager) and AudioManager.has_method("set_startup_sfx_muted"):
+		AudioManager.set_startup_sfx_muted(false)
 
 	if show_blocking_overlay and is_instance_valid(bg) and is_instance_valid(loading_layer):
 		var tween = lm.create_tween()
