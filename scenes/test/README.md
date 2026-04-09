@@ -68,3 +68,6 @@
   Loads scripts and scenes headless, checks for common Godot 3-era syntax leftovers, then runs a small runtime smoke check against preview base, ship spawns, launcher fires, projectile launches, and boss spawns.
 - `scripts/test/run_project_contract_sweep.sh`
   Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
+- `scripts/test/run_leak_probe.sh`
+  Leak summary wrapper for any auto-quitting scene.
+  Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.
