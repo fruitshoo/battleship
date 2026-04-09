@@ -43,6 +43,7 @@
 - `midgame_fleet_battle_preview.tscn`
   Midgame fleet battle harness that stages repeating mixed and heavy waves at a fixed combat state.
   Supports `visual_compare` to compare lean battle load against full debug/visual load.
+  Prints phase summaries with average and p95 frame time.
   Script: `scripts/test/midgame_fleet_battle_preview.gd`
 
 ## Sandbox

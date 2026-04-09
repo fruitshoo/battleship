@@ -22,7 +22,9 @@ enum BattleMode {
 @export var wave_limit: int = 6
 @export var wave_plan: PackedStringArray = PackedStringArray(["mixed", "heavy", "mixed", "heavy", "mixed", "heavy"])
 @export var open_deck_for_combat: bool = true
-@export var compare_phase_seconds: float = 12.0
+@export var compare_warmup_seconds: float = 0.5
+@export var compare_phase_seconds: float = 0.35
+@export var auto_print_compare_results: bool = true
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
@@ -34,6 +36,10 @@ var _last_spawned_fleet: String = ""
 var _compare_phase_samples: Array = [[], []]
 var _compare_phase_elapsed: float = 0.0
 var _compare_phase_index: int = 0
+var _compare_warmup_elapsed: float = 0.0
+var _compare_collecting: bool = false
+var _compare_phase_finished: bool = false
+var _compare_final_reported: bool = false
 var _midgame_initialized: bool = false
 
 
@@ -243,12 +249,14 @@ func _build_visual_compare_text(current_difficulty: int, current_time: float, ne
 	var baseline: Dictionary = _summarize_compare_samples(0)
 	var overlay: Dictionary = _summarize_compare_samples(1)
 	var phase_name := "lean" if _compare_phase_index == 0 else "full"
-	return "scenario:midgame_visual_compare phase:%s\nlean fps:%d avg:%.2fms | full fps:%d avg:%.2fms | delta:%.2fms\nships:%d soldiers:%d projectiles:%d\nlevel:%d time:%.1fs target:%.1fs wave:%d/%d next:%.1fs" % [
+	return "scenario:midgame_visual_compare phase:%s\nlean fps:%d avg:%.2fms p95:%.2fms | full fps:%d avg:%.2fms p95:%.2fms | delta:%.2fms\nships:%d soldiers:%d projectiles:%d\nlevel:%d time:%.1fs target:%.1fs wave:%d/%d next:%.1fs" % [
 		phase_name,
 		int(float(baseline.get("fps", 0.0))),
 		float(baseline.get("avg_ms", 0.0)),
+		_get_phase_p95_ms(0),
 		int(float(overlay.get("fps", 0.0))),
 		float(overlay.get("avg_ms", 0.0)),
+		_get_phase_p95_ms(1),
 		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
 		_count_ships(),
 		_count_soldiers(),
@@ -267,6 +275,8 @@ func _configure_compare_state() -> void:
 		return
 	_compare_phase_index = 0
 	_compare_phase_elapsed = 0.0
+	_compare_warmup_elapsed = 0.0
+	_compare_collecting = false
 	_compare_phase_samples = [[], []]
 	_set_compare_phase_enabled(false)
 
@@ -314,6 +324,13 @@ func _summarize_compare_samples(phase_index: int) -> Dictionary:
 func _track_compare_sample(delta: float) -> void:
 	if battle_mode != BattleMode.VISUAL_COMPARE:
 		return
+	if not _compare_collecting:
+		_compare_warmup_elapsed += delta
+		if _compare_warmup_elapsed < compare_warmup_seconds:
+			return
+		_compare_collecting = true
+		_compare_phase_samples = [[], []]
+		_compare_phase_elapsed = 0.0
 	var phase_samples: Array = _compare_phase_samples[_compare_phase_index]
 	phase_samples.append(delta)
 	_compare_phase_samples[_compare_phase_index] = phase_samples
@@ -322,6 +339,13 @@ func _track_compare_sample(delta: float) -> void:
 		_compare_phase_index = 1
 		_compare_phase_elapsed = 0.0
 		_set_compare_phase_enabled(true)
+		if auto_print_compare_results:
+			_print_compare_phase_report("baseline", _summarize_compare_samples(0), _count_ships(), _count_soldiers(), _count_projectiles())
+	elif _compare_phase_index == 1 and _compare_phase_elapsed >= compare_phase_seconds:
+		_compare_phase_finished = true
+		if auto_print_compare_results and not _compare_final_reported:
+			_compare_final_reported = true
+			_print_compare_final_report()
 
 
 func _set_compare_phase_enabled(enabled: bool) -> void:
@@ -346,3 +370,52 @@ func _set_compare_phase_enabled(enabled: bool) -> void:
 		if not is_instance_valid(ship):
 			continue
 		PreviewHarnessHelper.set_preview_deck_light_enabled(ship, enabled)
+
+
+func _print_compare_phase_report(label: String, sample_stats: Dictionary, ships: int, soldiers: int, projectiles: int) -> void:
+	var fps_value := float(sample_stats.get("fps", 0.0))
+	var avg_ms := float(sample_stats.get("avg_ms", 0.0))
+	var p95_ms := _get_phase_p95_ms(_compare_phase_index if label == "overlay" else 0)
+	print("[MidgameBattle] %s fps=%.1f avg=%.2fms p95=%.2fms samples=%d ships=%d soldiers=%d projectiles=%d" % [
+		label,
+		fps_value,
+		avg_ms,
+		p95_ms,
+		int(sample_stats.get("sample_count", 0)),
+		ships,
+		soldiers,
+		projectiles,
+	])
+
+
+func _print_compare_final_report() -> void:
+	var baseline: Dictionary = _summarize_compare_samples(0)
+	var overlay: Dictionary = _summarize_compare_samples(1)
+	var baseline_p95 := _get_phase_p95_ms(0)
+	var overlay_p95 := _get_phase_p95_ms(1)
+	print("[MidgameBattle] compare baseline fps=%.1f avg=%.2fms p95=%.2fms samples=%d" % [
+		float(baseline.get("fps", 0.0)),
+		float(baseline.get("avg_ms", 0.0)),
+		baseline_p95,
+		int(baseline.get("sample_count", 0)),
+	])
+	print("[MidgameBattle] compare overlay fps=%.1f avg=%.2fms p95=%.2fms samples=%d" % [
+		float(overlay.get("fps", 0.0)),
+		float(overlay.get("avg_ms", 0.0)),
+		overlay_p95,
+		int(overlay.get("sample_count", 0)),
+	])
+	print("[MidgameBattle] compare delta avg=%.2fms p95=%.2fms" % [
+		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
+		overlay_p95 - baseline_p95,
+	])
+
+
+func _get_phase_p95_ms(phase_index: int) -> float:
+	var samples: Array = _compare_phase_samples[phase_index]
+	if samples.is_empty():
+		return 0.0
+	var sorted_samples: Array = samples.duplicate()
+	sorted_samples.sort()
+	var p95_index := clampi(int(ceil(float(sorted_samples.size()) * 0.95)) - 1, 0, sorted_samples.size() - 1)
+	return float(sorted_samples[p95_index]) * 1000.0

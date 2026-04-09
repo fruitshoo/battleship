@@ -16,5 +16,6 @@ level_duration = 30.0
 initial_wave_delay = 0.75
 wave_interval = 7.0
 wave_limit = 6
+compare_phase_seconds = 0.35
 wave_plan = PackedStringArray("mixed", "heavy", "mixed", "heavy", "mixed", "heavy")
 open_deck_for_combat = true
