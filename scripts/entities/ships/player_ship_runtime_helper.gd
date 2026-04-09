@@ -78,13 +78,13 @@ static func capture_derelict_ship(ship) -> void:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if soldiers_node:
 		for child in soldiers_node.get_children():
-			if child.has_method("heal_full") and child.get("current_state") != 4:
+			if child.has_method("heal_full") and not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
 				child.heal_full()
 
 	var alive_count = 0
 	if soldiers_node:
 		for child in soldiers_node.get_children():
-			if child.get("current_state") != 4:
+			if not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
 				alive_count += 1
 
 		if alive_count < ship.max_crew_count and is_instance_valid(ship._cached_level_manager) and ship._cached_level_manager.has_node("LevelLogic"):
@@ -104,8 +104,8 @@ static func replenish_crew(ship, soldier_scene: PackedScene) -> void:
 	if not soldiers_node or not soldier_scene:
 		return
 	for child in soldiers_node.get_children():
-		var is_alive = child.get("current_state") != 4
-		var is_player = child.get("team") == "player"
+		var is_alive = not (child.has_method("is_dead_soldier") and child.is_dead_soldier())
+		var is_player = child.has_method("is_player_team_soldier") and child.is_player_team_soldier()
 		if not is_alive:
 			child.queue_free()
 		elif not is_player:

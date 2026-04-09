@@ -80,7 +80,9 @@ static func sync_player_crew_roster(ship) -> void:
 		ship.CREW_ROLE_SINGIGEON: [],
 	}
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.get("current_state") == 4 or child.get("team") != "player":
+		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+			continue
+		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
 			continue
 		if is_captain(ship, child):
 			alive_captains.append(child)
@@ -122,7 +124,7 @@ static func add_survivor(ship) -> bool:
 	var alive_count = 0
 	var soldiers = EntityRegistry.get_soldiers_by_ship(ship)
 	for child in soldiers:
-		if child.get("current_state") != 4:
+		if child.has_method("is_dead_soldier") and not child.is_dead_soldier():
 			alive_count += 1
 		else:
 			child.queue_free()
@@ -150,7 +152,9 @@ static func add_survivor(ship) -> bool:
 	}
 	var current_captains: int = 0
 	for child in soldiers:
-		if child.get("current_state") == 4 or child.get("team") != "player":
+		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+			continue
+		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
 			continue
 		if is_captain(ship, child):
 			current_captains += 1
@@ -211,7 +215,11 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 
 	var tosser = null
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.get("current_state") != 4 and child.get("team") == "player" and get_soldier_role(ship, child) == ship.CREW_ROLE_FIRE_POT:
+		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+			continue
+		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
+			continue
+		if get_soldier_role(ship, child) == ship.CREW_ROLE_FIRE_POT:
 			tosser = child
 			break
 
@@ -379,15 +387,15 @@ static func _recall_raid_boarders(ship) -> void:
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
 			continue
-		if soldier.get("team") != "player":
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if soldier.get("home_ship") != ship:
+		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
-		if soldier.get("owned_ship") == ship:
+		if soldier.has_method("get_owned_ship_node") and soldier.get_owned_ship_node() == ship:
 			continue
-		if bool(soldier.get("_is_jumping")):
+		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
 			continue
 		if soldier.has_method("_try_evacuate_to_home"):
 			soldier._try_evacuate_to_home()
@@ -396,9 +404,9 @@ static func _recall_raid_boarders(ship) -> void:
 static func _count_enemy_boarders_on_ship(ship) -> int:
 	var count: int = 0
 	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if soldier.get("team") == "enemy":
+		if soldier.has_method("is_enemy_team_soldier") and soldier.is_enemy_team_soldier():
 			count += 1
 	return count
 
@@ -406,11 +414,11 @@ static func _count_enemy_boarders_on_ship(ship) -> int:
 static func _count_home_defenders(ship) -> int:
 	var count: int = 0
 	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if soldier.get("team") != "player":
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if bool(soldier.get("_is_jumping")):
+		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
 			continue
 		count += 1
 	return count
@@ -422,13 +430,13 @@ static func _count_boarders_from_home(ship) -> int:
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
 			continue
-		if soldier.get("team") != "player":
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if soldier.get("home_ship") != ship:
+		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
-		if soldier.get("owned_ship") != ship:
+		if soldier.has_method("get_owned_ship_node") and soldier.get_owned_ship_node() != ship:
 			count += 1
 	return count
 
@@ -439,13 +447,13 @@ static func _get_home_boarders_on_ship(ship, target_ship: Node3D) -> Array:
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
 			continue
-		if soldier.get("team") != "player":
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if soldier.get("home_ship") != ship:
+		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
-		if soldier.get("owned_ship") == target_ship:
+		if soldier.has_method("get_owned_ship_node") and soldier.get_owned_ship_node() == target_ship:
 			result.append(soldier)
 	return result
 
@@ -455,13 +463,13 @@ static func _get_available_raid_boarders(ship) -> Array:
 	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
 		if not is_instance_valid(soldier):
 			continue
-		if soldier.get("team") != "player":
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if bool(soldier.get("_is_jumping")):
+		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
 			continue
-		if bool(soldier.get("is_ranged_only")):
+		if soldier.has_method("is_ranged_only_value") and soldier.is_ranged_only_value():
 			continue
 		if is_captain(ship, soldier):
 			continue
@@ -470,8 +478,8 @@ static func _get_available_raid_boarders(ship) -> Array:
 
 
 static func _get_boarder_priority(soldier: Node) -> int:
-	var role: String = str(soldier.get("crew_role"))
-	if bool(soldier.get("is_melee_only")):
+	var role: String = str(soldier.get_crew_role_value()) if soldier.has_method("get_crew_role_value") else str(soldier.get("crew_role"))
+	if soldier.has_method("is_melee_only_value") and soldier.is_melee_only_value():
 		return 3
 	if role == "spearman":
 		return 2
@@ -493,11 +501,11 @@ static func _get_desired_boarder_count(ship, target_ship: Node3D) -> int:
 static func _count_ranged_enemies_on_ship(target_ship: Node3D) -> int:
 	var count: int = 0
 	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
-		if soldier.get("current_state") == 4:
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
 			continue
-		if soldier.get("team") != "enemy":
+		if soldier.has_method("is_enemy_team_soldier") and not soldier.is_enemy_team_soldier():
 			continue
-		if bool(soldier.get("is_ranged_only")):
+		if soldier.has_method("is_ranged_only_value") and soldier.is_ranged_only_value():
 			count += 1
 	return count
 
@@ -509,9 +517,11 @@ static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
 		return false
 	if not target_ship.is_in_group("enemy"):
 		return false
-	if target_ship.get("team") == "player":
+	if target_ship.has_method("is_player_team") and target_ship.is_player_team():
 		return false
-	if target_ship.get("is_dying") or target_ship.get("is_sinking") or target_ship.get("is_derelict"):
+	if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
+		return false
+	if target_ship.has_method("is_derelict_ship") and target_ship.is_derelict_ship():
 		return false
 	return true
 
