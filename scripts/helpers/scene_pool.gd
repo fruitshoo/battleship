@@ -54,7 +54,7 @@ static func release(node: Node) -> void:
 	if pool.size() >= capacity:
 		node.queue_free()
 		return
-	if node.has_meta(PENDING_RELEASE_META) and bool(node.get_meta(PENDING_RELEASE_META)):
+	if node.has_meta(PENDING_RELEASE_META) and node.get_meta(PENDING_RELEASE_META) == true:
 		return
 	node.set_meta(PENDING_RELEASE_META, true)
 	tree.process_frame.connect(

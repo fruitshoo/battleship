@@ -288,7 +288,7 @@ func _physics_process(delta: float) -> void:
 	_apply_bobbing_effect()
 
 func _calculate_separation() -> Vector3:
-	if bool(get_meta("derelict_nonblocking", false)):
+	if get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
 	var force = Vector3.ZERO
@@ -297,7 +297,7 @@ func _calculate_separation() -> Vector3:
 	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_dead") or other.get("is_sinking"):
 			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
+		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 			
 		var offset = global_position - other.global_position

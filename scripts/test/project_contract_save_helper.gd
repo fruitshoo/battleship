@@ -146,7 +146,7 @@ static func _capture_file_bytes(path: String) -> Dictionary:
 static func _restore_file_bytes(path: String, payload: Dictionary, failures: Array[String]) -> void:
 	if payload.is_empty():
 		return
-	var existed := bool(payload.get("exists", false))
+	var existed: bool = payload.get("exists", false) == true
 	var bytes: PackedByteArray = payload.get("bytes", PackedByteArray())
 	if existed:
 		var file := FileAccess.open(path, FileAccess.WRITE)

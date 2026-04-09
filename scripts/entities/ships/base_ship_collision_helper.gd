@@ -5,7 +5,7 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 static func calculate_collision_repulsion(ship) -> Vector3:
-	if bool(ship.get_meta("derelict_nonblocking", false)):
+	if ship.get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
 	var force = Vector3.ZERO
@@ -14,7 +14,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
 			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
+		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 
 		var diff = other.global_position - ship.global_position

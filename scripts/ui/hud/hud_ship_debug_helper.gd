@@ -19,7 +19,7 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 	var crew_count: int = int(ship_snapshot.get("current_crew_count", 0))
 	var max_crew_count_value: int = int(ship_snapshot.get("max_crew_count", 0))
 	var speed_value: float = float(ship_snapshot.get("current_speed", 0.0))
-	var fire_state: String = "화재" if bool(ship_snapshot.get("is_burning", false)) else "정상"
+	var fire_state: String = "화재" if ship_snapshot.get("is_burning", false) == true else "정상"
 	var rudder_ratio_value: float = float(player_ship.call("get_rudder_health_ratio")) if player_ship.has_method("get_rudder_health_ratio") else 1.0
 	hud.debug_ship_status_value.text = "선체 %.0f/%.0f | 스태미나 %.0f/%.0f | 선원 %d/%d | 속도 %.1f | 조타 %.0f%% | %s" % [
 		hull_hp_value,
@@ -36,7 +36,7 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 	if is_instance_valid(hud.debug_ship_config_value):
 		var support_limit: int = int(ship_snapshot.get("support_fleet_limit", 0))
 		var captain_count_value: int = int(ship_snapshot.get("captain_count", 0))
-		var rowing_state: String = "ON" if bool(ship_snapshot.get("is_rowing", false)) else "OFF"
+		var rowing_state: String = "ON" if ship_snapshot.get("is_rowing", false) == true else "OFF"
 		var max_speed_value: float = float(ship_snapshot.get("max_speed", 0.0))
 		var turn_rate_value: float = float(ship_snapshot.get("turn_rate", 0.0))
 		var hull_defense_value: float = float(ship_snapshot.get("hull_defense", 0.0))
@@ -157,7 +157,7 @@ static func toggle_player_ship_fire_for_debug(hud) -> void:
 	if not _ensure_player_ship(hud):
 		return
 	var ship_snapshot: Dictionary = hud.player_ship.call("get_debug_ship_state_snapshot") if hud.player_ship.has_method("get_debug_ship_state_snapshot") else {}
-	var is_burning_now: bool = bool(ship_snapshot.get("is_burning", false))
+	var is_burning_now: bool = ship_snapshot.get("is_burning", false) == true
 	hud.player_ship.set("is_burning", not is_burning_now)
 	if ship_snapshot.get("fire_build_up", null) != null and ship_snapshot.get("fire_threshold", null) != null:
 		if is_burning_now:
@@ -172,7 +172,7 @@ static func toggle_player_rowing_for_debug(hud) -> void:
 	if not _ensure_player_ship(hud):
 		return
 	var ship_snapshot: Dictionary = hud.player_ship.call("get_debug_ship_state_snapshot") if hud.player_ship.has_method("get_debug_ship_state_snapshot") else {}
-	var next_rowing: bool = not bool(ship_snapshot.get("is_rowing", false))
+	var next_rowing: bool = ship_snapshot.get("is_rowing", false) != true
 	if hud.player_ship.has_method("set_rowing"):
 		hud.player_ship.call("set_rowing", next_rowing)
 	else:

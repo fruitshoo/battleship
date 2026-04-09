@@ -118,6 +118,7 @@ func _scan_legacy_godot3_patterns(roots: Array[String]) -> void:
 		{"pattern": "funcref(", "label": "funcref()"},
 		{"pattern": ".instance(", "label": "PackedScene.instance()"},
 		{"pattern": "String(", "label": "String() constructor"},
+		{"pattern": "bool(", "label": "bool() constructor"},
 	]
 
 	var paths: Array[String] = []
@@ -228,11 +229,11 @@ func _run_scene_wiring_contract_smoke() -> void:
 			str(check["path"]),
 			str(check["label"]),
 			str(check["team"]),
-			bool(check["player_controlled"]),
+			check["player_controlled"] == true,
 			check["groups"],
 			check["required_nodes"],
-			bool(check["require_hull"]),
-			bool(check["require_boss_group"]),
+			check["require_hull"] == true,
+			check["require_boss_group"] == true,
 			check["allow_boarding"]
 		)
 
@@ -259,7 +260,7 @@ func _run_single_scene_wiring_pass(scene_path: String, label: String, expected_t
 		if actual_team != expected_team:
 			_failures.append("%s wiring team mismatch: %s" % [label, actual_team])
 	if scene_root.has_method("is_player_controlled_ship"):
-		var actual_player_controlled: bool = bool(scene_root.is_player_controlled_ship())
+		var actual_player_controlled: bool = scene_root.is_player_controlled_ship() == true
 		if actual_player_controlled != expected_player_controlled:
 			_failures.append("%s wiring player-controlled mismatch" % label)
 	for group_name in expected_groups:
@@ -274,9 +275,9 @@ func _run_single_scene_wiring_pass(scene_path: String, label: String, expected_t
 		_failures.append("%s missing boss group tag after ready" % label)
 	if expected_allow_boarding != null:
 		var actual_allow_boarding: bool = scene_root.get("allow_boarding") == true
-		if actual_allow_boarding != bool(expected_allow_boarding):
+		if actual_allow_boarding != (expected_allow_boarding == true):
 			_failures.append("%s allow_boarding mismatch" % label)
-		if scene_root.has_method("is_boarding_ship") and scene_root.is_boarding_ship() != true and bool(expected_allow_boarding):
+		if scene_root.has_method("is_boarding_ship") and scene_root.is_boarding_ship() != true and expected_allow_boarding == true:
 			_failures.append("%s expected boarding-capable ship" % label)
 
 	scene_root.queue_free()
@@ -337,7 +338,7 @@ func _run_support_fleet_contract_smoke() -> void:
 		_failures.append("support fleet smoke team mismatch: %s" % support_team)
 	if not support_ship.is_in_group("captured_minion"):
 		_failures.append("support fleet smoke missing captured_minion group")
-	if bool(support_ship.get_meta("support_fleet_ship", false)) == false:
+	if support_ship.get_meta("support_fleet_ship", false) != true:
 		_failures.append("support fleet smoke missing support_fleet_ship meta")
 	if EntityRegistry.count_captured_minions() <= captured_before:
 		_failures.append("support fleet smoke did not increase captured minion count")
@@ -391,12 +392,12 @@ func _run_bootstrap_contract_smoke() -> void:
 	if not is_instance_valid(AudioManager):
 		_failures.append("bootstrap smoke missing AudioManager autoload")
 	else:
-		if not bool(AudioManager.get("is_prewarm_finished")) and AudioManager.has_signal("prewarm_finished"):
+		if AudioManager.get("is_prewarm_finished") != true and AudioManager.has_signal("prewarm_finished"):
 			await AudioManager.prewarm_finished
 			await _wait_frames(1)
-		if not bool(AudioManager.get("is_prewarm_finished")):
+		if AudioManager.get("is_prewarm_finished") != true:
 			_failures.append("bootstrap smoke audio prewarm did not finish")
-		if bool(AudioManager.get("_startup_sfx_muted")):
+		if AudioManager.get("_startup_sfx_muted") == true:
 			_failures.append("bootstrap smoke startup audio mute flag remained enabled")
 		var sfx_index_before: int = int(AudioManager.get("current_sfx_index"))
 		var ui_index_before: int = int(AudioManager.get("current_2d_index"))

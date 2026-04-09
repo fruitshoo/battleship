@@ -12,7 +12,7 @@ static func auto_adjust_sail(ship, delta: float) -> void:
 	ship.sail_angle = move_toward(ship.sail_angle, target_sail_angle, auto_turn_speed * delta)
 
 static func calculate_separation(ship) -> Vector3:
-	if bool(ship.get_meta("derelict_nonblocking", false)):
+	if ship.get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
 	var force = Vector3.ZERO
@@ -21,7 +21,7 @@ static func calculate_separation(ship) -> Vector3:
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
 			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
+		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 		if ship.has_method("is_boarding_ship") and ship.is_boarding_ship() and other == ship.get_boarding_target_ship():
 			continue
@@ -57,8 +57,8 @@ static func get_boarding_drag_multiplier(ship) -> float:
 
 static func update_movement(ship, delta: float) -> void:
 	var target_speed: float = calculate_sail_speed(ship)
-	var is_exhausted_rowing: bool = bool(ship.is_rowing and ship.rowing_locked)
-	var is_actively_rowing: bool = bool(ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0)
+	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
+	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
 	if is_actively_rowing:
 		target_speed += ship.rowing_speed
 	elif is_exhausted_rowing:
@@ -126,9 +126,9 @@ static func update_oar_visual(ship, delta: float) -> void:
 	var has_oars = ship.oar_pivot_left or ship.oar_pivot_right
 	if not has_oars:
 		return
-	var is_exhausted_rowing: bool = bool(ship.is_rowing and ship.rowing_locked)
-	var is_actively_rowing: bool = bool(ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0)
-	var is_moving_fast: bool = bool(ship.current_speed > 1.0)
+	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
+	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
+	var is_moving_fast: bool = ship.current_speed > 1.0
 	if is_actively_rowing or is_exhausted_rowing or is_moving_fast:
 		var row_speed = 2.2 if is_actively_rowing else (1.45 if is_exhausted_rowing else 1.2)
 		ship._oar_time += delta * row_speed

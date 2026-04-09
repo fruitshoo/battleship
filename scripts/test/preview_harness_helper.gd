@@ -97,7 +97,7 @@ static func has_preview_crew_role(ship: Node, role_name: String) -> bool:
 	if not is_instance_valid(ship):
 		return false
 	if ship.has_method("has_active_crew_role"):
-		return bool(ship.call("has_active_crew_role", role_name))
+		return ship.call("has_active_crew_role", role_name) == true
 	return false
 
 

@@ -27,7 +27,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 		ship._find_player()
 		return
 
-	var is_support_ship: bool = bool(ship.get_meta("support_fleet_ship", false))
+	var is_support_ship: bool = ship.get_meta("support_fleet_ship", false) == true
 	var minions: Array = _get_minion_roster(ship, is_support_ship)
 	var my_index: int = minions.find(ship)
 	if my_index == -1:
@@ -69,7 +69,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var direction = to_target_vec.normalized()
 	var rel_depth = to_target_vec.dot(player_fwd)
 	var dist_to_player = ship.global_position.distance_to(ship.target.global_position)
-	var is_joining_support: bool = ship.has_meta("support_joining") and bool(ship.get_meta("support_joining"))
+	var is_joining_support: bool = ship.has_meta("support_joining") and ship.get_meta("support_joining") == true
 	if is_support_ship:
 		support_lead_ship = _get_support_lead_ship(ship, minions, my_index)
 		_record_support_trail_point(support_lead_ship)
@@ -200,7 +200,7 @@ static func _get_minion_roster(ship, support_only: bool) -> Array:
 	for minion in all_minions:
 		if not is_instance_valid(minion):
 			continue
-		if support_only and bool(minion.get_meta("support_fleet_ship", false)) == false:
+		if support_only and minion.get_meta("support_fleet_ship", false) != true:
 			continue
 		roster.append(minion)
 	if support_only:

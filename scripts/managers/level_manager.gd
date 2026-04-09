@@ -740,7 +740,7 @@ func _debug_dump_support_fleet_state() -> void:
 		var rel_depth: float = float(support_ship.get_meta("support_debug_rel_depth", 0.0))
 		var lead_speed: float = float(support_ship.get_meta("support_debug_lead_speed", 0.0))
 		var target_speed: float = float(support_ship.get_meta("support_debug_target_speed", 0.0))
-		var join_state: bool = bool(support_ship.get_meta("support_joining", false))
+		var join_state: bool = support_ship.get_meta("support_joining", false) == true
 		print("[DEBUG] %s pos=%s speed=%.2f lead=%s slot_dist=%.2f rel_depth=%.2f lead_speed=%.2f target_speed=%.2f joining=%s" % [
 			support_ship.name,
 			support_ship.global_position,

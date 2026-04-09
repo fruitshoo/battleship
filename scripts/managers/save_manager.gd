@@ -133,7 +133,7 @@ func apply_settings() -> void:
 	_set_bus_volume_linear("Music", float(get_setting("music_volume", 0.75)))
 	_set_bus_volume_linear("SFX", float(get_setting("sfx_volume", 0.85)))
 	_set_bus_volume_linear("UI", float(get_setting("ui_volume", 0.85)))
-	var fullscreen: bool = bool(get_setting("fullscreen", false))
+	var fullscreen: bool = get_setting("fullscreen", false) == true
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 
 func _set_bus_volume_linear(bus_name: String, linear: float) -> void:

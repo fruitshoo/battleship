@@ -34,7 +34,7 @@ static func is_clear_day_preset_active(ship) -> bool:
 	if not is_instance_valid(ship._cached_environment_preset_manager):
 		return false
 	if ship._cached_environment_preset_manager.has_method("is_clear_day_active"):
-		return bool(ship._cached_environment_preset_manager.call("is_clear_day_active"))
+		return ship._cached_environment_preset_manager.call("is_clear_day_active") == true
 	if "current_preset" in ship._cached_environment_preset_manager:
 		return int(ship._cached_environment_preset_manager.get("current_preset")) == 0
 	return false
@@ -133,7 +133,7 @@ static func update_sail_visual(ship) -> void:
 	if ship == null:
 		return
 	var burn_ratio: float = 0.0
-	if ship.has_meta("debug_sail_burn_override_active") and bool(ship.get_meta("debug_sail_burn_override_active")):
+	if ship.has_meta("debug_sail_burn_override_active") and ship.get_meta("debug_sail_burn_override_active") == true:
 		burn_ratio = clampf(float(ship.get_meta("debug_sail_burn_override_value", 0.0)), 0.0, 1.0)
 	elif ship.is_burning:
 		var fire_ratio: float = 0.0

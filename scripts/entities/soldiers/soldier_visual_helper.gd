@@ -94,7 +94,7 @@ static func update_role_visual(soldier) -> void:
 		captain_material.albedo_color = Color(1.0, 0.82, 0.28, 0.95)
 		captain_material.emission = Color(1.0, 0.76, 0.22, 1.0)
 		captain_material.emission_energy_multiplier = 0.55
-		captain_marker.visible = bool(soldier.get("is_captain"))
+		captain_marker.visible = soldier.get("is_captain") == true
 		captain_marker.rotation_degrees = Vector3.ZERO
 		captain_marker.scale = Vector3(1.0, 1.0, 1.0)
 		captain_marker.material_override = captain_material

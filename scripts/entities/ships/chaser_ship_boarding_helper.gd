@@ -46,7 +46,7 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 			continue
 		if other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying():
 			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
+		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 
 		var use_support_guard: bool = _is_support_fleet_pair(ship, other)
@@ -74,7 +74,7 @@ static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vecto
 		return proposed_pos
 	if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
 		return proposed_pos
-	if bool(other_ship.get_meta("derelict_nonblocking", false)):
+	if other_ship.get_meta("derelict_nonblocking", false) == true:
 		return proposed_pos
 
 	var target_pos = other_ship.global_position
@@ -157,4 +157,4 @@ static func _is_support_fleet_pair(ship, other_ship: Node3D) -> bool:
 		return false
 	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
-	return bool(ship.get_meta("support_fleet_ship", false)) and bool(other_ship.get_meta("support_fleet_ship", false))
+	return ship.get_meta("support_fleet_ship", false) == true and other_ship.get_meta("support_fleet_ship", false) == true

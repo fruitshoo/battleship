@@ -24,9 +24,9 @@ static func is_sinking_or_dying(node: Node) -> bool:
 		return node.is_sinking_or_dying()
 	var sinking := false
 	if "is_sinking" in node:
-		sinking = sinking or bool(node.get("is_sinking"))
+		sinking = sinking or node.get("is_sinking") == true
 	if "is_dying" in node:
-		sinking = sinking or bool(node.get("is_dying"))
+		sinking = sinking or node.get("is_dying") == true
 	return sinking
 
 
@@ -132,5 +132,5 @@ static func is_player_controlled_ship(node: Node) -> bool:
 	if node.has_method("is_player_controlled_ship"):
 		return node.is_player_controlled_ship()
 	if "is_player_controlled" in node:
-		return bool(node.get("is_player_controlled"))
+		return node.get("is_player_controlled") == true
 	return false

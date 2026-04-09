@@ -72,8 +72,8 @@ func _refresh_debug_labels() -> void:
 
 func _build_debug_text(ship: Node) -> String:
 	return PreviewStateSnapshotHelper.build_enemy_role_text(
-		bool(ship.call("is_gunner_role")),
+		ship.call("is_gunner_role") == true,
 		float(ship.get("preferred_combat_range")),
-		bool(ship.call("can_board_targets")),
-		bool(ship.call("can_use_fire_pot_attack"))
+		ship.call("can_board_targets") == true,
+		ship.call("can_use_fire_pot_attack") == true
 	)

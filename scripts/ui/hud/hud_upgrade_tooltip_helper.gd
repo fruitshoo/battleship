@@ -127,7 +127,7 @@ static func update_upgrade_track_slot(hud, upgrade_id: String, level: int, track
 			hud.active_supports[upgrade_id] = slot_idx
 
 	var slot = track_node.update_slot(slot_idx, upgrade_id, level, actual_icon, actual_color)
-	if is_instance_valid(slot) and not bool(slot.get_meta("hover_bound", false)):
+	if is_instance_valid(slot) and slot.get_meta("hover_bound", false) != true:
 		bind_upgrade_slot_hover(hud, slot)
 		slot.set_meta("hover_bound", true)
 

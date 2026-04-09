@@ -84,7 +84,7 @@ func _get_ai_separation_update_interval_runtime(seed_value: int) -> float:
 
 
 func _calculate_separation() -> Vector3:
-	if bool(get_meta("derelict_nonblocking", false)):
+	if get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
 	var force = Vector3.ZERO
@@ -96,7 +96,7 @@ func _calculate_separation() -> Vector3:
 		var other = neighbors[i]
 		if other == self or not is_instance_valid(other) or other.get("is_dying"):
 			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
+		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 		if is_boarding and other == boarding_target:
 			continue

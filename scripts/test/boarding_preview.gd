@@ -68,6 +68,6 @@ func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 	return PreviewStateSnapshotHelper.build_boarding_preview_text(
 		has_target,
 		planar_distance,
-		bool(enemy.get("is_boarding")),
+		enemy.get("is_boarding") == true,
 		float(enemy.get("boarding_prep_timer"))
 	)

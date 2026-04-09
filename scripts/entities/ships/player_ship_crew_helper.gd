@@ -11,8 +11,8 @@ static func is_captain(ship, soldier: Node) -> bool:
 	if soldier == null:
 		return false
 	if "is_captain" in soldier:
-		return bool(soldier.is_captain)
-	return bool(soldier.get_meta("is_captain", false))
+		return soldier.is_captain == true
+	return soldier.get_meta("is_captain", false) == true
 
 static func set_captain_state(ship, soldier: Node, enabled: bool) -> void:
 	if soldier == null:
@@ -257,7 +257,7 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 
 
 static func update_auto_boarding_raid(ship, delta: float) -> void:
-	if not bool(ship.auto_raid_enabled):
+	if ship.auto_raid_enabled != true:
 		_recall_raid_boarders(ship)
 		ship.auto_raid_target = null
 		return
@@ -529,7 +529,7 @@ static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
 static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
 	if not ship.has_method("_is_side_boarding_approach"):
 		return false
-	if not bool(ship.call("_is_side_boarding_approach", target_ship)):
+	if ship.call("_is_side_boarding_approach", target_ship) != true:
 		return false
 	var my_ext: Vector2 = ship.get_deck_half_extents()
 	var other_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)

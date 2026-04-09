@@ -30,7 +30,7 @@ func _ready() -> void:
 	music_slider.value = float(SaveManager.get_setting("music_volume", 0.75))
 	sfx_slider.value = float(SaveManager.get_setting("sfx_volume", 0.85))
 	ui_slider.value = float(SaveManager.get_setting("ui_volume", 0.85))
-	fullscreen_check.button_pressed = bool(SaveManager.get_setting("fullscreen", false))
+	fullscreen_check.button_pressed = SaveManager.get_setting("fullscreen", false) == true
 	fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	back_button.pressed.connect(_on_back_pressed)
 

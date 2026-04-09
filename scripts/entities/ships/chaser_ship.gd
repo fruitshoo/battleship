@@ -204,7 +204,7 @@ func _apply_combat_profile_from_stats(stats: Dictionary) -> void:
 		var role_name := str(stats["combat_role"]).to_lower()
 		combat_role = CombatRole.GUNNER if role_name == "gunner" else CombatRole.CHARGER
 	if stats.has("allow_boarding"):
-		allow_boarding = bool(stats["allow_boarding"])
+		allow_boarding = stats["allow_boarding"] == true
 	if stats.has("preferred_range"):
 		preferred_combat_range = float(stats["preferred_range"])
 	if stats.has("range_tolerance"):

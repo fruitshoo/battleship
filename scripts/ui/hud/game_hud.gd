@@ -583,7 +583,7 @@ func add_item_icon(icon_data) -> void:
 		var tooltip_text: String = "[%s]\n%s" % [item_name, item_description]
 		slot.set_meta("tooltip_text", tooltip_text.strip_edges())
 		slot.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
-		if not bool(slot.get_meta("hover_bound", false)):
+		if slot.get_meta("hover_bound", false) != true:
 			_bind_upgrade_slot_hover(slot)
 			slot.set_meta("hover_bound", true)
 

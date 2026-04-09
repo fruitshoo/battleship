@@ -80,7 +80,7 @@ func _process(delta: float) -> void:
 func _is_prewarm_mode() -> bool:
 	var n: Node = self
 	while is_instance_valid(n):
-		if n.has_meta("prewarm_mode") and bool(n.get_meta("prewarm_mode")):
+		if n.has_meta("prewarm_mode") and n.get_meta("prewarm_mode") == true:
 			return true
 		n = n.get_parent()
 	return false

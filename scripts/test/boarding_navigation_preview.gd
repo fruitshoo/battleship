@@ -113,5 +113,5 @@ func _build_enemy_debug_text(enemy: Node) -> String:
 		mode,
 		slot,
 		side_value,
-		bool(enemy.get("is_boarding"))
+		enemy.get("is_boarding") == true
 	)

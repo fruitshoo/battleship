@@ -73,7 +73,7 @@ static func get_support_fleet_ships(ship) -> Array:
 	for minion in EntityRegistry.get_ships_by_team("player"):
 		if not is_instance_valid(minion):
 			continue
-		if bool(minion.get_meta("support_fleet_ship", false)) == false:
+		if minion.get_meta("support_fleet_ship", false) != true:
 			continue
 		if minion.has_method("is_combat_disabled") and minion.is_combat_disabled():
 			continue

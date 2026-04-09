@@ -508,7 +508,7 @@ func get_boarding_target_ship() -> Node3D:
 func is_player_controlled_ship() -> bool:
 	if not ("is_player_controlled" in self):
 		return false
-	return bool(get("is_player_controlled"))
+	return get("is_player_controlled") == true
 
 func is_player_team() -> bool:
 	return get_team_tag() == "player"
@@ -547,7 +547,7 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		if captain_count_variant != null:
 			captain_count_value = max(0, int(captain_count_variant))
 	if "is_rowing" in self:
-		is_rowing_value = bool(get("is_rowing"))
+		is_rowing_value = get("is_rowing") == true
 	if "crew_respawn_interval" in self:
 		var crew_respawn_interval_variant: Variant = get("crew_respawn_interval")
 		if crew_respawn_interval_variant != null:

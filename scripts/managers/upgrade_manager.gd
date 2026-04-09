@@ -917,7 +917,7 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 		var base_limit: int = int(ship.get_meta("base_support_fleet_limit", ship.support_fleet_limit))
 		if not ship.has_meta("base_support_fleet_limit"):
 			ship.set_meta("base_support_fleet_limit", base_limit)
-		var item_bonus: int = 1 if bool(ship.get_meta("item_choyogi_applied", false)) else 0
+		var item_bonus: int = 1 if ship.get_meta("item_choyogi_applied", false) == true else 0
 		var upgrade_bonus: int = 0
 		if level >= int(stats.get("limit_add_level", 5)):
 			upgrade_bonus = int(stats.get("limit_add", 1))
