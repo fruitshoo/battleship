@@ -5,4 +5,4 @@
 
 [node name="PerformancePreview" instance=ExtResource("1_main")]
 script = ExtResource("2_script")
-scenario = 6
+scenario = 4

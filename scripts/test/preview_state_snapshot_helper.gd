@@ -59,3 +59,21 @@ static func build_cannon_player_text(range_value: float, active_cannons: int, to
 static func build_cannon_enemy_text(distance_to_target: float, range_value: float) -> String:
 	var state_text := "IN" if distance_to_target <= range_value else "OUT"
 	return "dist:%.1f range:%.1f %s" % [distance_to_target, range_value, state_text]
+
+
+static func build_projectile_compare_text(scenario_name: String, phase_name: String, base_kind: String, overlay_kind: String, baseline: Dictionary, overlay: Dictionary, active_kind: String) -> String:
+	return "scenario:%s phase:%s projectile:%s base:%s overlay:%s\nbase fps:%d avg:%.2fms | overlay fps:%d avg:%.2fms | delta:%.2fms\nships:%d soldiers:%d projectiles:%d" % [
+		scenario_name,
+		phase_name,
+		active_kind,
+		base_kind,
+		overlay_kind,
+		int(float(baseline.get("fps", 0.0))),
+		float(baseline.get("avg_ms", 0.0)),
+		int(float(overlay.get("fps", 0.0))),
+		float(overlay.get("avg_ms", 0.0)),
+		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
+		int(baseline.get("ships", 0)),
+		int(baseline.get("soldiers", 0)),
+		int(baseline.get("projectiles", 0)),
+	]

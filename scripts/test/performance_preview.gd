@@ -4,8 +4,11 @@ const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
 const CANNONBALL_SCENE := preload("res://scenes/projectiles/cannonball.tscn")
+const ARROW_SCENE := preload("res://scenes/projectiles/arrow.tscn")
+const FIRE_POT_SCENE := preload("res://scenes/projectiles/fire_pot.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 enum Scenario {
@@ -13,9 +16,16 @@ enum Scenario {
 	SHIP_DENSITY,
 	BOARDING_STRESS,
 	PROJECTILE_STRESS,
+	PROJECTILE_COMPARE,
 	FULL_COMBAT,
 	OVERLAY_COMPARE,
 	VISUAL_COMPARE,
+}
+
+enum ProjectileKind {
+	CANNONBALL,
+	ARROW,
+	FIRE_POT,
 }
 
 @export var scenario: Scenario = Scenario.FULL_COMBAT
@@ -32,6 +42,10 @@ enum Scenario {
 @export var boarding_ring_radius: float = 9.0
 @export var projectile_ring_radius: float = 42.0
 @export var projectile_lifetime_multiplier: float = 3.0
+@export var projectile_speed: float = 28.0
+@export var projectile_arc_height: float = 2.8
+@export var projectile_compare_base_kind: ProjectileKind = ProjectileKind.CANNONBALL
+@export var projectile_compare_overlay_kind: ProjectileKind = ProjectileKind.ARROW
 @export var compare_phase_seconds: float = 3.0
 
 var _overlay_panel: PanelContainer = null
@@ -42,6 +56,7 @@ var _frame_samples: Array[float] = []
 var _compare_phase_samples: Array = [[], []]
 var _compare_phase_elapsed: float = 0.0
 var _compare_phase_index: int = 0
+var _compare_projectile_kind: int = ProjectileKind.CANNONBALL
 var _projectile_spawns: Array[Node] = []
 
 
@@ -103,19 +118,22 @@ func _apply_scenario() -> void:
 			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 			_spawn_boarding_stress(player)
 		Scenario.PROJECTILE_STRESS:
-			_spawn_projectile_stress(player)
+			_spawn_projectile_stress(player, projectile_compare_base_kind)
+		Scenario.PROJECTILE_COMPARE:
+			_compare_projectile_kind = int(projectile_compare_base_kind)
+			_spawn_projectile_stress(player, _compare_projectile_kind)
 		Scenario.FULL_COMBAT:
 			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 			_spawn_ship_density(player)
-			_spawn_projectile_stress(player)
+			_spawn_projectile_stress(player, projectile_compare_base_kind)
 		Scenario.OVERLAY_COMPARE:
 			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 			_spawn_ship_density(player)
-			_spawn_projectile_stress(player)
+			_spawn_projectile_stress(player, projectile_compare_base_kind)
 		Scenario.VISUAL_COMPARE:
 			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 			_spawn_ship_density(player)
-			_spawn_projectile_stress(player)
+			_spawn_projectile_stress(player, projectile_compare_base_kind)
 
 
 func _preview_reset_player_state(player: Node3D) -> void:
@@ -132,13 +150,13 @@ func _spawn_boarding_stress(player: Node3D) -> void:
 	_spawn_ring_ships(ENEMY_MELEE_SCENE, max(8, melee_ship_count * 2), player, boarding_ring_radius, "performance_preview_spawn")
 
 
-func _spawn_projectile_stress(player: Node3D) -> void:
+func _spawn_projectile_stress(player: Node3D, projectile_kind: int) -> void:
 	var count: int = maxi(1, projectile_count)
 	for index in range(count):
 		var angle := TAU * float(index) / float(count)
 		var radial := Vector3(cos(angle), 0.0, sin(angle)).normalized()
 		var spawn_pos := player.global_position + radial * projectile_ring_radius + Vector3(0.0, 1.4, 0.0)
-		_spawn_cannonball(spawn_pos, radial, "enemy")
+		_spawn_projectile(spawn_pos, radial, "enemy", projectile_kind)
 
 
 func _spawn_ring_ships(scene: PackedScene, count: int, player: Node3D, radius: float, meta_name: String) -> void:
@@ -163,28 +181,64 @@ func _spawn_ship(scene: PackedScene, world_pos: Vector3, player: Node3D, meta_na
 	PreviewHarnessHelper.assign_preview_target(ship, player)
 
 
-func _spawn_cannonball(world_pos: Vector3, direction: Vector3, team: String) -> void:
-	var cannonball := CANNONBALL_SCENE.instantiate()
-	if cannonball == null:
+func _spawn_projectile(world_pos: Vector3, direction: Vector3, team: String, projectile_kind: int) -> void:
+	var projectile_scene: PackedScene = _get_projectile_scene(projectile_kind)
+	if projectile_scene == null:
 		return
-	add_child(cannonball)
-	cannonball.set_meta("performance_preview_projectile", true)
-	_projectile_spawns.append(cannonball)
-	if cannonball.has_method("launch"):
-		cannonball.call(
-			"launch",
-			world_pos,
-			team,
-			direction,
-			null,
-			1.0,
-			projectile_lifetime_multiplier,
-			"roundshot"
-		)
-	elif cannonball is Node3D:
-		var projectile := cannonball as Node3D
-		projectile.global_position = world_pos
-		projectile.look_at(world_pos + direction, Vector3.UP)
+	var projectile := projectile_scene.instantiate()
+	if projectile == null:
+		return
+	add_child(projectile)
+	projectile.set_meta("performance_preview_projectile", true)
+	_projectile_spawns.append(projectile)
+	if projectile.has_method("launch"):
+		if projectile_kind == ProjectileKind.CANNONBALL:
+			projectile.call(
+				"launch",
+				world_pos,
+				team,
+				direction,
+				null,
+				1.0,
+				projectile_lifetime_multiplier,
+				"roundshot"
+			)
+		elif projectile_kind == ProjectileKind.ARROW:
+			var target_pos := world_pos + direction * projectile_ring_radius
+			projectile.call(
+				"launch",
+				world_pos,
+				target_pos,
+				null,
+				team,
+				1.0,
+				"bow",
+				projectile_speed,
+				projectile_arc_height
+			)
+		elif projectile_kind == ProjectileKind.FIRE_POT:
+			var fire_target := world_pos + direction * projectile_ring_radius
+			projectile.call(
+				"setup_flight",
+				world_pos,
+				fire_target,
+				projectile_speed / 10.0,
+				projectile_arc_height + 0.8
+			)
+	elif projectile is Node3D:
+		var projectile_node := projectile as Node3D
+		projectile_node.global_position = world_pos
+		projectile_node.look_at(world_pos + direction, Vector3.UP)
+
+
+func _get_projectile_scene(projectile_kind: int) -> PackedScene:
+	match projectile_kind:
+		ProjectileKind.ARROW:
+			return ARROW_SCENE
+		ProjectileKind.FIRE_POT:
+			return FIRE_POT_SCENE
+		_:
+			return CANNONBALL_SCENE
 
 
 func _ensure_overlay() -> void:
@@ -231,7 +285,7 @@ func _ensure_overlay() -> void:
 
 
 func _configure_compare_state() -> void:
-	if scenario not in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE]:
+	if scenario not in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE, Scenario.PROJECTILE_COMPARE]:
 		return
 	_compare_phase_index = 0
 	_compare_phase_elapsed = 0.0
@@ -240,7 +294,7 @@ func _configure_compare_state() -> void:
 
 
 func _track_compare_sample(delta: float) -> void:
-	if scenario not in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE]:
+	if scenario not in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE, Scenario.PROJECTILE_COMPARE]:
 		return
 	var phase_samples: Array = _compare_phase_samples[_compare_phase_index]
 	phase_samples.append(delta)
@@ -250,6 +304,8 @@ func _track_compare_sample(delta: float) -> void:
 		_compare_phase_index = 1
 		_compare_phase_elapsed = 0.0
 		_set_compare_phase_enabled(true)
+		if scenario == Scenario.PROJECTILE_COMPARE:
+			_respawn_projectile_compare_overlay()
 
 
 func _track_frame_sample(delta: float) -> void:
@@ -263,6 +319,9 @@ func _update_overlay() -> void:
 		return
 	if scenario in [Scenario.OVERLAY_COMPARE, Scenario.VISUAL_COMPARE]:
 		_overlay_label.text = _build_compare_overlay_text()
+		return
+	if scenario == Scenario.PROJECTILE_COMPARE:
+		_overlay_label.text = _build_projectile_compare_text()
 		return
 	var sample_count := _frame_samples.size()
 	var avg_delta := 0.0
@@ -314,6 +373,22 @@ func _build_compare_overlay_text() -> String:
 	]
 
 
+func _build_projectile_compare_text() -> String:
+	var baseline: Dictionary = _summarize_phase_samples(0)
+	var overlay: Dictionary = _summarize_phase_samples(1)
+	var phase_name := "baseline" if _compare_phase_index == 0 else "overlay"
+	var active_kind := _get_projectile_kind_name(_compare_projectile_kind)
+	return PreviewStateSnapshotHelper.build_projectile_compare_text(
+		"projectile_compare",
+		phase_name,
+		_get_projectile_kind_name(int(projectile_compare_base_kind)),
+		_get_projectile_kind_name(int(projectile_compare_overlay_kind)),
+		baseline,
+		overlay,
+		active_kind
+	)
+
+
 func _summarize_phase_samples(phase_index: int) -> Dictionary:
 	var samples: Array = _compare_phase_samples[phase_index]
 	var sample_count := samples.size()
@@ -332,10 +407,15 @@ func _summarize_phase_samples(phase_index: int) -> Dictionary:
 		"stat_enabled": phase_index == 1,
 		"distance_enabled": phase_index == 1,
 		"deck_light_enabled": phase_index == 1,
+		"ships": _count_ships(),
+		"soldiers": _count_soldiers(),
+		"projectiles": _count_projectiles(),
 	}
 
 
 func _set_compare_phase_enabled(enabled: bool) -> void:
+	if scenario == Scenario.PROJECTILE_COMPARE:
+		return
 	var hud: Node = get_node_or_null("GameHUD")
 	if not is_instance_valid(hud):
 		return
@@ -368,6 +448,18 @@ func _set_ship_visuals_enabled(enabled: bool) -> void:
 		PreviewHarnessHelper.set_preview_deck_light_enabled(ship, enabled)
 
 
+func _respawn_projectile_compare_overlay() -> void:
+	for child in get_children():
+		if child is Node and child.has_meta("performance_preview_projectile"):
+			child.queue_free()
+	_projectile_spawns.clear()
+	var player: Node3D = get_node_or_null("PlayerShip")
+	if not is_instance_valid(player):
+		return
+	_compare_projectile_kind = int(projectile_compare_overlay_kind)
+	_spawn_projectile_stress(player, _compare_projectile_kind)
+
+
 func _get_scenario_name() -> String:
 	match scenario:
 		Scenario.SHIP_DENSITY:
@@ -382,8 +474,20 @@ func _get_scenario_name() -> String:
 			return "overlay_compare"
 		Scenario.VISUAL_COMPARE:
 			return "visual_compare"
+		Scenario.PROJECTILE_COMPARE:
+			return "projectile_compare"
 		_:
 			return "idle"
+
+
+func _get_projectile_kind_name(projectile_kind: int) -> String:
+	match projectile_kind:
+		ProjectileKind.ARROW:
+			return "arrow"
+		ProjectileKind.FIRE_POT:
+			return "fire_pot"
+		_:
+			return "cannonball"
 
 
 func _count_ships() -> int:

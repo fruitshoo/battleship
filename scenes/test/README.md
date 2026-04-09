@@ -39,6 +39,7 @@
   Script: `scripts/test/performance_preview.gd`
   Supports `overlay_compare` for stat panel and distance debug cost checks.
   Supports `visual_compare` for deck light and moving-ship visual cost checks.
+  Supports `projectile_compare` for cannonball, arrow, and fire pot cost checks.
 
 ## Sandbox
 
