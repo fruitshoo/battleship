@@ -22,7 +22,7 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 		return
 	if not is_instance_valid(ship.fire_pot_scene):
 		return
-	var raw_target = ship.get("target")
+	var raw_target = ship.get_target_ship() if ship.has_method("get_target_ship") else ship.get("target")
 	if not is_instance_valid(raw_target):
 		if "target" in ship:
 			ship.target = null
@@ -32,9 +32,9 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 		if "target" in ship:
 			ship.target = null
 		return
-	if target.get("team") != "player":
+	if not _is_player_ship(target):
 		return
-	if target.get("is_dying") or target.get("is_sinking"):
+	if target.has_method("is_sinking_or_dying") and target.is_sinking_or_dying():
 		return
 	if ship.is_boarding:
 		return
@@ -60,13 +60,23 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 
 static func _find_fire_pot_tosser(ship):
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.get("current_state") == 4:
+		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
 			continue
-		if child.get("team") != ship.team:
+		if child.has_method("get_team_tag") and child.get_team_tag() != ship.team:
 			continue
-		if str(child.get("crew_role")) == "fire_pot":
+		if child.has_method("get_crew_role_value") and child.get_crew_role_value() == "fire_pot":
 			return child
 	return null
+
+
+static func _is_player_ship(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.has_method("is_player_team"):
+		return node.is_player_team()
+	if node.has_method("get_team_tag"):
+		return node.get_team_tag() == "player"
+	return false
 
 
 static func _get_fire_pot_target_pos(target_ship: Node3D) -> Vector3:
@@ -203,7 +213,7 @@ static func evacuate_player_soldiers_as_survivors(ship) -> void:
 
 	var converted_count = 0
 	for child in soldiers_node.get_children():
-		if child.get("team") == "player" and child.get("current_state") != 4:
+		if child.has_method("is_player_team_soldier") and child.is_player_team_soldier() and child.has_method("is_dead_soldier") and not child.is_dead_soldier():
 			var spawn_pos = child.global_position
 			spawn_pos.y = 0.5
 
@@ -225,11 +235,11 @@ static func evacuate_soldiers_to_home(ship) -> void:
 
 	var returned_count = 0
 	for child in soldiers_node.get_children():
-		if child.get("current_state") == 4:
+		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
 			continue
 
 		var h_ship = child.get("home_ship")
-		if is_instance_valid(h_ship) and h_ship != ship and not h_ship.get("is_sinking") and not h_ship.get("is_dying"):
+		if is_instance_valid(h_ship) and h_ship != ship and not (h_ship.has_method("is_sinking_or_dying") and h_ship.is_sinking_or_dying()):
 			var target_soldiers = h_ship.get_node_or_null("Soldiers")
 			if not target_soldiers:
 				continue
@@ -251,7 +261,7 @@ static func evacuate_soldiers_to_home(ship) -> void:
 			y_tween.tween_property(child, "global_position:y", end_pos.y, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 
 			child.set("owned_ship", h_ship)
-			if child.get("is_stationary"):
+			if child.has_method("is_stationary_value") and child.is_stationary_value():
 				child.set("is_stationary", false)
 			returned_count += 1
 			print("[Evacuation] 병사가 원래 배(%s)로 복귀합니다!" % h_ship.name)

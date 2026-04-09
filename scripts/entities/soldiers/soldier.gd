@@ -423,6 +423,31 @@ func is_dead() -> bool:
 func get_owned_ship_node() -> Node3D:
 	return owned_ship if is_instance_valid(owned_ship) else null
 
+
+func is_dead_soldier() -> bool:
+	return current_state == State.DEAD
+
+
+func is_player_team_soldier() -> bool:
+	return team == "player"
+
+
+func is_enemy_team_soldier() -> bool:
+	return team == "enemy"
+
+
+func get_crew_role_value() -> String:
+	return crew_role
+
+
+func is_ranged_only_value() -> bool:
+	return is_ranged_only
+
+
+func is_stationary_value() -> bool:
+	return is_stationary
+
+
 func _update_team_color() -> void:
 	SoldierVisualHelper.update_team_color(self)
 

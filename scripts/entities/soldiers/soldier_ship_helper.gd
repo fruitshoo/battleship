@@ -37,7 +37,7 @@ static func find_nearest_enemy(soldier) -> Node3D:
 		if dist_sq_xz < nearest_distance_on_ship:
 			nearest_distance_on_ship = dist_sq_xz
 			nearest_on_ship = other
-		if is_player_boarder and other.get("is_ranged_only") == true and dist_sq_xz < nearest_distance_ranged_on_ship:
+		if is_player_boarder and other.has_method("is_ranged_only_value") and other.is_ranged_only_value() and dist_sq_xz < nearest_distance_ranged_on_ship:
 			nearest_distance_ranged_on_ship = dist_sq_xz
 			nearest_ranged_on_ship = other
 		if soldier.is_melee_only:
