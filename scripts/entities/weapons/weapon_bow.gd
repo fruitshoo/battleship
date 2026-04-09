@@ -34,7 +34,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		time_to_reach = 0.2
 		
 	# 타겟의 이동 속도(velocity)를 기반으로 미래 위치 예측
-	var local_vel = target.get("velocity") if "velocity" in target else Vector3.ZERO
+	var local_vel: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
 	
 	# 타겟이 배 위에 타고 있는 경우 배의 이동 속도 합산
 	var ship = _resolve_parent_ship(target)
@@ -46,8 +46,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 			var s_dir = - ship.global_transform.basis.z.normalized()
 			
 			# chaser_ship의 move_dir가 있다면 그것을 사용
-			if "move_dir" in ship and typeof(ship.get("move_dir")) == TYPE_VECTOR3:
-				s_dir = ship.get("move_dir").normalized()
+			if ship.has_method("get_move_direction_value"):
+				s_dir = ship.get_move_direction_value()
 				
 			ship_vel = s_dir * s_speed
 			

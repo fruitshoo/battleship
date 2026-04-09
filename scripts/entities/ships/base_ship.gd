@@ -464,6 +464,13 @@ func get_hull_hp_value() -> float:
 func get_current_speed_value() -> float:
 	return current_speed
 
+func get_move_direction_value() -> Vector3:
+	var move_dir: Vector3 = -global_transform.basis.z
+	move_dir.y = 0.0
+	if move_dir.length_squared() > 0.0001:
+		return move_dir.normalized()
+	return Vector3.FORWARD
+
 func get_target_ship() -> Node3D:
 	if "target" in self:
 		var target_value: Variant = get("target")
@@ -600,7 +607,7 @@ func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
 	if not soldiers_node: return
 	
 	for child in soldiers_node.get_children():
-		if child.has_method("take_damage") and child.get("current_state") != 4: # 4 = DEAD
+		if child.has_method("take_damage") and not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
 			# 병사들에게 충격파 데미지 전달
 			child.take_damage(damage, impact_pos)
 			
@@ -624,7 +631,7 @@ func get_alive_crew_count() -> int:
 	var count = 0
 	for child in soldiers_node.get_children():
 		# current_state != 4 (DEAD) 인 병사만 카운트
-		if child.get("current_state") != 4:
+		if not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
 			count += 1
 	return count
 
@@ -641,13 +648,13 @@ func has_active_crew_role(role_name: String) -> bool:
 	var soldiers_node := get_node_or_null("Soldiers")
 	if not is_instance_valid(soldiers_node):
 		return false
-	for child in soldiers_node.get_children():
-		if not is_instance_valid(child):
-			continue
-		if child.get("current_state") == 4:
-			continue
-		if str(child.get("crew_role")).strip_edges().to_lower() == normalized_role:
-			return true
+		for child in soldiers_node.get_children():
+			if not is_instance_valid(child):
+				continue
+			if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+				continue
+			if child.has_method("get_crew_role_value") and str(child.get_crew_role_value()).strip_edges().to_lower() == normalized_role:
+				return true
 	return false
 
 
@@ -662,9 +669,9 @@ func replace_preview_crew_role(from_role: String, to_role: String = "general") -
 	for child in soldiers_node.get_children():
 		if not is_instance_valid(child):
 			continue
-		if child.get("current_state") == 4:
+		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
 			continue
-		if str(child.get("crew_role")).strip_edges().to_lower() != normalized_from:
+		if child.has_method("get_crew_role_value") and str(child.get_crew_role_value()).strip_edges().to_lower() != normalized_from:
 			continue
 		if child.has_method("apply_crew_role"):
 			child.apply_crew_role(normalized_to)

@@ -38,10 +38,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var current_target_pos: Vector3 = target.global_position
 	current_target_pos.y += 0.8
 	var time_to_reach: float = clampf(spawn_pos.distance_to(current_target_pos) / maxf(projectile_speed, 1.0), 0.18, 0.9)
-	var target_velocity: Variant = target.get("velocity")
-	var local_velocity: Vector3 = Vector3.ZERO
-	if typeof(target_velocity) == TYPE_VECTOR3:
-		local_velocity = target_velocity
+	var local_velocity: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
 	var ship_velocity: Vector3 = Vector3.ZERO
 	var target_ship: Node3D = target.get_owned_ship_node() if target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship):
@@ -49,10 +46,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 			var ship_speed: float = target_ship.get_current_speed_value()
 			if ship_speed > 0.1:
 				var ship_dir: Vector3 = -target_ship.global_transform.basis.z.normalized()
-				if "move_dir" in target_ship and typeof(target_ship.get("move_dir")) == TYPE_VECTOR3:
-					var move_dir: Vector3 = target_ship.get("move_dir")
-					if move_dir.length_squared() > 0.0001:
-						ship_dir = move_dir.normalized()
+				if target_ship.has_method("get_move_direction_value"):
+					ship_dir = target_ship.get_move_direction_value()
 				ship_velocity = ship_dir * ship_speed
 	current_target_pos += (local_velocity + ship_velocity) * time_to_reach * 0.9
 

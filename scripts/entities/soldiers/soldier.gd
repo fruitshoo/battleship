@@ -414,6 +414,9 @@ func get_crit_multiplier_value() -> float:
 func get_damage_multiplier_value() -> float:
 	return float(get_meta("damage_multiplier", 1.0))
 
+func get_velocity_value() -> Vector3:
+	return velocity
+
 func is_combat_disabled() -> bool:
 	return current_state == State.DEAD
 
