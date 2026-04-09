@@ -1,6 +1,7 @@
 @tool
 extends Node3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
@@ -164,7 +165,7 @@ func _update_target() -> void:
 	# 현재까지 찾은 가장 '매력적인' 타겟의 가중치 적용 거리
 	var best_score_sq: float = INF
 	
-	var enemies = SceneGroupCache.get_nodes(get_tree(), "ships")
+	var enemies = EntityRegistry.get_ships_by_team(_enemy_team_tag())
 	
 	for enemy in enemies:
 		if not is_instance_valid(enemy) or not (enemy is Node3D):

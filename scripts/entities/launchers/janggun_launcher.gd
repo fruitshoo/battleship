@@ -1,4 +1,5 @@
 extends Node3D
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const DEBUG_COMBAT_LOGS := false
 
@@ -81,8 +82,7 @@ func _is_target_valid(target: Variant) -> bool:
 
 
 func _find_nearest_enemy() -> Node3D:
-	var enemy_group = "enemy" if team == "player" else "player"
-	var enemies = SceneGroupCache.get_nodes(get_tree(), enemy_group)
+	var enemies = EntityRegistry.get_ships_by_team("enemy" if team == "player" else "player")
 	var nearest: Node3D = null
 	var min_dist_sq: float = detection_range * detection_range
 	

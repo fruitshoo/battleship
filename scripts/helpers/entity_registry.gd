@@ -46,6 +46,17 @@ static func get_soldiers() -> Array:
 	return _compact_nodes(_soldiers)
 
 
+static func get_soldiers_by_team(team_name: String) -> Array:
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty():
+		return get_soldiers()
+	var filtered: Array = []
+	for soldier in get_soldiers():
+		if _matches_team(soldier, normalized_team):
+			filtered.append(soldier)
+	return filtered
+
+
 static func get_soldiers_by_ship(ship: Node) -> Array:
 	if not is_instance_valid(ship):
 		return []

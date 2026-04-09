@@ -1,4 +1,5 @@
 extends Node3D
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 ## 팔우노 (Ballista Launcher)
@@ -99,7 +100,7 @@ func _update_target() -> void:
 	var min_dist_sq = detection_range * detection_range
 	
 	var enemy_team = "enemy" if team == "player" else "player"
-	var soldiers = SceneGroupCache.get_nodes(get_tree(), "soldiers")
+	var soldiers = EntityRegistry.get_soldiers_by_team("enemy" if team == "player" else "player")
 	
 	for s in soldiers:
 		if not is_instance_valid(s) or s.get("current_state") == 4: # 4 = DEAD
