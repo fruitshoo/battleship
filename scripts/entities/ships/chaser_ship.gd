@@ -111,6 +111,8 @@ var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
 @export_range(0.05, 0.5, 0.01) var ai_logic_update_interval: float = 0.2
 @export_range(0.0, 0.15, 0.01) var ai_logic_update_jitter: float = 0.05
 var _ai_logic_update_interval_runtime: float = 0.2
+@export_range(0.05, 0.5, 0.01) var ai_separation_update_interval: float = 0.12
+var _ai_separation_update_interval_runtime: float = 0.12
 
 # 도선 로직 변수 (base_ship.gd에서 상속)
 var has_rammed: bool = false # 중복 데미지 방지
@@ -647,11 +649,43 @@ func _configure_ai_logic_throttle() -> void:
 	var jitter_scale: float = float(seed_value % 500) / 500.0
 	var jitter: float = ai_logic_update_jitter * jitter_sign * jitter_scale
 	_ai_logic_update_interval_runtime = clampf(ai_logic_update_interval + jitter, 0.06, 0.5)
+	_ai_separation_update_interval_runtime = _get_ai_separation_update_interval_runtime(seed_value)
 	logic_timer = _ai_logic_update_interval_runtime * phase
+	separation_timer = _ai_separation_update_interval_runtime * phase
 
 
 func get_ai_logic_update_interval() -> float:
-	return _ai_logic_update_interval_runtime
+	return _ai_logic_update_interval_runtime * _get_ai_load_multiplier()
+
+
+func get_ai_separation_update_interval() -> float:
+	return _ai_separation_update_interval_runtime * _get_ai_load_multiplier()
+
+
+func _get_ai_load_multiplier() -> float:
+	var ship_count: int = EntityRegistry.count_ships()
+	var projectile_count: int = EntityRegistry.count_projectiles()
+	var load_multiplier: float = 1.0
+	if ship_count > 12:
+		load_multiplier += minf(0.45, float(ship_count - 12) * 0.03)
+	if projectile_count > 18:
+		load_multiplier += minf(0.25, float(projectile_count - 18) * 0.01)
+	if team == "player":
+		load_multiplier *= 0.9
+	if is_gunner_role():
+		load_multiplier *= 1.05
+	return clampf(load_multiplier, 0.75, 1.6)
+
+
+func _get_ai_separation_update_interval_runtime(seed_value: int) -> float:
+	var base_interval: float = clampf(ai_separation_update_interval, 0.05, 0.35)
+	var role_adjust: float = 0.0
+	if is_gunner_role():
+		role_adjust = 0.02
+	elif is_charger_role():
+		role_adjust = -0.01
+	var phase_jitter: float = float(seed_value % 7) * 0.005
+	return clampf(base_interval + role_adjust + phase_jitter, 0.05, 0.35)
 
 ## 주변 함선들로부터 멀어지려는 힘 계산
 func _calculate_separation() -> Vector3:

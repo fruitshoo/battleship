@@ -1,6 +1,7 @@
 extends RefCounted
 class_name ChaserShipAiHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
 
 static func _is_gunner(ship) -> bool:
@@ -47,6 +48,13 @@ static func process_physics(ship, delta: float) -> void:
 	if ship.logic_timer <= 0:
 		ship.logic_timer = _get_logic_update_interval(ship)
 		do_logic_update = true
+	ship.separation_timer -= delta
+	if ship.separation_timer <= 0.0:
+		ship.separation_timer = _get_separation_update_interval(ship)
+		if ship.team == "player" and bool(ship.get_meta("support_fleet_ship", false)):
+			ship.separation_force = Vector3.ZERO
+		else:
+			ship.separation_force = ship._calculate_separation()
 	if ship.has_meta("post_impact_follow_timer"):
 		var follow_timer: float = maxf(0.0, float(ship.get_meta("post_impact_follow_timer")) - delta)
 		if follow_timer <= 0.0:
@@ -201,10 +209,6 @@ static func update_logic_throttled(ship) -> void:
 	if not is_instance_valid(ship.target) or ship.target.get("is_sinking"):
 		ship.target = null
 		find_player(ship)
-	if ship.team == "player" and bool(ship.get_meta("support_fleet_ship", false)):
-		ship.separation_force = Vector3.ZERO
-		return
-	ship.separation_force = ship._calculate_separation()
 
 
 static func _get_logic_update_interval(ship) -> float:
@@ -213,8 +217,14 @@ static func _get_logic_update_interval(ship) -> float:
 	return 0.2
 
 
+static func _get_separation_update_interval(ship) -> float:
+	if ship.has_method("get_ai_separation_update_interval"):
+		return maxf(0.05, float(ship.call("get_ai_separation_update_interval")))
+	return 0.12
+
+
 static func find_player(ship) -> void:
-	var players = ship.SceneGroupCache.get_nodes(ship.get_tree(), "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 
 	if ship.is_in_group("captured_minion") or ship.team == "player":
 		for p in players:
