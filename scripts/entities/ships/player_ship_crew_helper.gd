@@ -200,10 +200,11 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 	var fp_lv = ship._cached_um.current_levels.get("fire_pot", 0)
 	if fp_lv <= 0:
 		return
-	if not is_instance_valid(ship.boarding_attacker) or (ship.boarding_attacker.has_method("is_combat_disabled") and ship.boarding_attacker.is_combat_disabled()):
+	var boarding_attacker: Node3D = ship.get_boarding_attacker_ship() if ship.has_method("get_boarding_attacker_ship") else null
+	if not is_instance_valid(boarding_attacker) or (boarding_attacker.has_method("is_combat_disabled") and boarding_attacker.is_combat_disabled()):
 		return
 
-	var target = ship.boarding_attacker
+	var target = boarding_attacker
 	var dist = ship.global_position.distance_to(target.global_position)
 	if dist > 15.0:
 		return
@@ -328,7 +329,7 @@ static func _can_initiate_raid(ship) -> bool:
 		return false
 	if _count_enemy_boarders_on_ship(ship) > 0:
 		return false
-	if is_instance_valid(ship.boarding_attacker):
+	if ship.has_method("get_boarding_attacker_ship") and is_instance_valid(ship.get_boarding_attacker_ship()):
 		return false
 	var available_defenders: int = _count_home_defenders(ship)
 	return available_defenders > int(ship.auto_raid_min_defenders)

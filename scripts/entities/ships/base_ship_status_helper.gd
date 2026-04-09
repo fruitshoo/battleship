@@ -93,7 +93,7 @@ static func update_boarding_state(ship, delta: float) -> void:
 	ship.deck_is_overrun = overrun
 
 	if overrun:
-		var attacker_ship: Node = ship.boarding_attacker if is_instance_valid(ship.boarding_attacker) else null
+		var attacker_ship: Node = ship.get_boarding_attacker_ship() if ship.has_method("get_boarding_attacker_ship") else null
 		var effective_capture_duration: float = ship.boarding_capture_duration
 		if ship.has_method("get_effective_boarding_capture_duration"):
 			effective_capture_duration = float(ship.call("get_effective_boarding_capture_duration", attacker_ship))

@@ -72,7 +72,7 @@ static func process_boarding_common(ship, delta: float) -> void:
 
 static func cancel_boarding(ship) -> void:
 	if is_instance_valid(ship.boarding_target) and ship.boarding_target.has_method("get_boarding_attacker_ship") and ship.boarding_target.get_boarding_attacker_ship() == ship:
-		ship.boarding_target.set("boarding_attacker", null)
+		ship.boarding_target.clear_boarding_attacker_ship()
 	ship._clear_ropes()
 	ship.is_boarding = false
 	ship.boarding_timer = 0.0

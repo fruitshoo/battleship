@@ -487,6 +487,15 @@ func is_enemy_team() -> bool:
 func get_boarding_attacker_ship() -> Node3D:
 	return boarding_attacker if is_instance_valid(boarding_attacker) else null
 
+func set_boarding_attacker_ship(attacker: Node3D) -> void:
+	if is_instance_valid(attacker):
+		boarding_attacker = attacker
+	else:
+		boarding_attacker = null
+
+func clear_boarding_attacker_ship() -> void:
+	boarding_attacker = null
+
 func _get_team_collision_layer(team_tag: String) -> int:
 	return 2 if team_tag == "player" else 4
 

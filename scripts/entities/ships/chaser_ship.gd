@@ -494,7 +494,7 @@ func die() -> void:
 	
 	# 밧줄 및 도선 공격자 정보 제거
 	if is_instance_valid(boarding_target) and boarding_target.has_method("get_boarding_attacker_ship") and boarding_target.get_boarding_attacker_ship() == self:
-		boarding_target.set("boarding_attacker", null)
+		boarding_target.clear_boarding_attacker_ship()
 	_clear_ropes()
 	
 	# 침몰 시작 시 타겟 그룹에서 제외 (대포가 시체를 쏘지 않게 함)
@@ -1099,8 +1099,8 @@ func _board_ship(target_ship: Node3D) -> void:
 		boarding_target = ship_node
 		
 		# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
-		if boarding_target.has_method("set") or "boarding_attacker" in boarding_target:
-			boarding_target.set("boarding_attacker", self )
+		if boarding_target.has_method("set_boarding_attacker_ship"):
+			boarding_target.set_boarding_attacker_ship(self)
 			
 		_clear_ropes()
 		boarding_timer = 0.0

@@ -12,8 +12,8 @@ static func die(ship) -> void:
 	ship.current_speed = 0.0
 	ship.fire_pot_cooldown_timer = 9999.0
 	if is_instance_valid(ship.boarding_target) and ship.boarding_target.has_method("get_boarding_attacker_ship") and ship.boarding_target.get_boarding_attacker_ship() == ship:
-		ship.boarding_target.set("boarding_attacker", null)
-	ship.boarding_attacker = null
+		ship.boarding_target.clear_boarding_attacker_ship()
+	ship.clear_boarding_attacker_ship()
 	disable_combat_modules_on_sink(ship)
 
 	print("[Critical] 배가 침몰합니다!")
