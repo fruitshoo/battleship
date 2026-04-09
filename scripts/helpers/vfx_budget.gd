@@ -18,11 +18,36 @@ static func allow_spawn(tree: SceneTree, key: String, position: Vector3, max_per
 	_refresh_if_needed()
 	if max_distance > 0.0 and not _is_within_budget_distance(tree, position, max_distance):
 		return false
+	var effective_max := _get_effective_max_per_frame(max_per_frame)
 	var current := int(_spawn_counts.get(key, 0))
-	if current >= max_per_frame:
+	if current >= effective_max:
 		return false
 	_spawn_counts[key] = current + 1
 	return true
+
+
+static func _get_effective_max_per_frame(max_per_frame: int) -> int:
+	var budget_scale := _get_budget_scale()
+	if budget_scale >= 0.999:
+		return max_per_frame
+	return maxi(1, int(ceil(float(max_per_frame) * budget_scale)))
+
+
+static func _get_budget_scale() -> float:
+	var ship_pressure: float = _pressure_from_count(EntityRegistry.count_ships(), 12, 20)
+	var soldier_pressure: float = _pressure_from_count(EntityRegistry.count_soldiers(), 40, 70)
+	var projectile_pressure: float = _pressure_from_count(EntityRegistry.count_projectiles(), 20, 50)
+	var combined: float = 1.0
+	combined -= ship_pressure * 0.18
+	combined -= soldier_pressure * 0.12
+	combined -= projectile_pressure * 0.22
+	return clampf(combined, 0.35, 1.0)
+
+
+static func _pressure_from_count(count: int, soft_threshold: int, hard_window: int) -> float:
+	if count <= soft_threshold:
+		return 0.0
+	return clampf(float(count - soft_threshold) / maxf(float(hard_window), 1.0), 0.0, 1.0)
 
 static func _is_within_budget_distance(tree: SceneTree, position: Vector3, max_distance: float) -> bool:
 	if not is_instance_valid(tree):
