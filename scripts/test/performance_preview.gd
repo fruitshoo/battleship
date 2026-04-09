@@ -5,6 +5,7 @@ const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
 const CANNONBALL_SCENE := preload("res://scenes/projectiles/cannonball.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 enum Scenario {
@@ -13,6 +14,7 @@ enum Scenario {
 	BOARDING_STRESS,
 	PROJECTILE_STRESS,
 	FULL_COMBAT,
+	OVERLAY_COMPARE,
 }
 
 @export var scenario: Scenario = Scenario.FULL_COMBAT
@@ -29,12 +31,16 @@ enum Scenario {
 @export var boarding_ring_radius: float = 9.0
 @export var projectile_ring_radius: float = 42.0
 @export var projectile_lifetime_multiplier: float = 3.0
+@export var compare_phase_seconds: float = 3.0
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
 var _overlay_refresh_left: float = 0.0
 var _elapsed_time: float = 0.0
 var _frame_samples: Array[float] = []
+var _compare_phase_samples: Array = [[], []]
+var _compare_phase_elapsed: float = 0.0
+var _compare_phase_index: int = 0
 var _projectile_spawns: Array[Node] = []
 
 
@@ -45,6 +51,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_elapsed_time += delta
 	_track_frame_sample(delta)
+	_track_compare_sample(delta)
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = overlay_refresh_interval
@@ -56,6 +63,7 @@ func _configure_preview() -> void:
 	_ensure_stat_panel()
 	_clear_existing_preview_spawns()
 	_apply_scenario()
+	_configure_compare_state()
 	_ensure_overlay()
 	_update_overlay()
 
@@ -96,6 +104,10 @@ func _apply_scenario() -> void:
 		Scenario.PROJECTILE_STRESS:
 			_spawn_projectile_stress(player)
 		Scenario.FULL_COMBAT:
+			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
+			_spawn_ship_density(player)
+			_spawn_projectile_stress(player)
+		Scenario.OVERLAY_COMPARE:
 			PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 			_spawn_ship_density(player)
 			_spawn_projectile_stress(player)
@@ -213,6 +225,30 @@ func _ensure_overlay() -> void:
 	_overlay_panel.visible = true
 
 
+func _configure_compare_state() -> void:
+	if scenario != Scenario.OVERLAY_COMPARE:
+		return
+	_compare_phase_index = 0
+	_compare_phase_elapsed = 0.0
+	_compare_phase_samples = [[], []]
+	_set_stat_panel_enabled(false)
+	_set_distance_debug_enabled(false)
+
+
+func _track_compare_sample(delta: float) -> void:
+	if scenario != Scenario.OVERLAY_COMPARE:
+		return
+	var phase_samples: Array = _compare_phase_samples[_compare_phase_index]
+	phase_samples.append(delta)
+	_compare_phase_samples[_compare_phase_index] = phase_samples
+	_compare_phase_elapsed += delta
+	if _compare_phase_index == 0 and _compare_phase_elapsed >= compare_phase_seconds:
+		_compare_phase_index = 1
+		_compare_phase_elapsed = 0.0
+		_set_stat_panel_enabled(true)
+		_set_distance_debug_enabled(true)
+
+
 func _track_frame_sample(delta: float) -> void:
 	_frame_samples.append(delta)
 	if _frame_samples.size() > sample_window_frames:
@@ -221,6 +257,9 @@ func _track_frame_sample(delta: float) -> void:
 
 func _update_overlay() -> void:
 	if not is_instance_valid(_overlay_label):
+		return
+	if scenario == Scenario.OVERLAY_COMPARE:
+		_overlay_label.text = _build_compare_overlay_text()
 		return
 	var sample_count := _frame_samples.size()
 	var avg_delta := 0.0
@@ -250,6 +289,65 @@ func _update_overlay() -> void:
 	]
 
 
+func _build_compare_overlay_text() -> String:
+	var baseline: Dictionary = _summarize_phase_samples(0)
+	var overlay: Dictionary = _summarize_phase_samples(1)
+	var phase_name := "baseline" if _compare_phase_index == 0 else "overlay"
+	return "scenario:overlay_compare phase:%s\nbase fps:%d avg:%.2fms | overlay fps:%d avg:%.2fms | delta:%.2fms\nstat:%s distance:%s ships:%d soldiers:%d projectiles:%d" % [
+		phase_name,
+		int(float(baseline.get("fps", 0.0))),
+		float(baseline.get("avg_ms", 0.0)),
+		int(float(overlay.get("fps", 0.0))),
+		float(overlay.get("avg_ms", 0.0)),
+		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
+		"ON" if bool(baseline.get("stat_enabled", false)) or bool(overlay.get("stat_enabled", false)) else "OFF",
+		"ON" if bool(baseline.get("distance_enabled", false)) or bool(overlay.get("distance_enabled", false)) else "OFF",
+		_count_ships(),
+		_count_soldiers(),
+		_count_projectiles(),
+	]
+
+
+func _summarize_phase_samples(phase_index: int) -> Dictionary:
+	var samples: Array = _compare_phase_samples[phase_index]
+	var sample_count := samples.size()
+	var total_delta := 0.0
+	var max_delta := 0.0
+	for sample in samples:
+		var sample_delta: float = float(sample)
+		total_delta += sample_delta
+		max_delta = maxf(max_delta, sample_delta)
+	var avg_delta := total_delta / float(sample_count) if sample_count > 0 else 0.0
+	return {
+		"fps": 1.0 / avg_delta if avg_delta > 0.0 else 0.0,
+		"avg_ms": avg_delta * 1000.0,
+		"max_ms": max_delta * 1000.0,
+		"sample_count": sample_count,
+		"stat_enabled": phase_index == 1,
+		"distance_enabled": phase_index == 1,
+	}
+
+
+func _set_stat_panel_enabled(enabled: bool) -> void:
+	var hud: Node = get_node_or_null("GameHUD")
+	if not is_instance_valid(hud):
+		return
+	if "show_stat_panel" in hud:
+		hud.set("show_stat_panel", enabled)
+	if hud.has_method("_update_stat_panel"):
+		hud.call("_update_stat_panel")
+
+
+func _set_distance_debug_enabled(enabled: bool) -> void:
+	var hud: Node = get_node_or_null("GameHUD")
+	if not is_instance_valid(hud):
+		return
+	if DistanceDebugVisualizer.runtime_enabled != enabled and hud.has_method("_toggle_distance_debug"):
+		hud.call("_toggle_distance_debug")
+	if enabled and hud.has_method("_ensure_distance_debug_visualizer"):
+		hud.call("_ensure_distance_debug_visualizer")
+
+
 func _get_scenario_name() -> String:
 	match scenario:
 		Scenario.SHIP_DENSITY:
@@ -260,6 +358,8 @@ func _get_scenario_name() -> String:
 			return "projectile_stress"
 		Scenario.FULL_COMBAT:
 			return "full_combat"
+		Scenario.OVERLAY_COMPARE:
+			return "overlay_compare"
 		_:
 			return "idle"
 

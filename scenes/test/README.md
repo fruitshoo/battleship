@@ -37,6 +37,7 @@
 - `performance_preview.tscn`
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
+  Supports `overlay_compare` for stat panel and distance debug cost checks.
 
 ## Sandbox
 
