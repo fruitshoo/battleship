@@ -16,6 +16,20 @@ const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.
 	"sekibune_cannon",
 	"sekibune_melee",
 ]
+@export var smoke_spawn_launcher_scenes: Array[String] = [
+	"res://scenes/entities/launchers/cannon_joseon.tscn",
+	"res://scenes/entities/launchers/ballista_launcher.tscn",
+	"res://scenes/entities/launchers/janggun_launcher.tscn",
+	"res://scenes/entities/launchers/singigeon_launcher.tscn",
+]
+@export var smoke_spawn_projectile_scenes: Array[String] = [
+	"res://scenes/projectiles/cannonball.tscn",
+	"res://scenes/projectiles/arrow.tscn",
+	"res://scenes/projectiles/fire_pot.tscn",
+	"res://scenes/projectiles/ballista_bolt.tscn",
+	"res://scenes/projectiles/janggun_missile.tscn",
+	"res://scenes/projectiles/singigeon_rocket.tscn",
+]
 
 var _failures: Array[String] = []
 var _loaded_scripts: int = 0
@@ -111,10 +125,9 @@ func _run_runtime_smoke() -> void:
 		_failures.append("smoke scene load failed: %s" % smoke_scene_path)
 		return
 
-	if not smoke_spawn_boss and not smoke_spawn_final_boss:
-		if smoke_spawn_ship_types.is_empty():
-			_failures.append("no smoke mode enabled")
-			return
+	if not smoke_spawn_boss and not smoke_spawn_final_boss and smoke_spawn_ship_types.is_empty() and smoke_spawn_launcher_scenes.is_empty() and smoke_spawn_projectile_scenes.is_empty():
+		_failures.append("no smoke mode enabled")
+		return
 
 	if smoke_spawn_boss:
 		await _run_single_smoke_pass(packed, "debug_spawn_mid_boss", "mid boss")
@@ -122,6 +135,10 @@ func _run_runtime_smoke() -> void:
 		await _run_single_smoke_pass(packed, "debug_spawn_final_boss", "final boss")
 	for ship_type_name in smoke_spawn_ship_types:
 		await _run_ship_variant_smoke_pass(packed, str(ship_type_name))
+	for launcher_scene_path in smoke_spawn_launcher_scenes:
+		await _run_launcher_smoke_pass(packed, str(launcher_scene_path))
+	for projectile_scene_path in smoke_spawn_projectile_scenes:
+		await _run_projectile_smoke_pass(packed, str(projectile_scene_path))
 
 
 func _run_single_smoke_pass(packed: PackedScene, spawn_method: String, label: String) -> void:
@@ -186,6 +203,170 @@ func _run_ship_variant_smoke_pass(packed: PackedScene, ship_type_name: String) -
 
 	smoke_root.queue_free()
 	await _wait_frames(1)
+
+
+func _run_launcher_smoke_pass(packed: PackedScene, launcher_scene_path: String) -> void:
+	var smoke_root := packed.instantiate()
+	if smoke_root == null:
+		_failures.append("smoke scene instantiate failed: %s" % smoke_scene_path)
+		return
+
+	add_child(smoke_root)
+	PreviewHarnessHelper.setup_common(smoke_root, false, true)
+	await _wait_frames(smoke_wait_frames_after_attach)
+
+	var player_ship: Node3D = smoke_root.get_node_or_null("PlayerShip") as Node3D
+	if not is_instance_valid(player_ship):
+		_failures.append("preview base is missing PlayerShip for launcher smoke: %s" % launcher_scene_path)
+	else:
+		var spawner: Node = smoke_root.get_node_or_null("EnemySpawner")
+		var target_ship: Node3D = null
+		if is_instance_valid(spawner) and spawner.has_method("debug_spawn_ship"):
+			target_ship = spawner.call("debug_spawn_ship", "kobayabune_melee", 18.0, 0.0) as Node3D
+			await _wait_frames(smoke_wait_frames_after_spawn)
+		if not is_instance_valid(target_ship):
+			_failures.append("launcher smoke target spawn failed: %s" % launcher_scene_path)
+		else:
+			var launcher_scene := load(launcher_scene_path) as PackedScene
+			if launcher_scene == null:
+				_failures.append("launcher scene load failed: %s" % launcher_scene_path)
+			else:
+				var launcher := launcher_scene.instantiate()
+				if launcher == null:
+					_failures.append("launcher scene instantiate failed: %s" % launcher_scene_path)
+				else:
+					if launcher.has_method("set_team"):
+						launcher.set_team("player")
+					elif launcher.get("team") != null:
+						launcher.set("team", "player")
+					player_ship.add_child(launcher)
+					launcher.set_process(false)
+					launcher.set_physics_process(false)
+					await _wait_frames(smoke_wait_frames_after_attach)
+					var launcher_team_variant: Variant = launcher.get("team")
+					var launcher_team: String = "player" if launcher_team_variant == null else str(launcher_team_variant)
+					if launcher_team != "player":
+						_failures.append("launcher team contract failed: %s" % launcher_scene_path)
+
+					var before_projectiles := EntityRegistry.count_projectiles()
+					if launcher.has_method("fire"):
+						if launcher_scene_path.contains("singigeon"):
+							launcher.call("fire", target_ship, 0.0)
+						else:
+							launcher.call("fire", target_ship)
+						await _wait_frames(smoke_wait_frames_after_spawn)
+						var after_projectiles := EntityRegistry.count_projectiles()
+						if after_projectiles <= before_projectiles:
+							_failures.append("launcher did not spawn projectile: %s" % launcher_scene_path)
+					else:
+						_failures.append("launcher is missing fire() method: %s" % launcher_scene_path)
+
+	smoke_root.queue_free()
+	await _wait_frames(1)
+
+
+func _run_projectile_smoke_pass(packed: PackedScene, projectile_scene_path: String) -> void:
+	var smoke_root := packed.instantiate()
+	if smoke_root == null:
+		_failures.append("smoke scene instantiate failed: %s" % smoke_scene_path)
+		return
+
+	add_child(smoke_root)
+	PreviewHarnessHelper.setup_common(smoke_root, false, true)
+	await _wait_frames(smoke_wait_frames_after_attach)
+
+	var player_ship: Node3D = smoke_root.get_node_or_null("PlayerShip") as Node3D
+	if not is_instance_valid(player_ship):
+		_failures.append("preview base is missing PlayerShip for projectile smoke: %s" % projectile_scene_path)
+	else:
+		var spawner: Node = smoke_root.get_node_or_null("EnemySpawner")
+		var target_ship: Node3D = null
+		if is_instance_valid(spawner) and spawner.has_method("debug_spawn_ship"):
+			target_ship = spawner.call("debug_spawn_ship", "kobayabune_melee", 18.0, 0.0) as Node3D
+			await _wait_frames(smoke_wait_frames_after_spawn)
+		if not is_instance_valid(target_ship):
+			_failures.append("projectile smoke target spawn failed: %s" % projectile_scene_path)
+		else:
+			var projectile_scene := load(projectile_scene_path) as PackedScene
+			if projectile_scene == null:
+				_failures.append("projectile scene load failed: %s" % projectile_scene_path)
+			else:
+				var projectile := projectile_scene.instantiate()
+				if projectile == null:
+					_failures.append("projectile scene instantiate failed: %s" % projectile_scene_path)
+				else:
+					if projectile_scene_path.ends_with("fire_pot.tscn"):
+						projectile.team = "player"
+						projectile.start_pos = player_ship.global_position + Vector3(0.0, 1.0, 0.0)
+						projectile.target_pos = target_ship.global_position
+					elif projectile_scene_path.ends_with("ballista_bolt.tscn"):
+						projectile.team = "player"
+						projectile.direction = (target_ship.global_position - player_ship.global_position).normalized()
+						if projectile.direction.length_squared() <= 0.0001:
+							projectile.direction = Vector3.FORWARD
+						projectile.position = player_ship.global_position + Vector3(0.0, 1.0, 0.0)
+					elif projectile_scene_path.ends_with("janggun_missile.tscn"):
+						projectile.start_pos = player_ship.global_position + Vector3(0.0, 1.0, 0.0)
+						projectile.target_pos = target_ship.global_position
+						projectile.team = "player"
+						projectile.janggun_lv = 1
+					elif projectile_scene_path.ends_with("singigeon_rocket.tscn"):
+						projectile.start_pos = player_ship.global_position + Vector3(0.0, 1.0, 0.0)
+						projectile.target_pos = target_ship.global_position
+						projectile.launch_direction = (target_ship.global_position - player_ship.global_position).normalized()
+						projectile.team = "player"
+						projectile.shooter = player_ship
+
+					var before_projectiles := EntityRegistry.count_projectiles()
+					smoke_root.add_child(projectile)
+					await _wait_frames(smoke_wait_frames_after_attach)
+					if projectile.has_method("set_team"):
+						projectile.set_team("player")
+					elif projectile.get("team") != null:
+						projectile.set("team", "player")
+					var projectile_team_variant: Variant = projectile.get("team")
+					var projectile_team: String = "player" if projectile_team_variant == null else str(projectile_team_variant)
+					if projectile_team != "player":
+						_failures.append("projectile team contract failed: %s" % projectile_scene_path)
+					_configure_projectile_smoke(projectile, projectile_scene_path, player_ship, target_ship)
+					await _wait_frames(smoke_wait_frames_after_spawn)
+					var after_projectiles := EntityRegistry.count_projectiles()
+					if after_projectiles <= before_projectiles:
+						_failures.append("projectile did not register in entity registry: %s" % projectile_scene_path)
+
+	smoke_root.queue_free()
+	await _wait_frames(1)
+
+
+func _configure_projectile_smoke(projectile: Node, projectile_scene_path: String, player_ship: Node3D, target_ship: Node3D) -> void:
+	if projectile_scene_path.ends_with("cannonball.tscn"):
+		if projectile.has_method("launch"):
+			projectile.call(
+				"launch",
+				player_ship.global_position + Vector3(0.0, 1.2, 0.0),
+				"player",
+				-target_ship.global_transform.basis.z,
+				target_ship,
+				12.0,
+				1.0,
+				"roundshot"
+			)
+	elif projectile_scene_path.ends_with("arrow.tscn"):
+		if projectile.has_method("launch"):
+			projectile.call(
+				"launch",
+				player_ship.global_position + Vector3(0.0, 1.0, 0.0),
+				target_ship.global_position,
+				target_ship,
+				"player",
+				9.0,
+				"bow",
+				24.0,
+				2.0
+			)
+	elif projectile_scene_path.ends_with("fire_pot.tscn"):
+		if projectile.has_method("setup_flight"):
+			projectile.call("setup_flight", projectile.start_pos, projectile.target_pos, 0.8, 3.5)
 
 
 func _validate_registry_smoke(player_ship: Node3D, label: String) -> void:
