@@ -3,7 +3,6 @@ extends RefCounted
 const RAID_SWITCH_BUFFER: float = 2.0
 const RAID_MAX_ACTIVE_THREATS: int = 1
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 static func get_desired_player_captain_count(ship) -> int:
 	return clampi(int(ship.captain_count), 0, maxi(0, int(ship.max_crew_count)))
@@ -288,7 +287,7 @@ static func _find_raid_target(ship) -> Node3D:
 	var own_crew: int = ship.get_alive_crew_count()
 	var candidates: Array = []
 	var nearby_enemy_count: int = 0
-	var enemies = SceneGroupCache.get_nodes(ship.get_tree(), "enemy")
+	var enemies = EntityRegistry.get_ships_by_team("enemy")
 	for enemy in enemies:
 		if not _is_valid_raid_target_ship(ship, enemy):
 			continue
@@ -375,7 +374,7 @@ static func _dispatch_raid_boarders(ship, target_ship: Node3D) -> void:
 
 
 static func _recall_raid_boarders(ship) -> void:
-	var all_soldiers = SceneGroupCache.get_nodes(ship.get_tree(), "soldiers")
+	var all_soldiers = EntityRegistry.get_soldiers_by_team("player")
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
 			continue
@@ -394,11 +393,8 @@ static func _recall_raid_boarders(ship) -> void:
 
 
 static func _count_enemy_boarders_on_ship(ship) -> int:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
-	if not soldiers_node:
-		return 0
 	var count: int = 0
-	for soldier in soldiers_node.get_children():
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
 		if soldier.get("current_state") == 4:
 			continue
 		if soldier.get("team") == "enemy":
@@ -407,11 +403,8 @@ static func _count_enemy_boarders_on_ship(ship) -> int:
 
 
 static func _count_home_defenders(ship) -> int:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
-	if not soldiers_node:
-		return 0
 	var count: int = 0
-	for soldier in soldiers_node.get_children():
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
 		if soldier.get("current_state") == 4:
 			continue
 		if soldier.get("team") != "player":
@@ -424,7 +417,7 @@ static func _count_home_defenders(ship) -> int:
 
 static func _count_boarders_from_home(ship) -> int:
 	var count: int = 0
-	var all_soldiers = SceneGroupCache.get_nodes(ship.get_tree(), "soldiers")
+	var all_soldiers = EntityRegistry.get_soldiers_by_team("player")
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
 			continue
@@ -441,7 +434,7 @@ static func _count_boarders_from_home(ship) -> int:
 
 static func _get_home_boarders_on_ship(ship, target_ship: Node3D) -> Array:
 	var result: Array = []
-	var all_soldiers = SceneGroupCache.get_nodes(ship.get_tree(), "soldiers")
+	var all_soldiers = EntityRegistry.get_soldiers_by_team("player")
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
 			continue
@@ -458,11 +451,7 @@ static func _get_home_boarders_on_ship(ship, target_ship: Node3D) -> Array:
 
 static func _get_available_raid_boarders(ship) -> Array:
 	var result: Array = []
-	var soldiers_node = ship.get_node_or_null("Soldiers")
-	if not soldiers_node:
-		return result
-
-	for soldier in soldiers_node.get_children():
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
 		if not is_instance_valid(soldier):
 			continue
 		if soldier.get("team") != "player":
@@ -501,11 +490,8 @@ static func _get_desired_boarder_count(ship, target_ship: Node3D) -> int:
 
 
 static func _count_ranged_enemies_on_ship(target_ship: Node3D) -> int:
-	var soldiers_node = target_ship.get_node_or_null("Soldiers")
-	if not soldiers_node:
-		return 0
 	var count: int = 0
-	for soldier in soldiers_node.get_children():
+	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
 		if soldier.get("current_state") == 4:
 			continue
 		if soldier.get("team") != "enemy":

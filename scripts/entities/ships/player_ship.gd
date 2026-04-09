@@ -85,7 +85,7 @@ static var _last_ships_frame: int = -1
 static func _get_ships_cached(tree: SceneTree) -> Array:
 	var f = Engine.get_physics_frames()
 	if f != _last_ships_frame:
-		_cached_ships = tree.get_nodes_in_group("ships")
+		_cached_ships = EntityRegistry.get_ships()
 		_last_ships_frame = f
 	return _cached_ships
 

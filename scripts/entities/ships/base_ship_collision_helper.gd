@@ -1,12 +1,14 @@
 extends RefCounted
 class_name BaseShipCollisionHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if bool(ship.get_meta("derelict_nonblocking", false)):
 		return Vector3.ZERO
 
 	var force = Vector3.ZERO
-	var neighbors = ship.SceneGroupCache.get_nodes(ship.get_tree(), "ships")
+	var neighbors = EntityRegistry.get_ships()
 
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or other.get("is_dying") or other.get("is_sinking"):
