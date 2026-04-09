@@ -478,8 +478,9 @@ func get_target_ship() -> Node3D:
 	return null
 
 func get_ship_type_value() -> String:
-	if "ship_type" in self and get("ship_type") != null:
-		return str(get("ship_type"))
+	var ship_type_value: Variant = get("ship_type") if "ship_type" in self else null
+	if ship_type_value != null:
+		return str(ship_type_value)
 	return ""
 
 func is_sinking_or_dying() -> bool:

@@ -6,7 +6,7 @@ static func find_ship_duty_target(soldier) -> Vector3:
 	var owned_ship: Node3D = soldier.get_owned_ship_node() if soldier.has_method("get_owned_ship_node") else null
 	if not is_instance_valid(owned_ship):
 		return Vector3.INF
-	var owned_team: String = owned_ship.get_team_tag() if owned_ship.has_method("get_team_tag") else str(owned_ship.get("team"))
+	var owned_team: String = _get_node_team_tag(owned_ship)
 	if owned_team != soldier.team:
 		return Vector3.INF
 	if soldier.current_target != null:
@@ -25,7 +25,9 @@ static func find_ship_duty_target(soldier) -> Vector3:
 	var bias_sign: float = -1.0 if int(soldier.get_instance_id()) % 2 == 0 else 1.0
 	var local_target: Vector3 = Vector3.INF
 
-	if (soldier.has_method("is_ranged_only_value") and soldier.is_ranged_only_value() or soldier.crew_role == "general" or soldier.crew_role == "fire_pot") and gunnery_ratio >= 0.45:
+	var soldier_role: String = soldier.get_crew_role_value() if soldier.has_method("get_crew_role_value") else str(soldier.crew_role)
+	var is_ranged_only: bool = soldier.has_method("is_ranged_only_value") and soldier.is_ranged_only_value()
+	if (is_ranged_only or soldier_role == "general" or soldier_role == "fire_pot") and gunnery_ratio >= 0.45:
 		var side_sign: float = _get_enemy_side_sign(soldier, bias_sign)
 		var lane_index: int = int(soldier.get_instance_id()) % 5
 		var lane_offset: float = clampf((float(lane_index) - 2.0) * 0.45, -half_ext.y * 0.42, half_ext.y * 0.42)
@@ -78,3 +80,15 @@ static func _get_enemy_side_sign(soldier, fallback_sign: float) -> float:
 	if absf(enemy_local.x) <= 0.2:
 		return fallback_sign
 	return 1.0 if enemy_local.x >= 0.0 else -1.0
+
+
+static func _get_node_team_tag(node: Node) -> String:
+	if not is_instance_valid(node):
+		return ""
+	if node.has_method("get_team_tag"):
+		return node.get_team_tag()
+	if "team" in node:
+		var team_value: Variant = node.get("team")
+		if team_value != null:
+			return str(team_value)
+	return ""
