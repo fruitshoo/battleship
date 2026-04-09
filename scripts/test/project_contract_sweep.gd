@@ -30,6 +30,7 @@ const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.
 	"res://scenes/projectiles/janggun_missile.tscn",
 	"res://scenes/projectiles/singigeon_rocket.tscn",
 ]
+@export var smoke_run_save_contract: bool = true
 
 var _failures: Array[String] = []
 var _loaded_scripts: int = 0
@@ -45,6 +46,8 @@ func _run_contract_checks() -> void:
 	_scan_legacy_godot3_patterns(script_roots)
 	_scan_resource_roots(scene_roots, ".tscn")
 	await _run_runtime_smoke()
+	if smoke_run_save_contract:
+		_run_save_contract_smoke()
 	_report_and_quit()
 
 
@@ -139,6 +142,58 @@ func _run_runtime_smoke() -> void:
 		await _run_launcher_smoke_pass(packed, str(launcher_scene_path))
 	for projectile_scene_path in smoke_spawn_projectile_scenes:
 		await _run_projectile_smoke_pass(packed, str(projectile_scene_path))
+
+
+func _run_save_contract_smoke() -> void:
+	if not is_instance_valid(SaveManager):
+		_failures.append("SaveManager autoload is not available for save smoke")
+		return
+
+	var save_path := "user://save_data.cfg"
+	var backup_path := "user://save_data.backup.cfg"
+	var save_backup := _capture_file_bytes(save_path)
+	var backup_backup := _capture_file_bytes(backup_path)
+	var snapshot := _capture_save_manager_state()
+	var expected := {
+		"gold": 1234,
+		"meta_upgrades": {"hull_hp": 3, "sailing": 2},
+		"items": ["choyogi", "ilseongjeongsiui"],
+		"settings": {
+			"master_volume": 0.12,
+			"music_volume": 0.34,
+			"sfx_volume": 0.56,
+			"ui_volume": 0.78,
+			"fullscreen": false,
+		},
+	}
+
+	_apply_save_manager_state(expected)
+	SaveManager.save_game()
+
+	var loaded_main := ConfigFile.new()
+	if loaded_main.load(save_path) != OK:
+		_failures.append("save smoke could not reload main save file")
+	else:
+		_validate_save_config(loaded_main, expected, "main save smoke")
+
+	var loaded_backup := ConfigFile.new()
+	if loaded_backup.load(backup_path) != OK:
+		_failures.append("save smoke could not reload backup save file")
+	else:
+		_validate_save_config(loaded_backup, expected, "backup save smoke")
+
+	_apply_save_manager_state({
+		"gold": 1,
+		"meta_upgrades": {"wrong": 99},
+		"items": ["wrong"],
+		"settings": {},
+	})
+	SaveManager.load_game()
+	_validate_save_manager_state(expected, "save smoke roundtrip")
+
+	_restore_save_manager_state(snapshot)
+	_restore_file_bytes(save_path, save_backup)
+	_restore_file_bytes(backup_path, backup_backup)
 
 
 func _run_single_smoke_pass(packed: PackedScene, spawn_method: String, label: String) -> void:
@@ -422,6 +477,113 @@ func _validate_spawned_ship(spawned_ship: Node3D, label: String) -> void:
 	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_ship)
 	if not registered_enemy:
 		_failures.append("%s instance was not registered in enemy team bucket" % label)
+
+
+func _capture_save_manager_state() -> Dictionary:
+	return {
+		"gold": SaveManager.gold,
+		"meta_upgrades": SaveManager.meta_upgrades.duplicate(true),
+		"items": SaveManager.get_items(),
+		"settings": _capture_settings_snapshot(),
+	}
+
+
+func _capture_settings_snapshot() -> Dictionary:
+	var snapshot: Dictionary = {}
+	for key in ["master_volume", "music_volume", "sfx_volume", "ui_volume", "fullscreen"]:
+		snapshot[key] = SaveManager.get_setting(key)
+	return snapshot
+
+
+func _apply_save_manager_state(state: Dictionary) -> void:
+	SaveManager.gold = int(state.get("gold", 0))
+	SaveManager.meta_upgrades = {}
+	var meta_upgrades_value = state.get("meta_upgrades", {})
+	if meta_upgrades_value is Dictionary:
+		SaveManager.meta_upgrades = meta_upgrades_value.duplicate(true)
+	SaveManager.items = []
+	var items_value = state.get("items", [])
+	if items_value is Array:
+		for item_id in items_value:
+			SaveManager.items.append(str(item_id))
+	var settings_value = state.get("settings", {})
+	SaveManager.settings = {}
+	if settings_value is Dictionary:
+		SaveManager.settings = settings_value.duplicate(true)
+
+
+func _restore_save_manager_state(snapshot: Dictionary) -> void:
+	_apply_save_manager_state(snapshot)
+
+
+func _validate_save_manager_state(expected: Dictionary, label: String) -> void:
+	if SaveManager.gold != int(expected.get("gold", 0)):
+		_failures.append("%s gold mismatch" % label)
+	if SaveManager.meta_upgrades != expected.get("meta_upgrades", {}):
+		_failures.append("%s meta upgrade mismatch" % label)
+	if SaveManager.get_items() != expected.get("items", []):
+		_failures.append("%s items mismatch" % label)
+	var expected_settings: Dictionary = expected.get("settings", {})
+	for key in expected_settings.keys():
+		if SaveManager.get_setting(str(key)) != expected_settings[key]:
+			_failures.append("%s setting mismatch for %s" % [label, key])
+
+
+func _validate_save_config(config: ConfigFile, expected: Dictionary, label: String) -> void:
+	var expected_gold: int = int(expected.get("gold", 0))
+	var expected_meta_upgrades: Dictionary = expected.get("meta_upgrades", {})
+	var expected_items: Array = expected.get("items", [])
+	var expected_settings: Dictionary = expected.get("settings", {})
+
+	if int(config.get_value("player", "gold", -1)) != expected_gold:
+		_failures.append("%s gold mismatch" % label)
+
+	var loaded_meta_upgrades = config.get_value("player", "meta_upgrades", {})
+	if loaded_meta_upgrades != expected_meta_upgrades:
+		_failures.append("%s meta upgrade mismatch" % label)
+
+	var loaded_items = config.get_value("player", "items", [])
+	if loaded_items != expected_items:
+		_failures.append("%s items mismatch" % label)
+
+	var loaded_settings = config.get_value("player", "settings", {})
+	if not (loaded_settings is Dictionary):
+		_failures.append("%s settings payload mismatch" % label)
+	else:
+		for key in expected_settings.keys():
+			if loaded_settings.get(key) != expected_settings[key]:
+				_failures.append("%s setting mismatch for %s" % [label, key])
+
+
+func _capture_file_bytes(path: String) -> Dictionary:
+	var payload := {"exists": false, "bytes": PackedByteArray()}
+	if not FileAccess.file_exists(path):
+		return payload
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return payload
+	payload["exists"] = true
+	payload["bytes"] = file.get_buffer(file.get_length())
+	file.close()
+	return payload
+
+
+func _restore_file_bytes(path: String, payload: Dictionary) -> void:
+	if payload.is_empty():
+		return
+	var existed := bool(payload.get("exists", false))
+	var bytes: PackedByteArray = payload.get("bytes", PackedByteArray())
+	if existed:
+		var file := FileAccess.open(path, FileAccess.WRITE)
+		if file == null:
+			_failures.append("failed to restore file: %s" % path)
+			return
+		file.store_buffer(bytes)
+		file.close()
+	elif FileAccess.file_exists(path):
+		var remove_err := DirAccess.remove_absolute(path)
+		if remove_err != OK:
+			_failures.append("failed to remove temp save file: %s" % path)
 
 
 func _report_and_quit() -> void:
