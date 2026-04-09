@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
@@ -55,6 +56,16 @@ var _last_faced_dir: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	pool_reset()
+
+
+func _enter_tree() -> void:
+	if process_mode == Node.PROCESS_MODE_DISABLED:
+		return
+	EntityRegistry.register_projectile(self)
+
+
+func _exit_tree() -> void:
+	EntityRegistry.unregister_projectile(self)
 
 func pool_capacity() -> int:
 	return 100

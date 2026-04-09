@@ -1,4 +1,5 @@
 extends Area3D
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
@@ -26,6 +27,16 @@ var _rotation_update_timer: float = 0.0
 
 func _ready() -> void:
 	pool_reset()
+
+
+func _enter_tree() -> void:
+	if process_mode == Node.PROCESS_MODE_DISABLED:
+		return
+	EntityRegistry.register_projectile(self)
+
+
+func _exit_tree() -> void:
+	EntityRegistry.unregister_projectile(self)
 
 func pool_capacity() -> int:
 	return 20

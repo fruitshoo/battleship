@@ -3,6 +3,7 @@ extends RefCounted
 
 static var _ships: Array[Node] = []
 static var _soldiers: Array[Node] = []
+static var _projectiles: Array[Node] = []
 
 
 static func register_ship(ship: Node) -> void:
@@ -41,6 +42,25 @@ static func count_ships() -> int:
 
 static func count_soldiers() -> int:
 	return get_soldiers().size()
+
+
+static func register_projectile(projectile: Node) -> void:
+	if not is_instance_valid(projectile):
+		return
+	if not _projectiles.has(projectile):
+		_projectiles.append(projectile)
+
+
+static func unregister_projectile(projectile: Node) -> void:
+	_unregister_node(_projectiles, projectile)
+
+
+static func get_projectiles() -> Array:
+	return _compact_nodes(_projectiles)
+
+
+static func count_projectiles() -> int:
+	return get_projectiles().size()
 
 
 static func _unregister_node(collection: Array, node: Node) -> void:

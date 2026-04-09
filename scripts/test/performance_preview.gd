@@ -500,8 +500,4 @@ func _count_soldiers() -> int:
 
 
 func _count_projectiles() -> int:
-	var count := 0
-	for projectile in _projectile_spawns:
-		if is_instance_valid(projectile):
-			count += 1
-	return count
+	return EntityRegistry.count_projectiles()

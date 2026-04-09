@@ -1,5 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
@@ -168,6 +169,16 @@ func _ready() -> void:
 		area_entered.connect(_on_area_entered)
 		body_entered.connect(_on_body_entered)
 		_signals_connected = true
+
+
+func _enter_tree() -> void:
+	if process_mode == Node.PROCESS_MODE_DISABLED:
+		return
+	EntityRegistry.register_projectile(self)
+
+
+func _exit_tree() -> void:
+	EntityRegistry.unregister_projectile(self)
 
 var has_hit: bool = false
 
