@@ -94,4 +94,5 @@
   Useful for spotting whether leak budget is coming from a script preload chain or from an individual referenced scene.
 - `scripts/test/run_chaser_script_isolation.sh`
   Compares lightweight `extends base_ship` isolation scripts against the real `chaser_ship.gd`.
-  Useful for checking whether the leak comes from helper preloads, top-level declarations, or something unique to the full chaser script.
+  Also includes `process_loop`, `ai_core`, `process_ai`, `capture_minion`, `boarding_collision`, and `late_combined` buckets for narrowing the leak to specific late-method clusters.
+  Useful for checking whether the leak comes from helper preloads, top-level declarations, or a specific method family inside the full chaser script.

@@ -10,6 +10,12 @@ declare -a targets=(
 	"isolation_helpers|res://scripts/test/chaser_isolation_helpers.gd"
 	"isolation_combined|res://scripts/test/chaser_isolation_combined.gd"
 	"isolation_runtime_methods|res://scripts/test/chaser_isolation_runtime_methods.gd"
+	"isolation_process_loop|res://scripts/test/chaser_isolation_process_loop.gd"
+	"isolation_ai_core|res://scripts/test/chaser_isolation_ai_core.gd"
+	"isolation_process_ai|res://scripts/test/chaser_isolation_process_ai.gd"
+	"isolation_capture_minion|res://scripts/test/chaser_isolation_capture_minion.gd"
+	"isolation_boarding_collision|res://scripts/test/chaser_isolation_boarding_collision.gd"
+	"isolation_late_combined|res://scripts/test/chaser_isolation_late_combined.gd"
 	"chaser_ship|res://scripts/entities/ships/chaser_ship.gd"
 )
 
