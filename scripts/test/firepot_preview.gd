@@ -60,13 +60,20 @@ func _spawn_scenario(label_text: String, anchor: Vector3, player: Node3D, distan
 	enemy.global_position = player.global_position + direction * distance_to_player
 	enemy.look_at(player.global_position, Vector3.UP)
 
-	if "target" in enemy:
+	if enemy.has_method("set_preview_target"):
+		enemy.call("set_preview_target", player if assign_target else null)
+	elif "target" in enemy:
 		enemy.target = player if assign_target else null
-	if "fire_pot_cooldown_timer" in enemy:
+	if enemy.has_method("reset_preview_fire_pot_cooldown"):
+		enemy.call("reset_preview_fire_pot_cooldown")
+	elif "fire_pot_cooldown_timer" in enemy:
 		enemy.fire_pot_cooldown_timer = 0.0
 
 	if not keep_tosser:
-		_remove_fire_pot_role(enemy)
+		if enemy.has_method("set_preview_fire_pot_enabled"):
+			enemy.call("set_preview_fire_pot_enabled", false)
+		else:
+			_remove_fire_pot_role(enemy)
 
 	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0))
 	var debug_label := PreviewHarnessHelper.add_billboard_label(enemy, "", Vector3(0.0, 4.8, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)
@@ -115,14 +122,17 @@ func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 		var dist: float = enemy.global_position.distance_to(player.global_position)
 		in_range = dist >= 7.0 and dist <= 18.0
 
-	var soldiers_node := enemy.get_node_or_null("Soldiers")
-	if is_instance_valid(soldiers_node):
-		for soldier in soldiers_node.get_children():
-			if not is_instance_valid(soldier):
-				continue
-			if str(soldier.get("crew_role")) == "fire_pot" and int(soldier.get("current_state")) != 4:
-				has_tosser = true
-				break
+	if enemy.has_method("has_active_crew_role"):
+		has_tosser = bool(enemy.call("has_active_crew_role", "fire_pot"))
+	else:
+		var soldiers_node := enemy.get_node_or_null("Soldiers")
+		if is_instance_valid(soldiers_node):
+			for soldier in soldiers_node.get_children():
+				if not is_instance_valid(soldier):
+					continue
+				if str(soldier.get("crew_role")) == "fire_pot" and int(soldier.get("current_state")) != 4:
+					has_tosser = true
+					break
 
 	return "target:%s range:%s tosser:%s cd:%.1f" % [
 		"Y" if has_target else "N",

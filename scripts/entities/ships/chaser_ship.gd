@@ -133,6 +133,20 @@ func can_use_fire_pot_attack() -> bool:
 	return false
 
 
+func set_preview_target(target_ship: Node3D) -> void:
+	target = target_ship
+
+
+func reset_preview_fire_pot_cooldown() -> void:
+	fire_pot_cooldown_timer = 0.0
+
+
+func set_preview_fire_pot_enabled(enabled: bool) -> void:
+	if enabled:
+		return
+	replace_preview_crew_role("fire_pot", "general")
+
+
 func get_preferred_engagement_range() -> float:
 	return preferred_combat_range
 

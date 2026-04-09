@@ -561,6 +561,50 @@ func get_alive_crew_count() -> int:
 			count += 1
 	return count
 
+
+func set_preview_deck_state(is_contested: bool, is_overrun: bool = false) -> void:
+	deck_is_contested = is_contested
+	deck_is_overrun = is_overrun
+
+
+func has_active_crew_role(role_name: String) -> bool:
+	var normalized_role := role_name.strip_edges().to_lower()
+	if normalized_role.is_empty():
+		return false
+	var soldiers_node := get_node_or_null("Soldiers")
+	if not is_instance_valid(soldiers_node):
+		return false
+	for child in soldiers_node.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.get("current_state") == 4:
+			continue
+		if str(child.get("crew_role")).strip_edges().to_lower() == normalized_role:
+			return true
+	return false
+
+
+func replace_preview_crew_role(from_role: String, to_role: String = "general") -> void:
+	var normalized_from := from_role.strip_edges().to_lower()
+	var normalized_to := to_role.strip_edges().to_lower()
+	if normalized_from.is_empty() or normalized_to.is_empty() or normalized_from == normalized_to:
+		return
+	var soldiers_node := get_node_or_null("Soldiers")
+	if not is_instance_valid(soldiers_node):
+		return
+	for child in soldiers_node.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.get("current_state") == 4:
+			continue
+		if str(child.get("crew_role")).strip_edges().to_lower() != normalized_from:
+			continue
+		if child.has_method("apply_crew_role"):
+			child.apply_crew_role(normalized_to)
+		else:
+			child.set("crew_role", normalized_to)
+			child.set_meta("crew_role", normalized_to)
+
 ## 병사가 사망할 때마다 호출되어, 배의 폐선 여부를 이벤트 방식으로 검사
 func check_derelict_status() -> void:
 	BaseShipStatusHelper.check_derelict_status(self)
