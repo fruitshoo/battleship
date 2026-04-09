@@ -52,7 +52,7 @@ var mid_boss_escort_layout: Array[Dictionary] = [
 ]
 
 
-func trigger_boss_event() -> void:
+func trigger_boss_event() -> Node3D:
 	regular_spawn_stopped = true
 	print("[Warning] 보스 등장 이벤트 시작! 일반 적 스폰 중단")
 	
@@ -63,11 +63,12 @@ func trigger_boss_event() -> void:
 	# 		enemy.die()
 	
 	# 보스 소환
-	_spawn_boss()
+	return _spawn_boss()
 
 
-func _spawn_boss() -> void:
-	if not boss_scene or boss_spawned: return
+func _spawn_boss() -> Node3D:
+	if not boss_scene or boss_spawned:
+		return null
 	boss_spawned = true
 	
 	var boss = boss_scene.instantiate()
@@ -86,6 +87,7 @@ func _spawn_boss() -> void:
 	_prime_enemy_momentum(boss, true)
 	_push_boss_hp_to_hud(boss)
 	print("[Boss] 최종 보스 소환 완료!")
+	return boss
 
 
 func set_difficulty(new_interval: float, new_max: int, new_boarders: int = 2) -> void:
@@ -300,8 +302,9 @@ func _is_position_safe(pos: Vector3, min_dist: float) -> bool:
 	return true
 
 
-func _spawn_elite_ship() -> void:
-	if not boss_scene: return
+func _spawn_elite_ship() -> Node3D:
+	if not boss_scene:
+		return null
 	
 	# 중간 보스는 보스 베이스(Atakebune)를 사용하되 tier 1로 설정
 	var elite = boss_scene.instantiate()
@@ -321,14 +324,15 @@ func _spawn_elite_ship() -> void:
 	_spawn_elite_escorts(spawn_pos)
 	
 	print("[Event] 중간 보스 편대 출현!")
+	return elite
 
 
-func debug_spawn_mid_boss() -> void:
+func debug_spawn_mid_boss() -> Node3D:
 	if not is_instance_valid(player):
 		_find_player()
 	if not is_instance_valid(player):
-		return
-	_spawn_elite_ship()
+		return null
+	return _spawn_elite_ship()
 
 
 func debug_spawn_fleet(fleet_class: String) -> void:
@@ -343,12 +347,12 @@ func debug_spawn_fleet(fleet_class: String) -> void:
 	_spawn_enemy_from_template(fleet_template, fleet_template.size())
 
 
-func debug_spawn_final_boss() -> void:
+func debug_spawn_final_boss() -> Node3D:
 	if not is_instance_valid(player):
 		_find_player()
 	if not is_instance_valid(player):
-		return
-	trigger_boss_event()
+		return null
+	return trigger_boss_event()
 
 
 func _push_boss_hp_to_hud(boss_ship: Node) -> void:
