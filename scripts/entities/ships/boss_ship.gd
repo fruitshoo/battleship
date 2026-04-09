@@ -293,7 +293,7 @@ func _calculate_separation() -> Vector3:
 		return Vector3.ZERO
 
 	var force = Vector3.ZERO
-	var neighbors = SceneGroupCache.get_nodes(get_tree(), "ships")
+	var neighbors = EntityRegistry.get_ships()
 	
 	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_dead") or other.get("is_sinking"):
@@ -319,7 +319,7 @@ func _calculate_separation() -> Vector3:
 	return force
 
 func _find_player() -> void:
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 	var closest_dist = INF
 	var closest_player = null
 	

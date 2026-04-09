@@ -710,8 +710,7 @@ func _is_engagement_pair(other: Node3D) -> bool:
 
 ## 나포 가능한 함대 정원(최대 3척)이 남았는지 확인
 func can_capture_more_ships() -> bool:
-	var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
-	return minions.size() < 3
+	return EntityRegistry.count_captured_minions() < 3
 
 ## 밧줄에 데미지 적용
 func take_rope_damage(amount: float) -> void:

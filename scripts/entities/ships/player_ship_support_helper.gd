@@ -56,6 +56,7 @@ static func spawn_or_repair_ally(ship) -> void:
 		ally.set_team("player")
 	if ally.has_method("add_to_group"):
 		ally.add_to_group("captured_minion")
+	EntityRegistry.register_captured_minion(ally)
 	if "target" in ally:
 		ally.target = ship
 	if ally.has_method("_find_player"):

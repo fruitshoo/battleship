@@ -226,7 +226,7 @@ static func _get_separation_update_interval(ship) -> float:
 static func find_player(ship) -> void:
 	var players = EntityRegistry.get_ships_by_team("player")
 
-	if ship.is_in_group("captured_minion") or ship.team == "player":
+	if ship.team == "player":
 		for p in players:
 			if p.get("is_player_controlled") == true:
 				ship.target = p

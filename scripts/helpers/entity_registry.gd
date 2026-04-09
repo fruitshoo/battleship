@@ -4,6 +4,7 @@ extends RefCounted
 static var _ships: Array[Node] = []
 static var _soldiers: Array[Node] = []
 static var _projectiles: Array[Node] = []
+static var _captured_minions: Array[Node] = []
 static var _soldiers_by_ship: Dictionary = {}
 
 
@@ -40,6 +41,25 @@ static func move_soldier_ship(soldier: Node, old_ship: Node, new_ship: Node) -> 
 
 static func get_ships() -> Array:
 	return _compact_nodes(_ships)
+
+
+static func register_captured_minion(ship: Node) -> void:
+	if not is_instance_valid(ship):
+		return
+	if not _captured_minions.has(ship):
+		_captured_minions.append(ship)
+
+
+static func unregister_captured_minion(ship: Node) -> void:
+	_unregister_node(_captured_minions, ship)
+
+
+static func get_captured_minions() -> Array:
+	return _compact_nodes(_captured_minions)
+
+
+static func count_captured_minions() -> int:
+	return get_captured_minions().size()
 
 
 static func get_soldiers() -> Array:

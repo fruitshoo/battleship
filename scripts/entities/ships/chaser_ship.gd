@@ -88,14 +88,14 @@ static var _last_ships_cache_frame: int = -1
 
 var _cached_wind_manager: Node = null
 
-static func get_minions_cached(tree: SceneTree) -> Array:
+static func get_minions_cached(_tree: SceneTree) -> Array:
 	var current_frame = Engine.get_physics_frames()
 	if current_frame != _last_minion_cache_frame:
-		_cached_minion_list = tree.get_nodes_in_group("captured_minion")
+		_cached_minion_list = EntityRegistry.get_captured_minions()
 		_last_minion_cache_frame = current_frame
 	return _cached_minion_list
 
-static func get_ships_cached(tree: SceneTree) -> Array:
+static func get_ships_cached(_tree: SceneTree) -> Array:
 	var current_frame = Engine.get_physics_frames()
 	if current_frame != _last_ships_cache_frame:
 		_cached_ships_list = EntityRegistry.get_ships()
@@ -393,6 +393,7 @@ func _ready() -> void:
 	set_team(team)
 	if team == "player":
 		add_to_group("captured_minion")
+		EntityRegistry.register_captured_minion(self)
 		_apply_minion_visuals()
 		_equip_minion_cannons()
 		var upgrade_manager = get_node_or_null("/root/UpgradeManager")
@@ -401,6 +402,7 @@ func _ready() -> void:
 	else:
 		if is_in_group("captured_minion"):
 			remove_from_group("captured_minion")
+		EntityRegistry.unregister_captured_minion(self)
 	
 	_setup_soldiers() # 모든 함선 초기 병사 배치 (팀 속성 반영)
 		
@@ -504,6 +506,7 @@ func die() -> void:
 		remove_from_group("player")
 	if is_in_group("captured_minion"):
 		remove_from_group("captured_minion")
+	EntityRegistry.unregister_captured_minion(self)
 	
 	# 점수 및 XP 추가
 	if is_instance_valid(cached_lm):
@@ -759,8 +762,7 @@ func capture_ship() -> void:
 	if team == "player": return
 	
 	# 기존 함대 수 체크 (정예 함선 1척 체제)
-	var minions = SceneGroupCache.get_nodes(get_tree(), "captured_minion")
-	if minions.size() >= 1:
+	if EntityRegistry.count_captured_minions() >= 1:
 		# ✅ 정원 초과 시 나포 대신 배를 파괴함
 		print("[Limitation] 함대 정원 초과! 적함을 파괴합니다.")
 		die()
@@ -800,7 +802,7 @@ func capture_ship() -> void:
 	# (is_boarding, boarding_target, _clear_ropes 등은 _cancel_boarding()에서 이미 처리됨)
 	
 	# 플레이어의 현재 업그레이드된 최대 속도를 상속받아 평준화 (기본치 3.2 대신)
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 	if players.size() > 0 and players[0].get("is_player_controlled"):
 		move_speed = players[0].get("max_speed")
 	else:
@@ -808,6 +810,7 @@ func capture_ship() -> void:
 	
 	if not is_in_group("captured_minion"):
 		add_to_group("captured_minion")
+		EntityRegistry.register_captured_minion(self)
 
 	
 	# 자식들(대포, 병사) 팀 변경 및 UI 알림
