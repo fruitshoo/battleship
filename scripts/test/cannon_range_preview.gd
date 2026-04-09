@@ -3,6 +3,7 @@ extends Node3D
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var auto_enable_distance_debug: bool = true
@@ -112,17 +113,13 @@ func _build_player_debug_text(player: Node3D) -> String:
 	var range_value: float = _get_ship_cannon_range(player)
 	var active_cannons: int = _count_active_cannons(player)
 	var total_cannons: int = _count_total_cannons(player)
-	return "range:%.1f active:%d/%d" % [range_value, active_cannons, total_cannons]
+	return PreviewStateSnapshotHelper.build_cannon_player_text(range_value, active_cannons, total_cannons)
 
 
 func _build_enemy_debug_text(player: Node3D, enemy: Node3D) -> String:
 	var range_value: float = _get_ship_cannon_range(player)
-	var planar_distance: float = Vector2(
-		player.global_position.x - enemy.global_position.x,
-		player.global_position.z - enemy.global_position.z
-	).length()
-	var state_text := "IN" if planar_distance <= range_value else "OUT"
-	return "dist:%.1f range:%.1f %s" % [planar_distance, range_value, state_text]
+	var planar_distance := PreviewStateSnapshotHelper.planar_distance(player, enemy)
+	return PreviewStateSnapshotHelper.build_cannon_enemy_text(planar_distance, range_value)
 
 
 func _get_ship_cannon_range(ship: Node) -> float:

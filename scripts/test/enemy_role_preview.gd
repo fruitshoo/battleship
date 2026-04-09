@@ -4,6 +4,7 @@ const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true
@@ -70,8 +71,9 @@ func _refresh_debug_labels() -> void:
 
 
 func _build_debug_text(ship: Node) -> String:
-	var role_text := "gunner" if bool(ship.call("is_gunner_role")) else "charger"
-	var range_text := "%.1f" % float(ship.get("preferred_combat_range"))
-	var board_text := "Y" if bool(ship.call("can_board_targets")) else "N"
-	var firepot_text := "Y" if bool(ship.call("can_use_fire_pot_attack")) else "N"
-	return "role:%s rng:%s board:%s pot:%s" % [role_text, range_text, board_text, firepot_text]
+	return PreviewStateSnapshotHelper.build_enemy_role_text(
+		bool(ship.call("is_gunner_role")),
+		float(ship.get("preferred_combat_range")),
+		bool(ship.call("can_board_targets")),
+		bool(ship.call("can_use_fire_pot_attack"))
+	)

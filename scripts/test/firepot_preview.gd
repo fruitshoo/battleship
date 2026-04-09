@@ -2,6 +2,7 @@ extends Node3D
 
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true
@@ -126,9 +127,4 @@ func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 					has_tosser = true
 					break
 
-	return "target:%s range:%s tosser:%s cd:%.1f" % [
-		"Y" if has_target else "N",
-		"Y" if in_range else "N",
-		"Y" if has_tosser else "N",
-		cooldown,
-	]
+	return PreviewStateSnapshotHelper.build_firepot_text(has_target, in_range, has_tosser, cooldown)

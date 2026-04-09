@@ -2,6 +2,7 @@ extends Node3D
 
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true
@@ -63,17 +64,10 @@ func _refresh_debug_labels() -> void:
 
 func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 	var has_target := is_instance_valid(enemy.get("target"))
-	var planar_distance := 0.0
-	if is_instance_valid(player):
-		planar_distance = Vector2(
-			player.global_position.x - enemy.global_position.x,
-			player.global_position.z - enemy.global_position.z
-		).length()
-	var boarding_text := "Y" if bool(enemy.get("is_boarding")) else "N"
-	var prep_text := "%.1f" % float(enemy.get("boarding_prep_timer"))
-	return "target:%s dist:%.1f board:%s prep:%s" % [
-		"Y" if has_target else "N",
+	var planar_distance := PreviewStateSnapshotHelper.planar_distance(player, enemy)
+	return PreviewStateSnapshotHelper.build_boarding_preview_text(
+		has_target,
 		planar_distance,
-		boarding_text,
-		prep_text,
-	]
+		bool(enemy.get("is_boarding")),
+		float(enemy.get("boarding_prep_timer"))
+	)

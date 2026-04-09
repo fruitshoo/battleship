@@ -2,6 +2,7 @@ extends Node3D
 
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 
 enum TargetDeckState {
 	CLEAR,
@@ -108,6 +109,9 @@ func _build_enemy_debug_text(enemy: Node) -> String:
 	var mode: String = String(enemy.get_meta("boarding_approach_mode", "-"))
 	var slot: String = String(enemy.get_meta("boarding_slot_id", "-"))
 	var side_value: float = float(enemy.get_meta("boarding_side_sign", 0.0))
-	var side_text := "R" if side_value < -0.5 else ("L" if side_value > 0.5 else "-")
-	var boarding_text := "Y" if bool(enemy.get("is_boarding")) else "N"
-	return "mode:%s slot:%s side:%s board:%s" % [mode, slot, side_text, boarding_text]
+	return PreviewStateSnapshotHelper.build_boarding_navigation_text(
+		mode,
+		slot,
+		side_value,
+		bool(enemy.get("is_boarding"))
+	)
