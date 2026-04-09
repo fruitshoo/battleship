@@ -1,6 +1,7 @@
 extends RefCounted
 class_name ChaserShipSupportHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
 const DERELICT_OFFSCREEN_DESPAWN_DISTANCE: float = 42.0
@@ -57,10 +58,7 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 
 
 static func _find_fire_pot_tosser(ship):
-	var soldiers_node = ship.get_node_or_null("Soldiers")
-	if not soldiers_node:
-		return null
-	for child in soldiers_node.get_children():
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
 		if child.get("current_state") == 4:
 			continue
 		if child.get("team") != ship.team:
@@ -145,17 +143,16 @@ static func sink_derelict(ship) -> void:
 static func check_offscreen_despawn(ship) -> void:
 	if not ship.is_derelict or ship.is_sinking:
 		return
-	var players = ship.SceneGroupCache.get_nodes(ship.get_tree(), "player")
-	if players.is_empty():
+	var player: Node = EntityRegistry.get_first_ship_by_team("player")
+	if not is_instance_valid(player):
 		return
-	var p = players[0]
 
 	var started_at: float = float(ship.get_meta("derelict_started_at", 0.0))
 	var now: float = Time.get_ticks_msec() / 1000.0
 	if now - started_at < DERELICT_MIN_VISIBLE_LIFETIME:
 		return
 
-	var dist = ship.global_position.distance_to(p.global_position)
+	var dist = ship.global_position.distance_to(player.global_position)
 	if dist > DERELICT_HARD_DESPAWN_DISTANCE:
 		print("[Ship] 폐선이 완전히 표류하여 사라집니다.")
 		ship.queue_free()

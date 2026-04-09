@@ -1,6 +1,6 @@
 extends RefCounted
 
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_FLEET_NEXT_ORDER_META := "support_fleet_next_order"
 
@@ -69,8 +69,7 @@ static func spawn_or_repair_ally(ship) -> void:
 
 static func get_support_fleet_ships(ship) -> Array:
 	var support_ships: Array = []
-	var minions: Array = SceneGroupCache.get_nodes(ship.get_tree(), "captured_minion")
-	for minion in minions:
+	for minion in EntityRegistry.get_ships_by_team("player"):
 		if not is_instance_valid(minion):
 			continue
 		if bool(minion.get_meta("support_fleet_ship", false)) == false:
