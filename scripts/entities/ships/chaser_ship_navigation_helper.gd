@@ -1,6 +1,9 @@
 extends RefCounted
 class_name ChaserShipNavigationHelper
 
+static func _is_true(value: Variant) -> bool:
+	return value == true
+
 static func _team_tag(node: Node) -> String:
 	if not is_instance_valid(node):
 		return ""
@@ -16,7 +19,7 @@ static func _is_sinking_or_dying(node: Node) -> bool:
 		return true
 	if node.has_method("is_sinking_or_dying"):
 		return node.is_sinking_or_dying()
-	return bool(node.get("is_dying")) or bool(node.get("is_sinking"))
+	return _is_true(node.get("is_dying")) or _is_true(node.get("is_sinking"))
 
 
 static func _is_boarding_ship(node: Node) -> bool:
@@ -24,7 +27,7 @@ static func _is_boarding_ship(node: Node) -> bool:
 		return false
 	if node.has_method("is_boarding_ship"):
 		return node.is_boarding_ship()
-	return bool(node.get("is_boarding"))
+	return _is_true(node.get("is_boarding"))
 
 
 static func _boarding_target_ship(node: Node) -> Node3D:
@@ -51,8 +54,8 @@ static func _can_board_node(node: Node) -> bool:
 	if not is_instance_valid(node):
 		return false
 	if node.has_method("can_board_targets"):
-		return bool(node.call("can_board_targets"))
-	return bool(node.get("allow_boarding"))
+		return node.call("can_board_targets") == true
+	return _is_true(node.get("allow_boarding"))
 
 
 static func _current_speed(node: Node) -> float:
@@ -67,7 +70,7 @@ static func _current_speed(node: Node) -> float:
 
 static func _is_gunner(ship) -> bool:
 	if ship.has_method("is_gunner_role"):
-		return bool(ship.call("is_gunner_role"))
+		return ship.call("is_gunner_role") == true
 	return int(ship.combat_role) == int(ship.CombatRole.GUNNER)
 
 
@@ -417,7 +420,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			if post_impact_follow_timer <= 0.0 and absf(current_side_sign) > 0.5:
 				if absf(rel_side) >= collision_dist * 0.42 and absf(rel_forward) <= 8.0:
 					approach_mode = "side"
-			if ship.has_method("_is_side_boarding_approach") and bool(ship.call("_is_side_boarding_approach", target_node)):
+			if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_node) == true:
 				if dist_to_target <= ship.boarding_break_distance - 0.4:
 					var refreshed_timer: float = maxf(post_impact_follow_timer, 2.0)
 					ship.set_meta("post_impact_follow_timer", refreshed_timer)

@@ -7,16 +7,19 @@ const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
 
+static func _is_true(value: Variant) -> bool:
+	return value == true
+
 static func _is_gunner(ship) -> bool:
 	if ship.has_method("is_gunner_role"):
-		return bool(ship.call("is_gunner_role"))
+		return ship.call("is_gunner_role") == true
 	return int(ship.combat_role) == int(ship.CombatRole.GUNNER)
 
 
 static func _can_board(ship) -> bool:
 	if ship.has_method("can_board_targets"):
-		return bool(ship.call("can_board_targets"))
-	return bool(ship.allow_boarding)
+		return ship.call("can_board_targets") == true
+	return ship.allow_boarding == true
 
 
 static func _target_ship(ship) -> Node3D:
@@ -34,7 +37,7 @@ static func _is_sinking_or_dying(node: Node) -> bool:
 		return true
 	if node.has_method("is_sinking_or_dying"):
 		return node.is_sinking_or_dying()
-	return bool(node.get("is_dying")) or bool(node.get("is_sinking"))
+	return _is_true(node.get("is_dying")) or _is_true(node.get("is_sinking"))
 
 
 static func _is_player_controlled(node: Node) -> bool:
@@ -42,7 +45,7 @@ static func _is_player_controlled(node: Node) -> bool:
 		return false
 	if node.has_method("is_player_controlled_ship"):
 		return node.is_player_controlled_ship()
-	return bool(node.get("is_player_controlled"))
+	return _is_true(node.get("is_player_controlled"))
 
 
 static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) -> float:
@@ -119,7 +122,7 @@ static func get_separation_update_interval_runtime(ship, seed_value: int) -> flo
 
 
 static func calculate_separation(ship) -> Vector3:
-	if bool(ship.get_meta("derelict_nonblocking", false)):
+	if _is_true(ship.get_meta("derelict_nonblocking", false)):
 		return Vector3.ZERO
 
 	var force := Vector3.ZERO
@@ -128,9 +131,9 @@ static func calculate_separation(ship) -> Vector3:
 	var max_checks: int = min(neighbors.size(), 15)
 	for i in range(max_checks):
 		var other = neighbors[i]
-		if other == ship or not is_instance_valid(other) or bool(other.get("is_dying")):
+		if other == ship or not is_instance_valid(other) or _is_true(other.get("is_dying")):
 			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
+		if _is_true(other.get_meta("derelict_nonblocking", false)):
 			continue
 		if ship.is_boarding and other == ship.boarding_target:
 			continue
@@ -178,7 +181,7 @@ static func process_physics(ship, delta: float) -> void:
 	ship.separation_timer -= delta
 	if ship.separation_timer <= 0.0:
 		ship.separation_timer = _get_separation_update_interval(ship)
-		if ship.team == "player" and bool(ship.get_meta("support_fleet_ship", false)):
+		if ship.team == "player" and _is_true(ship.get_meta("support_fleet_ship", false)):
 			ship.separation_force = Vector3.ZERO
 		else:
 			ship.separation_force = calculate_separation(ship)
