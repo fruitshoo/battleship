@@ -3,6 +3,7 @@ extends Node
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const ProjectContractBootstrapHelper = preload("res://scripts/test/project_contract_bootstrap_helper.gd")
 const ProjectContractHudHelper = preload("res://scripts/test/project_contract_hud_helper.gd")
 const ProjectContractSaveHelper = preload("res://scripts/test/project_contract_save_helper.gd")
 const ProjectContractSceneWiringHelper = preload("res://scripts/test/project_contract_scene_wiring_helper.gd")
@@ -275,69 +276,12 @@ func _run_support_fleet_contract_smoke() -> void:
 
 
 func _run_bootstrap_contract_smoke() -> void:
-	var packed := load(smoke_scene_path) as PackedScene
-	if packed == null:
-		_failures.append("bootstrap smoke scene load failed: %s" % smoke_scene_path)
-		return
-
-	var smoke_root := packed.instantiate()
-	if smoke_root == null:
-		_failures.append("bootstrap smoke scene instantiate failed: %s" % smoke_scene_path)
-		return
-
-	add_child(smoke_root)
-	PreviewHarnessHelper.setup_common(smoke_root, false, true)
-	await _wait_frames(smoke_wait_frames_after_attach + 1)
-
-	if not is_instance_valid(AudioManager):
-		_failures.append("bootstrap smoke missing AudioManager autoload")
-	else:
-		if AudioManager.get("is_prewarm_finished") != true and AudioManager.has_signal("prewarm_finished"):
-			await AudioManager.prewarm_finished
-			await _wait_frames(1)
-		if AudioManager.get("is_prewarm_finished") != true:
-			_failures.append("bootstrap smoke audio prewarm did not finish")
-		if AudioManager.get("_startup_sfx_muted") == true:
-			_failures.append("bootstrap smoke startup audio mute flag remained enabled")
-		var sfx_index_before: int = int(AudioManager.get("current_sfx_index"))
-		var ui_index_before: int = int(AudioManager.get("current_2d_index"))
-		if AudioManager.has_method("set_startup_sfx_muted"):
-			AudioManager.set_startup_sfx_muted(true)
-		AudioManager.play_sfx("ui_click")
-		AudioManager.play_sfx("cannon_fire", Vector3.ZERO)
-		await _wait_frames(1)
-		if int(AudioManager.get("current_sfx_index")) != sfx_index_before:
-			_failures.append("bootstrap smoke muted 3D SFX still advanced audio pool")
-		if int(AudioManager.get("current_2d_index")) != ui_index_before:
-			_failures.append("bootstrap smoke muted 2D SFX still advanced audio pool")
-		if AudioManager.has_method("set_startup_sfx_muted"):
-			AudioManager.set_startup_sfx_muted(false)
-
-	var prewarm_wrapper := Node3D.new()
-	prewarm_wrapper.name = "BootstrapPrewarmSmoke"
-	prewarm_wrapper.set_meta("prewarm_mode", true)
-	smoke_root.add_child(prewarm_wrapper)
-
-	var effect_paths := [
-		"res://scenes/effects/impact_puff.tscn",
-		"res://scenes/effects/water_burst.tscn",
-		"res://scenes/effects/fire_effect.tscn",
-	]
-	for effect_path in effect_paths:
-		var effect_scene := load(effect_path) as PackedScene
-		if effect_scene == null:
-			_failures.append("bootstrap smoke effect load failed: %s" % effect_path)
-			continue
-		var effect_instance := effect_scene.instantiate()
-		if effect_instance == null:
-			_failures.append("bootstrap smoke effect instantiate failed: %s" % effect_path)
-			continue
-		prewarm_wrapper.add_child(effect_instance)
-		await _wait_frames(1)
-		_validate_prewarm_effect_state(effect_instance, effect_path)
-
-	smoke_root.queue_free()
-	await _wait_frames(1)
+	await ProjectContractBootstrapHelper.run_bootstrap_contract_smoke(
+		self,
+		_failures,
+		smoke_scene_path,
+		smoke_wait_frames_after_attach
+	)
 
 
 func _run_recovery_effect_contract_smoke() -> void:
@@ -463,24 +407,6 @@ func _run_treasure_chest_smoke(smoke_root: Node, player_ship: Node3D) -> void:
 		_failures.append("recovery treasure smoke did not mark chest collected")
 	if not chest.is_queued_for_deletion():
 		_failures.append("recovery treasure smoke did not queue chest for deletion")
-
-
-func _validate_prewarm_effect_state(effect_root: Node, effect_path: String) -> void:
-	if not is_instance_valid(effect_root):
-		_failures.append("bootstrap smoke invalid effect instance: %s" % effect_path)
-		return
-	var stack: Array[Node] = [effect_root]
-	while not stack.is_empty():
-		var node: Node = stack.pop_back()
-		if not is_instance_valid(node):
-			continue
-		if node is GPUParticles3D and (node as GPUParticles3D).emitting:
-			_failures.append("bootstrap smoke prewarm particle emitted unexpectedly: %s" % effect_path)
-		if node is AudioStreamPlayer3D and (node as AudioStreamPlayer3D).playing:
-			_failures.append("bootstrap smoke prewarm audio played unexpectedly: %s" % effect_path)
-		for child in node.get_children():
-			if child is Node:
-				stack.append(child)
 
 
 func _run_single_smoke_pass(packed: PackedScene, spawn_method: String, label: String) -> void:
