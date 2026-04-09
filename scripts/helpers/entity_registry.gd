@@ -77,7 +77,7 @@ static func get_captured_minions() -> Array:
 
 
 static func count_captured_minions() -> int:
-	return get_captured_minions().size()
+	return _captured_minions.size()
 
 
 static func get_soldiers() -> Array:
@@ -100,15 +100,19 @@ static func get_soldiers_by_ship(ship: Node) -> Array:
 
 
 static func count_soldiers_by_ship(ship: Node) -> int:
-	return get_soldiers_by_ship(ship).size()
+	if not is_instance_valid(ship):
+		return 0
+	var ship_id: int = ship.get_instance_id()
+	var bucket: Array = _soldiers_by_ship.get(ship_id, [])
+	return bucket.size()
 
 
 static func count_ships() -> int:
-	return get_ships().size()
+	return _ships.size()
 
 
 static func count_soldiers() -> int:
-	return get_soldiers().size()
+	return _soldiers.size()
 
 
 static func register_projectile(projectile: Node) -> void:
@@ -127,7 +131,21 @@ static func get_projectiles() -> Array:
 
 
 static func count_projectiles() -> int:
-	return get_projectiles().size()
+	return _projectiles.size()
+
+
+static func count_ships_by_team(team_name: String) -> int:
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty():
+		return count_ships()
+	return _ships_by_team.get(normalized_team, []).size()
+
+
+static func count_soldiers_by_team(team_name: String) -> int:
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty():
+		return count_soldiers()
+	return _soldiers_by_team.get(normalized_team, []).size()
 
 
 static func get_ships_by_team(team_name: String) -> Array:
