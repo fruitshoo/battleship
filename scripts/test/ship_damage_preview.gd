@@ -30,4 +30,4 @@ func _apply_ship_preset(ship: Node3D, preset: Dictionary) -> void:
 
 	var label: Label3D = ship.get_node_or_null("StateLabel")
 	if is_instance_valid(label):
-		label.text = String(preset.get("name", "Preset"))
+		label.text = str(preset.get("name", "Preset"))

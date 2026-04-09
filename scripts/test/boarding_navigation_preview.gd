@@ -106,8 +106,8 @@ func _refresh_enemy_debug_labels() -> void:
 
 
 func _build_enemy_debug_text(enemy: Node) -> String:
-	var mode: String = String(enemy.get_meta("boarding_approach_mode", "-"))
-	var slot: String = String(enemy.get_meta("boarding_slot_id", "-"))
+	var mode: String = str(enemy.get_meta("boarding_approach_mode", "-"))
+	var slot: String = str(enemy.get_meta("boarding_slot_id", "-"))
 	var side_value: float = float(enemy.get_meta("boarding_side_sign", 0.0))
 	return PreviewStateSnapshotHelper.build_boarding_navigation_text(
 		mode,

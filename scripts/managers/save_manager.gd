@@ -119,7 +119,7 @@ func _apply_loaded_config(config: ConfigFile) -> void:
 	items = []
 	if loaded_items is Array:
 		for item_id in loaded_items:
-			items.append(String(item_id))
+			items.append(str(item_id))
 	var loaded_settings = config.get_value("player", "settings", {})
 	settings = DEFAULT_SETTINGS.duplicate(true)
 	if loaded_settings is Dictionary:

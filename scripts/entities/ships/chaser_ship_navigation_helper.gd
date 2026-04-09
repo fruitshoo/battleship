@@ -98,9 +98,9 @@ static func _build_boarding_slots(ship, target_node: Node3D, target_pos: Vector3
 
 static func _score_boarding_slot(ship, target_node: Node3D, slot: Dictionary) -> float:
 	var slot_point: Vector3 = slot["point"]
-	var slot_id: String = String(slot["id"])
+	var slot_id: String = str(slot["id"])
 	var score: float = ship.global_position.distance_to(slot_point) - float(slot["bias"])
-	var current_slot_id: String = String(ship.get_meta("boarding_slot_id", ""))
+	var current_slot_id: String = str(ship.get_meta("boarding_slot_id", ""))
 	var current_side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 	var slot_side_sign: float = float(slot["side_sign"])
 	var ship_forward: Vector3 = - ship.global_transform.basis.z
@@ -141,7 +141,7 @@ static func _score_boarding_slot(ship, target_node: Node3D, slot: Dictionary) ->
 		if other_dist < 11.0:
 			score += (11.0 - other_dist) * 4.2
 
-		if String(other.get_meta("boarding_slot_id", "")) == slot_id:
+		if str(other.get_meta("boarding_slot_id", "")) == slot_id:
 			score += 12.0
 
 	return score
@@ -158,7 +158,7 @@ static func _classify_boarding_approach(rel_forward: float, rel_side: float) -> 
 
 
 static func _classify_boarding_approach_smoothed(ship, rel_forward: float, rel_side: float) -> String:
-	var current_mode: String = String(ship.get_meta("boarding_approach_mode", ""))
+	var current_mode: String = str(ship.get_meta("boarding_approach_mode", ""))
 	var abs_forward: float = absf(rel_forward)
 	var abs_side: float = absf(rel_side)
 
@@ -226,7 +226,7 @@ static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos:
 
 static func _choose_boarding_slot(ship, target_node: Node3D, target_pos: Vector3, target_forward: Vector3, target_right: Vector3) -> Dictionary:
 	var slots: Array = _build_boarding_slots(ship, target_node, target_pos, target_forward, target_right)
-	var current_slot_id: String = String(ship.get_meta("boarding_slot_id", ""))
+	var current_slot_id: String = str(ship.get_meta("boarding_slot_id", ""))
 	var best_slot: Dictionary = {}
 	var best_score: float = INF
 	var current_slot: Dictionary = {}
@@ -238,7 +238,7 @@ static func _choose_boarding_slot(ship, target_node: Node3D, target_pos: Vector3
 		if slot_score < best_score:
 			best_score = slot_score
 			best_slot = slot
-		if String(slot["id"]) == current_slot_id:
+		if str(slot["id"]) == current_slot_id:
 			current_slot = slot
 			current_slot_score = slot_score
 
@@ -379,7 +379,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			elif approach_mode == "rear":
 				var slot: Dictionary = _choose_boarding_slot(ship, target_node, target_pos, target_forward, target_right)
 				if not slot.is_empty():
-					ship.set_meta("boarding_slot_id", String(slot["id"]))
+					ship.set_meta("boarding_slot_id", str(slot["id"]))
 					ship.set_meta("boarding_side_sign", float(slot["side_sign"]))
 					desired_point = slot["point"]
 					heading_point = slot["heading"]

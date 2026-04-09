@@ -23,6 +23,7 @@ func _ready() -> void:
 
 func _run_contract_checks() -> void:
 	_scan_resource_roots(script_roots, ".gd")
+	_scan_legacy_godot3_patterns(script_roots)
 	_scan_resource_roots(scene_roots, ".tscn")
 	await _run_runtime_smoke()
 	_report_and_quit()
@@ -70,6 +71,33 @@ func _collect_paths(root_path: String, suffix: String, out: Array[String]) -> vo
 			out.append(full_path)
 		entry = dir.get_next()
 	dir.list_dir_end()
+
+
+func _scan_legacy_godot3_patterns(roots: Array[String]) -> void:
+	var legacy_patterns := [
+		{"pattern": "yield(", "label": "yield()"},
+		{"pattern": "funcref(", "label": "funcref()"},
+		{"pattern": ".instance(", "label": "PackedScene.instance()"},
+		{"pattern": "String(", "label": "String() constructor"},
+	]
+
+	var paths: Array[String] = []
+	for root in roots:
+		_collect_paths(root, ".gd", paths)
+	paths.sort()
+
+	for path in paths:
+		var source := FileAccess.get_file_as_string(path)
+		if source.is_empty():
+			continue
+		for legacy in legacy_patterns:
+			var pattern: String = legacy["pattern"]
+			var label: String = legacy["label"]
+			var line_no := 1
+			for line in source.split("\n", false):
+				if line.find(pattern) != -1:
+					_failures.append("%s found in %s:%d" % [label, path, line_no])
+				line_no += 1
 
 
 func _run_runtime_smoke() -> void:

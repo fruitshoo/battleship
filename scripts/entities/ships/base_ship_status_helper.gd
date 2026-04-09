@@ -77,13 +77,13 @@ static func update_boarding_state(ship, delta: float) -> void:
 	var ship_team_variant: Variant = ship.get("team")
 	var ship_team: String = "enemy"
 	if ship_team_variant != null:
-		ship_team = String(ship_team_variant)
+		ship_team = str(ship_team_variant)
 	var friendly_count: int = 0
 	var hostile_count: int = 0
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
 		if child.get("current_state") == 4:
 			continue
-		if String(child.get("team")) == ship_team:
+		if str(child.get("team")) == ship_team:
 			friendly_count += 1
 		else:
 			hostile_count += 1

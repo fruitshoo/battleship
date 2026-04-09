@@ -132,14 +132,14 @@ func _load_items_from_resources() -> bool:
 			var resource_path := "%s/%s" % [ITEM_DATA_DIR, file_name]
 			var item_res: Resource = load(resource_path)
 			if item_res != null and item_res.get_script() == ItemDataResource:
-				var item_id: String = String(item_res.get("item_id"))
+				var item_id: String = str(item_res.get("item_id"))
 				if item_id.is_empty():
 					file_name = dir.get_next()
 					continue
-				var item_name: String = String(item_res.get("item_name"))
-				var item_description: String = String(item_res.get("description"))
-				var item_icon: String = String(item_res.get("icon"))
-				var item_alert_msg: String = String(item_res.get("alert_msg"))
+				var item_name: String = str(item_res.get("item_name"))
+				var item_description: String = str(item_res.get("description"))
+				var item_icon: String = str(item_res.get("icon"))
+				var item_alert_msg: String = str(item_res.get("alert_msg"))
 				var icon_texture_variant: Variant = item_res.get("icon_texture")
 				var icon_texture_path: String = ""
 				if icon_texture_variant is Texture2D:
@@ -450,7 +450,7 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 		soldier.remove_meta("defense_reduction")
 	
 	if soldier.has_method("apply_crew_role") and "crew_role" in soldier:
-		soldier.apply_crew_role(String(soldier.crew_role))
+		soldier.apply_crew_role(str(soldier.crew_role))
 
 func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	var def_lv = current_levels.get("hull_defense", 0)
@@ -579,13 +579,13 @@ func _sync_player_cannon_layout(ship: Node3D, level: int) -> void:
 
 	var desired_names: Dictionary = {}
 	for slot in slot_specs:
-		desired_names[String(slot["name"])] = true
+		desired_names[str(slot["name"])] = true
 
 	var named_nodes: Dictionary = {}
 	for child in cannons_node.get_children():
 		if not is_instance_valid(child):
 			continue
-		var child_name := String(child.name)
+		var child_name := str(child.name)
 		if not desired_names.has(child_name):
 			if child is Node3D:
 				(child as Node3D).visible = false
@@ -605,7 +605,7 @@ func _sync_player_cannon_layout(ship: Node3D, level: int) -> void:
 		named_nodes[child_name] = child
 
 	for slot in slot_specs:
-		var node_name := String(slot["name"])
+		var node_name := str(slot["name"])
 		var required_level := int(slot["required_level"])
 		var cannon = named_nodes.get(node_name, null)
 		if level < required_level:
@@ -647,7 +647,7 @@ func _get_player_cannons_node(ship: Node3D) -> Node3D:
 	for child in ship.get_children():
 		if not is_instance_valid(child):
 			continue
-		if String(child.name).contains("Hull"):
+		if str(child.name).contains("Hull"):
 			var nested = child.find_child("Cannons", true, false)
 			if nested is Node3D:
 				preferred_node = nested as Node3D
@@ -669,7 +669,7 @@ func _cleanup_stray_player_cannons_nodes(ship: Node3D, keep_node: Node3D) -> voi
 			continue
 		if child == keep_node:
 			continue
-		if String(child.name) != "Cannons":
+		if str(child.name) != "Cannons":
 			continue
 		child.set_process(false)
 		child.set_physics_process(false)
@@ -910,7 +910,7 @@ func _get_item_icon_payload(item_id: String, item_data: Dictionary) -> Dictionar
 		"icon_data": null,
 	}
 	if "icon_texture" in item_data:
-		var icon_texture_path: String = String(item_data["icon_texture"])
+		var icon_texture_path: String = str(item_data["icon_texture"])
 		if not icon_texture_path.is_empty():
 			payload["icon_data"] = icon_texture_path
 			return payload

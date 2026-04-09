@@ -47,8 +47,8 @@ static func get_soldier_role(ship, soldier: Node) -> String:
 	if soldier == null:
 		return ship.CREW_ROLE_GENERAL
 	if "crew_role" in soldier:
-		return String(soldier.crew_role)
-	return String(soldier.get_meta("crew_role", ship.CREW_ROLE_GENERAL))
+		return str(soldier.crew_role)
+	return str(soldier.get_meta("crew_role", ship.CREW_ROLE_GENERAL))
 
 static func spawn_player_soldier(ship, soldiers_node: Node, role: String, captain: bool = false) -> Node:
 	var soldier = ship.SOLDIER_SCENE.instantiate()
@@ -469,7 +469,7 @@ static func _get_available_raid_boarders(ship) -> Array:
 
 
 static func _get_boarder_priority(soldier: Node) -> int:
-	var role: String = String(soldier.get("crew_role"))
+	var role: String = str(soldier.get("crew_role"))
 	if bool(soldier.get("is_melee_only")):
 		return 3
 	if role == "spearman":

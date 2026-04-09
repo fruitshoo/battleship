@@ -42,7 +42,7 @@ static func release(node: Node) -> void:
 	if node.has_method("pool_reset"):
 		node.call("pool_reset")
 	_prepare_released_node(node)
-	var key := String(node.get_meta(KEY_META))
+	var key := str(node.get_meta(KEY_META))
 	var store := _get_store(tree)
 	if store.is_empty() and _get_root_node(tree) == null:
 		node.queue_free()

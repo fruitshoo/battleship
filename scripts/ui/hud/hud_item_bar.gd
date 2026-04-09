@@ -76,7 +76,7 @@ func _resolve_icon_texture(icon_data) -> Texture2D:
 	if resolved_icon_data is Texture2D:
 		return resolved_icon_data
 	if resolved_icon_data is String:
-		var icon_path := String(resolved_icon_data)
+		var icon_path := str(resolved_icon_data)
 		if icon_path.begins_with("res://") and ResourceLoader.exists(icon_path, "Texture2D"):
 			return load(icon_path) as Texture2D
 	return null
