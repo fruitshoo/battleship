@@ -104,8 +104,6 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true) -> voi
 	if not AudioManager.is_prewarm_finished:
 		await AudioManager.prewarm_finished
 
-	_prewarm_audio_playback()
-
 	for i in range(2):
 		await lm.get_tree().process_frame
 
@@ -156,10 +154,3 @@ static func _prewarm_scene_pool_instance(tree: SceneTree, scene: PackedScene) ->
 	if inst.has_method("pool_reset"):
 		inst.call("pool_reset")
 	ScenePool.release(inst)
-
-static func _prewarm_audio_playback() -> void:
-	if not is_instance_valid(AudioManager):
-		return
-	for key in ["cannon_fire", "cannon_fuse", "cannon_reload", "impact_wood", "wood_break", "water_splash_large"]:
-		# Use Vector3.ZERO to explicitly prewarm the 3D AudioStreamPlayer pool and Godot's spatial audio
-		AudioManager.play_sfx(key, Vector3.ZERO, 1.0, -80.0)
