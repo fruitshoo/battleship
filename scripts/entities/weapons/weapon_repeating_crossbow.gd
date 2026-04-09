@@ -52,7 +52,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 			break
 			
 		# 적이 도중에 죽었으면 발사 중단
-		if target.has_method("get") and target.get("current_state") == 3: # 3 = DEAD
+		if target.has_method("get_current_state_value") and target.get_current_state_value() == 3: # 3 = DEAD
 			break
 			
 		# 발사 위치는 활 부근으로 약간 보정 (매번 갱신)
@@ -75,8 +75,8 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		var ship = _resolve_parent_ship(target)
 			
 		var ship_vel = Vector3.ZERO
-		if ship and "current_speed" in ship:
-			var s_speed = ship.get("current_speed")
+		if ship and ship.has_method("get_current_speed_value"):
+			var s_speed = ship.get_current_speed_value()
 			if s_speed > 0.1:
 				var s_dir = - ship.global_transform.basis.z.normalized()
 				if "move_dir" in ship and typeof(ship.get("move_dir")) == TYPE_VECTOR3:
@@ -91,7 +91,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		current_target_pos.z += randf_range(-0.22, 0.22)
 		
 		var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
-		var team_name: String = str(attacker.get("team")) if "team" in attacker else "player"
+		var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 		var dist = spawn_pos.distance_to(current_target_pos)
 		var final_arc_height: float = clamp(dist * 0.2, 0.5, 3.0) # 연노는 궤적이 더 낮음 (빠석궁)
 		

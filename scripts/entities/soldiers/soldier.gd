@@ -405,6 +405,15 @@ func get_team_tag() -> String:
 func get_current_state_value() -> int:
 	return current_state
 
+func get_crit_chance_value() -> float:
+	return crit_chance
+
+func get_crit_multiplier_value() -> float:
+	return crit_multiplier
+
+func get_damage_multiplier_value() -> float:
+	return float(get_meta("damage_multiplier", 1.0))
+
 func is_combat_disabled() -> bool:
 	return current_state == State.DEAD
 

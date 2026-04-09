@@ -40,8 +40,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var ship = _resolve_parent_ship(target)
 		
 	var ship_vel = Vector3.ZERO
-	if ship and "current_speed" in ship:
-		var s_speed = ship.get("current_speed")
+	if ship and ship.has_method("get_current_speed_value"):
+		var s_speed = ship.get_current_speed_value()
 		if s_speed > 0.1:
 			var s_dir = - ship.global_transform.basis.z.normalized()
 			
@@ -60,7 +60,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	current_target_pos.z += randf_range(-0.12, 0.12)
 	
 	var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
-	var team_name: String = str(attacker.get("team")) if "team" in attacker else "player"
+	var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 	var dist = spawn_pos.distance_to(current_target_pos)
 	var final_arc_height: float = clamp(dist * 0.3, 1.0, 5.0)
 	

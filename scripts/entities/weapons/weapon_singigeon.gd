@@ -43,11 +43,10 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	if typeof(target_velocity) == TYPE_VECTOR3:
 		local_velocity = target_velocity
 	var ship_velocity: Vector3 = Vector3.ZERO
-	var target_ship_variant: Variant = target.get("owned_ship")
-	if target_ship_variant is Node3D:
-		var target_ship: Node3D = target_ship_variant
-		if "current_speed" in target_ship:
-			var ship_speed: float = float(target_ship.get("current_speed"))
+	var target_ship: Node3D = target.get_owned_ship_node() if target.has_method("get_owned_ship_node") else null
+	if is_instance_valid(target_ship):
+		if target_ship.has_method("get_current_speed_value"):
+			var ship_speed: float = target_ship.get_current_speed_value()
 			if ship_speed > 0.1:
 				var ship_dir: Vector3 = -target_ship.global_transform.basis.z.normalized()
 				if "move_dir" in target_ship and typeof(target_ship.get("move_dir")) == TYPE_VECTOR3:
@@ -91,10 +90,10 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		rocket.terminal_turn_rate_deg = maxf(float(rocket.terminal_turn_rate_deg), 320.0)
 	if "burst_phase_duration" in rocket:
 		rocket.burst_phase_duration = minf(float(rocket.burst_phase_duration), 0.08)
-	if "team" in rocket and "team" in attacker:
-		rocket.team = attacker.get("team")
+	if "team" in rocket and attacker.has_method("get_team_tag"):
+		rocket.team = attacker.get_team_tag()
 	if "shooter" in rocket:
-		var owner_ship: Node = attacker.get("owned_ship") as Node
+		var owner_ship: Node = attacker.get_owned_ship_node() if attacker.has_method("get_owned_ship_node") else null
 		rocket.shooter = owner_ship if is_instance_valid(owner_ship) else attacker
 
 	var spawn_parent := _resolve_spawn_parent(attacker.get_tree())

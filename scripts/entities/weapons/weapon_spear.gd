@@ -14,8 +14,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	
 	# 데미지 적용
-	var crit_chance = attacker.get("crit_chance") if "crit_chance" in attacker else 0.1
-	var crit_multiplier = attacker.get("crit_multiplier") if "crit_multiplier" in attacker else 2.0
+	var crit_chance = attacker.get_crit_chance_value() if attacker.has_method("get_crit_chance_value") else 0.1
+	var crit_multiplier = attacker.get_crit_multiplier_value() if attacker.has_method("get_crit_multiplier_value") else 2.0
 	var hit_pos = target.global_position
 	
 	var is_crit = randf() < crit_chance
