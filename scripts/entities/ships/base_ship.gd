@@ -426,6 +426,7 @@ func _physics_process(_delta: float) -> void:
 	_apply_bobbing_effect()
 
 func set_team(new_team: String) -> void:
+	var old_team = str(get("team")) if get("team") != null else "enemy"
 	var normalized_team = "player" if new_team == "player" else "enemy"
 	if "team" in self:
 		set("team", normalized_team)
@@ -445,6 +446,7 @@ func set_team(new_team: String) -> void:
 		set("collision_mask", _get_team_collision_mask(normalized_team))
 	if is_inside_tree() and has_method("_sync_contact_area_layers"):
 		call_deferred("_sync_contact_area_layers", _get_team_collision_layer(normalized_team))
+	EntityRegistry.update_ship_team(self, old_team, normalized_team)
 
 	_update_children_team()
 

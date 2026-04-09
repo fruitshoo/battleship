@@ -6,6 +6,8 @@ static var _soldiers: Array[Node] = []
 static var _projectiles: Array[Node] = []
 static var _captured_minions: Array[Node] = []
 static var _soldiers_by_ship: Dictionary = {}
+static var _ships_by_team: Dictionary = {}
+static var _soldiers_by_team: Dictionary = {}
 
 
 static func register_ship(ship: Node) -> void:
@@ -13,9 +15,11 @@ static func register_ship(ship: Node) -> void:
 		return
 	if not _ships.has(ship):
 		_ships.append(ship)
+	_register_team_bucket(_ships_by_team, ship, String(ship.get("team")))
 
 
 static func unregister_ship(ship: Node) -> void:
+	_unregister_team_bucket(_ships_by_team, ship, String(ship.get("team")))
 	_unregister_node(_ships, ship)
 
 
@@ -24,10 +28,12 @@ static func register_soldier(soldier: Node) -> void:
 		return
 	if not _soldiers.has(soldier):
 		_soldiers.append(soldier)
+	_register_team_bucket(_soldiers_by_team, soldier, String(soldier.get("team")))
 	_register_soldier_ship_bucket(soldier, soldier.get("owned_ship"))
 
 
 static func unregister_soldier(soldier: Node) -> void:
+	_unregister_team_bucket(_soldiers_by_team, soldier, String(soldier.get("team")))
 	_unregister_soldier_ship_bucket(soldier, soldier.get("owned_ship"))
 	_unregister_node(_soldiers, soldier)
 
@@ -37,6 +43,18 @@ static func move_soldier_ship(soldier: Node, old_ship: Node, new_ship: Node) -> 
 		return
 	_unregister_soldier_ship_bucket(soldier, old_ship)
 	_register_soldier_ship_bucket(soldier, new_ship)
+
+
+static func update_ship_team(ship: Node, old_team: String, new_team: String) -> void:
+	if not is_instance_valid(ship):
+		return
+	_move_team_bucket(_ships_by_team, ship, old_team, new_team)
+
+
+static func update_soldier_team(soldier: Node, old_team: String, new_team: String) -> void:
+	if not is_instance_valid(soldier):
+		return
+	_move_team_bucket(_soldiers_by_team, soldier, old_team, new_team)
 
 
 static func get_ships() -> Array:
@@ -70,11 +88,7 @@ static func get_soldiers_by_team(team_name: String) -> Array:
 	var normalized_team := team_name.strip_edges().to_lower()
 	if normalized_team.is_empty():
 		return get_soldiers()
-	var filtered: Array = []
-	for soldier in get_soldiers():
-		if _matches_team(soldier, normalized_team):
-			filtered.append(soldier)
-	return filtered
+	return _compact_nodes(_soldiers_by_team.get(normalized_team, []))
 
 
 static func get_soldiers_by_ship(ship: Node) -> Array:
@@ -120,15 +134,15 @@ static func get_ships_by_team(team_name: String) -> Array:
 	var normalized_team := team_name.strip_edges().to_lower()
 	if normalized_team.is_empty():
 		return get_ships()
-	var filtered: Array = []
-	for ship in get_ships():
-		if _matches_team(ship, normalized_team):
-			filtered.append(ship)
-	return filtered
+	return _compact_nodes(_ships_by_team.get(normalized_team, []))
 
 
 static func get_first_ship_by_team(team_name: String) -> Node:
-	var ships := get_ships_by_team(team_name)
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty():
+		var ships := get_ships()
+		return ships[0] if not ships.is_empty() else null
+	var ships := _compact_nodes(_ships_by_team.get(normalized_team, []))
 	return ships[0] if not ships.is_empty() else null
 
 
@@ -169,6 +183,37 @@ static func _unregister_soldier_ship_bucket(soldier: Node, ship: Node) -> void:
 		_soldiers_by_ship.erase(ship_id)
 	else:
 		_soldiers_by_ship[ship_id] = bucket
+
+
+static func _register_team_bucket(bucket_map: Dictionary, node: Node, team_name: String) -> void:
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty():
+		return
+	var bucket: Array = bucket_map.get(normalized_team, [])
+	if not bucket.has(node):
+		bucket.append(node)
+	bucket_map[normalized_team] = bucket
+
+
+static func _unregister_team_bucket(bucket_map: Dictionary, node: Node, team_name: String) -> void:
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty() or not bucket_map.has(normalized_team):
+		return
+	var bucket: Array = bucket_map[normalized_team]
+	_unregister_node(bucket, node)
+	if bucket.is_empty():
+		bucket_map.erase(normalized_team)
+	else:
+		bucket_map[normalized_team] = bucket
+
+
+static func _move_team_bucket(bucket_map: Dictionary, node: Node, old_team: String, new_team: String) -> void:
+	var normalized_old := old_team.strip_edges().to_lower()
+	var normalized_new := new_team.strip_edges().to_lower()
+	if normalized_old == normalized_new:
+		return
+	_unregister_team_bucket(bucket_map, node, normalized_old)
+	_register_team_bucket(bucket_map, node, normalized_new)
 
 
 static func _matches_team(node: Node, normalized_team: String) -> bool:

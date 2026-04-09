@@ -393,7 +393,9 @@ func _update_role_visual() -> void:
 
 
 func set_team(new_team: String) -> void:
+	var old_team = team
 	team = new_team
+	EntityRegistry.update_soldier_team(self, old_team, team)
 	_update_team_color()
 
 func _update_team_color() -> void:
