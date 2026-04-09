@@ -11,6 +11,11 @@ const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.
 @export var smoke_wait_frames_after_spawn: int = 3
 @export var smoke_spawn_boss: bool = true
 @export var smoke_spawn_final_boss: bool = true
+@export var smoke_spawn_ship_types: Array[String] = [
+	"kobayabune_melee",
+	"sekibune_cannon",
+	"sekibune_melee",
+]
 
 var _failures: Array[String] = []
 var _loaded_scripts: int = 0
@@ -107,13 +112,16 @@ func _run_runtime_smoke() -> void:
 		return
 
 	if not smoke_spawn_boss and not smoke_spawn_final_boss:
-		_failures.append("no boss smoke mode enabled")
-		return
+		if smoke_spawn_ship_types.is_empty():
+			_failures.append("no smoke mode enabled")
+			return
 
 	if smoke_spawn_boss:
 		await _run_single_smoke_pass(packed, "debug_spawn_mid_boss", "mid boss")
 	if smoke_spawn_final_boss:
 		await _run_single_smoke_pass(packed, "debug_spawn_final_boss", "final boss")
+	for ship_type_name in smoke_spawn_ship_types:
+		await _run_ship_variant_smoke_pass(packed, str(ship_type_name))
 
 
 func _run_single_smoke_pass(packed: PackedScene, spawn_method: String, label: String) -> void:
@@ -145,6 +153,36 @@ func _run_single_smoke_pass(packed: PackedScene, spawn_method: String, label: St
 		_validate_spawned_boss(spawned_boss, label)
 
 	_validate_registry_smoke(player_ship, label)
+
+	smoke_root.queue_free()
+	await _wait_frames(1)
+
+
+func _run_ship_variant_smoke_pass(packed: PackedScene, ship_type_name: String) -> void:
+	var smoke_root := packed.instantiate()
+	if smoke_root == null:
+		_failures.append("smoke scene instantiate failed: %s" % smoke_scene_path)
+		return
+
+	add_child(smoke_root)
+	PreviewHarnessHelper.setup_common(smoke_root, false, true)
+	await _wait_frames(smoke_wait_frames_after_attach)
+
+	var player_ship: Node3D = smoke_root.get_node_or_null("PlayerShip") as Node3D
+	if not is_instance_valid(player_ship):
+		_failures.append("preview base is missing PlayerShip for %s smoke" % ship_type_name)
+
+	var spawner: Node = smoke_root.get_node_or_null("EnemySpawner")
+	if not is_instance_valid(spawner):
+		_failures.append("preview base is missing EnemySpawner for %s smoke" % ship_type_name)
+	else:
+		var spawned_ship: Node3D = null
+		if spawner.has_method("debug_spawn_ship"):
+			spawned_ship = spawner.call("debug_spawn_ship", ship_type_name) as Node3D
+			await _wait_frames(smoke_wait_frames_after_spawn)
+		_validate_spawned_ship(spawned_ship, ship_type_name)
+
+	_validate_registry_smoke(player_ship, ship_type_name)
 
 	smoke_root.queue_free()
 	await _wait_frames(1)
@@ -187,6 +225,20 @@ func _validate_spawned_boss(spawned_boss: Node3D, label: String) -> void:
 	if not spawned_boss.is_in_group("boss"):
 		_failures.append("%s is missing boss group tag" % label)
 	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_boss)
+	if not registered_enemy:
+		_failures.append("%s instance was not registered in enemy team bucket" % label)
+
+
+func _validate_spawned_ship(spawned_ship: Node3D, label: String) -> void:
+	if not is_instance_valid(spawned_ship):
+		_failures.append("%s spawn returned null" % label)
+		return
+	var ship_team := str(spawned_ship.get("team"))
+	if ship_team != "enemy":
+		_failures.append("%s team contract failed: %s" % [label, ship_team])
+	if not spawned_ship.is_in_group("ships"):
+		_failures.append("%s is missing ships group tag" % label)
+	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_ship)
 	if not registered_enemy:
 		_failures.append("%s instance was not registered in enemy team bucket" % label)
 
