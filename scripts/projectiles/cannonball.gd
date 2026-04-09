@@ -1,6 +1,7 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
@@ -277,9 +278,9 @@ func _check_hit(target: Node) -> void:
 		_release_self()
 	else:
 		# 침몰 중인 함선에 맞은 거면 무시 (부자연스러운 물폭발 방지)
-		var is_sinking = false
-		if target.has_method("get") and target.get("is_sinking") == true: is_sinking = true
-		elif target.get_parent() and target.get_parent().has_method("get") and target.get_parent().get("is_sinking") == true: is_sinking = true
+		var is_sinking = NodeContractHelper.is_sinking_or_dying(target)
+		if not is_sinking and target.get_parent():
+			is_sinking = NodeContractHelper.is_sinking_or_dying(target.get_parent())
 			
 		if not is_sinking:
 			# 함선 외의 물체에 부딪혔을 때 → 물 폭발 이펙트 생성
@@ -334,9 +335,9 @@ func _apply_crew_damage_for_ammo(ship: Node3D, hit_pos: Vector3) -> void:
 	for child in soldiers_node.get_children():
 		if not is_instance_valid(child):
 			continue
-		if child.get("current_state") == 4:
+		if NodeContractHelper.get_current_state_value(child) == 4:
 			continue
-		if str(child.get("team")) == team:
+		if NodeContractHelper.get_team_tag(child) == team:
 			continue
 		enemy_soldiers.append(child)
 	if enemy_soldiers.is_empty():

@@ -1,5 +1,6 @@
 extends Area3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
@@ -144,7 +145,7 @@ func _apply_area_damage() -> void:
 		var col = result.collider
 		
 		# 같은 팀(player면 player)에게는 데미지 주지 않음
-		if col.has_method("get") and col.get("team") == team:
+		if NodeContractHelper.get_team_tag(col) == team:
 			continue
 			
 		# 함선(Ship) 본체에도 화통 폭발 데미지와 화재 유발 적용
@@ -157,7 +158,7 @@ func _apply_area_damage() -> void:
 				col.apply_status_effect("burn", 5.0)
 				
 		# 적 병사(Soldier)에게 데미지
-		elif col.has_method("take_damage") and col.get("team") != team:
+		elif col.has_method("take_damage") and NodeContractHelper.get_team_tag(col) != team:
 			var soldier_source = "fire_pot" if team == "player" else ""
 			col.take_damage(damage, global_position, soldier_source)
 			# 불타는 효과를 줄 수 있다면 추가

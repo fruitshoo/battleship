@@ -1,6 +1,7 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 팔우노 화살 (Ballista Bolt)
@@ -64,7 +65,7 @@ func _check_hit(target: Node) -> void:
 	var enemy_node = null
 	
 	if target.is_in_group("soldiers"):
-		if target.get("team") != team:
+		if NodeContractHelper.get_team_tag(target) != team:
 			is_enemy = true
 			enemy_node = target
 	else:

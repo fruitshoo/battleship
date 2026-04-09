@@ -1,5 +1,6 @@
 extends Area3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 생존자(Survivor) 시스템
@@ -87,7 +88,7 @@ func _physics_process(delta: float) -> void:
 	if is_expiring:
 		return
 
-	if is_instance_valid(target_player) and target_player.get("is_sinking"):
+	if is_instance_valid(target_player) and NodeContractHelper.is_sinking_or_dying(target_player):
 		target_player = null
 	if not is_instance_valid(target_player) and _player_search_timer <= 0.0:
 		_player_search_timer = player_search_interval
@@ -101,8 +102,7 @@ func _physics_process(delta: float) -> void:
 		if within_pull_zone:
 			# 자석 효과: 거리가 가까울수록 더 빠르게 가속
 			var ship_speed_bonus: float = 0.0
-			if target_player.get("current_speed") != null:
-				ship_speed_bonus = maxf(0.0, float(target_player.get("current_speed"))) * 0.75
+			ship_speed_bonus = maxf(0.0, NodeContractHelper.get_current_speed_value(target_player)) * 0.75
 			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (16.0 / max(dist, 0.8))
 			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 24.0 * delta)
 			var direction: Vector3 = (target_player.global_position - global_position).normalized()
@@ -154,7 +154,7 @@ func _find_target_player() -> void:
 	var closest_p = null
 	
 	for p in players:
-		if p.get("is_sinking"): continue
+		if NodeContractHelper.is_sinking_or_dying(p): continue
 		
 		var d = global_position.distance_to(p.global_position)
 		if d < closest_dist:

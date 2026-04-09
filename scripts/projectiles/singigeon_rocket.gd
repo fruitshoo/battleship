@@ -1,6 +1,7 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
@@ -255,12 +256,12 @@ func _is_valid_ship_target(ship: Node) -> bool:
 		return false
 	if shooter and (ship_3d == shooter or ship_3d.get_parent() == shooter):
 		return false
-	if ship_3d.get("is_derelict") == true:
+	if ship_3d.has_method("is_derelict_ship") and ship_3d.is_derelict_ship():
 		return false
-	if ship_3d.get("is_sinking") == true:
+	if NodeContractHelper.is_sinking_or_dying(ship_3d):
 		return false
 
-	var team_tag = str(ship_3d.get("team"))
+	var team_tag = NodeContractHelper.get_team_tag(ship_3d)
 	if team_tag == _target_group:
 		return true
 	if ship_3d.is_in_group(_target_group):
@@ -274,10 +275,9 @@ func _is_valid_soldier_target(node: Node) -> bool:
 		return false
 	if node.is_queued_for_deletion():
 		return false
-	if str(node.get("team")) != _target_group:
+	if NodeContractHelper.get_team_tag(node) != _target_group:
 		return false
-	var state_value: Variant = node.get("current_state")
-	if state_value != null and int(state_value) == 4:
+	if NodeContractHelper.get_current_state_value(node) == 4:
 		return false
 	return true
 
@@ -304,7 +304,7 @@ func _on_hit(target: Node) -> void:
 	var active_target_soldier: Node = target_node
 	if prefer_personnel_targets and _is_valid_soldier_target(active_target_soldier):
 		var struck_ship: Node = HitTargetResolver.resolve_ship_from_node(target)
-		var target_ship_variant: Variant = active_target_soldier.get("owned_ship")
+		var target_ship_variant: Variant = NodeContractHelper.get_owned_ship_node(active_target_soldier)
 		if struck_ship != null and target_ship_variant is Node and struck_ship == target_ship_variant and not _is_valid_soldier_target(target):
 			return
 

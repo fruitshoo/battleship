@@ -1,6 +1,7 @@
 extends Area3D
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 부유물(Floating Loot) 시스템
@@ -103,7 +104,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# 플레이어 탐색은 주기적으로 수행하여 비용을 줄임
-	if is_instance_valid(target_player) and (not target_player.is_inside_tree() or target_player.get("is_sinking")):
+	if is_instance_valid(target_player) and (not target_player.is_inside_tree() or NodeContractHelper.is_sinking_or_dying(target_player)):
 		target_player = null
 	if not is_instance_valid(target_player) and _player_search_timer <= 0.0:
 		_player_search_timer = player_search_interval
@@ -117,8 +118,7 @@ func _physics_process(delta: float) -> void:
 		if within_pull_zone:
 			# 자석 효과 발동: 가속도가 붙으면서 끌려감
 			var ship_speed_bonus: float = 0.0
-			if target_player.get("current_speed") != null:
-				ship_speed_bonus = maxf(0.0, float(target_player.get("current_speed"))) * 0.9
+			ship_speed_bonus = maxf(0.0, NodeContractHelper.get_current_speed_value(target_player)) * 0.9
 			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (22.0 / max(dist, 0.8))
 			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 28.0 * delta)
 			var direction: Vector3 = (target_player.global_position - global_position).normalized()
@@ -176,7 +176,7 @@ func _find_target_player() -> void:
 	for p in players:
 		if not is_instance_valid(p) or not p.is_inside_tree():
 			continue
-		if p.get("is_sinking"): continue
+		if NodeContractHelper.is_sinking_or_dying(p): continue
 		
 		var d = global_position.distance_to(p.global_position)
 		if d < closest_dist:
