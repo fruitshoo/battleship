@@ -51,6 +51,9 @@
 - `combat_sandbox.tscn`
   Broader combat playground for mixed-system checks.
   Script: `scripts/test/combat_sandbox.gd`
+- `project_contract_sweep.tscn`
+  Project-wide load sweep plus a small runtime smoke check for registry and startup contracts.
+  Script: `scripts/test/project_contract_sweep.gd`
 
 ## Helper Scripts
 
@@ -58,3 +61,5 @@
   Shared preview bootstrapping and preview ship setup helpers.
 - `scripts/test/preview_state_snapshot_helper.gd`
   Shared label text formatting and simple state snapshot helpers.
+- `scripts/test/project_contract_sweep.gd`
+  Loads scripts and scenes headless, then runs a small runtime smoke check against preview base.

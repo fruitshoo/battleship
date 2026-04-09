@@ -15,11 +15,11 @@ static func register_ship(ship: Node) -> void:
 		return
 	if not _ships.has(ship):
 		_ships.append(ship)
-	_register_team_bucket(_ships_by_team, ship, String(ship.get("team")))
+	_register_team_bucket(_ships_by_team, ship, str(ship.get("team")))
 
 
 static func unregister_ship(ship: Node) -> void:
-	_unregister_team_bucket(_ships_by_team, ship, String(ship.get("team")))
+	_unregister_team_bucket(_ships_by_team, ship, str(ship.get("team")))
 	_unregister_node(_ships, ship)
 
 
@@ -28,12 +28,12 @@ static func register_soldier(soldier: Node) -> void:
 		return
 	if not _soldiers.has(soldier):
 		_soldiers.append(soldier)
-	_register_team_bucket(_soldiers_by_team, soldier, String(soldier.get("team")))
+	_register_team_bucket(_soldiers_by_team, soldier, str(soldier.get("team")))
 	_register_soldier_ship_bucket(soldier, soldier.get("owned_ship"))
 
 
 static func unregister_soldier(soldier: Node) -> void:
-	_unregister_team_bucket(_soldiers_by_team, soldier, String(soldier.get("team")))
+	_unregister_team_bucket(_soldiers_by_team, soldier, str(soldier.get("team")))
 	_unregister_soldier_ship_bucket(soldier, soldier.get("owned_ship"))
 	_unregister_node(_soldiers, soldier)
 
