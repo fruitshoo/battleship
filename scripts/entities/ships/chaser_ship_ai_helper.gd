@@ -4,6 +4,9 @@ class_name ChaserShipAiHelper
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
 
+static var _cached_ships_list: Array = []
+static var _last_ships_cache_frame: int = -1
+
 static func _is_gunner(ship) -> bool:
 	if ship.has_method("is_gunner_role"):
 		return bool(ship.call("is_gunner_role"))
@@ -61,6 +64,104 @@ static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) ->
 	return lerp(floor_ratio, 1.05, sail_efficiency)
 
 
+static func get_ships_cached(_tree: SceneTree) -> Array:
+	var current_frame = Engine.get_physics_frames()
+	if current_frame != _last_ships_cache_frame:
+		_cached_ships_list = EntityRegistry.get_ships()
+		_last_ships_cache_frame = current_frame
+	return _cached_ships_list
+
+
+static func configure_logic_throttle(ship) -> void:
+	var seed_value: int = abs(hash("%s:%s:%s" % [str(ship.get_instance_id()), ship.ship_type, ship.formation_role_name]))
+	var phase: float = float(seed_value % 1000) / 1000.0
+	var jitter_sign: float = -1.0 if (seed_value % 2) == 0 else 1.0
+	var jitter_scale: float = float(seed_value % 500) / 500.0
+	var jitter: float = ship.ai_logic_update_jitter * jitter_sign * jitter_scale
+	ship._ai_logic_update_interval_runtime = clampf(ship.ai_logic_update_interval + jitter, 0.06, 0.5)
+	ship._ai_separation_update_interval_runtime = get_separation_update_interval_runtime(ship, seed_value)
+	ship.logic_timer = ship._ai_logic_update_interval_runtime * phase
+	ship.separation_timer = ship._ai_separation_update_interval_runtime * phase
+
+
+static func get_logic_update_interval_for_ship(ship) -> float:
+	return ship._ai_logic_update_interval_runtime * get_load_multiplier(ship)
+
+
+static func get_separation_update_interval_for_ship(ship) -> float:
+	return ship._ai_separation_update_interval_runtime * get_load_multiplier(ship)
+
+
+static func get_load_multiplier(ship) -> float:
+	var ship_count: int = EntityRegistry.count_ships()
+	var projectile_count: int = EntityRegistry.count_projectiles()
+	var load_multiplier: float = 1.0
+	if ship_count > 12:
+		load_multiplier += minf(0.45, float(ship_count - 12) * 0.03)
+	if projectile_count > 18:
+		load_multiplier += minf(0.25, float(projectile_count - 18) * 0.01)
+	if ship.team == "player":
+		load_multiplier *= 0.9
+	if _is_gunner(ship):
+		load_multiplier *= 1.05
+	return clampf(load_multiplier, 0.75, 1.6)
+
+
+static func get_separation_update_interval_runtime(ship, seed_value: int) -> float:
+	var base_interval: float = clampf(ship.ai_separation_update_interval, 0.05, 0.35)
+	var role_adjust: float = 0.0
+	if _is_gunner(ship):
+		role_adjust = 0.02
+	elif ship.has_method("is_charger_role") and ship.is_charger_role():
+		role_adjust = -0.01
+	var phase_jitter: float = float(seed_value % 7) * 0.005
+	return clampf(base_interval + role_adjust + phase_jitter, 0.05, 0.35)
+
+
+static func calculate_separation(ship) -> Vector3:
+	if bool(ship.get_meta("derelict_nonblocking", false)):
+		return Vector3.ZERO
+
+	var force := Vector3.ZERO
+	var neighbors := get_ships_cached(ship.get_tree())
+	var count := 0
+	var max_checks: int = min(neighbors.size(), 15)
+	for i in range(max_checks):
+		var other = neighbors[i]
+		if other == ship or not is_instance_valid(other) or bool(other.get("is_dying")):
+			continue
+		if bool(other.get_meta("derelict_nonblocking", false)):
+			continue
+		if ship.is_boarding and other == ship.boarding_target:
+			continue
+		if other.has_method("get_boarding_attacker_ship") and other.get_boarding_attacker_ship() == ship:
+			continue
+
+		var offset: Vector3 = ship.global_position - other.global_position
+		offset.y = 0.0
+		var dist_sq: float = offset.length_squared()
+		if dist_sq <= 0.01:
+			continue
+
+		var dist := sqrt(dist_sq)
+		var coll_dist: float = ship.get_collision_distance_to(other)
+		if ship.has_method("is_charger_role") and ship.is_charger_role() and is_instance_valid(_target_ship(ship)) and other == _target_ship(ship) and dist < coll_dist + 1.2:
+			continue
+		var separation_trigger_dist: float = coll_dist + (0.18 * ship.separation_pad_scale)
+
+		if dist < separation_trigger_dist:
+			var push_dir := offset.normalized()
+			var ratio: float = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
+			var strength: float = pow(ratio, 2.0)
+			force += push_dir * strength
+			count += 1
+
+	if count > 0:
+		force = (force / count) * 1.8
+
+	return force
+
+
 static func process_physics(ship, delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
@@ -80,7 +181,7 @@ static func process_physics(ship, delta: float) -> void:
 		if ship.team == "player" and bool(ship.get_meta("support_fleet_ship", false)):
 			ship.separation_force = Vector3.ZERO
 		else:
-			ship.separation_force = ship._calculate_separation()
+			ship.separation_force = calculate_separation(ship)
 	if ship.has_meta("post_impact_follow_timer"):
 		var follow_timer: float = maxf(0.0, float(ship.get_meta("post_impact_follow_timer")) - delta)
 		if follow_timer <= 0.0:

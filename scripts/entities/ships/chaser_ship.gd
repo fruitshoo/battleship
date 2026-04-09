@@ -88,8 +88,6 @@ var fire_pot_scene: PackedScene = null
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_minion_list: Array = []
 static var _last_minion_cache_frame: int = -1
-static var _cached_ships_list: Array = []
-static var _last_ships_cache_frame: int = -1
 
 var _cached_wind_manager: Node = null
 
@@ -101,11 +99,7 @@ static func get_minions_cached(_tree: SceneTree) -> Array:
 	return _cached_minion_list
 
 static func get_ships_cached(_tree: SceneTree) -> Array:
-	var current_frame = Engine.get_physics_frames()
-	if current_frame != _last_ships_cache_frame:
-		_cached_ships_list = EntityRegistry.get_ships()
-		_last_ships_cache_frame = current_frame
-	return _cached_ships_list
+	return ChaserShipAiHelper.get_ships_cached(_tree)
 
 
 # 최적화 변수
@@ -668,97 +662,19 @@ func _update_logic_throttled() -> void:
 
 
 func _configure_ai_logic_throttle() -> void:
-	var seed_value: int = abs(hash("%s:%s:%s" % [str(get_instance_id()), ship_type, formation_role_name]))
-	var phase: float = float(seed_value % 1000) / 1000.0
-	var jitter_sign: float = -1.0 if (seed_value % 2) == 0 else 1.0
-	var jitter_scale: float = float(seed_value % 500) / 500.0
-	var jitter: float = ai_logic_update_jitter * jitter_sign * jitter_scale
-	_ai_logic_update_interval_runtime = clampf(ai_logic_update_interval + jitter, 0.06, 0.5)
-	_ai_separation_update_interval_runtime = _get_ai_separation_update_interval_runtime(seed_value)
-	logic_timer = _ai_logic_update_interval_runtime * phase
-	separation_timer = _ai_separation_update_interval_runtime * phase
+	ChaserShipAiHelper.configure_logic_throttle(self)
 
 
 func get_ai_logic_update_interval() -> float:
-	return _ai_logic_update_interval_runtime * _get_ai_load_multiplier()
+	return ChaserShipAiHelper.get_logic_update_interval_for_ship(self)
 
 
 func get_ai_separation_update_interval() -> float:
-	return _ai_separation_update_interval_runtime * _get_ai_load_multiplier()
-
-
-func _get_ai_load_multiplier() -> float:
-	var ship_count: int = EntityRegistry.count_ships()
-	var projectile_count: int = EntityRegistry.count_projectiles()
-	var load_multiplier: float = 1.0
-	if ship_count > 12:
-		load_multiplier += minf(0.45, float(ship_count - 12) * 0.03)
-	if projectile_count > 18:
-		load_multiplier += minf(0.25, float(projectile_count - 18) * 0.01)
-	if team == "player":
-		load_multiplier *= 0.9
-	if is_gunner_role():
-		load_multiplier *= 1.05
-	return clampf(load_multiplier, 0.75, 1.6)
-
-
-func _get_ai_separation_update_interval_runtime(seed_value: int) -> float:
-	var base_interval: float = clampf(ai_separation_update_interval, 0.05, 0.35)
-	var role_adjust: float = 0.0
-	if is_gunner_role():
-		role_adjust = 0.02
-	elif is_charger_role():
-		role_adjust = -0.01
-	var phase_jitter: float = float(seed_value % 7) * 0.005
-	return clampf(base_interval + role_adjust + phase_jitter, 0.05, 0.35)
+	return ChaserShipAiHelper.get_separation_update_interval_for_ship(self)
 
 ## 주변 함선들로부터 멀어지려는 힘 계산
 func _calculate_separation() -> Vector3:
-	if bool(get_meta("derelict_nonblocking", false)):
-		return Vector3.ZERO
-
-	var force = Vector3.ZERO
-	var neighbors = get_ships_cached(get_tree())
-	var count = 0
-	
-	var _max_checks = min(neighbors.size(), 15)
-	for i in range(_max_checks):
-		var other = neighbors[i]
-		if other == self or not is_instance_valid(other) or other.get("is_dying"):
-			continue
-		if bool(other.get_meta("derelict_nonblocking", false)):
-			continue
-			
-		# 도선 중인 상대와는 분리력(Separation)을 적용하지 않음 (가까이 붙어야 하므로)
-		if is_boarding and other == boarding_target:
-			continue
-		if other.has_method("get_boarding_attacker_ship") and other.get_boarding_attacker_ship() == self:
-			continue
-
-		var offset = global_position - other.global_position
-		offset.y = 0.0
-		var dist_sq = offset.length_squared()
-		if dist_sq <= 0.01:
-			continue
-		
-		var dist = sqrt(dist_sq)
-		var coll_dist = get_collision_distance_to(other)
-		# 현재 추격 타겟과는 접촉 직전까지 분리력을 제거해 정박/충돌이 가능하도록 함
-		if is_charger_role() and is_instance_valid(target) and other == target and dist < coll_dist + 1.2:
-			continue
-		var separation_trigger_dist = coll_dist + (0.18 * separation_pad_scale)
-		
-		if dist < separation_trigger_dist:
-			var push_dir = offset.normalized()
-			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
-			var strength = pow(ratio, 2.0)
-			force += push_dir * strength
-			count += 1
-			
-	if count > 0:
-		force = (force / count) * 1.8
-		
-	return force
+	return ChaserShipAiHelper.calculate_separation(self)
 
 func _process_boarding(delta: float) -> void:
 	ChaserShipBoardingHelper.process_boarding(self, delta)
