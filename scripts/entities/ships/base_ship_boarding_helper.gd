@@ -93,14 +93,14 @@ static func transfer_one_soldier(ship) -> void:
 	if not target_soldiers_node:
 		target_soldiers_node = ship.boarding_target
 
-	var team_prop = ship.get("team") if "team" in ship else "enemy"
+	var team_prop = ship.get_team_tag() if ship.has_method("get_team_tag") else ("player" if "team" in ship and str(ship.get("team")) == "player" else "enemy")
 	var defenders_alive = 0
 	var attackers_on_target_deck = 0
 	if target_soldiers_node:
 		for child in target_soldiers_node.get_children():
-			if child.get("current_state") == 4:
+			if child.has_method("is_dead") and child.is_dead():
 				continue
-			if child.get("team") != team_prop:
+			if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 				defenders_alive += 1
 			else:
 				attackers_on_target_deck += 1
@@ -115,8 +115,8 @@ static func transfer_one_soldier(ship) -> void:
 		var enemy_count_on_deck = 0
 		var ally_count_on_deck = 0
 		for child in soldiers:
-			if child.get("current_state") != 4:
-				if child.get("team") != team_prop:
+			if not (child.has_method("is_dead") and child.is_dead()):
+				if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 					enemy_count_on_deck += 1
 				else:
 					ally_count_on_deck += 1
@@ -129,7 +129,7 @@ static func transfer_one_soldier(ship) -> void:
 			return
 
 		for child in soldiers:
-			if child.get("current_state") != 4 and child.get("team") == team_prop:
+			if not (child.has_method("is_dead") and child.is_dead()) and child.has_method("get_team_tag") and child.get_team_tag() == team_prop:
 				s = child
 				break
 
@@ -164,7 +164,7 @@ static func transfer_one_soldier(ship) -> void:
 			s.set_team(team_prop)
 
 		s.set("owned_ship", ship.boarding_target)
-		if team_prop == "enemy" and ship.boarding_target.get("team") == "player":
+		if team_prop == "enemy" and ship.boarding_target.has_method("get_team_tag") and ship.boarding_target.get_team_tag() == "player":
 			s.set("boarder_explosion_timer", 8.0)
 
 		if s.get("is_stationary"):

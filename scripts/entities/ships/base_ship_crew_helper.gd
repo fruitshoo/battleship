@@ -73,13 +73,13 @@ static func estimate_available_crew_count(ship) -> int:
 	var soldiers: Array = EntityRegistry.get_soldiers_by_ship(ship)
 	if not soldiers.is_empty():
 		var alive_count: int = 0
-		var own_team: String = str(ship.get("team"))
+		var own_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
 		for child in soldiers:
 			if not is_instance_valid(child):
 				continue
-			if child.get("team") != own_team:
+			if child.has_method("get_team_tag") and child.get_team_tag() != own_team:
 				continue
-			if child.get("current_state") == 4:
+			if child.has_method("is_dead") and child.is_dead():
 				continue
 			alive_count += 1
 		if alive_count > 0:
@@ -119,14 +119,14 @@ static func get_ship_cannon_range_for_allocation(ship) -> float:
 
 
 static func get_nearest_enemy_ship_distance_for_allocation(ship) -> float:
-	var own_team: String = str(ship.get("team"))
+	var own_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
 	var nearest_distance_sq: float = INF
 	var opposing_team: String = "enemy" if own_team == "player" else "player"
 	var all_ships: Array = EntityRegistry.get_ships_by_team(opposing_team)
 	for other in all_ships:
 		if not is_instance_valid(other) or other == ship:
 			continue
-		if other.get("is_dying") == true or other.get("is_sinking") == true:
+		if other.has_method("is_combat_disabled") and other.is_combat_disabled():
 			continue
 		var planar_delta: Vector3 = other.global_position - ship.global_position
 		planar_delta.y = 0.0

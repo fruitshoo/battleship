@@ -47,14 +47,14 @@ static func check_derelict_status(ship) -> void:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if soldiers_node:
 		for child in EntityRegistry.get_soldiers_by_ship(ship):
-			if child.get("current_state") != 4:
+			if not child.has_method("is_dead") or not child.is_dead():
 				all_crew_dead = false
 				break
 
 	if all_crew_dead:
 		var all_soldiers = EntityRegistry.get_soldiers()
 		for s in all_soldiers:
-			if s.get("home_ship") == ship and s.get("current_state") != 4:
+			if s.get("home_ship") == ship and (not s.has_method("is_dead") or not s.is_dead()):
 				all_crew_dead = false
 				break
 
@@ -74,16 +74,13 @@ static func update_boarding_state(ship, delta: float) -> void:
 		ship._deck_overrun_announced = false
 		return
 
-	var ship_team_variant: Variant = ship.get("team")
-	var ship_team: String = "enemy"
-	if ship_team_variant != null:
-		ship_team = str(ship_team_variant)
+	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else "enemy"
 	var friendly_count: int = 0
 	var hostile_count: int = 0
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.get("current_state") == 4:
+		if child.has_method("is_dead") and child.is_dead():
 			continue
-		if str(child.get("team")) == ship_team:
+		if child.has_method("get_team_tag") and child.get_team_tag() == ship_team:
 			friendly_count += 1
 		else:
 			hostile_count += 1

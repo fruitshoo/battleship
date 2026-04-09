@@ -399,6 +399,15 @@ func set_team(new_team: String) -> void:
 	EntityRegistry.update_soldier_team(self, old_team, team)
 	_update_team_color()
 
+func get_team_tag() -> String:
+	return team
+
+func is_combat_disabled() -> bool:
+	return current_state == State.DEAD
+
+func is_dead() -> bool:
+	return current_state == State.DEAD
+
 func _update_team_color() -> void:
 	SoldierVisualHelper.update_team_color(self)
 

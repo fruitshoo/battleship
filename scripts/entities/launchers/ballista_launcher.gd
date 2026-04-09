@@ -88,10 +88,7 @@ func _is_owner_combat_ready() -> bool:
 		_owner_ship = _resolve_owner_ship()
 	if not is_instance_valid(_owner_ship):
 		return true
-	if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict"):
-		return false
-	var owner_hp = _owner_ship.get("hull_hp")
-	if owner_hp != null and float(owner_hp) <= 0.0:
+	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
 		return false
 	return true
 
@@ -103,9 +100,9 @@ func _update_target() -> void:
 	var soldiers = EntityRegistry.get_soldiers_by_team("enemy" if team == "player" else "player")
 	
 	for s in soldiers:
-		if not is_instance_valid(s) or s.get("current_state") == 4: # 4 = DEAD
+		if not is_instance_valid(s) or (s.has_method("is_dead") and s.is_dead()):
 			continue
-		if s.get("team") != enemy_team:
+		if s.has_method("get_team_tag") and s.get_team_tag() != enemy_team:
 			continue
 			
 		var dist_sq = global_position.distance_squared_to(s.global_position)

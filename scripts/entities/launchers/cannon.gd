@@ -26,7 +26,7 @@ var cooldown_timer: float = 0.0
 var is_preparing: bool = false
 var prepare_timer: float = 0.0
 @export var prepare_time: float = 0.15 # 0.8에서 타격감을 위해 0.15초로 단축
-var current_target: Variant = null
+var current_target: Node3D = null
 var _target_scan_left: float = 0.0
 
 # 함대 업그레이드 보너스 (나포함 전용)
@@ -88,8 +88,7 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(_owner_ship):
 		_owner_ship = _resolve_owner_ship()
 	if is_instance_valid(_owner_ship):
-		var owner_hp = _owner_ship.get("hull_hp")
-		if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict") or (owner_hp != null and float(owner_hp) <= 0.0):
+		if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
 			is_preparing = false
 			current_target = null
 			return
@@ -208,38 +207,30 @@ func _update_target() -> void:
 	
 	current_target = nearest_enemy
 
-func _is_target_valid(target: Variant) -> bool:
+func _is_target_valid(target: Node3D) -> bool:
 	if not is_instance_valid(target):
 		return false
-	if not (target is Node3D):
-		return false
-	var target_node := target as Node3D
-	if target_node.is_queued_for_deletion():
+	if target.is_queued_for_deletion():
 		return false
 	
-	# 침몰 중이거나 체력이 없는 배는 타겟에서 제외
-	var is_dying = target_node.get("is_dying") == true
-	var is_sinking = target_node.get("is_sinking") == true
-	var is_dead_hp = target_node.get("hp") != null and target_node.get("hp") <= 0
-	
-	if is_dying or is_sinking or is_dead_hp:
+	if target.has_method("is_combat_disabled") and target.is_combat_disabled():
 		return false
 		
 	# 팀 체크 (그룹 꼬임보다 우선)
-	if not _is_enemy_ship(target_node):
+	if not _is_enemy_ship(target):
 		return false
 		
 	var current_range = _get_current_range()
-	if global_position.distance_squared_to(target_node.global_position) > current_range * current_range: return false
-	if not _is_within_arc(target_node): return false
+	if global_position.distance_squared_to(target.global_position) > current_range * current_range: return false
+	if not _is_within_arc(target): return false
 	
 	# 도선 중이거나 폐선인 배인지 최종 체크
-	if target_node.get("is_derelict") == true: return false
-	var attacker = target_node.get("boarding_attacker")
-	if is_instance_valid(attacker) and attacker.get("team") == team:
+	if target.has_method("is_combat_disabled") and target.is_combat_disabled(): return false
+	var attacker = target.get("boarding_attacker")
+	if is_instance_valid(attacker) and attacker.has_method("get_team_tag") and attacker.get_team_tag() == team:
 		return false
 		
-	if _is_ship_occupied_by_friendly(target_node): return false
+	if _is_ship_occupied_by_friendly(target): return false
 	return true
 
 func _is_within_arc(target: Node3D) -> bool:
@@ -257,7 +248,7 @@ func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
 	
 	for child in soldiers_node.get_children():
 		# 살아있는 아군 병사가 한 명이라도 있으면 True
-		if child.get("team") == team and child.get("current_state") != 4: # 4 = DEAD
+		if child.has_method("get_team_tag") and child.get_team_tag() == team and child.has_method("is_dead") and not child.is_dead():
 			return true
 	return false
 
@@ -269,7 +260,7 @@ func _is_ship_occupied_by_enemy(target_ship: Node3D) -> bool:
 	var enemy_team = "enemy" if team == "player" else "player"
 	for child in soldiers_node.get_children():
 		# 살아있는 적군 병사가 한 명이라도 있으면 True
-		if child.get("team") == enemy_team and child.get("current_state") != 4: # 4 = DEAD
+		if child.has_method("get_team_tag") and child.get_team_tag() == enemy_team and child.has_method("is_dead") and not child.is_dead():
 			return true
 	return false
 
@@ -304,8 +295,7 @@ func fire(target_enemy: Node3D) -> void:
 func _execute_fire() -> void:
 	is_preparing = false
 	if is_instance_valid(_owner_ship):
-		var owner_hp = _owner_ship.get("hull_hp")
-		if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict") or (owner_hp != null and float(owner_hp) <= 0.0):
+		if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
 			current_target = null
 			return
 	
@@ -313,7 +303,7 @@ func _execute_fire() -> void:
 	if not _is_target_valid(current_target):
 		current_target = null
 		return
-	var target_node := current_target as Node3D
+	var target_node := current_target
 		
 	# 사운드 재생
 	var audio_manager = get_node_or_null("/root/AudioManager")

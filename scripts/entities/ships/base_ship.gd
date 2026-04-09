@@ -450,6 +450,24 @@ func set_team(new_team: String) -> void:
 
 	_update_children_team()
 
+func get_team_tag() -> String:
+	var team_value: Variant = get("team")
+	if team_value == null:
+		return "enemy"
+	return str(team_value)
+
+func is_combat_disabled() -> bool:
+	return is_dying or is_sinking or is_derelict or hull_hp <= 0.0
+
+func get_hull_hp_value() -> float:
+	return hull_hp
+
+func is_player_team() -> bool:
+	return get_team_tag() == "player"
+
+func is_enemy_team() -> bool:
+	return get_team_tag() == "enemy"
+
 func _get_team_collision_layer(team_tag: String) -> int:
 	return 2 if team_tag == "player" else 4
 
@@ -457,8 +475,7 @@ func _get_team_collision_mask(team_tag: String) -> int:
 	return 21 if team_tag == "player" else 2
 
 func _update_children_team() -> void:
-	var team_val = get("team")
-	if team_val == null: team_val = "enemy" # 기본값
+	var team_val: String = get_team_tag()
 	
 	for child in get_children():
 		_recursive_set_team(child, team_val)

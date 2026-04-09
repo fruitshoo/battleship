@@ -16,7 +16,7 @@ const DEBUG_COMBAT_LOGS := false
 var cooldown_timer: float = 0.0
 var _owner_ship: Node = null
 var _target_scan_left: float = 0.0
-var _cached_target: Variant = null
+var _cached_target: Node3D = null
 @export_range(1.0, 6.0) var target_tracking_scan_multiplier: float = 3.0
 
 func _ready() -> void:
@@ -60,25 +60,16 @@ func _is_owner_combat_ready() -> bool:
 		_owner_ship = _resolve_owner_ship()
 	if not is_instance_valid(_owner_ship):
 		return true
-	if _owner_ship.get("is_dying") or _owner_ship.get("is_sinking") or _owner_ship.get("is_derelict"):
-		return false
-	var owner_hp = _owner_ship.get("hull_hp")
-	if owner_hp != null and float(owner_hp) <= 0.0:
+	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
 		return false
 	return true
 
-func _is_target_valid(target: Variant) -> bool:
+func _is_target_valid(target: Node3D) -> bool:
 	if not is_instance_valid(target):
 		return false
-	if not (target is Node3D):
+	if target.has_method("is_combat_disabled") and target.is_combat_disabled():
 		return false
-	var target_node := target as Node3D
-	if target_node.get("is_derelict") == true or target_node.get("is_sinking") == true or target_node.get("is_dying") == true:
-		return false
-	var target_hp = target_node.get("hull_hp")
-	if target_hp != null and float(target_hp) <= 0.0:
-		return false
-	return global_position.distance_squared_to(target_node.global_position) <= detection_range * detection_range
+	return global_position.distance_squared_to(target.global_position) <= detection_range * detection_range
 
 
 func _find_nearest_enemy() -> Node3D:
@@ -90,10 +81,7 @@ func _find_nearest_enemy() -> Node3D:
 		if not is_instance_valid(enemy): continue
 		
 		# 빈 배(폐선)는 타겟에서 제외
-		if enemy.get("is_derelict") == true: continue
-		if enemy.get("is_sinking") == true or enemy.get("is_dying") == true: continue
-		var enemy_hp = enemy.get("hull_hp")
-		if enemy_hp != null and float(enemy_hp) <= 0.0: continue
+		if enemy.has_method("is_combat_disabled") and enemy.is_combat_disabled(): continue
 		
 		var dist_sq = global_position.distance_squared_to(enemy.global_position)
 		if dist_sq < min_dist_sq:
