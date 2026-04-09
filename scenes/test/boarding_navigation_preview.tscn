@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/main.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/boarding_navigation_preview.gd" id="2_script"]
+
+[node name="BoardingNavigationPreview" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+auto_open_debug_panel = true
+stop_regular_spawns = true
+target_deck_state = 0
+front_distance = 13.0
+side_distance = 9.0
+rear_distance = 11.0
