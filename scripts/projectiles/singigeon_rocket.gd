@@ -1,7 +1,6 @@
 extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
@@ -217,7 +216,7 @@ func _resolve_homing_target() -> Node3D:
 	var best_dist_sq: float = retarget_radius * retarget_radius
 
 	if prefer_personnel_targets:
-		for candidate in SceneGroupCache.get_nodes(get_tree(), "soldiers"):
+		for candidate in EntityRegistry.get_soldiers():
 			if not (candidate is Node3D):
 				continue
 			var soldier := candidate as Node3D
@@ -231,7 +230,7 @@ func _resolve_homing_target() -> Node3D:
 			target_node = best_target
 			return best_target
 
-	for candidate in SceneGroupCache.get_nodes(get_tree(), "ships"):
+	for candidate in EntityRegistry.get_ships():
 		if not (candidate is Node3D):
 			continue
 		var ship := candidate as Node3D
@@ -373,7 +372,7 @@ func _explode(primary_target: Node3D = null) -> void:
 func _find_splash_targets() -> Array[Node3D]:
 	var out: Array[Node3D] = []
 	var radius_sq = blast_radius * blast_radius
-	for node in SceneGroupCache.get_nodes(get_tree(), "ships"):
+	for node in EntityRegistry.get_ships():
 		if not (node is Node3D):
 			continue
 		var ship := node as Node3D
@@ -381,7 +380,7 @@ func _find_splash_targets() -> Array[Node3D]:
 			continue
 		if global_position.distance_squared_to(ship.global_position) <= radius_sq:
 			out.append(ship)
-	for node in SceneGroupCache.get_nodes(get_tree(), "soldiers"):
+	for node in EntityRegistry.get_soldiers():
 		if not (node is Node3D):
 			continue
 		var soldier := node as Node3D

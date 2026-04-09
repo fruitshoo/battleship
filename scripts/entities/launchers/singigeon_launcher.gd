@@ -1,7 +1,6 @@
 extends Node3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const DEBUG_COMBAT_LOGS := false
 
 ## 신기전 발사기 (Singigeon Launcher)

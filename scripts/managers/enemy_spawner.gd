@@ -1,7 +1,6 @@
 extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
 const DEBUG_SPAWNER_LOGS := false
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
@@ -111,7 +110,7 @@ func _process(delta: float) -> void:
 		
 	# 1. 적 생성 주기 관리
 	var enemies = EntityRegistry.get_ships_by_team("enemy")
-	var elite_count = SceneGroupCache.get_nodes(get_tree(), "elite").size()
+	var elite_count = _count_elite_enemy_ships()
 	
 	if not regular_spawn_stopped:
 		# 1-1. 엘리트 소환 주기 체크
@@ -176,6 +175,14 @@ func compute_next_interval() -> float:
 
 func _find_player() -> void:
 	player = EntityRegistry.get_first_ship_by_team("player") as Node3D
+
+func _count_elite_enemy_ships() -> int:
+	var enemy_ships: Array = EntityRegistry.get_ships_by_team("enemy")
+	var elite_count := 0
+	for ship in enemy_ships:
+		if is_instance_valid(ship) and ship.is_in_group("elite"):
+			elite_count += 1
+	return elite_count
 
 func _spawn_enemy() -> void:
 	if not enemy_scene:
