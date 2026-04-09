@@ -1,13 +1,19 @@
 extends Node3D
 
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
+const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+
+enum BattleMode {
+	STRESS,
+	VISUAL_COMPARE,
+}
 
 @export var auto_open_debug_panel: bool = true
 @export var open_stat_panel: bool = true
 @export var stop_regular_spawns: bool = true
 @export var enable_distance_debug: bool = false
+@export var battle_mode: BattleMode = BattleMode.STRESS
 @export var midgame_time_seconds: float = 240.0
 @export var midgame_difficulty: int = 6
 @export var level_duration: float = 30.0
@@ -16,6 +22,7 @@ const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 @export var wave_limit: int = 6
 @export var wave_plan: PackedStringArray = PackedStringArray(["mixed", "heavy", "mixed", "heavy", "mixed", "heavy"])
 @export var open_deck_for_combat: bool = true
+@export var compare_phase_seconds: float = 12.0
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
@@ -24,6 +31,9 @@ var _elapsed_time: float = 0.0
 var _wave_elapsed: float = 0.0
 var _wave_index: int = -1
 var _last_spawned_fleet: String = ""
+var _compare_phase_samples: Array = [[], []]
+var _compare_phase_elapsed: float = 0.0
+var _compare_phase_index: int = 0
 var _midgame_initialized: bool = false
 
 
@@ -34,11 +44,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_elapsed_time += delta
 	_wave_elapsed += delta
+	_track_compare_sample(delta)
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = 0.25
 		_update_overlay()
-	if _midgame_initialized:
+	if _midgame_initialized and battle_mode == BattleMode.STRESS:
 		_maybe_spawn_next_wave()
 
 
@@ -47,7 +58,8 @@ func _configure_preview() -> void:
 	_ensure_stat_panel()
 	_configure_midgame_state()
 	_clear_existing_preview_spawns()
-	_spawn_initial_wave()
+	_spawn_battle_load()
+	_configure_compare_state()
 	_ensure_overlay()
 	_update_overlay()
 
@@ -56,12 +68,21 @@ func _ensure_stat_panel() -> void:
 	var hud: Node = get_node_or_null("GameHUD")
 	if not is_instance_valid(hud):
 		return
+	var should_show_stat_panel: bool = open_stat_panel
+	var should_show_ship_health_bars: bool = open_stat_panel
+	if battle_mode == BattleMode.VISUAL_COMPARE:
+		should_show_stat_panel = false
+		should_show_ship_health_bars = false
 	if "show_stat_panel" in hud:
-		hud.set("show_stat_panel", open_stat_panel)
-	if open_stat_panel and hud.has_method("_update_stat_panel"):
+		hud.set("show_stat_panel", should_show_stat_panel)
+	if should_show_stat_panel and hud.has_method("_update_stat_panel"):
 		hud.call("_update_stat_panel")
 	if enable_distance_debug and hud.has_method("_toggle_distance_debug"):
 		hud.call("_toggle_distance_debug")
+	if "show_ship_health_bars" in hud:
+		hud.set("show_ship_health_bars", should_show_ship_health_bars)
+		if hud.has_method("_update_ship_health_bars"):
+			hud.call("_update_ship_health_bars", false)
 
 
 func _configure_midgame_state() -> void:
@@ -98,12 +119,31 @@ func _clear_existing_preview_spawns() -> void:
 	PreviewHarnessHelper.clear_preview_enemies(self, "midgame_fleet_battle_spawn")
 
 
+func _spawn_battle_load() -> void:
+	if battle_mode == BattleMode.STRESS:
+		_spawn_initial_wave()
+		return
+	_spawn_wave_schedule()
+
+
 func _spawn_initial_wave() -> void:
 	_maybe_spawn_next_wave(true)
 
 
+func _spawn_wave_schedule() -> void:
+	if wave_limit <= 0:
+		return
+	var wave_count: int = min(wave_limit, max(1, wave_plan.size()))
+	for wave_index in range(wave_count):
+		var fleet_class := _get_wave_fleet_class(wave_index)
+		_spawn_fleet_wave(fleet_class)
+		_last_spawned_fleet = fleet_class
+
+
 func _maybe_spawn_next_wave(force: bool = false) -> void:
 	if not _midgame_initialized:
+		return
+	if battle_mode != BattleMode.STRESS:
 		return
 	if _wave_index >= wave_limit - 1:
 		return
@@ -161,7 +201,7 @@ func _ensure_overlay() -> void:
 	box.add_child(title)
 
 	var hint := Label.new()
-	hint.text = "wave / level / enemy count / combat load"
+	hint.text = "wave / level / enemy count / visual load"
 	NavalUiTheme.style_muted(hint, 10)
 	box.add_child(hint)
 
@@ -181,6 +221,9 @@ func _update_overlay() -> void:
 	var current_time := float(level_manager.get("current_time")) if is_instance_valid(level_manager) and "current_time" in level_manager else midgame_time_seconds
 	var current_difficulty := int(level_manager.get("game_difficulty")) if is_instance_valid(level_manager) and "game_difficulty" in level_manager else midgame_difficulty
 	var next_wave_in := maxf(0.0, (initial_wave_delay if _wave_index < 0 else wave_interval) - _wave_elapsed)
+	if battle_mode == BattleMode.VISUAL_COMPARE:
+		_overlay_label.text = _build_visual_compare_text(current_difficulty, current_time, next_wave_in)
+		return
 	_overlay_label.text = "scenario:midgame_fleet_battle\nlevel:%d time:%.1fs target:%.1fs\nwave:%d/%d next:%.1fs last:%s\nships:%d soldiers:%d projectiles:%d elapsed:%.1fs" % [
 		current_difficulty,
 		current_time,
@@ -194,6 +237,38 @@ func _update_overlay() -> void:
 		_count_projectiles(),
 		_elapsed_time,
 	]
+
+
+func _build_visual_compare_text(current_difficulty: int, current_time: float, next_wave_in: float) -> String:
+	var baseline: Dictionary = _summarize_compare_samples(0)
+	var overlay: Dictionary = _summarize_compare_samples(1)
+	var phase_name := "lean" if _compare_phase_index == 0 else "full"
+	return "scenario:midgame_visual_compare phase:%s\nlean fps:%d avg:%.2fms | full fps:%d avg:%.2fms | delta:%.2fms\nships:%d soldiers:%d projectiles:%d\nlevel:%d time:%.1fs target:%.1fs wave:%d/%d next:%.1fs" % [
+		phase_name,
+		int(float(baseline.get("fps", 0.0))),
+		float(baseline.get("avg_ms", 0.0)),
+		int(float(overlay.get("fps", 0.0))),
+		float(overlay.get("avg_ms", 0.0)),
+		float(overlay.get("avg_ms", 0.0)) - float(baseline.get("avg_ms", 0.0)),
+		_count_ships(),
+		_count_soldiers(),
+		_count_projectiles(),
+		current_difficulty,
+		current_time,
+		midgame_time_seconds,
+		maxi(_wave_index + 1, 0),
+		wave_limit,
+		next_wave_in,
+	]
+
+
+func _configure_compare_state() -> void:
+	if battle_mode != BattleMode.VISUAL_COMPARE:
+		return
+	_compare_phase_index = 0
+	_compare_phase_elapsed = 0.0
+	_compare_phase_samples = [[], []]
+	_set_compare_phase_enabled(false)
 
 
 func _count_ships() -> int:
@@ -216,3 +291,58 @@ func _count_projectiles_recursive(node: Node) -> int:
 		if child is Node:
 			count += _count_projectiles_recursive(child)
 	return count
+
+
+func _summarize_compare_samples(phase_index: int) -> Dictionary:
+	var samples: Array = _compare_phase_samples[phase_index]
+	var sample_count := samples.size()
+	var total_delta := 0.0
+	var max_delta := 0.0
+	for sample in samples:
+		var sample_delta: float = float(sample)
+		total_delta += sample_delta
+		max_delta = maxf(max_delta, sample_delta)
+	var avg_delta := total_delta / float(sample_count) if sample_count > 0 else 0.0
+	return {
+		"fps": 1.0 / avg_delta if avg_delta > 0.0 else 0.0,
+		"avg_ms": avg_delta * 1000.0,
+		"max_ms": max_delta * 1000.0,
+		"sample_count": sample_count,
+	}
+
+
+func _track_compare_sample(delta: float) -> void:
+	if battle_mode != BattleMode.VISUAL_COMPARE:
+		return
+	var phase_samples: Array = _compare_phase_samples[_compare_phase_index]
+	phase_samples.append(delta)
+	_compare_phase_samples[_compare_phase_index] = phase_samples
+	_compare_phase_elapsed += delta
+	if _compare_phase_index == 0 and _compare_phase_elapsed >= compare_phase_seconds:
+		_compare_phase_index = 1
+		_compare_phase_elapsed = 0.0
+		_set_compare_phase_enabled(true)
+
+
+func _set_compare_phase_enabled(enabled: bool) -> void:
+	if battle_mode != BattleMode.VISUAL_COMPARE:
+		return
+	var hud: Node = get_node_or_null("GameHUD")
+	if not is_instance_valid(hud):
+		return
+	if "show_stat_panel" in hud:
+		hud.set("show_stat_panel", enabled)
+	if "show_ship_health_bars" in hud:
+		hud.set("show_ship_health_bars", enabled)
+	if hud.has_method("_update_stat_panel"):
+		hud.call("_update_stat_panel")
+	if hud.has_method("_update_ship_health_bars"):
+		hud.call("_update_ship_health_bars", false)
+	if DistanceDebugVisualizer.runtime_enabled != enabled and hud.has_method("_toggle_distance_debug"):
+		hud.call("_toggle_distance_debug")
+	if enabled and hud.has_method("_ensure_distance_debug_visualizer"):
+		hud.call("_ensure_distance_debug_visualizer")
+	for ship in get_tree().get_nodes_in_group("ships"):
+		if not is_instance_valid(ship):
+			continue
+		PreviewHarnessHelper.set_preview_deck_light_enabled(ship, enabled)

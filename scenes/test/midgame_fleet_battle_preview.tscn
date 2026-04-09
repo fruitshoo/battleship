@@ -9,6 +9,7 @@ auto_open_debug_panel = true
 open_stat_panel = true
 stop_regular_spawns = true
 enable_distance_debug = false
+battle_mode = 1
 midgame_time_seconds = 240.0
 midgame_difficulty = 6
 level_duration = 30.0
