@@ -1,0 +1,80 @@
+[gd_scene load_steps=5 format=3 uid="uid://c6r7m7j4h5rlg"]
+
+[ext_resource type="Environment" path="res://resources/environment/world_environment_clear_day.tres" id="1_env"]
+[ext_resource type="PackedScene" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="2_hull"]
+[ext_resource type="Script" path="res://scripts/test/ship_damage_preview.gd" id="3_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.12, 0.29, 0.36, 1)
+roughness = 1.0
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(48, 40)
+subdivide_width = 1
+subdivide_depth = 1
+
+[node name="ShipDamagePreview" type="Node3D"]
+script = ExtResource("3_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.17101, 0.469846, 0, 0.939693, 0.34202, -0.5, -0.296198, 0.813798, 0, 0, 0)
+light_energy = 2.0
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(0, 8.5, 26)
+rotation_degrees = Vector3(-18, 0, 0)
+fov = 34.0
+current = true
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.02, 0)
+mesh = SubResource("PlaneMesh_ground")
+surface_material_override/0 = SubResource("StandardMaterial3D_ground")
+
+[node name="PreviewShip1" parent="." instance=ExtResource("2_hull")]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -12, 0, 0)
+
+[node name="StateLabel" type="Label3D" parent="PreviewShip1"]
+position = Vector3(0, 8.8, 0)
+billboard = 1
+font_size = 48
+outline_size = 8
+modulate = Color(1, 0.95, 0.8, 1)
+text = "Clean"
+
+[node name="PreviewShip2" parent="." instance=ExtResource("2_hull")]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -4, 0, 0)
+
+[node name="StateLabel" type="Label3D" parent="PreviewShip2"]
+position = Vector3(0, 8.8, 0)
+billboard = 1
+font_size = 48
+outline_size = 8
+modulate = Color(1, 0.95, 0.8, 1)
+text = "Wear"
+
+[node name="PreviewShip3" parent="." instance=ExtResource("2_hull")]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, 4, 0, 0)
+
+[node name="StateLabel" type="Label3D" parent="PreviewShip3"]
+position = Vector3(0, 8.8, 0)
+billboard = 1
+font_size = 48
+outline_size = 8
+modulate = Color(1, 0.95, 0.8, 1)
+text = "Burned"
+
+[node name="PreviewShip4" parent="." instance=ExtResource("2_hull")]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, 12, 0, 0)
+
+[node name="StateLabel" type="Label3D" parent="PreviewShip4"]
+position = Vector3(0, 8.8, 0)
+billboard = 1
+font_size = 48
+outline_size = 8
+modulate = Color(1, 0.95, 0.8, 1)
+text = "Wrecked"

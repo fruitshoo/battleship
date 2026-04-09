@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://dw4xhxrxj1pas"]
+
+[ext_resource type="PackedScene" path="res://scenes/main.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/enemy_role_preview.gd" id="2_script"]
+
+[node name="EnemyRolePreview" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+auto_open_debug_panel = true
+stop_regular_spawns = true
+role_spacing = 14.0
+role_forward_offset = -10.0
