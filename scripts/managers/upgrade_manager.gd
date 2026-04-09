@@ -777,6 +777,9 @@ func _apply_fleet_signal(ship: Node3D, _level: int) -> void:
 	if not is_instance_valid(ship):
 		return
 	_refresh_support_fleet_upgrade_state(ship)
+	if _should_skip_support_fleet_autospawn():
+		print("[Support] 지원함 자동 소환 건너뜀 (probe)")
+		return
 	if ship.has_method("_spawn_or_repair_ally"):
 		ship.call_deferred("_spawn_or_repair_ally")
 		print("[Support] 지원함 소집 발동!")
@@ -796,10 +799,10 @@ func _apply_fleet_crew(ship: Node3D, level: int) -> void:
 	if "support_fleet_respawn_timer" in ship and "support_fleet_respawn_interval" in ship:
 		if float(ship.support_fleet_respawn_timer) >= float(ship.support_fleet_respawn_interval):
 			ship.support_fleet_respawn_timer = 0.0
-			if ship.has_method("_spawn_or_repair_ally") and int(current_levels.get("fleet_signal", 0)) > 0:
+			if not _should_skip_support_fleet_autospawn() and ship.has_method("_spawn_or_repair_ally") and int(current_levels.get("fleet_signal", 0)) > 0:
 				ship.call_deferred("_spawn_or_repair_ally")
 	if level >= int(stats.get("limit_add_level", 5)):
-		if ship.has_method("_spawn_or_repair_ally") and int(current_levels.get("fleet_signal", 0)) > 0:
+		if not _should_skip_support_fleet_autospawn() and ship.has_method("_spawn_or_repair_ally") and int(current_levels.get("fleet_signal", 0)) > 0:
 			ship.call_deferred("_spawn_or_repair_ally")
 	print("[Support] 지원함 재합류 강화 Lv.%d (재합류 %.0f초)" % [level, next_respawn_interval])
 
@@ -885,7 +888,7 @@ func _apply_item_choyogi(ship: Node3D) -> void:
 		return
 	ship.set_meta("item_choyogi_applied", true)
 	_refresh_support_fleet_upgrade_state(ship)
-	if ship.has_method("_spawn_or_repair_ally"):
+	if not _should_skip_support_fleet_autospawn() and ship.has_method("_spawn_or_repair_ally"):
 		ship.call_deferred("_spawn_or_repair_ally")
 
 func _apply_item_ilseongjeongsiui(ship: Node3D) -> void:
@@ -901,6 +904,15 @@ func _update_item_ship_hud(ship: Node3D) -> void:
 	var hud = ship._find_hud()
 	if hud and hud.has_method("update_hull_hp") and "hull_hp" in ship and "max_hull_hp" in ship:
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
+
+
+func _should_skip_support_fleet_autospawn() -> bool:
+	return _env_flag_enabled("BATTLESHIP_DISABLE_SUPPORT_FLEET_AUTOSPAWN")
+
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 func _get_item_icon_payload(item_id: String, item_data: Dictionary) -> Dictionary:
 	var payload: Dictionary = {

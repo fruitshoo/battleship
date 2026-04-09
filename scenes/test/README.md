@@ -71,3 +71,6 @@
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.
   Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.
+- `scripts/test/run_player_ship_leak_compare.sh`
+  Compares `player_ship.tscn` leak totals with normal startup and with support-fleet autosummon disabled via probe-only env flag.
+  Useful for checking how much of the bootstrap leak budget comes from support fleet initialization.
