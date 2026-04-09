@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/cannon_range_preview.gd" id="2_script"]
+
+[node name="CannonRangePreview" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+auto_open_debug_panel = true
+auto_enable_distance_debug = true
+stop_regular_spawns = true
+close_distance = 5.0
+ideal_distance = 13.0
+edge_padding = -0.5
+out_padding = 6.0
+lateral_spacing = 6.5
