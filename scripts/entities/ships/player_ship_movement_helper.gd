@@ -19,11 +19,11 @@ static func calculate_separation(ship) -> Vector3:
 	var neighbors = ship._get_ships_cached(ship.get_tree())
 	var _max_checks = min(neighbors.size(), 12)
 	for other in neighbors:
-		if other == ship or not is_instance_valid(other) or other.get("is_sinking"):
+		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
 			continue
 		if bool(other.get_meta("derelict_nonblocking", false)):
 			continue
-		if ship.is_boarding and other == ship.boarding_target:
+		if ship.has_method("is_boarding_ship") and ship.is_boarding_ship() and other == ship.get_boarding_target_ship():
 			continue
 		if other.has_method("get_boarding_attacker_ship") and other.get_boarding_attacker_ship() == ship:
 			continue
@@ -34,7 +34,9 @@ static func calculate_separation(ship) -> Vector3:
 			continue
 		var dist = sqrt(dist_sq)
 		var coll_dist = ship.get_collision_distance_to(other)
-		var is_enemy_attacker = other.get("team") == "enemy" and (other.get("target") == ship or other.get("boarding_target") == ship)
+		var is_enemy_attacker = false
+		if other.has_method("is_enemy_team") and other.is_enemy_team():
+			is_enemy_attacker = (other.get("target") == ship or (other.has_method("get_boarding_target_ship") and other.get_boarding_target_ship() == ship))
 		if is_enemy_attacker and dist < coll_dist + 1.0:
 			continue
 		var separation_trigger_dist = coll_dist + 0.12
@@ -49,7 +51,7 @@ static func get_boarding_drag_multiplier(ship) -> float:
 	var drag = 1.0
 	var neighbors = ship._get_ships_cached(ship.get_tree())
 	for other in neighbors:
-		if other.get("is_boarding") and other.get("boarding_target") == ship:
+		if other.has_method("is_boarding_ship") and other.is_boarding_ship() and other.has_method("get_boarding_target_ship") and other.get_boarding_target_ship() == ship:
 			drag *= 0.6
 	return maxf(0.1, drag)
 

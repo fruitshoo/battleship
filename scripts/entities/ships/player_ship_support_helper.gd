@@ -75,7 +75,7 @@ static func get_support_fleet_ships(ship) -> Array:
 			continue
 		if bool(minion.get_meta("support_fleet_ship", false)) == false:
 			continue
-		if minion.get("is_dying") == true or minion.get("is_sinking") == true or minion.get("is_derelict") == true:
+		if minion.has_method("is_combat_disabled") and minion.is_combat_disabled():
 			continue
 		support_ships.append(minion)
 	support_ships.sort_custom(func(a, b):

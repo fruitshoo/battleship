@@ -425,7 +425,7 @@ func _physics_process(_delta: float) -> void:
 	_apply_bobbing_effect()
 
 func set_team(new_team: String) -> void:
-	var old_team = str(get("team")) if get("team") != null else "enemy"
+	var old_team = get_team_tag()
 	var normalized_team = "player" if new_team == "player" else "enemy"
 	if "team" in self:
 		set("team", normalized_team)
@@ -460,6 +460,23 @@ func is_combat_disabled() -> bool:
 
 func get_hull_hp_value() -> float:
 	return hull_hp
+
+func is_sinking_or_dying() -> bool:
+	return is_sinking or is_dying
+
+func is_derelict_ship() -> bool:
+	return is_derelict
+
+func is_boarding_ship() -> bool:
+	return is_boarding
+
+func get_boarding_target_ship() -> Node3D:
+	return boarding_target if is_instance_valid(boarding_target) else null
+
+func is_player_controlled_ship() -> bool:
+	if not ("is_player_controlled" in self):
+		return false
+	return bool(get("is_player_controlled"))
 
 func is_player_team() -> bool:
 	return get_team_tag() == "player"
@@ -720,10 +737,18 @@ func _calculate_collision_repulsion() -> Vector3:
 func _is_engagement_pair(other: Node3D) -> bool:
 	if not is_instance_valid(other):
 		return false
-	var my_target = get("target")
-	var my_boarding_target = get("boarding_target")
-	var other_target = other.get("target")
-	var other_boarding_target = other.get("boarding_target")
+	var my_target: Node3D = null
+	if "target" in self:
+		my_target = get("target")
+	var my_boarding_target = get_boarding_target_ship()
+	var other_target: Node3D = null
+	if "target" in other:
+		other_target = other.get("target")
+	var other_boarding_target: Node3D = null
+	if other.has_method("get_boarding_target_ship"):
+		other_boarding_target = other.get_boarding_target_ship()
+	elif "boarding_target" in other:
+		other_boarding_target = other.get("boarding_target")
 	return my_target == other \
 		or my_boarding_target == other \
 		or other_target == self \
@@ -777,7 +802,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 			ship_label += "/" + str(get("ship_type"))
 		print("[DamageLog][%s][%s] source=%s raw=%.1f defense=%.1f final=%.1f hp=%.1f->%.1f" % [
 			ship_label,
-			str(get("team")),
+			get_team_tag(),
 			source_label,
 			amount,
 			hull_defense,
@@ -790,7 +815,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 		call_deferred("_sink_derelict")
 	
 	# 플레이어 무기 피해 집계: 적 함선에만 기록
-	if not damage_source.is_empty() and get("team") == "enemy":
+	if not damage_source.is_empty() and is_enemy_team():
 		if is_instance_valid(_cached_level_manager) and _cached_level_manager.has_method("add_player_weapon_damage"):
 			_cached_level_manager.add_player_weapon_damage(damage_source, final_damage)
 	

@@ -44,7 +44,7 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 			continue
 		if other == excluded_ship:
 			continue
-		if other.get("is_dying") or other.get("is_sinking"):
+		if other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying():
 			continue
 		if bool(other.get_meta("derelict_nonblocking", false)):
 			continue
@@ -58,8 +58,8 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 		if diff.length_squared() > safe_probe * safe_probe:
 			continue
 
-		var ship_team: String = str(ship.get("team"))
-		var other_team: String = str(other.get("team"))
+		var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
+		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
 		var emit_collision_event: bool = ship_team != other_team
 		corrected_pos = apply_ship_collision_guard(ship, other, prev_pos, corrected_pos, safe_ratio, ship.current_speed, emit_collision_event)
 		check_count += 1
@@ -72,7 +72,7 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = 0.94, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:
 	if not is_instance_valid(other_ship):
 		return proposed_pos
-	if other_ship.get("is_dying") or other_ship.get("is_sinking"):
+	if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
 		return proposed_pos
 	if bool(other_ship.get_meta("derelict_nonblocking", false)):
 		return proposed_pos
@@ -156,6 +156,6 @@ static func soften_collision_speed(ship) -> void:
 static func _is_support_fleet_pair(ship, other_ship: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(other_ship):
 		return false
-	if str(ship.get("team")) != "player" or str(other_ship.get("team")) != "player":
+	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
 	return bool(ship.get_meta("support_fleet_ship", false)) and bool(other_ship.get_meta("support_fleet_ship", false))
