@@ -52,7 +52,7 @@
   Broader combat playground for mixed-system checks.
   Script: `scripts/test/combat_sandbox.gd`
 - `project_contract_sweep.tscn`
-  Project-wide load sweep plus a legacy-pattern scan, save/load and HUD roundtrip smokes, and a small runtime smoke check for registry, boss, ship, launcher, and projectile contracts.
+  Project-wide load sweep plus a legacy-pattern scan, save/load, HUD, and scene-wiring roundtrip smokes, and a small runtime smoke check for registry, boss, ship, launcher, and projectile contracts.
   Script: `scripts/test/project_contract_sweep.gd`
   Wrapper: `scripts/test/run_project_contract_sweep.sh`
 
