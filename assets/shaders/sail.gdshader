@@ -68,14 +68,14 @@ float sample_burn_mask_c(vec2 uv, float scale, vec2 offset) {
 float get_erosion_field(vec2 uv, float seed) {
 	vec2 coarse_offset = vec2(seed * 0.071, seed * 0.053);
 	vec2 detail_offset = vec2(seed * 0.163 + 0.11, seed * 0.127 + 0.07);
-	float coarse_c = sample_burn_mask_c(uv, 1.55, coarse_offset * 0.57 + vec2(0.17, 0.09));
-	float detail_c = sample_burn_mask_c(uv.yx, 2.85, detail_offset * 0.68 + vec2(0.23, 0.31));
-	return clamp(coarse_c * 0.56 + detail_c * 0.44, 0.0, 1.0);
+	float coarse_c = sample_burn_mask_c(uv, 0.82, coarse_offset * 0.57 + vec2(0.17, 0.09));
+	float detail_c = sample_burn_mask_c(uv.yx, 1.46, detail_offset * 0.68 + vec2(0.23, 0.31));
+	return clamp(coarse_c * 0.72 + detail_c * 0.28, 0.0, 1.0);
 }
 
 float get_fiber_field(vec2 uv, float seed) {
 	vec2 fiber_offset = vec2(seed * 0.211 + 0.19, seed * 0.167 + 0.31);
-	float fiber_c = sample_burn_mask_c(uv * vec2(0.92, 1.0) + vec2(0.13, 0.0), 3.95, fiber_offset * 0.61 + vec2(0.29, 0.17));
+	float fiber_c = sample_burn_mask_c(uv * vec2(0.92, 1.0) + vec2(0.13, 0.0), 2.35, fiber_offset * 0.61 + vec2(0.29, 0.17));
 	return clamp(fiber_c, 0.0, 1.0);
 }
 
@@ -133,55 +133,48 @@ void vertex() {
 // Damage / burn appearance
 void fragment() {
 	vec2 base_uv = UV;
-	float edge_distance = min(min(base_uv.x, 1.0 - base_uv.x), min(base_uv.y, 1.0 - base_uv.y));
 	float seed = damage_seed * 17.0;
-	float edge_bias = 1.0 - smoothstep(0.03, 0.24, edge_distance);
-	float edge_fray_mask = 1.0 - smoothstep(0.10, 0.34, edge_distance);
 	float erosion_field = get_erosion_field(base_uv, seed);
 	float fiber_field = get_fiber_field(base_uv, seed);
-	float dissolve_field = get_dissolve_field(base_uv, seed);
-	float wear_field = clamp(erosion_field * 0.72 + fiber_field * 0.38 + edge_bias * 0.34, 0.0, 1.0);
+	float erosion_basis = clamp(erosion_field * 0.9 + fiber_field * 0.1, 0.0, 1.0);
+	float damage_pattern = smoothstep(0.30, 0.82, erosion_basis);
+	float damage_mask = clamp(sail_damage * mix(0.10, 1.0, damage_pattern), 0.0, 1.0);
 
 	// Stage 1: staining / scorch
-	float scorch_progress = clamp(max(sail_damage * 0.92, burn_amount * 1.10), 0.0, 1.0);
-	float scorch_threshold = 1.0 - scorch_progress * 0.88;
-	float scorch_mask = (1.0 - smoothstep(scorch_threshold - 0.22, scorch_threshold + 0.08, wear_field)) * scorch_progress;
+	// sail_damage defines where the sail is weakened.
+	// burn_amount only deepens color on those weakened zones.
+	float scorch_progress = smoothstep(0.18, 0.46, sail_damage);
+	float scorch_mask = clamp(damage_mask * scorch_progress, 0.0, 1.0);
 
-	// Stage 2: edge fray
-	float fray_progress = smoothstep(0.08, 0.66, sail_damage);
-	float fray_field = clamp(wear_field * 0.74 + edge_bias * 0.46, 0.0, 1.0);
-	float fray_threshold = 1.0 - fray_progress * 0.9;
-	float fray_mask = (1.0 - smoothstep(fray_threshold - 0.16, fray_threshold + 0.05, fray_field)) * edge_fray_mask * fray_progress;
+	// Stage 2: fray follows the same damage map, only becoming visible after
+	// the sail is already somewhat weakened.
+	float fray_progress = smoothstep(0.12, 0.60, sail_damage);
+	float fray_mask = clamp(damage_mask * fray_progress, 0.0, 1.0);
 
-	// Stage 3: direct dissolve / erosion across the fabric surface.
-	// Use the new erosion texture as an actual threshold field so the
-	// breakup is easy to read during debug tuning.
-	float hole_progress = smoothstep(0.05, 0.62, sail_damage);
-	float dissolve_threshold = mix(0.88, 0.28, hole_progress);
-	float hole_mask = smoothstep(dissolve_threshold - 0.1, dissolve_threshold + 0.03, dissolve_field) * hole_progress;
-	float hole_outer = smoothstep(dissolve_threshold - 0.24, dissolve_threshold + 0.08, dissolve_field) * hole_progress;
+	// Stage 3: holes are driven by the same damage map, but only where the sail
+	// is already strongly weakened. hole_alpha_strength controls how much of
+	// those zones become true cutouts.
+	float hole_progress = smoothstep(0.38, 0.60, sail_damage);
+	float hole_field = damage_pattern;
+	float hole_openness = clamp(hole_alpha_strength / 2.0, 0.0, 1.0);
+	float hole_mask = clamp(smoothstep(0.74, 0.92, hole_field) * hole_progress * hole_openness, 0.0, 1.0);
+	float hole_outer = clamp(smoothstep(0.58, 0.84, hole_field) * hole_progress * hole_openness * 0.64, 0.0, 1.0);
 	float hole_char_mask = clamp(hole_outer - hole_mask * 0.78, 0.0, 1.0);
+	float hole_alpha_mask = clamp(hole_mask + hole_outer, 0.0, 1.0);
 
-	// Keep edge fray additive so the sail still tears along the borders,
-	// but let the dissolve dominate the interior silhouette.
-	float edge_hole_bias = mix(0.90, 1.0, edge_bias);
-	hole_mask *= edge_hole_bias;
-	hole_char_mask *= mix(0.84, 1.0, edge_bias);
+	// Burn follows the same broad damage pattern, but its intensity should be
+	// readable independently from sail_damage.
+	float burn_progress = burn_amount;
+	float burn_pattern = smoothstep(0.24, 0.78, damage_pattern);
+	float burn_mask = clamp(burn_progress * mix(0.10, 1.0, burn_pattern), 0.0, 1.0);
 
-	// Burn can deepen the char without immediately cutting away the sail.
-	float burn_progress = max(burn_amount, sail_damage * 0.35);
-	float burn_field = clamp(erosion_field * 0.62 + fiber_field * 0.28 + edge_bias * 0.50, 0.0, 1.0);
-	float burn_threshold = 1.0 - burn_progress * 0.84;
-	float burn_mask = (1.0 - smoothstep(burn_threshold - 0.18, burn_threshold + 0.04, burn_field)) * mix(0.55, 1.0, edge_bias) * burn_progress;
-
-	float burn_scorch_mask = clamp(max(scorch_mask, burn_mask * 0.94) + hole_char_mask * 1.55 + fray_mask * 0.52, 0.0, 1.0);
-	float damage_alpha = clamp(1.0 - fray_mask * 0.42 - hole_mask * 1.08 * hole_alpha_strength, 0.0, 1.0);
-	float burn_alpha = clamp(1.0 - burn_mask * burn_amount * 0.18, 0.0, 1.0);
-	damage_alpha *= burn_alpha;
-	float burn_edge_emission_mask = clamp(hole_char_mask * 0.72 + burn_mask * edge_bias * 0.34 + scorch_mask * edge_bias * 0.08, 0.0, 1.0) * burn_amount;
-	float burn_core_emission_mask = clamp(hole_char_mask * 0.24 + burn_mask * edge_bias * 0.12, 0.0, 1.0) * smoothstep(0.24, 1.0, burn_amount);
-	float emission_variation = 0.86 + 0.14 * sin(TIME * 4.7 + dissolve_field * 12.0 + fiber_field * 7.0 + damage_seed * 19.0);
-	float ember_variation = 0.88 + 0.12 * sin(TIME * 2.9 + erosion_field * 9.0 + damage_seed * 13.0);
+	float burn_scorch_mask = clamp(max(scorch_mask * 0.72, burn_mask) + hole_char_mask * 1.45 + fray_mask * 0.44, 0.0, 1.0);
+	float damage_alpha = clamp(1.0 - hole_alpha_mask * mix(0.0, 1.48, hole_openness), 0.0, 1.0);
+	damage_alpha = clamp(damage_alpha, 0.0, 1.0);
+	float burn_edge_emission_mask = clamp(hole_char_mask * 0.76 + burn_mask * 0.24 + scorch_mask * 0.08, 0.0, 1.0) * burn_amount;
+	float burn_core_emission_mask = clamp(hole_char_mask * 0.22 + burn_mask * 0.12, 0.0, 1.0) * smoothstep(0.32, 1.0, burn_amount);
+	float emission_variation = 0.86 + 0.14 * sin(TIME * 4.7 + damage_pattern * 12.0 + fiber_field * 7.0 + damage_seed * 19.0);
+	float ember_variation = 0.88 + 0.12 * sin(TIME * 2.9 + erosion_basis * 9.0 + damage_seed * 13.0);
 
 	if (use_sail_texture) {
 		vec2 sail_uv = get_sail_uv(UV);
@@ -189,11 +182,11 @@ void fragment() {
 		if (use_dark_alpha_cutoff) {
 			float luma = dot(tex.rgb, vec3(0.2126, 0.7152, 0.0722));
 			float dark_mask = smoothstep(dark_alpha_cutoff, dark_alpha_cutoff + dark_alpha_softness, luma);
-			if (tex.a * dark_mask * damage_alpha <= 0.001) {
+			if (tex.a * dark_mask * damage_alpha <= 0.14) {
 				discard;
 			}
 		}
-		else if (tex.a * damage_alpha <= 0.001) {
+		else if (tex.a * damage_alpha <= 0.14) {
 			discard;
 		}
 		vec3 base_color = tex.rgb * albedo.rgb;
@@ -201,7 +194,7 @@ void fragment() {
 		vec3 ember_tint = base_color * vec3(0.56, 0.22, 0.12);
 		ALBEDO = mix(base_color, mix(char_color, ember_tint, burn_mask * 0.28), burn_scorch_mask);
 	} else {
-		if (damage_alpha <= 0.001) {
+		if (damage_alpha <= 0.14) {
 			discard;
 		}
 		vec3 char_color = albedo.rgb * vec3(0.26, 0.18, 0.14);

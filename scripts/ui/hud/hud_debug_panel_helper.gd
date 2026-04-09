@@ -2,6 +2,7 @@ extends RefCounted
 class_name HudDebugPanelHelper
 
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+const MastDamagePresets = preload("res://scripts/props/mast_damage_presets.gd")
 
 
 static func setup_debug_panel(hud) -> void:
@@ -387,14 +388,9 @@ static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
 	var preset_row := HBoxContainer.new()
 	preset_row.add_theme_constant_override("separation", 4)
 	section["body"].add_child(preset_row)
-	for preset in [
-		{"label": "Clean", "damage": 0.0, "burn": 0.0},
-		{"label": "Scorch", "damage": 0.22, "burn": 0.18, "hole": 0.5},
-		{"label": "Fray", "damage": 0.55, "burn": 0.32, "hole": 1.0},
-		{"label": "Burn", "damage": 0.88, "burn": 0.70, "hole": 1.4},
-	]:
+	for preset in MastDamagePresets.ALL:
 		var preset_button := Button.new()
-		preset_button.text = str(preset["label"])
+		preset_button.text = str(preset["name"])
 		preset_button.custom_minimum_size = Vector2(0, 26)
 		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		NavalUiTheme.apply_hud_button(preset_button, 11)
@@ -419,7 +415,11 @@ static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	NavalUiTheme.apply_hud_button(reset_button, 11)
 	reset_button.pressed.connect(func() -> void:
-		hud._apply_sail_debug_values(0.0, 0.0, 1.0)
+		hud._apply_sail_debug_values(
+			float(MastDamagePresets.CLEAN["damage"]),
+			float(MastDamagePresets.CLEAN["burn"]),
+			float(MastDamagePresets.CLEAN["hole"])
+		)
 	)
 	action_row.add_child(reset_button)
 

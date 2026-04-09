@@ -39,7 +39,6 @@ scale = Vector3(0.2, 0.2, 0.2)
 
 [node name="Mast" parent="." instance=ExtResource("mast_scene")]
 visible = false # Geobukseon often lowered mast in battle
-use_sail_texture = true
 sail_texture = ExtResource("horizon_sail")
 sail_uv_scale = Vector2(1, 2.01)
 sail_uv_offset = Vector2(0, 0)

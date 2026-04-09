@@ -62,41 +62,26 @@ const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 	set(value):
 		sail_uv_offset = value
 		_apply_sail_material_settings()
-@export_group("Mast Geometry")
-@export var mast_height_scale: float = 1.0:
-	set(value):
-		mast_height_scale = max(value, 0.1)
-		_apply_mast_geometry()
-@export_group("Sail Geometry")
-@export var sail_size: Vector2 = Vector2(3.5, 7.0):
-	set(value):
-		sail_size = Vector2(max(value.x, 0.1), max(value.y, 0.1))
-		_apply_sail_geometry()
-@export var sail_bottom_width_scale: float = 1.0:
-	set(value):
-		sail_bottom_width_scale = clamp(value, 0.35, 1.25)
-		_apply_sail_material_settings()
-@export var sail_offset: Vector3 = Vector3.ZERO:
-	set(value):
-		sail_offset = value
-		_apply_sail_geometry()
-@export_group("Yardarm Geometry")
-@export var yardarm_scale: Vector3 = Vector3.ONE:
-	set(value):
-		yardarm_scale = Vector3(max(value.x, 0.01), max(value.y, 0.01), max(value.z, 0.01))
-		_apply_sail_geometry()
-@export var yardarm_offset: Vector3 = Vector3.ZERO:
-	set(value):
-		yardarm_offset = value
-		_apply_sail_geometry()
+# Geometry is edited directly in the scene tree now.
+# Keep these as plain runtime fields so older code paths remain harmless,
+# but do not expose them in the inspector.
+var mast_height_scale: float = 1.0
+var sail_size: Vector2 = Vector2(3.5, 7.0)
+var sail_mesh_offset: Vector3 = Vector3.ZERO
+var sail_bottom_width_scale: float = 1.0
+var sail_offset: Vector3 = Vector3.ZERO
+var yardarm_scale: Vector3 = Vector3.ONE
+var yardarm_offset: Vector3 = Vector3.ZERO
+var flag_offset: Vector3 = Vector3.ZERO
 
 @onready var mast_mesh: MeshInstance3D = $MastMesh
 @onready var sail_visual: Node3D = $SailVisual
-@onready var yardarm_mesh: MeshInstance3D = $SailVisual/Yardarm
 @onready var sail_mesh: MeshInstance3D = $SailVisual/SailMesh
-@onready var sail_model_root: Node3D = get_node_or_null("SailVisual/sail2") as Node3D
-@onready var yardarm_model_root: Node3D = get_node_or_null("SailVisual/yardarm2") as Node3D
-@onready var mast_model_root: Node3D = get_node_or_null("mast2") as Node3D
+# Optional dormant reference roots kept only if we temporarily park imported meshes
+# under the mast scene while tuning proportions.
+@onready var sail_model_root: Node3D = get_node_or_null("SailVisual/sail_model") as Node3D
+@onready var yardarm_model_root: Node3D = get_node_or_null("SailVisual/yardarm") as Node3D
+@onready var mast_model_root: Node3D = get_node_or_null("mast_model") as Node3D
 @onready var flag: Node3D = $SailVisual/Flag
 
 var sail_angle: float = 0.0
@@ -104,8 +89,6 @@ const BASE_SAIL_SIZE := Vector2(3.5, 7.0)
 var _base_mast_mesh_position := Vector3.ZERO
 var _base_mast_mesh_scale := Vector3.ONE
 var _base_sail_visual_position := Vector3.ZERO
-var _base_yardarm_mesh_position := Vector3.ZERO
-var _base_yardarm_mesh_scale := Vector3.ONE
 var _base_sail_mesh_position := Vector3.ZERO
 var _base_flag_position := Vector3.ZERO
 var _base_model_root_position := Vector3.ZERO
@@ -135,6 +118,8 @@ func _ready() -> void:
 	_apply_mast_geometry()
 	_apply_sail_geometry()
 	_apply_sail_material_settings()
+	if Engine.is_editor_hint():
+		return
 	_update_sail_smoke()
 	_update_sail_wind_visual()
 
@@ -142,9 +127,13 @@ func set_sail_angle(angle: float) -> void:
 	if is_equal_approx(sail_angle, angle):
 		return
 	sail_angle = angle
+	if Engine.is_editor_hint():
+		return
 	_update_sail_wind_visual()
 
 func _process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	_update_sail_wind_visual()
 
 func set_team_color(team: String) -> void:
@@ -176,21 +165,32 @@ func add_sail_damage(amount: float) -> void:
 	if is_equal_approx(sail_damage, target_damage):
 		return
 	sail_damage = target_damage
+	_apply_sail_material_settings()
 
 func repair_sail_damage(amount: float) -> void:
 	var target_damage: float = clamp(sail_damage - maxf(amount, 0.0), 0.0, 1.0)
 	if is_equal_approx(sail_damage, target_damage):
 		return
 	sail_damage = target_damage
+	_apply_sail_material_settings()
 
 func get_sail_damage() -> float:
 	return sail_damage
+
+func set_sail_damage(value: float) -> void:
+	var target_damage: float = clamp(value, 0.0, 1.0)
+	if is_equal_approx(sail_damage, target_damage):
+		return
+	sail_damage = target_damage
+	_apply_sail_material_settings()
 
 func set_burn_amount(value: float) -> void:
 	var target_burn: float = clamp(value, 0.0, 1.0)
 	if is_equal_approx(burn_amount, target_burn):
 		return
 	burn_amount = target_burn
+	_apply_sail_material_settings()
+	_update_sail_smoke()
 
 func get_burn_amount() -> float:
 	return burn_amount
@@ -200,6 +200,7 @@ func set_hole_alpha_strength(value: float) -> void:
 	if is_equal_approx(hole_alpha_strength, target_strength):
 		return
 	hole_alpha_strength = target_strength
+	_apply_sail_material_settings()
 
 func get_hole_alpha_strength() -> float:
 	return hole_alpha_strength
@@ -208,9 +209,13 @@ func _ensure_sail_smoke() -> Node3D:
 	return MastVisualHelper.ensure_sail_smoke(self, SAIL_SMOKE_SCENE)
 
 func _update_sail_smoke() -> void:
+	if Engine.is_editor_hint():
+		return
 	MastVisualHelper.update_sail_smoke(self, SAIL_SMOKE_SCENE)
 
 func _update_sail_wind_visual() -> void:
+	if Engine.is_editor_hint():
+		return
 	MastWindHelper.update_sail_wind_visual(self)
 
 func _apply_wind_strength_to_sails(wind_strength_value: float) -> void:
