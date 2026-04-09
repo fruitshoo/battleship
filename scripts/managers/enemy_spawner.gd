@@ -71,6 +71,8 @@ func _spawn_boss() -> void:
 	boss_spawned = true
 	
 	var boss = boss_scene.instantiate()
+	if boss.has_method("set_team"):
+		boss.set_team("enemy")
 	if "ship_type" in boss:
 		boss.ship_type = "atakebune_final" # 최종 보스 설정
 	# 플레이어 전방 50m 지점에 소환
@@ -303,6 +305,8 @@ func _spawn_elite_ship() -> void:
 	
 	# 중간 보스는 보스 베이스(Atakebune)를 사용하되 tier 1로 설정
 	var elite = boss_scene.instantiate()
+	if elite.has_method("set_team"):
+		elite.set_team("enemy")
 	if "ship_type" in elite:
 		# 중간 보스 성격의 엘리트 함선
 		elite.ship_type = "atakebune_mid"

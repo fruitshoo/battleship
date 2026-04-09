@@ -7,6 +7,7 @@ const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_regist
 
 signal boss_died
 
+@export var team: String = "enemy"
 @export var move_speed: float = 3.0
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
 @export_range(0.0, 1.0, 0.01) var orbit_inward_bias: float = 0.34 # 선회 중에도 플레이어 쪽으로 얼마나 파고들지
@@ -84,7 +85,7 @@ func _ready() -> void:
 		
 	super._ready()
 	hull_hp = max_hull_hp
-	add_to_group("enemy")
+	set_team(team)
 	add_to_group("boss")
 	add_to_group("ships")
 	_find_player()
