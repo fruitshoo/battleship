@@ -3,10 +3,10 @@ const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutline
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const HudGameOverOverlay = preload("res://scripts/ui/hud/hud_game_over_overlay.gd")
-const HudUpgradeTooltip = preload("res://scripts/ui/hud/hud_upgrade_tooltip.gd")
 const HudLayoutBuilder = preload("res://scripts/ui/hud/hud_layout_builder.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud/hud_update_helper.gd")
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
+const HudUpgradeTooltipHelper = preload("res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd")
 const HudStatPanelHelper = preload("res://scripts/ui/hud/hud_stat_panel_helper.gd")
 const HudDebugPanelHelper = preload("res://scripts/ui/hud/hud_debug_panel_helper.gd")
 const HudDistanceDebugHelper = preload("res://scripts/ui/hud/hud_distance_debug_helper.gd")
@@ -630,93 +630,34 @@ func toggle_stat_panel() -> void:
 	_update_stat_panel()
 
 func _setup_upgrade_tooltip() -> void:
-	if is_instance_valid(upgrade_tooltip_panel):
-		return
-	upgrade_tooltip_panel = HudUpgradeTooltip.new()
-	add_child(upgrade_tooltip_panel)
+	HudUpgradeTooltipHelper.setup_upgrade_tooltip(self)
 
 func _bind_upgrade_slot_hover(slot: PanelContainer) -> void:
-	slot.mouse_entered.connect(_on_upgrade_slot_mouse_entered.bind(slot))
-	slot.mouse_exited.connect(_on_upgrade_slot_mouse_exited.bind(slot))
+	HudUpgradeTooltipHelper.bind_upgrade_slot_hover(self, slot)
 
 func _on_upgrade_slot_mouse_entered(slot: PanelContainer) -> void:
-	if show_stat_panel:
-		return
-	if not is_instance_valid(upgrade_tooltip_panel):
-		return
-	if not _slot_has_tooltip(slot):
-		return
-	_tooltip_hover_slot = slot
-	_tooltip_hover_elapsed = 0.0
-	if _tooltip_slot_ref != slot and upgrade_tooltip_panel.is_showing():
-		_show_slot_tooltip(slot)
+	HudUpgradeTooltipHelper.on_upgrade_slot_mouse_entered(self, slot)
 
 func _on_upgrade_slot_mouse_exited(slot: PanelContainer) -> void:
-	if _tooltip_hover_slot == slot:
-		_tooltip_hover_slot = null
-		_tooltip_hover_elapsed = 0.0
-	if _tooltip_slot_ref != slot:
-		return
-	_tooltip_slot_ref = null
-	_hide_upgrade_tooltip()
+	HudUpgradeTooltipHelper.on_upgrade_slot_mouse_exited(self, slot)
 
 func _update_upgrade_tooltip_state(delta: float) -> void:
-	if show_stat_panel:
-		if is_instance_valid(upgrade_tooltip_panel) and upgrade_tooltip_panel.is_showing():
-			_hide_upgrade_tooltip(true)
-		return
-	if is_instance_valid(_tooltip_hover_slot):
-		_tooltip_hover_elapsed += delta
-		if (not is_instance_valid(upgrade_tooltip_panel) or not upgrade_tooltip_panel.is_showing()) and _tooltip_hover_elapsed >= UPGRADE_TOOLTIP_SHOW_DELAY:
-			_show_slot_tooltip(_tooltip_hover_slot)
+	HudUpgradeTooltipHelper.update_upgrade_tooltip_state(self, delta)
 
 func _show_slot_tooltip(slot: PanelContainer) -> void:
-	if show_stat_panel:
-		return
-	if not is_instance_valid(upgrade_tooltip_panel):
-		return
-	var tooltip_payload: Dictionary = _get_slot_tooltip_payload(slot)
-	if tooltip_payload.is_empty():
-		return
-	_tooltip_slot_ref = slot
-	upgrade_tooltip_panel.show_tooltip(
-		str(tooltip_payload.get("text", "")),
-		tooltip_payload.get("color", Color(0.9, 0.85, 0.6, 1.0)),
-		get_viewport().get_mouse_position(),
-		get_viewport().get_visible_rect().size
-	)
+	HudUpgradeTooltipHelper.show_slot_tooltip(self, slot)
 
 func _slot_has_tooltip(slot: PanelContainer) -> bool:
-	return not _get_slot_tooltip_payload(slot).is_empty()
+	return HudUpgradeTooltipHelper.slot_has_tooltip(self, slot)
 
 func _get_slot_tooltip_payload(slot: PanelContainer) -> Dictionary:
-	var tooltip_text: String = str(slot.get_meta("tooltip_text", ""))
-	if not tooltip_text.is_empty():
-		return {
-			"text": tooltip_text,
-			"color": slot.get_meta("tooltip_color", Color(0.9, 0.85, 0.6, 1.0))
-		}
-	var upgrade_id = str(slot.get_meta("upgrade_id", ""))
-	var level = int(slot.get_meta("upgrade_level", 0))
-	if upgrade_id.is_empty() or level <= 0:
-		return {}
-	return {
-		"text": _build_upgrade_tooltip_text(upgrade_id, level),
-		"color": _get_upgrade_color(upgrade_id)
-	}
+	return HudUpgradeTooltipHelper.get_slot_tooltip_payload(self, slot)
 
 func _hide_upgrade_tooltip(instant: bool = false) -> void:
-	if not is_instance_valid(upgrade_tooltip_panel):
-		return
-	upgrade_tooltip_panel.hide_tooltip(instant)
+	HudUpgradeTooltipHelper.hide_upgrade_tooltip(self, instant)
 
 func _update_upgrade_tooltip_position() -> void:
-	if not is_instance_valid(upgrade_tooltip_panel) or not upgrade_tooltip_panel.is_showing():
-		return
-	upgrade_tooltip_panel.update_position(
-		get_viewport().get_mouse_position(),
-		get_viewport().get_visible_rect().size
-	)
+	HudUpgradeTooltipHelper.update_upgrade_tooltip_position(self)
 
 func _is_ship_upgrade(upgrade_id: String) -> bool:
 	return HudUpgradeInfoHelper.is_ship_upgrade(self, upgrade_id)
@@ -737,56 +678,19 @@ func _get_upgrade_color(upgrade_id: String) -> Color:
 	return HudUpgradeInfoHelper.get_upgrade_color(upgrade_id)
 
 func _update_upgrade_track_slot(upgrade_id: String, level: int, track: String) -> void:
-	if level <= 0:
-		return
-	var actual_icon = _get_upgrade_icon(upgrade_id)
-	var actual_color = _get_upgrade_color(upgrade_id)
-	var track_node = weapon_track if track == "ship" else support_track
-	if not track_node:
-		return
-	var slots = track_node.slots
-
-	var slot_idx = -1
-	if track == "ship":
-		if active_weapons.has(upgrade_id):
-			slot_idx = active_weapons[upgrade_id]
-		else:
-			slot_idx = active_weapons.size()
-			active_weapons[upgrade_id] = slot_idx
-	else:
-		if active_supports.has(upgrade_id):
-			slot_idx = active_supports[upgrade_id]
-		else:
-			slot_idx = active_supports.size()
-			active_supports[upgrade_id] = slot_idx
-
-	var slot = track_node.update_slot(slot_idx, upgrade_id, level, actual_icon, actual_color)
-	if is_instance_valid(slot) and not bool(slot.get_meta("hover_bound", false)):
-		_bind_upgrade_slot_hover(slot)
-		slot.set_meta("hover_bound", true)
-
-	if track == "ship":
-		weapon_slots = track_node.slots
-	else:
-		support_slots = track_node.slots
+	HudUpgradeTooltipHelper.update_upgrade_track_slot(self, upgrade_id, level, track)
 
 func update_ship_upgrade_ui(upgrade_id: String, level: int) -> void:
-	_update_upgrade_track_slot(upgrade_id, level, "ship")
+	HudUpgradeTooltipHelper.update_ship_upgrade_ui(self, upgrade_id, level)
 
 func update_crew_upgrade_ui(upgrade_id: String, level: int) -> void:
-	_update_upgrade_track_slot(upgrade_id, level, "crew")
+	HudUpgradeTooltipHelper.update_crew_upgrade_ui(self, upgrade_id, level)
 
 func update_weapon_ui(weapon_id: String, level: int) -> void:
-	if _is_crew_upgrade(weapon_id):
-		update_crew_upgrade_ui(weapon_id, level)
-		return
-	update_ship_upgrade_ui(weapon_id, level)
+	HudUpgradeTooltipHelper.update_weapon_ui(self, weapon_id, level)
 
 func update_support_ui(upgrade_id: String, level: int) -> void:
-	if _is_crew_upgrade(upgrade_id):
-		update_crew_upgrade_ui(upgrade_id, level)
-		return
-	update_ship_upgrade_ui(upgrade_id, level)
+	HudUpgradeTooltipHelper.update_support_ui(self, upgrade_id, level)
 
 
 func _update_hull_display() -> void:
