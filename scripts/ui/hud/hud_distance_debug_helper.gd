@@ -1,7 +1,7 @@
 class_name HudDistanceDebugHelper
 extends RefCounted
 
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 
 
@@ -84,7 +84,7 @@ static func update_distance_debug_display(hud) -> void:
 static func find_nearest_enemy_ship_for_distance_debug(hud) -> Node3D:
 	if not is_instance_valid(hud.player_ship):
 		return null
-	var all_ships: Array = SceneGroupCache.get_nodes(hud.get_tree(), "ships")
+	var all_ships: Array = EntityRegistry.get_ships_by_team("enemy")
 	var nearest_ship: Node3D = null
 	var nearest_distance_sq: float = INF
 	for ship in all_ships:

@@ -3,8 +3,8 @@ extends RefCounted
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const SUPPORT_FLEET_ICON = preload("res://assets/ui/support_fleet/support_fleet_bow_icon.png")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
 const CAPTURE_HINT_CREW_RATIO: float = 0.34
 const CAPTURE_HINT_CREW_MAX: int = 2
@@ -353,7 +353,7 @@ static func _get_capture_opportunity_text(player_ship) -> String:
 	if player_ship.get("max_boarding_distance") != null:
 		detect_distance = float(player_ship.get("max_boarding_distance")) + CAPTURE_HINT_DISTANCE_PADDING
 
-	var ships: Array = SceneGroupCache.get_nodes(player_ship.get_tree(), "ships")
+	var ships: Array = EntityRegistry.get_ships_by_team("enemy")
 	for ship in ships:
 		if not is_instance_valid(ship) or ship == player_ship:
 			continue
@@ -418,7 +418,7 @@ static func update_ship_health_bars(hud, positions_only: bool = false) -> void:
 		return
 	var viewport_rect: Rect2 = hud.get_viewport().get_visible_rect()
 	var active_ids: Dictionary = {}
-	var ships: Array = SceneGroupCache.get_nodes(hud.get_tree(), "ships")
+	var ships: Array = EntityRegistry.get_ships()
 	for ship in ships:
 		if not _is_ship_hp_bar_target_valid(ship):
 			continue

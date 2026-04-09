@@ -3,6 +3,7 @@ extends RefCounted
 const PLAYER_CANNON_BASE_DAMAGE := 25.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 static func update_stat_panel(hud) -> void:
@@ -34,7 +35,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var sections: Array[Dictionary] = []
 	var lm: Node = hud._cached_level_manager
 	if not is_instance_valid(lm):
-		lm = SceneGroupCache.get_first(hud.get_tree(), "level_manager") as Node
+		lm = LevelManagerRegistry.get_level_manager(hud.get_tree())
 
 	if is_instance_valid(lm):
 		sections.append({

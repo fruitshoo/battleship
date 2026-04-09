@@ -1,5 +1,5 @@
 extends Control
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 ## 배 조작 UI: 현재는 나침반/바람 표시만 담당
@@ -35,7 +35,7 @@ func _resolve_controlled_ship() -> void:
 		if is_instance_valid(configured_ship):
 			ship = configured_ship as Node3D
 			return
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 	for p in players:
 		if is_instance_valid(p) and p.get("is_player_controlled") == true:
 			ship = p

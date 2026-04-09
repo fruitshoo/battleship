@@ -1,6 +1,7 @@
 extends CanvasLayer
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const HudGameOverOverlay = preload("res://scripts/ui/hud/hud_game_over_overlay.gd")
 const HudUpgradeTooltip = preload("res://scripts/ui/hud/hud_upgrade_tooltip.gd")
 const HudLayoutBuilder = preload("res://scripts/ui/hud/hud_layout_builder.gd")
@@ -349,7 +350,7 @@ func _process(delta: float) -> void:
 
 func _sync_game_time(delta: float) -> void:
 	if not is_instance_valid(_cached_level_manager):
-		_cached_level_manager = SceneGroupCache.get_first(get_tree(), "level_manager")
+		_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
 	if is_instance_valid(_cached_level_manager) and _cached_level_manager.get("current_time") != null:
 		game_time = float(_cached_level_manager.current_time)
 	else:
@@ -376,7 +377,7 @@ func _try_resolve_player_ship() -> void:
 	if _player_lookup_cooldown > 0.0:
 		return
 	_player_lookup_cooldown = 0.25
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 	for p in players:
 		if is_instance_valid(p) and p.get("is_player_controlled") == true:
 			player_ship = p
@@ -387,7 +388,7 @@ func _try_resolve_player_ship() -> void:
 
 func _get_level_manager_for_debug() -> Node:
 	if not is_instance_valid(_cached_level_manager):
-		_cached_level_manager = SceneGroupCache.get_first(get_tree(), "level_manager")
+		_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
 	return _cached_level_manager
 
 

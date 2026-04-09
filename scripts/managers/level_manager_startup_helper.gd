@@ -1,7 +1,6 @@
 class_name LevelManagerStartupHelper
 extends RefCounted
 
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 static func initialize(lm: Node) -> void:
