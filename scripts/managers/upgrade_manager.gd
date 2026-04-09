@@ -3,6 +3,7 @@ extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
+const UpgradeManagerChoiceHelper = preload("res://scripts/managers/upgrade_manager_choice_helper.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
@@ -204,26 +205,26 @@ func refresh_hud_item_icons() -> void:
 				hud.add_item_icon(item_icon)
 
 func get_ship_upgrade_choices(count: int = 3) -> Array:
-	var ship_pool: Array[String] = SHIP_UPGRADE_IDS.duplicate()
-	if _is_fleet_progress_available():
-		ship_pool.append_array(SUPPORT_SHIP_UPGRADE_IDS)
-	var choices = _collect_choices_from_ids(ship_pool, count)
-	_maybe_add_rare_fleet_upgrade(choices, count)
-	_fill_with_fallbacks(choices, count)
-	var preferred_order: Array[String] = ship_pool.duplicate()
-	preferred_order.append(RARE_FLEET_UPGRADE_ID)
-	preferred_order.append_array(["supply", "gold"])
-	_sort_choices_by_preferred_order(choices, preferred_order)
-	return choices
+	return UpgradeManagerChoiceHelper.build_ship_upgrade_choices(
+		UPGRADES,
+		current_levels,
+		SHIP_UPGRADE_IDS,
+		SUPPORT_SHIP_UPGRADE_IDS,
+		RARE_FLEET_UPGRADE_ID,
+		RARE_FLEET_UPGRADE_CHANCE,
+		_is_fleet_progress_available(),
+		count
+	)
 
 func get_command_upgrade_choices(count: int = 3) -> Array:
-	var command_pool: Array[String] = CREW_UPGRADE_IDS.duplicate()
-	if _is_fleet_progress_available():
-		for upgrade_id in SUPPORT_CREW_UPGRADE_IDS:
-			command_pool.append(upgrade_id)
-	var choices = _collect_choices_from_ids(command_pool, count)
-	_sort_choices_by_preferred_order(choices, command_pool)
-	return choices
+	return UpgradeManagerChoiceHelper.build_command_upgrade_choices(
+		UPGRADES,
+		current_levels,
+		CREW_UPGRADE_IDS,
+		SUPPORT_CREW_UPGRADE_IDS,
+		_is_fleet_progress_available(),
+		count
+	)
 
 func _is_fleet_progress_available() -> bool:
 	# 지원 함대를 해금했거나 이미 함대 강화가 시작됐으면 지휘 선택지에 함대 강화를 노출한다.
@@ -235,13 +236,7 @@ func _is_fleet_progress_available() -> bool:
 	return EntityRegistry.count_captured_minions() > 0
 
 func _collect_choices_from_ids(ids: Array[String], count: int) -> Array:
-	var available: Array = []
-	for id in ids:
-		if not _is_upgrade_available(id):
-			continue
-		available.append(id)
-	available.shuffle()
-	return available.slice(0, mini(count, available.size()))
+	return UpgradeManagerChoiceHelper.collect_choices_from_ids(UPGRADES, current_levels, ids, count)
 
 func get_specialist_unit_count(upgrade_id: String, level: int = -1) -> int:
 	return UpgradeManagerDataHelper.get_specialist_unit_count(UPGRADES, current_levels, upgrade_id, level)
@@ -253,36 +248,20 @@ func get_player_crew_roster(total_crew: int) -> Dictionary:
 	return UpgradeManagerDataHelper.get_player_crew_roster(UPGRADES, current_levels, total_crew)
 
 func _is_upgrade_available(upgrade_id: String) -> bool:
-	if upgrade_id not in UPGRADES:
-		return false
-	if UPGRADES[upgrade_id].get("disabled", false) == true:
-		return false
-	return int(current_levels.get(upgrade_id, 0)) < int(UPGRADES[upgrade_id].get("max_level", 0))
+	return UpgradeManagerChoiceHelper.is_upgrade_available(UPGRADES, current_levels, upgrade_id)
 
 func _maybe_add_rare_fleet_upgrade(choices: Array, count: int) -> void:
-	if count <= 0:
-		return
-	if not _is_upgrade_available(RARE_FLEET_UPGRADE_ID):
-		return
-	if randf() > RARE_FLEET_UPGRADE_CHANCE:
-		return
-	if choices.has(RARE_FLEET_UPGRADE_ID):
-		return
-
-	if choices.size() >= count and choices.size() > 0:
-		var replace_idx = randi() % choices.size()
-		choices[replace_idx] = RARE_FLEET_UPGRADE_ID
-	else:
-		choices.append(RARE_FLEET_UPGRADE_ID)
+	UpgradeManagerChoiceHelper.maybe_add_rare_fleet_upgrade(
+		UPGRADES,
+		current_levels,
+		choices,
+		count,
+		RARE_FLEET_UPGRADE_ID,
+		RARE_FLEET_UPGRADE_CHANCE
+	)
 
 func _fill_with_fallbacks(choices: Array, count: int) -> void:
-	var fallbacks = ["supply", "gold"]
-	var guard = 0
-	while choices.size() < count and guard < 8:
-		var fb = fallbacks[guard % fallbacks.size()]
-		if not choices.has(fb):
-			choices.append(fb)
-		guard += 1
+	UpgradeManagerChoiceHelper.fill_with_fallbacks(choices, count)
 
 
 ## 랜덤 선택지 반환
@@ -291,63 +270,13 @@ func get_random_choices(count: int = 3, category_filter: int = -1) -> Array:
 		return get_ship_upgrade_choices(count)
 	if category_filter == Category.FLEET:
 		return get_command_upgrade_choices(count)
-
-	var available: Array = []
-	
-	# 무제한 업그레이드 (보급/돈) 제외하고 선택지 수집
-	for id in UPGRADES:
-		if id in ["supply", "gold"]:
-			continue
-			
-		var u = UPGRADES[id]
-		if u.get("disabled", false) == true:
-			continue
-		# 카테고리 필터링 (있을 경우)
-		if category_filter != -1 and u.get("category", -1) != category_filter:
-			continue
-		# 일반 레벨업 시 함대 업그레이드 제외 (카테고리 5 = FLEET)
-		if category_filter == -1 and u.get("category", -1) == 5:
-			continue
-			
-		if current_levels[id] < u["max_level"]:
-			available.append(id)
-	
-	available.shuffle()
-	var choices = available.slice(0, mini(count, available.size()))
-	
-	# 함대 업그레이드 필터링 중이면 보급/돈 대신 다른 함대 항목이나 빈 배열을 반환할 수도 있음
-	# 여기선 함대 항목이 부족할 경우 보급/돈은 넣지 않음 (함대 강화는 한정적이므로)
-	if category_filter == 5:
-		return choices
-		
-	# 빈 자리는 보급/돈으로 채움 (일반 레벨업용)
-	var fallbacks = ["supply", "gold"]
-	while choices.size() < count:
-		var fb = fallbacks[choices.size() % fallbacks.size()]
-		# 이미 선택된 것이거나, (혹시나) 정비가 만렙이면서 병사가 풀이면 패스 (일단은 무조건 허용)
-		if fb not in choices:
-			choices.append(fb)
-		else:
-			# 더 이상 추가할 fallback이 없으면 중단
-			if choices.size() >= fallbacks.size(): break
-			# 다음 fallback 시도
-			continue
-
-	return choices
+	return UpgradeManagerChoiceHelper.build_random_choices(UPGRADES, current_levels, count, category_filter)
 
 func _level_matches(level: int, level_list: Variant) -> bool:
 	return UpgradeManagerDataHelper.level_matches(level, level_list)
 
 func _sort_choices_by_preferred_order(choices: Array, preferred_ids: Array[String]) -> void:
-	choices.sort_custom(func(a: String, b: String) -> bool:
-		var a_idx := preferred_ids.find(a)
-		var b_idx := preferred_ids.find(b)
-		if a_idx == -1:
-			a_idx = preferred_ids.size() + 100
-		if b_idx == -1:
-			b_idx = preferred_ids.size() + 100
-		return a_idx < b_idx
-	)
+	UpgradeManagerChoiceHelper.sort_choices_by_preferred_order(choices, preferred_ids)
 
 
 ## 업그레이드 적용
