@@ -73,10 +73,7 @@ func _spawn_enemy(label_text: String, world_pos: Vector3, player: Node3D) -> voi
 	enemy.global_position = world_pos
 	enemy.look_at(player.global_position, Vector3.UP)
 
-	if enemy.has_method("set_preview_target"):
-		enemy.call("set_preview_target", player)
-	elif "target" in enemy:
-		enemy.target = player
+	PreviewHarnessHelper.assign_preview_target(enemy, player)
 
 	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.2, 0.0), Color(1.0, 0.95, 0.8, 1.0))
 	var debug_label := PreviewHarnessHelper.add_billboard_label(enemy, "", Vector3(0.0, 4.9, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)

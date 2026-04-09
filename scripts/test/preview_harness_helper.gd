@@ -45,6 +45,60 @@ static func clear_preview_enemies(root: Node, meta_name: String) -> void:
 			child.queue_free()
 
 
+static func assign_preview_target(ship: Node, target_ship: Node3D) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("set_preview_target"):
+		ship.call("set_preview_target", target_ship)
+		return true
+	elif "target" in ship:
+		ship.target = target_ship
+		return true
+	return false
+
+
+static func apply_preview_deck_state(ship: Node, is_contested: bool, is_overrun: bool = false) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("set_preview_deck_state"):
+		ship.call("set_preview_deck_state", is_contested, is_overrun)
+		return true
+	else:
+		ship.set("deck_is_contested", is_contested)
+		ship.set("deck_is_overrun", is_overrun)
+		return true
+	return false
+
+
+static func reset_preview_fire_pot_cooldown(ship: Node) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("reset_preview_fire_pot_cooldown"):
+		ship.call("reset_preview_fire_pot_cooldown")
+		return true
+	elif "fire_pot_cooldown_timer" in ship:
+		ship.fire_pot_cooldown_timer = 0.0
+		return true
+	return false
+
+
+static func set_preview_fire_pot_enabled(ship: Node, enabled: bool) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("set_preview_fire_pot_enabled"):
+		ship.call("set_preview_fire_pot_enabled", enabled)
+		return true
+	return false
+
+
+static func has_preview_crew_role(ship: Node, role_name: String) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("has_active_crew_role"):
+		return bool(ship.call("has_active_crew_role", role_name))
+	return false
+
+
 static func add_billboard_label(parent: Node, text: String, position: Vector3, modulate: Color, font_size: int = 40) -> Label3D:
 	var label := Label3D.new()
 	label.text = text

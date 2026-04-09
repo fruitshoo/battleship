@@ -40,15 +40,11 @@ func _apply_target_deck_state() -> void:
 	var player: Node = get_node_or_null("PlayerShip")
 	if not is_instance_valid(player):
 		return
-	if player.has_method("set_preview_deck_state"):
-		player.call(
-			"set_preview_deck_state",
-			target_deck_state != TargetDeckState.CLEAR,
-			target_deck_state == TargetDeckState.OVERRUN
-		)
-	else:
-		player.set("deck_is_contested", target_deck_state != TargetDeckState.CLEAR)
-		player.set("deck_is_overrun", target_deck_state == TargetDeckState.OVERRUN)
+	PreviewHarnessHelper.apply_preview_deck_state(
+		player,
+		target_deck_state != TargetDeckState.CLEAR,
+		target_deck_state == TargetDeckState.OVERRUN
+	)
 
 	var label: Label3D = player.get_node_or_null("BoardingStateLabel")
 	if not is_instance_valid(label):
@@ -81,10 +77,7 @@ func _spawn_enemy(label_text: String, world_pos: Vector3, player: Node3D) -> voi
 	enemy.global_position = world_pos
 	enemy.look_at(player.global_position, Vector3.UP)
 
-	if enemy.has_method("set_preview_target"):
-		enemy.call("set_preview_target", player)
-	elif "target" in enemy:
-		enemy.target = player
+	PreviewHarnessHelper.assign_preview_target(enemy, player)
 
 	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0))
 	var debug_label := PreviewHarnessHelper.add_billboard_label(enemy, "", Vector3(0.0, 4.7, 0.0), Color(0.86, 0.98, 1.0, 1.0), 24)

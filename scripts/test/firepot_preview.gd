@@ -60,19 +60,12 @@ func _spawn_scenario(label_text: String, anchor: Vector3, player: Node3D, distan
 	enemy.global_position = player.global_position + direction * distance_to_player
 	enemy.look_at(player.global_position, Vector3.UP)
 
-	if enemy.has_method("set_preview_target"):
-		enemy.call("set_preview_target", player if assign_target else null)
-	elif "target" in enemy:
-		enemy.target = player if assign_target else null
-	if enemy.has_method("reset_preview_fire_pot_cooldown"):
-		enemy.call("reset_preview_fire_pot_cooldown")
-	elif "fire_pot_cooldown_timer" in enemy:
-		enemy.fire_pot_cooldown_timer = 0.0
+	PreviewHarnessHelper.assign_preview_target(enemy, player if assign_target else null)
+	PreviewHarnessHelper.reset_preview_fire_pot_cooldown(enemy)
 
 	if not keep_tosser:
-		if enemy.has_method("set_preview_fire_pot_enabled"):
-			enemy.call("set_preview_fire_pot_enabled", false)
-		else:
+		var handled := PreviewHarnessHelper.set_preview_fire_pot_enabled(enemy, false)
+		if not handled:
 			_remove_fire_pot_role(enemy)
 
 	PreviewHarnessHelper.add_billboard_label(enemy, label_text, Vector3(0.0, 6.0, 0.0), Color(1.0, 0.95, 0.8, 1.0))
@@ -122,9 +115,8 @@ func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 		var dist: float = enemy.global_position.distance_to(player.global_position)
 		in_range = dist >= 7.0 and dist <= 18.0
 
-	if enemy.has_method("has_active_crew_role"):
-		has_tosser = bool(enemy.call("has_active_crew_role", "fire_pot"))
-	else:
+	has_tosser = PreviewHarnessHelper.has_preview_crew_role(enemy, "fire_pot")
+	if not has_tosser:
 		var soldiers_node := enemy.get_node_or_null("Soldiers")
 		if is_instance_valid(soldiers_node):
 			for soldier in soldiers_node.get_children():
