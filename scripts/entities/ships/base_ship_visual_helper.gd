@@ -2,6 +2,7 @@ extends RefCounted
 class_name BaseShipVisualHelper
 
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 static func cache_common_references(ship) -> void:
 	if ship == null:
@@ -60,8 +61,8 @@ static func refresh_deck_light(ship) -> void:
 	if should_enable and is_clear_day_preset_active(ship):
 		should_enable = false
 	if should_enable and ship.deck_light_player_only:
-		var team_tag = str(ship.get("team"))
-		var is_player_controlled = ship.get("is_player_controlled") == true
+		var team_tag = NodeContractHelper.get_team_tag(ship)
+		var is_player_controlled = NodeContractHelper.is_player_controlled_ship(ship)
 		var is_player_tagged = team_tag == "player" or ship.is_in_group("player") or is_player_controlled
 		should_enable = is_player_tagged
 

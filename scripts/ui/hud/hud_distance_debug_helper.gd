@@ -3,6 +3,7 @@ extends RefCounted
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
 static func toggle_distance_debug(hud) -> void:
@@ -90,9 +91,9 @@ static func find_nearest_enemy_ship_for_distance_debug(hud) -> Node3D:
 	for ship in all_ships:
 		if not is_instance_valid(ship) or ship == hud.player_ship:
 			continue
-		if ship.get("team") == hud.player_ship.get("team"):
+		if NodeContractHelper.get_team_tag(ship) == NodeContractHelper.get_team_tag(hud.player_ship):
 			continue
-		if ship.get("is_dying") == true or ship.get("is_sinking") == true:
+		if NodeContractHelper.is_sinking_or_dying(ship):
 			continue
 		var planar_delta := Vector2(
 			ship.global_position.x - hud.player_ship.global_position.x,
@@ -147,9 +148,9 @@ static func get_ship_deck_half_extents_for_debug(ship: Node3D) -> Vector2:
 		var ext: Variant = ship.call("get_deck_half_extents")
 		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
 			return ext
-	var radius: float = float(ship.get("base_collision_radius")) if ship.get("base_collision_radius") != null else 4.5
-	var w_mult: float = float(ship.get("width_multiplier")) if ship.get("width_multiplier") != null else 1.0
-	var l_mult: float = float(ship.get("length_multiplier")) if ship.get("length_multiplier") != null else 1.0
+	var radius: float = NodeContractHelper.get_base_collision_radius_value(ship)
+	var w_mult: float = NodeContractHelper.get_collision_width_multiplier_value(ship)
+	var l_mult: float = NodeContractHelper.get_collision_length_multiplier_value(ship)
 	return Vector2(
 		maxf(0.4, radius * w_mult * 0.85),
 		maxf(0.8, radius * l_mult * 0.85)
