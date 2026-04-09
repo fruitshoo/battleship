@@ -174,7 +174,8 @@ func _ready() -> void:
 		add_to_group("player")
 	
 	_cache_references()
-	_sync_player_crew_roster()
+	if not _probe_flag_enabled("BATTLESHIP_SKIP_PLAYER_CREW_SYNC"):
+		_sync_player_crew_roster()
 	if not has_meta("base_support_fleet_limit"):
 		set_meta("base_support_fleet_limit", support_fleet_limit)
 	if not has_meta("base_support_fleet_respawn_interval"):
@@ -196,11 +197,16 @@ func _cache_references() -> void:
 		_cached_hud = _cached_level_manager.hud
 		
 	_cached_um = get_tree().root.find_child("UpgradeManager", true, false)
-	if is_player_controlled and is_instance_valid(_cached_um):
+	if is_player_controlled and is_instance_valid(_cached_um) and not _probe_flag_enabled("BATTLESHIP_SKIP_PLAYER_UPGRADE_BOOTSTRAP"):
 		if _cached_um.has_method("equip_owned_items"):
 			_cached_um.call_deferred("equip_owned_items")
 		if _cached_um.has_method("refresh_hud_item_icons"):
 			_cached_um.call_deferred("refresh_hud_item_icons")
+
+
+func _probe_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 
 func _process(_delta: float) -> void:

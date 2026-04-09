@@ -80,3 +80,12 @@
 - `scripts/test/run_player_ship_component_breakdown.sh`
   Runs the component probe as baseline, then compares `no_support`, `no_soldiers`, `no_wake`, `no_hull`, and fully stripped variants.
   Useful for narrowing which `player_ship` subsystems contribute most to leak totals.
+- `scripts/test/run_player_ship_bootstrap_breakdown.sh`
+  Reuses the component probe to compare `player_ship` bootstrap flags such as `no_upgrade_bootstrap`, `no_crew_sync`, and `bootstrap_min`.
+  Useful for checking whether `_sync_player_crew_roster()` or deferred upgrade bootstrap calls contribute meaningfully to leak totals.
+- `scenes/test/scene_load_probe.tscn`
+  Generic auto-quitting load probe that can either just `load()` a target scene or also instantiate it via env flags.
+  Script: `scripts/test/scene_load_probe.gd`
+- `scripts/test/run_player_ship_load_vs_instance.sh`
+  Uses the generic scene load probe to compare `player_ship.tscn` load-only versus instantiate leak totals.
+  Useful for separating scene resource leak from runtime bootstrap leak.
