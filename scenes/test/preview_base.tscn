@@ -1,0 +1,52 @@
+[gd_scene format=3]
+
+[ext_resource type="Environment" uid="uid://d3wyl5ks17fd8" path="res://resources/environment/world_environment.tres" id="1_env"]
+[ext_resource type="Script" uid="uid://c1jpt1wfonqye" path="res://scripts/camera/camera_controller.gd" id="2_camera_script"]
+[ext_resource type="CameraAttributesPhysical" uid="uid://b8j5n2m4k7ya" path="res://resources/environment/camera_attributes.tres" id="3_camera_attributes"]
+[ext_resource type="Script" uid="uid://c7xvvsarc7ggx" path="res://scripts/managers/enemy_spawner.gd" id="4_spawner_script"]
+[ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="5_level_manager_script"]
+[ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="6_player_ship"]
+[ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="7_ocean"]
+[ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="8_env_preset_manager"]
+[ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="9_game_hud_scene"]
+
+[node name="PreviewBase" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.433, 0.25, 0, 0.5, 0.866, -0.5, -0.75, 0.433, 0, 20, 0)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.642788, 0.766044, 0, -0.766044, 0.642788, 0, 35, 45)
+environment = ExtResource("1_env")
+attributes = ExtResource("3_camera_attributes")
+script = ExtResource("2_camera_script")
+target_path = NodePath("../PlayerShip")
+pitch_degrees = -42.0
+lead_distance = 6.2
+offset = Vector3(0, 18, 24)
+zoom_speed = 3.2
+min_zoom = 18.0
+max_zoom = 66.0
+zoom_smooth_speed = 24.0
+
+[node name="EnemySpawner" type="Node" parent="."]
+script = ExtResource("4_spawner_script")
+
+[node name="GameHUD" parent="." instance=ExtResource("9_game_hud_scene")]
+
+[node name="LevelManager" type="Node" parent="." node_paths=PackedStringArray("hud", "enemy_spawner")]
+script = ExtResource("5_level_manager_script")
+hud = NodePath("../GameHUD")
+enemy_spawner = NodePath("../EnemySpawner")
+
+[node name="EnvironmentPresetManager" type="Node" parent="."]
+script = ExtResource("8_env_preset_manager")
+
+[node name="OceanPlane" parent="." instance=ExtResource("7_ocean")]
+
+[node name="PlayerShip" parent="." instance=ExtResource("6_player_ship")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7088671, 0, 15.67263)

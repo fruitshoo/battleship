@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://bspvd5b7f0f5x"]
 
-[ext_resource type="PackedScene" path="res://scenes/main.tscn" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_main"]
 [ext_resource type="Script" path="res://scripts/test/combat_sandbox.gd" id="2_script"]
 
 [node name="CombatSandbox" instance=ExtResource("1_main")]
