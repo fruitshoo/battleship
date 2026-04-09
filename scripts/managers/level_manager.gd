@@ -1,4 +1,5 @@
 extends Node
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
@@ -128,6 +129,7 @@ var level_data = {
 
 func _ready() -> void:
 	add_to_group("level_manager")
+	LevelManagerRegistry.register_level_manager(self)
 	_load_level_progression_data()
 	_load_reward_rules_data()
 	if is_instance_valid(MetaManager) and MetaManager.has_method("get_xp_gain_multiplier"):
@@ -136,6 +138,10 @@ func _ready() -> void:
 	max_merit_points = _get_merit_requirement(merit_level)
 	merit_points = clamp(merit_points, 0, max_merit_points)
 	LevelManagerStartupHelper.initialize(self)
+
+
+func _exit_tree() -> void:
+	LevelManagerRegistry.unregister_level_manager(self)
 
 
 func _load_level_progression_data() -> void:

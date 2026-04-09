@@ -1,4 +1,5 @@
 extends Node3D
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 
 ## 보물 상자 (Treasure Chest)
@@ -38,7 +39,11 @@ func _collect() -> void:
 		AudioManager.play_sfx("treasure_collect")
 	
 	# 레벨 매니저를 통해 업그레이드 메뉴 호출 (보물 상자 전용)
-	var lm = SceneGroupCache.get_first(get_tree(), "level_manager")
+	var lm = LevelManagerRegistry.get_level_manager(get_tree())
+	if not is_instance_valid(lm):
+		var lm_list = SceneGroupCache.get_nodes(get_tree(), "level_manager")
+		if lm_list.size() > 0:
+			lm = lm_list[0]
 	if lm and lm.has_method("_show_upgrade_ui"):
 		# 보물 상자는 5개의 선택지 제공 및 특별 보너스
 		lm.call_deferred("_show_upgrade_ui", 5)

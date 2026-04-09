@@ -1,4 +1,5 @@
 extends Node
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
 const DEBUG_SPAWNER_LOGS := false
@@ -341,7 +342,7 @@ func debug_spawn_final_boss() -> void:
 func _push_boss_hp_to_hud(boss_ship: Node) -> void:
 	if not is_instance_valid(boss_ship):
 		return
-	var lm: Node = get_tree().root.find_child("LevelManager", true, false)
+	var lm: Node = LevelManagerRegistry.get_level_manager(get_tree())
 	if not is_instance_valid(lm):
 		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lm_nodes.size() > 0:

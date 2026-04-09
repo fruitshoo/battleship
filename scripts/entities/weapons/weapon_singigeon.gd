@@ -1,4 +1,5 @@
 extends "res://scripts/entities/weapons/weapon.gd"
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
@@ -120,7 +121,7 @@ func _apply_upgrade_stats() -> void:
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):
 		return _cached_spawn_parent
-	var lm = tree.root.find_child("LevelManager", true, false)
+	var lm = LevelManagerRegistry.get_level_manager(tree)
 	if is_instance_valid(lm):
 		_cached_spawn_parent = lm
 		return _cached_spawn_parent

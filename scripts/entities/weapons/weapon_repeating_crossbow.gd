@@ -1,4 +1,5 @@
 extends "res://scripts/entities/weapons/weapon.gd"
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
@@ -134,7 +135,7 @@ func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):
 		return _cached_spawn_parent
-	var lm = tree.root.find_child("LevelManager", true, false)
+	var lm = LevelManagerRegistry.get_level_manager(tree)
 	if is_instance_valid(lm):
 		_cached_spawn_parent = lm
 		return _cached_spawn_parent

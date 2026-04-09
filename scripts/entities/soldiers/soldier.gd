@@ -2,6 +2,7 @@ extends CharacterBody3D
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
@@ -175,7 +176,7 @@ func _ready() -> void:
 	# 모든 병사에게 home_ship 기록 (원래 소속 배 추적용)
 	home_ship = owned_ship
 	
-	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
+	_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
 			
 	if not has_node("HandPivot"):
 		var pivot = Node3D.new()

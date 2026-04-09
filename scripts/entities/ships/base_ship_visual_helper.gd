@@ -1,10 +1,12 @@
 extends RefCounted
 class_name BaseShipVisualHelper
 
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+
 static func cache_common_references(ship) -> void:
 	if ship == null:
 		return
-	ship._cached_level_manager = ship.get_tree().root.find_child("LevelManager", true, false)
+	ship._cached_level_manager = LevelManagerRegistry.get_level_manager(ship.get_tree())
 	if not ship._cached_level_manager:
 		var lms = ship.SceneGroupCache.get_nodes(ship.get_tree(), "level_manager")
 		if lms.size() > 0:

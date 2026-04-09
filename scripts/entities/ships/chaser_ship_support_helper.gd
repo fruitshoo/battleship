@@ -1,6 +1,7 @@
 extends RefCounted
 class_name ChaserShipSupportHelper
 
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
@@ -86,7 +87,7 @@ static func become_derelict(ship) -> void:
 	ship.set_meta("derelict_started_at", Time.get_ticks_msec() / 1000.0)
 
 	if not is_instance_valid(ship.cached_lm):
-		ship.cached_lm = ship.get_tree().root.find_child("LevelManager", true, false)
+		ship.cached_lm = LevelManagerRegistry.get_level_manager(ship.get_tree())
 		if not ship.cached_lm:
 			var lm_nodes = ship.SceneGroupCache.get_nodes(ship.get_tree(), "level_manager")
 			if lm_nodes.size() > 0:

@@ -1,6 +1,7 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
 class_name ChaserShip
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const DEBUG_CHASER_LOGS := false
 const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
 const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship_minion_helper.gd")
@@ -408,7 +409,7 @@ func _ready() -> void:
 		
 	_find_player()
 	
-	cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 	if not cached_lm:
 		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]

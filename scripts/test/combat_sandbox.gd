@@ -1,6 +1,7 @@
 extends Node3D
 
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var auto_enable_distance_debug: bool = false
@@ -29,7 +30,7 @@ func _configure_sandbox() -> void:
 			if not DistanceDebugVisualizer.runtime_enabled:
 				hud.call("_toggle_distance_debug")
 
-	var level_manager: Node = get_node_or_null("LevelManager")
+	var level_manager: Node = LevelManagerRegistry.get_level_manager(get_tree())
 	if is_instance_valid(level_manager):
 		if "boss_spawn_time" in level_manager:
 			level_manager.set("boss_spawn_time", 99999.0)

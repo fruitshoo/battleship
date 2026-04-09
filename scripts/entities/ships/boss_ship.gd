@@ -1,5 +1,6 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -88,7 +89,7 @@ func _ready() -> void:
 	add_to_group("ships")
 	_find_player()
 	
-	cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 	if not cached_lm:
 		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
@@ -344,7 +345,7 @@ func _find_player() -> void:
 
 func _update_boss_hp_hud() -> void:
 	if not is_instance_valid(cached_lm):
-		cached_lm = get_tree().root.find_child("LevelManager", true, false)
+		cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 		if not cached_lm:
 			var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
 			if lm_nodes.size() > 0:

@@ -3,6 +3,7 @@ extends Node3D
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 enum BattleMode {
@@ -97,7 +98,7 @@ func _configure_midgame_state() -> void:
 	if is_instance_valid(player) and open_deck_for_combat:
 		PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
 
-	var level_manager: Node = get_node_or_null("LevelManager")
+	var level_manager: Node = LevelManagerRegistry.get_level_manager(get_tree())
 	if is_instance_valid(level_manager):
 		if "boss_spawn_time" in level_manager:
 			level_manager.set("boss_spawn_time", 99999.0)
@@ -224,7 +225,7 @@ func _ensure_overlay() -> void:
 func _update_overlay() -> void:
 	if not is_instance_valid(_overlay_label):
 		return
-	var level_manager: Node = get_node_or_null("LevelManager")
+	var level_manager: Node = LevelManagerRegistry.get_level_manager(get_tree())
 	var current_time := float(level_manager.get("current_time")) if is_instance_valid(level_manager) and "current_time" in level_manager else midgame_time_seconds
 	var current_difficulty := int(level_manager.get("game_difficulty")) if is_instance_valid(level_manager) and "game_difficulty" in level_manager else midgame_difficulty
 	var next_wave_in := maxf(0.0, (initial_wave_delay if _wave_index < 0 else wave_interval) - _wave_elapsed)

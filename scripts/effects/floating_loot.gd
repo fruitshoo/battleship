@@ -1,4 +1,5 @@
 extends Area3D
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
@@ -75,7 +76,7 @@ func pool_reset() -> void:
 			(visual as GeometryInstance3D).extra_cull_margin = 1.0
 	
 	# 레벨 매니저 캐싱
-	_cached_lm = get_tree().root.find_child("LevelManager", true, false)
+	_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 	if not _cached_lm:
 		_cached_lm = SceneGroupCache.get_first(get_tree(), "level_manager")
 	

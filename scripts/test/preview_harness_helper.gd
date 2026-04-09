@@ -1,6 +1,8 @@
 extends RefCounted
 class_name PreviewHarnessHelper
 
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+
 
 static func setup_common(root: Node, auto_open_debug_panel: bool, stop_regular_spawns: bool) -> void:
 	_open_debug_panel(root, auto_open_debug_panel)
@@ -23,7 +25,7 @@ static func _open_debug_panel(root: Node, should_open: bool) -> void:
 
 
 static func _disable_regular_spawns(root: Node, stop_regular_spawns: bool) -> void:
-	var level_manager: Node = root.get_node_or_null("LevelManager")
+	var level_manager: Node = LevelManagerRegistry.get_level_manager(root.get_tree())
 	if is_instance_valid(level_manager):
 		if "boss_spawn_time" in level_manager:
 			level_manager.set("boss_spawn_time", 99999.0)

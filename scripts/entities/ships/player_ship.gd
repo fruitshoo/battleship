@@ -12,6 +12,7 @@ var team: String = "player"
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
 const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ENEMY_SHIP_SCENE = preload("res://scenes/ships/enemy_ship.tscn")
 const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
 const JOSEON_CANNON_SCENE = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
@@ -190,7 +191,7 @@ func _apply_soldier_rules_data() -> void:
 	captain_defense_bonus = float(captain_rules.get("defense_bonus", captain_defense_bonus))
 
 func _cache_references() -> void:
-	_cached_level_manager = get_tree().root.find_child("LevelManager", true, false)
+	_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
 	if _cached_level_manager and "hud" in _cached_level_manager:
 		_cached_hud = _cached_level_manager.hud
 		
