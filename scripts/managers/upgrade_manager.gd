@@ -1,5 +1,6 @@
 @tool
 extends Node
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
@@ -767,7 +768,7 @@ func _apply_supply(ship: Node3D, _level: int) -> void:
 func _apply_gold(_ship: Node3D, _level: int) -> void:
 	var s = UPGRADES["gold"]["stats"]
 	var pts = int(s.get("score_add", 50))
-	var level_mgr = get_tree().get_first_node_in_group("level_manager")
+	var level_mgr = LevelManagerRegistry.get_level_manager(get_tree())
 	if level_mgr and level_mgr.has_method("add_score"):
 		level_mgr.add_score(pts)
 	else:

@@ -90,9 +90,6 @@ func _ready() -> void:
 	_find_player()
 	
 	cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
-	if not cached_lm:
-		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
-		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 		
 	_setup_weapons()
 	_setup_soldiers()
@@ -346,10 +343,6 @@ func _find_player() -> void:
 func _update_boss_hp_hud() -> void:
 	if not is_instance_valid(cached_lm):
 		cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
-		if not cached_lm:
-			var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
-			if lm_nodes.size() > 0:
-				cached_lm = lm_nodes[0]
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
 		cached_lm.update_boss_hp(maxf(hull_hp, 0.0), max_hull_hp)
 

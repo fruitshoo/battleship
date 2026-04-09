@@ -24,10 +24,4 @@ static func get_level_manager(tree: SceneTree = null) -> Node:
 	if is_instance_valid(level_manager):
 		_level_manager = level_manager
 		return level_manager
-	var level_managers := tree.get_nodes_in_group("level_manager")
-	for candidate in level_managers:
-		if is_instance_valid(candidate):
-			_level_manager = candidate
-			return candidate
 	return null
-

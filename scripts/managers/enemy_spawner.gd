@@ -1,5 +1,6 @@
 extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
 const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
 const DEBUG_SPAWNER_LOGS := false
@@ -109,7 +110,7 @@ func _process(delta: float) -> void:
 		return
 		
 	# 1. 적 생성 주기 관리
-	var enemies = SceneGroupCache.get_nodes(get_tree(), "enemy")
+	var enemies = EntityRegistry.get_ships_by_team("enemy")
 	var elite_count = SceneGroupCache.get_nodes(get_tree(), "elite").size()
 	
 	if not regular_spawn_stopped:
@@ -174,13 +175,13 @@ func compute_next_interval() -> float:
 	return spawn_interval * randf_range(0.8, 1.2)
 
 func _find_player() -> void:
-	player = SceneGroupCache.get_first(get_tree(), "player") as Node3D
+	player = EntityRegistry.get_first_ship_by_team("player") as Node3D
 
 func _spawn_enemy() -> void:
 	if not enemy_scene:
 		return
 
-	var existing_enemy_count: int = SceneGroupCache.get_nodes(get_tree(), "enemy").size()
+	var existing_enemy_count: int = EntityRegistry.count_ships_by_team("enemy")
 	var remaining_slots: int = max(0, max_enemies - existing_enemy_count)
 	if remaining_slots <= 0:
 		return
@@ -279,7 +280,7 @@ func _get_biased_spawn_position() -> Vector3:
 ## 특정 위치가 모든 아군 배(플레이어+나포함)로부터 일정 거리(min_dist) 이상 떨어져 있는지 확인
 func _is_position_safe(pos: Vector3, min_dist: float) -> bool:
 	var safe_sq = min_dist * min_dist
-	var allies = SceneGroupCache.get_nodes(get_tree(), "player")
+	var allies = EntityRegistry.get_ships_by_team("player")
 	
 	for ally in allies:
 		if not is_instance_valid(ally): continue
@@ -343,10 +344,6 @@ func _push_boss_hp_to_hud(boss_ship: Node) -> void:
 	if not is_instance_valid(boss_ship):
 		return
 	var lm: Node = LevelManagerRegistry.get_level_manager(get_tree())
-	if not is_instance_valid(lm):
-		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
-		if lm_nodes.size() > 0:
-			lm = lm_nodes[0]
 	if is_instance_valid(lm) and lm.has_method("update_boss_hp"):
 		var current_hp: float = float(boss_ship.get("hull_hp"))
 		var maximum_hp: float = float(boss_ship.get("max_hull_hp"))

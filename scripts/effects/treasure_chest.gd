@@ -40,10 +40,6 @@ func _collect() -> void:
 	
 	# 레벨 매니저를 통해 업그레이드 메뉴 호출 (보물 상자 전용)
 	var lm = LevelManagerRegistry.get_level_manager(get_tree())
-	if not is_instance_valid(lm):
-		var lm_list = SceneGroupCache.get_nodes(get_tree(), "level_manager")
-		if lm_list.size() > 0:
-			lm = lm_list[0]
 	if lm and lm.has_method("_show_upgrade_ui"):
 		# 보물 상자는 5개의 선택지 제공 및 특별 보너스
 		lm.call_deferred("_show_upgrade_ui", 5)

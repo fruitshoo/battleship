@@ -7,10 +7,6 @@ static func cache_common_references(ship) -> void:
 	if ship == null:
 		return
 	ship._cached_level_manager = LevelManagerRegistry.get_level_manager(ship.get_tree())
-	if not ship._cached_level_manager:
-		var lms = ship.SceneGroupCache.get_nodes(ship.get_tree(), "level_manager")
-		if lms.size() > 0:
-			ship._cached_level_manager = lms[0]
 
 	if ship._cached_level_manager and "hud" in ship._cached_level_manager:
 		ship._cached_hud = ship._cached_level_manager.hud

@@ -1,6 +1,6 @@
 extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
 const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
@@ -395,7 +395,7 @@ func _update_boss_arena_state(delta: float) -> void:
 		_boss_boundary_hidden_for_current_boss = false
 	_boss_arena_active = true
 	_boss_arena_anchor_boss_id = boss_id
-	var player_ship: Node3D = SceneGroupCache.get_first(get_tree(), "player") as Node3D
+	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D
 	if is_instance_valid(player_ship):
 		_boss_arena_center = (player_ship.global_position + boss_ship.global_position) * 0.5
 	else:
@@ -407,9 +407,11 @@ func _update_boss_arena_state(delta: float) -> void:
 
 
 func _get_active_boss_ship() -> Node3D:
-	var bosses: Array = SceneGroupCache.get_nodes(get_tree(), "boss")
+	var bosses: Array = EntityRegistry.get_ships_by_team("enemy")
 	for boss in bosses:
 		if not is_instance_valid(boss):
+			continue
+		if not boss.is_in_group("boss"):
 			continue
 		if boss.get("is_dying") == true or boss.get("is_sinking") == true:
 			continue
@@ -610,12 +612,12 @@ func _update_difficulty() -> void:
 
 
 func _debug_cannons() -> void:
-	var ship = SceneGroupCache.get_nodes(get_tree(), "player")
-	if ship.is_empty():
+	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D
+	if not is_instance_valid(player_ship):
 		print("[DEBUG] 플레이어 배 없음!")
 		return
-	
-	var cannons_node = ship[0].get_node_or_null("Cannons")
+
+	var cannons_node = player_ship.get_node_or_null("Cannons")
 	if not cannons_node:
 		print("[DEBUG] Cannons 노드 없음!")
 		return
@@ -640,7 +642,7 @@ func _debug_cannons() -> void:
 		])
 	
 	# 적 수도 출력
-	var enemies = SceneGroupCache.get_nodes(get_tree(), "enemy")
+	var enemies = EntityRegistry.get_ships_by_team("enemy")
 	print("[DEBUG] 적 수: %d" % enemies.size())
 	for e in enemies:
 		print("[DEBUG]   적 [%s] pos=%s" % [e.name, e.global_position])
@@ -697,13 +699,9 @@ func _cycle_collision_visualizer_mode() -> void:
 	print("[DEBUG] 충돌 시각화 모드: %s" % mode_name)
 
 func _debug_spawn_support_ship() -> void:
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
-	if players.is_empty():
-		print("[DEBUG] 플레이어 배 없음!")
-		return
-	var player_ship = players[0]
+	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D
 	if not is_instance_valid(player_ship):
-		print("[DEBUG] 플레이어 배 유효하지 않음!")
+		print("[DEBUG] 플레이어 배 없음!")
 		return
 	if not player_ship.has_method("_spawn_or_repair_ally"):
 		print("[DEBUG] 플레이어 배에 지원함 소환 함수 없음!")
@@ -723,12 +721,11 @@ func _debug_spawn_support_ship() -> void:
 	])
 
 func _debug_dump_support_fleet_state() -> void:
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
-	if players.is_empty():
+	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D
+	if not is_instance_valid(player_ship):
 		print("[DEBUG] 플레이어 배 없음!")
 		return
-	var player_ship = players[0]
-	if not is_instance_valid(player_ship) or not player_ship.has_method("_get_support_fleet_ships"):
+	if not player_ship.has_method("_get_support_fleet_ships"):
 		print("[DEBUG] 지원함 상태 확인 불가!")
 		return
 	var support_ships: Array = player_ship._get_support_fleet_ships()
@@ -759,10 +756,7 @@ func _debug_dump_support_fleet_state() -> void:
 
 
 func _get_debug_player_ship() -> Node3D:
-	var players = SceneGroupCache.get_nodes(get_tree(), "player")
-	if players.is_empty():
-		return null
-	var player_ship: Node3D = players[0] as Node3D
+	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D
 	if not is_instance_valid(player_ship):
 		return null
 	return player_ship

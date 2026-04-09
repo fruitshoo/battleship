@@ -410,9 +410,6 @@ func _ready() -> void:
 	_find_player()
 	
 	cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
-	if not cached_lm:
-		var lm_nodes = SceneGroupCache.get_nodes(get_tree(), "level_manager")
-		if lm_nodes.size() > 0: cached_lm = lm_nodes[0]
 	
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
 	_sync_contact_area_layers()

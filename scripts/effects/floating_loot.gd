@@ -77,8 +77,6 @@ func pool_reset() -> void:
 	
 	# 레벨 매니저 캐싱
 	_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
-	if not _cached_lm:
-		_cached_lm = SceneGroupCache.get_first(get_tree(), "level_manager")
 	
 	# UpgradeManager 캐싱
 	_cached_um = get_node_or_null("/root/UpgradeManager")

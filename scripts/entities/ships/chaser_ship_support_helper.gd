@@ -88,10 +88,6 @@ static func become_derelict(ship) -> void:
 
 	if not is_instance_valid(ship.cached_lm):
 		ship.cached_lm = LevelManagerRegistry.get_level_manager(ship.get_tree())
-		if not ship.cached_lm:
-			var lm_nodes = ship.SceneGroupCache.get_nodes(ship.get_tree(), "level_manager")
-			if lm_nodes.size() > 0:
-				ship.cached_lm = lm_nodes[0]
 
 	if not ship._merit_granted:
 		if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_merit"):
