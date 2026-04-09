@@ -1,6 +1,7 @@
 @tool
 extends Node
 const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 
@@ -814,7 +815,7 @@ func _get_player_ship() -> Node3D:
 	var direct_player = tree.root.find_child("PlayerShip", true, false)
 	if is_instance_valid(direct_player) and direct_player is Node3D and direct_player.get("is_player_controlled") == true:
 		return direct_player
-	var players = SceneGroupCache.get_nodes(tree, "player")
+	var players = EntityRegistry.get_ships_by_team("player")
 	for p in players:
 		if is_instance_valid(p) and p.get("is_player_controlled") == true:
 			return p

@@ -123,12 +123,12 @@ static func get_ships_cached(tree: SceneTree, team_name: String) -> Array:
 	var f = Engine.get_physics_frames()
 	if team_name == "player":
 		if f != _last_player_cache_frame:
-			_cached_player_ships = SceneGroupCache.get_nodes(tree, "player")
+			_cached_player_ships = EntityRegistry.get_ships_by_team("player")
 			_last_player_cache_frame = f
 		return _cached_player_ships
 	else:
 		if f != _last_enemy_cache_frame:
-			_cached_enemy_ships = SceneGroupCache.get_nodes(tree, "enemy")
+			_cached_enemy_ships = EntityRegistry.get_ships_by_team("enemy")
 			_last_enemy_cache_frame = f
 		return _cached_enemy_ships
 

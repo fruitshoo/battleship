@@ -1,7 +1,7 @@
 class_name VfxBudget
 extends RefCounted
 
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DISTANCE_BIAS_MULT: float = 1.2
 
 static var _last_frame: int = -1
@@ -31,7 +31,7 @@ static func _is_within_budget_distance(tree: SceneTree, position: Vector3, max_d
 	var camera := tree.root.get_camera_3d()
 	if is_instance_valid(camera):
 		return camera.global_position.distance_squared_to(position) <= adjusted_distance * adjusted_distance
-	var player: Node = SceneGroupCache.get_first(tree, "player") as Node
+	var player: Node = EntityRegistry.get_first_ship_by_team("player") as Node
 	if player is Node3D:
 		return (player as Node3D).global_position.distance_squared_to(position) <= adjusted_distance * adjusted_distance
 	return true

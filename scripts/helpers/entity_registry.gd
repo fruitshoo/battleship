@@ -63,6 +63,22 @@ static func count_projectiles() -> int:
 	return get_projectiles().size()
 
 
+static func get_ships_by_team(team_name: String) -> Array:
+	var normalized_team := team_name.strip_edges().to_lower()
+	if normalized_team.is_empty():
+		return get_ships()
+	var filtered: Array = []
+	for ship in get_ships():
+		if _matches_team(ship, normalized_team):
+			filtered.append(ship)
+	return filtered
+
+
+static func get_first_ship_by_team(team_name: String) -> Node:
+	var ships := get_ships_by_team(team_name)
+	return ships[0] if not ships.is_empty() else null
+
+
 static func _unregister_node(collection: Array, node: Node) -> void:
 	if node == null:
 		return
@@ -76,3 +92,12 @@ static func _compact_nodes(collection: Array) -> Array:
 		if not is_instance_valid(collection[index]):
 			collection.remove_at(index)
 	return collection.duplicate()
+
+
+static func _matches_team(node: Node, normalized_team: String) -> bool:
+	if not is_instance_valid(node):
+		return false
+	var team_value: Variant = node.get("team")
+	if team_value != null:
+		return str(team_value).strip_edges().to_lower() == normalized_team
+	return node.is_in_group(normalized_team)
