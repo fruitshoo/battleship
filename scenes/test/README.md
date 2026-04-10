@@ -45,6 +45,11 @@
   Script: `scripts/test/ship_combat_balance_preview.gd`
   Wrapper: `scripts/test/run_ship_combat_balance_preview.sh`
   The wrapper disables startup prewarm, runtime rewards, and autosave so the log stays focused on combat behavior instead of bootstrap or progression noise.
+- `ship_combat_gauntlet_preview.tscn`
+  Persistent-player gauntlet harness for chained ship fights and cumulative attrition checks.
+  Prints per-encounter and final `hull / crew` loss across multiple enemy archetypes.
+  Script: `scripts/test/ship_combat_gauntlet_preview.gd`
+  Wrapper: `scripts/test/run_ship_combat_gauntlet_preview.sh`
 - `performance_preview.tscn`
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
@@ -101,6 +106,9 @@
 - `scripts/test/run_ship_combat_balance_preview.sh`
   Headless wrapper for the ship combat balance harness.
   Auto-quits after the summary report, skips startup prewarm, disables runtime rewards/autosave for cleaner combat-only runs, and fails on common runtime log errors or missing summary output.
+- `scripts/test/run_ship_combat_gauntlet_preview.sh`
+  Headless wrapper for the cumulative ship combat gauntlet harness.
+  Auto-quits after the summary report, skips startup prewarm, disables runtime rewards/autosave, and fails on common runtime log errors or missing summary output.
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.
   Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.
