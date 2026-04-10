@@ -65,7 +65,23 @@
 - `scripts/test/preview_state_snapshot_helper.gd`
   Shared label text formatting and simple state snapshot helpers.
 - `scripts/test/project_contract_sweep.gd`
-  Loads scripts and scenes headless, checks for common Godot 3-era syntax leftovers, then runs a small runtime smoke check against preview base, ship spawns, launcher fires, projectile launches, and boss spawns.
+  Orchestrates the contract sweep by delegating scans and runtime smoke groups to focused helper scripts.
+- `scripts/test/project_contract_scan_helper.gd`
+  Headless script/scene load sweep plus legacy syntax scans for `yield()`, `funcref()`, `.instance()`, `String()`, and `bool()`.
+- `scripts/test/project_contract_runtime_helper.gd`
+  Runtime smoke helper for boss, enemy ship, launcher, projectile, and registry contracts.
+- `scripts/test/project_contract_save_helper.gd`
+  Save/load roundtrip smoke for `SaveManager` state and config files.
+- `scripts/test/project_contract_hud_helper.gd`
+  HUD state smoke for boarding, capture, stat panel, and ship debug UI states.
+- `scripts/test/project_contract_support_helper.gd`
+  Support-fleet lifecycle smoke for summon, registry, targeting, and repair paths.
+- `scripts/test/project_contract_bootstrap_helper.gd`
+  Startup audio mute/prewarm and effect prewarm smoke.
+- `scripts/test/project_contract_recovery_helper.gd`
+  Floating loot, survivor, and treasure chest collection smoke.
+- `scripts/test/project_contract_scene_wiring_helper.gd`
+  Scene wiring smoke for player, enemy, boss, and firepot ship scene contracts.
 - `scripts/test/run_project_contract_sweep.sh`
   Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
 - `scripts/test/run_leak_probe.sh`
