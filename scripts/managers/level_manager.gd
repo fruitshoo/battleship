@@ -35,9 +35,9 @@ signal merit_full_action_completed() # 지휘 포인트 가득 참 후속 처리
 @export var drowned_soldier_kill_merit_reward: int = 0 ## 적 병사를 수장시켰을 때 획득 지휘 포인트
 @export var melee_kill_xp_bonus: int = 2 ## 백병전(검/창/작살) 처치 시 추가 XP
 @export var melee_kill_merit_bonus: int = 1 ## 백병전(검/창/작살) 처치 시 추가 지휘 포인트
-@export var boarding_capture_score_reward: int = 70 ## 나포 성공 시 추가 점수
-@export var boarding_capture_xp_reward: int = 25 ## 나포 성공 시 추가 XP
-@export var boarding_capture_merit_reward: int = 15 ## 나포 성공 시 추가 지휘 포인트
+@export var boarding_capture_score_reward: int = 95 ## 나포 성공 시 추가 점수
+@export var boarding_capture_xp_reward: int = 35 ## 나포 성공 시 추가 XP
+@export var boarding_capture_merit_reward: int = 20 ## 나포 성공 시 추가 지휘 포인트
 @export_group("Boss Arena")
 @export var mid_boss_arena_half_extents: Vector2 = Vector2(112.0, 84.0)
 @export var final_boss_arena_half_extents: Vector2 = Vector2(136.0, 98.0)

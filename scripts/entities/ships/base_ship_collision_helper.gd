@@ -4,9 +4,11 @@ class_name BaseShipCollisionHelper
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
-const BOSS_DERELICT_CONTACT_REPAIR_BONUS: float = 10.0
-const BOSS_DERELICT_CONTACT_XP_REWARD: int = 20
-const BOSS_DERELICT_CONTACT_MERIT_REWARD: int = 10
+const BOSS_DERELICT_CONTACT_REPAIR_BONUS: float = 18.0
+const BOSS_DERELICT_CONTACT_SCORE_REWARD: int = 120
+const BOSS_DERELICT_CONTACT_XP_REWARD: int = 35
+const BOSS_DERELICT_CONTACT_MERIT_REWARD: int = 18
+const BOSS_DERELICT_CONTACT_SURVIVOR_RESCUES: int = 2
 
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
@@ -202,8 +204,9 @@ static func _repair_player_from_derelict_contact(player_ship, source_ship: Node 
 	player_ship.set("hull_hp", hull_hp_after)
 	var rescued_crew: int = 0
 	if is_boss_salvage and player_ship.has_method("add_survivor"):
-		if player_ship.add_survivor():
-			rescued_crew = 1
+		for _i in range(BOSS_DERELICT_CONTACT_SURVIVOR_RESCUES):
+			if player_ship.add_survivor():
+				rescued_crew += 1
 
 	var level_manager: Node = null
 	if "_cached_level_manager" in player_ship:
@@ -211,6 +214,8 @@ static func _repair_player_from_derelict_contact(player_ship, source_ship: Node 
 		if is_instance_valid(cached_level_manager):
 			level_manager = cached_level_manager
 	if is_boss_salvage and is_instance_valid(level_manager):
+		if BOSS_DERELICT_CONTACT_SCORE_REWARD > 0 and level_manager.has_method("add_score"):
+			level_manager.add_score(BOSS_DERELICT_CONTACT_SCORE_REWARD)
 		if BOSS_DERELICT_CONTACT_XP_REWARD > 0 and level_manager.has_method("add_xp"):
 			level_manager.add_xp(BOSS_DERELICT_CONTACT_XP_REWARD)
 		if BOSS_DERELICT_CONTACT_MERIT_REWARD > 0 and level_manager.has_method("add_merit"):
@@ -229,8 +234,9 @@ static func _repair_player_from_derelict_contact(player_ship, source_ship: Node 
 		if hull_hp_after > hull_hp_before and hud.has_method("show_message"):
 			var message := "폐선 해체! 선체 +%d" % int(round(hull_hp_after - hull_hp_before))
 			if is_boss_salvage:
-				message = "거함 해체! 선체 +%d / XP +%d / 지휘 +%d" % [
+				message = "거함 해체! 선체 +%d / 점수 +%d / XP +%d / 지휘 +%d" % [
 					int(round(hull_hp_after - hull_hp_before)),
+					BOSS_DERELICT_CONTACT_SCORE_REWARD,
 					BOSS_DERELICT_CONTACT_XP_REWARD,
 					BOSS_DERELICT_CONTACT_MERIT_REWARD,
 				]
