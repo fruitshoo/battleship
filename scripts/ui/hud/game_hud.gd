@@ -1,6 +1,5 @@
 extends CanvasLayer
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const HudGameOverOverlay = preload("res://scripts/ui/hud/hud_game_over_overlay.gd")
 const HudLayoutBuilder = preload("res://scripts/ui/hud/hud_layout_builder.gd")
@@ -13,8 +12,6 @@ const HudDistanceDebugHelper = preload("res://scripts/ui/hud/hud_distance_debug_
 const HudSailDebugHelper = preload("res://scripts/ui/hud/hud_sail_debug_helper.gd")
 const HudShipDebugHelper = preload("res://scripts/ui/hud/hud_ship_debug_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
-const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
-const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
 const CANNON_CLOSE_RANGE_MIN_MULTIPLIER: float = 0.55
@@ -386,64 +383,23 @@ func _try_resolve_player_ship() -> void:
 
 
 func _get_level_manager_for_debug() -> Node:
-	if not is_instance_valid(_cached_level_manager):
-		_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
-	return _cached_level_manager
+	return HudDebugPanelHelper.get_level_manager_for_debug(self)
 
 
 func _get_environment_preset_manager_for_debug() -> Node:
-	if is_instance_valid(_cached_environment_preset_manager):
-		return _cached_environment_preset_manager
-	_cached_environment_preset_manager = get_tree().root.find_child("EnvironmentPresetManager", true, false)
-	return _cached_environment_preset_manager
+	return HudDebugPanelHelper.get_environment_preset_manager_for_debug(self)
 
 
 func _invoke_level_debug_method(method_name: String, args: Array = []) -> void:
-	var level_manager: Node = _get_level_manager_for_debug()
-	if not is_instance_valid(level_manager):
-		show_gust_warning_message("LevelManager 없음", 0.8)
-		return
-	if not level_manager.has_method(method_name):
-		show_gust_warning_message("디버그 메서드 없음: %s" % method_name, 0.8)
-		return
-	level_manager.callv(method_name, args)
+	HudDebugPanelHelper.invoke_level_debug_method(self, method_name, args)
 
 
 func _apply_environment_preset(preset_index: int) -> void:
-	var preset_manager: Node = _get_environment_preset_manager_for_debug()
-	if not is_instance_valid(preset_manager) or not preset_manager.has_method("apply_preset"):
-		show_gust_warning_message("환경 프리셋 매니저 없음", 0.8)
-		return
-	preset_manager.call("apply_preset", preset_index)
-	_sync_debug_tools_panel_state()
+	HudDebugPanelHelper.apply_environment_preset(self, preset_index)
 
 
 func _sync_debug_tools_panel_state() -> void:
-	if not is_instance_valid(sail_debug_panel):
-		return
-	if is_instance_valid(debug_environment_value):
-		var preset_manager: Node = _get_environment_preset_manager_for_debug()
-		var environment_text: String = "-"
-		if is_instance_valid(preset_manager):
-			var preset_index: int = int(preset_manager.get("current_preset"))
-			environment_text = "낮" if preset_index == 0 else "밤"
-		debug_environment_value.text = "프리셋: %s" % environment_text
-	if is_instance_valid(debug_collision_value):
-		var collision_text := "OFF"
-		if CollisionVisualizer.runtime_enabled:
-			var mode_name := "ALL"
-			match CollisionVisualizer.runtime_mode:
-				CollisionVisualizer.MODE_BASE:
-					mode_name = "BASE"
-				CollisionVisualizer.MODE_SEPARATION:
-					mode_name = "SEPARATION"
-				CollisionVisualizer.MODE_GUARD:
-					mode_name = "GUARD"
-			collision_text = "ON (%s)" % mode_name
-		debug_collision_value.text = "충돌 시각화: %s" % collision_text
-	if is_instance_valid(debug_distance_value):
-		debug_distance_value.text = "거리 표시: %s" % ("ON" if DistanceDebugVisualizer.runtime_enabled else "OFF")
-	_sync_ship_debug_panel_from_player()
+	HudDebugPanelHelper.sync_debug_tools_panel_state(self)
 
 
 func _toggle_distance_debug() -> void:

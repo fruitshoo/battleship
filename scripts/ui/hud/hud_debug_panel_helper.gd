@@ -1,8 +1,11 @@
 extends RefCounted
 class_name HudDebugPanelHelper
 
+const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MastDamagePresets = preload("res://scripts/props/mast_damage_presets.gd")
+const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
+const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 
 
 static func setup_debug_panel(hud) -> void:
@@ -78,6 +81,67 @@ static func setup_debug_panel(hud) -> void:
 	hud._sync_sail_debug_panel_from_player()
 	hud._sync_debug_tools_panel_state()
 	hud._update_sail_debug_toggle_button_text()
+
+
+static func get_level_manager_for_debug(hud) -> Node:
+	if not is_instance_valid(hud._cached_level_manager):
+		hud._cached_level_manager = LevelManagerRegistry.get_level_manager(hud.get_tree())
+	return hud._cached_level_manager
+
+
+static func get_environment_preset_manager_for_debug(hud) -> Node:
+	if is_instance_valid(hud._cached_environment_preset_manager):
+		return hud._cached_environment_preset_manager
+	hud._cached_environment_preset_manager = hud.get_tree().root.find_child("EnvironmentPresetManager", true, false)
+	return hud._cached_environment_preset_manager
+
+
+static func invoke_level_debug_method(hud, method_name: String, args: Array = []) -> void:
+	var level_manager: Node = get_level_manager_for_debug(hud)
+	if not is_instance_valid(level_manager):
+		hud.show_gust_warning_message("LevelManager 없음", 0.8)
+		return
+	if not level_manager.has_method(method_name):
+		hud.show_gust_warning_message("디버그 메서드 없음: %s" % method_name, 0.8)
+		return
+	level_manager.callv(method_name, args)
+
+
+static func apply_environment_preset(hud, preset_index: int) -> void:
+	var preset_manager: Node = get_environment_preset_manager_for_debug(hud)
+	if not is_instance_valid(preset_manager) or not preset_manager.has_method("apply_preset"):
+		hud.show_gust_warning_message("환경 프리셋 매니저 없음", 0.8)
+		return
+	preset_manager.call("apply_preset", preset_index)
+	sync_debug_tools_panel_state(hud)
+
+
+static func sync_debug_tools_panel_state(hud) -> void:
+	if not is_instance_valid(hud.sail_debug_panel):
+		return
+	if is_instance_valid(hud.debug_environment_value):
+		var preset_manager: Node = get_environment_preset_manager_for_debug(hud)
+		var environment_text: String = "-"
+		if is_instance_valid(preset_manager):
+			var preset_index: int = int(preset_manager.get("current_preset"))
+			environment_text = "낮" if preset_index == 0 else "밤"
+		hud.debug_environment_value.text = "프리셋: %s" % environment_text
+	if is_instance_valid(hud.debug_collision_value):
+		var collision_text := "OFF"
+		if CollisionVisualizer.runtime_enabled:
+			var mode_name := "ALL"
+			match CollisionVisualizer.runtime_mode:
+				CollisionVisualizer.MODE_BASE:
+					mode_name = "BASE"
+				CollisionVisualizer.MODE_SEPARATION:
+					mode_name = "SEPARATION"
+				CollisionVisualizer.MODE_GUARD:
+					mode_name = "GUARD"
+			collision_text = "ON (%s)" % mode_name
+		hud.debug_collision_value.text = "충돌 시각화: %s" % collision_text
+	if is_instance_valid(hud.debug_distance_value):
+		hud.debug_distance_value.text = "거리 표시: %s" % ("ON" if DistanceDebugVisualizer.runtime_enabled else "OFF")
+	hud._sync_ship_debug_panel_from_player()
 
 
 static func _add_environment_section(hud, panel_box: VBoxContainer) -> void:
