@@ -10,6 +10,9 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 var _is_collected: bool = false
 
 func _ready() -> void:
+	if _env_flag_enabled("BATTLESHIP_GAUNTLET_DISABLE_RECOVERY"):
+		queue_free()
+		return
 	add_to_group("treasure_chest")
 	# 부유 효과 (Tween)
 	var tween = create_tween().set_loops()
@@ -46,3 +49,8 @@ func _collect() -> void:
 	
 	# 파티클 효과 (필요 시) 생성 후 제거
 	queue_free()
+
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"

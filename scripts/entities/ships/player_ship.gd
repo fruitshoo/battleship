@@ -306,6 +306,8 @@ func _update_crew_respawn(delta: float) -> void:
 	if is_sinking: return
 	if deck_is_contested:
 		return
+	if _has_nearby_enemy_pressure_for_respawn():
+		return
 	
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node: return
@@ -325,6 +327,25 @@ func _update_crew_respawn(delta: float) -> void:
 			print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
 	else:
 		crew_respawn_timer = 0.0 # 정원이 차면 타이머 초기화
+
+func _has_nearby_enemy_pressure_for_respawn() -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	var pressure_range: float = maxf(12.0, auto_raid_threat_range)
+	var pressure_range_sq: float = pressure_range * pressure_range
+	for other in _get_ships_cached(tree):
+		if not is_instance_valid(other) or other == self:
+			continue
+		if other.get("team") != "enemy":
+			continue
+		if other.has_method("is_combat_disabled") and other.is_combat_disabled():
+			continue
+		var planar_delta: Vector3 = other.global_position - global_position
+		planar_delta.y = 0.0
+		if planar_delta.length_squared() <= pressure_range_sq:
+			return true
+	return false
 
 func _update_auto_boarding_raid(delta: float) -> void:
 	PlayerShipCrewHelper.update_auto_boarding_raid(self, delta)

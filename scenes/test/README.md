@@ -111,6 +111,7 @@
   Headless wrapper for the cumulative ship combat gauntlet harness.
   Auto-quits after the summary report, skips startup prewarm, disables runtime rewards/autosave, and fails on common runtime log errors or missing summary output.
   Accepts an optional first argument such as `crew_sustain` to apply a gauntlet upgrade preset before the encounter chain begins.
+  Accepts an optional second argument `no_recovery` to disable survivor, floating loot, and treasure recovery pickups during the gauntlet.
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.
   Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.

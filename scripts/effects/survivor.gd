@@ -28,6 +28,9 @@ var _player_search_timer: float = 0.0
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
 func _ready() -> void:
+	if _env_flag_enabled("BATTLESHIP_GAUNTLET_DISABLE_RECOVERY"):
+		ScenePool.release(self)
+		return
 	# 획득 이벤트 연결 (한 번만 수행)
 	if not body_entered.is_connected(_on_body_entered):
 		body_entered.connect(_on_body_entered)
@@ -129,6 +132,11 @@ func _expire_and_free() -> void:
 	if visual:
 		tween.tween_property(visual, "scale", Vector3.ZERO, 4.0)
 	tween.chain().tween_callback(func(): ScenePool.release(self))
+
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 
 func _apply_floating(delta: float) -> void:

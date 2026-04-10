@@ -32,6 +32,7 @@ var _sequence_finished: bool = false
 var _baseline_hull: float = 0.0
 var _baseline_crew: int = 0
 var _upgrade_preset: String = ""
+var _disable_recovery_pickups: bool = false
 
 
 func _ready() -> void:
@@ -42,6 +43,8 @@ func _process(delta: float) -> void:
 	if not _running:
 		return
 	_current_elapsed = (Time.get_ticks_usec() - _current_started_usec) / 1000000.0
+	if _disable_recovery_pickups:
+		_strip_recovery_pickups()
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = 0.2
@@ -52,6 +55,7 @@ func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_ensure_overlay()
 	_upgrade_preset = OS.get_environment("BATTLESHIP_GAUNTLET_UPGRADE_PRESET").strip_edges().to_lower()
+	_disable_recovery_pickups = _env_flag_enabled("BATTLESHIP_GAUNTLET_DISABLE_RECOVERY")
 	_setup_player_ship()
 	_encounters = _build_encounters()
 	_baseline_hull = _get_ship_hull(_current_player_ship)
@@ -148,6 +152,8 @@ func _clear_runtime_noise() -> void:
 	for projectile in EntityRegistry.get_projectiles():
 		if is_instance_valid(projectile):
 			projectile.queue_free()
+	if _disable_recovery_pickups:
+		_strip_recovery_pickups()
 	for child in get_children():
 		if child == _current_player_ship:
 			continue
@@ -265,6 +271,34 @@ func _apply_upgrade_preset() -> void:
 			upgrade_manager.apply_upgrade(upgrade_id)
 	if auto_print_summary:
 		print("[ShipGauntlet] upgrade_preset=%s" % _upgrade_preset)
+
+
+func _strip_recovery_pickups() -> void:
+	var root: Node = get_tree().root
+	_strip_recovery_nodes_under(root)
+	_strip_recovery_nodes_under(self)
+
+
+func _strip_recovery_nodes_under(parent: Node) -> void:
+	if not is_instance_valid(parent):
+		return
+	for child in parent.get_children():
+		if not is_instance_valid(child):
+			continue
+		if _is_recovery_pickup_node(child):
+			_archive_preview_node(child)
+
+
+func _is_recovery_pickup_node(node: Node) -> bool:
+	var node_name: String = str(node.name)
+	if node_name == "Survivor" or node_name == "FloatingLoot" or node_name == "TreasureChest":
+		return true
+	return node.is_in_group("treasure_chest")
+
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 
 func _configure_enemy_runtime() -> void:
@@ -564,8 +598,3 @@ func _quit_after_report() -> void:
 	if auto_quit_delay_seconds > 0.0:
 		await get_tree().create_timer(auto_quit_delay_seconds).timeout
 	get_tree().quit(0)
-
-
-func _env_flag_enabled(name: String) -> bool:
-	var value := OS.get_environment(name).strip_edges().to_lower()
-	return value == "1" or value == "true" or value == "yes" or value == "on"

@@ -6,6 +6,7 @@ project_root="$(cd "$script_dir/../.." && pwd)"
 godot_bin="${GODOT_BIN:-/Applications/Godot.app/Contents/MacOS/Godot}"
 log_file="$(mktemp -t battleship_ship_gauntlet.XXXXXX.log)"
 preset="${1:-}"
+recovery_mode="${2:-}"
 
 cleanup() {
 	rm -f "$log_file"
@@ -15,6 +16,7 @@ trap cleanup EXIT
 HOME=/tmp \
 BATTLESHIP_SHIP_GAUNTLET_AUTO_QUIT=1 \
 BATTLESHIP_GAUNTLET_UPGRADE_PRESET="$preset" \
+BATTLESHIP_GAUNTLET_DISABLE_RECOVERY="$([[ "$recovery_mode" == "no_recovery" ]] && echo 1 || echo 0)" \
 BATTLESHIP_DISABLE_SUPPORT_FLEET_AUTOSPAWN=1 \
 BATTLESHIP_SKIP_STARTUP_PREWARM=1 \
 BATTLESHIP_DISABLE_RUNTIME_REWARDS=1 \

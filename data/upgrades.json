@@ -102,10 +102,10 @@
 			"max_level": 5,
 			"color": "8fd46b",
 			"stats": {
-				"respawn_reduce_per_lv": 1.0,
-				"min_respawn_interval": 7.0,
-				"instant_restore_levels": [3, 5],
-				"survivor_hull_heal_per_lv": 1.0
+				"respawn_reduce_per_lv": 0.75,
+				"min_respawn_interval": 9.0,
+				"instant_restore_levels": [5],
+				"survivor_hull_heal_per_lv": 0.5
 			}
 		},
 		"boarding_resist": {

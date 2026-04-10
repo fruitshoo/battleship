@@ -104,10 +104,10 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "전열 병력 %d명 | 창병/갑판 방어 강화" % spearmen
 		"crew_reserve":
 			var reserve_respawn: float = maxf(
-				float(s.get("min_respawn_interval", 7.0)),
-				12.0 - (float(next_level) * float(s.get("respawn_reduce_per_lv", 1.0)))
+				float(s.get("min_respawn_interval", 9.0)),
+				12.0 - (float(next_level) * float(s.get("respawn_reduce_per_lv", 0.75)))
 			)
-			var heal_bonus: float = float(next_level) * float(s.get("survivor_hull_heal_per_lv", 1.0))
+			var heal_bonus: float = float(next_level) * float(s.get("survivor_hull_heal_per_lv", 0.5))
 			return "병사 자동 보충 %.1f초 | 구조 회복 +%.0f" % [reserve_respawn, heal_bonus]
 		"boarding_resist":
 			var capture_delay_pct: int = int(round(float(next_level) * float(s.get("capture_duration_mult_per_lv", 0.08)) * 100.0))

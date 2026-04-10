@@ -294,12 +294,12 @@ func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 		var base_interval: float = float(ship.get_meta("base_crew_respawn_interval", ship.crew_respawn_interval))
 		if not ship.has_meta("base_crew_respawn_interval"):
 			ship.set_meta("base_crew_respawn_interval", base_interval)
-		var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 1.0))
-		var min_interval: float = float(stats.get("min_respawn_interval", 7.0))
+		var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 0.75))
+		var min_interval: float = float(stats.get("min_respawn_interval", 9.0))
 		ship.crew_respawn_interval = maxf(min_interval, base_interval - (reduce_per_level * float(level)))
 	if "crew_respawn_timer" in ship:
 		ship.crew_respawn_timer = minf(float(ship.crew_respawn_timer), float(ship.crew_respawn_interval))
-	ship.set_meta("survivor_hull_heal_bonus", float(stats.get("survivor_hull_heal_per_lv", 1.0)) * float(level))
+	ship.set_meta("survivor_hull_heal_bonus", float(stats.get("survivor_hull_heal_per_lv", 0.5)) * float(level))
 	if _level_matches(level, stats.get("instant_restore_levels", [])) and ship.has_method("get_alive_crew_count") and "max_crew_count" in ship:
 		if int(ship.call("get_alive_crew_count")) < int(ship.max_crew_count) and ship.has_method("add_survivor"):
 			ship.add_survivor()

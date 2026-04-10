@@ -33,6 +33,9 @@ var _player_search_timer: float = 0.0
 @onready var visual: Node3D = $Visual if has_node("Visual") else ($MeshInstance3D if has_node("MeshInstance3D") else self)
 
 func _ready() -> void:
+	if _env_flag_enabled("BATTLESHIP_GAUNTLET_DISABLE_RECOVERY"):
+		ScenePool.release(self)
+		return
 	# 획득 이벤트 연결 (한 번만 수행)
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
@@ -89,6 +92,11 @@ func pool_reset() -> void:
 
 @export var lifetime: float = 60.0 # 소멸 시간 (초)
 var is_expiring: bool = false # 소멸 진행 중 여부
+
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 func _physics_process(delta: float) -> void:
 	if is_collected or not is_inside_tree():
