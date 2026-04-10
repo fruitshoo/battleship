@@ -258,6 +258,18 @@ func _apply_upgrade_preset() -> void:
 				"crew_reserve": 2,
 				"boarding_resist": 2,
 			}
+		"cannon_pressure":
+			preset_levels = {
+				"cannon": 3,
+				"janggun": 2,
+			}
+		"crew_sustain_cannon":
+			preset_levels = {
+				"crew_reserve": 2,
+				"boarding_resist": 2,
+				"cannon": 2,
+				"janggun": 1,
+			}
 		"crew_sustain_heavy":
 			preset_levels = {
 				"crew_reserve": 5,

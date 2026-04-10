@@ -47,7 +47,7 @@ func _ready() -> void:
 	_owner_ship = _resolve_owner_ship()
 	_target_scan_left = randf_range(0.0, target_scan_interval)
 	# 업그레이드 발생 시그널 연결
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	var upgrade_manager = _get_upgrade_manager()
 	if is_instance_valid(upgrade_manager) and upgrade_manager.has_signal("upgrade_applied"):
 		upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
 
@@ -63,7 +63,7 @@ func _update_cached_stats() -> void:
 	_cached_crit_multiplier = 1.5
 	if team != "player":
 		return
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	var upgrade_manager = _get_upgrade_manager()
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager and "UPGRADES" in upgrade_manager:
 		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
 		var s = upgrade_manager.UPGRADES.get("cannon", {}).get("stats", {})
@@ -74,6 +74,18 @@ func _update_cached_stats() -> void:
 		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_lv", 20) / 100.0) * (cannon_lv - 1)
 		_cached_crit_chance = maxf(0.0, (s.get("crit_pct_per_lv", 2.5) / 100.0) * (cannon_lv - 1))
 		_cached_crit_multiplier = float(s.get("crit_multiplier", 1.5))
+
+
+func _get_upgrade_manager() -> Node:
+	if not is_inside_tree():
+		return null
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var root := tree.root
+	if root == null:
+		return null
+	return root.get_node_or_null("UpgradeManager")
 
 func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 	fleet_damage_mult = dmg_mult
