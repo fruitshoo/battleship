@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 WRITE_MODE=0
 RUN_CONTRACT_SWEEP=0
+STRICT_MODE=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -15,16 +16,23 @@ for arg in "$@"; do
     --contract-sweep)
       RUN_CONTRACT_SWEEP=1
       ;;
+    --strict)
+      STRICT_MODE=1
+      ;;
     *)
       echo "Unknown argument: $arg" >&2
-      echo "Usage: scripts/dev/run_refactor_tooling.sh [--write] [--contract-sweep]" >&2
+      echo "Usage: scripts/dev/run_refactor_tooling.sh [--write] [--contract-sweep] [--strict]" >&2
       exit 2
       ;;
   esac
 done
 
 echo "== Refactor Audit =="
-python3 scripts/dev/refactor_audit.py --top 10
+if [[ "$STRICT_MODE" -eq 1 ]]; then
+  python3 scripts/dev/refactor_audit.py --top 10 --fail-on-legacy
+else
+  python3 scripts/dev/refactor_audit.py --top 10
+fi
 
 echo
 echo "== Safe Godot 4 Fixes =="

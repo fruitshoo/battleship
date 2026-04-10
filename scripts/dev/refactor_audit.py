@@ -183,6 +183,23 @@ def parse_args() -> argparse.Namespace:
         default=40,
         help="Mark .gd files at or above this function count as giant files.",
     )
+    parser.add_argument(
+        "--fail-on-legacy",
+        action="store_true",
+        help="Exit non-zero if any legacy-pattern hits are found.",
+    )
+    parser.add_argument(
+        "--max-giant-files",
+        type=int,
+        default=None,
+        help="Exit non-zero if giant file count exceeds this threshold.",
+    )
+    parser.add_argument(
+        "--max-smell-total",
+        type=int,
+        default=None,
+        help="Exit non-zero if total smell hits exceed this threshold.",
+    )
     return parser.parse_args()
 
 
@@ -193,7 +210,30 @@ def main() -> int:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
         print_human_report(report, args.top)
-    return 0
+
+    summary = report["summary"]
+    failed = False
+    if args.fail_on_legacy and summary["legacy_total"] > 0:
+        print(
+            "Audit gate failed: legacy_total=%d" % summary["legacy_total"],
+            flush=True,
+        )
+        failed = True
+    if args.max_giant_files is not None and summary["giant_file_total"] > args.max_giant_files:
+        print(
+            "Audit gate failed: giant_file_total=%d exceeds max=%d"
+            % (summary["giant_file_total"], args.max_giant_files),
+            flush=True,
+        )
+        failed = True
+    if args.max_smell_total is not None and summary["smell_total"] > args.max_smell_total:
+        print(
+            "Audit gate failed: smell_total=%d exceeds max=%d"
+            % (summary["smell_total"], args.max_smell_total),
+            flush=True,
+        )
+        failed = True
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

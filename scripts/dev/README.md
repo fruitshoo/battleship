@@ -10,6 +10,7 @@ Examples:
 python3 scripts/dev/refactor_audit.py
 python3 scripts/dev/refactor_audit.py --top 20
 python3 scripts/dev/refactor_audit.py --json
+python3 scripts/dev/refactor_audit.py --fail-on-legacy
 ```
 
 The report currently highlights:
@@ -17,6 +18,12 @@ The report currently highlights:
 - giant `.gd` files by line count and function count
 - legacy Godot 3 style patterns such as `yield()`, `funcref()`, `.instance()`, `String()`, and `bool()`
 - refactor smells such as direct `.get()`, `.has_method()`, `.find_child()`, `SceneGroupCache`, and `.call_deferred()`
+
+Optional gates:
+
+- `--fail-on-legacy`
+- `--max-giant-files N`
+- `--max-smell-total N`
 
 ## `apply_safe_godot4_fixes.py`
 
@@ -46,7 +53,9 @@ Examples:
 bash scripts/dev/run_refactor_tooling.sh
 bash scripts/dev/run_refactor_tooling.sh --write
 bash scripts/dev/run_refactor_tooling.sh --write --contract-sweep
+bash scripts/dev/run_refactor_tooling.sh --strict
 ```
 
 Use `--write` only for the safe codemod step.
 Use `--contract-sweep` when you want the wrapper to finish by running the project contract harness.
+Use `--strict` when you want the audit step to fail on any legacy-pattern hits.
