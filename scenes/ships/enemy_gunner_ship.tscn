@@ -6,7 +6,8 @@
 [node name="EnemyGunnerShip" unique_id=1910346140 instance=ExtResource("1_enemy_base")]
 script = ExtResource("2_enemy_gunner_script")
 combat_role = 1
-preferred_combat_range = 14.0
-combat_range_tolerance = 2.5
-retreat_distance = 8.5
+preferred_combat_range = 15.5
+combat_range_tolerance = 3.2
+retreat_distance = 10.0
 allow_boarding = false
+initial_crew_count = 5

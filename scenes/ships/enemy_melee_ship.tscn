@@ -8,3 +8,5 @@ script = ExtResource("2_enemy_melee_script")
 preferred_combat_range = 3.8
 combat_range_tolerance = 0.8
 retreat_distance = 3.0
+initial_crew_count = 6
+boarders_count = 6

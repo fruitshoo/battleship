@@ -9,3 +9,5 @@ preferred_combat_range = 4.8
 combat_range_tolerance = 1.2
 retreat_distance = 3.8
 allow_boarding = true
+initial_crew_count = 6
+boarders_count = 5

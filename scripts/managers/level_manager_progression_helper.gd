@@ -2,6 +2,8 @@ class_name LevelManagerProgressionHelper
 extends RefCounted
 
 static func add_score(lm: Node, points: int) -> void:
+	if _env_flag_enabled("BATTLESHIP_DISABLE_RUNTIME_REWARDS"):
+		return
 	lm.current_score += points
 	lm.enemies_killed += 1
 	lm.score_changed.emit(lm.current_score)
@@ -70,6 +72,8 @@ static func get_weapon_damage_rows(lm: Node, max_rows: int = 8) -> Array:
 	return rows
 
 static func add_xp(lm: Node, amount: int) -> void:
+	if _env_flag_enabled("BATTLESHIP_DISABLE_RUNTIME_REWARDS"):
+		return
 	lm.current_xp += int(amount * lm.xp_multiplier)
 
 	if lm.hud and lm.hud.has_method("update_xp"):
@@ -80,6 +84,8 @@ static func add_xp(lm: Node, amount: int) -> void:
 		set_level(lm, lm.current_level + 1)
 
 static func add_merit(lm: Node, amount: int) -> void:
+	if _env_flag_enabled("BATTLESHIP_DISABLE_RUNTIME_REWARDS"):
+		return
 	if lm.merit_points >= lm.max_merit_points:
 		return
 
@@ -133,3 +139,7 @@ static func update_difficulty(lm: Node) -> void:
 			data["max_enemies"],
 			data.get("boarders", 2)
 		)
+
+static func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"

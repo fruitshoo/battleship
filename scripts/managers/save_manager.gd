@@ -23,6 +23,8 @@ func _ready() -> void:
 	apply_settings()
 
 func save_game() -> void:
+	if _env_flag_enabled("BATTLESHIP_DISABLE_AUTOSAVE"):
+		return
 	var config = ConfigFile.new()
 	config.set_value("player", "gold", gold)
 	config.set_value("player", "meta_upgrades", meta_upgrades)
@@ -145,3 +147,7 @@ func _set_bus_volume_linear(bus_name: String, linear: float) -> void:
 	if clamped <= 0.001:
 		volume_db = -80.0
 	AudioServer.set_bus_volume_db(bus_idx, volume_db)
+
+func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"

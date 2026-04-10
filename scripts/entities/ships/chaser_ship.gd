@@ -19,6 +19,7 @@ const DEFAULT_FIRE_POT_SCENE_PATH := "res://scenes/projectiles/fire_pot.tscn"
 @export var move_speed: float = 3.5
 @export var soldier_scene: PackedScene
 @export var boarders_count: int = 4 # 도선시킬 병사 수 (상향: 2 -> 4)
+@export_range(1, 12, 1) var initial_crew_count: int = 4
 
 @export var cannon_scene: PackedScene
 @export var hull_scene: PackedScene
@@ -477,8 +478,9 @@ func _setup_soldiers() -> void:
 	for child in soldiers_node.get_children():
 		child.queue_free()
 	
-	# 함선 팀에 맞춰 초기 4명 배치
-	for i in range(4):
+	var spawn_count: int = clampi(initial_crew_count, 1, max(1, max_crew))
+	# 함선 팀에 맞춰 초기 병사 배치
+	for i in range(spawn_count):
 		_spawn_one_soldier(team)
 
 func _spawn_one_soldier(s_team: String, soldier_type_override: String = "") -> void:

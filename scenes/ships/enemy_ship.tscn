@@ -19,11 +19,15 @@ preferred_combat_range = 4.5
 combat_range_tolerance = 1.0
 retreat_distance = 3.5
 max_speed = 6.0
+move_speed = 4.2
 length_multiplier = 0.939
 width_multiplier = 0.43700000000000006
 auto_fit_scale = 0.84
 floating_offset = 0.5
-max_hull_hp = 145.0
+max_hull_hp = 170.0
+max_crew = 7
+initial_crew_count = 5
+boarders_count = 5
 
 [node name="ProximityArea" type="Area3D" parent="." unique_id=694699390 groups=["ship_proximity"]]
 collision_layer = 4

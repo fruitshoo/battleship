@@ -29,7 +29,6 @@ var _current_player_ship: Node3D = null
 var _current_enemy_ship: Node3D = null
 var _scenario_running: bool = false
 var _sequence_finished: bool = false
-var _reused_initial_player_ship: bool = false
 
 
 func _ready() -> void:
@@ -130,21 +129,21 @@ func _run_scenarios() -> void:
 
 
 func _setup_scenario(scenario: Dictionary) -> void:
-	var preserve_initial_player: bool = not _reused_initial_player_ship
-	await _clear_existing_preview_nodes(preserve_initial_player)
-	_spawn_fresh_ships(scenario, preserve_initial_player)
+	await _clear_existing_preview_nodes()
+	_spawn_fresh_ships(scenario)
 	await get_tree().process_frame
+	_reset_player_ship_runtime()
 	_configure_player_runtime()
 	_configure_enemy_runtime()
 	_update_overlay()
 
 
-func _clear_existing_preview_nodes(preserve_initial_player: bool) -> void:
+func _clear_existing_preview_nodes() -> void:
 	for projectile in EntityRegistry.get_projectiles():
 		if is_instance_valid(projectile):
 			projectile.queue_free()
 	for child in get_children():
-		if preserve_initial_player and child == get_node_or_null("PlayerShip"):
+		if child == get_node_or_null("PlayerShip"):
 			continue
 		if child is Node3D and (
 			child.name == "PlayerShip"
@@ -152,19 +151,12 @@ func _clear_existing_preview_nodes(preserve_initial_player: bool) -> void:
 			or child.get_meta("support_fleet_ship", false) == true
 			or child.is_in_group("captured_minion")
 		):
-			child.queue_free()
+			_archive_preview_node(child)
 	await get_tree().process_frame
 
 
-func _spawn_fresh_ships(scenario: Dictionary, preserve_initial_player: bool) -> void:
-	_current_player_ship = null
-	if preserve_initial_player:
-		var existing_player := get_node_or_null("PlayerShip") as Node3D
-		if is_instance_valid(existing_player):
-			_current_player_ship = existing_player
-			_current_player_ship.set_meta("ship_combat_preview_spawn", true)
-			_reused_initial_player_ship = true
-
+func _spawn_fresh_ships(scenario: Dictionary) -> void:
+	_current_player_ship = get_node_or_null("PlayerShip") as Node3D
 	if not is_instance_valid(_current_player_ship):
 		_current_player_ship = PLAYER_SHIP_SCENE.instantiate() as Node3D
 		if is_instance_valid(_current_player_ship):
@@ -192,6 +184,56 @@ func _spawn_fresh_ships(scenario: Dictionary, preserve_initial_player: bool) -> 
 		PreviewHarnessHelper.assign_preview_target(_current_enemy_ship, _current_player_ship)
 
 
+func _archive_preview_node(node: Node) -> void:
+	if not is_instance_valid(node):
+		return
+	node.process_mode = Node.PROCESS_MODE_DISABLED
+	if node is Node3D:
+		var spatial := node as Node3D
+		spatial.visible = false
+		spatial.global_position = Vector3(0.0, -500.0, 0.0)
+	node.set_meta("ship_combat_preview_archived", true)
+
+
+func _reset_player_ship_runtime() -> void:
+	if not is_instance_valid(_current_player_ship):
+		return
+	if "hull_hp" in _current_player_ship and "max_hull_hp" in _current_player_ship:
+		_current_player_ship.set("hull_hp", float(_current_player_ship.get("max_hull_hp")))
+	if "current_speed" in _current_player_ship:
+		_current_player_ship.set("current_speed", 0.0)
+	if "rudder_angle" in _current_player_ship:
+		_current_player_ship.set("rudder_angle", 0.0)
+	if "sail_angle" in _current_player_ship:
+		_current_player_ship.set("sail_angle", 0.0)
+	if "is_sinking" in _current_player_ship:
+		_current_player_ship.set("is_sinking", false)
+	if "is_dying" in _current_player_ship:
+		_current_player_ship.set("is_dying", false)
+	if "is_burning" in _current_player_ship:
+		_current_player_ship.set("is_burning", false)
+	if "is_derelict" in _current_player_ship:
+		_current_player_ship.set("is_derelict", false)
+	if "is_boarding" in _current_player_ship:
+		_current_player_ship.set("is_boarding", false)
+	if "boarding_target" in _current_player_ship:
+		_current_player_ship.set("boarding_target", null)
+	if "boarding_timer" in _current_player_ship:
+		_current_player_ship.set("boarding_timer", 0.0)
+	if "boarding_prep_timer" in _current_player_ship:
+		_current_player_ship.set("boarding_prep_timer", 0.0)
+	if "crew_respawn_timer" in _current_player_ship:
+		_current_player_ship.set("crew_respawn_timer", 0.0)
+	if _current_player_ship.has_method("clear_boarding_attacker_ship"):
+		_current_player_ship.call("clear_boarding_attacker_ship")
+	if _current_player_ship.has_method("set_preview_deck_state"):
+		_current_player_ship.call("set_preview_deck_state", false, false)
+	if _current_player_ship.has_method("_sync_player_crew_roster"):
+		_current_player_ship.call("_sync_player_crew_roster")
+	if _current_player_ship.has_method("check_derelict_status"):
+		_current_player_ship.call("check_derelict_status")
+
+
 func _configure_player_runtime() -> void:
 	if not is_instance_valid(_current_player_ship):
 		return
@@ -203,6 +245,10 @@ func _configure_player_runtime() -> void:
 		_current_player_ship.set("support_fleet_respawn_timer", 0.0)
 	if "captain_count" in _current_player_ship:
 		_current_player_ship.set("captain_count", 0)
+	if "crew_respawn_interval" in _current_player_ship:
+		_current_player_ship.set("crew_respawn_interval", 99999.0)
+	if "crew_respawn_timer" in _current_player_ship:
+		_current_player_ship.set("crew_respawn_timer", 0.0)
 	if "is_rowing" in _current_player_ship:
 		_current_player_ship.set("is_rowing", false)
 	if _current_player_ship.has_method("set_preview_deck_state"):
