@@ -15,6 +15,7 @@ const HudEndStateHelper = preload("res://scripts/ui/hud/hud_end_state_helper.gd"
 const HudStatusDisplayHelper = preload("res://scripts/ui/hud/hud_status_display_helper.gd")
 const HudItemDisplayHelper = preload("res://scripts/ui/hud/hud_item_display_helper.gd")
 const HudProgressionLayoutHelper = preload("res://scripts/ui/hud/hud_progression_layout_helper.gd")
+const HudRuntimeHelper = preload("res://scripts/ui/hud/hud_runtime_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
@@ -254,55 +255,11 @@ func _adjust_player_ship_float_for_debug(property_name: String, delta_value: flo
 	HudShipDebugHelper.adjust_player_ship_float_for_debug(self, property_name, delta_value, min_value, max_value, label)
 
 func _process(delta: float) -> void:
-	_sync_game_time(delta)
-	if _gust_warning_timer > 0.0:
-		_gust_warning_timer = maxf(0.0, _gust_warning_timer - delta)
-		if gust_warning:
-			gust_warning.visible = true
-	elif gust_warning and gust_warning.visible:
-		gust_warning.visible = false
-	_player_lookup_cooldown = maxf(0.0, _player_lookup_cooldown - delta)
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	_update_upgrade_tooltip_state(delta)
-	_update_upgrade_tooltip_position()
-	_item_refresh_retry_left = maxf(0.0, _item_refresh_retry_left - delta)
-	if _item_refresh_retry_left <= 0.0 and item_bar and is_instance_valid(UpgradeManager):
-		var owned_items = UpgradeManager.acquired_items if "acquired_items" in UpgradeManager else []
-		if owned_items is Array and item_bar.current_item_count < owned_items.size():
-			_item_refresh_retry_left = 0.5
-			_refresh_owned_item_icons()
-	if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible:
-		_sail_debug_sync_left = maxf(0.0, _sail_debug_sync_left - delta)
-		if _sail_debug_sync_left <= 0.0:
-			_sail_debug_sync_left = 0.2
-			_sync_sail_debug_panel_from_player()
-			_sync_debug_tools_panel_state()
-	if show_ship_health_bars:
-		_update_ship_health_bars(true)
-	_hud_refresh_left -= delta
-	if _hud_refresh_left <= 0.0:
-		_hud_refresh_left = hud_refresh_interval
-		_update_timer()
-		_update_speed_display()
-		_update_force_panel()
-		_update_hull_display()
-		_update_stamina_display()
-		_update_boarding_display()
-		_update_capture_opportunity_display()
-		_update_ammo_mode_display()
-		_update_distance_debug_display()
-		_update_ship_health_bars(false)
-	HudStatPanelHelper.process_stat_panel(self, delta)
+	HudRuntimeHelper.process_hud(self, delta)
 
 
 func _sync_game_time(delta: float) -> void:
-	if not is_instance_valid(_cached_level_manager):
-		_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
-	if is_instance_valid(_cached_level_manager) and _cached_level_manager.get("current_time") != null:
-		game_time = float(_cached_level_manager.current_time)
-	else:
-		game_time += delta
+	HudRuntimeHelper.sync_game_time(self, delta)
 
 func _attach_level_label_to_xp_bar() -> void:
 	HudProgressionLayoutHelper.attach_level_label_to_xp_bar(self)
