@@ -249,8 +249,8 @@ func _apply_upgrade_preset() -> void:
 	match _upgrade_preset:
 		"crew_sustain":
 			preset_levels = {
-				"crew_reserve": 3,
-				"boarding_resist": 3,
+				"crew_reserve": 2,
+				"boarding_resist": 2,
 			}
 		"crew_sustain_heavy":
 			preset_levels = {

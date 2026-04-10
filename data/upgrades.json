@@ -102,10 +102,10 @@
 			"max_level": 5,
 			"color": "8fd46b",
 			"stats": {
-				"respawn_reduce_per_lv": 1.5,
-				"min_respawn_interval": 5.0,
-				"instant_restore_levels": [1, 3, 5],
-				"survivor_hull_heal_per_lv": 2.0
+				"respawn_reduce_per_lv": 1.0,
+				"min_respawn_interval": 7.0,
+				"instant_restore_levels": [3, 5],
+				"survivor_hull_heal_per_lv": 1.0
 			}
 		},
 		"boarding_resist": {
@@ -115,9 +115,9 @@
 			"max_level": 5,
 			"color": "4ca6ff",
 			"stats": {
-				"capture_duration_mult_per_lv": 0.14,
-				"capture_damage_reduction_per_lv": 0.08,
-				"boarding_fire_reduce_per_lv": 0.12
+				"capture_duration_mult_per_lv": 0.08,
+				"capture_damage_reduction_per_lv": 0.05,
+				"boarding_fire_reduce_per_lv": 0.08
 			}
 		},
 		"crew_attack": {

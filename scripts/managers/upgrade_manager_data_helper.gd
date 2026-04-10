@@ -104,14 +104,14 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "전열 병력 %d명 | 창병/갑판 방어 강화" % spearmen
 		"crew_reserve":
 			var reserve_respawn: float = maxf(
-				float(s.get("min_respawn_interval", 5.0)),
-				12.0 - (float(next_level) * float(s.get("respawn_reduce_per_lv", 1.5)))
+				float(s.get("min_respawn_interval", 7.0)),
+				12.0 - (float(next_level) * float(s.get("respawn_reduce_per_lv", 1.0)))
 			)
-			var heal_bonus: float = float(next_level) * float(s.get("survivor_hull_heal_per_lv", 2.0))
+			var heal_bonus: float = float(next_level) * float(s.get("survivor_hull_heal_per_lv", 1.0))
 			return "병사 자동 보충 %.1f초 | 구조 회복 +%.0f" % [reserve_respawn, heal_bonus]
 		"boarding_resist":
-			var capture_delay_pct: int = int(round(float(next_level) * float(s.get("capture_duration_mult_per_lv", 0.14)) * 100.0))
-			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.12)) * 100.0))
+			var capture_delay_pct: int = int(round(float(next_level) * float(s.get("capture_duration_mult_per_lv", 0.08)) * 100.0))
+			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.08)) * 100.0))
 			return "적 장악 %d%% 지연 | 갑판 혼란 피해 -%d%%" % [capture_delay_pct, boarding_fire_reduce_pct]
 		"crew_attack":
 			return "병사 공격력 +%.0f" % [next_level * float(s.get("attack_add_per_lv", 2.0))]
