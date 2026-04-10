@@ -2,15 +2,23 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
+const BASE_DAMAGE: float = 18.0
+const OWNER_ATTACK_BONUS_SCALE: float = 0.55
+
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
 @export var max_range: float = 20.0
 var _cached_spawn_parent: Node = null
 
 func _ready() -> void:
-	damage = 12.0
+	damage = BASE_DAMAGE
 	attack_range = max_range
 	attack_cooldown = shoot_cooldown
+
+
+func apply_owner_attack_damage(owner_attack_damage: float) -> void:
+	var owner_bonus: float = maxf(0.0, owner_attack_damage - 12.0)
+	damage = BASE_DAMAGE + (owner_bonus * OWNER_ATTACK_BONUS_SCALE)
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return

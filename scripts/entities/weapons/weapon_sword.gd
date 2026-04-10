@@ -1,9 +1,17 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
+const BASE_DAMAGE: float = 13.0
+const OWNER_ATTACK_BONUS_SCALE: float = 0.8
+
 func _ready() -> void:
-	damage = 15.0
+	damage = BASE_DAMAGE
 	attack_range = 2.2
 	attack_cooldown = 1.0
+
+
+func apply_owner_attack_damage(owner_attack_damage: float) -> void:
+	var owner_bonus: float = maxf(0.0, owner_attack_damage - 12.0)
+	damage = BASE_DAMAGE + (owner_bonus * OWNER_ATTACK_BONUS_SCALE)
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target): return

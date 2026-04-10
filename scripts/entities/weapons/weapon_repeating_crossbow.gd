@@ -2,6 +2,9 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
+const DEFAULT_BASE_DAMAGE: float = 6.5
+const OWNER_ATTACK_BONUS_SCALE: float = 0.2
+
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
 @export var max_range: float = 20.0
@@ -10,12 +13,14 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 var burst_count: int = 3
 var burst_delay: float = 0.15
 var _cached_spawn_parent: Node = null
+var _upgrade_base_damage: float = DEFAULT_BASE_DAMAGE
+var _owner_attack_bonus: float = 0.0
 
 func _ready() -> void:
 	refresh_upgrade_stats()
 
 func refresh_upgrade_stats() -> void:
-	damage = 10.0 # 기존 활(12)보다 단발은 약하지만 연사로 총합은 높음
+	_upgrade_base_damage = DEFAULT_BASE_DAMAGE
 	attack_range = max_range
 	attack_cooldown = shoot_cooldown
 	
@@ -23,21 +28,30 @@ func refresh_upgrade_stats() -> void:
 	var um = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(um) and "current_levels" in um:
 		var lv = um.current_levels.get("repeating_crossbow", 1)
-		# 레벨에 따른 발사수 증가 (Lv1: 3, Lv3: 4, Lv5: 5)
+		# 레벨에 따른 발사수 증가 (Lv1: 3, Lv3+: 4)
 		if lv >= 1: burst_count = 3
 		if lv >= 3: burst_count = 4
-		if lv >= 5: burst_count = 5
 		
 		# 연노 스탯이 정의되어 있으면 적용
 		if "repeating_crossbow" in um.UPGRADES:
 			var s = um.UPGRADES["repeating_crossbow"]["stats"]
-			damage = s.get("base_damage", 10.0) + (lv - 1) * s.get("damage_per_lv", 2.0)
-			attack_cooldown = s.get("base_cooldown", 2.0) - (lv - 1) * s.get("cooldown_reduce_per_lv", 0.2)
+			_upgrade_base_damage = s.get("base_damage", DEFAULT_BASE_DAMAGE) + (lv - 1) * s.get("damage_per_lv", 1.0)
+			attack_cooldown = s.get("base_cooldown", 2.3) - (lv - 1) * s.get("cooldown_reduce_per_lv", 0.05)
 			burst_delay = s.get("burst_delay", 0.15)
 			
 	# 최소 쿨다운 보장 (버스트 쏘는 시간보다 짧으면 꼬임 방지)
 	if attack_cooldown < burst_count * burst_delay + 0.5:
 		attack_cooldown = burst_count * burst_delay + 0.5
+	_apply_effective_damage()
+
+
+func apply_owner_attack_damage(owner_attack_damage: float) -> void:
+	_owner_attack_bonus = maxf(0.0, owner_attack_damage - 12.0)
+	_apply_effective_damage()
+
+
+func _apply_effective_damage() -> void:
+	damage = _upgrade_base_damage + (_owner_attack_bonus * OWNER_ATTACK_BONUS_SCALE)
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return

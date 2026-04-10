@@ -302,7 +302,6 @@ func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
 ## 무기 공격력 수치 동기화
 func _update_weapon_stats() -> void:
 	var meta_manager = get_node_or_null("/root/MetaManager")
-	var mult: float = 1.0
 	var attack_flat_bonus: float = 0.0
 	if team == "player" and is_instance_valid(meta_manager):
 		if meta_manager.has_method("get_crew_damage_bonus"):
@@ -312,13 +311,15 @@ func _update_weapon_stats() -> void:
 	var effective_attack: float = attack_damage + attack_flat_bonus
 		
 	if is_instance_valid(weapon_sword):
-		# 검은 기본 공격력의 1.25배 (근접 보너스)
-		weapon_sword.damage = effective_attack * 1.25 * mult
+		if weapon_sword.has_method("apply_owner_attack_damage"):
+			weapon_sword.apply_owner_attack_damage(effective_attack)
+		else:
+			weapon_sword.damage = effective_attack
 	if is_instance_valid(weapon_bow):
 		if weapon_bow.has_method("apply_owner_attack_damage"):
-			weapon_bow.apply_owner_attack_damage(effective_attack * mult)
+			weapon_bow.apply_owner_attack_damage(effective_attack)
 		else:
-			weapon_bow.damage = effective_attack * mult
+			weapon_bow.damage = effective_attack
 
 
 func _set_active_weapon(type: String) -> void:

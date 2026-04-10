@@ -49,6 +49,7 @@ def main() -> int:
     parser.add_argument("--meta-crew-defense", type=int, default=0, help="Assumed permanent crew_defense level.")
     parser.add_argument("--run-crew-attack", type=int, default=0, help="Assumed run crew_attack level.")
     parser.add_argument("--run-crew-defense", type=int, default=0, help="Assumed run crew_defense level.")
+    parser.add_argument("--repeating-crossbow-level", type=int, default=1, help="Assumed repeating_crossbow specialist upgrade level.")
     args = parser.parse_args()
 
     soldier_rules = load_json(SOLDIER_RULES_PATH)
@@ -74,21 +75,31 @@ def main() -> int:
     effective_health = base_health * meta_health_mult
     effective_attack = base_attack + meta_attack_bonus + run_attack_bonus
     effective_defense = base_defense + meta_defense_bonus + run_defense_bonus
+    owner_attack_bonus = max(0.0, effective_attack - base_attack)
 
     melee_expected_crit = expected_crit_multiplier(crit_chance, crit_multiplier)
     harpoon_expected_crit = expected_crit_multiplier(crit_chance + 0.15, 2.5)
 
-    # Mirror the code-facing formulas, not the design intent.
-    sword_damage = effective_attack * 1.25
-    spear_damage = effective_attack * 1.25
-    trident_damage = effective_attack * 1.25
-    harpoon_damage = effective_attack * 1.25
-    bow_damage = effective_attack
+    # Mirror the current code-facing formulas, not the design intent.
+    sword_damage = 13.0 + (owner_attack_bonus * 0.8)
+    spear_damage = 12.0 + (owner_attack_bonus * 0.7)
+    trident_damage = 16.0 + (owner_attack_bonus * 0.75)
+    harpoon_damage = 12.0 + (owner_attack_bonus * 0.65)
+    bow_damage = 18.0 + (owner_attack_bonus * 0.55)
 
+    repeating_crossbow_level = max(1, args.repeating_crossbow_level)
+    repeating_stats = upgrades["repeating_crossbow"]["stats"]
     repeater_upgrade_damage = (
-        float(upgrades["repeating_crossbow"]["stats"].get("base_damage", 10.0))
-        + max(0, args.run_crew_attack - 1) * float(upgrades["repeating_crossbow"]["stats"].get("damage_per_lv", 2.0))
+        float(repeating_stats.get("base_damage", 6.5))
+        + max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("damage_per_lv", 1.0))
     )
+    repeater_burst_count = 3
+    if repeating_crossbow_level >= 3:
+        repeater_burst_count = 4
+    repeater_cooldown = float(repeating_stats.get("base_cooldown", 2.3)) - max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("cooldown_reduce_per_lv", 0.05))
+    repeater_burst_delay = float(repeating_stats.get("burst_delay", 0.15))
+    repeater_cooldown = max(repeater_cooldown, repeater_burst_count * repeater_burst_delay + 0.5)
+    repeater_damage = repeater_upgrade_damage + (owner_attack_bonus * 0.2)
     singigeon_base_damage = float(upgrades["singigeon"]["stats"].get("base_damage", 2.2))
     singigeon_personnel_mult = float(upgrades["singigeon"]["stats"].get("personnel_damage_mult", 6.0))
 
@@ -101,21 +112,21 @@ def main() -> int:
             "raw_hit": sword_damage,
             "cooldown": 1.0,
             "expected_hit": sword_damage * melee_expected_crit,
-            "notes": "Current code applies melee-slot weapons from soldier effective_attack * 1.25.",
+            "notes": "General melee baseline with moderate owner-attack scaling.",
         },
         {
             "weapon": "spear",
             "raw_hit": spear_damage,
             "cooldown": 1.2,
             "expected_hit": spear_damage * melee_expected_crit,
-            "notes": "Scene defaults differ, but current soldier stat sync tends to flatten melee-slot damage.",
+            "notes": "Longer reach, lower scaling than sword to keep it utility-oriented.",
         },
         {
             "weapon": "trident",
             "raw_hit": trident_damage,
             "cooldown": 1.6,
             "expected_hit": trident_damage * melee_expected_crit,
-            "notes": "Higher scene default exists, but current soldier stat sync tends to flatten melee-slot damage.",
+            "notes": "Heavy melee variant with slower cadence and stronger base hit.",
         },
         {
             "weapon": "harpoon",
@@ -133,10 +144,10 @@ def main() -> int:
         },
         {
             "weapon": "repeating_crossbow",
-            "raw_hit": bow_damage,
-            "cooldown": 2.0,
-            "expected_hit": bow_damage * 3.0,
-            "notes": f"Current soldier sync can overwrite per-bolt base damage. Intended upgrade base hit starts near {repeater_upgrade_damage:.1f}.",
+            "raw_hit": repeater_damage,
+            "cooldown": repeater_cooldown,
+            "expected_hit": repeater_damage * repeater_burst_count,
+            "notes": f"Current per-bolt base hit is {repeater_upgrade_damage:.1f} at level {repeating_crossbow_level}, with {repeater_burst_count} bolts per burst and softer owner scaling.",
         },
         {
             "weapon": "singigeon",
@@ -155,7 +166,8 @@ def main() -> int:
     print(
         "- assumptions: "
         f"meta_health={args.meta_crew_health}, meta_attack={args.meta_crew_attack}, meta_defense={args.meta_crew_defense}, "
-        f"run_attack={args.run_crew_attack}, run_defense={args.run_crew_defense}"
+        f"run_attack={args.run_crew_attack}, run_defense={args.run_crew_defense}, "
+        f"repeating_crossbow_level={repeating_crossbow_level}"
     )
     print()
     print("weapon                  hit    hit_vs_def  hit_vs_def_cover  dps    ttk    ttk_cover")
@@ -179,8 +191,8 @@ def main() -> int:
     for row in rows:
         print(f"- {row['weapon']}: {row['notes']}")
     print("- cover column is only meaningful for ranged damage sources, but is printed consistently for quick comparison.")
-    print("- spear/trident/harpoon scene defaults are not always the final applied damage, because soldier stat sync can overwrite melee-slot damage values.")
-    print("- repeating_crossbow and singigeon also mix role-specific stats with owner stat sync, so intended JSON values and effective runtime values can diverge.")
+    print("- melee and bow families now preserve role-specific base damage and apply separate owner-attack scaling instead of flattening to the same value.")
+    print("- repeating_crossbow and singigeon still mix role-specific stats with owner stat sync, so progression shape should be watched closely.")
     return 0
 
 

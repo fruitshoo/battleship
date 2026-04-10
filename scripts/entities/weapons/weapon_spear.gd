@@ -3,10 +3,18 @@ extends "res://scripts/entities/weapons/weapon.gd"
 ## 창 (Spear)
 ## 검보다 리치가 길지만 쿨다운이 약간 더 깁니다.
 
+const BASE_DAMAGE: float = 12.0
+const OWNER_ATTACK_BONUS_SCALE: float = 0.7
+
 func _ready() -> void:
-	damage = 12.0
+	damage = BASE_DAMAGE
 	attack_range = 3.2
 	attack_cooldown = 1.2
+
+
+func apply_owner_attack_damage(owner_attack_damage: float) -> void:
+	var owner_bonus: float = maxf(0.0, owner_attack_damage - 12.0)
+	damage = BASE_DAMAGE + (owner_bonus * OWNER_ATTACK_BONUS_SCALE)
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target): return
