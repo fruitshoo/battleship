@@ -43,10 +43,14 @@ static func check_derelict_status(ship) -> void:
 	if ship.is_derelict or ship.is_dying or ship.is_sinking:
 		return
 
+	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
 	var all_crew_dead = true
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if soldiers_node:
 		for child in EntityRegistry.get_soldiers_by_ship(ship):
+			var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
+			if child_team != ship_team:
+				continue
 			if not child.has_method("is_dead") or not child.is_dead():
 				all_crew_dead = false
 				break
@@ -54,6 +58,9 @@ static func check_derelict_status(ship) -> void:
 	if all_crew_dead:
 		var all_soldiers = EntityRegistry.get_soldiers()
 		for s in all_soldiers:
+			var soldier_team: String = s.get_team_tag() if s.has_method("get_team_tag") else str(s.get("team"))
+			if soldier_team != ship_team:
+				continue
 			if s.get("home_ship") == ship and (not s.has_method("is_dead") or not s.is_dead()):
 				all_crew_dead = false
 				break
