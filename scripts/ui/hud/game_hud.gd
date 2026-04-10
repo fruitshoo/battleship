@@ -12,6 +12,7 @@ const HudDistanceDebugHelper = preload("res://scripts/ui/hud/hud_distance_debug_
 const HudSailDebugHelper = preload("res://scripts/ui/hud/hud_sail_debug_helper.gd")
 const HudShipDebugHelper = preload("res://scripts/ui/hud/hud_ship_debug_helper.gd")
 const HudEndStateHelper = preload("res://scripts/ui/hud/hud_end_state_helper.gd")
+const HudStatusDisplayHelper = preload("res://scripts/ui/hud/hud_status_display_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
@@ -452,64 +453,16 @@ func _update_force_panel() -> void:
 	HudUpdateHelper.update_force_panel(self)
 
 func update_hull_hp(current: float, maximum: float) -> void:
-	if hp_bar:
-		hp_bar.max_value = maximum
-
-		var tween = create_tween()
-		tween.tween_property(hp_bar, "value", current, 0.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-
-		if hp_text_label:
-			hp_text_label.text = "HP %.0f / %.0f" % [current, maximum]
-
-		var ratio = current / maximum
-		var fill_style = hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
-		if fill_style:
-			if ratio > 0.6:
-				fill_style.bg_color = NavalUiTheme.STATUS_GOOD
-			elif ratio > 0.3:
-				fill_style.bg_color = NavalUiTheme.STATUS_WARN
-			else:
-				fill_style.bg_color = NavalUiTheme.STATUS_DANGER
+	HudStatusDisplayHelper.update_hull_hp(self, current, maximum)
 
 func update_stamina(current: float, maximum: float) -> void:
-	if stamina_bar:
-		stamina_bar.max_value = maximum
-		stamina_bar.value = current
-
-		var fill_style = stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
-		if fill_style:
-			if current < 1.0:
-				fill_style.bg_color = NavalUiTheme.STATUS_DANGER
-			else:
-				fill_style.bg_color = NavalUiTheme.STATUS_WARN
+	HudStatusDisplayHelper.update_stamina(self, current, maximum)
 
 func update_xp(current: int, maximum: int) -> void:
-	if xp_bar:
-		xp_bar.max_value = maximum
-		xp_bar.value = current
+	HudStatusDisplayHelper.update_xp(self, current, maximum)
 
 func update_merit(current: int, maximum: int, level: int = 1) -> void:
-	if merit_bar:
-		merit_bar.max_value = maximum
-
-		var tween = create_tween()
-		tween.tween_property(merit_bar, "value", current, 0.3).set_trans(Tween.TRANS_SINE)
-
-		if merit_label:
-			if current >= maximum:
-				merit_label.text = "[ 병영 LEVEL UP! ]"
-				merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
-
-				var style = merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
-				if style:
-					style.bg_color = Color(1.0, 0.94, 0.58, 1.0)
-			else:
-				merit_label.text = "지휘 Lv.%d (%d / %d)" % [level, current, maximum]
-				merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
-
-				var style_normal = merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
-				if style_normal:
-					style_normal.bg_color = NavalUiTheme.STATUS_WARN
+	HudStatusDisplayHelper.update_merit(self, current, maximum, level)
 
 func add_item_icon(icon_data) -> void:
 	if item_bar == null:
@@ -641,25 +594,7 @@ func _update_capture_opportunity_display() -> void:
 
 
 func _update_ammo_mode_display() -> void:
-	if not is_instance_valid(ammo_mode_label):
-		return
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		if ammo_mode_label.visible:
-			ammo_mode_label.visible = false
-		return
-	var ammo_key: String = str(player_ship.get("current_cannon_ammo")) if player_ship.get("current_cannon_ammo") != null else "roundshot"
-	var ammo_text: String = "탄종: 실선탄"
-	match ammo_key:
-		"chainshot":
-			ammo_text = "탄종: 사슬탄"
-		"grapeshot":
-			ammo_text = "탄종: 포도탄"
-	if _last_ammo_mode_text != ammo_text:
-		_last_ammo_mode_text = ammo_text
-		ammo_mode_label.text = ammo_text
-	ammo_mode_label.visible = true
+	HudStatusDisplayHelper.update_ammo_mode_display(self)
 
 
 func show_game_over() -> void:
@@ -671,11 +606,7 @@ func update_boss_hp(current: float, maximum: float) -> void:
 
 
 func show_gust_warning_message(message: String, duration: float = 0.35) -> void:
-	if not gust_warning:
-		return
-	gust_warning.text = message
-	gust_warning.visible = true
-	_gust_warning_timer = maxf(_gust_warning_timer, duration)
+	HudStatusDisplayHelper.show_gust_warning_message(self, message, duration)
 
 
 func _get_player_masts_for_debug() -> Array[Node]:
