@@ -59,3 +59,17 @@ bash scripts/dev/run_refactor_tooling.sh --strict
 Use `--write` only for the safe codemod step.
 Use `--contract-sweep` when you want the wrapper to finish by running the project contract harness.
 Use `--strict` when you want the audit step to fail on any legacy-pattern hits.
+
+## `soldier_balance_report.py`
+
+Quick balance report for current soldier health, damage, defense, and rough TTK bands.
+
+Examples:
+
+```bash
+python3 scripts/dev/soldier_balance_report.py
+python3 scripts/dev/soldier_balance_report.py --meta-crew-health 3 --meta-crew-attack 2 --meta-crew-defense 2
+python3 scripts/dev/soldier_balance_report.py --run-crew-attack 5 --run-crew-defense 5
+```
+
+The report mirrors the code-facing formulas and highlights when intended weapon stats and effective runtime stats can diverge.
