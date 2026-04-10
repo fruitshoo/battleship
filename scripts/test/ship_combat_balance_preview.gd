@@ -418,6 +418,18 @@ func _build_current_result() -> Dictionary:
 		"enemy_boarders_on_player": enemy_boarders_on_player,
 		"raid_debug": raid_debug,
 		"winner": winner,
+		"event_summary": _build_event_summary(
+			player_hull_ratio,
+			enemy_hull_ratio,
+			player_crew,
+			enemy_crew,
+			player_derelict,
+			enemy_derelict,
+			player_boarding,
+			enemy_boarding,
+			player_boarders_on_enemy,
+			enemy_boarders_on_player
+		),
 	}
 
 
@@ -590,6 +602,44 @@ func _get_live_winner_hint(player_hull: float, enemy_hull: float, player_crew: i
 	return "player crew+" if player_crew > enemy_crew else "enemy crew+"
 
 
+func _build_event_summary(
+	player_hull_ratio: float,
+	enemy_hull_ratio: float,
+	player_crew: int,
+	enemy_crew: int,
+	player_derelict: bool,
+	enemy_derelict: bool,
+	player_boarding: bool,
+	enemy_boarding: bool,
+	player_boarders_on_enemy: int,
+	enemy_boarders_on_player: int
+) -> String:
+	var events: Array[String] = []
+	if enemy_derelict:
+		events.append("폐선화")
+	if player_derelict:
+		events.append("본함 위기")
+	if player_boarding:
+		events.append("월선 개시")
+	if enemy_boarding:
+		events.append("적 보딩")
+	if player_boarders_on_enemy > 0:
+		events.append("적 갑판 침투")
+	if enemy_boarders_on_player > 0:
+		events.append("적 월선 성공")
+	if player_hull_ratio - enemy_hull_ratio >= 0.18:
+		events.append("포격 우세")
+	elif enemy_hull_ratio - player_hull_ratio >= 0.18:
+		events.append("적 포격 우세")
+	if player_crew - enemy_crew >= 2:
+		events.append("갑판 우세")
+	elif enemy_crew - player_crew >= 2:
+		events.append("적 갑판 우세")
+	if events.is_empty():
+		events.append("대치")
+	return ", ".join(events)
+
+
 func _report_summary() -> void:
 	var player_wins: int = 0
 	var enemy_wins: int = 0
@@ -605,7 +655,7 @@ func _report_summary() -> void:
 	if auto_print_summary:
 		for result in _scenario_results:
 			var raid_debug: Dictionary = result.get("raid_debug", {})
-			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d" % [
+			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d events=%s" % [
 				str(result.get("name", "Scenario")),
 				str(result.get("winner", "draw")),
 				float(result.get("elapsed", 0.0)),
@@ -629,6 +679,7 @@ func _report_summary() -> void:
 				int(raid_debug.get("spare", 0)),
 				int(raid_debug.get("desired_boarders", 0)),
 				int(raid_debug.get("available_boarders", 0)),
+				str(result.get("event_summary", "")),
 			])
 		print("[ShipCombat] summary scenarios=%d player_wins=%d enemy_wins=%d draws=%d" % [
 			_scenario_results.size(),
