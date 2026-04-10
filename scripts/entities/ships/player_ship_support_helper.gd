@@ -14,9 +14,10 @@ static func spawn_or_repair_ally(ship) -> void:
 		ship._cached_audio_manager.play_sfx("trumpet_war", ship.global_position)
 
 	if not support_ships.is_empty():
+		var repair_fraction: float = _get_support_repair_fraction(ship)
 		for support_ship in support_ships:
 			if support_ship.has_method("repair_ship"):
-				support_ship.repair_ship(0.5)
+				support_ship.repair_ship(repair_fraction)
 			if is_instance_valid(UpgradeManager):
 				UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
 		print("[Merit] 기존 지원 함대를 수리 및 강화했습니다.")
@@ -67,6 +68,12 @@ static func spawn_or_repair_ally(ship) -> void:
 		ally._last_ai_speed = ally.current_speed
 
 	print("[Summon] 정규군 함선을 소환했습니다!")
+
+static func _get_support_repair_fraction(ship) -> float:
+	var fleet_hull_level: int = 0
+	if is_instance_valid(ship._cached_um):
+		fleet_hull_level = int(ship._cached_um.current_levels.get("fleet_hull", 0))
+	return minf(0.4, 0.2 + float(fleet_hull_level) * 0.04)
 
 static func get_support_fleet_ships(ship) -> Array:
 	var support_ships: Array = []

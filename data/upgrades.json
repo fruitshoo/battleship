@@ -266,9 +266,9 @@
 			"max_level": 5,
 			"color": "33e5ff",
 			"stats": {
-				"respawn_reduce_per_lv": 4.0,
+				"respawn_reduce_per_lv": 3.0,
 				"respawn_reduce_max_level": 4,
-				"min_respawn_interval": 14.0,
+				"min_respawn_interval": 18.0,
 				"limit_add_level": 5,
 				"limit_add": 1
 			}

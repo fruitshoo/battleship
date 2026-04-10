@@ -691,8 +691,8 @@ func _apply_fleet_crew(ship: Node3D, level: int) -> void:
 	_refresh_support_fleet_upgrade_state(ship)
 	var stats: Dictionary = UPGRADES["fleet_crew"].get("stats", {})
 	var reduce_levels: int = mini(level, int(stats.get("respawn_reduce_max_level", 4)))
-	var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 4.0))
-	var min_respawn_interval: float = float(stats.get("min_respawn_interval", 14.0))
+	var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 3.0))
+	var min_respawn_interval: float = float(stats.get("min_respawn_interval", 18.0))
 	var base_interval: float = float(ship.get_meta("base_support_fleet_respawn_interval", ship.support_fleet_respawn_interval))
 	var next_respawn_interval: float = maxf(min_respawn_interval, base_interval - (reduce_per_level * float(reduce_levels)))
 	if "support_fleet_respawn_timer" in ship and "support_fleet_respawn_interval" in ship:
@@ -842,8 +842,8 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 		if not ship.has_meta("base_support_fleet_respawn_interval"):
 			ship.set_meta("base_support_fleet_respawn_interval", base_interval)
 		var reduce_levels: int = mini(level, int(stats.get("respawn_reduce_max_level", 4)))
-		var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 4.0))
-		var min_respawn_interval: float = float(stats.get("min_respawn_interval", 14.0))
+		var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 3.0))
+		var min_respawn_interval: float = float(stats.get("min_respawn_interval", 18.0))
 		ship.support_fleet_respawn_interval = maxf(min_respawn_interval, base_interval - (reduce_per_level * float(reduce_levels)))
 	if "support_fleet_limit" in ship:
 		var base_limit: int = int(ship.get_meta("base_support_fleet_limit", ship.support_fleet_limit))
