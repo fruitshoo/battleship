@@ -11,6 +11,7 @@ const HudDebugPanelHelper = preload("res://scripts/ui/hud/hud_debug_panel_helper
 const HudDistanceDebugHelper = preload("res://scripts/ui/hud/hud_distance_debug_helper.gd")
 const HudSailDebugHelper = preload("res://scripts/ui/hud/hud_sail_debug_helper.gd")
 const HudShipDebugHelper = preload("res://scripts/ui/hud/hud_ship_debug_helper.gd")
+const HudEndStateHelper = preload("res://scripts/ui/hud/hud_end_state_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
@@ -662,18 +663,7 @@ func _update_ammo_mode_display() -> void:
 
 
 func show_game_over() -> void:
-	if _game_over_transitioning:
-		return
-	if game_over_label:
-		game_over_label.text = "!!! SHIP DESTROYED !!!"
-		game_over_label.visible = true
-		# 페이드인
-		var tween = create_tween()
-		game_over_label.modulate.a = 0.0
-		tween.tween_property(game_over_label, "modulate:a", 1.0, 1.0)
-	get_tree().paused = true
-	if is_instance_valid(game_over_overlay):
-		game_over_overlay.show_overlay("함선이 침몰했습니다. 항구로 복귀합니다.", 4.0)
+	HudEndStateHelper.show_game_over(self)
 
 
 func update_boss_hp(current: float, maximum: float) -> void:
@@ -713,55 +703,13 @@ func _on_sail_debug_hole_changed(value: float) -> void:
 
 
 func show_victory() -> void:
-	if victory_label:
-		victory_label.text = "[!] VICTORY [!]"
-		victory_label.visible = true
-		var tween = create_tween()
-		victory_label.modulate.a = 0.0
-		tween.tween_property(victory_label, "modulate:a", 1.0, 2.0)
+	HudEndStateHelper.show_victory(self)
 
 func show_victory_with_damage(rows: Array, total_damage: float) -> void:
-	if not victory_label:
-		return
-	var lines: Array[String] = []
-	lines.append("[!] VICTORY [!]")
-	lines.append("총 무기 피해: %.0f" % total_damage)
-	if rows.is_empty():
-		lines.append("무기 데미지 통계 없음")
-	else:
-		lines.append("----- 무기별 데미지 -----")
-		for row in rows:
-			var name = str(row.get("name", "?"))
-			var dmg = float(row.get("damage", 0.0))
-			lines.append("%s : %.0f" % [name, dmg])
-	
-	victory_label.text = "\n".join(lines)
-	victory_label.visible = true
-	victory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	victory_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	victory_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	victory_label.offset_left = -320.0
-	victory_label.offset_top = -180.0
-	victory_label.offset_right = 320.0
-	victory_label.offset_bottom = 220.0
-	victory_label.add_theme_font_size_override("font_size", 24)
-	
-	var tween = create_tween()
-	victory_label.modulate.a = 0.0
-	tween.tween_property(victory_label, "modulate:a", 1.0, 0.8)
+	HudEndStateHelper.show_victory_with_damage(self, rows, total_damage)
 
 func _setup_game_over_overlay() -> void:
-	if is_instance_valid(game_over_overlay):
-		return
-	game_over_overlay = HudGameOverOverlay.new()
-	game_over_overlay.return_requested.connect(_return_to_main_menu)
-	add_child(game_over_overlay)
+	HudEndStateHelper.setup_game_over_overlay(self)
 
 func _return_to_main_menu() -> void:
-	if _game_over_transitioning:
-		return
-	_game_over_transitioning = true
-	if is_instance_valid(game_over_overlay):
-		game_over_overlay.hide_overlay()
-	get_tree().paused = false
-	get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
+	HudEndStateHelper.return_to_main_menu(self)
