@@ -15,6 +15,7 @@ signal boss_died
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/launchers/singigeon_launcher.tscn")
 @export var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
 @export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/atakebune_hull.tscn")
+@export var chest_scene: PackedScene = preload("res://scenes/effects/treasure_chest.tscn")
 
 var target: Node3D = null
 var orbit_angle: float = 0.0
@@ -379,6 +380,8 @@ func die() -> void:
 	if not _merit_granted and is_instance_valid(cached_lm) and cached_lm.has_method("add_merit"):
 		cached_lm.add_merit(50)
 		_merit_granted = true
+
+	_drop_treasure_chest()
 	
 	# 침몰 효과 (회전하며 가라앉음)
 	var tween = create_tween()
@@ -408,6 +411,18 @@ func die() -> void:
 	# 삭제 지연
 	leaking_rate = 0.0 # 사망 시 누수 중단
 	get_tree().create_timer(5.0).timeout.connect(queue_free)
+
+
+func _drop_treasure_chest() -> void:
+	if not chest_scene:
+		return
+	var chest = chest_scene.instantiate()
+	if chest == null:
+		return
+	get_tree().root.add_child(chest)
+	chest.global_position = global_position
+	chest.global_position.y = 0.0
+	print("[Boss] 보스 격침! 보물 상자 드랍.")
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:
