@@ -48,16 +48,22 @@ static func _play_attack_animation(soldier) -> void:
 	var weapon := soldier.current_weapon as Node3D
 	var weapon_visual := _get_weapon_visual_node(weapon)
 	_cache_attack_rest_transforms(hand_pivot, weapon_visual)
-	_reset_attack_pose(hand_pivot, weapon_visual)
 
 	var mesh_instance = soldier.get_node_or_null("MeshInstance3D")
 	if mesh_instance:
-		var tween = soldier.create_tween()
-		tween.tween_property(mesh_instance, "position:z", -0.5, 0.1).as_relative()
-		tween.tween_property(mesh_instance, "position:z", 0.5, 0.1).as_relative()
+		_stop_tracked_tween(soldier, "_attack_body_tween")
+		if not mesh_instance.has_meta("_attack_rest_position"):
+			mesh_instance.set_meta("_attack_rest_position", mesh_instance.position)
+		var mesh_rest_position: Vector3 = mesh_instance.get_meta("_attack_rest_position", mesh_instance.position)
+		var body_tween: Tween = soldier.create_tween()
+		soldier.set_meta("_attack_body_tween", body_tween)
+		body_tween.tween_property(mesh_instance, "position", mesh_rest_position + Vector3(0.0, 0.0, -0.28), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		body_tween.tween_property(mesh_instance, "position", mesh_rest_position, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 	if not is_instance_valid(hand_pivot):
 		return
+
+	_stop_tracked_tween(soldier, "_attack_pose_tween")
 
 	var weapon_id := ""
 	if is_instance_valid(weapon):
@@ -76,52 +82,60 @@ static func _play_attack_animation(soldier) -> void:
 static func _play_swing_attack_animation(soldier, hand_pivot: Node3D, weapon_visual: Node3D = null) -> void:
 	var rest_rotation: Vector3 = hand_pivot.get_meta("_attack_rest_rotation", hand_pivot.rotation)
 	var rest_scale: Vector3 = hand_pivot.get_meta("_attack_rest_scale", hand_pivot.scale)
-	var swing_tween = soldier.create_tween()
+	var swing_tween: Tween = soldier.create_tween()
+	soldier.set_meta("_attack_pose_tween", swing_tween)
 	swing_tween.set_parallel(true)
-	swing_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-28.0), 0.0, deg_to_rad(58.0)), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	swing_tween.tween_property(hand_pivot, "scale", rest_scale * 1.08, 0.09)
+	swing_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-18.0), 0.0, deg_to_rad(24.0)), 0.07).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	swing_tween.tween_property(hand_pivot, "scale", rest_scale * 1.04, 0.07).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	if is_instance_valid(weapon_visual):
 		var visual_rest_rot: Vector3 = weapon_visual.get_meta("_attack_rest_rotation", weapon_visual.rotation)
-		swing_tween.tween_property(weapon_visual, "rotation", visual_rest_rot + Vector3(0.0, 0.0, deg_to_rad(22.0)), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		swing_tween.tween_property(weapon_visual, "rotation", visual_rest_rot + Vector3(0.0, 0.0, deg_to_rad(12.0)), 0.07).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	swing_tween.chain().set_parallel(true)
-	swing_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(8.0), 0.0, deg_to_rad(-34.0)), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	swing_tween.tween_property(hand_pivot, "scale", rest_scale, 0.12)
+	swing_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(6.0), 0.0, deg_to_rad(-26.0)), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	swing_tween.tween_property(hand_pivot, "scale", rest_scale, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	if is_instance_valid(weapon_visual):
 		var visual_rest_rot_2: Vector3 = weapon_visual.get_meta("_attack_rest_rotation", weapon_visual.rotation)
-		swing_tween.tween_property(weapon_visual, "rotation", visual_rest_rot_2 + Vector3(0.0, 0.0, deg_to_rad(-16.0)), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		swing_tween.tween_property(weapon_visual, "rotation", visual_rest_rot_2 + Vector3(0.0, 0.0, deg_to_rad(-12.0)), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	swing_tween.chain().set_parallel(true)
-	swing_tween.tween_property(hand_pivot, "rotation", rest_rotation, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	swing_tween.tween_property(hand_pivot, "rotation", rest_rotation, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	if is_instance_valid(weapon_visual):
-		swing_tween.tween_property(weapon_visual, "rotation", weapon_visual.get_meta("_attack_rest_rotation", weapon_visual.rotation), 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		swing_tween.tween_property(weapon_visual, "rotation", weapon_visual.get_meta("_attack_rest_rotation", weapon_visual.rotation), 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 static func _play_thrust_attack_animation(soldier, hand_pivot: Node3D, weapon_visual: Node3D = null) -> void:
 	var rest_position: Vector3 = hand_pivot.get_meta("_attack_rest_position", hand_pivot.position)
 	var rest_rotation: Vector3 = hand_pivot.get_meta("_attack_rest_rotation", hand_pivot.rotation)
-	var thrust_tween = soldier.create_tween()
+	var thrust_tween: Tween = soldier.create_tween()
+	soldier.set_meta("_attack_pose_tween", thrust_tween)
+	var visual_rest_pos: Vector3 = weapon_visual.get_meta("_attack_rest_position", weapon_visual.position) if is_instance_valid(weapon_visual) else Vector3.ZERO
 	thrust_tween.set_parallel(true)
-	thrust_tween.tween_property(hand_pivot, "position", rest_position + Vector3(0.0, 0.03, -0.38), 0.07).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	thrust_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-18.0), 0.0, deg_to_rad(6.0)), 0.07).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	thrust_tween.tween_property(hand_pivot, "position", rest_position + Vector3(0.0, 0.02, -0.18), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	thrust_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-8.0), 0.0, deg_to_rad(2.0)), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	if is_instance_valid(weapon_visual):
-		var visual_rest_pos: Vector3 = weapon_visual.get_meta("_attack_rest_position", weapon_visual.position)
-		thrust_tween.tween_property(weapon_visual, "position", visual_rest_pos + Vector3(0.0, 0.18, -0.05), 0.07).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		thrust_tween.tween_property(weapon_visual, "position", visual_rest_pos + Vector3(0.0, 0.06, -0.18), 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	thrust_tween.chain().set_parallel(true)
-	thrust_tween.tween_property(hand_pivot, "position", rest_position, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	thrust_tween.tween_property(hand_pivot, "rotation", rest_rotation, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	thrust_tween.tween_property(hand_pivot, "position", rest_position + Vector3(0.0, 0.01, -0.36), 0.10).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	thrust_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-14.0), 0.0, deg_to_rad(4.0)), 0.10).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if is_instance_valid(weapon_visual):
-		thrust_tween.tween_property(weapon_visual, "position", weapon_visual.get_meta("_attack_rest_position", weapon_visual.position), 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		thrust_tween.tween_property(weapon_visual, "position", visual_rest_pos + Vector3(0.0, 0.12, -0.32), 0.10).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	thrust_tween.chain().set_parallel(true)
+	thrust_tween.tween_property(hand_pivot, "position", rest_position, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	thrust_tween.tween_property(hand_pivot, "rotation", rest_rotation, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if is_instance_valid(weapon_visual):
+		thrust_tween.tween_property(weapon_visual, "position", weapon_visual.get_meta("_attack_rest_position", weapon_visual.position), 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 static func _play_ranged_attack_animation(soldier, hand_pivot: Node3D) -> void:
 	var rest_position: Vector3 = hand_pivot.get_meta("_attack_rest_position", hand_pivot.position)
 	var rest_rotation: Vector3 = hand_pivot.get_meta("_attack_rest_rotation", hand_pivot.rotation)
-	var ranged_tween = soldier.create_tween()
+	var ranged_tween: Tween = soldier.create_tween()
+	soldier.set_meta("_attack_pose_tween", ranged_tween)
 	ranged_tween.set_parallel(true)
-	ranged_tween.tween_property(hand_pivot, "position", rest_position + Vector3(0.0, 0.0, 0.18), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	ranged_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-10.0), 0.0, 0.0), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	ranged_tween.tween_property(hand_pivot, "position", rest_position + Vector3(0.0, 0.0, 0.12), 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	ranged_tween.tween_property(hand_pivot, "rotation", rest_rotation + Vector3(deg_to_rad(-6.0), 0.0, 0.0), 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	ranged_tween.chain().set_parallel(true)
-	ranged_tween.tween_property(hand_pivot, "position", rest_position, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	ranged_tween.tween_property(hand_pivot, "rotation", rest_rotation, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	ranged_tween.tween_property(hand_pivot, "position", rest_position, 0.20).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	ranged_tween.tween_property(hand_pivot, "rotation", rest_rotation, 0.20).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 static func _get_weapon_visual_node(weapon: Node3D) -> Node3D:
@@ -152,6 +166,15 @@ static func _reset_attack_pose(hand_pivot: Node3D, weapon_visual: Node3D) -> voi
 		weapon_visual.position = weapon_visual.get_meta("_attack_rest_position", weapon_visual.position)
 		weapon_visual.rotation = weapon_visual.get_meta("_attack_rest_rotation", weapon_visual.rotation)
 		weapon_visual.scale = weapon_visual.get_meta("_attack_rest_scale", weapon_visual.scale)
+
+
+static func _stop_tracked_tween(soldier, meta_key: String) -> void:
+	if not soldier.has_meta(meta_key):
+		return
+	var tracked_tween = soldier.get_meta(meta_key)
+	if tracked_tween is Tween and is_instance_valid(tracked_tween):
+		tracked_tween.kill()
+	soldier.remove_meta(meta_key)
 
 
 static func check_ranged_combat(soldier) -> void:
