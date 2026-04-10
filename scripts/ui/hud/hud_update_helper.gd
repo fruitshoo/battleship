@@ -306,20 +306,23 @@ static func update_boarding_display(hud) -> void:
 	var target_friendly_count: int = 0
 	var target_hostile_count: int = 0
 	var target_overrun: bool = false
+	var target_name: String = _get_short_ship_name(boarding_target)
 	if is_instance_valid(boarding_target):
 		target_friendly_count = int(boarding_target.get("deck_friendly_crew_count")) if boarding_target.get("deck_friendly_crew_count") != null else 0
 		target_hostile_count = int(boarding_target.get("deck_hostile_boarder_count")) if boarding_target.get("deck_hostile_boarder_count") != null else 0
 		target_overrun = boarding_target.get("deck_is_overrun") == true
 	if is_boarding:
 		hud.boarding_ui.visible = true
+		var target_suffix := " [%s]" % target_name if not target_name.is_empty() else ""
 		if prep_timer < prep_duration:
-			hud.boarding_label.text = "도선 준비 중 (밧줄 고정)  승조 %d | 월선 %d" % [target_friendly_count, target_hostile_count]
+			hud.boarding_label.text = "도선 준비 중%s  승조 %d | 월선 %d" % [target_suffix, target_friendly_count, target_hostile_count]
 			hud.boarding_bar.value = (prep_timer / prep_duration) * 100
 			var fill = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
 			if fill:
 				fill.bg_color = Color(1.0, 1.0, 1.0, 0.7)
 		else:
-			hud.boarding_label.text = "도선 진행 중!  승조 %d | 월선 %d%s" % [
+			hud.boarding_label.text = "도선 진행 중%s  승조 %d | 월선 %d%s" % [
+				target_suffix,
 				target_friendly_count,
 				target_hostile_count,
 				" | 갑판 장악" if target_overrun else ""
@@ -480,6 +483,7 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 	bar_root.position = screen_pos + Vector2(-hud.SHIP_HP_BAR_WIDTH * 0.5, hud.SHIP_HP_BAR_OFFSET_Y)
 	var hp_bar: ProgressBar = bar_root.get_node("Bar") as ProgressBar
 	var boarding_label: Label = bar_root.get_node("Boarding") as Label
+	var state_label: Label = bar_root.get_node("State") as Label
 	if not is_instance_valid(hp_bar):
 		return false
 	if positions_only:
@@ -521,6 +525,19 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 			boarding_label.visible = true
 		else:
 			boarding_label.visible = false
+	if is_instance_valid(state_label):
+		var is_contested_state: bool = ship.get("deck_is_contested") == true
+		var is_overrun_state: bool = ship.get("deck_is_overrun") == true
+		if is_overrun_state:
+			state_label.text = "장악" if team_tag != "player" else "위기"
+			state_label.add_theme_color_override("font_color", Color(1.0, 0.80, 0.32, 1.0))
+			state_label.visible = true
+		elif is_contested_state:
+			state_label.text = "교전"
+			state_label.add_theme_color_override("font_color", Color(1.0, 0.90, 0.58, 1.0))
+			state_label.visible = true
+		else:
+			state_label.visible = false
 	return true
 
 static func _cleanup_stale_ship_hp_bars(hud, active_ids: Dictionary) -> void:
@@ -545,15 +562,29 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	var bar_root: Control = Control.new()
 	bar_root.name = "ShipHP_%d" % ship_id
 	bar_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar_root.custom_minimum_size = Vector2(hud.SHIP_HP_BAR_WIDTH, hud.SHIP_HP_BAR_HEIGHT + 16.0)
+	bar_root.custom_minimum_size = Vector2(hud.SHIP_HP_BAR_WIDTH, hud.SHIP_HP_BAR_HEIGHT + 30.0)
 	bar_root.size = bar_root.custom_minimum_size
 	bar_root.z_index = 20
 	hud.ship_hp_overlay.add_child(bar_root)
 
+	var state_label := Label.new()
+	state_label.name = "State"
+	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	state_label.position = Vector2(0.0, 0.0)
+	state_label.custom_minimum_size = Vector2(hud.SHIP_HP_BAR_WIDTH, 14.0)
+	state_label.size = state_label.custom_minimum_size
+	state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	state_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	state_label.add_theme_font_size_override("font_size", 10)
+	state_label.add_theme_constant_override("outline_size", 2)
+	state_label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.05, 0.9))
+	state_label.visible = false
+	bar_root.add_child(state_label)
+
 	var boarding_label := Label.new()
 	boarding_label.name = "Boarding"
 	boarding_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	boarding_label.position = Vector2(0.0, 0.0)
+	boarding_label.position = Vector2(0.0, 14.0)
 	boarding_label.custom_minimum_size = Vector2(hud.SHIP_HP_BAR_WIDTH, 14.0)
 	boarding_label.size = boarding_label.custom_minimum_size
 	boarding_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -571,7 +602,7 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	hp_bar.custom_minimum_size = Vector2(hud.SHIP_HP_BAR_WIDTH, hud.SHIP_HP_BAR_HEIGHT)
 	hp_bar.size = hp_bar.custom_minimum_size
 	hp_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	hp_bar.position = Vector2(0.0, 14.0)
+	hp_bar.position = Vector2(0.0, 28.0)
 	bar_root.add_child(hp_bar)
 
 	var bg_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -588,3 +619,13 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 
 	hud.ship_hp_bars[ship_id] = bar_root
 	return bar_root
+
+
+static func _get_short_ship_name(ship) -> String:
+	if not is_instance_valid(ship):
+		return ""
+	if ship.get("ship_type") != null:
+		var ship_type: String = str(ship.get("ship_type"))
+		if not ship_type.is_empty():
+			return ship_type.capitalize()
+	return ship.name if ship.name != null else ""
