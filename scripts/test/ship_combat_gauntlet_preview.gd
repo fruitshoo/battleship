@@ -31,6 +31,7 @@ var _running: bool = false
 var _sequence_finished: bool = false
 var _baseline_hull: float = 0.0
 var _baseline_crew: int = 0
+var _upgrade_preset: String = ""
 
 
 func _ready() -> void:
@@ -50,6 +51,7 @@ func _process(delta: float) -> void:
 func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
 	_ensure_overlay()
+	_upgrade_preset = OS.get_environment("BATTLESHIP_GAUNTLET_UPGRADE_PRESET").strip_edges().to_lower()
 	_setup_player_ship()
 	_encounters = _build_encounters()
 	_baseline_hull = _get_ship_hull(_current_player_ship)
@@ -77,6 +79,7 @@ func _setup_player_ship() -> void:
 			add_child(_current_player_ship)
 	_reset_player_ship_for_gauntlet(true)
 	_configure_player_runtime()
+	_apply_upgrade_preset()
 
 
 func _run_encounters() -> void:
@@ -226,7 +229,7 @@ func _configure_player_runtime() -> void:
 		_current_player_ship.set("support_fleet_respawn_timer", 0.0)
 	if "captain_count" in _current_player_ship:
 		_current_player_ship.set("captain_count", 0)
-	if "crew_respawn_interval" in _current_player_ship:
+	if "crew_respawn_interval" in _current_player_ship and _upgrade_preset.is_empty():
 		_current_player_ship.set("crew_respawn_interval", 99999.0)
 	if "crew_respawn_timer" in _current_player_ship:
 		_current_player_ship.set("crew_respawn_timer", 0.0)
@@ -234,6 +237,34 @@ func _configure_player_runtime() -> void:
 		_current_player_ship.set("is_rowing", false)
 	if _current_player_ship.has_method("set_preview_deck_state"):
 		_current_player_ship.call("set_preview_deck_state", false, false)
+
+
+func _apply_upgrade_preset() -> void:
+	if _upgrade_preset.is_empty():
+		return
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if not is_instance_valid(upgrade_manager):
+		return
+	var preset_levels: Dictionary = {}
+	match _upgrade_preset:
+		"crew_sustain":
+			preset_levels = {
+				"crew_reserve": 3,
+				"boarding_resist": 3,
+			}
+		"crew_sustain_heavy":
+			preset_levels = {
+				"crew_reserve": 5,
+				"boarding_resist": 5,
+			}
+		_:
+			return
+	for upgrade_id in preset_levels.keys():
+		var target_level: int = int(preset_levels.get(upgrade_id, 0))
+		while int(upgrade_manager.current_levels.get(upgrade_id, 0)) < target_level:
+			upgrade_manager.apply_upgrade(upgrade_id)
+	if auto_print_summary:
+		print("[ShipGauntlet] upgrade_preset=%s" % _upgrade_preset)
 
 
 func _configure_enemy_runtime() -> void:

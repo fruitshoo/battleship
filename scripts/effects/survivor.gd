@@ -230,6 +230,8 @@ func _try_collect(player_ship: Node3D) -> void:
 					var supply_stats: Dictionary = um.get_supply_bonus_stats()
 					heal_amount += float(supply_stats.get("heal_bonus", 0.0))
 					stamina_recover += float(supply_stats.get("stamina_recovery_bonus", 0.0))
+				if player_ship.has_meta("survivor_hull_heal_bonus"):
+					heal_amount += float(player_ship.get_meta("survivor_hull_heal_bonus"))
 				player_ship.hull_hp = minf(player_ship.hull_hp + heal_amount, player_ship.max_hull_hp)
 				if "rowing_stamina" in player_ship and "max_rowing_stamina" in player_ship:
 					player_ship.rowing_stamina = minf(player_ship.max_rowing_stamina, player_ship.rowing_stamina + stamina_recover)

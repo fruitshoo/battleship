@@ -66,6 +66,8 @@ static func get_effective_boarding_capture_duration(ship, attacker_ship: Node = 
 		attacker_combat_mult = float(attacker_ship.call("get_combat_effectiveness_multiplier"))
 	var defender_combat_mult: float = maxf(0.01, get_combat_effectiveness_multiplier(ship))
 	var duration_mult: float = defender_combat_mult / maxf(0.01, attacker_combat_mult)
+	if ship.has_meta("boarding_capture_duration_multiplier"):
+		duration_mult *= maxf(0.1, float(ship.get_meta("boarding_capture_duration_multiplier")))
 	return clampf(ship.boarding_capture_duration * duration_mult, 1.2, 16.0)
 
 

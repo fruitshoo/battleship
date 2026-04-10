@@ -73,10 +73,14 @@ static func update_boarding_chaos(soldier, delta: float) -> void:
 
 	if soldier.chaos_tick_timer <= 0.0:
 		soldier.chaos_tick_timer = 1.0
+		var chaos_damage: float = soldier.chaos_damage_per_tick
+		if soldier.owned_ship.has_meta("boarding_fire_damage_reduction"):
+			var reduction: float = clampf(float(soldier.owned_ship.get_meta("boarding_fire_damage_reduction")), 0.0, 0.75)
+			chaos_damage *= 1.0 - reduction
 		if soldier.owned_ship.has_method("take_fire_damage"):
-			soldier.owned_ship.take_fire_damage(soldier.chaos_damage_per_tick, 2.0)
+			soldier.owned_ship.take_fire_damage(chaos_damage, 2.0)
 		elif soldier.owned_ship.has_method("take_damage"):
-			soldier.owned_ship.take_damage(soldier.chaos_damage_per_tick, soldier.global_position, "boarding_fire")
+			soldier.owned_ship.take_damage(chaos_damage, soldier.global_position, "boarding_fire")
 
 	if soldier.chaos_duration_timer <= 0.0:
 		soldier.is_boarder_on_player_ship = false

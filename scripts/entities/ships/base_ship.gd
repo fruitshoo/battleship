@@ -897,6 +897,9 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	var hp_before: float = hull_hp
 	if deck_is_contested and _is_contested_hull_damage_source(damage_source):
 		amount *= contested_hull_damage_multiplier
+	if damage_source == "boarding_capture" and has_meta("boarding_capture_damage_reduction"):
+		var capture_reduction: float = clampf(float(get_meta("boarding_capture_damage_reduction")), 0.0, 0.75)
+		amount *= 1.0 - capture_reduction
 	var final_damage = maxf(amount - hull_defense, 1.0)
 	hull_hp -= final_damage
 	_apply_sail_damage_from_hit(final_damage, damage_source)

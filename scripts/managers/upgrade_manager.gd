@@ -49,6 +49,8 @@ const SHIP_UPGRADE_IDS: Array[String] = [
 ]
 const CREW_UPGRADE_IDS: Array[String] = [
 	"crew_numbers",
+	"crew_reserve",
+	"boarding_resist",
 	"crew_attack",
 	"crew_defense",
 	"singigeon",
@@ -254,7 +256,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
 	var ship_ui_ids = ["cannon", "janggun", "hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal", "fleet_cannon", "fleet_hull", "supply", "gold"]
-	var crew_ui_ids = ["crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
+	var crew_ui_ids = ["crew_numbers", "crew_reserve", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
 		if upgrade_id in ship_ui_ids:
@@ -284,7 +286,36 @@ func _apply_crew_numbers(ship: Node3D, level: int) -> void:
 
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[Spearman] 창병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
+	print("[CrewFormation] 전열 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
+
+func _apply_crew_reserve(ship: Node3D, level: int) -> void:
+	var stats: Dictionary = UPGRADES["crew_reserve"].get("stats", {})
+	if "crew_respawn_interval" in ship:
+		var base_interval: float = float(ship.get_meta("base_crew_respawn_interval", ship.crew_respawn_interval))
+		if not ship.has_meta("base_crew_respawn_interval"):
+			ship.set_meta("base_crew_respawn_interval", base_interval)
+		var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 1.5))
+		var min_interval: float = float(stats.get("min_respawn_interval", 5.0))
+		ship.crew_respawn_interval = maxf(min_interval, base_interval - (reduce_per_level * float(level)))
+	if "crew_respawn_timer" in ship:
+		ship.crew_respawn_timer = minf(float(ship.crew_respawn_timer), float(ship.crew_respawn_interval))
+	ship.set_meta("survivor_hull_heal_bonus", float(stats.get("survivor_hull_heal_per_lv", 2.0)) * float(level))
+	if _level_matches(level, stats.get("instant_restore_levels", [])) and ship.has_method("get_alive_crew_count") and "max_crew_count" in ship:
+		if int(ship.call("get_alive_crew_count")) < int(ship.max_crew_count) and ship.has_method("add_survivor"):
+			ship.add_survivor()
+	if ship.has_method("_sync_player_crew_roster"):
+		ship._sync_player_crew_roster()
+	print("[CrewReserve] 예비 병력 Lv.%d (보충 %.1fs)" % [level, float(ship.get("crew_respawn_interval")) if ship.get("crew_respawn_interval") != null else 0.0])
+
+func _apply_boarding_resist(ship: Node3D, level: int) -> void:
+	var stats: Dictionary = UPGRADES["boarding_resist"].get("stats", {})
+	var duration_bonus: float = float(stats.get("capture_duration_mult_per_lv", 0.14)) * float(level)
+	var capture_damage_reduction: float = float(stats.get("capture_damage_reduction_per_lv", 0.08)) * float(level)
+	var boarding_fire_reduction: float = float(stats.get("boarding_fire_reduce_per_lv", 0.12)) * float(level)
+	ship.set_meta("boarding_capture_duration_multiplier", 1.0 + duration_bonus)
+	ship.set_meta("boarding_capture_damage_reduction", clampf(capture_damage_reduction, 0.0, 0.75))
+	ship.set_meta("boarding_fire_damage_reduction", clampf(boarding_fire_reduction, 0.0, 0.75))
+	print("[BoardingResist] 갑판 방어 Lv.%d (장악 %.0f%% 지연)" % [level, duration_bonus * 100.0])
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
 	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")
