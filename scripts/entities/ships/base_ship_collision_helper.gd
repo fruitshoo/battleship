@@ -4,6 +4,9 @@ class_name BaseShipCollisionHelper
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
+const BOSS_DERELICT_CONTACT_REPAIR_BONUS: float = 10.0
+const BOSS_DERELICT_CONTACT_XP_REWARD: int = 20
+const BOSS_DERELICT_CONTACT_MERIT_REWARD: int = 10
 
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
@@ -164,7 +167,7 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 	if other.has_method("_set_contact_areas_enabled"):
 		other.call("_set_contact_areas_enabled", false)
 
-	_repair_player_from_derelict_contact(ship)
+	_repair_player_from_derelict_contact(ship, other)
 
 	if other.has_method("_sink_derelict"):
 		other.call_deferred("_sink_derelict")
@@ -181,12 +184,15 @@ static func _is_derelict_ship(node: Node) -> bool:
 	return false
 
 
-static func _repair_player_from_derelict_contact(player_ship) -> void:
+static func _repair_player_from_derelict_contact(player_ship, source_ship: Node = null) -> void:
 	if not ("hull_hp" in player_ship and "max_hull_hp" in player_ship):
 		return
+	var is_boss_salvage: bool = _is_boss_salvage_target(source_ship)
 	var hull_hp_before: float = float(player_ship.get("hull_hp"))
 	var max_hull_hp: float = float(player_ship.get("max_hull_hp"))
 	var heal_amount: float = DERELICT_CONTACT_REPAIR_BASE
+	if is_boss_salvage:
+		heal_amount += BOSS_DERELICT_CONTACT_REPAIR_BONUS
 	if "_cached_um" in player_ship:
 		var cached_um: Variant = player_ship.get("_cached_um")
 		if is_instance_valid(cached_um) and cached_um.has_method("get_supply_bonus_stats"):
@@ -194,6 +200,21 @@ static func _repair_player_from_derelict_contact(player_ship) -> void:
 			heal_amount += float(supply_stats.get("heal_bonus", 0.0))
 	var hull_hp_after: float = minf(hull_hp_before + heal_amount, max_hull_hp)
 	player_ship.set("hull_hp", hull_hp_after)
+	var rescued_crew: int = 0
+	if is_boss_salvage and player_ship.has_method("add_survivor"):
+		if player_ship.add_survivor():
+			rescued_crew = 1
+
+	var level_manager: Node = null
+	if "_cached_level_manager" in player_ship:
+		var cached_level_manager: Variant = player_ship.get("_cached_level_manager")
+		if is_instance_valid(cached_level_manager):
+			level_manager = cached_level_manager
+	if is_boss_salvage and is_instance_valid(level_manager):
+		if BOSS_DERELICT_CONTACT_XP_REWARD > 0 and level_manager.has_method("add_xp"):
+			level_manager.add_xp(BOSS_DERELICT_CONTACT_XP_REWARD)
+		if BOSS_DERELICT_CONTACT_MERIT_REWARD > 0 and level_manager.has_method("add_merit"):
+			level_manager.add_merit(BOSS_DERELICT_CONTACT_MERIT_REWARD)
 
 	var hud: Node = null
 	if player_ship.has_method("_find_hud"):
@@ -206,7 +227,28 @@ static func _repair_player_from_derelict_contact(player_ship) -> void:
 		if hud.has_method("update_hull_hp"):
 			hud.update_hull_hp(hull_hp_after, max_hull_hp)
 		if hull_hp_after > hull_hp_before and hud.has_method("show_message"):
-			hud.show_message("폐선 해체! 선체 +%d" % int(round(hull_hp_after - hull_hp_before)), 1.35)
+			var message := "폐선 해체! 선체 +%d" % int(round(hull_hp_after - hull_hp_before))
+			if is_boss_salvage:
+				message = "거함 해체! 선체 +%d / XP +%d / 지휘 +%d" % [
+					int(round(hull_hp_after - hull_hp_before)),
+					BOSS_DERELICT_CONTACT_XP_REWARD,
+					BOSS_DERELICT_CONTACT_MERIT_REWARD,
+				]
+				if rescued_crew > 0:
+					message += " / 병사 +%d" % rescued_crew
+			hud.show_message(message, 1.6 if is_boss_salvage else 1.35)
+
+
+static func _is_boss_salvage_target(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.is_in_group("boss"):
+		return true
+	if "ship_type" in node:
+		var ship_type_name: String = str(node.get("ship_type")).to_lower()
+		if ship_type_name.contains("atakebune"):
+			return true
+	return false
 
 
 static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
