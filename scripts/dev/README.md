@@ -35,3 +35,18 @@ Current safe rewrites:
 - `.instance(...)` to `.instantiate(...)`
 
 The script avoids quoted strings and `#` comments, so it is meant for mechanical compatibility cleanup rather than structural refactors.
+
+## `run_refactor_tooling.sh`
+
+Convenience wrapper that runs the audit first and then the safe codemod.
+
+Examples:
+
+```bash
+bash scripts/dev/run_refactor_tooling.sh
+bash scripts/dev/run_refactor_tooling.sh --write
+bash scripts/dev/run_refactor_tooling.sh --write --contract-sweep
+```
+
+Use `--write` only for the safe codemod step.
+Use `--contract-sweep` when you want the wrapper to finish by running the project contract harness.
