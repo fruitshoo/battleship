@@ -3,8 +3,8 @@ extends "res://scripts/entities/weapons/weapon.gd"
 ## 창 (Spear)
 ## 검보다 리치가 길지만 쿨다운이 약간 더 깁니다.
 
-const BASE_DAMAGE: float = 12.0
-const OWNER_ATTACK_BONUS_SCALE: float = 0.7
+const BASE_DAMAGE: float = 13.5
+const OWNER_ATTACK_BONUS_SCALE: float = 0.75
 
 func _ready() -> void:
 	damage = BASE_DAMAGE

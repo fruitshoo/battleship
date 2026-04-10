@@ -82,7 +82,7 @@ def main() -> int:
 
     # Mirror the current code-facing formulas, not the design intent.
     sword_damage = 13.0 + (owner_attack_bonus * 0.8)
-    spear_damage = 12.0 + (owner_attack_bonus * 0.7)
+    spear_damage = 13.5 + (owner_attack_bonus * 0.75)
     trident_damage = 16.0 + (owner_attack_bonus * 0.75)
     harpoon_damage = 12.0 + (owner_attack_bonus * 0.65)
     bow_damage = 18.0 + (owner_attack_bonus * 0.55)
@@ -90,16 +90,16 @@ def main() -> int:
     repeating_crossbow_level = max(1, args.repeating_crossbow_level)
     repeating_stats = upgrades["repeating_crossbow"]["stats"]
     repeater_upgrade_damage = (
-        float(repeating_stats.get("base_damage", 6.5))
+        float(repeating_stats.get("base_damage", 7.0))
         + max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("damage_per_lv", 1.0))
     )
     repeater_burst_count = 3
     if repeating_crossbow_level >= 3:
         repeater_burst_count = 4
-    repeater_cooldown = float(repeating_stats.get("base_cooldown", 2.3)) - max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("cooldown_reduce_per_lv", 0.05))
+    repeater_cooldown = float(repeating_stats.get("base_cooldown", 2.2)) - max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("cooldown_reduce_per_lv", 0.05))
     repeater_burst_delay = float(repeating_stats.get("burst_delay", 0.15))
     repeater_cooldown = max(repeater_cooldown, repeater_burst_count * repeater_burst_delay + 0.5)
-    repeater_damage = repeater_upgrade_damage + (owner_attack_bonus * 0.2)
+    repeater_damage = repeater_upgrade_damage + (owner_attack_bonus * 0.25)
     singigeon_base_damage = float(upgrades["singigeon"]["stats"].get("base_damage", 2.2))
     singigeon_personnel_mult = float(upgrades["singigeon"]["stats"].get("personnel_damage_mult", 6.0))
 
@@ -119,7 +119,7 @@ def main() -> int:
             "raw_hit": spear_damage,
             "cooldown": 1.2,
             "expected_hit": spear_damage * melee_expected_crit,
-            "notes": "Longer reach, lower scaling than sword to keep it utility-oriented.",
+            "notes": "Longer reach with a modest anti-general bump while staying below heavy melee variants.",
         },
         {
             "weapon": "trident",
@@ -147,7 +147,7 @@ def main() -> int:
             "raw_hit": repeater_damage,
             "cooldown": repeater_cooldown,
             "expected_hit": repeater_damage * repeater_burst_count,
-            "notes": f"Current per-bolt base hit is {repeater_upgrade_damage:.1f} at level {repeating_crossbow_level}, with {repeater_burst_count} bolts per burst and softer owner scaling.",
+            "notes": f"Current per-bolt base hit is {repeater_upgrade_damage:.1f} at level {repeating_crossbow_level}, with {repeater_burst_count} bolts per burst and modest owner scaling.",
         },
         {
             "weapon": "singigeon",

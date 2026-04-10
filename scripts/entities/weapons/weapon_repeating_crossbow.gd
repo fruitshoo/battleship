@@ -2,8 +2,8 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
-const DEFAULT_BASE_DAMAGE: float = 6.5
-const OWNER_ATTACK_BONUS_SCALE: float = 0.2
+const DEFAULT_BASE_DAMAGE: float = 7.0
+const OWNER_ATTACK_BONUS_SCALE: float = 0.25
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
