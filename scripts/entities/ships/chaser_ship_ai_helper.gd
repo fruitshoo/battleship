@@ -236,7 +236,9 @@ static func process_physics(ship, delta: float) -> void:
 	var dir_to_target: Vector3 = nav["dir_to_target"]
 
 	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.max_boarding_distance + 0.35:
-		if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target):
+		var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
+		var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
+		if can_side_board or can_force_head_on:
 			if ship.has_method("_board_ship"):
 				ship.call("_board_ship", current_target)
 				if ship.is_boarding:

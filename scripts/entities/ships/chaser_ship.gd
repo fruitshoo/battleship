@@ -1017,7 +1017,8 @@ func _board_ship(target_ship: Node3D) -> void:
 
 	# 선미 추격이나 정면 비비기에서 바로 밧줄이 걸리지 않도록,
 	# 측면 접현이 성립할 때만 실제 도선 상태로 들어간다.
-	if not _is_side_boarding_approach(ship_node):
+	var can_head_on_board: bool = _can_force_head_on_boarding(ship_node)
+	if not _is_side_boarding_approach(ship_node) and not can_head_on_board:
 		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
@@ -1036,7 +1037,7 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node.has_method("get_alive_crew_count"):
 		enemy_crew = ship_node.get_alive_crew_count()
 		
-	if my_crew > enemy_crew:
+	if my_crew > enemy_crew or can_head_on_board:
 		is_boarding = true
 		boarding_target = ship_node
 		
@@ -1058,6 +1059,35 @@ func _board_ship(target_ship: Node3D) -> void:
 	else:
 		if DEBUG_COMBAT_LOGS:
 			print("[Skirmish] 병력 우위 부족으로 도선하지 않고 대치합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+
+
+func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if is_gunner_role():
+		return false
+	if not target_ship.is_in_group("player"):
+		return false
+	var enemy_crew: int = int(target_ship.call("get_alive_crew_count")) if target_ship.has_method("get_alive_crew_count") else 0
+	if enemy_crew > 1:
+		return false
+	if target_ship.has_method("is_boarding_ship") and target_ship.is_boarding_ship():
+		return true
+	var state: Dictionary = _get_boarding_alignment_state(target_ship)
+	if state.is_empty():
+		return false
+	var my_contact_dot: float = float(state.get("my_contact_dot", -1.0))
+	var target_contact_abs: float = absf(float(state.get("target_contact_dot", 1.0)))
+	var closing_speed: float = float(state.get("closing_speed", 999.0))
+	var center_distance: float = global_position.distance_to(target_ship.global_position)
+	var collision_distance: float = get_collision_distance_to(target_ship)
+	if center_distance > collision_distance + 1.0:
+		return false
+	if enemy_crew <= 0:
+		return true
+	if enemy_crew == 1 and center_distance <= collision_distance + 0.45:
+		return true
+	return my_contact_dot >= 0.52 and target_contact_abs <= 0.92 and closing_speed <= boarding_max_relative_speed * 2.4
 
 # 누수 추가/제거
 func add_leak(amount: float) -> void:

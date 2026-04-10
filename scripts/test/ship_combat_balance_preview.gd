@@ -94,6 +94,16 @@ func _build_scenarios() -> Array[Dictionary]:
 			"player_auto_raid_min_defenders": 1,
 			"player_auto_raid_eval_interval": 0.12,
 		},
+		{
+			"name": "Head-on Cleanup",
+			"enemy_scene": ENEMY_MELEE_SCENE,
+			"distance": 8.0,
+			"enemy_lateral_offset": 0.0,
+			"time_limit": 16.0,
+			"disable_player_weapons": true,
+			"disable_enemy_weapons": true,
+			"player_alive_crew_limit": 1,
+		},
 	]
 
 
@@ -151,6 +161,7 @@ func _setup_scenario(scenario: Dictionary) -> void:
 	_reset_player_ship_runtime()
 	_configure_player_runtime(scenario)
 	_configure_enemy_runtime(scenario)
+	await get_tree().process_frame
 	_update_overlay()
 
 
@@ -286,6 +297,25 @@ func _configure_player_runtime(scenario: Dictionary) -> void:
 		_set_ship_launcher_detection_range(_current_player_ship, 0.0)
 	if _current_player_ship.has_method("set_preview_deck_state"):
 		_current_player_ship.call("set_preview_deck_state", false, false)
+	_apply_player_crew_limit(int(scenario.get("player_alive_crew_limit", -1)))
+
+
+func _apply_player_crew_limit(alive_limit: int) -> void:
+	if alive_limit < 0 or not is_instance_valid(_current_player_ship):
+		return
+	var survivors: Array = []
+	for soldier in EntityRegistry.get_soldiers_by_ship(_current_player_ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+			continue
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
+			continue
+		survivors.append(soldier)
+	if survivors.size() <= alive_limit:
+		return
+	for index in range(alive_limit, survivors.size()):
+		survivors[index].queue_free()
 
 
 func _configure_enemy_runtime(scenario: Dictionary) -> void:
