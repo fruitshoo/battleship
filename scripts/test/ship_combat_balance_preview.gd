@@ -104,6 +104,16 @@ func _build_scenarios() -> Array[Dictionary]:
 			"disable_enemy_weapons": true,
 			"player_alive_crew_limit": 1,
 		},
+		{
+			"name": "Cleanup Drift",
+			"enemy_scene": ENEMY_MELEE_SCENE,
+			"distance": 8.5,
+			"enemy_lateral_offset": 2.8,
+			"time_limit": 16.0,
+			"disable_player_weapons": true,
+			"disable_enemy_weapons": true,
+			"player_alive_crew_limit": 0,
+		},
 	]
 
 

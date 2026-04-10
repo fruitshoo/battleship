@@ -238,7 +238,8 @@ static func process_physics(ship, delta: float) -> void:
 	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.max_boarding_distance + 0.35:
 		var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
 		var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
-		if can_side_board or can_force_head_on:
+		var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
+		if can_side_board or can_force_head_on or can_force_cleanup:
 			if ship.has_method("_board_ship"):
 				ship.call("_board_ship", current_target)
 				if ship.is_boarding:
