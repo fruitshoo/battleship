@@ -1,12 +1,12 @@
 extends RefCounted
 class_name HudShipDebugHelper
 
+const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
+
 static func sync_ship_debug_panel_from_player(hud) -> void:
 	if not is_instance_valid(hud.debug_ship_status_value):
 		return
-	if not is_instance_valid(hud.player_ship):
-		hud._try_resolve_player_ship()
-	if not is_instance_valid(hud.player_ship):
+	if not HudLookupHelper.ensure_player_ship(hud):
 		hud.debug_ship_status_value.text = "함선 상태: 플레이어 배 없음"
 		return
 
@@ -98,9 +98,7 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 static func on_debug_ship_hull_changed(hud, value: float) -> void:
 	if hud._ship_debug_ui_syncing:
 		return
-	if not is_instance_valid(hud.player_ship):
-		hud._try_resolve_player_ship()
-	if not is_instance_valid(hud.player_ship):
+	if not HudLookupHelper.ensure_player_ship(hud):
 		return
 	var ship_snapshot: Dictionary = hud.player_ship.call("get_debug_ship_state_snapshot") if hud.player_ship.has_method("get_debug_ship_state_snapshot") else {}
 	var max_hull_hp_value: float = maxf(0.01, float(ship_snapshot.get("max_hull_hp", 1.0)))
@@ -111,9 +109,7 @@ static func on_debug_ship_hull_changed(hud, value: float) -> void:
 static func on_debug_ship_stamina_changed(hud, value: float) -> void:
 	if hud._ship_debug_ui_syncing:
 		return
-	if not is_instance_valid(hud.player_ship):
-		hud._try_resolve_player_ship()
-	if not is_instance_valid(hud.player_ship):
+	if not HudLookupHelper.ensure_player_ship(hud):
 		return
 	var ship_snapshot: Dictionary = hud.player_ship.call("get_debug_ship_state_snapshot") if hud.player_ship.has_method("get_debug_ship_state_snapshot") else {}
 	var max_stamina_value: float = maxf(0.01, float(ship_snapshot.get("max_rowing_stamina", 1.0)))
@@ -244,9 +240,7 @@ static func adjust_player_ship_float_for_debug(hud, property_name: String, delta
 
 
 static func _ensure_player_ship(hud) -> bool:
-	if not is_instance_valid(hud.player_ship):
-		hud._try_resolve_player_ship()
-	if not is_instance_valid(hud.player_ship):
+	if not HudLookupHelper.ensure_player_ship(hud):
 		hud.show_gust_warning_message("플레이어 배 없음", 0.8)
 		return false
 	return true

@@ -1,6 +1,8 @@
 extends RefCounted
 class_name HudSailDebugHelper
 
+const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
+
 
 static func update_sail_debug_toggle_button_text(hud) -> void:
 	if not is_instance_valid(hud.sail_debug_toggle_button):
@@ -9,9 +11,7 @@ static func update_sail_debug_toggle_button_text(hud) -> void:
 
 
 static func get_player_masts_for_debug(hud) -> Array[Node]:
-	if not is_instance_valid(hud.player_ship):
-		hud._try_resolve_player_ship()
-	if not is_instance_valid(hud.player_ship):
+	if not HudLookupHelper.ensure_player_ship(hud):
 		return []
 	var mast_nodes: Array[Node] = []
 	var raw_masts = hud.player_ship.get("masts")

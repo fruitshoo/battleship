@@ -3,6 +3,7 @@ extends RefCounted
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
@@ -38,9 +39,7 @@ static func update_distance_debug_display(hud) -> void:
 		if is_instance_valid(hud.debug_distance_label):
 			hud.debug_distance_label.visible = false
 		return
-	if not is_instance_valid(hud.player_ship):
-		hud._try_resolve_player_ship()
-	if not is_instance_valid(hud.player_ship):
+	if not HudLookupHelper.ensure_player_ship(hud):
 		return
 	ensure_distance_debug_visualizer(hud)
 	var target: Node3D = find_nearest_enemy_ship_for_distance_debug(hud)

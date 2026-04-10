@@ -1,8 +1,8 @@
 extends CanvasLayer
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const HudGameOverOverlay = preload("res://scripts/ui/hud/hud_game_over_overlay.gd")
 const HudLayoutBuilder = preload("res://scripts/ui/hud/hud_layout_builder.gd")
+const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud/hud_update_helper.gd")
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
 const HudUpgradeTooltipHelper = preload("res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd")
@@ -368,18 +368,7 @@ func _attach_level_label_to_xp_bar() -> void:
 	level_label.add_theme_constant_override("outline_size", 4)
 
 func _try_resolve_player_ship() -> void:
-	if is_instance_valid(player_ship):
-		return
-	if _player_lookup_cooldown > 0.0:
-		return
-	_player_lookup_cooldown = 0.25
-	var players = EntityRegistry.get_ships_by_team("player")
-	for p in players:
-		if is_instance_valid(p) and p.get("is_player_controlled") == true:
-			player_ship = p
-			return
-	if players.size() > 0 and is_instance_valid(players[0]):
-		player_ship = players[0]
+	HudLookupHelper.try_resolve_player_ship(self)
 
 
 func _get_level_manager_for_debug() -> Node:
