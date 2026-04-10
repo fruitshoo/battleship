@@ -5,6 +5,7 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
 const UpgradeManagerChoiceHelper = preload("res://scripts/managers/upgrade_manager_choice_helper.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
+const UpgradeManagerItemHelper = preload("res://scripts/managers/upgrade_manager_item_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
 ## 업그레이드 데이터 및 적용 로직 관리
@@ -121,42 +122,7 @@ func _load_data_from_json() -> void:
 	print("[UpgradeManager] 데이터를 성공적으로 로드했습니다: %d개의 업그레이드, %d개의 아이템" % [UPGRADES.size(), ITEMS.size()])
 
 func _load_items_from_resources() -> bool:
-	ITEMS.clear()
-	var dir := DirAccess.open(ITEM_DATA_DIR)
-	if dir == null:
-		return false
-
-	dir.list_dir_begin()
-	var file_name := dir.get_next()
-	while file_name != "":
-		if not dir.current_is_dir() and file_name.ends_with(".tres"):
-			var resource_path := "%s/%s" % [ITEM_DATA_DIR, file_name]
-			var item_res: Resource = load(resource_path)
-			if item_res != null and item_res.get_script() == ItemDataResource:
-				var item_id: String = str(item_res.get("item_id"))
-				if item_id.is_empty():
-					file_name = dir.get_next()
-					continue
-				var item_name: String = str(item_res.get("item_name"))
-				var item_description: String = str(item_res.get("description"))
-				var item_icon: String = str(item_res.get("icon"))
-				var item_alert_msg: String = str(item_res.get("alert_msg"))
-				var icon_texture_variant: Variant = item_res.get("icon_texture")
-				var icon_texture_path: String = ""
-				if icon_texture_variant is Texture2D:
-					icon_texture_path = (icon_texture_variant as Texture2D).resource_path
-				ITEMS[item_id] = {
-					"name": item_name,
-					"description": item_description,
-					"icon": item_icon,
-					"icon_texture": icon_texture_path,
-					"alert_msg": item_alert_msg,
-					"resource_path": resource_path,
-				}
-		file_name = dir.get_next()
-	dir.list_dir_end()
-
-	return not ITEMS.is_empty()
+	return UpgradeManagerItemHelper.load_items_from_resources(self)
 
 ## 게임 시작 시 기본 무기 지급
 func initialize_default_weapons() -> void:
@@ -172,37 +138,10 @@ func initialize_default_weapons() -> void:
 		hud.update_weapon_ui("cannon", 1)
 
 func equip_owned_items() -> void:
-	_sync_items_from_save()
-	var ship = _get_player_ship()
-	if not ship:
-		return
-	for item_id in acquired_items:
-		if item_id not in ITEMS:
-			continue
-		_apply_item_to_ship(item_id, ship)
-	refresh_hud_item_icons()
+	UpgradeManagerItemHelper.equip_owned_items(self)
 
 func refresh_hud_item_icons() -> void:
-	_sync_items_from_save()
-	var ship = _get_player_ship()
-	if not ship:
-		return
-	for item_id in acquired_items:
-		if item_id in ITEMS:
-			_apply_item_to_ship(item_id, ship)
-	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
-	if not hud:
-		return
-	if hud.has_method("clear_item_icons"):
-		hud.clear_item_icons()
-	for item_id in acquired_items:
-		if item_id not in ITEMS:
-			continue
-		var item_data = ITEMS[item_id]
-		if hud.has_method("add_item_icon"):
-			var item_icon: Dictionary = _get_item_icon_payload(item_id, item_data)
-			if not item_icon.is_empty():
-				hud.add_item_icon(item_icon)
+	UpgradeManagerItemHelper.refresh_hud_item_icons(self)
 
 func get_ship_upgrade_choices(count: int = 3) -> Array:
 	return UpgradeManagerChoiceHelper.build_ship_upgrade_choices(
@@ -758,32 +697,7 @@ func _apply_item_to_ship(item_id: String, ship: Node3D) -> void:
 
 
 func add_item(item_id: String) -> void:
-	if item_id not in ITEMS:
-		push_warning("UpgradeManager: 존재하지 않는 아이템 ID입니다 - %s" % item_id)
-		return
-
-	if acquired_items.has(item_id):
-		var existing_ship = _get_player_ship()
-		if existing_ship:
-			# 이미 획득한 아이템이어도 현재 본선에는 효과를 재적용한다.
-			_apply_item_to_ship(item_id, existing_ship)
-			refresh_hud_item_icons()
-		return
-	
-	acquired_items.append(item_id)
-	if is_instance_valid(SaveManager) and SaveManager.has_method("add_item"):
-		SaveManager.add_item(item_id)
-
-	var item_data = ITEMS[item_id]
-	var ship = _get_player_ship()
-	if ship:
-		_apply_item_to_ship(item_id, ship)
-		refresh_hud_item_icons()
-		var hud = ship._find_hud() if ship.has_method("_find_hud") else null
-		if hud and "alert_msg" in item_data and hud.has_method("show_message"):
-			hud.show_message(item_data["alert_msg"], 3.0)
-			
-	print("[Item] %s 획득! - %s" % [item_data["name"], item_data["description"]])
+	UpgradeManagerItemHelper.add_item(self, item_id)
 
 func grant_final_boss_item() -> void:
 	if acquired_items.has("choyogi") == false:
@@ -844,20 +758,7 @@ func _env_flag_enabled(name: String) -> bool:
 	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 func _get_item_icon_payload(item_id: String, item_data: Dictionary) -> Dictionary:
-	var payload: Dictionary = {
-		"item_id": item_id,
-		"name": str(item_data.get("name", item_id)),
-		"description": str(item_data.get("description", "")),
-		"icon_data": null,
-	}
-	if "icon_texture" in item_data:
-		var icon_texture_path: String = str(item_data["icon_texture"])
-		if not icon_texture_path.is_empty():
-			payload["icon_data"] = icon_texture_path
-			return payload
-	if "icon" in item_data:
-		payload["icon_data"] = item_data["icon"]
-	return payload
+	return UpgradeManagerItemHelper.get_item_icon_payload(item_id, item_data)
 
 
 ## 지원함 업그레이드 일괄 적용 함수
