@@ -296,6 +296,7 @@ static func _find_raid_target(ship) -> Node3D:
 	var own_crew: int = ship.get_alive_crew_count()
 	var candidates: Array = []
 	var nearby_enemy_count: int = 0
+	var boss_candidate_present: bool = false
 	var enemies = EntityRegistry.get_ships_by_team("enemy")
 	for enemy in enemies:
 		if not _is_valid_raid_target_ship(ship, enemy):
@@ -308,18 +309,21 @@ static func _find_raid_target(ship) -> Node3D:
 		var enemy_crew: int = int(enemy.call("get_alive_crew_count")) if enemy.has_method("get_alive_crew_count") else 0
 		if own_crew <= enemy_crew:
 			continue
-		var enemy_ranged: int = _count_ranged_enemies_on_ship(enemy)
-		if enemy_ranged <= 0:
+		var raid_pressure: int = _get_raid_pressure_value(enemy)
+		if raid_pressure <= 0:
 			continue
-		var score: float = float(enemy_ranged) * 10.0
+		var score: float = float(raid_pressure) * 10.0
 		score += float(own_crew - enemy_crew) * 2.0
 		score -= dist * 0.15
+		if _is_boss_raid_target(enemy):
+			score += 14.0
+			boss_candidate_present = true
 		candidates.append({
 			"ship": enemy,
 			"score": score,
 		})
 
-	if nearby_enemy_count > RAID_MAX_ACTIVE_THREATS:
+	if nearby_enemy_count > RAID_MAX_ACTIVE_THREATS and not boss_candidate_present:
 		return null
 	if candidates.is_empty():
 		return null
@@ -365,6 +369,7 @@ static func get_auto_raid_debug_snapshot(ship, target_ship: Node3D = null) -> Di
 	snapshot["close_for_raid"] = _is_ship_close_for_raid(ship, target)
 	snapshot["continue_ok"] = _can_continue_raid(ship, target)
 	snapshot["enemy_ranged"] = _count_ranged_enemies_on_ship(target)
+	snapshot["raid_pressure"] = _get_raid_pressure_value(target)
 	snapshot["desired_boarders"] = _get_desired_boarder_count(ship, target)
 	snapshot["current_boarders"] = _get_home_boarders_on_ship(ship, target).size()
 	snapshot["available_boarders"] = _get_available_raid_boarders(ship).size()
@@ -391,7 +396,7 @@ static func _can_continue_raid(ship, target_ship: Node3D) -> bool:
 		return false
 	if not _is_ship_close_for_raid(ship, target_ship):
 		return false
-	if _count_ranged_enemies_on_ship(target_ship) <= 0:
+	if _get_raid_pressure_value(target_ship) <= 0:
 		return false
 	return true
 
@@ -534,8 +539,13 @@ static func _get_desired_boarder_count(ship, target_ship: Node3D) -> int:
 	if spare <= 0:
 		return 0
 
-	var enemy_ranged: int = _count_ranged_enemies_on_ship(target_ship)
-	var desired: int = min(int(ship.auto_raid_max_boarders), spare, max(1, enemy_ranged))
+	var raid_pressure: int = _get_raid_pressure_value(target_ship)
+	var desired_cap: int = int(ship.auto_raid_max_boarders)
+	if _is_boss_raid_target(target_ship):
+		desired_cap += 1
+	var desired: int = min(desired_cap, spare, max(1, raid_pressure))
+	if _is_boss_raid_target(target_ship) and spare >= 2:
+		desired = max(desired, min(desired_cap, 2))
 	return desired
 
 
@@ -549,6 +559,19 @@ static func _count_ranged_enemies_on_ship(target_ship: Node3D) -> int:
 		if soldier.has_method("is_ranged_only_value") and soldier.is_ranged_only_value():
 			count += 1
 	return count
+
+
+static func _get_raid_pressure_value(target_ship: Node3D) -> int:
+	if not is_instance_valid(target_ship):
+		return 0
+	var enemy_ranged: int = _count_ranged_enemies_on_ship(target_ship)
+	if enemy_ranged > 0:
+		return enemy_ranged
+	if _is_boss_raid_target(target_ship):
+		var enemy_crew: int = int(target_ship.call("get_alive_crew_count")) if target_ship.has_method("get_alive_crew_count") else 0
+		if enemy_crew > 0:
+			return maxi(1, ceili(float(enemy_crew) / 3.0))
+	return 0
 
 
 static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
@@ -620,4 +643,15 @@ static func _is_large_raid_target(target_ship: Node3D, target_ext: Vector2) -> b
 		var ship_type_name: String = str(target_ship.get("ship_type")).to_lower()
 		if ship_type_name.contains("atakebune"):
 			return true
+	return false
+
+
+static func _is_boss_raid_target(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if target_ship.is_in_group("boss"):
+		return true
+	if "ship_type" in target_ship:
+		var ship_type_name: String = str(target_ship.get("ship_type")).to_lower()
+		return ship_type_name.contains("atakebune")
 	return false

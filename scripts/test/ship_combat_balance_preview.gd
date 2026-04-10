@@ -499,10 +499,11 @@ func _update_overlay() -> void:
 		winner = _get_live_winner_hint(player_hull, enemy_hull, player_crew, enemy_crew)
 	var raid_line := ""
 	if scenario_name == "Atakebune Boarding":
-		raid_line = "\nraid valid:%s close:%s init:%s ranged:%d spare:%d desired:%d avail:%d" % [
+		raid_line = "\nraid valid:%s close:%s init:%s pressure:%d ranged:%d spare:%d desired:%d avail:%d" % [
 			"Y" if raid_debug.get("valid_target", false) == true else "N",
 			"Y" if raid_debug.get("close_for_raid", false) == true else "N",
 			"Y" if raid_debug.get("can_initiate", false) == true else "N",
+			int(raid_debug.get("raid_pressure", 0)),
 			int(raid_debug.get("enemy_ranged", 0)),
 			int(raid_debug.get("spare", 0)),
 			int(raid_debug.get("desired_boarders", 0)),
@@ -564,7 +565,7 @@ func _report_summary() -> void:
 	if auto_print_summary:
 		for result in _scenario_results:
 			var raid_debug: Dictionary = result.get("raid_debug", {})
-			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d" % [
+			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d" % [
 				str(result.get("name", "Scenario")),
 				str(result.get("winner", "draw")),
 				float(result.get("elapsed", 0.0)),
@@ -583,6 +584,7 @@ func _report_summary() -> void:
 				"Y" if raid_debug.get("valid_target", false) == true else "N",
 				"Y" if raid_debug.get("close_for_raid", false) == true else "N",
 				"Y" if raid_debug.get("can_initiate", false) == true else "N",
+				int(raid_debug.get("raid_pressure", 0)),
 				int(raid_debug.get("enemy_ranged", 0)),
 				int(raid_debug.get("spare", 0)),
 				int(raid_debug.get("desired_boarders", 0)),
