@@ -51,6 +51,11 @@
   Script: `scripts/test/ship_combat_gauntlet_preview.gd`
   Wrapper: `scripts/test/run_ship_combat_gauntlet_preview.sh`
   Pass `crew_sustain`, `cannon_pressure`, `crew_sustain_cannon`, `fleet_screen`, or `crew_sustain_fleet` as the first wrapper argument to inject an upgrade preset and compare long-run attrition.
+- `upgrade_choice_preview.tscn`
+  Early upgrade draft harness that simulates the first six ship/crew picks across repeated trials.
+  Prints per-round offer and pick counts so core upgrades can be checked without a full run.
+  Script: `scripts/test/upgrade_choice_preview.gd`
+  Wrapper: `scripts/test/run_upgrade_choice_preview.sh`
 - `performance_preview.tscn`
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
@@ -112,6 +117,9 @@
   Auto-quits after the summary report, skips startup prewarm, disables runtime rewards/autosave, and fails on common runtime log errors or missing summary output.
   Accepts an optional first argument such as `crew_sustain`, `cannon_pressure`, `crew_sustain_cannon`, `fleet_screen`, or `crew_sustain_fleet` to apply a gauntlet upgrade preset before the encounter chain begins.
   Accepts an optional second argument `no_recovery` to disable survivor, floating loot, and treasure recovery pickups during the gauntlet.
+- `scripts/test/run_upgrade_choice_preview.sh`
+  Headless wrapper for the upgrade choice draft harness.
+  Auto-quits after the summary report and fails on common runtime log errors or missing summary output.
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.
   Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.
