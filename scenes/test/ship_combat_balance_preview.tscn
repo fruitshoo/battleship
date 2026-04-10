@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/ship_combat_balance_preview.gd" id="2_script"]
+
+[node name="ShipCombatBalancePreview" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+auto_open_debug_panel = true
+stop_regular_spawns = true
+scenario_time_limit_seconds = 18.0
+intermission_seconds = 0.5
+auto_print_summary = true
+player_support_limit = 0

@@ -39,6 +39,12 @@
   Prints per-scenario winners, survivor counts, and remaining HP totals.
   Script: `scripts/test/soldier_balance_preview.gd`
   Wrapper: `scripts/test/run_soldier_balance_preview.sh`
+- `ship_combat_balance_preview.tscn`
+  Sequential ship combat harness for gunner, melee, firepot, and mixed pressure scenarios.
+  Prints per-scenario winners, hull totals, crew counts, boarding state, and derelict transitions.
+  Script: `scripts/test/ship_combat_balance_preview.gd`
+  Wrapper: `scripts/test/run_ship_combat_balance_preview.sh`
+  The wrapper disables startup prewarm so the log stays focused on combat behavior instead of bootstrap shader/audio noise.
 - `performance_preview.tscn`
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
@@ -92,6 +98,9 @@
 - `scripts/test/run_soldier_balance_preview.sh`
   Headless wrapper for the soldier balance harness.
   Auto-quits after the summary report and fails on common runtime log errors or missing summary output.
+- `scripts/test/run_ship_combat_balance_preview.sh`
+  Headless wrapper for the ship combat balance harness.
+  Auto-quits after the summary report, skips startup prewarm for cleaner combat-only runs, and fails on common runtime log errors or missing summary output.
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.
   Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.

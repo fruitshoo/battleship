@@ -18,7 +18,8 @@ static func initialize(lm: Node) -> void:
 			lm.hud.update_difficulty_ui(lm.game_difficulty)
 
 	# 시작 직후 짧은 로딩 오버레이 안에서 예열을 끝내 첫 전투 끊김을 줄인다.
-	lm.call_deferred("_prewarm_shaders", true)
+	if not _env_flag_enabled("BATTLESHIP_SKIP_STARTUP_PREWARM"):
+		lm.call_deferred("_prewarm_shaders", true)
 
 	# 초요기/일성정시는 현재 시작 기본 아이템으로 장착한다.
 	lm.get_tree().create_timer(0.1).timeout.connect(func():
@@ -158,3 +159,8 @@ static func _prewarm_scene_pool_instance(tree: SceneTree, scene: PackedScene) ->
 	if inst.has_method("pool_reset"):
 		inst.call("pool_reset")
 	ScenePool.release(inst)
+
+
+static func _env_flag_enabled(name: String) -> bool:
+	var value := OS.get_environment(name).strip_edges().to_lower()
+	return value == "1" or value == "true" or value == "yes" or value == "on"

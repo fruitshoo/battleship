@@ -4,18 +4,17 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
 godot_bin="${GODOT_BIN:-/Applications/Godot.app/Contents/MacOS/Godot}"
-log_file="$(mktemp -t battleship_contract_sweep.XXXXXX.log)"
+log_file="$(mktemp -t battleship_ship_combat.XXXXXX.log)"
 
 cleanup() {
 	rm -f "$log_file"
 }
 trap cleanup EXIT
 
-HOME=/tmp "$godot_bin" \
+HOME=/tmp BATTLESHIP_SHIP_COMBAT_AUTO_QUIT=1 BATTLESHIP_DISABLE_SUPPORT_FLEET_AUTOSPAWN=1 BATTLESHIP_SKIP_STARTUP_PREWARM=1 "$godot_bin" \
 	--headless \
 	--path "$project_root" \
-	res://scenes/test/project_contract_sweep.tscn \
-	--quit 2>&1 | tee "$log_file"
+	res://scenes/test/ship_combat_balance_preview.tscn 2>&1 | tee "$log_file"
 
 bad_patterns=(
 	"Parse Error"
@@ -31,7 +30,12 @@ bad_patterns=(
 
 for pattern in "${bad_patterns[@]}"; do
 	if grep -Fq "$pattern" "$log_file"; then
-		echo "[ContractSweep] log gate failed: $pattern" >&2
+		echo "[ShipCombat] log gate failed: $pattern" >&2
 		exit 1
 	fi
 done
+
+if ! grep -Fq "[ShipCombat] summary" "$log_file"; then
+	echo "[ShipCombat] missing summary output" >&2
+	exit 1
+fi
