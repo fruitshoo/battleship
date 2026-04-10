@@ -575,16 +575,18 @@ static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
 	var other_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)
 	var center_distance: float = ship.global_position.distance_to(target_ship.global_position)
 	var max_distance: float = my_ext.y + other_ext.y + RAID_SWITCH_BUFFER
-	if other_ext.y >= 5.0:
+	var large_target: bool = _is_large_raid_target(target_ship, other_ext)
+	if large_target:
 		# 대형 선체는 측면으로 길게 접촉하는 경우가 많아서
 		# 폭 성분도 같이 고려한 더 넉넉한 접현 거리로 본다.
 		max_distance += maxf(my_ext.x, other_ext.x) * 1.35
+		max_distance = maxf(max_distance, 18.0 + my_ext.x * 0.6)
 	var hull_contact_distance: float = max_distance
 	if ship.has_method("get_collision_distance_to"):
 		hull_contact_distance = maxf(hull_contact_distance, float(ship.call("get_collision_distance_to", target_ship)) + RAID_SWITCH_BUFFER)
 	if center_distance > hull_contact_distance:
 		return false
-	if other_ext.y >= 5.0:
+	if large_target:
 		# 아타케부네처럼 긴 대형 선체는 중심선 정렬이 조금 어긋나도
 		# 실제로는 접현 가능한 경우가 많아서 거리 조건만 만족하면 월선 후보로 본다.
 		return true
@@ -607,3 +609,15 @@ static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
 	var target_contact_abs: float = absf(float(boarding_state.get("target_contact_dot", 1.0)))
 	var parallel_dot: float = float(boarding_state.get("parallel_dot", -1.0))
 	return my_contact_abs <= 0.82 and target_contact_abs <= 0.82 and parallel_dot >= -0.15
+
+
+static func _is_large_raid_target(target_ship: Node3D, target_ext: Vector2) -> bool:
+	if target_ext.y >= 5.0 or target_ext.x >= 3.8:
+		return true
+	if target_ship.is_in_group("boss"):
+		return true
+	if "ship_type" in target_ship:
+		var ship_type_name: String = str(target_ship.get("ship_type")).to_lower()
+		if ship_type_name.contains("atakebune"):
+			return true
+	return false
