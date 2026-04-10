@@ -330,6 +330,47 @@ static func _find_raid_target(ship) -> Node3D:
 	return candidates[0]["ship"] as Node3D
 
 
+static func get_auto_raid_debug_snapshot(ship, target_ship: Node3D = null) -> Dictionary:
+	var snapshot := {
+		"enabled": false,
+		"can_initiate": false,
+		"valid_target": false,
+		"close_for_raid": false,
+		"continue_ok": false,
+		"own_crew": 0,
+		"home_defenders": 0,
+		"reserve": 0,
+		"spare": 0,
+		"enemy_ranged": 0,
+		"desired_boarders": 0,
+		"current_boarders": 0,
+		"available_boarders": 0,
+	}
+	if not is_instance_valid(ship):
+		return snapshot
+	snapshot["enabled"] = ship.auto_raid_enabled == true
+	snapshot["own_crew"] = ship.get_alive_crew_count() if ship.has_method("get_alive_crew_count") else 0
+	snapshot["home_defenders"] = _count_home_defenders(ship)
+	snapshot["reserve"] = int(ship.auto_raid_min_defenders)
+	snapshot["spare"] = max(0, int(snapshot["home_defenders"]) - int(snapshot["reserve"]))
+	snapshot["can_initiate"] = _can_initiate_raid(ship)
+
+	var target: Node3D = target_ship
+	if not is_instance_valid(target) and "auto_raid_target" in ship:
+		target = ship.auto_raid_target
+	if not is_instance_valid(target):
+		return snapshot
+
+	snapshot["valid_target"] = _is_valid_raid_target_ship(ship, target)
+	snapshot["close_for_raid"] = _is_ship_close_for_raid(ship, target)
+	snapshot["continue_ok"] = _can_continue_raid(ship, target)
+	snapshot["enemy_ranged"] = _count_ranged_enemies_on_ship(target)
+	snapshot["desired_boarders"] = _get_desired_boarder_count(ship, target)
+	snapshot["current_boarders"] = _get_home_boarders_on_ship(ship, target).size()
+	snapshot["available_boarders"] = _get_available_raid_boarders(ship).size()
+	return snapshot
+
+
 static func _can_initiate_raid(ship) -> bool:
 	if not is_instance_valid(ship):
 		return false
@@ -532,8 +573,16 @@ static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
 static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
 	var my_ext: Vector2 = ship.get_deck_half_extents()
 	var other_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)
+	var center_distance: float = ship.global_position.distance_to(target_ship.global_position)
 	var max_distance: float = my_ext.y + other_ext.y + RAID_SWITCH_BUFFER
-	if ship.global_position.distance_to(target_ship.global_position) > max_distance:
+	if other_ext.y >= 5.0:
+		# 대형 선체는 측면으로 길게 접촉하는 경우가 많아서
+		# 폭 성분도 같이 고려한 더 넉넉한 접현 거리로 본다.
+		max_distance += maxf(my_ext.x, other_ext.x) * 1.35
+	var hull_contact_distance: float = max_distance
+	if ship.has_method("get_collision_distance_to"):
+		hull_contact_distance = maxf(hull_contact_distance, float(ship.call("get_collision_distance_to", target_ship)) + RAID_SWITCH_BUFFER)
+	if center_distance > hull_contact_distance:
 		return false
 	if other_ext.y >= 5.0:
 		# 아타케부네처럼 긴 대형 선체는 중심선 정렬이 조금 어긋나도
