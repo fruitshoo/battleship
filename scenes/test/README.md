@@ -41,6 +41,7 @@
   Wrapper: `scripts/test/run_soldier_balance_preview.sh`
 - `ship_combat_balance_preview.tscn`
   Sequential ship combat harness for gunner, melee, firepot, and mixed pressure scenarios.
+  Includes an `Atakebune Boarding` scenario that disables boss guns and forces close side-approach boarding so large-ship deck fighting can be verified directly.
   Prints per-scenario winners, hull totals, crew counts, boarding state, and derelict transitions.
   Script: `scripts/test/ship_combat_balance_preview.gd`
   Wrapper: `scripts/test/run_ship_combat_balance_preview.sh`

@@ -146,6 +146,11 @@ static func get_cross_ship_contact_point_local(soldier, other_ship: Node3D) -> V
 		return Vector3.INF
 
 	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, soldier.owned_ship)
+	var contact_span_ratio: float = 0.72
+	if half_ext.x >= 3.2 or half_ext.y >= 5.6:
+		# 대형 선박은 측면/갑판 가장자리 접촉 범위를 조금 더 넓혀서
+		# 병사들이 접현 후 실제 교전을 시작하기 쉽게 만든다.
+		contact_span_ratio = 0.84
 	var other_local: Vector3 = soldier.owned_ship.to_local(other_ship.global_position)
 	var use_side_edge: bool = absf(other_local.x / maxf(half_ext.x, 0.01)) > absf(other_local.z / maxf(half_ext.y, 0.01))
 	var contact_local := Vector3.ZERO
@@ -153,10 +158,10 @@ static func get_cross_ship_contact_point_local(soldier, other_ship: Node3D) -> V
 	if use_side_edge:
 		var x_sign: float = 1.0 if other_local.x >= 0.0 else -1.0
 		contact_local.x = x_sign * half_ext.x
-		contact_local.z = clampf(other_local.z, -half_ext.y * 0.72, half_ext.y * 0.72)
+		contact_local.z = clampf(other_local.z, -half_ext.y * contact_span_ratio, half_ext.y * contact_span_ratio)
 	else:
 		var z_sign: float = 1.0 if other_local.z >= 0.0 else -1.0
-		contact_local.x = clampf(other_local.x, -half_ext.x * 0.72, half_ext.x * 0.72)
+		contact_local.x = clampf(other_local.x, -half_ext.x * contact_span_ratio, half_ext.x * contact_span_ratio)
 		contact_local.z = z_sign * half_ext.y
 
 	return contact_local
@@ -179,7 +184,14 @@ static func is_in_cross_ship_contact_zone(soldier, other_ship: Node3D) -> bool:
 		return false
 	var soldier_local: Vector3 = soldier.owned_ship.to_local(soldier.global_position)
 	var diff_xz := Vector2(soldier_local.x - contact_local.x, soldier_local.z - contact_local.z)
-	var zone_radius: float = clampf(get_cross_ship_engage_max_distance(soldier, other_ship) * 0.35, 3.0, 9.0)
+	var my_half_ext: Vector2 = get_ship_deck_half_extents(soldier, soldier.owned_ship)
+	var other_half_ext: Vector2 = get_ship_deck_half_extents(soldier, other_ship)
+	var size_pressure: float = maxf(0.0, (my_half_ext.x + other_half_ext.x + my_half_ext.y + other_half_ext.y) - 10.0)
+	var zone_radius: float = clampf(
+		get_cross_ship_engage_max_distance(soldier, other_ship) * 0.35 + size_pressure * 0.16,
+		3.0,
+		12.0
+	)
 	return diff_xz.length_squared() <= (zone_radius * zone_radius)
 
 

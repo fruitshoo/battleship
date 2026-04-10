@@ -515,7 +515,10 @@ static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
 		return false
 	if target_ship == ship:
 		return false
-	if not target_ship.is_in_group("enemy"):
+	if target_ship.has_method("get_team_tag"):
+		if target_ship.get_team_tag() != "enemy":
+			return false
+	elif not target_ship.is_in_group("enemy"):
 		return false
 	if target_ship.has_method("is_player_team") and target_ship.is_player_team():
 		return false
@@ -527,11 +530,31 @@ static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
 
 
 static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
-	if not ship.has_method("_is_side_boarding_approach"):
-		return false
-	if ship.call("_is_side_boarding_approach", target_ship) != true:
-		return false
 	var my_ext: Vector2 = ship.get_deck_half_extents()
 	var other_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)
 	var max_distance: float = my_ext.y + other_ext.y + RAID_SWITCH_BUFFER
-	return ship.global_position.distance_to(target_ship.global_position) <= max_distance
+	if ship.global_position.distance_to(target_ship.global_position) > max_distance:
+		return false
+	if other_ext.y >= 5.0:
+		# 아타케부네처럼 긴 대형 선체는 중심선 정렬이 조금 어긋나도
+		# 실제로는 접현 가능한 경우가 많아서 거리 조건만 만족하면 월선 후보로 본다.
+		return true
+	if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_ship) == true:
+		return true
+
+	# 대형 선체는 중심점/접점 기준 오차가 더 커서 자동 월선 판정을 조금 완화한다.
+	var combined_length: float = my_ext.y + other_ext.y
+	if combined_length < 8.5:
+		return false
+	if not ship.has_method("_get_boarding_alignment_state"):
+		return false
+	var state: Variant = ship.call("_get_boarding_alignment_state", target_ship)
+	if typeof(state) != TYPE_DICTIONARY:
+		return false
+	var boarding_state: Dictionary = state as Dictionary
+	if boarding_state.is_empty():
+		return false
+	var my_contact_abs: float = absf(float(boarding_state.get("my_contact_dot", 1.0)))
+	var target_contact_abs: float = absf(float(boarding_state.get("target_contact_dot", 1.0)))
+	var parallel_dot: float = float(boarding_state.get("parallel_dot", -1.0))
+	return my_contact_abs <= 0.82 and target_contact_abs <= 0.82 and parallel_dot >= -0.15

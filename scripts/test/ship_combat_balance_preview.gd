@@ -5,6 +5,7 @@ const ENEMY_BASE_SCENE := preload("res://scenes/ships/enemy_ship.tscn")
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
+const BOSS_SCENE := preload("res://scenes/ships/boss_ship.tscn")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
@@ -78,6 +79,19 @@ func _build_scenarios() -> Array[Dictionary]:
 			"distance": 12.5,
 			"enemy_lateral_offset": 0.0,
 		},
+		{
+			"name": "Atakebune Boarding",
+			"enemy_scene": BOSS_SCENE,
+			"distance": 9.5,
+			"enemy_lateral_offset": 6.0,
+			"enemy_rotation_offset_deg": 90.0,
+			"time_limit": 24.0,
+			"disable_enemy_weapons": true,
+			"force_player_auto_raid": true,
+			"player_auto_raid_max_boarders": 4,
+			"player_auto_raid_min_defenders": 1,
+			"player_auto_raid_eval_interval": 0.12,
+		},
 	]
 
 
@@ -133,8 +147,8 @@ func _setup_scenario(scenario: Dictionary) -> void:
 	_spawn_fresh_ships(scenario)
 	await get_tree().process_frame
 	_reset_player_ship_runtime()
-	_configure_player_runtime()
-	_configure_enemy_runtime()
+	_configure_player_runtime(scenario)
+	_configure_enemy_runtime(scenario)
 	_update_overlay()
 
 
@@ -181,6 +195,9 @@ func _spawn_fresh_ships(scenario: Dictionary) -> void:
 		var right := _current_player_ship.global_basis.x.normalized()
 		_current_enemy_ship.global_position = _current_player_ship.global_position + forward * distance + right * lateral
 		_current_enemy_ship.look_at(_current_player_ship.global_position, Vector3.UP)
+		var rot_offset_deg: float = float(scenario.get("enemy_rotation_offset_deg", 0.0))
+		if absf(rot_offset_deg) > 0.01:
+			_current_enemy_ship.rotate_y(deg_to_rad(rot_offset_deg))
 		PreviewHarnessHelper.assign_preview_target(_current_enemy_ship, _current_player_ship)
 
 
@@ -234,7 +251,7 @@ func _reset_player_ship_runtime() -> void:
 		_current_player_ship.call("check_derelict_status")
 
 
-func _configure_player_runtime() -> void:
+func _configure_player_runtime(scenario: Dictionary) -> void:
 	if not is_instance_valid(_current_player_ship):
 		return
 	if "support_fleet_limit" in _current_player_ship:
@@ -249,17 +266,40 @@ func _configure_player_runtime() -> void:
 		_current_player_ship.set("crew_respawn_interval", 99999.0)
 	if "crew_respawn_timer" in _current_player_ship:
 		_current_player_ship.set("crew_respawn_timer", 0.0)
+	if "auto_raid_enabled" in _current_player_ship:
+		_current_player_ship.set("auto_raid_enabled", scenario.get("force_player_auto_raid", false) == true)
+	if "auto_raid_max_boarders" in _current_player_ship:
+		_current_player_ship.set("auto_raid_max_boarders", int(scenario.get("player_auto_raid_max_boarders", 2)))
+	if "auto_raid_min_defenders" in _current_player_ship:
+		_current_player_ship.set("auto_raid_min_defenders", int(scenario.get("player_auto_raid_min_defenders", 3)))
+	if "auto_raid_eval_interval" in _current_player_ship:
+		_current_player_ship.set("auto_raid_eval_interval", float(scenario.get("player_auto_raid_eval_interval", 0.35)))
+	if "auto_raid_eval_timer" in _current_player_ship:
+		_current_player_ship.set("auto_raid_eval_timer", 0.0)
+	if "auto_raid_target" in _current_player_ship:
+		_current_player_ship.set("auto_raid_target", null)
 	if "is_rowing" in _current_player_ship:
 		_current_player_ship.set("is_rowing", false)
 	if _current_player_ship.has_method("set_preview_deck_state"):
 		_current_player_ship.call("set_preview_deck_state", false, false)
 
 
-func _configure_enemy_runtime() -> void:
+func _configure_enemy_runtime(scenario: Dictionary) -> void:
 	if not is_instance_valid(_current_enemy_ship):
 		return
+	if scenario.get("disable_enemy_weapons", false) == true:
+		_set_ship_launcher_detection_range(_current_enemy_ship, 0.0)
 	if _current_enemy_ship.has_method("set_preview_deck_state"):
 		_current_enemy_ship.call("set_preview_deck_state", false, false)
+
+
+func _set_ship_launcher_detection_range(ship: Node, detection_range: float) -> void:
+	if not is_instance_valid(ship):
+		return
+	for child in ship.get_children():
+		if "detection_range" in child:
+			child.set("detection_range", detection_range)
+		_set_ship_launcher_detection_range(child, detection_range)
 
 
 func _is_current_scenario_finished() -> bool:
@@ -269,7 +309,7 @@ func _is_current_scenario_finished() -> bool:
 		return true
 	if _is_ship_out(_current_enemy_ship):
 		return true
-	return _current_scenario_elapsed >= scenario_time_limit_seconds
+	return _current_scenario_elapsed >= _get_current_scenario_time_limit()
 
 
 func _is_ship_out(ship: Node3D) -> bool:
@@ -299,6 +339,8 @@ func _build_current_result() -> Dictionary:
 	var enemy_derelict := _is_derelict(_current_enemy_ship)
 	var player_boarding := _is_boarding(_current_player_ship)
 	var enemy_boarding := _is_boarding(_current_enemy_ship)
+	var player_boarders_on_enemy := _count_boarders_from_home_to_target(_current_player_ship, _current_enemy_ship)
+	var enemy_boarders_on_player := _count_boarders_from_home_to_target(_current_enemy_ship, _current_player_ship)
 
 	var winner := "draw"
 	if _is_ship_out(_current_enemy_ship) and not _is_ship_out(_current_player_ship):
@@ -327,6 +369,8 @@ func _build_current_result() -> Dictionary:
 		"enemy_derelict": enemy_derelict,
 		"player_boarding": player_boarding,
 		"enemy_boarding": enemy_boarding,
+		"player_boarders_on_enemy": player_boarders_on_enemy,
+		"enemy_boarders_on_player": enemy_boarders_on_player,
 		"winner": winner,
 	}
 
@@ -373,6 +417,20 @@ func _is_boarding(ship: Node3D) -> bool:
 	if ship.has_method("is_boarding_ship"):
 		return ship.call("is_boarding_ship") == true
 	return ship.get("is_boarding") == true if "is_boarding" in ship else false
+
+
+func _count_boarders_from_home_to_target(home_ship: Node3D, target_ship: Node3D) -> int:
+	if not is_instance_valid(home_ship) or not is_instance_valid(target_ship):
+		return 0
+	var count: int = 0
+	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+			continue
+		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() == home_ship:
+			count += 1
+	return count
 
 
 func _ensure_overlay() -> void:
@@ -432,22 +490,30 @@ func _update_overlay() -> void:
 		winner = str(_scenario_results[_scenario_results.size() - 1].get("winner", "-"))
 	elif _scenario_running:
 		winner = _get_live_winner_hint(player_hull, enemy_hull, player_crew, enemy_crew)
-	_overlay_label.text = "scenario:%s (%d/%d)\nelapsed:%.1fs / %.1fs\nplayer hull:%.1f crew:%d board:%s derelict:%s\nenemy hull:%.1f crew:%d board:%s derelict:%s\nwinner:%s" % [
+	_overlay_label.text = "scenario:%s (%d/%d)\nelapsed:%.1fs / %.1fs\nplayer hull:%.1f crew:%d board:%s enemy_boarders:%d derelict:%s\nenemy hull:%.1f crew:%d board:%s our_boarders:%d derelict:%s\nwinner:%s" % [
 		scenario_name,
 		maxi(_current_scenario_index + 1, 0),
 		maxi(_scenario_defs.size(), 0),
 		_current_scenario_elapsed,
-		scenario_time_limit_seconds,
+		_get_current_scenario_time_limit(),
 		player_hull,
 		player_crew,
 		"Y" if _is_boarding(_current_player_ship) else "N",
+		_count_boarders_from_home_to_target(_current_enemy_ship, _current_player_ship),
 		"Y" if _is_derelict(_current_player_ship) else "N",
 		enemy_hull,
 		enemy_crew,
 		"Y" if _is_boarding(_current_enemy_ship) else "N",
+		_count_boarders_from_home_to_target(_current_player_ship, _current_enemy_ship),
 		"Y" if _is_derelict(_current_enemy_ship) else "N",
 		winner,
 	]
+
+
+func _get_current_scenario_time_limit() -> float:
+	if _current_scenario_index >= 0 and _current_scenario_index < _scenario_defs.size():
+		return float(_scenario_defs[_current_scenario_index].get("time_limit", scenario_time_limit_seconds))
+	return scenario_time_limit_seconds
 
 
 func _get_live_winner_hint(player_hull: float, enemy_hull: float, player_crew: int, enemy_crew: int) -> String:
@@ -478,7 +544,7 @@ func _report_summary() -> void:
 			draws += 1
 	if auto_print_summary:
 		for result in _scenario_results:
-			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s" % [
+			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s player_boarders_on_enemy=%d enemy_boarders_on_player=%d" % [
 				str(result.get("name", "Scenario")),
 				str(result.get("winner", "draw")),
 				float(result.get("elapsed", 0.0)),
@@ -492,6 +558,8 @@ func _report_summary() -> void:
 				"Y" if result.get("enemy_derelict", false) == true else "N",
 				"Y" if result.get("player_boarding", false) == true else "N",
 				"Y" if result.get("enemy_boarding", false) == true else "N",
+				int(result.get("player_boarders_on_enemy", 0)),
+				int(result.get("enemy_boarders_on_player", 0)),
 			])
 		print("[ShipCombat] summary scenarios=%d player_wins=%d enemy_wins=%d draws=%d" % [
 			_scenario_results.size(),

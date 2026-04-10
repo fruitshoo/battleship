@@ -1212,7 +1212,12 @@ func _is_side_boarding_approach(target_ship: Node3D) -> bool:
 	var my_contact_abs: float = absf(float(state["my_contact_dot"]))
 	var target_contact_abs: float = absf(float(state["target_contact_dot"]))
 	var parallel_dot: float = float(state["parallel_dot"])
-	return my_contact_abs <= 0.55 and target_contact_abs <= 0.55 and parallel_dot >= 0.2
+	var my_ext: Vector2 = get_deck_half_extents()
+	var target_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)
+	var size_pressure: float = maxf(0.0, (my_ext.y + target_ext.y) - 8.0)
+	var contact_limit: float = clampf(0.55 + size_pressure * 0.025, 0.55, 0.72)
+	var parallel_min: float = clampf(0.2 - size_pressure * 0.03, -0.05, 0.2)
+	return my_contact_abs <= contact_limit and target_contact_abs <= contact_limit and parallel_dot >= parallel_min
 
 func _is_boarding_contact_stable() -> bool:
 	if not is_instance_valid(boarding_target):
