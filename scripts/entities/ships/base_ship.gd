@@ -1097,18 +1097,36 @@ func _spawn_ropes(count_override: int = -1) -> void:
 	for i in range(count):
 		var mesh_instance = MeshInstance3D.new()
 		var cylinder = CylinderMesh.new()
-		cylinder.top_radius = 0.04
-		cylinder.bottom_radius = 0.04
+		cylinder.top_radius = 0.055
+		cylinder.bottom_radius = 0.055
 		cylinder.height = 1.0 # 기본 길이는 1로 설정 (scale로 조절)
 		mesh_instance.mesh = cylinder
 		
 		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.4, 0.3, 0.2)
-		mat.roughness = 0.9
+		mat.albedo_color = Color(0.76, 0.63, 0.40, 0.96)
+		mat.roughness = 0.72
+		mat.emission_enabled = true
+		mat.emission = Color(0.48, 0.34, 0.16, 1.0)
+		mat.emission_energy_multiplier = 0.65
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mesh_instance.material_override = mat
 		
 		add_child(mesh_instance)
+
+		var hook_visual := MeshInstance3D.new()
+		var hook_mesh := SphereMesh.new()
+		hook_mesh.radius = 0.12
+		hook_mesh.height = 0.24
+		hook_visual.mesh = hook_mesh
+		var hook_mat := StandardMaterial3D.new()
+		hook_mat.albedo_color = Color(1.0, 0.86, 0.52, 0.95)
+		hook_mat.emission_enabled = true
+		hook_mat.emission = Color(1.0, 0.72, 0.28, 1.0)
+		hook_mat.emission_energy_multiplier = 1.15
+		hook_mat.roughness = 0.35
+		hook_visual.material_override = hook_mat
+		hook_visual.top_level = true
+		add_child(hook_visual)
 		
 		var offset_z = 0.0
 		if count > 1:
@@ -1123,6 +1141,7 @@ func _spawn_ropes(count_override: int = -1) -> void:
 		mesh_instance.set_meta("anchor_offset", offset)
 		mesh_instance.set_meta("deploy_progress", 0.0)
 		mesh_instance.set_meta("deploy_duration", maxf(0.05, boarding_rope_throw_duration + randf_range(-0.06, 0.08)))
+		mesh_instance.set_meta("hook_visual", hook_visual)
 		rope_instances.append(mesh_instance)
 
 func _update_ropes(delta: float = 0.0) -> void:
@@ -1147,17 +1166,32 @@ func _update_ropes(delta: float = 0.0) -> void:
 		# 밧줄 투척 연출: 시작점에서 목표점까지 전개 길이가 점진적으로 늘어난다.
 		var current_end = start_pos.lerp(target_center, deploy_progress)
 		var dist = maxf(0.05, start_pos.distance_to(current_end))
+		var rope_dir = (current_end - start_pos).normalized()
+		var sag_amount = minf(0.45, dist * 0.04) * deploy_progress
+		var sag_mid = (start_pos + current_end) * 0.5 + Vector3(0.0, -sag_amount, 0.0)
 		
-		var mid_pos = start_pos + (current_end - start_pos) * 0.5
-		rope.global_transform = Transform3D().looking_at(current_end - mid_pos, Vector3.UP)
-		rope.global_position = mid_pos
+		rope.global_transform = Transform3D().looking_at(current_end - sag_mid, Vector3.UP)
+		rope.global_position = sag_mid
 		
 		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
-		rope.scale = Vector3(1.0, dist, 1.0)
+		rope.scale = Vector3(1.0, dist, 1.0) * (1.0 + (1.0 - deploy_progress) * 0.12)
+		var rope_material: StandardMaterial3D = rope.material_override as StandardMaterial3D
+		if is_instance_valid(rope_material):
+			rope_material.emission_energy_multiplier = lerpf(0.5, 1.25, deploy_progress)
+		var hook_visual = rope.get_meta("hook_visual", null) as MeshInstance3D
+		if is_instance_valid(hook_visual):
+			hook_visual.visible = deploy_progress >= 0.18
+			hook_visual.global_position = current_end
+			var hook_basis := Basis.looking_at(-rope_dir, Vector3.UP)
+			hook_visual.global_transform = Transform3D(hook_basis, current_end)
+			hook_visual.scale = Vector3.ONE * lerpf(0.65, 1.0, deploy_progress)
 
 func _clear_ropes() -> void:
 	for rope in rope_instances:
 		if is_instance_valid(rope):
+			var hook_visual = rope.get_meta("hook_visual", null) as MeshInstance3D
+			if is_instance_valid(hook_visual):
+				hook_visual.queue_free()
 			rope.queue_free()
 	rope_instances.clear()
 
