@@ -57,6 +57,14 @@ const CREW_UPGRADE_IDS: Array[String] = [
 	"fire_pot",
 	"repeating_crossbow",
 ]
+const PRIORITY_SHIP_UPGRADE_IDS: Array[String] = [
+	"cannon",
+	"janggun",
+]
+const PRIORITY_CREW_UPGRADE_IDS: Array[String] = [
+	"crew_reserve",
+	"boarding_resist",
+]
 const SUPPORT_SHIP_UPGRADE_IDS: Array[String] = [
 	"fleet_cannon",
 	"fleet_hull",
@@ -69,6 +77,8 @@ const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
 	"fleet_hull",
 	"fleet_crew",
 ]
+const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
+const SUPPORT_CREW_PROGRESS_MIN_LEVELS: int = 6
 const RARE_FLEET_UPGRADE_ID: String = "fleet_signal"
 const RARE_FLEET_UPGRADE_CHANCE: float = 0.08
 const CREW_ROLE_GENERAL := "general"
@@ -151,9 +161,10 @@ func get_ship_upgrade_choices(count: int = 3) -> Array:
 		current_levels,
 		SHIP_UPGRADE_IDS,
 		SUPPORT_SHIP_UPGRADE_IDS,
+		_get_priority_ship_upgrade_ids(),
 		RARE_FLEET_UPGRADE_ID,
 		RARE_FLEET_UPGRADE_CHANCE,
-		_is_fleet_progress_available(),
+		_is_fleet_ship_progress_available(),
 		count
 	)
 
@@ -163,7 +174,8 @@ func get_command_upgrade_choices(count: int = 3) -> Array:
 		current_levels,
 		CREW_UPGRADE_IDS,
 		SUPPORT_CREW_UPGRADE_IDS,
-		_is_fleet_progress_available(),
+		_get_priority_crew_upgrade_ids(),
+		_is_fleet_crew_progress_available(),
 		count
 	)
 
@@ -175,6 +187,47 @@ func _is_fleet_progress_available() -> bool:
 		if int(current_levels.get(upgrade_id, 0)) > 0:
 			return true
 	return EntityRegistry.count_captured_minions() > 0
+
+
+func _is_fleet_ship_progress_available() -> bool:
+	if not _is_fleet_progress_available():
+		return false
+	return _get_non_fleet_progress_levels() >= SUPPORT_SHIP_PROGRESS_MIN_LEVELS
+
+
+func _is_fleet_crew_progress_available() -> bool:
+	if not _is_fleet_progress_available():
+		return false
+	return _get_non_fleet_progress_levels() >= SUPPORT_CREW_PROGRESS_MIN_LEVELS
+
+
+func _get_non_fleet_progress_levels() -> int:
+	var total_levels := 0
+	for upgrade_id in current_levels.keys():
+		if upgrade_id == RARE_FLEET_UPGRADE_ID:
+			continue
+		if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
+			continue
+		total_levels += int(current_levels.get(upgrade_id, 0))
+	return total_levels
+
+
+func _get_priority_ship_upgrade_ids() -> Array[String]:
+	var priority_ids: Array[String] = []
+	if int(current_levels.get("cannon", 0)) < 3:
+		priority_ids.append("cannon")
+	if int(current_levels.get("janggun", 0)) < 2:
+		priority_ids.append("janggun")
+	return priority_ids
+
+
+func _get_priority_crew_upgrade_ids() -> Array[String]:
+	var priority_ids: Array[String] = []
+	if int(current_levels.get("crew_reserve", 0)) < 2:
+		priority_ids.append("crew_reserve")
+	if int(current_levels.get("boarding_resist", 0)) < 2:
+		priority_ids.append("boarding_resist")
+	return priority_ids
 
 func _collect_choices_from_ids(ids: Array[String], count: int) -> Array:
 	return UpgradeManagerChoiceHelper.collect_choices_from_ids(UPGRADES, current_levels, ids, count)
