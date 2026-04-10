@@ -16,6 +16,7 @@ const HudStatusDisplayHelper = preload("res://scripts/ui/hud/hud_status_display_
 const HudItemDisplayHelper = preload("res://scripts/ui/hud/hud_item_display_helper.gd")
 const HudProgressionLayoutHelper = preload("res://scripts/ui/hud/hud_progression_layout_helper.gd")
 const HudRuntimeHelper = preload("res://scripts/ui/hud/hud_runtime_helper.gd")
+const HudShipHealthOverlayHelper = preload("res://scripts/ui/hud/hud_ship_health_overlay_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
@@ -374,21 +375,13 @@ func _refresh_owned_item_icons() -> void:
 
 
 func _setup_ship_hp_overlay() -> void:
-	if is_instance_valid(ship_hp_overlay):
-		return
-	ship_hp_overlay = Control.new()
-	ship_hp_overlay.name = "ShipHealthOverlay"
-	ship_hp_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ship_hp_overlay.z_index = 20
-	add_child(ship_hp_overlay)
-	ship_hp_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	HudShipHealthOverlayHelper.setup_ship_hp_overlay(self)
 
 func _update_ship_health_bars(positions_only: bool = false) -> void:
-	HudUpdateHelper.update_ship_health_bars(self, positions_only)
+	HudShipHealthOverlayHelper.update_ship_health_bars(self, positions_only)
 
 func toggle_ship_health_bars() -> void:
-	show_ship_health_bars = not show_ship_health_bars
-	_update_ship_health_bars()
+	HudShipHealthOverlayHelper.toggle_ship_health_bars(self)
 
 func _update_stat_panel() -> void:
 	HudStatPanelHelper.update_stat_panel(self)
