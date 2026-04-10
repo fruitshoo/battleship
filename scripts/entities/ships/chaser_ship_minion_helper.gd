@@ -5,6 +5,9 @@ const SUPPORT_FORMATION_SPACING := 10.0
 const SUPPORT_JOIN_SPACING := 14.0
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
+const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
+const SUPPORT_ANCHOR_FWD_META := "support_anchor_forward"
+const SUPPORT_IDLE_ORBIT_TIME_META := "support_idle_orbit_time"
 const SUPPORT_SLOT_SPEED_GAIN := 0.42
 const SUPPORT_SLOT_BRAKE_GAIN := 0.55
 const SUPPORT_MAX_CATCHUP_SPEED := 4.5
@@ -21,13 +24,22 @@ const SUPPORT_DIRECT_STEER_DISTANCE := 7.0
 const SUPPORT_BRAKE_LATERAL_TOLERANCE := 2.5
 const SUPPORT_TRAIL_POINT_DISTANCE := 1.8
 const SUPPORT_TRAIL_MAX_POINTS := 96
+const SUPPORT_IDLE_ORBIT_RADIUS := 11.0
+const SUPPORT_IDLE_ORBIT_SPEED := 0.65
+const SUPPORT_IDLE_SPEED_RESPONSE := 2.4
 
 static func process_minion_ai(ship, delta: float) -> void:
-	if not is_instance_valid(ship.target):
-		ship._find_player()
-		return
-
 	var is_support_ship: bool = ship.get_meta("support_fleet_ship", false) == true
+	if not is_instance_valid(ship.target) or _is_ship_disabled(ship.target):
+		ship._find_player()
+		if not is_instance_valid(ship.target) or _is_ship_disabled(ship.target):
+			if is_support_ship and _has_support_anchor(ship):
+				_process_support_idle_patrol(ship, delta)
+			return
+
+	if is_support_ship:
+		_record_support_anchor(ship, ship.target)
+
 	var minions: Array = _get_minion_roster(ship, is_support_ship)
 	var my_index: int = minions.find(ship)
 	if my_index == -1:
@@ -193,6 +205,90 @@ static func process_minion_ai(ship, delta: float) -> void:
 		ship.set_meta("support_debug_player_speed", float(player_speed))
 		ship.set_meta("support_debug_lead_speed", float(support_lead_speed))
 		ship.set_meta("support_debug_target_speed", float(target_final_speed))
+
+static func _is_ship_disabled(node: Node3D) -> bool:
+	if not is_instance_valid(node):
+		return true
+	if node.has_method("is_sinking_or_dying"):
+		return node.is_sinking_or_dying()
+	var is_sinking: Variant = node.get("is_sinking")
+	var is_dying: Variant = node.get("is_dying")
+	return is_sinking == true or is_dying == true
+
+static func _record_support_anchor(ship, target_ship: Node3D) -> void:
+	if not is_instance_valid(target_ship):
+		return
+	var anchor_pos: Vector3 = target_ship.global_position
+	anchor_pos.y = ship.global_position.y
+	ship.set_meta(SUPPORT_ANCHOR_POS_META, anchor_pos)
+	ship.set_meta(SUPPORT_ANCHOR_FWD_META, _get_ship_forward_flat(target_ship))
+
+static func _has_support_anchor(ship) -> bool:
+	var anchor_pos: Variant = ship.get_meta(SUPPORT_ANCHOR_POS_META, null)
+	return anchor_pos is Vector3
+
+static func _process_support_idle_patrol(ship, delta: float) -> void:
+	var anchor_variant: Variant = ship.get_meta(SUPPORT_ANCHOR_POS_META, null)
+	if not (anchor_variant is Vector3):
+		ship.current_speed = move_toward(float(ship.current_speed), 0.0, delta * 2.0)
+		ship._set_wake_state(false)
+		return
+
+	var anchor_pos: Vector3 = anchor_variant
+	var anchor_fwd_variant: Variant = ship.get_meta(SUPPORT_ANCHOR_FWD_META, Vector3.FORWARD)
+	var anchor_fwd: Vector3 = anchor_fwd_variant if anchor_fwd_variant is Vector3 else Vector3.FORWARD
+	anchor_fwd.y = 0.0
+	if anchor_fwd.length_squared() <= 0.0001:
+		anchor_fwd = Vector3.FORWARD
+	else:
+		anchor_fwd = anchor_fwd.normalized()
+	var anchor_right: Vector3 = anchor_fwd.cross(Vector3.UP).normalized()
+
+	var order_index: int = int(ship.get_meta(SUPPORT_FLEET_ORDER_META, 0))
+	var orbit_time: float = float(ship.get_meta(SUPPORT_IDLE_ORBIT_TIME_META, 0.0)) + delta
+	ship.set_meta(SUPPORT_IDLE_ORBIT_TIME_META, orbit_time)
+	var orbit_angle: float = orbit_time * SUPPORT_IDLE_ORBIT_SPEED + (float(order_index) * 1.35)
+	var orbit_radius: float = SUPPORT_IDLE_ORBIT_RADIUS + float(order_index) * 3.0
+	var target_pos: Vector3 = anchor_pos
+	target_pos += anchor_right * cos(orbit_angle) * orbit_radius
+	target_pos += anchor_fwd * sin(orbit_angle) * orbit_radius * 0.75
+	target_pos.y = ship.global_position.y
+
+	var to_target: Vector3 = target_pos - ship.global_position
+	to_target.y = 0.0
+	var dist_to_target: float = to_target.length()
+	var desired_dir: Vector3 = to_target.normalized() if dist_to_target > 0.001 else anchor_fwd
+	var target_heading: float = atan2(-desired_dir.x, -desired_dir.z)
+	var angle_diff: float = wrapf(target_heading - ship.rotation.y, -PI, PI)
+	var desired_rudder: float = clamp(-rad_to_deg(angle_diff) * 2.0, -40.0, 40.0)
+	var rudder_speed_adjusted: float = 120.0 * ship.get_rudder_response_multiplier()
+	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
+
+	var desired_speed: float = clampf(dist_to_target * 0.45, 1.4, ship.move_speed * 0.65)
+	ship._last_ai_speed = lerp(ship._last_ai_speed, desired_speed, delta * SUPPORT_IDLE_SPEED_RESPONSE)
+	ship.current_speed = maxf(ship._last_ai_speed, 0.0)
+
+	var speed_ratio: float = ship.current_speed / maxf(ship.max_speed, 0.01)
+	var actual_turn: float = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * delta
+	ship.rotation.y -= deg_to_rad(actual_turn)
+
+	var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
+	var velocity: Vector3 = forward_vec * ship.current_speed
+	var prev_pos: Vector3 = ship.global_position
+	var next_pos: Vector3 = prev_pos + velocity * delta
+	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos)
+	ship.global_position = next_pos
+	_record_support_trail_point(ship)
+	ship._update_rudder_visual()
+	ship._apply_bobbing_effect()
+	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+	ship.set_meta("support_debug_lead_name", "anchor")
+	ship.set_meta("support_debug_target_pos", target_pos)
+	ship.set_meta("support_debug_slot_dist", dist_to_target)
+	ship.set_meta("support_debug_rel_depth", 0.0)
+	ship.set_meta("support_debug_player_speed", 0.0)
+	ship.set_meta("support_debug_lead_speed", 0.0)
+	ship.set_meta("support_debug_target_speed", desired_speed)
 
 static func _get_minion_roster(ship, support_only: bool) -> Array:
 	var roster: Array = []

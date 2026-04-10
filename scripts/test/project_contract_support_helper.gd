@@ -75,6 +75,15 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	if target_ship != player_ship:
 		failures.append("support fleet smoke support ship target mismatch")
 
+	var support_before_idle_pos: Vector3 = support_ship.global_position
+	support_ship.set("target", null)
+	await _wait_frames(owner, wait_frames_after_spawn + 2)
+	var support_idle_distance: float = support_ship.global_position.distance_to(support_before_idle_pos)
+	if support_idle_distance <= 0.1:
+		failures.append("support fleet smoke support ship did not keep moving after target loss")
+	if support_ship.get_meta("support_debug_lead_name", "") != "anchor":
+		failures.append("support fleet smoke support ship did not enter anchor idle mode after target loss")
+
 	var repair_before: float = 0.0
 	if support_ship.get("hull_hp") != null and support_ship.get("max_hull_hp") != null:
 		var max_hull_hp: float = float(support_ship.get("max_hull_hp"))
