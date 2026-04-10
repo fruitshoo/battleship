@@ -10,6 +10,7 @@ const HudUpgradeTooltipHelper = preload("res://scripts/ui/hud/hud_upgrade_toolti
 const HudStatPanelHelper = preload("res://scripts/ui/hud/hud_stat_panel_helper.gd")
 const HudDebugPanelHelper = preload("res://scripts/ui/hud/hud_debug_panel_helper.gd")
 const HudDistanceDebugHelper = preload("res://scripts/ui/hud/hud_distance_debug_helper.gd")
+const HudSailDebugHelper = preload("res://scripts/ui/hud/hud_sail_debug_helper.gd")
 const HudShipDebugHelper = preload("res://scripts/ui/hud/hud_ship_debug_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
@@ -245,9 +246,7 @@ func _setup_sail_debug_panel() -> void:
 
 
 func _update_sail_debug_toggle_button_text() -> void:
-	if not is_instance_valid(sail_debug_toggle_button):
-		return
-	sail_debug_toggle_button.text = "Debug 닫기" if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible else "Debug 열기"
+	HudSailDebugHelper.update_sail_debug_toggle_button_text(self)
 
 
 func _sync_ship_debug_panel_from_player() -> void:
@@ -756,98 +755,27 @@ func show_gust_warning_message(message: String, duration: float = 0.35) -> void:
 
 
 func _get_player_masts_for_debug() -> Array[Node]:
-	if not is_instance_valid(player_ship):
-		_try_resolve_player_ship()
-	if not is_instance_valid(player_ship):
-		return []
-	var mast_nodes: Array[Node] = []
-	var raw_masts = player_ship.get("masts")
-	if raw_masts is Array:
-		for mast in raw_masts:
-			if is_instance_valid(mast):
-				mast_nodes.append(mast)
-	return mast_nodes
+	return HudSailDebugHelper.get_player_masts_for_debug(self)
 
 
 func _apply_sail_debug_values(damage: float, burn: float, hole_strength: float = 1.0) -> void:
-	var masts: Array[Node] = _get_player_masts_for_debug()
-	if masts.is_empty():
-		show_gust_warning_message("돛 디버그 대상 없음", 0.9)
-		return
-	if is_instance_valid(player_ship):
-		player_ship.set_meta("debug_sail_burn_override_active", true)
-		player_ship.set_meta("debug_sail_burn_override_value", burn)
-	var target_damage := clampf(damage, 0.0, 1.0)
-	var target_burn := clampf(burn, 0.0, 1.0)
-	var target_hole := clampf(hole_strength, 0.0, 2.0)
-	for mast in masts:
-		mast.set("sail_damage", target_damage)
-		if mast.has_method("set_burn_amount"):
-			mast.set_burn_amount(target_burn)
-		else:
-			mast.set("burn_amount", target_burn)
-		if mast.has_method("set_hole_alpha_strength"):
-			mast.set_hole_alpha_strength(target_hole)
-		else:
-			mast.set("hole_alpha_strength", target_hole)
-	_sync_sail_debug_panel_from_player()
-	show_gust_warning_message("돛 손상 %.2f | burn %.2f | hole %.2f" % [target_damage, target_burn, target_hole], 0.7)
+	HudSailDebugHelper.apply_sail_debug_values(self, damage, burn, hole_strength)
 
 
 func _sync_sail_debug_panel_from_player() -> void:
-	if not is_instance_valid(sail_debug_panel):
-		return
-	var masts: Array[Node] = _get_player_masts_for_debug()
-	if masts.is_empty():
-		return
-	var first_mast: Node = masts[0]
-	var current_damage: float = 0.0
-	var current_burn: float = 0.0
-	var current_hole: float = 1.0
-	if first_mast.has_method("get_sail_damage"):
-		current_damage = float(first_mast.get_sail_damage())
-	if first_mast.has_method("get_burn_amount"):
-		current_burn = float(first_mast.get_burn_amount())
-	if first_mast.has_method("get_hole_alpha_strength"):
-		current_hole = float(first_mast.get_hole_alpha_strength())
-	_sail_debug_ui_syncing = true
-	if is_instance_valid(sail_debug_damage_slider):
-		sail_debug_damage_slider.value = current_damage
-	if is_instance_valid(sail_debug_burn_slider):
-		sail_debug_burn_slider.value = current_burn
-	if is_instance_valid(sail_debug_hole_slider):
-		sail_debug_hole_slider.value = current_hole
-	if is_instance_valid(sail_debug_damage_value):
-		sail_debug_damage_value.text = "%.2f" % current_damage
-	if is_instance_valid(sail_debug_burn_value):
-		sail_debug_burn_value.text = "%.2f" % current_burn
-	if is_instance_valid(sail_debug_hole_value):
-		sail_debug_hole_value.text = "%.2f" % current_hole
-	_sail_debug_ui_syncing = false
+	HudSailDebugHelper.sync_sail_debug_panel_from_player(self)
 
 
 func _on_sail_debug_damage_changed(value: float) -> void:
-	if _sail_debug_ui_syncing:
-		return
-	var burn_value: float = sail_debug_burn_slider.value if is_instance_valid(sail_debug_burn_slider) else 0.0
-	var hole_value: float = sail_debug_hole_slider.value if is_instance_valid(sail_debug_hole_slider) else 1.0
-	_apply_sail_debug_values(value, burn_value, hole_value)
+	HudSailDebugHelper.on_sail_debug_damage_changed(self, value)
 
 
 func _on_sail_debug_burn_changed(value: float) -> void:
-	if _sail_debug_ui_syncing:
-		return
-	var damage_value: float = sail_debug_damage_slider.value if is_instance_valid(sail_debug_damage_slider) else 0.0
-	var hole_value: float = sail_debug_hole_slider.value if is_instance_valid(sail_debug_hole_slider) else 1.0
-	_apply_sail_debug_values(damage_value, value, hole_value)
+	HudSailDebugHelper.on_sail_debug_burn_changed(self, value)
 
 
 func _on_sail_debug_hole_changed(value: float) -> void:
-	if _sail_debug_ui_syncing:
-		return
-	var damage_value: float = sail_debug_damage_slider.value if is_instance_valid(sail_debug_damage_slider) else 0.0
-	var burn_value: float = sail_debug_burn_slider.value if is_instance_valid(sail_debug_burn_slider) else 0.0
-	_apply_sail_debug_values(damage_value, burn_value, value)
+	HudSailDebugHelper.on_sail_debug_hole_changed(self, value)
 
 
 func show_victory() -> void:
