@@ -50,7 +50,7 @@
   Prints per-encounter and final `hull / crew` loss across multiple enemy archetypes.
   Script: `scripts/test/ship_combat_gauntlet_preview.gd`
   Wrapper: `scripts/test/run_ship_combat_gauntlet_preview.sh`
-  Pass `crew_sustain`, `cannon_pressure`, or `crew_sustain_cannon` as the first wrapper argument to inject an upgrade preset and compare long-run attrition.
+  Pass `crew_sustain`, `cannon_pressure`, `crew_sustain_cannon`, `fleet_screen`, or `crew_sustain_fleet` as the first wrapper argument to inject an upgrade preset and compare long-run attrition.
 - `performance_preview.tscn`
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
@@ -110,7 +110,7 @@
 - `scripts/test/run_ship_combat_gauntlet_preview.sh`
   Headless wrapper for the cumulative ship combat gauntlet harness.
   Auto-quits after the summary report, skips startup prewarm, disables runtime rewards/autosave, and fails on common runtime log errors or missing summary output.
-  Accepts an optional first argument such as `crew_sustain`, `cannon_pressure`, or `crew_sustain_cannon` to apply a gauntlet upgrade preset before the encounter chain begins.
+  Accepts an optional first argument such as `crew_sustain`, `cannon_pressure`, `crew_sustain_cannon`, `fleet_screen`, or `crew_sustain_fleet` to apply a gauntlet upgrade preset before the encounter chain begins.
   Accepts an optional second argument `no_recovery` to disable survivor, floating loot, and treasure recovery pickups during the gauntlet.
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.

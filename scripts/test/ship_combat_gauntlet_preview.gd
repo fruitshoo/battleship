@@ -33,6 +33,7 @@ var _baseline_hull: float = 0.0
 var _baseline_crew: int = 0
 var _upgrade_preset: String = ""
 var _disable_recovery_pickups: bool = false
+var _keep_support_fleet_between_encounters: bool = false
 
 
 func _ready() -> void:
@@ -157,6 +158,10 @@ func _clear_runtime_noise() -> void:
 	for child in get_children():
 		if child == _current_player_ship:
 			continue
+		if _keep_support_fleet_between_encounters and child.get_meta("support_fleet_ship", false) == true:
+			if "target" in child:
+				child.target = _current_player_ship
+			continue
 		if child is Node3D and (
 			child.has_meta("ship_gauntlet_spawn")
 			or child.get_meta("support_fleet_ship", false) == true
@@ -270,6 +275,22 @@ func _apply_upgrade_preset() -> void:
 				"cannon": 2,
 				"janggun": 1,
 			}
+		"fleet_screen":
+			preset_levels = {
+				"fleet_signal": 1,
+				"fleet_hull": 2,
+				"fleet_cannon": 2,
+				"fleet_crew": 2,
+			}
+		"crew_sustain_fleet":
+			preset_levels = {
+				"crew_reserve": 2,
+				"boarding_resist": 2,
+				"fleet_signal": 1,
+				"fleet_hull": 2,
+				"fleet_cannon": 1,
+				"fleet_crew": 2,
+			}
 		"crew_sustain_heavy":
 			preset_levels = {
 				"crew_reserve": 5,
@@ -281,8 +302,25 @@ func _apply_upgrade_preset() -> void:
 		var target_level: int = int(preset_levels.get(upgrade_id, 0))
 		while int(upgrade_manager.current_levels.get(upgrade_id, 0)) < target_level:
 			upgrade_manager.apply_upgrade(upgrade_id)
+	_keep_support_fleet_between_encounters = (
+		int(preset_levels.get("fleet_signal", 0)) > 0
+		or int(preset_levels.get("fleet_hull", 0)) > 0
+		or int(preset_levels.get("fleet_cannon", 0)) > 0
+		or int(preset_levels.get("fleet_crew", 0)) > 0
+	)
+	if _keep_support_fleet_between_encounters:
+		_prepare_support_fleet_screen()
 	if auto_print_summary:
 		print("[ShipGauntlet] upgrade_preset=%s" % _upgrade_preset)
+
+
+func _prepare_support_fleet_screen() -> void:
+	if not is_instance_valid(_current_player_ship):
+		return
+	if "support_fleet_limit" in _current_player_ship:
+		_current_player_ship.set("support_fleet_limit", maxi(1, int(_current_player_ship.get("support_fleet_limit"))))
+	if _current_player_ship.has_method("_spawn_or_repair_ally"):
+		_current_player_ship.call("_spawn_or_repair_ally")
 
 
 func _strip_recovery_pickups() -> void:
