@@ -7,7 +7,7 @@ const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true
-@export var scenario_time_limit_seconds: float = 10.0
+@export var scenario_time_limit_seconds: float = 8.0
 @export var intermission_seconds: float = 0.4
 @export var auto_print_summary: bool = true
 @export var auto_quit_delay_seconds: float = 0.05
@@ -53,16 +53,43 @@ func _configure_preview() -> void:
 func _build_scenarios() -> Array[Dictionary]:
 	return [
 		{
-			"name": "General 2v2",
-			"player_roles": ["general", "general"],
-			"enemy_roles": ["general", "general"],
+			"name": "General Mirror",
+			"player_roles": ["general", "general", "general"],
+			"enemy_roles": ["general", "general", "general"],
 			"line_gap": 2.0,
+		},
+		{
+			"name": "Spearman Mirror",
+			"player_roles": ["spearman", "spearman"],
+			"enemy_roles": ["spearman", "spearman"],
+			"line_gap": 2.2,
+		},
+		{
+			"name": "General vs Spear",
+			"player_roles": ["general", "general"],
+			"enemy_roles": ["spearman", "spearman"],
+			"line_gap": 2.3,
 		},
 		{
 			"name": "Spearman Hold",
 			"player_roles": ["spearman", "spearman"],
 			"enemy_roles": ["general", "general"],
 			"line_gap": 2.2,
+		},
+		{
+			"name": "Bow Pressure",
+			"player_roles": ["general", "general"],
+			"enemy_roles": ["general", "general"],
+			"line_gap": 7.5,
+			"player_force_ranged_only": true,
+		},
+		{
+			"name": "Repeater Mirror",
+			"player_roles": ["repeating_crossbow", "repeating_crossbow"],
+			"enemy_roles": ["repeating_crossbow", "repeating_crossbow"],
+			"line_gap": 7.2,
+			"player_force_ranged_only": true,
+			"enemy_force_ranged_only": true,
 		},
 		{
 			"name": "Repeater Volley",
@@ -500,6 +527,14 @@ func _report_summary() -> void:
 		else:
 			draws += 1
 	if auto_print_summary:
+		for result in _scenario_results:
+			print("[SoldierBalance] result name=%s winner=%s elapsed=%.2f player_alive=%d enemy_alive=%d" % [
+				str(result.get("name", "Scenario")),
+				str(result.get("winner", "draw")),
+				float(result.get("elapsed", 0.0)),
+				int(result.get("player_alive", 0)),
+				int(result.get("enemy_alive", 0)),
+			])
 		print("[SoldierBalance] summary scenarios=%d player_wins=%d enemy_wins=%d draws=%d" % [
 			_scenario_results.size(),
 			player_wins,

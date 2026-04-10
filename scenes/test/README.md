@@ -35,7 +35,7 @@
   Cannon range and active-slot preview across close, ideal, edge, and out distances.
   Script: `scripts/test/cannon_range_preview.gd`
 - `soldier_balance_preview.tscn`
-  Sequential soldier combat harness for general, spearman, repeater, and mixed boarding scenarios.
+  Sequential soldier combat harness for mirror, counter, repeater-volley, and mixed boarding scenarios.
   Prints per-scenario winners and survivor counts.
   Script: `scripts/test/soldier_balance_preview.gd`
   Wrapper: `scripts/test/run_soldier_balance_preview.sh`

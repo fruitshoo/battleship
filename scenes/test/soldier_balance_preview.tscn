@@ -7,7 +7,7 @@
 script = ExtResource("2_script")
 auto_open_debug_panel = true
 stop_regular_spawns = true
-scenario_time_limit_seconds = 10.0
+scenario_time_limit_seconds = 8.0
 intermission_seconds = 0.4
 auto_print_summary = true
 scenario_ship_gap = 6.6
