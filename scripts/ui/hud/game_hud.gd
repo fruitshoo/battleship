@@ -337,11 +337,7 @@ func _process(delta: float) -> void:
 		_update_ammo_mode_display()
 		_update_distance_debug_display()
 		_update_ship_health_bars(false)
-	if show_stat_panel:
-		_stat_refresh_left -= delta
-		if _stat_refresh_left <= 0.0:
-			_stat_refresh_left = stat_refresh_interval
-			_update_stat_panel()
+	HudStatPanelHelper.process_stat_panel(self, delta)
 
 
 func _sync_game_time(delta: float) -> void:
@@ -564,14 +560,7 @@ func _update_stat_panel() -> void:
 
 
 func toggle_stat_panel() -> void:
-	show_stat_panel = not show_stat_panel
-	if show_stat_panel:
-		_tooltip_hover_slot = null
-		_tooltip_slot_ref = null
-		_tooltip_hover_elapsed = 0.0
-		_hide_upgrade_tooltip(true)
-	_stat_refresh_left = 0.0
-	_update_stat_panel()
+	HudStatPanelHelper.toggle_stat_panel(self)
 
 func _setup_upgrade_tooltip() -> void:
 	HudUpgradeTooltipHelper.setup_upgrade_tooltip(self)

@@ -6,6 +6,26 @@ const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutline
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
+static func process_stat_panel(hud, delta: float) -> void:
+	if not hud.show_stat_panel:
+		return
+	hud._stat_refresh_left -= delta
+	if hud._stat_refresh_left <= 0.0:
+		hud._stat_refresh_left = hud.stat_refresh_interval
+		update_stat_panel(hud)
+
+
+static func toggle_stat_panel(hud) -> void:
+	hud.show_stat_panel = not hud.show_stat_panel
+	if hud.show_stat_panel:
+		hud._tooltip_hover_slot = null
+		hud._tooltip_slot_ref = null
+		hud._tooltip_hover_elapsed = 0.0
+		hud._hide_upgrade_tooltip(true)
+	hud._stat_refresh_left = 0.0
+	update_stat_panel(hud)
+
+
 static func update_stat_panel(hud) -> void:
 	if not is_instance_valid(hud.stat_panel):
 		return
