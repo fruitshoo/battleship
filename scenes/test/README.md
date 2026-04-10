@@ -34,6 +34,11 @@
 - `cannon_range_preview.tscn`
   Cannon range and active-slot preview across close, ideal, edge, and out distances.
   Script: `scripts/test/cannon_range_preview.gd`
+- `soldier_balance_preview.tscn`
+  Sequential soldier combat harness for general, spearman, repeater, and mixed boarding scenarios.
+  Prints per-scenario winners and survivor counts.
+  Script: `scripts/test/soldier_balance_preview.gd`
+  Wrapper: `scripts/test/run_soldier_balance_preview.sh`
 - `performance_preview.tscn`
   FPS and frame-time stress harness for ship density, boarding, projectile, and full combat loads.
   Script: `scripts/test/performance_preview.gd`
@@ -84,6 +89,9 @@
   Scene wiring smoke for player, enemy, boss, and firepot ship scene contracts.
 - `scripts/test/run_project_contract_sweep.sh`
   Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
+- `scripts/test/run_soldier_balance_preview.sh`
+  Headless wrapper for the soldier balance harness.
+  Auto-quits after the summary report and fails on common runtime log errors or missing summary output.
 - `scripts/test/run_leak_probe.sh`
   Leak summary wrapper for any auto-quitting scene.
   Defaults to `res://scenes/main.tscn`, prints RID/resource/ObjectDB totals, and can gate regressions with `LEAK_MAX_RID_TOTAL`, `LEAK_MAX_RESOURCES`, `LEAK_MAX_OBJECTDB_WARNINGS`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS`.

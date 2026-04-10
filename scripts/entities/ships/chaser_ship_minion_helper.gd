@@ -224,6 +224,8 @@ static func _record_support_anchor(ship, target_ship: Node3D) -> void:
 	ship.set_meta(SUPPORT_ANCHOR_FWD_META, _get_ship_forward_flat(target_ship))
 
 static func _has_support_anchor(ship) -> bool:
+	if not ship.has_meta(SUPPORT_ANCHOR_POS_META):
+		return false
 	var anchor_pos: Variant = ship.get_meta(SUPPORT_ANCHOR_POS_META, null)
 	return anchor_pos is Vector3
 
