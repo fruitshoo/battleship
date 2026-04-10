@@ -22,6 +22,7 @@ static func run_runtime_smoke(owner: Node, failures: Array[String], smoke_scene_
 		await _run_single_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn, "debug_spawn_final_boss", "final boss")
 	for ship_type_name in smoke_spawn_ship_types:
 		await _run_ship_variant_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn, str(ship_type_name))
+	await _run_derelict_contact_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
 	for launcher_scene_path in smoke_spawn_launcher_scenes:
 		await _run_launcher_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn, str(launcher_scene_path))
 	for projectile_scene_path in smoke_spawn_projectile_scenes:
@@ -87,6 +88,62 @@ static func _run_ship_variant_smoke_pass(owner: Node, failures: Array[String], p
 		_validate_spawned_ship(failures, spawned_ship, ship_type_name)
 
 	_validate_registry_smoke(failures, player_ship, ship_type_name)
+
+	smoke_root.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String], packed: PackedScene, smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
+	var smoke_root := packed.instantiate()
+	if smoke_root == null:
+		failures.append("smoke scene instantiate failed: %s" % smoke_scene_path)
+		return
+
+	owner.add_child(smoke_root)
+	PreviewHarnessHelper.setup_common(smoke_root, false, true)
+	await _wait_frames(owner, wait_frames_after_attach)
+
+	var player_ship: Node3D = smoke_root.get_node_or_null("PlayerShip") as Node3D
+	var spawner: Node = smoke_root.get_node_or_null("EnemySpawner")
+	if not is_instance_valid(player_ship) or not is_instance_valid(spawner):
+		failures.append("derelict contact smoke missing player ship or spawner")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	var derelict_ship: Node3D = null
+	if spawner.has_method("debug_spawn_ship"):
+		derelict_ship = spawner.call("debug_spawn_ship", "kobayabune_melee", 5.0, 0.0) as Node3D
+	await _wait_frames(owner, wait_frames_after_spawn)
+	if not is_instance_valid(derelict_ship):
+		failures.append("derelict contact smoke failed to spawn derelict target")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	if not derelict_ship.has_method("_become_derelict"):
+		failures.append("derelict contact smoke target is missing _become_derelict()")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	derelict_ship.call("_become_derelict")
+	await _wait_frames(owner, 1)
+	derelict_ship.global_position = player_ship.global_position + Vector3(0.0, 0.0, -1.0)
+	var player_max_hull: float = float(player_ship.get("max_hull_hp"))
+	var player_hull_before: float = maxf(1.0, player_max_hull - 20.0)
+	player_ship.set("hull_hp", player_hull_before)
+	if player_ship.has_method("_calculate_collision_repulsion"):
+		player_ship.call("_calculate_collision_repulsion")
+	await _wait_frames(owner, wait_frames_after_spawn)
+
+	if derelict_ship.get_meta("derelict_contact_salvaged", false) != true:
+		failures.append("derelict contact smoke did not mark salvage on contact")
+	if derelict_ship.get_meta("derelict_nonblocking", false) != true:
+		failures.append("derelict contact smoke did not unlock nonblocking on contact")
+	if not derelict_ship.get("is_sinking"):
+		failures.append("derelict contact smoke did not start sinking derelict ship")
+	if float(player_ship.get("hull_hp")) <= player_hull_before:
+		failures.append("derelict contact smoke did not repair player hull")
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)

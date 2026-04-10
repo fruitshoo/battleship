@@ -135,6 +135,7 @@ static func sink_derelict(ship) -> void:
 		return
 	ship.is_sinking = true
 	print("[Ship] 폐선 침몰 시작!")
+	drop_floating_loot(ship)
 
 	ship._set_fire_emitting(true)
 
@@ -184,6 +185,9 @@ static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, wo
 static func drop_floating_loot(ship) -> void:
 	if not ship.loot_scene:
 		return
+	if ship.get_meta("floating_loot_dropped", false) == true:
+		return
+	ship.set_meta("floating_loot_dropped", true)
 	if randf() > float(ship.floating_loot_drop_chance):
 		return
 

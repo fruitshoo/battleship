@@ -3,6 +3,7 @@ class_name BaseShipCollisionHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
 
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
@@ -61,6 +62,9 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			coll_dist *= 0.90
 		elif is_player_support_pair:
 			coll_dist *= 0.92
+
+		if _try_salvage_derelict_contact(ship, other, dist, coll_dist):
+			continue
 
 		if dist < coll_dist:
 			var compression = coll_dist - dist
@@ -129,6 +133,80 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				ship.apply_ramming_damage(other, approach_speed)
 
 	return force
+
+
+static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll_dist: float) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return false
+	if not NodeContractHelper.is_player_controlled_ship(ship):
+		return false
+	if NodeContractHelper.get_team_tag(ship) != "player":
+		return false
+	if NodeContractHelper.get_team_tag(other) != "enemy":
+		return false
+	if dist >= coll_dist:
+		return false
+	if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
+		return false
+	if NodeContractHelper.is_sinking_or_dying(other):
+		return false
+	if not _is_derelict_ship(other):
+		return false
+	if other.get_meta("derelict_contact_salvaged", false) == true:
+		return false
+
+	other.set_meta("derelict_contact_salvaged", true)
+	other.set_meta("derelict_nonblocking", true)
+	if "monitoring" in other:
+		other.set_deferred("monitoring", false)
+	if "monitorable" in other:
+		other.set_deferred("monitorable", false)
+	if other.has_method("_set_contact_areas_enabled"):
+		other.call("_set_contact_areas_enabled", false)
+
+	_repair_player_from_derelict_contact(ship)
+
+	if other.has_method("_sink_derelict"):
+		other.call_deferred("_sink_derelict")
+	return true
+
+
+static func _is_derelict_ship(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if node.has_method("is_derelict_ship"):
+		return node.is_derelict_ship()
+	if "is_derelict" in node:
+		return node.get("is_derelict") == true
+	return false
+
+
+static func _repair_player_from_derelict_contact(player_ship) -> void:
+	if not ("hull_hp" in player_ship and "max_hull_hp" in player_ship):
+		return
+	var hull_hp_before: float = float(player_ship.get("hull_hp"))
+	var max_hull_hp: float = float(player_ship.get("max_hull_hp"))
+	var heal_amount: float = DERELICT_CONTACT_REPAIR_BASE
+	if "_cached_um" in player_ship:
+		var cached_um: Variant = player_ship.get("_cached_um")
+		if is_instance_valid(cached_um) and cached_um.has_method("get_supply_bonus_stats"):
+			var supply_stats: Dictionary = cached_um.get_supply_bonus_stats()
+			heal_amount += float(supply_stats.get("heal_bonus", 0.0))
+	var hull_hp_after: float = minf(hull_hp_before + heal_amount, max_hull_hp)
+	player_ship.set("hull_hp", hull_hp_after)
+
+	var hud: Node = null
+	if player_ship.has_method("_find_hud"):
+		hud = player_ship._find_hud()
+	if not is_instance_valid(hud) and "_cached_hud" in player_ship:
+		var cached_hud: Variant = player_ship.get("_cached_hud")
+		if is_instance_valid(cached_hud):
+			hud = cached_hud
+	if is_instance_valid(hud):
+		if hud.has_method("update_hull_hp"):
+			hud.update_hull_hp(hull_hp_after, max_hull_hp)
+		if hull_hp_after > hull_hp_before and hud.has_method("show_message"):
+			hud.show_message("폐선 해체! 선체 +%d" % int(round(hull_hp_after - hull_hp_before)), 1.35)
 
 
 static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
