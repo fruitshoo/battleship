@@ -36,7 +36,7 @@
   Script: `scripts/test/cannon_range_preview.gd`
 - `soldier_balance_preview.tscn`
   Sequential soldier combat harness for mirror, counter, repeater-volley, and mixed boarding scenarios.
-  Prints per-scenario winners and survivor counts.
+  Prints per-scenario winners, survivor counts, and remaining HP totals.
   Script: `scripts/test/soldier_balance_preview.gd`
   Wrapper: `scripts/test/run_soldier_balance_preview.sh`
 - `performance_preview.tscn`

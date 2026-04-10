@@ -177,6 +177,7 @@ func _setup_scenario(scenario: Dictionary) -> void:
 	await get_tree().process_frame
 
 	_stage_soldier_lines(float(scenario.get("line_gap", 2.0)))
+	_seed_initial_targets()
 	_update_overlay()
 
 
@@ -363,6 +364,48 @@ func _stage_soldier_lines(line_gap: float) -> void:
 		enemy_soldier.look_at(player_anchor + enemy_right * spread, Vector3.UP)
 
 
+func _seed_initial_targets() -> void:
+	var player_soldiers := _get_alive_ship_soldiers(_current_player_ship)
+	var enemy_soldiers := _get_alive_ship_soldiers(_current_enemy_ship)
+	for player_soldier in player_soldiers:
+		var target := _find_nearest_opponent(player_soldier, enemy_soldiers)
+		_assign_initial_target(player_soldier, target)
+	for enemy_soldier in enemy_soldiers:
+		var target := _find_nearest_opponent(enemy_soldier, player_soldiers)
+		_assign_initial_target(enemy_soldier, target)
+
+
+func _find_nearest_opponent(source: Node3D, candidates: Array[Node3D]) -> Node3D:
+	if not is_instance_valid(source):
+		return null
+	var nearest: Node3D = null
+	var nearest_distance_sq: float = INF
+	for candidate in candidates:
+		if not is_instance_valid(candidate):
+			continue
+		var distance_sq := source.global_position.distance_squared_to(candidate.global_position)
+		if distance_sq < nearest_distance_sq:
+			nearest_distance_sq = distance_sq
+			nearest = candidate
+	return nearest
+
+
+func _assign_initial_target(soldier: Node, target: Node3D) -> void:
+	if not is_instance_valid(soldier) or not is_instance_valid(target):
+		return
+	soldier.set("current_target", target)
+	var attack_range: float = 1.2
+	var current_weapon: Variant = soldier.get("current_weapon")
+	if current_weapon != null and "attack_range" in current_weapon:
+		attack_range = float(current_weapon.attack_range)
+	var distance_xz := Vector2(
+		soldier.global_position.x - target.global_position.x,
+		soldier.global_position.z - target.global_position.z
+	).length()
+	if soldier.has_method("_change_state"):
+		soldier.call("_change_state", 3 if distance_xz <= attack_range else 2)
+
+
 func _get_line_spread_offset(index: int, count: int) -> float:
 	if count <= 1:
 		return 0.0
@@ -402,6 +445,10 @@ func _build_current_result() -> Dictionary:
 		scenario = _scenario_defs[_current_scenario_index]
 	var player_alive := _get_ship_alive_crew(_current_player_ship)
 	var enemy_alive := _get_ship_alive_crew(_current_enemy_ship)
+	var player_hp := _get_ship_alive_health(_current_player_ship)
+	var enemy_hp := _get_ship_alive_health(_current_enemy_ship)
+	var player_hp_pct := _get_ship_alive_health_ratio(_current_player_ship)
+	var enemy_hp_pct := _get_ship_alive_health_ratio(_current_enemy_ship)
 	var winner := "draw"
 	if player_alive > 0 and enemy_alive <= 0:
 		winner = "player"
@@ -411,11 +458,19 @@ func _build_current_result() -> Dictionary:
 		winner = "player_timeout"
 	elif enemy_alive > player_alive:
 		winner = "enemy_timeout"
+	elif player_hp > enemy_hp + 1.0:
+		winner = "player_hp_timeout"
+	elif enemy_hp > player_hp + 1.0:
+		winner = "enemy_hp_timeout"
 	return {
 		"name": str(scenario.get("name", "Scenario")),
 		"elapsed": _current_scenario_elapsed,
 		"player_alive": player_alive,
 		"enemy_alive": enemy_alive,
+		"player_hp": snappedf(player_hp, 0.1),
+		"enemy_hp": snappedf(enemy_hp, 0.1),
+		"player_hp_pct": snappedf(player_hp_pct * 100.0, 0.1),
+		"enemy_hp_pct": snappedf(enemy_hp_pct * 100.0, 0.1),
 		"winner": winner,
 	}
 
@@ -426,6 +481,27 @@ func _get_ship_alive_crew(ship: Node) -> int:
 	if ship.has_method("get_alive_crew_count"):
 		return int(ship.call("get_alive_crew_count"))
 	return 0
+
+
+func _get_ship_alive_health(ship: Node3D) -> float:
+	var total_health: float = 0.0
+	for soldier in _get_alive_ship_soldiers(ship):
+		if "current_health" in soldier:
+			total_health += float(soldier.get("current_health"))
+	return total_health
+
+
+func _get_ship_alive_health_ratio(ship: Node3D) -> float:
+	var total_health: float = 0.0
+	var total_max_health: float = 0.0
+	for soldier in _get_alive_ship_soldiers(ship):
+		if "current_health" in soldier:
+			total_health += float(soldier.get("current_health"))
+		if "max_health" in soldier:
+			total_max_health += float(soldier.get("max_health"))
+	if total_max_health <= 0.0:
+		return 0.0
+	return total_health / total_max_health
 
 
 func _string_array_from_variant(value: Variant) -> PackedStringArray:
@@ -485,19 +561,23 @@ func _update_overlay() -> void:
 		scenario_name = str(_scenario_defs[_current_scenario_index].get("name", scenario_name))
 	var player_alive := _get_ship_alive_crew(_current_player_ship)
 	var enemy_alive := _get_ship_alive_crew(_current_enemy_ship)
+	var player_hp := _get_ship_alive_health(_current_player_ship)
+	var enemy_hp := _get_ship_alive_health(_current_enemy_ship)
 	var winner := "-"
 	if _sequence_finished and not _scenario_results.is_empty():
 		winner = str(_scenario_results[_scenario_results.size() - 1].get("winner", "-"))
 	elif _scenario_running:
 		winner = _get_live_winner_hint(player_alive, enemy_alive)
-	_overlay_label.text = "scenario:%s (%d/%d)\nelapsed:%.1fs / %.1fs\nplayer:%d enemy:%d\nwinner:%s" % [
+	_overlay_label.text = "scenario:%s (%d/%d)\nelapsed:%.1fs / %.1fs\nplayer:%d hp:%.1f | enemy:%d hp:%.1f\nwinner:%s" % [
 		scenario_name,
 		maxi(_current_scenario_index + 1, 0),
 		maxi(_scenario_defs.size(), 0),
 		_current_scenario_elapsed,
 		scenario_time_limit_seconds,
 		player_alive,
+		player_hp,
 		enemy_alive,
+		enemy_hp,
 		winner,
 	]
 
@@ -528,12 +608,16 @@ func _report_summary() -> void:
 			draws += 1
 	if auto_print_summary:
 		for result in _scenario_results:
-			print("[SoldierBalance] result name=%s winner=%s elapsed=%.2f player_alive=%d enemy_alive=%d" % [
+			print("[SoldierBalance] result name=%s winner=%s elapsed=%.2f player_alive=%d enemy_alive=%d player_hp=%.1f enemy_hp=%.1f player_hp_pct=%.1f enemy_hp_pct=%.1f" % [
 				str(result.get("name", "Scenario")),
 				str(result.get("winner", "draw")),
 				float(result.get("elapsed", 0.0)),
 				int(result.get("player_alive", 0)),
 				int(result.get("enemy_alive", 0)),
+				float(result.get("player_hp", 0.0)),
+				float(result.get("enemy_hp", 0.0)),
+				float(result.get("player_hp_pct", 0.0)),
+				float(result.get("enemy_hp_pct", 0.0)),
 			])
 		print("[SoldierBalance] summary scenarios=%d player_wins=%d enemy_wins=%d draws=%d" % [
 			_scenario_results.size(),
