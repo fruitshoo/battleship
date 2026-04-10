@@ -4,6 +4,7 @@ const ProjectContractBootstrapHelper = preload("res://scripts/test/project_contr
 const ProjectContractHudHelper = preload("res://scripts/test/project_contract_hud_helper.gd")
 const ProjectContractRecoveryHelper = preload("res://scripts/test/project_contract_recovery_helper.gd")
 const ProjectContractRuntimeHelper = preload("res://scripts/test/project_contract_runtime_helper.gd")
+const ProjectContractScanHelper = preload("res://scripts/test/project_contract_scan_helper.gd")
 const ProjectContractSaveHelper = preload("res://scripts/test/project_contract_save_helper.gd")
 const ProjectContractSceneWiringHelper = preload("res://scripts/test/project_contract_scene_wiring_helper.gd")
 const ProjectContractSupportHelper = preload("res://scripts/test/project_contract_support_helper.gd")
@@ -51,9 +52,9 @@ func _ready() -> void:
 
 
 func _run_contract_checks() -> void:
-	_scan_resource_roots(script_roots, ".gd")
-	_scan_legacy_godot3_patterns(script_roots)
-	_scan_resource_roots(scene_roots, ".tscn")
+	_loaded_scripts = ProjectContractScanHelper.scan_resource_roots(script_roots, ".gd", _failures)
+	ProjectContractScanHelper.scan_legacy_godot3_patterns(script_roots, _failures)
+	_loaded_scenes = ProjectContractScanHelper.scan_resource_roots(scene_roots, ".tscn", _failures)
 	await _run_runtime_smoke()
 	if smoke_run_save_contract:
 		_run_save_contract_smoke()
@@ -68,78 +69,6 @@ func _run_contract_checks() -> void:
 	if smoke_run_scene_wiring_contract:
 		await _run_scene_wiring_contract_smoke()
 	_report_and_quit()
-
-
-func _scan_resource_roots(roots: Array[String], suffix: String) -> void:
-	var paths: Array[String] = []
-	for root in roots:
-		_collect_paths(root, suffix, paths)
-	paths.sort()
-
-	for path in paths:
-		var resource = load(path)
-		if resource == null:
-			_failures.append("load failed: %s" % path)
-			continue
-		if suffix == ".gd":
-			if not (resource is Script):
-				_failures.append("script load returned %s: %s" % [resource.get_class(), path])
-				continue
-			_loaded_scripts += 1
-		else:
-			if not (resource is PackedScene):
-				_failures.append("scene load returned %s: %s" % [resource.get_class(), path])
-				continue
-			_loaded_scenes += 1
-
-
-func _collect_paths(root_path: String, suffix: String, out: Array[String]) -> void:
-	var dir := DirAccess.open(root_path)
-	if dir == null:
-		_failures.append("unable to open: %s" % root_path)
-		return
-
-	dir.list_dir_begin()
-	var entry := dir.get_next()
-	while entry != "":
-		if entry.begins_with(".") or entry.ends_with(".uid"):
-			entry = dir.get_next()
-			continue
-		var full_path := "%s/%s" % [root_path, entry]
-		if dir.current_is_dir():
-			_collect_paths(full_path, suffix, out)
-		elif entry.ends_with(suffix):
-			out.append(full_path)
-		entry = dir.get_next()
-	dir.list_dir_end()
-
-
-func _scan_legacy_godot3_patterns(roots: Array[String]) -> void:
-	var legacy_patterns := [
-		{"pattern": "yield(", "label": "yield()"},
-		{"pattern": "funcref(", "label": "funcref()"},
-		{"pattern": ".instance(", "label": "PackedScene.instance()"},
-		{"pattern": "String(", "label": "String() constructor"},
-		{"pattern": "bool(", "label": "bool() constructor"},
-	]
-
-	var paths: Array[String] = []
-	for root in roots:
-		_collect_paths(root, ".gd", paths)
-	paths.sort()
-
-	for path in paths:
-		var source := FileAccess.get_file_as_string(path)
-		if source.is_empty():
-			continue
-		for legacy in legacy_patterns:
-			var pattern: String = legacy["pattern"]
-			var label: String = legacy["label"]
-			var line_no := 1
-			for line in source.split("\n", false):
-				if line.find(pattern) != -1:
-					_failures.append("%s found in %s:%d" % [label, path, line_no])
-				line_no += 1
 
 
 func _run_runtime_smoke() -> void:
@@ -217,4 +146,3 @@ func _report_and_quit() -> void:
 		push_error("[ContractSweep] %s" % failure)
 	print("[ContractSweep] failed scripts=%d scenes=%d issues=%d" % [_loaded_scripts, _loaded_scenes, _failures.size()])
 	get_tree().quit(1)
-
