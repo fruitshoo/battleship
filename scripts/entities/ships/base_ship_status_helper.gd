@@ -94,10 +94,14 @@ static func update_boarding_state(ship, delta: float) -> void:
 
 	var contested: bool = hostile_count > 0
 	var overrun: bool = hostile_count > 0 and friendly_count <= 0
+	var was_contested: bool = ship.get_meta("boarding_feedback_contested", false) == true
+	var was_overrun: bool = ship.get_meta("boarding_feedback_overrun", false) == true
 	ship.deck_friendly_crew_count = friendly_count
 	ship.deck_hostile_boarder_count = hostile_count
 	ship.deck_is_contested = contested
 	ship.deck_is_overrun = overrun
+	ship.set_meta("boarding_feedback_contested", contested)
+	ship.set_meta("boarding_feedback_overrun", overrun)
 
 	if overrun:
 		var attacker_ship: Node = ship.get_boarding_attacker_ship() if ship.has_method("get_boarding_attacker_ship") else null
@@ -109,12 +113,22 @@ static func update_boarding_state(ship, delta: float) -> void:
 			ship._deck_overrun_announced = true
 			if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
 				ship._cached_hud.show_message("적이 갑판을 장악했습니다!", 1.75)
+		elif ship_team != "player" and not was_overrun and is_instance_valid(attacker_ship):
+			var attacker_team: String = attacker_ship.get_team_tag() if attacker_ship.has_method("get_team_tag") else str(attacker_ship.get("team"))
+			if attacker_team == "player" and is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
+				ship._cached_hud.show_message("월선 성공! 적 갑판 장악 중", 1.65)
 		if ship_team == "player" and ship.boarding_capture_progress >= effective_capture_duration:
 			ship.boarding_capture_progress = 0.0
 			var capture_tick_damage: float = maxf(float(ship.boarding_capture_damage_tick), float(ship.max_hull_hp) * 0.12)
 			ship.take_damage(capture_tick_damage, ship.global_position, "boarding_capture")
 	elif contested:
 		ship.boarding_capture_progress = move_toward(ship.boarding_capture_progress, 0.0, delta * 0.7)
+		if ship_team != "player" and not was_contested:
+			var attacker_ship: Node = ship.get_boarding_attacker_ship() if ship.has_method("get_boarding_attacker_ship") else null
+			if is_instance_valid(attacker_ship):
+				var attacker_team: String = attacker_ship.get_team_tag() if attacker_ship.has_method("get_team_tag") else str(attacker_ship.get("team"))
+				if attacker_team == "player" and is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
+					ship._cached_hud.show_message("월선 성공! 갑판 전투 시작", 1.5)
 		if ship._deck_overrun_announced and ship_team == "player":
 			ship._deck_overrun_announced = false
 			if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
