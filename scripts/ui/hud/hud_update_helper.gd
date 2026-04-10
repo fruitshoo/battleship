@@ -302,20 +302,32 @@ static func update_boarding_display(hud) -> void:
 	var is_boarding = hud.player_ship.get("is_boarding") == true
 	var prep_timer = hud.player_ship.get("boarding_prep_timer") if "boarding_prep_timer" in hud.player_ship else 0.0
 	var prep_duration = hud.player_ship.get("boarding_prep_duration") if "boarding_prep_duration" in hud.player_ship else 2.5
+	var boarding_target: Node3D = hud.player_ship.get("boarding_target") if "boarding_target" in hud.player_ship else null
+	var target_friendly_count: int = 0
+	var target_hostile_count: int = 0
+	var target_overrun: bool = false
+	if is_instance_valid(boarding_target):
+		target_friendly_count = int(boarding_target.get("deck_friendly_crew_count")) if boarding_target.get("deck_friendly_crew_count") != null else 0
+		target_hostile_count = int(boarding_target.get("deck_hostile_boarder_count")) if boarding_target.get("deck_hostile_boarder_count") != null else 0
+		target_overrun = boarding_target.get("deck_is_overrun") == true
 	if is_boarding:
 		hud.boarding_ui.visible = true
 		if prep_timer < prep_duration:
-			hud.boarding_label.text = "도선 준비 중 (밧줄 고정)..."
+			hud.boarding_label.text = "도선 준비 중 (밧줄 고정)  승조 %d | 월선 %d" % [target_friendly_count, target_hostile_count]
 			hud.boarding_bar.value = (prep_timer / prep_duration) * 100
 			var fill = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
 			if fill:
 				fill.bg_color = Color(1.0, 1.0, 1.0, 0.7)
 		else:
-			hud.boarding_label.text = "도선 진행 중!"
+			hud.boarding_label.text = "도선 진행 중!  승조 %d | 월선 %d%s" % [
+				target_friendly_count,
+				target_hostile_count,
+				" | 갑판 장악" if target_overrun else ""
+			]
 			hud.boarding_bar.value = 100
 			var fill_active = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
 			if fill_active:
-				fill_active.bg_color = NavalUiTheme.STATUS_ACTIVE_BLUE
+				fill_active.bg_color = NavalUiTheme.STATUS_WARN if target_overrun else NavalUiTheme.STATUS_ACTIVE_BLUE
 	else:
 		hud.boarding_ui.visible = false
 
@@ -483,17 +495,29 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 			fill_style.bg_color = NavalUiTheme.STATUS_WARN
 		else:
 			fill_style.bg_color = NavalUiTheme.STATUS_DANGER
+	var bg_style: StyleBoxFlat = hp_bar.get_theme_stylebox("background") as StyleBoxFlat
+	if is_instance_valid(bg_style):
+		if ship.get("deck_is_overrun") == true:
+			bg_style.border_color = Color(1.0, 0.78, 0.28, 0.98)
+			bg_style.bg_color = Color(0.14, 0.08, 0.02, 0.84)
+		elif ship.get("deck_is_contested") == true:
+			bg_style.border_color = Color(1.0, 0.90, 0.48, 0.96)
+			bg_style.bg_color = Color(0.11, 0.08, 0.03, 0.78)
+		else:
+			bg_style.border_color = NavalUiTheme.STATUS_ACTIVE_BLUE if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
+			bg_style.bg_color = Color(0.03, 0.04, 0.06, 0.72)
 	if is_instance_valid(boarding_label):
 		var friendly_count: int = int(ship.get("deck_friendly_crew_count")) if ship.get("deck_friendly_crew_count") != null else 0
 		var hostile_count: int = int(ship.get("deck_hostile_boarder_count")) if ship.get("deck_hostile_boarder_count") != null else 0
 		var is_contested: bool = ship.get("deck_is_contested") == true
+		var is_overrun: bool = ship.get("deck_is_overrun") == true
 		if hostile_count > 0 or is_contested:
 			if team_tag == "player":
-				boarding_label.text = "갑판 %d | 적 %d" % [friendly_count, hostile_count]
-				boarding_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62, 1.0))
+				boarding_label.text = "갑판 %d | 적 %d%s" % [friendly_count, hostile_count, " | 위기" if is_overrun else ""]
+				boarding_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.56, 1.0) if is_overrun else Color(1.0, 0.88, 0.62, 1.0))
 			else:
-				boarding_label.text = "승조 %d | 월선 %d" % [friendly_count, hostile_count]
-				boarding_label.add_theme_color_override("font_color", Color(1.0, 0.80, 0.64, 1.0))
+				boarding_label.text = "승조 %d | 월선 %d%s" % [friendly_count, hostile_count, " | 장악" if is_overrun else ""]
+				boarding_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.46, 1.0) if is_overrun else Color(1.0, 0.80, 0.64, 1.0))
 			boarding_label.visible = true
 		else:
 			boarding_label.visible = false
