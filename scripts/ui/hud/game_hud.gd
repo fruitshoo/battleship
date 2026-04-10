@@ -14,6 +14,7 @@ const HudShipDebugHelper = preload("res://scripts/ui/hud/hud_ship_debug_helper.g
 const HudEndStateHelper = preload("res://scripts/ui/hud/hud_end_state_helper.gd")
 const HudStatusDisplayHelper = preload("res://scripts/ui/hud/hud_status_display_helper.gd")
 const HudItemDisplayHelper = preload("res://scripts/ui/hud/hud_item_display_helper.gd")
+const HudProgressionLayoutHelper = preload("res://scripts/ui/hud/hud_progression_layout_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
@@ -181,62 +182,14 @@ func _ready() -> void:
 
 
 func _apply_overlay_theme() -> void:
-	if is_instance_valid(gust_warning):
-		NavalUiTheme.style_accent(gust_warning, 22)
-		gust_warning.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-		gust_warning.add_theme_constant_override("outline_size", 4)
-	if is_instance_valid(game_over_label):
-		game_over_label.add_theme_color_override("font_color", Color(0.84, 0.34, 0.28, 1.0))
-		game_over_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-		game_over_label.add_theme_constant_override("outline_size", 4)
-	if is_instance_valid(victory_label):
-		victory_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
-		victory_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-		victory_label.add_theme_constant_override("outline_size", 4)
+	HudProgressionLayoutHelper.apply_overlay_theme(self)
 
 func _ensure_hud_label(existing: Label, node_name: String, default_text: String) -> Label:
-	if is_instance_valid(existing):
-		return existing
-	var label := Label.new()
-	label.name = node_name
-	label.text = default_text
-	add_child(label)
-	return label
+	return HudProgressionLayoutHelper.ensure_hud_label(self, existing, node_name, default_text)
 
 
 func _setup_top_xp_bar() -> void:
-	level_label = _ensure_hud_label(level_label, "LevelLabel", "[Lv] 1")
-	xp_bar = ProgressBar.new()
-	xp_bar.name = "TopXPBar"
-	add_child(xp_bar)
-
-	xp_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	xp_bar.custom_minimum_size.y = 18.0
-	xp_bar.show_percentage = false
-	xp_bar.z_index = 10
-
-	NavalUiTheme.apply_progress_bar(xp_bar, Color(0.06, 0.08, 0.11, 0.82), Color(0.58, 0.77, 0.92, 0.94), 0)
-
-	merit_bar = ProgressBar.new()
-	merit_bar.name = "TopMeritBar"
-	add_child(merit_bar)
-
-	merit_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	merit_bar.offset_top = 22.0
-	merit_bar.custom_minimum_size.y = 12.0
-	merit_bar.show_percentage = false
-	merit_bar.z_index = 10
-
-	NavalUiTheme.apply_progress_bar(merit_bar, Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0)
-
-	merit_label = Label.new()
-	merit_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	merit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	merit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_overlay_value(merit_label, 10)
-	merit_label.add_theme_constant_override("outline_size", 3)
-	merit_label.text = "지휘 포인트 (병영 강화 대기)"
-	merit_bar.add_child(merit_label)
+	HudProgressionLayoutHelper.setup_top_xp_bar(self)
 
 func _setup_new_layout() -> void:
 	HudLayoutBuilder.setup_new_layout(self)
@@ -352,19 +305,7 @@ func _sync_game_time(delta: float) -> void:
 		game_time += delta
 
 func _attach_level_label_to_xp_bar() -> void:
-	if not level_label or not xp_bar:
-		return
-	var current_parent = level_label.get_parent()
-	if current_parent and current_parent != xp_bar:
-		current_parent.remove_child(level_label)
-	if level_label.get_parent() != xp_bar:
-		xp_bar.add_child(level_label)
-	level_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	level_label.add_theme_font_size_override("font_size", 14)
-	level_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-	level_label.add_theme_constant_override("outline_size", 4)
+	HudProgressionLayoutHelper.attach_level_label_to_xp_bar(self)
 
 func _try_resolve_player_ship() -> void:
 	HudLookupHelper.try_resolve_player_ship(self)
