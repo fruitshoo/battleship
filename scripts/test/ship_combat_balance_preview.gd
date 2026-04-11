@@ -392,6 +392,7 @@ func _build_current_result() -> Dictionary:
 	var enemy_boarding_latch_timer := _get_boarding_latch_timer(_current_enemy_ship)
 	var enemy_boarding_latch_seen := _current_enemy_latch_seen or not enemy_boarding_latch_mode.is_empty()
 	var enemy_boarding_latch_summary_mode := enemy_boarding_latch_mode if not enemy_boarding_latch_mode.is_empty() else _current_enemy_latch_mode
+	var enemy_contact_defenders := _get_boarding_contact_defenders(_current_enemy_ship)
 	var player_boarders_on_enemy := _count_boarders_from_home_to_target(_current_player_ship, _current_enemy_ship)
 	var enemy_boarders_on_player := _count_boarders_from_home_to_target(_current_enemy_ship, _current_player_ship)
 	var raid_debug: Dictionary = PlayerShipCrewHelper.get_auto_raid_debug_snapshot(_current_player_ship, _current_enemy_ship)
@@ -426,6 +427,7 @@ func _build_current_result() -> Dictionary:
 		"enemy_boarding_latch_seen": enemy_boarding_latch_seen,
 		"enemy_boarding_latch_mode": enemy_boarding_latch_summary_mode,
 		"enemy_boarding_latch_timer": snappedf(enemy_boarding_latch_timer, 0.1),
+		"enemy_contact_defenders": enemy_contact_defenders,
 		"player_boarders_on_enemy": player_boarders_on_enemy,
 		"enemy_boarders_on_player": enemy_boarders_on_player,
 		"raid_debug": raid_debug,
@@ -502,6 +504,12 @@ func _get_boarding_latch_timer(ship: Node3D) -> float:
 	if not is_instance_valid(ship):
 		return 0.0
 	return maxf(0.0, float(ship.get_meta("boarding_latch_timer", 0.0)))
+
+
+func _get_boarding_contact_defenders(ship: Node3D) -> int:
+	if not is_instance_valid(ship) or not ship.has_meta("boarding_local_defenders_at_contact"):
+		return -1
+	return int(ship.get_meta("boarding_local_defenders_at_contact", -1))
 
 
 func _track_current_enemy_latch_state() -> void:
@@ -696,7 +704,7 @@ func _report_summary() -> void:
 	if auto_print_summary:
 		for result in _scenario_results:
 			var raid_debug: Dictionary = result.get("raid_debug", {})
-			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s enemy_latch_seen=%s enemy_latch=%s enemy_latch_timer=%.1f player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d events=%s" % [
+			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s enemy_latch_seen=%s enemy_latch=%s enemy_latch_timer=%.1f enemy_contact_defenders=%d player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d events=%s" % [
 				str(result.get("name", "Scenario")),
 				str(result.get("winner", "draw")),
 				float(result.get("elapsed", 0.0)),
@@ -713,6 +721,7 @@ func _report_summary() -> void:
 				"Y" if result.get("enemy_boarding_latch_seen", false) == true else "N",
 				str(result.get("enemy_boarding_latch_mode", "")) if result.get("enemy_boarding_latch_seen", false) == true and not str(result.get("enemy_boarding_latch_mode", "")).is_empty() else "-",
 				float(result.get("enemy_boarding_latch_timer", 0.0)),
+				int(result.get("enemy_contact_defenders", -1)),
 				int(result.get("player_boarders_on_enemy", 0)),
 				int(result.get("enemy_boarders_on_player", 0)),
 				"Y" if raid_debug.get("valid_target", false) == true else "N",

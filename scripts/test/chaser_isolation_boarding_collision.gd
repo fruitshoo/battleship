@@ -101,7 +101,12 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node.has_method("get_alive_crew_count"):
 		enemy_crew = ship_node.get_alive_crew_count()
 
-	if my_crew > enemy_crew:
+	var contact_defenders: int = _count_boarding_contact_defenders(ship_node)
+	set_meta("boarding_local_defenders_at_contact", contact_defenders)
+	var remote_defenders_engaged: bool = _has_remote_engaged_boarding_defenders(ship_node)
+	set_meta("boarding_remote_defenders_engaged", remote_defenders_engaged)
+	var contact_allows_boarding: bool = remote_defenders_engaged and (contact_defenders <= 0 or my_crew > contact_defenders)
+	if my_crew > enemy_crew or contact_allows_boarding:
 		is_boarding = true
 		boarding_target = ship_node
 
@@ -118,10 +123,89 @@ func _board_ship(target_ship: Node3D) -> void:
 		_full_rope_deployed = false
 
 		if DEBUG_COMBAT_LOGS:
-			print("[Boarding] 병력 우위! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+			print("[Boarding] 접점 확보! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
 	else:
 		if DEBUG_COMBAT_LOGS:
-			print("[Skirmish] 병력 우위 부족으로 도선하지 않고 대치합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+			print("[Skirmish] 접점 방어를 돌파하지 못해 도선하지 않고 대치합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
+
+
+func _count_boarding_contact_defenders(target_ship: Node3D) -> int:
+	if not is_instance_valid(target_ship):
+		return 0
+	var target_team: String = target_ship.get_team_tag() if target_ship.has_method("get_team_tag") else str(target_ship.get("team"))
+	if target_team.is_empty():
+		return 0
+	var contact_local: Vector3 = _get_boarding_contact_point_on_target_local(target_ship)
+	var contact_radius: float = _get_boarding_contact_defense_radius(target_ship)
+	var contact_radius_sq: float = contact_radius * contact_radius
+	var defenders: int = 0
+	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_dead") and soldier.is_dead():
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != target_team:
+			continue
+		var soldier_local: Vector3 = target_ship.to_local(soldier.global_position)
+		var diff_xz := Vector2(soldier_local.x - contact_local.x, soldier_local.z - contact_local.z)
+		if diff_xz.length_squared() <= contact_radius_sq:
+			defenders += 1
+	return defenders
+
+
+func _has_remote_engaged_boarding_defenders(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	var hostile_boarders: int = int(target_ship.get("deck_hostile_boarder_count")) if target_ship.get("deck_hostile_boarder_count") != null else 0
+	if target_ship.get("deck_is_contested") == true or hostile_boarders > 0:
+		return true
+	var target_team: String = target_ship.get_team_tag() if target_ship.has_method("get_team_tag") else str(target_ship.get("team"))
+	if target_team.is_empty():
+		return false
+	var contact_local: Vector3 = _get_boarding_contact_point_on_target_local(target_ship)
+	var remote_radius: float = _get_boarding_contact_defense_radius(target_ship) * 1.15
+	var remote_radius_sq: float = remote_radius * remote_radius
+	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_dead") and soldier.is_dead():
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != target_team:
+			continue
+		var current_target: Variant = soldier.get("current_target") if "current_target" in soldier else null
+		if not is_instance_valid(current_target):
+			continue
+		var target_of_soldier_team: String = current_target.get_team_tag() if current_target.has_method("get_team_tag") else str(current_target.get("team"))
+		if target_of_soldier_team == target_team:
+			continue
+		var soldier_local: Vector3 = target_ship.to_local(soldier.global_position)
+		var diff_xz := Vector2(soldier_local.x - contact_local.x, soldier_local.z - contact_local.z)
+		if diff_xz.length_squared() > remote_radius_sq:
+			return true
+	return false
+
+
+func _get_boarding_contact_point_on_target_local(target_ship: Node3D) -> Vector3:
+	var half_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)
+	var attacker_local: Vector3 = target_ship.to_local(global_position)
+	var width_ratio: float = absf(attacker_local.x / maxf(half_ext.x, 0.01))
+	var length_ratio: float = absf(attacker_local.z / maxf(half_ext.y, 0.01))
+	var contact_span_ratio: float = 0.84 if maxf(half_ext.x, half_ext.y) >= 5.6 else 0.72
+	var contact_local := Vector3.ZERO
+	if width_ratio > length_ratio:
+		contact_local.x = (1.0 if attacker_local.x >= 0.0 else -1.0) * half_ext.x
+		contact_local.z = clampf(attacker_local.z, -half_ext.y * contact_span_ratio, half_ext.y * contact_span_ratio)
+	else:
+		contact_local.x = clampf(attacker_local.x, -half_ext.x * contact_span_ratio, half_ext.x * contact_span_ratio)
+		contact_local.z = (1.0 if attacker_local.z >= 0.0 else -1.0) * half_ext.y
+	return contact_local
+
+
+func _get_boarding_contact_defense_radius(target_ship: Node3D) -> float:
+	var half_ext: Vector2 = target_ship.get_deck_half_extents() if target_ship.has_method("get_deck_half_extents") else Vector2(2.0, 3.0)
+	return clampf(maxf(half_ext.x, half_ext.y) * 0.28 + 1.0, 2.4, 5.5)
 
 
 func add_leak(amount: float) -> void:
