@@ -24,7 +24,7 @@ static func process_boarding(ship, delta: float) -> void:
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + (approach_velocity + pull_force * delta) * delta
 	if is_instance_valid(ship.boarding_target):
-		var guard_ratio: float = 0.92 if motion["parallel_hold"] == true else 0.975
+		var guard_ratio: float = 0.92
 		next_pos = apply_ship_collision_guard(ship, ship.boarding_target, prev_pos, next_pos, guard_ratio, approach_velocity.length())
 	next_pos = apply_neighbor_ship_guards(ship, prev_pos, next_pos, ship.boarding_target)
 	ship.global_position = next_pos
@@ -35,21 +35,12 @@ static func process_boarding(ship, delta: float) -> void:
 
 static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector3, flat_to_target: Vector3, dist_to_target: float) -> Dictionary:
 	var fallback_dir: Vector3 = flat_to_target.normalized() if dist_to_target > 0.001 else Vector3.FORWARD
-	var parallel_hold: bool = ship.has_meta("boarding_side_sign")
-	if not parallel_hold and ship.has_method("_is_side_boarding_approach"):
+	var contact_mode: String = str(ship.get_meta("boarding_contact_mode", ""))
+	var parallel_hold: bool = contact_mode == "side"
+	if contact_mode.is_empty() and ship.has_method("_is_side_boarding_approach"):
 		parallel_hold = ship.call("_is_side_boarding_approach", target_ship) == true
 	if not parallel_hold:
-		var fallback_speed := 0.0
-		if dist_to_target > (ship.max_boarding_distance - 0.6):
-			fallback_speed = clamp((dist_to_target - (ship.max_boarding_distance - 0.6)) * 1.6, 1.1, ship.move_speed * 0.9)
-		elif dist_to_target > 6.5:
-			fallback_speed = 0.9
-		return {
-			"heading_dir": fallback_dir,
-			"desired_speed": fallback_speed,
-			"correction_velocity": Vector3.ZERO,
-			"parallel_hold": false,
-		}
+		return _build_contact_hold_motion(ship, fallback_dir, dist_to_target)
 
 	var target_forward: Vector3 = -target_ship.global_transform.basis.z
 	target_forward.y = 0.0
@@ -89,6 +80,30 @@ static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector
 		"desired_speed": desired_speed,
 		"correction_velocity": correction_velocity,
 		"parallel_hold": true,
+	}
+
+
+static func _build_contact_hold_motion(ship, fallback_dir: Vector3, dist_to_target: float) -> Dictionary:
+	var hold_forward: Vector3 = ship.get_meta("boarding_hold_forward", Vector3.ZERO)
+	if hold_forward.length_squared() <= 0.001:
+		hold_forward = -ship.global_transform.basis.z
+		hold_forward.y = 0.0
+	if hold_forward.length_squared() <= 0.001:
+		hold_forward = fallback_dir
+	else:
+		hold_forward = hold_forward.normalized()
+
+	var correction_velocity := Vector3.ZERO
+	var desired_contact_dist: float = ship.max_boarding_distance - 0.75
+	if dist_to_target > desired_contact_dist and fallback_dir.length_squared() > 0.001:
+		var correction_speed: float = clampf((dist_to_target - desired_contact_dist) * 1.8, 0.0, ship.move_speed * 0.55)
+		correction_velocity = fallback_dir.normalized() * correction_speed
+
+	return {
+		"heading_dir": hold_forward,
+		"desired_speed": 0.0,
+		"correction_velocity": correction_velocity,
+		"parallel_hold": false,
 	}
 
 

@@ -12,17 +12,19 @@ static func process_boarding_common(ship, delta: float) -> void:
 
 	var target_pos = ship.boarding_target.global_position
 	var dist = ship.global_position.distance_to(target_pos)
+	var effective_boarding_distance: float = _get_effective_boarding_distance(ship)
+	var effective_break_distance: float = _get_effective_break_distance(ship, effective_boarding_distance)
 
-	if dist > ship.boarding_break_distance:
+	if dist > effective_break_distance:
 		print("[Boarding] 밧줄이 끊어졌습니다. 도선 중단.")
 		cancel_boarding(ship)
 		return
 
-	if dist > ship.max_boarding_distance:
+	if dist > effective_boarding_distance:
 		ship.boarding_contact_timer = maxf(0.0, ship.boarding_contact_timer - delta * 2.0)
 		ship.boarding_hook_timer = 0.0
 		ship.boarding_secondary_rope_timer = 0.0
-		if ship._initial_rope_deployed and dist > (ship.max_boarding_distance + 0.8):
+		if ship._initial_rope_deployed and dist > (effective_boarding_distance + 0.8):
 			ship._clear_ropes()
 			ship._initial_rope_deployed = false
 			ship._full_rope_deployed = false
@@ -83,6 +85,28 @@ static func cancel_boarding(ship) -> void:
 	ship._initial_rope_deployed = false
 	ship._full_rope_deployed = false
 	ship.boarding_rope_hp = ship.max_boarding_rope_hp
+	if ship.has_meta("boarding_contact_mode"):
+		ship.remove_meta("boarding_contact_mode")
+	if ship.has_meta("boarding_hold_forward"):
+		ship.remove_meta("boarding_hold_forward")
+
+
+static func _get_effective_boarding_distance(ship) -> float:
+	if not is_instance_valid(ship.boarding_target):
+		return ship.max_boarding_distance
+	if not ship.has_method("get_collision_distance_to"):
+		return ship.max_boarding_distance
+	var contact_distance: float = float(ship.call("get_collision_distance_to", ship.boarding_target))
+	return maxf(ship.max_boarding_distance, contact_distance * 0.94)
+
+
+static func _get_effective_break_distance(ship, effective_boarding_distance: float) -> float:
+	if not is_instance_valid(ship.boarding_target):
+		return ship.boarding_break_distance
+	if not ship.has_method("get_collision_distance_to"):
+		return ship.boarding_break_distance
+	var contact_distance: float = float(ship.call("get_collision_distance_to", ship.boarding_target))
+	return maxf(ship.boarding_break_distance, maxf(effective_boarding_distance + 1.8, contact_distance + 1.2))
 
 
 static func transfer_one_soldier(ship) -> void:

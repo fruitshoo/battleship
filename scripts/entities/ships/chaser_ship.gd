@@ -1017,9 +1017,10 @@ func _board_ship(target_ship: Node3D) -> void:
 
 	# 선미 추격이나 정면 비비기에서 바로 밧줄이 걸리지 않도록,
 	# 측면 접현이 성립할 때만 실제 도선 상태로 들어간다.
+	var can_side_board: bool = _is_side_boarding_approach(ship_node)
 	var can_head_on_board: bool = _can_force_head_on_boarding(ship_node)
 	var can_cleanup_board: bool = _can_force_cleanup_boarding(ship_node)
-	if not _is_side_boarding_approach(ship_node) and not can_head_on_board and not can_cleanup_board:
+	if not can_side_board and not can_head_on_board and not can_cleanup_board:
 		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
@@ -1041,6 +1042,16 @@ func _board_ship(target_ship: Node3D) -> void:
 	if my_crew > enemy_crew or can_head_on_board or can_cleanup_board:
 		is_boarding = true
 		boarding_target = ship_node
+		if can_side_board:
+			set_meta("boarding_contact_mode", "side")
+		elif can_head_on_board:
+			set_meta("boarding_contact_mode", "head_on")
+		else:
+			set_meta("boarding_contact_mode", "cleanup")
+		var hold_forward: Vector3 = -global_transform.basis.z
+		hold_forward.y = 0.0
+		if hold_forward.length_squared() > 0.001:
+			set_meta("boarding_hold_forward", hold_forward.normalized())
 		
 		# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
 		if boarding_target.has_method("set_boarding_attacker_ship"):
