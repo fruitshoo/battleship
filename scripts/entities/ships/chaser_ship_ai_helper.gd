@@ -235,16 +235,20 @@ static func process_physics(ship, delta: float) -> void:
 	var permit_sprint: bool = nav["permit_sprint"]
 	var dir_to_target: Vector3 = nav["dir_to_target"]
 
-	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.max_boarding_distance + 0.35:
+	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.boarding_break_distance:
 		var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
 		var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
 		var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
-		if can_side_board or can_force_head_on or can_force_cleanup:
+		var can_latched_board: bool = ship.has_method("_can_start_boarding_latched") and ship.call("_can_start_boarding_latched", current_target, dist_to_target, can_side_board, can_force_head_on, can_force_cleanup, delta)
+		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= ship.max_boarding_distance + 0.35
+		if can_latched_board or can_direct_board:
 			if ship.has_method("_board_ship"):
 				ship.call("_board_ship", current_target)
 				if ship.is_boarding:
 					ship._process_boarding(delta)
 					return
+	elif ship.has_method("_decay_boarding_latch"):
+		ship.call("_decay_boarding_latch", current_target, delta)
 
 	var move_vector = desired_point - ship.global_position
 	move_vector.y = 0.0

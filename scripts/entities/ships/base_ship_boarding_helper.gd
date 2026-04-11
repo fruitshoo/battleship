@@ -89,6 +89,8 @@ static func cancel_boarding(ship) -> void:
 		ship.remove_meta("boarding_contact_mode")
 	if ship.has_meta("boarding_hold_forward"):
 		ship.remove_meta("boarding_hold_forward")
+	if ship.has_method("_clear_boarding_latch"):
+		ship.call("_clear_boarding_latch")
 
 
 static func _get_effective_boarding_distance(ship) -> float:

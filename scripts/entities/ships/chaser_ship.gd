@@ -30,6 +30,9 @@ enum CombatRole {CHARGER, GUNNER}
 @export_range(0.5, 8.0) var combat_range_tolerance: float = 2.5
 @export_range(2.0, 20.0) var retreat_distance: float = 8.0
 @export var allow_boarding: bool = true
+@export_range(0.2, 3.0, 0.05) var boarding_latch_duration: float = 1.15
+@export_range(0.0, 4.0, 0.05) var boarding_latch_distance_pad: float = 1.55
+@export_range(1.0, 5.0, 0.05) var boarding_latch_relative_speed_mult: float = 2.8
 @export var formation_role_name: String = "":
 	set(value):
 		formation_role_name = value
@@ -1021,7 +1024,9 @@ func _board_ship(target_ship: Node3D) -> void:
 	var can_head_on_board: bool = _can_force_head_on_boarding(ship_node)
 	var can_cleanup_board: bool = _can_force_cleanup_boarding(ship_node)
 	if not can_side_board and not can_head_on_board and not can_cleanup_board:
-		return
+		var latch_mode: String = _get_active_boarding_latch_mode(ship_node)
+		if latch_mode.is_empty():
+			return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
 	if not has_rammed:
@@ -1039,7 +1044,9 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node.has_method("get_alive_crew_count"):
 		enemy_crew = ship_node.get_alive_crew_count()
 		
-	if my_crew > enemy_crew or can_head_on_board or can_cleanup_board:
+	var active_latch_mode: String = _get_active_boarding_latch_mode(ship_node)
+	var latch_allows_boarding: bool = not active_latch_mode.is_empty() and (active_latch_mode != "side" or my_crew > enemy_crew)
+	if my_crew > enemy_crew or can_head_on_board or can_cleanup_board or latch_allows_boarding:
 		is_boarding = true
 		boarding_target = ship_node
 		if can_side_board:
@@ -1047,7 +1054,7 @@ func _board_ship(target_ship: Node3D) -> void:
 		elif can_head_on_board:
 			set_meta("boarding_contact_mode", "head_on")
 		else:
-			set_meta("boarding_contact_mode", "cleanup")
+			set_meta("boarding_contact_mode", "cleanup" if active_latch_mode.is_empty() else active_latch_mode)
 		var hold_forward: Vector3 = -global_transform.basis.z
 		hold_forward.y = 0.0
 		if hold_forward.length_squared() > 0.001:
@@ -1065,6 +1072,7 @@ func _board_ship(target_ship: Node3D) -> void:
 		boarding_secondary_rope_timer = 0.0
 		_initial_rope_deployed = false
 		_full_rope_deployed = false
+		_clear_boarding_latch()
 		
 		if DEBUG_COMBAT_LOGS:
 			print("[Boarding] 병력 우위! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
@@ -1100,6 +1108,92 @@ func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
 	if enemy_crew == 1 and center_distance <= collision_distance + 0.45:
 		return true
 	return my_contact_dot >= 0.52 and target_contact_abs <= 0.92 and closing_speed <= boarding_max_relative_speed * 2.4
+
+
+func _can_start_boarding_latched(target_ship: Node3D, dist_to_target: float, can_side_board: bool, can_head_on_board: bool, can_cleanup_board: bool, delta: float) -> bool:
+	if not is_instance_valid(target_ship) or is_gunner_role() or not can_board_targets():
+		_clear_boarding_latch()
+		return false
+	if not target_ship.is_in_group("player"):
+		_clear_boarding_latch()
+		return false
+	if dist_to_target > _get_boarding_latch_distance(target_ship):
+		_decay_boarding_latch(target_ship, delta)
+		return not _get_active_boarding_latch_mode(target_ship).is_empty()
+
+	var latch_mode: String = ""
+	if can_side_board:
+		latch_mode = "side"
+	elif can_head_on_board:
+		latch_mode = "head_on"
+	elif can_cleanup_board:
+		latch_mode = "cleanup"
+	elif _is_relaxed_boarding_latch_contact(target_ship, dist_to_target):
+		latch_mode = "side"
+
+	if not latch_mode.is_empty():
+		set_meta("boarding_latch_target_id", target_ship.get_instance_id())
+		set_meta("boarding_latch_timer", boarding_latch_duration)
+		set_meta("boarding_latch_mode", latch_mode)
+		return true
+
+	_decay_boarding_latch(target_ship, delta)
+	return not _get_active_boarding_latch_mode(target_ship).is_empty()
+
+
+func _is_relaxed_boarding_latch_contact(target_ship: Node3D, dist_to_target: float) -> bool:
+	if dist_to_target > _get_boarding_latch_distance(target_ship):
+		return false
+	var state: Dictionary = _get_boarding_alignment_state(target_ship)
+	if state.is_empty():
+		return false
+	var my_contact_abs: float = absf(float(state.get("my_contact_dot", 1.0)))
+	var target_contact_abs: float = absf(float(state.get("target_contact_dot", 1.0)))
+	var parallel_dot: float = float(state.get("parallel_dot", -1.0))
+	var closing_speed: float = float(state.get("closing_speed", 999.0))
+	return my_contact_abs <= 0.78 \
+		and target_contact_abs <= 0.88 \
+		and parallel_dot >= -0.28 \
+		and closing_speed <= boarding_max_relative_speed * boarding_latch_relative_speed_mult
+
+
+func _get_boarding_latch_distance(target_ship: Node3D) -> float:
+	var collision_distance: float = get_collision_distance_to(target_ship) if is_instance_valid(target_ship) else max_boarding_distance
+	return maxf(max_boarding_distance + boarding_latch_distance_pad, collision_distance + 1.15)
+
+
+func _get_active_boarding_latch_mode(target_ship: Node3D) -> String:
+	if not is_instance_valid(target_ship):
+		return ""
+	if not has_meta("boarding_latch_timer") or float(get_meta("boarding_latch_timer", 0.0)) <= 0.0:
+		return ""
+	if int(get_meta("boarding_latch_target_id", 0)) != target_ship.get_instance_id():
+		return ""
+	if global_position.distance_to(target_ship.global_position) > _get_boarding_latch_distance(target_ship) + 0.75:
+		return ""
+	return str(get_meta("boarding_latch_mode", ""))
+
+
+func _decay_boarding_latch(target_ship: Node3D, delta: float) -> void:
+	if not has_meta("boarding_latch_timer"):
+		return
+	if not is_instance_valid(target_ship) or int(get_meta("boarding_latch_target_id", 0)) != target_ship.get_instance_id():
+		_clear_boarding_latch()
+		return
+	var remaining: float = float(get_meta("boarding_latch_timer", 0.0)) - delta
+	if remaining <= 0.0 or global_position.distance_to(target_ship.global_position) > _get_boarding_latch_distance(target_ship) + 0.75:
+		_clear_boarding_latch()
+		return
+	set_meta("boarding_latch_timer", remaining)
+
+
+func _clear_boarding_latch() -> void:
+	if has_meta("boarding_latch_target_id"):
+		remove_meta("boarding_latch_target_id")
+	if has_meta("boarding_latch_timer"):
+		remove_meta("boarding_latch_timer")
+	if has_meta("boarding_latch_mode"):
+		remove_meta("boarding_latch_mode")
 
 
 func _can_force_cleanup_boarding(target_ship: Node3D) -> bool:
