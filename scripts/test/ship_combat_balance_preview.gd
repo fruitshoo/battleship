@@ -31,6 +31,8 @@ var _current_player_ship: Node3D = null
 var _current_enemy_ship: Node3D = null
 var _scenario_running: bool = false
 var _sequence_finished: bool = false
+var _current_enemy_latch_seen: bool = false
+var _current_enemy_latch_mode: String = ""
 
 
 func _ready() -> void:
@@ -41,6 +43,7 @@ func _process(delta: float) -> void:
 	if not _scenario_running:
 		return
 	_current_scenario_elapsed = (Time.get_ticks_usec() - _current_scenario_started_usec) / 1000000.0
+	_track_current_enemy_latch_state()
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = 0.2
@@ -167,6 +170,8 @@ func _run_scenarios() -> void:
 func _setup_scenario(scenario: Dictionary) -> void:
 	await _clear_existing_preview_nodes()
 	_spawn_fresh_ships(scenario)
+	_current_enemy_latch_seen = false
+	_current_enemy_latch_mode = ""
 	await get_tree().process_frame
 	_reset_player_ship_runtime()
 	_configure_player_runtime(scenario)
@@ -383,6 +388,10 @@ func _build_current_result() -> Dictionary:
 	var enemy_derelict := _is_derelict(_current_enemy_ship)
 	var player_boarding := _is_boarding(_current_player_ship)
 	var enemy_boarding := _is_boarding(_current_enemy_ship)
+	var enemy_boarding_latch_mode := _get_boarding_latch_mode(_current_enemy_ship)
+	var enemy_boarding_latch_timer := _get_boarding_latch_timer(_current_enemy_ship)
+	var enemy_boarding_latch_seen := _current_enemy_latch_seen or not enemy_boarding_latch_mode.is_empty()
+	var enemy_boarding_latch_summary_mode := enemy_boarding_latch_mode if not enemy_boarding_latch_mode.is_empty() else _current_enemy_latch_mode
 	var player_boarders_on_enemy := _count_boarders_from_home_to_target(_current_player_ship, _current_enemy_ship)
 	var enemy_boarders_on_player := _count_boarders_from_home_to_target(_current_enemy_ship, _current_player_ship)
 	var raid_debug: Dictionary = PlayerShipCrewHelper.get_auto_raid_debug_snapshot(_current_player_ship, _current_enemy_ship)
@@ -414,6 +423,9 @@ func _build_current_result() -> Dictionary:
 		"enemy_derelict": enemy_derelict,
 		"player_boarding": player_boarding,
 		"enemy_boarding": enemy_boarding,
+		"enemy_boarding_latch_seen": enemy_boarding_latch_seen,
+		"enemy_boarding_latch_mode": enemy_boarding_latch_summary_mode,
+		"enemy_boarding_latch_timer": snappedf(enemy_boarding_latch_timer, 0.1),
 		"player_boarders_on_enemy": player_boarders_on_enemy,
 		"enemy_boarders_on_player": enemy_boarders_on_player,
 		"raid_debug": raid_debug,
@@ -475,6 +487,29 @@ func _is_boarding(ship: Node3D) -> bool:
 	if ship.has_method("is_boarding_ship"):
 		return ship.call("is_boarding_ship") == true
 	return ship.get("is_boarding") == true if "is_boarding" in ship else false
+
+
+func _get_boarding_latch_mode(ship: Node3D) -> String:
+	if not is_instance_valid(ship):
+		return ""
+	var timer: float = float(ship.get_meta("boarding_latch_timer", 0.0))
+	if timer <= 0.0:
+		return ""
+	return str(ship.get_meta("boarding_latch_mode", ""))
+
+
+func _get_boarding_latch_timer(ship: Node3D) -> float:
+	if not is_instance_valid(ship):
+		return 0.0
+	return maxf(0.0, float(ship.get_meta("boarding_latch_timer", 0.0)))
+
+
+func _track_current_enemy_latch_state() -> void:
+	var latch_mode := _get_boarding_latch_mode(_current_enemy_ship)
+	if latch_mode.is_empty():
+		return
+	_current_enemy_latch_seen = true
+	_current_enemy_latch_mode = latch_mode
 
 
 func _count_boarders_from_home_to_target(home_ship: Node3D, target_ship: Node3D) -> int:
@@ -544,6 +579,10 @@ func _update_overlay() -> void:
 	var player_crew := _get_ship_crew(_current_player_ship)
 	var enemy_crew := _get_ship_crew(_current_enemy_ship)
 	var winner := "-"
+	var enemy_latch_mode := _get_boarding_latch_mode(_current_enemy_ship)
+	var enemy_latch_timer := _get_boarding_latch_timer(_current_enemy_ship)
+	var enemy_latch_seen := _current_enemy_latch_seen or not enemy_latch_mode.is_empty()
+	var enemy_latch_display_mode := enemy_latch_mode if not enemy_latch_mode.is_empty() else _current_enemy_latch_mode
 	var raid_debug: Dictionary = PlayerShipCrewHelper.get_auto_raid_debug_snapshot(_current_player_ship, _current_enemy_ship)
 	if _sequence_finished and not _scenario_results.is_empty():
 		winner = str(_scenario_results[_scenario_results.size() - 1].get("winner", "-"))
@@ -561,7 +600,7 @@ func _update_overlay() -> void:
 			int(raid_debug.get("desired_boarders", 0)),
 			int(raid_debug.get("available_boarders", 0)),
 		]
-	_overlay_label.text = "scenario:%s (%d/%d)\nelapsed:%.1fs / %.1fs\nplayer hull:%.1f crew:%d board:%s enemy_boarders:%d derelict:%s\nenemy hull:%.1f crew:%d board:%s our_boarders:%d derelict:%s%s\nwinner:%s" % [
+	_overlay_label.text = "scenario:%s (%d/%d)\nelapsed:%.1fs / %.1fs\nplayer hull:%.1f crew:%d board:%s enemy_boarders:%d derelict:%s\nenemy hull:%.1f crew:%d board:%s latch:%s %.1fs our_boarders:%d derelict:%s%s\nwinner:%s" % [
 		scenario_name,
 		maxi(_current_scenario_index + 1, 0),
 		maxi(_scenario_defs.size(), 0),
@@ -575,6 +614,8 @@ func _update_overlay() -> void:
 		enemy_hull,
 		enemy_crew,
 		"Y" if _is_boarding(_current_enemy_ship) else "N",
+		enemy_latch_display_mode if enemy_latch_seen and not enemy_latch_display_mode.is_empty() else "-",
+		enemy_latch_timer,
 		_count_boarders_from_home_to_target(_current_player_ship, _current_enemy_ship),
 		"Y" if _is_derelict(_current_enemy_ship) else "N",
 		raid_line,
@@ -655,7 +696,7 @@ func _report_summary() -> void:
 	if auto_print_summary:
 		for result in _scenario_results:
 			var raid_debug: Dictionary = result.get("raid_debug", {})
-			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d events=%s" % [
+			print("[ShipCombat] result name=%s winner=%s elapsed=%.2f player_hull=%.1f enemy_hull=%.1f player_hull_pct=%.1f enemy_hull_pct=%.1f player_crew=%d enemy_crew=%d player_derelict=%s enemy_derelict=%s player_boarding=%s enemy_boarding=%s enemy_latch_seen=%s enemy_latch=%s enemy_latch_timer=%.1f player_boarders_on_enemy=%d enemy_boarders_on_player=%d raid_valid=%s raid_close=%s raid_init=%s raid_pressure=%d raid_ranged=%d raid_spare=%d raid_desired=%d raid_available=%d events=%s" % [
 				str(result.get("name", "Scenario")),
 				str(result.get("winner", "draw")),
 				float(result.get("elapsed", 0.0)),
@@ -669,6 +710,9 @@ func _report_summary() -> void:
 				"Y" if result.get("enemy_derelict", false) == true else "N",
 				"Y" if result.get("player_boarding", false) == true else "N",
 				"Y" if result.get("enemy_boarding", false) == true else "N",
+				"Y" if result.get("enemy_boarding_latch_seen", false) == true else "N",
+				str(result.get("enemy_boarding_latch_mode", "")) if result.get("enemy_boarding_latch_seen", false) == true and not str(result.get("enemy_boarding_latch_mode", "")).is_empty() else "-",
+				float(result.get("enemy_boarding_latch_timer", 0.0)),
 				int(result.get("player_boarders_on_enemy", 0)),
 				int(result.get("enemy_boarders_on_player", 0)),
 				"Y" if raid_debug.get("valid_target", false) == true else "N",

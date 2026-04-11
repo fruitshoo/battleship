@@ -65,9 +65,13 @@ func _refresh_debug_labels() -> void:
 func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 	var has_target := is_instance_valid(enemy.get("target"))
 	var planar_distance := PreviewStateSnapshotHelper.planar_distance(player, enemy)
+	var latch_mode: String = str(enemy.get_meta("boarding_latch_mode", ""))
+	var latch_timer: float = float(enemy.get_meta("boarding_latch_timer", 0.0))
 	return PreviewStateSnapshotHelper.build_boarding_preview_text(
 		has_target,
 		planar_distance,
 		enemy.get("is_boarding") == true,
-		float(enemy.get("boarding_prep_timer"))
+		float(enemy.get("boarding_prep_timer")),
+		latch_mode,
+		latch_timer
 	)

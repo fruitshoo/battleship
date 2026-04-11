@@ -24,13 +24,15 @@ static func build_firepot_text(has_target: bool, in_range: bool, has_tosser: boo
 	]
 
 
-static func build_boarding_navigation_text(mode: String, slot: String, side_value: float, is_boarding: bool) -> String:
+static func build_boarding_navigation_text(mode: String, slot: String, side_value: float, is_boarding: bool, latch_mode: String = "", latch_timer: float = 0.0) -> String:
 	var side_text := "R" if side_value < -0.5 else ("L" if side_value > 0.5 else "-")
-	return "mode:%s slot:%s side:%s board:%s" % [
+	var latch_text := "-" if latch_mode.is_empty() or latch_timer <= 0.0 else "%s %.1fs" % [latch_mode, latch_timer]
+	return "mode:%s slot:%s side:%s board:%s latch:%s" % [
 		mode,
 		slot,
 		side_text,
 		format_yes_no(is_boarding),
+		latch_text,
 	]
 
 
@@ -43,12 +45,14 @@ static func build_enemy_role_text(is_gunner: bool, preferred_range: float, can_b
 	]
 
 
-static func build_boarding_preview_text(has_target: bool, distance_to_target: float, is_boarding: bool, prep_timer: float) -> String:
-	return "target:%s dist:%.1f board:%s prep:%.1f" % [
+static func build_boarding_preview_text(has_target: bool, distance_to_target: float, is_boarding: bool, prep_timer: float, latch_mode: String = "", latch_timer: float = 0.0) -> String:
+	var latch_text := "-" if latch_mode.is_empty() or latch_timer <= 0.0 else "%s %.1fs" % [latch_mode, latch_timer]
+	return "target:%s dist:%.1f board:%s prep:%.1f latch:%s" % [
 		format_yes_no(has_target),
 		distance_to_target,
 		format_yes_no(is_boarding),
 		prep_timer,
+		latch_text,
 	]
 
 

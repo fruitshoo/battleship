@@ -113,9 +113,13 @@ func _build_enemy_debug_text(enemy: Node) -> String:
 	var mode: String = str(enemy.get_meta("boarding_approach_mode", "-"))
 	var slot: String = str(enemy.get_meta("boarding_slot_id", "-"))
 	var side_value: float = float(enemy.get_meta("boarding_side_sign", 0.0))
+	var latch_mode: String = str(enemy.get_meta("boarding_latch_mode", ""))
+	var latch_timer: float = float(enemy.get_meta("boarding_latch_timer", 0.0))
 	return PreviewStateSnapshotHelper.build_boarding_navigation_text(
 		mode,
 		slot,
 		side_value,
-		enemy.get("is_boarding") == true
+		enemy.get("is_boarding") == true,
+		latch_mode,
+		latch_timer
 	)
