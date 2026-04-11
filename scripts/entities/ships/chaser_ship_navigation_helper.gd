@@ -231,7 +231,7 @@ static func _classify_boarding_approach_smoothed(ship, rel_forward: float, rel_s
 		if rel_forward <= -0.6:
 			return "rear"
 	elif current_mode == "side":
-		if abs_side >= maxf(2.0, abs_forward * 0.52):
+		if abs_side >= maxf(1.6, abs_forward * 0.38):
 			return "side"
 	elif current_mode == "front":
 		if rel_forward > -0.4 and abs_side < maxf(3.2, abs_forward * 0.82):
@@ -252,18 +252,18 @@ static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos:
 	var target_half_ext: Vector2 = _get_ship_deck_half_extents(target_node)
 	var combined_half_width: float = my_half_ext.x + target_half_ext.x
 	var side_offset_dist: float = clampf(
-		maxf(collision_dist * (0.58 if tight_hold else 0.86), combined_half_width * (0.58 if tight_hold else 0.72)),
-		maxf(2.4 if tight_hold else 2.9, combined_half_width * (0.46 if tight_hold else 0.58)),
+		maxf(collision_dist * (0.72 if tight_hold else 0.88), combined_half_width * (0.68 if tight_hold else 0.74)),
+		maxf(2.9 if tight_hold else 3.1, combined_half_width * (0.54 if tight_hold else 0.60)),
 		maxf(8.6, combined_half_width * 1.6)
 	)
 	var side_anchor: Vector3 = target_pos + target_right * side_sign * side_offset_dist
 	var along_track_offset: float
 	if tight_hold:
-		var target_track_offset: float = 0.35
+		var target_track_offset: float = 0.75
 		along_track_offset = clampf(
 			lerpf(rel_forward, target_track_offset, 0.82),
 			0.0,
-			1.0
+			1.35
 		)
 	else:
 		along_track_offset = clampf(
@@ -274,13 +274,13 @@ static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos:
 	var heading_lead: float = 3.5 if tight_hold else 12.0
 	var desired_speed_mult: float
 	if tight_hold:
-		desired_speed_mult = 0.66
-		if rel_forward > 1.2:
-			desired_speed_mult = 0.40
+		desired_speed_mult = 0.72
+		if rel_forward > 2.0:
+			desired_speed_mult = 0.56
 		elif rel_forward < -0.2:
-			desired_speed_mult = 0.84
+			desired_speed_mult = 0.88
 	else:
-		desired_speed_mult = 0.98 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.88
+		desired_speed_mult = 1.02 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.92
 	return {
 		"desired_point": side_anchor + target_forward * along_track_offset,
 		"heading_point": side_anchor + target_forward * (along_track_offset + heading_lead),
@@ -446,7 +446,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			var current_side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 			var side_alignment_locked: bool = false
 			if post_impact_follow_timer <= 0.0 and absf(current_side_sign) > 0.5:
-				if absf(rel_side) >= collision_dist * 0.42 and absf(rel_forward) <= 8.0:
+				if absf(rel_side) >= collision_dist * 0.30 and absf(rel_forward) <= 10.0:
 					approach_mode = "side"
 			if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_node) == true:
 				if dist_to_target <= ship.boarding_break_distance - 0.4:
