@@ -66,9 +66,10 @@ func _spawn_navigation_scenarios() -> void:
 	_spawn_enemy("Port", player.global_position + right * side_distance + forward * 1.4, player)
 	_spawn_enemy("Rear", player.global_position - forward * rear_distance, player)
 	_spawn_enemy("Starboard", player.global_position - right * side_distance + forward * 1.4, player)
+	_spawn_enemy("Parallel Trap", player.global_position + right * (side_distance * 0.82) - forward * 3.0, player, true)
 
 
-func _spawn_enemy(label_text: String, world_pos: Vector3, player: Node3D) -> void:
+func _spawn_enemy(label_text: String, world_pos: Vector3, player: Node3D, align_parallel: bool = false) -> void:
 	var enemy := ENEMY_MELEE_SCENE.instantiate()
 	if enemy == null:
 		return
@@ -76,7 +77,10 @@ func _spawn_enemy(label_text: String, world_pos: Vector3, player: Node3D) -> voi
 	add_child(enemy)
 	enemy.set_meta("boarding_navigation_preview_spawn", true)
 	enemy.global_position = world_pos
-	enemy.look_at(player.global_position, Vector3.UP)
+	if align_parallel:
+		enemy.global_rotation = player.global_rotation
+	else:
+		enemy.look_at(player.global_position, Vector3.UP)
 
 	PreviewHarnessHelper.assign_preview_target(enemy, player)
 
