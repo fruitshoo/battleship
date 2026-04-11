@@ -299,6 +299,37 @@ static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos:
 	}
 
 
+static func _build_contact_settle_navigation(ship, target_pos: Vector3, target_forward: Vector3, target_right: Vector3, rel_forward: float, rel_side: float, collision_dist: float, dist_to_target: float) -> Dictionary:
+	var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
+	if absf(side_sign) < 0.5:
+		side_sign = 1.0 if rel_side >= 0.0 else -1.0
+	ship.set_meta("boarding_side_sign", side_sign)
+	if ship.has_meta("boarding_slot_id"):
+		ship.remove_meta("boarding_slot_id")
+
+	var current_forward: Vector3 = -ship.global_transform.basis.z
+	current_forward.y = 0.0
+	if current_forward.length_squared() <= 0.001:
+		current_forward = target_forward
+	else:
+		current_forward = current_forward.normalized()
+
+	var desired_side: float = side_sign * clampf(collision_dist * 0.86, 3.4, maxf(8.8, collision_dist * 0.95))
+	var desired_along: float = clampf(rel_forward, -0.7, 1.4)
+	var desired_point: Vector3 = target_pos + target_right * desired_side + target_forward * desired_along
+	var correction: Vector3 = desired_point - ship.global_position
+	correction.y = 0.0
+	if correction.length() < 0.45:
+		desired_point = ship.global_position + current_forward * 2.0
+
+	return {
+		"desired_point": desired_point,
+		"heading_point": ship.global_position + current_forward * 9.0,
+		"desired_speed_mult": 0.56 if dist_to_target > ship.max_boarding_distance else 0.34,
+		"permit_sprint": false,
+	}
+
+
 static func _build_rear_recovery_navigation(ship, target_node: Node3D, target_pos: Vector3, target_forward: Vector3, target_right: Vector3, rel_side: float, collision_dist: float, dist_to_target: float) -> Dictionary:
 	var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 	if absf(side_sign) < 0.5:
@@ -477,6 +508,12 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 				heading_point = follow_nav["heading_point"]
 				desired_speed_mult = follow_nav["desired_speed_mult"]
 				permit_sprint = follow_nav["permit_sprint"]
+			elif approach_mode == "side" and dist_to_target <= ship.max_boarding_distance + 1.35:
+				var settle_nav: Dictionary = _build_contact_settle_navigation(ship, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target)
+				desired_point = settle_nav["desired_point"]
+				heading_point = settle_nav["heading_point"]
+				desired_speed_mult = settle_nav["desired_speed_mult"]
+				permit_sprint = settle_nav["permit_sprint"]
 			elif approach_mode == "rear":
 				if dist_to_target <= ship.max_boarding_distance + 6.0:
 					var rear_recovery_nav: Dictionary = _build_rear_recovery_navigation(ship, target_node, target_pos, target_forward, target_right, rel_side, collision_dist, dist_to_target)
