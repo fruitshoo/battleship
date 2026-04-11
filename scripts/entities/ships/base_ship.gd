@@ -105,7 +105,6 @@ var max_boarding_rope_hp: float = 100.0
 @export_range(0.0, 2.0) var boarding_hook_throw_delay: float = 0.35
 @export_range(0.0, 3.0) var boarding_secondary_rope_delay: float = 0.9
 @export_range(0.5, 8.0) var boarding_max_relative_speed: float = 2.5
-@export_range(0.4, 1.0) var boarding_side_alignment_max_dot: float = 0.82
 @export_range(1, 3) var boarding_initial_rope_count: int = 1
 @export_range(0.05, 1.0) var boarding_rope_throw_duration: float = 0.28
 var boarding_contact_timer: float = 0.0

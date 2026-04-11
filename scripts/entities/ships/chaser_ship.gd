@@ -690,12 +690,6 @@ func _apply_neighbor_ship_guards(prev_pos: Vector3, proposed_pos: Vector3, exclu
 func _apply_ship_collision_guard(other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = 0.94, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:
 	return ChaserShipBoardingHelper.apply_ship_collision_guard(self, other_ship, prev_pos, proposed_pos, safe_ratio, impact_speed_hint, emit_collision_event)
 
-func _emit_guarded_collision(other_ship: Node3D, impact_speed_hint: float) -> void:
-	ChaserShipBoardingHelper.emit_guarded_collision(self, other_ship, impact_speed_hint)
-
-func _soften_collision_speed() -> void:
-	ChaserShipBoardingHelper.soften_collision_speed(self)
-
 
 func _find_player() -> void:
 	ChaserShipAiHelper.find_player(self)
