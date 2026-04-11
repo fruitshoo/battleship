@@ -10,28 +10,86 @@ static func process_boarding(ship, delta: float) -> void:
 	flat_to_target.y = 0.0
 	var dist_to_target = flat_to_target.length()
 
-	var look_dir = flat_to_target.normalized() if dist_to_target > 0.001 else Vector3.FORWARD
-	var target_rot = atan2(-look_dir.x, -look_dir.z)
+	var motion := _build_boarding_motion(ship, ship.boarding_target, target_pos, flat_to_target, dist_to_target)
+	var heading_dir: Vector3 = motion["heading_dir"]
+	var target_rot = atan2(-heading_dir.x, -heading_dir.z)
 	ship.rotation.y = lerp_angle(ship.rotation.y, target_rot, delta * 2.0)
 
-	var desired_boarding_speed := 0.0
-	if dist_to_target > (ship.max_boarding_distance - 0.6):
-		desired_boarding_speed = clamp((dist_to_target - (ship.max_boarding_distance - 0.6)) * 1.6, 1.1, ship.move_speed * 0.9)
-	elif dist_to_target > 6.5:
-		desired_boarding_speed = 0.9
+	var desired_boarding_speed: float = float(motion["desired_speed"])
 	ship.current_speed = move_toward(ship.current_speed, desired_boarding_speed, ship.acceleration * 2.0 * delta)
 
-	var approach_velocity = look_dir * ship.current_speed
+	var correction_velocity: Vector3 = motion["correction_velocity"]
+	var approach_velocity: Vector3 = heading_dir * ship.current_speed + correction_velocity
 	var pull_force = ship._calculate_boarding_pull()
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + (approach_velocity + pull_force * delta) * delta
 	if is_instance_valid(ship.boarding_target):
-		next_pos = apply_ship_collision_guard(ship, ship.boarding_target, prev_pos, next_pos, 0.975, approach_velocity.length())
+		var guard_ratio: float = 0.92 if motion["parallel_hold"] == true else 0.975
+		next_pos = apply_ship_collision_guard(ship, ship.boarding_target, prev_pos, next_pos, guard_ratio, approach_velocity.length())
 	next_pos = apply_neighbor_ship_guards(ship, prev_pos, next_pos, ship.boarding_target)
 	ship.global_position = next_pos
 
 	ship._apply_bobbing_effect()
 	ship._process_boarding_common(delta)
+
+
+static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector3, flat_to_target: Vector3, dist_to_target: float) -> Dictionary:
+	var fallback_dir: Vector3 = flat_to_target.normalized() if dist_to_target > 0.001 else Vector3.FORWARD
+	var parallel_hold: bool = ship.has_meta("boarding_side_sign")
+	if not parallel_hold and ship.has_method("_is_side_boarding_approach"):
+		parallel_hold = ship.call("_is_side_boarding_approach", target_ship) == true
+	if not parallel_hold:
+		var fallback_speed := 0.0
+		if dist_to_target > (ship.max_boarding_distance - 0.6):
+			fallback_speed = clamp((dist_to_target - (ship.max_boarding_distance - 0.6)) * 1.6, 1.1, ship.move_speed * 0.9)
+		elif dist_to_target > 6.5:
+			fallback_speed = 0.9
+		return {
+			"heading_dir": fallback_dir,
+			"desired_speed": fallback_speed,
+			"correction_velocity": Vector3.ZERO,
+			"parallel_hold": false,
+		}
+
+	var target_forward: Vector3 = -target_ship.global_transform.basis.z
+	target_forward.y = 0.0
+	if target_forward.length_squared() <= 0.001:
+		target_forward = fallback_dir
+	else:
+		target_forward = target_forward.normalized()
+	var target_right: Vector3 = target_forward.cross(Vector3.UP).normalized()
+	var rel_vector: Vector3 = ship.global_position - target_pos
+	rel_vector.y = 0.0
+	var rel_side: float = rel_vector.dot(target_right)
+	var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
+	if absf(side_sign) < 0.5:
+		side_sign = 1.0 if rel_side >= 0.0 else -1.0
+		ship.set_meta("boarding_side_sign", side_sign)
+
+	var collision_dist: float = ship.get_collision_distance_to(target_ship)
+	var max_hold_dist: float = maxf(4.0, ship.max_boarding_distance - 0.45)
+	var min_hold_dist: float = minf(max_hold_dist, maxf(3.8, collision_dist * 0.68))
+	var side_hold_dist: float = clampf(collision_dist * 0.88, min_hold_dist, max_hold_dist)
+	var along_offset: float = clampf(rel_vector.dot(target_forward), -0.8, 1.6)
+	var desired_point: Vector3 = target_pos + target_right * side_sign * side_hold_dist + target_forward * along_offset
+	var correction: Vector3 = desired_point - ship.global_position
+	correction.y = 0.0
+	var correction_velocity := Vector3.ZERO
+	if correction.length_squared() > 0.01:
+		correction_velocity = correction.normalized() * minf(ship.move_speed * 0.38, correction.length() * 1.45)
+
+	var target_speed: float = 0.0
+	if target_ship.has_method("get_current_speed_value"):
+		target_speed = float(target_ship.call("get_current_speed_value"))
+	elif "current_speed" in target_ship:
+		target_speed = float(target_ship.get("current_speed"))
+	var desired_speed: float = clampf(maxf(target_speed * 0.86, 0.65), 0.0, ship.move_speed * 0.62)
+	return {
+		"heading_dir": target_forward,
+		"desired_speed": desired_speed,
+		"correction_velocity": correction_velocity,
+		"parallel_hold": true,
+	}
 
 
 static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Vector3, excluded_ship: Node3D = null) -> Vector3:
