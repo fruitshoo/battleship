@@ -281,9 +281,19 @@ static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos:
 			desired_speed_mult = 0.88
 	else:
 		desired_speed_mult = 1.02 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.92
+	var desired_point: Vector3 = side_anchor + target_forward * along_track_offset
+	var parallel_heading_point: Vector3 = side_anchor + target_forward * (along_track_offset + heading_lead)
+	var heading_point: Vector3 = parallel_heading_point
+	var to_desired: Vector3 = desired_point - ship.global_position
+	to_desired.y = 0.0
+	if not tight_hold and to_desired.length_squared() > 0.01:
+		var desired_distance: float = to_desired.length()
+		var route_heading_point: Vector3 = ship.global_position + to_desired.normalized() * clampf(desired_distance, 4.0, 10.0)
+		var align_blend: float = clampf(1.0 - ((desired_distance - 1.8) / 5.5), 0.0, 1.0)
+		heading_point = route_heading_point.lerp(parallel_heading_point, align_blend)
 	return {
-		"desired_point": side_anchor + target_forward * along_track_offset,
-		"heading_point": side_anchor + target_forward * (along_track_offset + heading_lead),
+		"desired_point": desired_point,
+		"heading_point": heading_point,
 		"desired_speed_mult": desired_speed_mult,
 		"permit_sprint": false if tight_hold else dist_to_target > 10.0,
 	}
