@@ -48,6 +48,8 @@ static func process_boarding_common(ship, delta: float) -> void:
 			ship._initial_rope_deployed = true
 			ship._full_rope_deployed = ship.boarding_initial_rope_count >= 2
 			ship.boarding_secondary_rope_timer = 0.0
+			if ship.has_method("_show_boarding_start_feedback"):
+				ship.call("_show_boarding_start_feedback", ship.boarding_target)
 			if ship.DEBUG_COMBAT_LOGS:
 				print("[Boarding] 갈고리 투척 성공, 밧줄 연결 시작.")
 		return

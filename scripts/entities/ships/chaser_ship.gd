@@ -1064,7 +1064,6 @@ func _board_ship(target_ship: Node3D) -> void:
 		# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
 		if boarding_target.has_method("set_boarding_attacker_ship"):
 			boarding_target.set_boarding_attacker_ship(self)
-		_show_boarding_start_feedback(boarding_target)
 			
 		_clear_ropes()
 		boarding_timer = 0.0
