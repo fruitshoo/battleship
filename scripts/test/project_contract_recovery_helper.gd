@@ -118,14 +118,15 @@ static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smok
 		failures.append("recovery treasure smoke instantiate failed")
 		return
 	smoke_root.add_child(chest)
+	var expanded_pickup_distance: float = 8.0
+	if chest.has_method("_get_effective_collection_range"):
+		expanded_pickup_distance = maxf(5.0, float(chest.call("_get_effective_collection_range", player_ship)) - 0.5)
 	if chest is Node3D:
-		(chest as Node3D).global_position = player_ship.global_position + Vector3(0.0, 0.0, 1.0)
-	await _wait_frames(owner, 1)
+		(chest as Node3D).global_position = player_ship.global_position + Vector3(expanded_pickup_distance, 0.0, 0.0)
+	await _wait_frames(owner, 3)
 
-	chest.call("_collect")
-	await _wait_frames(owner, 1)
 	if chest.get("_is_collected") != true:
-		failures.append("recovery treasure smoke did not mark chest collected")
+		failures.append("recovery treasure smoke did not mark chest collected from expanded range")
 	if not chest.is_queued_for_deletion():
 		failures.append("recovery treasure smoke did not queue chest for deletion")
 

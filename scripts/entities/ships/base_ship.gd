@@ -1097,41 +1097,47 @@ func _spawn_ropes(count_override: int = -1) -> void:
 	for i in range(count):
 		var mesh_instance = MeshInstance3D.new()
 		var cylinder = CylinderMesh.new()
-		cylinder.top_radius = 0.055
-		cylinder.bottom_radius = 0.055
+		cylinder.top_radius = 0.13
+		cylinder.bottom_radius = 0.13
 		cylinder.height = 1.0 # 기본 길이는 1로 설정 (scale로 조절)
 		mesh_instance.mesh = cylinder
+		mesh_instance.top_level = true
+		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mesh_instance.extra_cull_margin = 8.0
 		
 		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.76, 0.63, 0.40, 0.96)
-		mat.roughness = 0.72
+		mat.albedo_color = Color(1.0, 0.88, 0.52, 1.0)
+		mat.roughness = 0.55
 		mat.emission_enabled = true
-		mat.emission = Color(0.48, 0.34, 0.16, 1.0)
-		mat.emission_energy_multiplier = 0.65
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.emission = Color(1.0, 0.66, 0.24, 1.0)
+		mat.emission_energy_multiplier = 1.8
+		mat.no_depth_test = true
 		mesh_instance.material_override = mat
 		
 		add_child(mesh_instance)
 
 		var hook_visual := MeshInstance3D.new()
 		var hook_mesh := SphereMesh.new()
-		hook_mesh.radius = 0.12
-		hook_mesh.height = 0.24
+		hook_mesh.radius = 0.28
+		hook_mesh.height = 0.56
 		hook_visual.mesh = hook_mesh
 		var hook_mat := StandardMaterial3D.new()
 		hook_mat.albedo_color = Color(1.0, 0.86, 0.52, 0.95)
 		hook_mat.emission_enabled = true
 		hook_mat.emission = Color(1.0, 0.72, 0.28, 1.0)
-		hook_mat.emission_energy_multiplier = 1.15
+		hook_mat.emission_energy_multiplier = 2.2
 		hook_mat.roughness = 0.35
+		hook_mat.no_depth_test = true
 		hook_visual.material_override = hook_mat
 		hook_visual.top_level = true
+		hook_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		hook_visual.extra_cull_margin = 8.0
 		add_child(hook_visual)
 		
 		var offset_z = 0.0
 		if count > 1:
 			offset_z = lerp(-2.0, 2.0, float(i) / float(count - 1))
-		var offset = Vector3(1.0, 0.8, offset_z)
+		var offset = Vector3(1.15, 1.55, offset_z)
 		if is_instance_valid(boarding_target):
 			var to_target = (boarding_target.global_position - global_position).normalized()
 			var local_to_target = global_transform.basis.inverse() * to_target
@@ -1149,7 +1155,7 @@ func _update_ropes(delta: float = 0.0) -> void:
 		_clear_ropes()
 		return
 		
-	var target_center = boarding_target.global_position + Vector3(0, 0.5, 0)
+	var target_center = boarding_target.global_position + Vector3(0, 1.6, 0)
 	
 	for rope in rope_instances:
 		if not is_instance_valid(rope): continue
@@ -1167,7 +1173,7 @@ func _update_ropes(delta: float = 0.0) -> void:
 		var current_end = start_pos.lerp(target_center, deploy_progress)
 		var dist = maxf(0.05, start_pos.distance_to(current_end))
 		var rope_dir = (current_end - start_pos).normalized()
-		var sag_amount = minf(0.45, dist * 0.04) * deploy_progress
+		var sag_amount = minf(0.28, dist * 0.025) * deploy_progress
 		var sag_mid = (start_pos + current_end) * 0.5 + Vector3(0.0, -sag_amount, 0.0)
 		
 		rope.global_transform = Transform3D().looking_at(current_end - sag_mid, Vector3.UP)
@@ -1177,7 +1183,7 @@ func _update_ropes(delta: float = 0.0) -> void:
 		rope.scale = Vector3(1.0, dist, 1.0) * (1.0 + (1.0 - deploy_progress) * 0.12)
 		var rope_material: StandardMaterial3D = rope.material_override as StandardMaterial3D
 		if is_instance_valid(rope_material):
-			rope_material.emission_energy_multiplier = lerpf(0.5, 1.25, deploy_progress)
+			rope_material.emission_energy_multiplier = lerpf(1.2, 2.4, deploy_progress)
 		var hook_visual = rope.get_meta("hook_visual", null) as MeshInstance3D
 		if is_instance_valid(hook_visual):
 			hook_visual.visible = deploy_progress >= 0.18
