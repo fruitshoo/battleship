@@ -263,31 +263,32 @@ func _update_target() -> void:
 	
 	current_target = nearest_enemy
 
-func _is_target_valid(target: Node3D) -> bool:
-	if not is_instance_valid(target):
+func _is_target_valid(target: Variant) -> bool:
+	if not is_instance_valid(target) or not (target is Node3D):
 		return false
-	if target.is_queued_for_deletion():
+	var target_node := target as Node3D
+	if target_node.is_queued_for_deletion():
 		return false
 	
-	if target.has_method("is_combat_disabled") and target.is_combat_disabled():
+	if target_node.has_method("is_combat_disabled") and target_node.is_combat_disabled():
 		return false
 		
 	# 팀 체크 (그룹 꼬임보다 우선)
-	if not _is_enemy_ship(target):
+	if not _is_enemy_ship(target_node):
 		return false
 		
 	var current_range = _get_current_range()
-	if global_position.distance_squared_to(target.global_position) > current_range * current_range: return false
-	if not _is_within_arc(target): return false
+	if global_position.distance_squared_to(target_node.global_position) > current_range * current_range: return false
+	if not _is_within_arc(target_node): return false
 	
 	# 도선 중이거나 폐선인 배인지 최종 체크
-	if target.has_method("is_combat_disabled") and target.is_combat_disabled(): return false
-	if target.has_method("get_boarding_attacker_ship"):
-		var attacker: Node3D = target.get_boarding_attacker_ship()
-		if is_instance_valid(attacker) and attacker.has_method("get_team_tag") and attacker.get_team_tag() == team:
+	if target_node.has_method("is_combat_disabled") and target_node.is_combat_disabled(): return false
+	if target_node.has_method("get_boarding_attacker_ship"):
+		var attacker: Variant = target_node.get_boarding_attacker_ship()
+		if is_instance_valid(attacker) and attacker is Node and attacker.has_method("get_team_tag") and attacker.get_team_tag() == team:
 			return false
 		
-	if _is_ship_occupied_by_friendly(target): return false
+	if _is_ship_occupied_by_friendly(target_node): return false
 	return true
 
 func _is_within_arc(target: Node3D) -> bool:

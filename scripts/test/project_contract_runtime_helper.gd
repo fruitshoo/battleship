@@ -205,6 +205,14 @@ static func _run_launcher_smoke_pass(owner: Node, failures: Array[String], packe
 					else:
 						failures.append("launcher is missing fire() method: %s" % launcher_scene_path)
 
+					if launcher.has_method("_is_target_valid"):
+						var stale_target: Node3D = target_ship
+						stale_target.queue_free()
+						await _wait_frames(owner, 2)
+						var stale_valid: bool = bool(launcher.call("_is_target_valid", stale_target))
+						if stale_valid:
+							failures.append("launcher stale target validator accepted freed target: %s" % launcher_scene_path)
+
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
 

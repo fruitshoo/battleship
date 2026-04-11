@@ -63,12 +63,15 @@ func _is_owner_combat_ready() -> bool:
 		return false
 	return true
 
-func _is_target_valid(target: Node3D) -> bool:
-	if not is_instance_valid(target):
+func _is_target_valid(target: Variant) -> bool:
+	if not is_instance_valid(target) or not (target is Node3D):
 		return false
-	if target.has_method("is_combat_disabled") and target.is_combat_disabled():
+	var target_node := target as Node3D
+	if target_node.is_queued_for_deletion():
 		return false
-	return global_position.distance_squared_to(target.global_position) <= detection_range * detection_range
+	if target_node.has_method("is_combat_disabled") and target_node.is_combat_disabled():
+		return false
+	return global_position.distance_squared_to(target_node.global_position) <= detection_range * detection_range
 
 
 func _find_nearest_enemy() -> Node3D:
@@ -90,14 +93,15 @@ func _find_nearest_enemy() -> Node3D:
 	return nearest
 
 
-func fire(target: Node3D) -> void:
+func fire(target: Variant) -> void:
 	if not missile_scene:
 		return
 	if not _is_owner_combat_ready():
 		return
-	if not is_instance_valid(target) or (target.has_method("is_combat_disabled") and target.is_combat_disabled()):
+	if not _is_target_valid(target):
 		return
-	if target.has_method("get_hull_hp_value") and float(target.get_hull_hp_value()) <= 0.0:
+	var target_node := target as Node3D
+	if target_node.has_method("get_hull_hp_value") and float(target_node.get_hull_hp_value()) <= 0.0:
 		return
 	
 	var um = get_node_or_null("/root/UpgradeManager")
@@ -112,23 +116,23 @@ func fire(target: Node3D) -> void:
 	missile.start_pos = global_position + Vector3(0, 1.0, 0)
 	
 	# 예측 사격 (Predictive Aiming)
-	var dist = global_position.distance_to(target.global_position)
+	var dist = global_position.distance_to(target_node.global_position)
 	# 레벨당 속도 증가폭 상향 (0.1 -> 0.15)
 	var projectile_speed = 18.0 * (1.0 + janggun_lv * 0.15)
 	var travel_time = dist / projectile_speed
 	
 	# 타겟의 속도와 방향 가져오기
 	var target_speed = 0.0
-	if "current_speed" in target:
-		target_speed = target.current_speed
-	elif "move_speed" in target: # chaser_ship 등
-		target_speed = target.move_speed
+	if "current_speed" in target_node:
+		target_speed = target_node.current_speed
+	elif "move_speed" in target_node: # chaser_ship 등
+		target_speed = target_node.move_speed
 		
-	var target_dir = - target.global_transform.basis.z
+	var target_dir = - target_node.global_transform.basis.z
 	var target_velocity = target_dir * target_speed
 	
 	# 예상 도달 위치 계산
-	var predicted_pos = target.global_position + (target_velocity * travel_time)
+	var predicted_pos = target_node.global_position + (target_velocity * travel_time)
 	
 	missile.target_pos = predicted_pos
 	# 레벨당 데미지 증가폭 상향 (0.3 -> 0.5)

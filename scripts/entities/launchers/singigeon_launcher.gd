@@ -101,18 +101,19 @@ func _is_owner_combat_ready() -> bool:
 		return false
 	return true
 
-func _is_target_valid(target: Node3D) -> bool:
-	if not is_instance_valid(target):
+func _is_target_valid(target: Variant) -> bool:
+	if not is_instance_valid(target) or not (target is Node3D):
 		return false
-	if target.is_queued_for_deletion():
+	var target_node := target as Node3D
+	if target_node.is_queued_for_deletion():
 		return false
-	if target == get_parent():
+	if target_node == get_parent():
 		return false
-	if target.has_method("is_combat_disabled") and target.is_combat_disabled():
+	if target_node.has_method("is_combat_disabled") and target_node.is_combat_disabled():
 		return false
-	if not _is_enemy_ship(target):
+	if not _is_enemy_ship(target_node):
 		return false
-	return global_position.distance_squared_to(target.global_position) <= detection_range * detection_range
+	return global_position.distance_squared_to(target_node.global_position) <= detection_range * detection_range
 
 
 func _find_nearest_enemy() -> Node3D:
