@@ -9,7 +9,7 @@
 			"stats": {
 				"dmg_pct_per_lv": 20,
 				"range_pct_per_lv": 10,
-				"cd_pct_per_lv": 8,
+				"cd_pct_per_lv": 6,
 				"crit_pct_per_lv": 2.5,
 				"crit_multiplier": 1.5
 			}
@@ -245,7 +245,7 @@
 			"color": "ff33e5",
 			"stats": {
 				"dmg_pct_per_lv": 20,
-				"cd_pct_per_lv": 8
+				"cd_pct_per_lv": 6
 			}
 		},
 		"fleet_hull": {

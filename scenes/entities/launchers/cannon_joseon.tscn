@@ -10,7 +10,7 @@ size = Vector3(10, 5, 30)
 [node name="CannonJoseon" type="Node3D"]
 script = ExtResource("1")
 cannonball_scene = ExtResource("2")
-fire_cooldown = 2.5
+fire_cooldown = 3.2
 detection_range = 24.0
 
 [node name="CannonModel" parent="." instance=ExtResource("3_model")]

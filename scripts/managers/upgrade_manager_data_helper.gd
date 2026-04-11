@@ -90,7 +90,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			if next_level == 3 or next_level == 5:
 				desc = "대포 추가 배치 (+1문) 및 "
 			return desc + "화력 +%d%%, 사거리 +%d%%, 장전속도 +%d%%" % [
-				s.get("dmg_pct_per_lv", 20), s.get("range_pct_per_lv", 10), s.get("cd_pct_per_lv", 8)]
+				s.get("dmg_pct_per_lv", 20), s.get("range_pct_per_lv", 10), s.get("cd_pct_per_lv", 6)]
 		"janggun":
 			return "대장군전 파괴력 및 디버프 효과(화염/둔화) 대폭 강화"
 		"singigeon":

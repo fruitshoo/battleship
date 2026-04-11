@@ -11,9 +11,10 @@ const DEBUG_CANNON_FIRE_LOGS := false
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
-@export var fire_cooldown: float = 2.0
+@export var fire_cooldown: float = 2.8
 @export var detection_range: float = 22.0
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
+@export_range(0.0, 0.35, 0.01) var reload_extra_jitter_pct: float = 0.12
 @export_range(0.05, 0.8) var target_scan_interval: float = 0.12
 @export_range(1.0, 6.0) var target_tracking_scan_multiplier: float = 3.0
 @export_range(0.0, 8.0, 0.1) var base_inaccuracy_deg: float = 1.0
@@ -75,7 +76,7 @@ func _update_cached_stats() -> void:
 		
 		# 5레벨 체계: 매 레벨마다 보너스가 중첩됨
 		_cached_range_mult = 1.0 + (s.get("range_pct_per_lv", 10) / 100.0) * (cannon_lv - 1)
-		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_lv", 8) / 100.0) * (cannon_lv - 1))
+		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_lv", 6) / 100.0) * (cannon_lv - 1))
 		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_lv", 20) / 100.0) * (cannon_lv - 1)
 		_cached_crit_chance = maxf(0.0, (s.get("crit_pct_per_lv", 2.5) / 100.0) * (cannon_lv - 1))
 		_cached_crit_multiplier = float(s.get("crit_multiplier", 1.5))
@@ -335,6 +336,12 @@ func _get_current_cooldown() -> float:
 		cooldown_mult *= float(_owner_ship.call("get_gunnery_reload_multiplier"))
 	return fire_cooldown * cooldown_mult
 
+func _get_next_reload_cooldown() -> float:
+	var base_cooldown: float = _get_current_cooldown()
+	if reload_extra_jitter_pct <= 0.0:
+		return base_cooldown
+	return base_cooldown * randf_range(1.0, 1.0 + reload_extra_jitter_pct)
+
 func _get_target_scan_interval(has_valid_target: bool) -> float:
 	var base_interval: float = target_scan_interval
 	if has_valid_target:
@@ -380,7 +387,7 @@ func _execute_fire() -> void:
 			cam.shake(0.15, 0.1) # 진동 세기 0.15, 지속시간 0.1초 (기존 0.5/0.25에서 대폭 완화)
 	
 	# 쿨타임 시작
-	cooldown_timer = _get_current_cooldown()
+	cooldown_timer = _get_next_reload_cooldown()
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(target_node.global_position)

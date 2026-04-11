@@ -19,7 +19,7 @@ size = Vector3(10, 5, 30)
 [node name="CannonJapanese" type="Node3D"]
 script = ExtResource("1")
 cannonball_scene = ExtResource("2")
-fire_cooldown = 2.6
+fire_cooldown = 3.25
 detection_range = 15.0
 
 [node name="Barrel" type="MeshInstance3D" parent="."]

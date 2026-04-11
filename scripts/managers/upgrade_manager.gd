@@ -637,7 +637,7 @@ func _configure_player_cannon(cannon: Node) -> void:
 	if "cannonball_scene" in cannon and cannonball_joseon_scene != null:
 		cannon.cannonball_scene = cannonball_joseon_scene
 	if "fire_cooldown" in cannon:
-		cannon.fire_cooldown = 2.5
+		cannon.fire_cooldown = 3.2
 	if "detection_range" in cannon:
 		cannon.detection_range = 24.0
 
