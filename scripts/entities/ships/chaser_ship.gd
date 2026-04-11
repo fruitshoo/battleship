@@ -1057,6 +1057,7 @@ func _board_ship(target_ship: Node3D) -> void:
 		# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
 		if boarding_target.has_method("set_boarding_attacker_ship"):
 			boarding_target.set_boarding_attacker_ship(self)
+		_show_boarding_start_feedback(boarding_target)
 			
 		_clear_ropes()
 		boarding_timer = 0.0
@@ -1073,6 +1074,32 @@ func _board_ship(target_ship: Node3D) -> void:
 	else:
 		if DEBUG_COMBAT_LOGS:
 			print("[Skirmish] 병력 우위 부족으로 도선하지 않고 대치합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+
+
+func _show_boarding_start_feedback(target_ship: Node) -> void:
+	if not is_instance_valid(target_ship) or not target_ship.is_in_group("player"):
+		return
+	var now: float = Time.get_ticks_msec() / 1000.0
+	var next_allowed: float = float(target_ship.get_meta("boarding_start_message_next_time", 0.0))
+	if now < next_allowed:
+		return
+	target_ship.set_meta("boarding_start_message_next_time", now + 2.25)
+
+	var hud: Node = null
+	if target_ship.has_method("_find_hud"):
+		var found_hud: Variant = target_ship.call("_find_hud")
+		if found_hud is Node:
+			hud = found_hud
+	if not is_instance_valid(hud) and "_cached_hud" in target_ship:
+		var cached_hud: Variant = target_ship.get("_cached_hud")
+		if cached_hud is Node:
+			hud = cached_hud
+	if not is_instance_valid(hud):
+		return
+	if hud.has_method("show_message"):
+		hud.show_message("갈고리가 걸렸습니다! 갑판 방어!", 1.8)
+	elif hud.has_method("show_gust_warning_message"):
+		hud.show_gust_warning_message("갈고리가 걸렸습니다! 갑판 방어!", 1.8)
 
 
 func _can_force_head_on_boarding(target_ship: Node3D) -> bool:

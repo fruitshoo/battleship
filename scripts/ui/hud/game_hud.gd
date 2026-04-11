@@ -483,6 +483,10 @@ func show_gust_warning_message(message: String, duration: float = 0.35) -> void:
 	HudStatusDisplayHelper.show_gust_warning_message(self, message, duration)
 
 
+func show_message(message: String, duration: float = 1.5) -> void:
+	show_gust_warning_message(message, duration)
+
+
 func _get_player_masts_for_debug() -> Array[Node]:
 	return HudSailDebugHelper.get_player_masts_for_debug(self)
 

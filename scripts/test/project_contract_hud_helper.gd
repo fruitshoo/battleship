@@ -99,6 +99,7 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 	if hud.has_method("_update_stat_panel"):
 		hud.show_stat_panel = true
 		hud.call("_update_stat_panel")
+	_validate_hud_message_api(hud, failures)
 	_validate_hud_baseline_state(hud, failures)
 
 
@@ -182,6 +183,20 @@ static func _validate_hud_baseline_state(hud: Node, failures: Array[String]) -> 
 		failures.append("hud smoke ship debug config was not populated")
 	if is_instance_valid(hud.stat_content) and hud.stat_content.get_child_count() <= 0:
 		failures.append("hud smoke stat panel was not populated")
+
+
+static func _validate_hud_message_api(hud: Node, failures: Array[String]) -> void:
+	if not hud.has_method("show_gust_warning_message"):
+		failures.append("hud smoke missing show_gust_warning_message")
+	if not hud.has_method("show_message"):
+		failures.append("hud smoke missing show_message")
+		return
+	hud.call("show_message", "하네스 메시지", 0.25)
+	if not is_instance_valid(hud.gust_warning):
+		failures.append("hud smoke missing gust warning label")
+		return
+	if not hud.gust_warning.visible or hud.gust_warning.text != "하네스 메시지":
+		failures.append("hud smoke show_message did not update warning label")
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:
