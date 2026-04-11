@@ -16,6 +16,9 @@ const DEBUG_CANNON_FIRE_LOGS := false
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
 @export_range(0.05, 0.8) var target_scan_interval: float = 0.12
 @export_range(1.0, 6.0) var target_tracking_scan_multiplier: float = 3.0
+@export_range(0.0, 8.0, 0.1) var base_inaccuracy_deg: float = 1.0
+@export_range(0.0, 8.0, 0.1) var moving_target_inaccuracy_deg: float = 2.2
+@export_range(0.1, 1.0, 0.05) var prediction_lead_factor: float = 0.72
 @export var team: String = "player" # "player" or "enemy"
 
 @onready var muzzle: Marker3D = $Muzzle
@@ -40,6 +43,7 @@ var _cached_dmg_mult: float = 1.0
 var _cached_crit_chance: float = 0.0
 var _cached_crit_multiplier: float = 1.5
 var _cached_ammo_type: String = "roundshot"
+var _cached_projectile_speed: float = 50.0
 
 func _ready() -> void:
 	# 초기 업그레이드 적용
@@ -61,6 +65,7 @@ func _update_cached_stats() -> void:
 	_cached_dmg_mult = 1.0
 	_cached_crit_chance = 0.0
 	_cached_crit_multiplier = 1.5
+	_cached_projectile_speed = _get_projectile_speed()
 	if team != "player":
 		return
 	var upgrade_manager = _get_upgrade_manager()
@@ -380,17 +385,18 @@ func _execute_fire() -> void:
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var dist = global_position.distance_to(target_node.global_position)
 	
-	var time_to_hit = dist / 50.0 # 탄속 50.0으로 동기화 (기존 80.0 오류 수정)
+	var projectile_speed: float = _cached_projectile_speed
+	var time_to_hit = dist / maxf(projectile_speed, 1.0)
 	
-	var enemy_speed = 3.5
-	if "move_speed" in target_node: enemy_speed = target_node.move_speed
+	var enemy_speed: float = _get_ship_speed(target_node, 3.5)
 	var enemy_dir = - target_node.global_transform.basis.z
 	var enemy_velocity = enemy_dir * enemy_speed
 	
-	var predicted_pos = target_node.global_position + enemy_velocity * time_to_hit
+	var predicted_pos = target_node.global_position + enemy_velocity * time_to_hit * prediction_lead_factor
 	var fire_direction = (predicted_pos - muzzle.global_position).normalized()
 	if fire_direction.is_zero_approx():
 		fire_direction = - global_transform.basis.z
+	fire_direction = _apply_cannon_inaccuracy(fire_direction, target_node, dist)
 
 	var final_damage = 1.0
 	var ammo_type: String = _get_current_ammo_type()
@@ -458,3 +464,40 @@ func _execute_fire() -> void:
 		get_tree().root.add_child(smoke)
 		if smoke.has_method("pool_activate"):
 			smoke.pool_activate()
+
+
+func _get_projectile_speed() -> float:
+	if not cannonball_scene:
+		return 50.0
+	var projectile = cannonball_scene.instantiate()
+	if projectile == null:
+		return 50.0
+	var projectile_speed: float = float(projectile.get("speed")) if projectile.get("speed") != null else 50.0
+	if projectile is Node:
+		(projectile as Node).free()
+	return maxf(projectile_speed, 1.0)
+
+
+func _get_ship_speed(ship: Node3D, fallback: float = 0.0) -> float:
+	if not is_instance_valid(ship):
+		return fallback
+	if ship.has_method("get_current_speed_value"):
+		return float(ship.call("get_current_speed_value"))
+	if "current_speed" in ship:
+		return float(ship.get("current_speed"))
+	if "move_speed" in ship:
+		return float(ship.get("move_speed"))
+	return fallback
+
+
+func _apply_cannon_inaccuracy(base_direction: Vector3, target_node: Node3D, distance_to_target: float) -> Vector3:
+	var shooter_speed: float = _get_ship_speed(_owner_ship as Node3D, 0.0) if _owner_ship is Node3D else 0.0
+	var target_speed: float = _get_ship_speed(target_node, 0.0)
+	var movement_spread: float = clampf((shooter_speed + target_speed) / 12.0, 0.0, 1.0) * moving_target_inaccuracy_deg
+	var distance_spread: float = clampf((distance_to_target - 8.0) / 18.0, 0.0, 1.0) * 2.4
+	var total_spread: float = base_inaccuracy_deg + movement_spread + distance_spread
+	if team != "player":
+		total_spread *= 1.12
+	var yaw_error: float = deg_to_rad(randf_range(-total_spread, total_spread))
+	var scattered_direction: Vector3 = base_direction.rotated(Vector3.UP, yaw_error).normalized()
+	return scattered_direction if not scattered_direction.is_zero_approx() else base_direction
