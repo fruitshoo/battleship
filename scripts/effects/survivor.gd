@@ -2,6 +2,13 @@ extends Area3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
+const RESCUE_CALL_LINES: Array[String] = [
+	"구해줘!",
+	"여기야!",
+	"살려줘!",
+	"배로 올려줘!",
+]
 
 ## 생존자(Survivor) 시스템
 ## 적함 침몰 시 발생하며, 플레이어가 다가가면 자석처럼 끌려와 병사로 합류함
@@ -11,6 +18,11 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 @export var float_speed: float = 1.5 # 둥실거리는 속도
 @export var float_height: float = 0.2 # 둥실거리는 진폭
 @export var rotation_speed: float = 0.5 # 회전 속도
+@export_range(0.0, 2.0, 0.05) var waterline_offset: float = 0.35
+@export_range(0.2, 3.0, 0.05) var wave_tilt_strength: float = 0.7
+@export_range(0.5, 8.0, 0.1) var rescue_call_interval_min: float = 2.6
+@export_range(0.5, 10.0, 0.1) var rescue_call_interval_max: float = 5.2
+@export_range(0.4, 4.0, 0.1) var rescue_call_duration: float = 1.5
 
 var target_player: Node3D = null
 var current_magnet_speed: float = 0.0
@@ -20,10 +32,15 @@ var is_collected: bool = false
 var _cached_ocean: Node = null
 var _cached_um: Node = null
 var _cached_wave_height: float = 0.0
+var _cached_wave_tilt := Vector2.ZERO
 var _wave_sample_timer: float = 0.0
 @export_range(0.03, 0.3) var wave_sample_interval: float = 0.1
 @export_range(0.05, 0.5) var player_search_interval: float = 0.2
 var _player_search_timer: float = 0.0
+var _rescue_call_timer: float = 0.0
+var _rescue_call_visible_timer: float = 0.0
+var _rescue_call_label: Label3D = null
+var _float_phase: float = 0.0
 
 @onready var visual = $MeshInstance3D if has_node("MeshInstance3D") else self
 
@@ -48,9 +65,12 @@ func pool_reset() -> void:
 	target_player = null
 	current_magnet_speed = 0.0
 	_player_search_timer = randf_range(0.0, player_search_interval)
+	_rescue_call_timer = randf_range(0.4, rescue_call_interval_max)
+	_rescue_call_visible_timer = 0.0
+	_hide_rescue_call()
+	_float_phase = randf_range(0.0, TAU)
 	
-	base_y = global_position.y
-	if base_y < 0.2: base_y = 0.5
+	base_y = maxf(global_position.y, waterline_offset)
 	
 	# 파란색 캡슐 이미지 설정 (병사 캐릭터와 동일하게)
 	if visual and visual is MeshInstance3D:
@@ -73,6 +93,7 @@ func pool_reset() -> void:
 	_cached_ocean = get_tree().get_first_node_in_group("ocean")
 	_cached_um = get_node_or_null("/root/UpgradeManager")
 	_player_search_timer = randf_range(0.0, player_search_interval)
+	_ensure_rescue_call_label()
 
 
 @export var lifetime: float = 90.0 # 소멸 시간 (초, 생존자는 조금 더 길게)
@@ -84,6 +105,7 @@ func _physics_process(delta: float) -> void:
 	time_alive += delta
 	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
 	_player_search_timer = maxf(0.0, _player_search_timer - delta)
+	_update_rescue_call(delta)
 	
 	if not is_expiring and time_alive > lifetime:
 		_expire_and_free()
@@ -108,8 +130,11 @@ func _physics_process(delta: float) -> void:
 			ship_speed_bonus = maxf(0.0, NodeContractHelper.get_current_speed_value(target_player)) * 0.75
 			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (16.0 / max(dist, 0.8))
 			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 24.0 * delta)
-			var direction: Vector3 = (target_player.global_position - global_position).normalized()
+			var direction: Vector3 = target_player.global_position - global_position
+			direction.y = 0.0
+			direction = direction.normalized() if direction.length_squared() > 0.001 else Vector3.ZERO
 			global_position += direction * current_magnet_speed * delta
+			_apply_floating(delta)
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
 			if dist < 3.0:
@@ -126,12 +151,14 @@ func _physics_process(delta: float) -> void:
 func _expire_and_free() -> void:
 	is_expiring = true
 	is_collected = true # 획득 방지
+	_hide_rescue_call()
 	var tween = create_tween().set_parallel(true)
 	# 천천히 가라앉으며 사라짐 (깜빡임 대신)
 	tween.tween_property(self , "position:y", position.y - 2.0, 4.0)
 	if visual:
 		tween.tween_property(visual, "scale", Vector3.ZERO, 4.0)
-	tween.chain().tween_callback(func(): ScenePool.release(self))
+	var self_id: int = get_instance_id()
+	tween.chain().tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 
 
 func _env_flag_enabled(name: String) -> bool:
@@ -140,20 +167,98 @@ func _env_flag_enabled(name: String) -> bool:
 
 
 func _apply_floating(delta: float) -> void:
-	var target_y = base_y + sin(time_alive * float_speed) * float_height
+	var bob := sin((time_alive * float_speed) + _float_phase) * float_height
+	var target_y = waterline_offset + bob
 	
 	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
 		if _wave_sample_timer <= 0.0:
-			_cached_wave_height = _cached_ocean.get_wave_height(global_position)
+			_sample_ocean_surface()
 			_wave_sample_timer = wave_sample_interval
 		target_y += _cached_wave_height
+	else:
+		target_y = base_y + bob
 		
-	# lerp를 사용하여 부드럽게 파도와 기본 높이를 따라감
+	# 수면을 살짝 늦게 따라가야 물 위에 떠 있는 느낌이 난다.
 	position.y = lerp(position.y, target_y, 4.0 * delta)
 	
 	if visual:
 		visual.rotation.y += rotation_speed * delta
-		visual.rotation.z = sin(time_alive * float_speed * 1.2) * 0.15
+		var target_pitch: float = clampf(_cached_wave_tilt.y * wave_tilt_strength, -0.38, 0.38)
+		var target_roll: float = clampf(-_cached_wave_tilt.x * wave_tilt_strength, -0.38, 0.38)
+		target_pitch += sin((time_alive * float_speed * 1.7) + _float_phase) * 0.08
+		target_roll += sin((time_alive * float_speed * 1.2) + _float_phase * 0.7) * 0.12
+		visual.rotation.x = lerp_angle(visual.rotation.x, target_pitch, 5.0 * delta)
+		visual.rotation.z = lerp_angle(visual.rotation.z, target_roll, 5.0 * delta)
+
+
+func _sample_ocean_surface() -> void:
+	if not is_instance_valid(_cached_ocean) or not _cached_ocean.has_method("get_wave_height"):
+		_cached_wave_height = 0.0
+		_cached_wave_tilt = Vector2.ZERO
+		return
+	var center := global_position
+	var sample_distance := 0.85
+	var center_height: float = float(_cached_ocean.get_wave_height(center))
+	var right_height: float = float(_cached_ocean.get_wave_height(center + Vector3(sample_distance, 0.0, 0.0)))
+	var forward_height: float = float(_cached_ocean.get_wave_height(center + Vector3(0.0, 0.0, sample_distance)))
+	_cached_wave_height = center_height
+	_cached_wave_tilt = Vector2(
+		(right_height - center_height) / sample_distance,
+		(forward_height - center_height) / sample_distance
+	)
+
+
+func _ensure_rescue_call_label() -> Label3D:
+	if is_instance_valid(_rescue_call_label):
+		return _rescue_call_label
+	_rescue_call_label = get_node_or_null(RESCUE_CALL_LABEL_NAME) as Label3D
+	if _rescue_call_label != null:
+		return _rescue_call_label
+	_rescue_call_label = Label3D.new()
+	_rescue_call_label.name = RESCUE_CALL_LABEL_NAME
+	_rescue_call_label.position = Vector3(0.0, 1.25, 0.0)
+	_rescue_call_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_rescue_call_label.font_size = 24
+	_rescue_call_label.outline_size = 6
+	_rescue_call_label.modulate = Color(0.96, 1.0, 0.72, 0.0)
+	_rescue_call_label.extra_cull_margin = 8.0
+	_rescue_call_label.visible = false
+	add_child(_rescue_call_label)
+	return _rescue_call_label
+
+
+func _update_rescue_call(delta: float) -> void:
+	if is_collected or is_expiring:
+		_hide_rescue_call()
+		return
+	var label := _ensure_rescue_call_label()
+	if label == null:
+		return
+	if _rescue_call_visible_timer > 0.0:
+		_rescue_call_visible_timer = maxf(0.0, _rescue_call_visible_timer - delta)
+		var fade_in: float = clampf((rescue_call_duration - _rescue_call_visible_timer) / 0.22, 0.0, 1.0)
+		var fade_out: float = clampf(_rescue_call_visible_timer / 0.35, 0.0, 1.0)
+		var alpha: float = minf(fade_in, fade_out)
+		label.visible = alpha > 0.03
+		label.modulate = Color(0.96, 1.0, 0.72, alpha)
+		label.position.y = 1.25 + (1.0 - alpha) * 0.12 + sin(time_alive * 3.1) * 0.025
+		return
+
+	_hide_rescue_call()
+	_rescue_call_timer -= delta
+	if _rescue_call_timer > 0.0:
+		return
+	_rescue_call_timer = randf_range(rescue_call_interval_min, rescue_call_interval_max)
+	_rescue_call_visible_timer = rescue_call_duration
+	label.text = RESCUE_CALL_LINES.pick_random()
+	label.visible = true
+	label.modulate = Color(0.96, 1.0, 0.72, 0.0)
+
+
+func _hide_rescue_call() -> void:
+	if is_instance_valid(_rescue_call_label):
+		_rescue_call_label.visible = false
+		_rescue_call_label.modulate = Color(0.96, 1.0, 0.72, 0.0)
 
 
 func _find_target_player() -> void:
@@ -226,11 +331,11 @@ func _try_collect(player_ship: Node3D) -> void:
 	
 	# 플레이어 배에 병사 추가 시도
 	if player_ship and player_ship.has_method("add_survivor"):
-		if player_ship.add_survivor():
+		if player_ship.add_survivor(true):
 			is_collected = true
 			
 			# 생존자 구조 시에도 체력 소폭 회복 로직 추가
-			if "hull_hp" in player_ship and "max_hull_hp" in player_ship:
+			if "hull_hp" in player_ship and "max_hull_hp" in player_ship and _can_apply_hull_rescue_heal(player_ship):
 				var um = get_node_or_null("/root/UpgradeManager")
 				var heal_amount: float = 5.0
 				var stamina_recover: float = 0.0
@@ -258,12 +363,24 @@ func _try_collect(player_ship: Node3D) -> void:
 
 
 func _finish_collection() -> void:
+	_hide_rescue_call()
 	# 획득 시 사라지는 연출
 	if visual:
 		var tween = create_tween()
 		tween.set_parallel(true)
 		tween.tween_property(visual, "scale", Vector3.ZERO, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 		tween.tween_property(visual, "position:y", position.y + 2.0, 0.3)
-		tween.chain().tween_callback(func(): ScenePool.release(self))
+		var self_id: int = get_instance_id()
+		tween.chain().tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 	else:
 		ScenePool.release(self)
+
+
+func _can_apply_hull_rescue_heal(player_ship: Node) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	if player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true:
+		return false
+	if player_ship.get("deck_hostile_boarder_count") != null and int(player_ship.get("deck_hostile_boarder_count")) > 0:
+		return false
+	return true

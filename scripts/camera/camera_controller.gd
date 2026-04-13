@@ -1,4 +1,5 @@
 extends Camera3D
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 ## 3rd Person Camera Controller
 ## 타겟(배)을 부드럽게 따라다니며 줌/회전 기능 제공
@@ -24,6 +25,13 @@ extends Camera3D
 @export_range(0.0, 10.0) var fog_begin_zoom_multiplier: float = 2.2
 @export_range(0.0, 12.0) var fog_end_zoom_multiplier: float = 6.0
 
+@export_group("Sail Occlusion Fade")
+@export var sail_occlusion_fade_enabled: bool = true
+@export_range(0.4, 1.0, 0.01) var sail_occlusion_alpha: float = 0.72
+@export_range(0.02, 0.4, 0.01) var sail_occlusion_update_interval: float = 0.08
+@export_range(0.0, 80.0, 1.0) var sail_occlusion_screen_padding: float = 28.0
+@export_range(6.0, 60.0, 1.0) var sail_occlusion_world_distance: float = 34.0
+
 var target: Node3D = null
 var current_zoom: float = 0.0
 var target_zoom: float = 0.0
@@ -35,6 +43,7 @@ var shake_timer: float = 0.0
 var shake_duration: float = 0.0
 var _last_zoom: float = -1.0 # 마지막으로 포그가 업데이트된 줌 레벨
 var audio_listener: AudioListener3D
+var _sail_occlusion_update_left: float = 0.0
 
 func _ready() -> void:
 	if target_path:
@@ -108,6 +117,7 @@ func _physics_process(delta: float) -> void:
 	
 	# 5. 동적 포그 조절 (줌에 따라 안개 거리 조정)
 	_update_dynamic_fog()
+	_update_sail_occlusion_fade(delta)
 	
 	# 오디오 리스너 위치 고정 (카메라 줌에 상관없이 타겟 근처 유지하되, 약간의 거리감 허용)
 	if is_instance_valid(audio_listener):
@@ -128,6 +138,171 @@ func _physics_process(delta: float) -> void:
 			randf_range(-1.0, 1.0)
 		) * shake_intensity * damping
 		global_position += shake_offset
+
+func _update_sail_occlusion_fade(delta: float) -> void:
+	if not sail_occlusion_fade_enabled:
+		_reset_all_sail_occlusion_fades()
+		return
+	_sail_occlusion_update_left -= delta
+	if _sail_occlusion_update_left > 0.0:
+		return
+	_sail_occlusion_update_left = sail_occlusion_update_interval
+
+	var ships: Array = EntityRegistry.get_ships()
+	if ships.size() <= 1:
+		_reset_all_sail_occlusion_fades(ships)
+		return
+
+	var faded_mast_ids: Dictionary = {}
+	for ship_variant in ships:
+		var ship: Node3D = ship_variant as Node3D
+		if not _is_sail_occlusion_ship_valid(ship):
+			continue
+		var masts: Array = _get_ship_masts(ship)
+		for mast_variant in masts:
+			var mast: Node3D = mast_variant as Node3D
+			if not is_instance_valid(mast):
+				continue
+			var sail_rect: Rect2 = _get_mast_sail_screen_rect(mast)
+			if sail_rect.size == Vector2.ZERO:
+				continue
+			var sail_cam_dist: float = _get_mast_sail_nearest_camera_distance_squared(mast)
+			for other_variant in ships:
+				var other_ship: Node3D = other_variant as Node3D
+				if other_ship == ship or not _is_sail_occlusion_ship_valid(other_ship):
+					continue
+				if ship.global_position.distance_to(other_ship.global_position) > sail_occlusion_world_distance:
+					continue
+				if _does_sail_cover_ship_points(sail_rect, sail_cam_dist, other_ship):
+					faded_mast_ids[mast.get_instance_id()] = true
+					break
+
+	for ship_variant in ships:
+		var ship: Node3D = ship_variant as Node3D
+		if not is_instance_valid(ship):
+			continue
+		for mast_variant in _get_ship_masts(ship):
+			var mast: Node3D = mast_variant as Node3D
+			if not is_instance_valid(mast) or not mast.has_method("set_sail_view_fade_alpha"):
+				continue
+			var alpha: float = sail_occlusion_alpha if faded_mast_ids.has(mast.get_instance_id()) else 1.0
+			mast.call("set_sail_view_fade_alpha", alpha)
+
+func _reset_all_sail_occlusion_fades(ships: Array = []) -> void:
+	var target_ships: Array = ships if not ships.is_empty() else EntityRegistry.get_ships()
+	for ship_variant in target_ships:
+		var ship: Node3D = ship_variant as Node3D
+		if not is_instance_valid(ship):
+			continue
+		for mast_variant in _get_ship_masts(ship):
+			var mast: Node3D = mast_variant as Node3D
+			if is_instance_valid(mast) and mast.has_method("set_sail_view_fade_alpha"):
+				mast.call("set_sail_view_fade_alpha", 1.0)
+
+func _is_sail_occlusion_ship_valid(ship: Node3D) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.get("is_sinking") == true or ship.get("is_dying") == true:
+		return false
+	if is_position_behind(ship.global_position):
+		return false
+	return true
+
+func _get_ship_masts(ship: Node3D) -> Array:
+	if not is_instance_valid(ship):
+		return []
+	var raw_masts: Variant = ship.get("masts")
+	if raw_masts is Array:
+		return raw_masts as Array
+	return []
+
+func _get_ship_occlusion_focus(ship: Node3D) -> Vector3:
+	var deck_height: float = 1.2
+	if ship.get("deck_height") != null:
+		deck_height = maxf(float(ship.get("deck_height")) + 0.8, 1.2)
+	return ship.global_position + Vector3(0.0, deck_height, 0.0)
+
+func _does_sail_cover_ship_points(sail_rect: Rect2, sail_cam_dist: float, ship: Node3D) -> bool:
+	var covered_points := 0
+	for focus_point in _get_ship_occlusion_points(ship):
+		if is_position_behind(focus_point):
+			continue
+		if global_position.distance_squared_to(focus_point) <= sail_cam_dist + 0.25:
+			continue
+		if sail_rect.has_point(unproject_position(focus_point)):
+			covered_points += 1
+			if covered_points >= 2:
+				return true
+	return false
+
+func _get_ship_occlusion_points(ship: Node3D) -> Array[Vector3]:
+	var center: Vector3 = _get_ship_occlusion_focus(ship)
+	var half_extents := Vector2(2.0, 4.0)
+	if ship.has_method("get_collision_half_extents"):
+		var raw_extents: Variant = ship.call("get_collision_half_extents")
+		if raw_extents is Vector2:
+			half_extents = raw_extents as Vector2
+	var right: Vector3 = ship.global_basis.x.normalized()
+	var forward: Vector3 = -ship.global_basis.z.normalized()
+	var half_width: float = maxf(half_extents.x, 1.6)
+	var half_length: float = maxf(half_extents.y, 2.8)
+	return [
+		center,
+		center + forward * half_length,
+		center - forward * half_length,
+		center + right * half_width,
+		center - right * half_width,
+		center + forward * half_length + right * half_width,
+		center + forward * half_length - right * half_width,
+		center - forward * half_length + right * half_width,
+		center - forward * half_length - right * half_width,
+	]
+
+func _get_mast_sail_nearest_camera_distance_squared(mast: Node3D) -> float:
+	var sail_mesh: MeshInstance3D = mast.get_node_or_null("SailVisual/SailMesh") as MeshInstance3D
+	if not is_instance_valid(sail_mesh) or sail_mesh.mesh == null:
+		return global_position.distance_squared_to(mast.global_position + Vector3(0.0, 4.0, 0.0))
+	var min_dist: float = INF
+	for local_corner in _aabb_corners(sail_mesh.mesh.get_aabb()):
+		var world_corner: Vector3 = sail_mesh.global_transform * local_corner
+		min_dist = minf(min_dist, global_position.distance_squared_to(world_corner))
+	return min_dist
+
+func _get_mast_sail_screen_rect(mast: Node3D) -> Rect2:
+	var sail_mesh: MeshInstance3D = mast.get_node_or_null("SailVisual/SailMesh") as MeshInstance3D
+	if not is_instance_valid(sail_mesh) or sail_mesh.mesh == null or not sail_mesh.visible:
+		return Rect2()
+	var local_aabb: AABB = sail_mesh.mesh.get_aabb()
+	var corners: Array[Vector3] = _aabb_corners(local_aabb)
+	var found: bool = false
+	var rect: Rect2 = Rect2()
+	for local_corner in corners:
+		var world_corner: Vector3 = sail_mesh.global_transform * local_corner
+		if is_position_behind(world_corner):
+			continue
+		var screen_point: Vector2 = unproject_position(world_corner)
+		if not found:
+			rect = Rect2(screen_point, Vector2.ZERO)
+			found = true
+		else:
+			rect = rect.expand(screen_point)
+	if not found:
+		return Rect2()
+	return rect.grow(sail_occlusion_screen_padding)
+
+func _aabb_corners(aabb: AABB) -> Array[Vector3]:
+	var p: Vector3 = aabb.position
+	var s: Vector3 = aabb.size
+	return [
+		p,
+		p + Vector3(s.x, 0, 0),
+		p + Vector3(0, s.y, 0),
+		p + Vector3(0, 0, s.z),
+		p + Vector3(s.x, s.y, 0),
+		p + Vector3(s.x, 0, s.z),
+		p + Vector3(0, s.y, s.z),
+		p + s,
+	]
 
 func shake(intensity: float, duration: float) -> void:
 	shake_intensity = intensity

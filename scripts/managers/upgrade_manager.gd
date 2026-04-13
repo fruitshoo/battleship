@@ -332,17 +332,41 @@ func get_next_description(upgrade_id: String) -> String:
 # === 업그레이드 적용 함수들 ===
 
 func _apply_crew_numbers(ship: Node3D, level: int) -> void:
-	var stats = UPGRADES["crew_numbers"].get("stats", {})
-	var thresholds = stats.get("specialist_levels", [1, 3, 5])
-	if level in thresholds:
-		ship.max_crew_count += 1
+	_refresh_player_crew_capacity(ship)
 
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[CrewFormation] 전열 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
+	print("[CrewFormation] 창병 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
+
+func _refresh_player_crew_capacity(ship: Node3D) -> void:
+	if not is_instance_valid(ship) or not "max_crew_count" in ship:
+		return
+	var base_capacity: int = int(ship.get_meta("base_player_max_crew_count", ship.max_crew_count))
+	if not ship.has_meta("base_player_max_crew_count"):
+		ship.set_meta("base_player_max_crew_count", base_capacity)
+	var capacity_bonus := 0
+	for upgrade_id in ["crew_numbers", "singigeon", "fire_pot", "repeating_crossbow"]:
+		var stats: Dictionary = UPGRADES.get(upgrade_id, {}).get("stats", {})
+		var thresholds: Array = stats.get("specialist_levels", [])
+		var level: int = int(current_levels.get(upgrade_id, 0))
+		for threshold in thresholds:
+			if level >= int(threshold):
+				capacity_bonus += 1
+	ship.max_crew_count = max(1, base_capacity + capacity_bonus)
 
 func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 	var stats: Dictionary = UPGRADES["crew_reserve"].get("stats", {})
+	var recovery_delay: float = maxf(
+		float(stats.get("min_incapacitated_recovery_delay", 7.0)),
+		16.0 - (float(level) * float(stats.get("incapacitated_recovery_reduce_per_lv", 1.8)))
+	)
+	var recovery_health_ratio: float = clampf(
+		0.35 + (float(level) * float(stats.get("incapacitated_recovery_health_add_per_lv", 0.08))),
+		0.35,
+		float(stats.get("max_incapacitated_recovery_health_ratio", 0.75))
+	)
+	ship.set_meta("incapacitated_recovery_delay", recovery_delay)
+	ship.set_meta("incapacitated_recovery_health_ratio", recovery_health_ratio)
 	if "crew_respawn_interval" in ship:
 		var base_interval: float = float(ship.get_meta("base_crew_respawn_interval", ship.crew_respawn_interval))
 		if not ship.has_meta("base_crew_respawn_interval"):
@@ -354,11 +378,25 @@ func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 		ship.crew_respawn_timer = minf(float(ship.crew_respawn_timer), float(ship.crew_respawn_interval))
 	ship.set_meta("survivor_hull_heal_bonus", float(stats.get("survivor_hull_heal_per_lv", 0.5)) * float(level))
 	if _level_matches(level, stats.get("instant_restore_levels", [])) and ship.has_method("get_alive_crew_count") and "max_crew_count" in ship:
-		if int(ship.call("get_alive_crew_count")) < int(ship.max_crew_count) and ship.has_method("add_survivor"):
+		var recovered_count := _recover_incapacitated_player_soldiers(ship)
+		if recovered_count <= 0 and int(ship.call("get_alive_crew_count")) < int(ship.max_crew_count) and ship.has_method("add_survivor"):
 			ship.add_survivor()
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[CrewReserve] 예비 병력 Lv.%d (보충 %.1fs)" % [level, float(ship.get("crew_respawn_interval")) if ship.get("crew_respawn_interval") != null else 0.0])
+	print("[CrewReserve] 생존 Lv.%d (전투불능 회복 %.1fs, 회복 %.0f%%)" % [level, recovery_delay, recovery_health_ratio * 100.0])
+
+func _recover_incapacitated_player_soldiers(ship: Node3D) -> int:
+	var recovered_count := 0
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
+			continue
+		if soldier.has_method("is_incapacitated_soldier") and soldier.is_incapacitated_soldier():
+			if soldier.has_method("heal_full"):
+				soldier.heal_full()
+				recovered_count += 1
+	return recovered_count
 
 func _apply_boarding_resist(ship: Node3D, level: int) -> void:
 	var stats: Dictionary = UPGRADES["boarding_resist"].get("stats", {})
@@ -368,7 +406,7 @@ func _apply_boarding_resist(ship: Node3D, level: int) -> void:
 	ship.set_meta("boarding_capture_duration_multiplier", 1.0 + duration_bonus)
 	ship.set_meta("boarding_capture_damage_reduction", clampf(capture_damage_reduction, 0.0, 0.75))
 	ship.set_meta("boarding_fire_damage_reduction", clampf(boarding_fire_reduction, 0.0, 0.75))
-	print("[BoardingResist] 갑판 방어 Lv.%d (장악 %.0f%% 지연)" % [level, duration_bonus * 100.0])
+	print("[BoardingResist] 방책 Lv.%d (장악 %.0f%% 지연)" % [level, duration_bonus * 100.0])
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
 	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")
@@ -378,14 +416,14 @@ func _apply_crew_attack(ship: Node3D, _level: int) -> void:
 	var attack_lv = current_levels.get("crew_attack", 0)
 	for sol in soldiers:
 		_apply_current_stats_to_soldier(sol)
-	print("[Crew Attack] 병사 공격력 Lv.%d 완료!" % attack_lv)
+	print("[Crew Attack] 무기 Lv.%d 완료!" % attack_lv)
 
 func _apply_crew_defense(ship: Node3D, _level: int) -> void:
 	var soldiers = _get_player_soldiers(ship)
 	var defense_lv = current_levels.get("crew_defense", 0)
 	for sol in soldiers:
 		_apply_current_stats_to_soldier(sol)
-	print("[Crew Defense] 병사 방어력 Lv.%d 완료!" % defense_lv)
+	print("[Crew Defense] 갑옷 Lv.%d 완료!" % defense_lv)
 
 func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var attack_lv = int(current_levels.get("crew_attack", 0))
@@ -394,12 +432,16 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var defense_stats: Dictionary = UPGRADES["crew_defense"]["stats"]
 	var attack_flat_bonus: float = attack_lv * float(attack_stats.get("attack_add_per_lv", 2.0))
 	var defense_flat_bonus: float = defense_lv * float(defense_stats.get("defense_add_per_lv", 1.0))
+	var defense_reduction: float = clampf(
+		defense_lv * float(defense_stats.get("damage_reduction_per_lv", 0.0)),
+		0.0,
+		float(defense_stats.get("max_damage_reduction", 0.22))
+	)
 	soldier.set_meta("attack_flat_bonus", attack_flat_bonus)
 	soldier.set_meta("defense_flat_bonus", defense_flat_bonus)
+	soldier.set_meta("defense_reduction", defense_reduction)
 	if soldier.has_meta("damage_multiplier"):
 		soldier.remove_meta("damage_multiplier")
-	if soldier.has_meta("defense_reduction"):
-		soldier.remove_meta("defense_reduction")
 	
 	if soldier.has_method("apply_crew_role") and "crew_role" in soldier:
 		soldier.apply_crew_role(str(soldier.crew_role))
@@ -647,14 +689,11 @@ func _apply_singigeon(ship: Node3D, level: int) -> void:
 	if is_instance_valid(launcher):
 		launcher.queue_free()
 	
-	var stats = UPGRADES["singigeon"].get("stats", {})
-	var thresholds = stats.get("specialist_levels", [1, 3, 5])
-	if level in thresholds:
-		ship.max_crew_count += 1
+	_refresh_player_crew_capacity(ship)
 		
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[Singigeon] 신기전병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
+	print("[Singigeon] 신기전 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
 
 
 func _apply_janggun(ship: Node3D, level: int) -> void:
@@ -668,27 +707,21 @@ func _apply_janggun(ship: Node3D, level: int) -> void:
 
 
 func _apply_fire_pot(ship: Node3D, level: int) -> void:
-	var stats = UPGRADES["fire_pot"].get("stats", {})
-	var thresholds = stats.get("specialist_levels", [1, 3, 5])
-	if level in thresholds:
-		ship.max_crew_count += 1
+	_refresh_player_crew_capacity(ship)
 		
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[FirePot] 화통병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
+	print("[FirePot] 화통 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
 
 
 var repeating_crossbow_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_repeating_crossbow.tscn")
 
 func _apply_repeating_crossbow(ship: Node3D, level: int) -> void:
-	var stats = UPGRADES["repeating_crossbow"].get("stats", {})
-	var thresholds = stats.get("specialist_levels", [1, 3, 5])
-	if level in thresholds:
-		ship.max_crew_count += 1
+	_refresh_player_crew_capacity(ship)
 		
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[RepeatingCrossbow] 연노병 편성 갱신! (Lv.%d, 정원: %d)" % [level, ship.max_crew_count])
+	print("[RepeatingCrossbow] 연노 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
 
 
 func _apply_supply(ship: Node3D, _level: int) -> void:
@@ -903,10 +936,22 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 		if not ship.has_meta("base_support_fleet_limit"):
 			ship.set_meta("base_support_fleet_limit", base_limit)
 		var item_bonus: int = 1 if ship.get_meta("item_choyogi_applied", false) == true else 0
-		var upgrade_bonus: int = 0
-		if level >= int(stats.get("limit_add_level", 5)):
-			upgrade_bonus = int(stats.get("limit_add", 1))
+		var upgrade_bonus: int = _get_support_fleet_limit_upgrade_bonus()
 		ship.support_fleet_limit = base_limit + item_bonus + upgrade_bonus
+
+
+func _get_support_fleet_limit_upgrade_bonus() -> int:
+	var upgrade_bonus: int = 0
+	var signal_level: int = int(current_levels.get("fleet_signal", 0))
+	var signal_stats: Dictionary = UPGRADES.get("fleet_signal", {}).get("stats", {})
+	if signal_level >= int(signal_stats.get("limit_add_level", 999)):
+		upgrade_bonus += int(signal_stats.get("limit_add", 0))
+	var crew_level: int = int(current_levels.get("fleet_crew", 0))
+	var crew_stats: Dictionary = UPGRADES.get("fleet_crew", {}).get("stats", {})
+	if not crew_stats.is_empty():
+		if crew_level >= int(crew_stats.get("limit_add_level", 5)):
+			upgrade_bonus += int(crew_stats.get("limit_add", 1))
+	return upgrade_bonus
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:

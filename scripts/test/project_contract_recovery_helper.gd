@@ -107,6 +107,8 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 	if alive_after <= alive_before:
 		failures.append("recovery survivor smoke did not add crew")
 
+	await _run_survivor_full_crew_still_joins_roster(owner, failures, smoke_root, player_ship)
+
 
 static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
 	var chest_scene := load("res://scenes/effects/treasure_chest.tscn") as PackedScene
@@ -129,6 +131,43 @@ static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smok
 		failures.append("recovery treasure smoke did not mark chest collected from expanded range")
 	if not chest.is_queued_for_deletion():
 		failures.append("recovery treasure smoke did not queue chest for deletion")
+
+
+static func _run_survivor_full_crew_still_joins_roster(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+	var survivor_scene := load("res://scenes/effects/survivor.tscn") as PackedScene
+	if survivor_scene == null:
+		failures.append("recovery survivor full crew scene load failed")
+		return
+	var survivor := survivor_scene.instantiate()
+	if survivor == null:
+		failures.append("recovery survivor full crew instantiate failed")
+		return
+	smoke_root.add_child(survivor)
+	if survivor is Node3D:
+		(survivor as Node3D).global_position = player_ship.global_position + Vector3(-2.5, 0.0, 0.0)
+	await _wait_frames(owner, 1)
+
+	var alive_before: int = 0
+	if player_ship.has_method("get_debug_crew_snapshot"):
+		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var original_max_crew_count = null
+	if player_ship.get("max_crew_count") != null:
+		original_max_crew_count = player_ship.get("max_crew_count")
+		player_ship.set("max_crew_count", alive_before)
+
+	survivor.call("_try_collect", player_ship)
+	await _wait_frames(owner, 2)
+
+	if original_max_crew_count != null:
+		player_ship.set("max_crew_count", original_max_crew_count)
+
+	var alive_after: int = alive_before
+	if player_ship.has_method("get_debug_crew_snapshot"):
+		alive_after = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	if survivor.get("is_collected") != true:
+		failures.append("recovery survivor full crew did not collect despite ignoring roster limit")
+	if alive_after <= alive_before:
+		failures.append("recovery survivor full crew did not add crew beyond roster limit")
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:

@@ -34,7 +34,10 @@ func _ready() -> void:
 	# 시그널은 한 번만 연결
 	area_entered.connect(_on_hit)
 	body_entered.connect(_on_hit)
-	pool_reset()
+	if start_pos.distance_squared_to(target_pos) > 0.1:
+		_begin_flight()
+	else:
+		pool_reset()
 
 
 func _enter_tree() -> void:
@@ -54,24 +57,46 @@ func pool_reset() -> void:
 	is_sinking = false
 	progress = 0.0
 	target_ship = null
-	
-	# 초기화 시 모니터링 다시 켜기
+	monitoring = false
+	monitorable = false
+
+
+func launch(
+	spawn_position: Vector3,
+	final_target_pos: Vector3,
+	fire_team: String,
+	final_damage: float,
+	projectile_speed: float,
+	final_janggun_lv: int
+) -> void:
+	start_pos = spawn_position
+	target_pos = final_target_pos
+	team = fire_team
+	damage = final_damage
+	speed = projectile_speed
+	janggun_lv = final_janggun_lv
+	_begin_flight()
+
+
+func _begin_flight() -> void:
+	is_stuck = false
+	is_sinking = false
+	progress = 0.0
+	target_ship = null
 	monitoring = true
 	monitorable = true
-	
-	# 수치 반영
 	_update_stats()
-	
 	global_position = start_pos
-	
+
 	var distance = start_pos.distance_to(target_pos)
 	duration = distance / speed
-	if duration < 0.7: duration = 0.7
+	if duration < 0.7:
+		duration = 0.7
 	arc_height = clamp(distance * 0.12, 1.5, 8.0)
-	
+
 	if start_pos.distance_squared_to(target_pos) > 0.1:
 		look_at(target_pos, Vector3.UP)
-	
+
 	_play_launch_vfx()
 
 func _update_stats() -> void:
@@ -183,7 +208,8 @@ func _splash_and_sink() -> void:
 	
 	var tween = create_tween()
 	tween.tween_property(self , "position:y", position.y - 2.0, 1.0)
-	tween.tween_callback(func(): ScenePool.release(self))
+	var self_id: int = get_instance_id()
+	tween.tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 
 func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트

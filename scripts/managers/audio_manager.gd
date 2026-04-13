@@ -85,6 +85,31 @@ var sfx_streams = {
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
 }
 
+const DEFAULT_3D_SFX_VOLUME_DB := 3.0
+const DEFAULT_3D_SFX_MAX_DISTANCE := 220.0
+const DEFAULT_3D_SFX_UNIT_SIZE := 55.0
+const SFX_ALIASES := {
+	"arrow_shoot": "bow_shoot",
+	"critical_hit": "soldier_hit",
+}
+const SFX_3D_PROFILES := {
+	"bow_shoot": {
+		"volume_db": -1.0,
+		"max_distance": 220.0,
+		"unit_size": 60.0,
+	},
+	"sword_swing": {
+		"volume_db": 0.5,
+		"max_distance": 220.0,
+		"unit_size": 60.0,
+	},
+	"soldier_hit": {
+		"volume_db": 1.0,
+		"max_distance": 230.0,
+		"unit_size": 65.0,
+	},
+}
+
 # 캐시된 스트림
 var _cached_streams = {}
 
@@ -107,16 +132,21 @@ var current_bgm_name: String = ""
 # 예열 완료 신호
 signal prewarm_finished
 var is_prewarm_finished: bool = false
-@export var enable_playback_warmup: bool = false
+@export var enable_playback_warmup: bool = true
 @export var mute_sfx_until_prewarm_finished: bool = true
 var _startup_sfx_muted: bool = false
 var _essential_warm_keys: Array[String] = [
 	"cannon_fire",
+	"cannon_fuse",
+	"cannon_reload",
 	"impact_wood",
 	"sword_swing",
+	"soldier_hit",
+	"bow_shoot",
 	"musket_fire",
 	"wave_splash",
-	"water_splash_large"
+	"water_splash_large",
+	"water_splash_small"
 ]
 var _web_essential_warm_keys: Array[String] = [
 	"ui_click"
@@ -137,8 +167,8 @@ func _ready() -> void:
 	for i in range(sfx_pool_size):
 		var p = AudioStreamPlayer3D.new()
 		p.name = "SFX_Player_3D_%d" % i
-		p.max_distance = 100.0
-		p.unit_size = 10.0
+		p.max_distance = DEFAULT_3D_SFX_MAX_DISTANCE
+		p.unit_size = DEFAULT_3D_SFX_UNIT_SIZE
 		p.bus = "SFX"
 		add_child(p)
 		sfx_pool.append(p)
@@ -197,16 +227,7 @@ func _preload_essential_audio() -> void:
 		for key in warm_keys:
 			if not _cached_streams.has(key):
 				continue
-			var s = _cached_streams[key]
-			if s is Array:
-				if s.size() > 0 and s[0] is AudioStream:
-					warm_up_player.stream = s[0]
-					warm_up_player.play()
-					await get_tree().process_frame
-			elif s is AudioStream:
-				warm_up_player.stream = s
-				warm_up_player.play()
-				await get_tree().process_frame
+			await _warm_playback_for_streams(warm_up_player, _cached_streams[key])
 		
 		warm_up_player.queue_free()
 
@@ -218,9 +239,22 @@ func _preload_essential_audio() -> void:
 	# 필수 사운드만 유지하고 나머지는 온디맨드 로드한다.
 	if OS.has_feature("web"):
 		return
-	
+
 	# 나머지 효과음은 백그라운드로 지연 캐싱
 	call_deferred("_preload_secondary_audio")
+
+
+func _warm_playback_for_streams(warm_up_player: AudioStreamPlayer, streams) -> void:
+	if streams is Array:
+		for stream in streams:
+			if stream is AudioStream:
+				warm_up_player.stream = stream
+				warm_up_player.play()
+				await get_tree().process_frame
+	elif streams is AudioStream:
+		warm_up_player.stream = streams
+		warm_up_player.play()
+		await get_tree().process_frame
 
 func set_startup_sfx_muted(muted: bool) -> void:
 	_startup_sfx_muted = muted
@@ -237,25 +271,26 @@ func _preload_secondary_audio() -> void:
 	print("[Resource] 보조 오디오 캐싱 완료")
 
 func _cache_stream_for_key(key: String) -> void:
-	if _cached_streams.has(key):
+	var resolved_key := _resolve_sfx_key(key)
+	if _cached_streams.has(resolved_key):
 		return
-	if not sfx_streams.has(key):
+	if not sfx_streams.has(resolved_key):
 		return
-	if OS.has_feature("web") and not _should_persist_cache(key):
+	if OS.has_feature("web") and not _should_persist_cache(resolved_key):
 		return
 		
-	var path = sfx_streams[key]
+	var path = sfx_streams[resolved_key]
 	if path is Array:
 		var loaded_arr = []
 		for p in path:
 			if p is String and ResourceLoader.exists(p):
 				loaded_arr.append(_load_audio_resource(p, true))
 		if loaded_arr.size() > 0:
-			_cached_streams[key] = loaded_arr
+			_cached_streams[resolved_key] = loaded_arr
 	elif path is String and ResourceLoader.exists(path):
-		_cached_streams[key] = _load_audio_resource(path, true)
+		_cached_streams[resolved_key] = _load_audio_resource(path, true)
 	elif path is AudioStream:
-		_cached_streams[key] = path
+		_cached_streams[resolved_key] = path
 
 func _get_warm_keys() -> Array[String]:
 	if OS.has_feature("web"):
@@ -265,7 +300,7 @@ func _get_warm_keys() -> Array[String]:
 func _should_persist_cache(key: String) -> bool:
 	if not OS.has_feature("web"):
 		return true
-	return key in _web_persistent_cache_keys
+	return _resolve_sfx_key(key) in _web_persistent_cache_keys
 
 func _load_audio_resource(path: String, persist_cache: bool) -> AudioStream:
 	if not ResourceLoader.exists(path):
@@ -276,41 +311,53 @@ func _load_audio_resource(path: String, persist_cache: bool) -> AudioStream:
 	return ResourceLoader.load(path, "", cache_mode) as AudioStream
 
 func _load_stream_for_playback(stream_name: String):
-	if _cached_streams.has(stream_name):
-		var cached = _cached_streams[stream_name]
+	var resolved_name := _resolve_sfx_key(stream_name)
+	if _cached_streams.has(resolved_name):
+		var cached = _cached_streams[resolved_name]
 		if cached is Array:
 			if cached.size() > 0:
 				return cached.pick_random()
 			return null
 		return cached
 	
-	if not sfx_streams.has(stream_name):
+	if not sfx_streams.has(resolved_name):
 		return null
 	
-	var path = sfx_streams[stream_name]
+	var path = sfx_streams[resolved_name]
 	if path is Array:
 		var loaded_arr = []
 		for p in path:
 			if p is String and ResourceLoader.exists(p):
-				loaded_arr.append(_load_audio_resource(p, _should_persist_cache(stream_name)))
+				loaded_arr.append(_load_audio_resource(p, _should_persist_cache(resolved_name)))
 		if loaded_arr.is_empty():
 			return null
-		if _should_persist_cache(stream_name):
-			_cached_streams[stream_name] = loaded_arr
+		if _should_persist_cache(resolved_name):
+			_cached_streams[resolved_name] = loaded_arr
 		return loaded_arr.pick_random()
 	
 	if path is String and ResourceLoader.exists(path):
-		var loaded_stream = _load_audio_resource(path, _should_persist_cache(stream_name))
-		if _should_persist_cache(stream_name):
-			_cached_streams[stream_name] = loaded_stream
+		var loaded_stream = _load_audio_resource(path, _should_persist_cache(resolved_name))
+		if _should_persist_cache(resolved_name):
+			_cached_streams[resolved_name] = loaded_stream
 		return loaded_stream
 	
 	if path is AudioStream:
-		if _should_persist_cache(stream_name):
-			_cached_streams[stream_name] = path
+		if _should_persist_cache(resolved_name):
+			_cached_streams[resolved_name] = path
 		return path
 	
 	return null
+
+func _resolve_sfx_key(stream_name: String) -> String:
+	return SFX_ALIASES.get(stream_name, stream_name)
+
+func _get_3d_sfx_profile(stream_name: String) -> Dictionary:
+	if SFX_3D_PROFILES.has(stream_name):
+		return SFX_3D_PROFILES[stream_name]
+	var resolved_name := _resolve_sfx_key(stream_name)
+	if SFX_3D_PROFILES.has(resolved_name):
+		return SFX_3D_PROFILES[resolved_name]
+	return {}
 
 
 ## 오디오 버스 상태 진단 로직
@@ -334,13 +381,13 @@ func _print_bus_status() -> void:
 ## 효과음 재생 (3D 위치)
 ## position이 null이면 2D로 재생
 func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
-	# 1. 리소스 확인 및 동적 로드
-	var stream = _load_stream_for_playback(stream_name)
 	if _startup_sfx_muted:
 		return
 	if not is_prewarm_finished and mute_sfx_until_prewarm_finished:
-		# 시작 예열 중에는 실제 재생만 막고 캐시는 유지한다.
+		# 시작 예열 중에는 온디맨드 로드도 막아 첫 전투 프레임 끊김을 피한다.
 		return
+	# 1. 리소스 확인 및 동적 로드
+	var stream = _load_stream_for_playback(stream_name)
 	
 	# 2. 리소스가 없으면 디버그용 비프음 재생 (선택사항)
 	if not stream:
@@ -350,11 +397,14 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 
 	if position != null:
 		# 3D 재생 (3D Player Pool 사용)
+		var profile := _get_3d_sfx_profile(stream_name)
 		var player = sfx_pool[current_sfx_index]
 		player.stream = stream
 		player.global_position = position
 		player.pitch_scale = pitch_scale + randf_range(-0.1, 0.1) # 약간의 피치 변동으로 자연스럽게
-		player.volume_db = volume_db
+		player.volume_db = volume_db + DEFAULT_3D_SFX_VOLUME_DB + float(profile.get("volume_db", 0.0))
+		player.max_distance = float(profile.get("max_distance", DEFAULT_3D_SFX_MAX_DISTANCE))
+		player.unit_size = float(profile.get("unit_size", DEFAULT_3D_SFX_UNIT_SIZE))
 		player.play()
 		
 		# 인덱스 순환

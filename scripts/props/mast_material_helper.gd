@@ -27,6 +27,7 @@ static func ensure_sail_material(mast: Node3D, mesh: MeshInstance3D) -> ShaderMa
 		return null
 	var instance_mat: ShaderMaterial = source_mat.duplicate() as ShaderMaterial
 	instance_mat.set_meta("mast_owner_id", owner_id)
+	instance_mat.render_priority = 20
 	mesh.material_override = instance_mat
 	return instance_mat
 

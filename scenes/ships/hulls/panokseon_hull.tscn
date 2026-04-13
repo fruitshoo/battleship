@@ -74,3 +74,7 @@ transform = Transform3D(-8.742278e-08, 0, 2, 0, 2, 0, -2, 0, -8.742278e-08, 1.61
 transform = Transform3D(2.3841858e-07, 0, -2, 0, 2, 0, 2, 0, 2.3841858e-07, -1.6565331, 0.90132594, 2.2324524)
 
 [node name="Mast" parent="." unique_id=1732171799 instance=ExtResource("mast_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8453069)
+
+[node name="Mast2" parent="." unique_id=1786866091 instance=ExtResource("mast_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.8253379)

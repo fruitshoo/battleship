@@ -28,6 +28,7 @@ const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_shi
 
 @export var rudder_speed: float = 120.0 # 러더 회전 속도 (60 -> 120 상향)
 @export var rudder_return_speed: float = 80.0 # 러더 자동 복귀 속도 (40 -> 80 상향)
+@export_range(0.5, 3.0, 0.05) var player_rudder_turn_authority: float = 1.35 # 플레이어 러더 회전 반응 보정
 # === 둥실둥실 효과 및 육분의 ===
 
 @export var rudder_turn_speed: float = 120.0 # Seamanship에 의해 강화됨
@@ -64,6 +65,14 @@ var rowing_locked: bool = false
 var support_fleet_respawn_timer: float = 0.0
 @export_enum("roundshot", "chainshot", "grapeshot") var current_cannon_ammo: String = "roundshot"
 
+@export_group("Post Combat Cleanup")
+@export var corpse_cleanup_enabled: bool = true
+@export_range(0.5, 12.0, 0.25) var corpse_cleanup_delay: float = 3.0
+@export_range(0.5, 8.0, 0.25) var corpse_cleanup_interval: float = 2.25
+@export_range(0.2, 2.0, 0.05) var corpse_cleanup_throw_duration: float = 0.65
+var corpse_cleanup_timer: float = 0.0
+var corpse_cleanup_peace_timer: float = 0.0
+
 @onready var ship_audio: AudioStreamPlayer3D = $ShipAudio
 
 var _cached_um: Node = null
@@ -93,7 +102,6 @@ static func _get_ships_cached(tree: SceneTree) -> Array:
 
 # === 병사 자동 보충 ===
 @export var crew_respawn_interval: float = 12.0 # 보충 주기 (초)
-@export_range(1, 20, 1) var survivor_merit_reward: int = 5
 var crew_respawn_timer: float = 0.0
 
 # === 자동 공세 월선 (보수적 전술 판단) ===
@@ -166,6 +174,8 @@ func _ready() -> void:
 			if meta_manager.has_method("get_hull_defense_bonus"): hull_defense = meta_manager.get_hull_defense_bonus()
 			if meta_manager.has_method("get_max_crew_bonus"): max_crew_count += int(meta_manager.get_max_crew_bonus())
 		print("[Ship] 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f, 병사 정원: %d)" % [max_hull_hp, max_speed, hull_defense, max_crew_count])
+	if not has_meta("base_player_max_crew_count"):
+		set_meta("base_player_max_crew_count", max_crew_count)
 	
 	
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
@@ -197,7 +207,8 @@ func _cache_references() -> void:
 		_cached_hud = _cached_level_manager.hud
 		
 	_cached_um = get_tree().root.find_child("UpgradeManager", true, false)
-	if is_player_controlled and is_instance_valid(_cached_um) and not _probe_flag_enabled("BATTLESHIP_SKIP_PLAYER_UPGRADE_BOOTSTRAP"):
+	var direct_upgrade_bootstrap_enabled: bool = _probe_flag_enabled("BATTLESHIP_ENABLE_PLAYER_UPGRADE_BOOTSTRAP")
+	if is_player_controlled and is_instance_valid(_cached_um) and direct_upgrade_bootstrap_enabled and not _probe_flag_enabled("BATTLESHIP_SKIP_PLAYER_UPGRADE_BOOTSTRAP"):
 		if _cached_um.has_method("equip_owned_items"):
 			_cached_um.call_deferred("equip_owned_items")
 		if _cached_um.has_method("refresh_hud_item_icons"):
@@ -258,6 +269,7 @@ func _physics_process(delta: float) -> void:
 	_update_crew_respawn(delta)
 	_update_auto_boarding_raid(delta)
 	_update_fire_pot_logic(delta)
+	_update_corpse_cleanup(delta)
 	
 	if is_boarding:
 		_process_boarding_common(delta)
@@ -312,19 +324,16 @@ func _update_crew_respawn(delta: float) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node: return
 	
-	# 현재 살아있는 아군 병사 수 체크
-	var alive_count = 0
-	for child in soldiers_node.get_children():
-		if child.get("current_state") != 4 and child.get("team") == "player": # 4 = DEAD
-			alive_count += 1
+	# 전투불능 병사는 정원을 차지하므로 자동 보충으로 대체하지 않는다.
+	var roster_count: int = PlayerShipCrewHelper.get_player_roster_count(self)
 			
-	if alive_count < max_crew_count:
+	if roster_count < max_crew_count:
 		crew_respawn_timer += delta
 		if crew_respawn_timer >= crew_respawn_interval:
 			crew_respawn_timer = 0.0
-			add_survivor() # 기존의 add_survivor 로직 재사용 (HUD 메시지 포함됨)
-			_sync_player_crew_roster()
-			print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [alive_count + 1, max_crew_count])
+			if add_survivor(): # 기존의 add_survivor 로직 재사용 (HUD 메시지 포함됨)
+				_sync_player_crew_roster()
+				print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [roster_count + 1, max_crew_count])
 	else:
 		crew_respawn_timer = 0.0 # 정원이 차면 타이머 초기화
 
@@ -346,6 +355,178 @@ func _has_nearby_enemy_pressure_for_respawn() -> bool:
 		if planar_delta.length_squared() <= pressure_range_sq:
 			return true
 	return false
+
+func _update_corpse_cleanup(delta: float) -> void:
+	if not corpse_cleanup_enabled:
+		return
+	if not _can_run_corpse_cleanup():
+		corpse_cleanup_peace_timer = 0.0
+		corpse_cleanup_timer = 0.0
+		return
+
+	corpse_cleanup_peace_timer += delta
+	if corpse_cleanup_peace_timer < corpse_cleanup_delay:
+		return
+
+	corpse_cleanup_timer -= delta
+	if corpse_cleanup_timer > 0.0:
+		return
+	corpse_cleanup_timer = corpse_cleanup_interval
+	_try_cleanup_enemy_corpse()
+
+
+func _can_run_corpse_cleanup() -> bool:
+	if is_sinking or is_dying or is_derelict:
+		return false
+	if deck_is_contested or deck_is_overrun:
+		return false
+	if is_boarding:
+		return false
+	if _has_nearby_enemy_pressure_for_respawn():
+		return false
+	return true
+
+
+func _try_cleanup_enemy_corpse() -> void:
+	var corpse: Node3D = _find_cleanup_enemy_corpse()
+	if not is_instance_valid(corpse):
+		return
+	var cleaner: Node3D = _find_corpse_cleanup_actor(corpse)
+	if not is_instance_valid(cleaner):
+		return
+
+	corpse.set_meta("corpse_cleanup_in_progress", true)
+	cleaner.set_meta("corpse_cleanup_busy", true)
+	_prepare_cleaner_for_corpse_cleanup(cleaner, corpse)
+	_throw_corpse_overboard(cleaner, corpse)
+
+
+func _find_cleanup_enemy_corpse() -> Node3D:
+	for soldier in EntityRegistry.get_soldiers_by_ship(self):
+		if not is_instance_valid(soldier) or not (soldier is Node3D):
+			continue
+		if soldier.get_meta("corpse_cleanup_in_progress", false) == true:
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != "enemy":
+			continue
+		if not (soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier()):
+			continue
+		if soldier.get_meta("incapacitated", false) == true:
+			continue
+		return soldier as Node3D
+	return null
+
+
+func _find_corpse_cleanup_actor(corpse: Node3D) -> Node3D:
+	var best: Node3D = null
+	var best_distance_sq: float = INF
+	for soldier in EntityRegistry.get_soldiers_by_ship(self):
+		if not is_instance_valid(soldier) or not (soldier is Node3D):
+			continue
+		if soldier.get_meta("corpse_cleanup_busy", false) == true:
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != "player":
+			continue
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+			continue
+		var soldier_node := soldier as Node3D
+		var distance_sq: float = soldier_node.global_position.distance_squared_to(corpse.global_position)
+		if distance_sq < best_distance_sq:
+			best_distance_sq = distance_sq
+			best = soldier_node
+	return best
+
+
+func _prepare_cleaner_for_corpse_cleanup(cleaner: Node3D, corpse: Node3D) -> void:
+	if "current_target" in cleaner:
+		cleaner.set("current_target", null)
+	if "attack_timer" in cleaner:
+		cleaner.set("attack_timer", maxf(float(cleaner.get("attack_timer")), corpse_cleanup_throw_duration + 0.5))
+	if "velocity" in cleaner:
+		cleaner.set("velocity", Vector3.ZERO)
+	if cleaner.has_method("_change_state"):
+		cleaner.call("_change_state", 0)
+	var look_target := Vector3(corpse.global_position.x, cleaner.global_position.y, corpse.global_position.z)
+	if not cleaner.global_position.is_equal_approx(look_target):
+		cleaner.look_at(look_target, Vector3.UP)
+
+
+func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
+	var throw_target: Vector3 = _get_corpse_cleanup_throw_target(corpse)
+	var corpse_id: int = corpse.get_instance_id()
+	var cleaner_id: int = cleaner.get_instance_id()
+	var start_position: Vector3 = corpse.global_position
+	var start_rotation: Vector3 = corpse.rotation
+	var arc_control: Vector3 = start_position.lerp(throw_target, 0.52)
+	arc_control.y = maxf(start_position.y, throw_target.y) + randf_range(1.85, 2.45)
+	var spin_rotation: Vector3 = corpse.rotation + Vector3(randf_range(1.7, 2.8), randf_range(-0.9, 0.9), randf_range(-1.8, 1.8))
+	var windup_seconds: float = 0.22
+	var throw_seconds: float = maxf(0.25, corpse_cleanup_throw_duration * randf_range(1.05, 1.18))
+
+	var tween := create_tween()
+	tween.tween_interval(windup_seconds)
+	tween.tween_method(
+		Callable(self, "_apply_corpse_cleanup_throw_arc").bind(corpse_id, start_position, arc_control, throw_target, start_rotation, spin_rotation),
+		0.0,
+		1.0,
+		throw_seconds
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.finished.connect(_finish_corpse_cleanup_throw.bind(corpse_id, cleaner_id, throw_target))
+
+
+func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, start_position: Vector3, arc_control: Vector3, throw_target: Vector3, start_rotation: Vector3, spin_rotation: Vector3) -> void:
+	var corpse := instance_from_id(corpse_id)
+	if not is_instance_valid(corpse) or not (corpse is Node3D):
+		return
+	var t: float = clampf(progress, 0.0, 1.0)
+	var eased_t: float = smoothstep(0.0, 1.0, t)
+	var arc_pos: Vector3 = start_position * ((1.0 - t) * (1.0 - t)) \
+		+ arc_control * (2.0 * (1.0 - t) * t) \
+		+ throw_target * (t * t)
+	corpse.global_position = arc_pos
+	corpse.rotation = Vector3(
+		lerp_angle(start_rotation.x, spin_rotation.x, eased_t),
+		lerp_angle(start_rotation.y, spin_rotation.y, eased_t),
+		lerp_angle(start_rotation.z, spin_rotation.z, eased_t)
+	)
+
+
+func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
+	var local_pos: Vector3 = to_local(corpse.global_position)
+	var side_sign: float = 1.0 if local_pos.x >= 0.0 else -1.0
+	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
+	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
+	local_pos.x = side_sign * (deck_half_width + randf_range(3.0, 4.2))
+	local_pos.z = clampf(local_pos.z, -deck_half_length, deck_half_length)
+	var global_target: Vector3 = to_global(local_pos)
+	global_target.y = 0.05
+	return global_target
+
+
+func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int, splash_pos: Vector3) -> void:
+	_play_corpse_cleanup_splash(splash_pos)
+	var corpse := instance_from_id(corpse_id)
+	if is_instance_valid(corpse):
+		corpse.queue_free()
+	var cleaner := instance_from_id(cleaner_id)
+	if is_instance_valid(cleaner) and cleaner.has_meta("corpse_cleanup_busy"):
+		cleaner.remove_meta("corpse_cleanup_busy")
+
+
+func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
+	if water_splash_scene:
+		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
+		if is_instance_valid(splash):
+			if splash.has_method("configure_as_small"):
+				splash.configure_as_small()
+			splash.position = Vector3(splash_pos.x, 0.05, splash_pos.z)
+			get_tree().root.add_child(splash)
+			if splash.has_method("pool_activate"):
+				splash.pool_activate()
+	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+		_cached_audio_manager.play_sfx("water_splash_small", splash_pos, randf_range(0.85, 1.15), 2.0)
 
 func _update_auto_boarding_raid(delta: float) -> void:
 	PlayerShipCrewHelper.update_auto_boarding_raid(self, delta)
@@ -502,8 +683,8 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 	PlayerShipRuntimeHelper.replenish_crew(self, soldier_scene)
 
 ## 생존자 구조 및 병사 합류 처리
-func add_survivor() -> bool:
-	return PlayerShipCrewHelper.add_survivor(self)
+func add_survivor(allow_over_capacity: bool = false) -> bool:
+	return PlayerShipCrewHelper.add_survivor(self, allow_over_capacity)
 
 ## 갑판 방어 무기 2: 화통 투척 로직 (병사가 수행)
 func _update_fire_pot_logic(delta: float) -> void:

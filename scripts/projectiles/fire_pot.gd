@@ -1,5 +1,6 @@
 extends Area3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
@@ -101,36 +102,35 @@ func _physics_process(delta: float) -> void:
 func explode() -> void:
 	if has_exploded: return
 	has_exploded = true
-	
+	var affected_target: bool = _apply_area_damage()
+
 	# 1. 폭발 이펙트 
 	if explosion_scene and VfxBudget.allow_spawn(get_tree(), "fire_pot_explosion", global_position, 3, 65.0):
 		var expl = ScenePool.acquire(get_tree(), explosion_scene)
 		expl.position = global_position
 		get_tree().root.add_child.call_deferred(expl)
 	
-	# 2. 바닥 잔여 화염 이펙트 (1.5초)
-	if fire_effect_scene and VfxBudget.allow_spawn(get_tree(), "fire_effect", global_position, 2, 55.0):
+	# 2. 바닥 잔여 화염 이펙트 (1.5초). 물에 빗나간 투척은 검은 연기를 남기지 않는다.
+	if affected_target and fire_effect_scene and VfxBudget.allow_spawn(get_tree(), "fire_effect", global_position, 2, 55.0):
 		var fire = ScenePool.acquire(get_tree(), fire_effect_scene)
 		fire.position = global_position
-		if fire is GPUParticles3D:
-			fire.emitting = true
 		get_tree().root.add_child.call_deferred(fire)
-		
+		if fire.has_method("pool_activate"):
+			fire.call_deferred("pool_activate")
+
 		var timer = get_tree().create_timer(1.5)
-		timer.timeout.connect(func(): if is_instance_valid(fire): ScenePool.release(fire))
+		var fire_id: int = fire.get_instance_id()
+		timer.timeout.connect(func(): ScenePool.release_by_instance_id(fire_id))
 	
 	# 3. 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("explosion_small", global_position, randf_range(0.9, 1.2))
 	
-	# 4. 범위 데미지 처리 (물리 질의)
-	_apply_area_damage()
-	
 	# 자신 삭제를 객체 풀 반납으로 변경
 	ScenePool.release(self)
 
-func _apply_area_damage() -> void:
+func _apply_area_damage() -> bool:
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsShapeQueryParameters3D.new()
 	var sphere = SphereShape3D.new()
@@ -139,28 +139,46 @@ func _apply_area_damage() -> void:
 	query.transform = global_transform
 	# 선박/병사/환경 기본 레이어만 대상으로 제한해 폭발 쿼리 비용을 줄인다.
 	query.collision_mask = 7
-	
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+
 	var results = space_state.intersect_shape(query)
+	var affected_target: bool = false
+	var damaged_targets: Dictionary = {}
 	for result in results:
-		var col = result.collider
-		
+		var col: Node = result.collider as Node
+		if not is_instance_valid(col):
+			continue
+
+		var ship: Node3D = HitTargetResolver.resolve_ship_from_node(col)
+		if is_instance_valid(ship):
+			var ship_team := HitTargetResolver.resolve_team_tag(ship)
+			if ship_team == team:
+				continue
+			var ship_id := ship.get_instance_id()
+			if damaged_targets.has(ship_id):
+				continue
+			damaged_targets[ship_id] = true
+			var source_id = "fire_pot" if team == "player" else ""
+			if ship.has_method("take_damage"):
+				ship.take_damage(damage * 1.5, global_position, source_id) # 배에는 데미지 1.5배
+			if ship.has_method("add_fire_buildup"):
+				ship.add_fire_buildup(30.0) # 화재 게이지 폭증
+			elif ship.has_method("apply_status_effect"):
+				ship.apply_status_effect("burn", 5.0)
+			affected_target = true
+			continue
+
 		# 같은 팀(player면 player)에게는 데미지 주지 않음
 		if NodeContractHelper.get_team_tag(col) == team:
 			continue
-			
-		# 함선(Ship) 본체에도 화통 폭발 데미지와 화재 유발 적용
-		if col.is_in_group("ship") and col.has_method("take_damage"):
-			var source_id = "fire_pot" if team == "player" else ""
-			col.take_damage(damage * 1.5, global_position, source_id) # 배에는 데미지 1.5배
-			if col.has_method("add_fire_buildup"):
-				col.add_fire_buildup(30.0) # 화재 게이지 폭증
-			elif col.has_method("apply_status_effect"):
-				col.apply_status_effect("burn", 5.0)
-				
+
 		# 적 병사(Soldier)에게 데미지
-		elif col.has_method("take_damage") and NodeContractHelper.get_team_tag(col) != team:
+		if col.has_method("take_damage") and NodeContractHelper.get_team_tag(col) != team:
 			var soldier_source = "fire_pot" if team == "player" else ""
 			col.take_damage(damage, global_position, soldier_source)
 			# 불타는 효과를 줄 수 있다면 추가
 			if col.has_method("apply_status_effect"):
 				col.apply_status_effect("burn", 3.0)
+			affected_target = true
+	return affected_target

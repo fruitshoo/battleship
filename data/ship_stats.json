@@ -61,14 +61,14 @@
 	},
 	"atakebune_mid": {
 		"name": "Mid-Boss Atakebune",
-		"hull_hp": 1170,
+		"hull_hp": 680,
 		"move_speed": 3.0,
 		"tier": 1,
 		"orbit_distance": 24.0,
 		"soldier_type": "general",
 		"crew_composition": {
-			"general": 1,
-			"melee": 1,
+			"general": 2,
+			"melee": 2,
 			"ranged": 1,
 			"fire_pot": 1
 		},

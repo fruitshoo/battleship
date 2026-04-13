@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
+source "$script_dir/harness_log_gate.sh"
 godot_bin="${GODOT_BIN:-/Applications/Godot.app/Contents/MacOS/Godot}"
 log_file="$(mktemp -t battleship_midgame_compare.XXXXXX.log)"
 timeout_seconds="${MIDGAME_COMPARE_TIMEOUT:-25}"
@@ -38,31 +39,14 @@ fi
 kill "$watcher_pid" 2>/dev/null || true
 wait "$watcher_pid" 2>/dev/null || true
 
-cat "$log_file"
+harness_print_filtered_log "$log_file"
 
 if [[ "$godot_status" -ne 0 ]]; then
 	echo "[MidgameCompare] Godot exited with status $godot_status" >&2
 	exit "$godot_status"
 fi
 
-bad_patterns=(
-	"Parse Error"
-	"Invalid call"
-	"Nonexistent"
-	"Cannot infer the type"
-	"Attempt to call function"
-	"Script error"
-	"Error calling"
-	"call to function"
-	"[MidgameCompare] timed out"
-)
-
-for pattern in "${bad_patterns[@]}"; do
-	if grep -Fq "$pattern" "$log_file"; then
-		echo "[MidgameCompare] log gate failed: $pattern" >&2
-		exit 1
-	fi
-done
+harness_check_log_gate "MidgameCompare" "$log_file" "[MidgameCompare] timed out"
 
 baseline_line="$(grep -F "[MidgameBattle] compare baseline" "$log_file" | tail -n 1 || true)"
 overlay_line="$(grep -F "[MidgameBattle] compare overlay" "$log_file" | tail -n 1 || true)"

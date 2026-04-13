@@ -1,11 +1,14 @@
 shader_type spatial;
-render_mode cull_disabled, shadows_disabled, depth_draw_opaque;
+render_mode cull_disabled, shadows_disabled, blend_mix, depth_draw_never;
 
 // Base sail appearance / motion
 instance uniform vec4 albedo : source_color = vec4(0.95, 0.95, 0.9, 1.0);
 uniform float wave_speed : hint_range(0.0, 10.0) = 3.0;
 uniform float wave_strength : hint_range(0.0, 1.0) = 0.2;
 instance uniform float wind_strength = 1.0;
+instance uniform float flutter_strength = 0.0;
+instance uniform float flutter_phase = 0.0;
+instance uniform float view_fade_alpha = 1.0;
 
 // Optional textured sail look
 uniform bool use_sail_texture = false;
@@ -126,6 +129,19 @@ void vertex() {
 	// Add some secondary high-frequency ripple
 	flap += sin(TIME * wave_speed * 1.9 + vertical * 12.0 + horizontal * 5.0) * wave_strength * 0.35 * flap_limit;
 	flap += sin(TIME * wave_speed * 1.25 + vertical * 4.0) * wave_strength * 0.28 * flap_limit;
+
+	// 4. Flag-like fabric flutter
+	// Keep the broad billow readable, but let the free edges chatter as the wind slips across the cloth.
+	float side_edge_mask = pow(abs(horizontal - 0.5) * 2.0, 1.65);
+	float lower_edge_mask = pow(1.0 - vertical, 1.35) * 0.55;
+	float flutter_mask = clamp(max(side_edge_mask, lower_edge_mask) * whole_sail_mask, 0.0, 1.0);
+	float flutter_time = TIME * (wave_speed * 2.65 + flutter_strength * 2.0) + flutter_phase;
+	float traveling_ripple = sin(flutter_time + horizontal * 16.0 + vertical * 3.5);
+	traveling_ripple += sin(flutter_time * 1.37 + horizontal * 25.0 - vertical * 6.0) * 0.42;
+	float flutter = traveling_ripple * wave_strength * flutter_strength * 0.18 * flutter_mask;
+	VERTEX.x += flutter * 0.18 * side_edge_mask;
+	VERTEX.y += flutter * 0.10 * lower_edge_mask;
+	flap += flutter;
 	
 	VERTEX.z -= flap * whole_sail_mask;
 }
@@ -179,9 +195,11 @@ void fragment() {
 	if (use_sail_texture) {
 		vec2 sail_uv = get_sail_uv(UV);
 		vec4 tex = texture(sail_texture, sail_uv);
+		float texture_alpha = tex.a * damage_alpha;
 		if (use_dark_alpha_cutoff) {
 			float luma = dot(tex.rgb, vec3(0.2126, 0.7152, 0.0722));
 			float dark_mask = smoothstep(dark_alpha_cutoff, dark_alpha_cutoff + dark_alpha_softness, luma);
+			texture_alpha *= dark_mask;
 			if (tex.a * dark_mask * damage_alpha <= 0.14) {
 				discard;
 			}
@@ -193,6 +211,7 @@ void fragment() {
 		vec3 char_color = base_color * vec3(0.26, 0.18, 0.14);
 		vec3 ember_tint = base_color * vec3(0.56, 0.22, 0.12);
 		ALBEDO = mix(base_color, mix(char_color, ember_tint, burn_mask * 0.28), burn_scorch_mask);
+		ALPHA = clamp(texture_alpha * view_fade_alpha, 0.0, 1.0);
 	} else {
 		if (damage_alpha <= 0.14) {
 			discard;
@@ -200,6 +219,7 @@ void fragment() {
 		vec3 char_color = albedo.rgb * vec3(0.26, 0.18, 0.14);
 		vec3 ember_tint = albedo.rgb * vec3(0.56, 0.22, 0.12);
 		ALBEDO = mix(albedo.rgb, mix(char_color, ember_tint, burn_mask * 0.28), burn_scorch_mask);
+		ALPHA = clamp(damage_alpha * view_fade_alpha, 0.0, 1.0);
 	}
 	vec3 burn_edge_emission = burn_edge_emission_color * (burn_edge_emission_mask * burn_edge_emission_strength * ember_variation);
 	vec3 burn_core_emission = burn_core_emission_color * (burn_core_emission_mask * burn_edge_emission_strength * 0.72 * emission_variation);

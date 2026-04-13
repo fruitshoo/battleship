@@ -22,9 +22,9 @@
 			"color": "996633"
 		},
 		"singigeon": {
-			"name": "신기전병",
+			"name": "신기전",
 			"category": 1,
-			"description": "신기전병이 적 병사를 노려 로켓 화살 운용",
+			"description": "신기전 운용",
 			"max_level": 5,
 			"color": "ff4c4c",
 			"stats": {
@@ -39,9 +39,9 @@
 			}
 		},
 		"fire_pot": {
-			"name": "화통병",
+			"name": "화통",
 			"category": 1,
-			"description": "화통병이 화통 투척",
+			"description": "화통 투척",
 			"max_level": 5,
 			"color": "e54c19",
 			"stats": {
@@ -55,9 +55,9 @@
 			}
 		},
 		"repeating_crossbow": {
-			"name": "연노병",
+			"name": "연노",
 			"category": 1,
-			"description": "연노병이 연노 운용",
+			"description": "연노 운용",
 			"max_level": 5,
 			"color": "99cc33",
 			"stats": {
@@ -86,9 +86,9 @@
 			}
 		},
 		"crew_numbers": {
-			"name": "전열 편성",
+			"name": "창병",
 			"category": 1,
-			"description": "창병과 갑판 전열 강화",
+			"description": "창병 편성",
 			"max_level": 5,
 			"color": "66ccff",
 			"stats": {
@@ -96,22 +96,26 @@
 			}
 		},
 		"crew_reserve": {
-			"name": "예비 병력",
+			"name": "생존",
 			"category": 1,
-			"description": "자동 보충과 구조 회복 강화",
+			"description": "전투불능 병사의 회복 시간과 회복 체력 강화",
 			"max_level": 5,
 			"color": "8fd46b",
 			"stats": {
-				"respawn_reduce_per_lv": 0.75,
-				"min_respawn_interval": 9.0,
+				"respawn_reduce_per_lv": 0.25,
+				"min_respawn_interval": 10.5,
+				"incapacitated_recovery_reduce_per_lv": 1.8,
+				"min_incapacitated_recovery_delay": 7.0,
+				"incapacitated_recovery_health_add_per_lv": 0.08,
+				"max_incapacitated_recovery_health_ratio": 0.75,
 				"instant_restore_levels": [5],
 				"survivor_hull_heal_per_lv": 0.5
 			}
 		},
 		"boarding_resist": {
-			"name": "갑판 방어",
+			"name": "방책",
 			"category": 1,
-			"description": "적 장악과 갑판 혼란 피해 저항",
+			"description": "적 장악과 갑판 혼란 저항",
 			"max_level": 5,
 			"color": "4ca6ff",
 			"stats": {
@@ -121,9 +125,9 @@
 			}
 		},
 		"crew_attack": {
-			"name": "병사 공격력",
+			"name": "무기",
 			"category": 1,
-			"description": "병사 공격력 +2",
+			"description": "병사의 검과 활 피해 강화",
 			"max_level": 5,
 			"color": "e3bf3a",
 			"stats": {
@@ -131,13 +135,15 @@
 			}
 		},
 		"crew_defense": {
-			"name": "병사 방어력",
+			"name": "갑옷",
 			"category": 1,
-			"description": "병사 방어력 +1",
+			"description": "병사 방어력과 받는 피해 감소",
 			"max_level": 5,
 			"color": "7fb6ff",
 			"stats": {
-				"defense_add_per_lv": 1.0
+				"defense_add_per_lv": 1.0,
+				"damage_reduction_per_lv": 0.04,
+				"max_damage_reduction": 0.22
 			}
 		},
 		"hull_defense": {
@@ -233,9 +239,13 @@
 		"fleet_signal": {
 			"name": "지원함",
 			"category": 4,
-			"description": "지원함 호출 또는 수리",
-			"max_level": 1,
-			"color": "ffb347"
+			"description": "지원함 호출 또는 수리, Lv2 한계 +1",
+			"max_level": 2,
+			"color": "ffb347",
+			"stats": {
+				"limit_add_level": 2,
+				"limit_add": 1
+			}
 		},
 		"fleet_cannon": {
 			"name": "지원함 대포",

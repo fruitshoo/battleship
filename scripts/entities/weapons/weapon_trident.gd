@@ -31,8 +31,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	
 	if target.has_method("take_damage"):
 		target.take_damage(final_damage, attacker.global_position, "trident")
-		if is_crit and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx("critical_hit", hit_pos, randf_range(0.9, 1.1))
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx("soldier_hit", hit_pos, randf_range(0.75, 0.95), 3.0 if is_crit else 0.0)
 			
 	# 묵직한 공격 사운드
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):

@@ -237,13 +237,32 @@ static func keep_within_owned_ship_bounds(soldier) -> void:
 	if not is_instance_valid(soldier.owned_ship):
 		return
 
-	var d_height: float = soldier.owned_ship.get("deck_height") if "deck_height" in soldier.owned_ship else 0.4
-	if soldier.position.y != d_height:
-		soldier.position.y = d_height
+	var ship: Node3D = soldier.owned_ship
+	var target_parent: Node = _get_ship_soldier_parent(ship)
+	if is_instance_valid(target_parent) and soldier.get_parent() != target_parent:
+		soldier.reparent(target_parent, true)
 
-	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, soldier.owned_ship)
-	soldier.position.x = clampf(soldier.position.x, -half_ext.x, half_ext.x)
-	soldier.position.z = clampf(soldier.position.z, -half_ext.y, half_ext.y)
+	var local_pos: Vector3 = ship.to_local(soldier.global_position)
+	var deck_pos: Vector3 = get_clamped_ship_deck_local(soldier, ship, local_pos)
+	if not local_pos.is_equal_approx(deck_pos):
+		soldier.global_position = ship.to_global(deck_pos)
+
+
+static func get_clamped_ship_deck_local(soldier, ship: Node3D, local_position: Vector3) -> Vector3:
+	var d_height: float = ship.get("deck_height") if "deck_height" in ship else 0.4
+	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, ship)
+	return Vector3(
+		clampf(local_position.x, -half_ext.x, half_ext.x),
+		d_height,
+		clampf(local_position.z, -half_ext.y, half_ext.y)
+	)
+
+
+static func _get_ship_soldier_parent(ship: Node3D) -> Node:
+	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
+	if is_instance_valid(soldiers_node):
+		return soldiers_node
+	return ship
 
 
 static func get_ship_deck_half_extents(_soldier, ship: Node3D) -> Vector2:

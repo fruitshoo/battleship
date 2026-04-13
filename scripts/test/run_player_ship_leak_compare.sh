@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
+source "$script_dir/harness_log_gate.sh"
 normal_log="$(mktemp -t battleship_player_ship_leak_normal.XXXXXX.log)"
 disabled_log="$(mktemp -t battleship_player_ship_leak_disabled.XXXXXX.log)"
 scene_path="res://scenes/ships/player_ship.tscn"
@@ -12,27 +13,35 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$project_root/scripts/test/run_leak_probe.sh" "$scene_path" >"$normal_log" 2>&1
+normal_status=0
+bash "$project_root/scripts/test/run_leak_probe.sh" "$scene_path" >"$normal_log" 2>&1 || normal_status=$?
 cat "$normal_log"
+if [[ "$normal_status" -ne 0 ]]; then
+	echo "[SupportFleetLeakCompare] normal probe failed with status $normal_status" >&2
+	exit "$normal_status"
+fi
 
 echo "[SupportFleetLeakCompare] --- autosummon disabled ---"
 
+disabled_status=0
 BATTLESHIP_DISABLE_SUPPORT_FLEET_AUTOSPAWN=1 \
-bash "$project_root/scripts/test/run_leak_probe.sh" "$scene_path" >"$disabled_log" 2>&1
+bash "$project_root/scripts/test/run_leak_probe.sh" "$scene_path" >"$disabled_log" 2>&1 || disabled_status=$?
 cat "$disabled_log"
-
-normal_summary="$(grep -F "[LeakProbe] scene=" "$normal_log" | tail -n 1 || true)"
-disabled_summary="$(grep -F "[LeakProbe] scene=" "$disabled_log" | tail -n 1 || true)"
-
-if [[ -z "$normal_summary" || -z "$disabled_summary" ]]; then
-	echo "[SupportFleetLeakCompare] missing leak summaries" >&2
-	exit 1
+if [[ "$disabled_status" -ne 0 ]]; then
+	echo "[SupportFleetLeakCompare] autosummon disabled probe failed with status $disabled_status" >&2
+	exit "$disabled_status"
 fi
 
-normal_rid="$(sed -E 's/.* rid_total=([0-9]+) resources=.*/\1/' <<<"$normal_summary")"
-normal_resources="$(sed -E 's/.* resources=([0-9]+) objectdb.*/\1/' <<<"$normal_summary")"
-disabled_rid="$(sed -E 's/.* rid_total=([0-9]+) resources=.*/\1/' <<<"$disabled_summary")"
-disabled_resources="$(sed -E 's/.* resources=([0-9]+) objectdb.*/\1/' <<<"$disabled_summary")"
+if ! harness_read_leak_summary "SupportFleetLeakCompare" "$normal_log" "normal"; then
+	exit 1
+fi
+normal_rid="$HARNESS_LEAK_RID"
+normal_resources="$HARNESS_LEAK_RESOURCES"
+if ! harness_read_leak_summary "SupportFleetLeakCompare" "$disabled_log" "autosummon disabled"; then
+	exit 1
+fi
+disabled_rid="$HARNESS_LEAK_RID"
+disabled_resources="$HARNESS_LEAK_RESOURCES"
 
 rid_delta=$((normal_rid - disabled_rid))
 resource_delta=$((normal_resources - disabled_resources))

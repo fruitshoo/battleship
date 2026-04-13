@@ -11,6 +11,7 @@ const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
 const DEFAULT_FIRE_POT_SCENE_PATH := "res://scenes/projectiles/fire_pot.tscn"
+const DEFER_INITIAL_CREW_SETUP_META := "defer_initial_crew_setup"
 const BOARDING_CONTACT_DEFENSE_RADIUS_MIN := 2.4
 const BOARDING_CONTACT_DEFENSE_RADIUS_MAX := 5.5
 
@@ -76,6 +77,7 @@ var _enemy_crew_spawn_index: int = 0
 # === 함대 진형 (Formation) 관련 ===
 enum Formation {COLUMN, WING}
 static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정 (기본: 장사진)
+static var support_hold_formation: bool = false # 지원함 자유 교전/진형 유지 토글
 
 var formation_spacing: float = 14.0 # 선박 간 간격 축소 (밀집 대형)
 
@@ -140,6 +142,21 @@ func can_board_targets() -> bool:
 
 func get_target_ship() -> Node3D:
 	return target if is_instance_valid(target) else null
+
+func _mark_boarding_impact(target_ship: Node3D, grace_duration: float = 1.25) -> void:
+	if not is_instance_valid(target_ship):
+		return
+	set_meta("boarding_impact_target_id", target_ship.get_instance_id())
+	set_meta("boarding_impact_grace_timer", grace_duration)
+
+func _has_recent_boarding_impact(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if not has_meta("boarding_impact_grace_timer"):
+		return false
+	if float(get_meta("boarding_impact_grace_timer", 0.0)) <= 0.0:
+		return false
+	return int(get_meta("boarding_impact_target_id", 0)) == target_ship.get_instance_id()
 
 
 func can_use_fire_pot_attack() -> bool:
@@ -413,7 +430,11 @@ func _ready() -> void:
 			remove_from_group("captured_minion")
 		EntityRegistry.unregister_captured_minion(self)
 	
-	_setup_soldiers() # 모든 함선 초기 병사 배치 (팀 속성 반영)
+	if get_meta(DEFER_INITIAL_CREW_SETUP_META, false) == true:
+		remove_meta(DEFER_INITIAL_CREW_SETUP_META)
+		call_deferred("_setup_soldiers_staggered")
+	else:
+		_setup_soldiers() # 모든 함선 초기 병사 배치 (팀 속성 반영)
 		
 	_find_player()
 	
@@ -487,6 +508,25 @@ func _setup_soldiers() -> void:
 	# 함선 팀에 맞춰 초기 병사 배치
 	for i in range(spawn_count):
 		_spawn_one_soldier(team)
+
+
+func _setup_soldiers_staggered() -> void:
+	if not soldier_scene or not is_inside_tree():
+		return
+	var soldiers_node = get_node_or_null("Soldiers")
+	if not soldiers_node:
+		return
+
+	for child in soldiers_node.get_children():
+		child.queue_free()
+
+	await get_tree().process_frame
+	var spawn_count: int = clampi(initial_crew_count, 1, max(1, max_crew))
+	for i in range(spawn_count):
+		if not is_inside_tree():
+			return
+		_spawn_one_soldier(team)
+		await get_tree().process_frame
 
 func _spawn_one_soldier(s_team: String, soldier_type_override: String = "") -> void:
 	var s = soldier_scene.instantiate()
@@ -590,7 +630,7 @@ func _evacuate_soldiers_to_home() -> void:
 
 
 ## 생존자 구조 및 병사 합류 처리 (나포함용)
-func add_survivor() -> bool:
+func add_survivor(_allow_over_capacity: bool = true) -> bool:
 	if is_dying: return false
 	
 	var soldiers_node = get_node_or_null("Soldiers")
@@ -964,6 +1004,9 @@ func _on_body_entered(body: Node3D) -> void:
 		return
 	# 플레이어와 충돌했는지 확인 (StaticBody/CharacterBody 등)
 	if body.is_in_group("player") or (body.get_parent() and body.get_parent().is_in_group("player")):
+		var ship_node := body if body.is_in_group("player") else body.get_parent()
+		if is_instance_valid(ship_node) and ship_node is Node3D:
+			_mark_boarding_impact(ship_node as Node3D)
 		_board_ship(body)
 
 func _on_area_entered(area: Area3D) -> void:
@@ -1023,6 +1066,8 @@ func _board_ship(target_ship: Node3D) -> void:
 		var latch_mode: String = _get_active_boarding_latch_mode(ship_node)
 		if latch_mode.is_empty():
 			return
+	if not _has_recent_boarding_impact(ship_node):
+		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
 	if not has_rammed:
@@ -1071,6 +1116,7 @@ func _board_ship(target_ship: Node3D) -> void:
 		boarding_contact_timer = 0.0
 		boarding_hook_timer = 0.0
 		boarding_secondary_rope_timer = 0.0
+		set_meta("boarding_motion_settle_timer", 0.0)
 		_initial_rope_deployed = false
 		_full_rope_deployed = false
 		_clear_boarding_latch()
@@ -1195,8 +1241,6 @@ func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
 	if not target_ship.is_in_group("player"):
 		return false
 	var enemy_crew: int = int(target_ship.call("get_alive_crew_count")) if target_ship.has_method("get_alive_crew_count") else 0
-	if enemy_crew > 1:
-		return false
 	if target_ship.has_method("is_boarding_ship") and target_ship.is_boarding_ship():
 		return true
 	var state: Dictionary = _get_boarding_alignment_state(target_ship)
@@ -1211,9 +1255,17 @@ func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
 		return false
 	if enemy_crew <= 0:
 		return true
+	var bow_to_side_contact: bool = (
+		my_contact_dot >= 0.58
+		and target_contact_abs <= 0.72
+		and center_distance <= collision_distance + 0.85
+		and closing_speed <= boarding_max_relative_speed * 2.6
+	)
+	if bow_to_side_contact:
+		return true
 	if enemy_crew == 1 and center_distance <= collision_distance + 0.45:
 		return true
-	return my_contact_dot >= 0.52 and target_contact_abs <= 0.92 and closing_speed <= boarding_max_relative_speed * 2.4
+	return enemy_crew <= 1 and my_contact_dot >= 0.52 and target_contact_abs <= 0.92 and closing_speed <= boarding_max_relative_speed * 2.4
 
 
 func _can_start_boarding_latched(target_ship: Node3D, dist_to_target: float, can_side_board: bool, can_head_on_board: bool, can_cleanup_board: bool, delta: float) -> bool:
@@ -1316,13 +1368,12 @@ func _can_force_cleanup_boarding(target_ship: Node3D) -> bool:
 		return false
 	var center_distance: float = global_position.distance_to(target_ship.global_position)
 	var collision_distance: float = get_collision_distance_to(target_ship)
-	if center_distance > collision_distance + 2.25:
-		return false
 	var state: Dictionary = _get_boarding_alignment_state(target_ship)
-	if state.is_empty():
-		return true
-	var closing_speed: float = float(state.get("closing_speed", 0.0))
-	return closing_speed <= boarding_max_relative_speed * 3.4
+	var closing_speed: float = float(state.get("closing_speed", 0.0)) if not state.is_empty() else 0.0
+	var crewless_boarding_distance: float = maxf(collision_distance + 4.25, max_boarding_distance + 1.5)
+	if center_distance > crewless_boarding_distance:
+		return false
+	return closing_speed <= boarding_max_relative_speed * 5.0
 
 # 누수 추가/제거
 func add_leak(amount: float) -> void:

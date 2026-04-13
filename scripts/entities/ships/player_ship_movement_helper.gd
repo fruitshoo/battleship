@@ -91,7 +91,8 @@ static func update_steering(ship, delta: float) -> void:
 	if ship.current_speed < 0.1:
 		return
 	var speed_ratio = ship.current_speed / ship.max_speed
-	var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * delta
+	var turn_authority: float = float(ship.player_rudder_turn_authority) if "player_rudder_turn_authority" in ship else 1.0
+	var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority * delta
 	ship.rotation.y -= deg_to_rad(actual_turn)
 
 static func calculate_sail_speed(ship) -> float:

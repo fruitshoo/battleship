@@ -27,6 +27,25 @@ const SUPPORT_TRAIL_MAX_POINTS := 96
 const SUPPORT_IDLE_ORBIT_RADIUS := 11.0
 const SUPPORT_IDLE_ORBIT_SPEED := 0.65
 const SUPPORT_IDLE_SPEED_RESPONSE := 2.4
+const SUPPORT_ASSIST_THREAT_RANGE := 40.0
+const SUPPORT_ASSIST_CLOSE_RANGE := 22.0
+const SUPPORT_ASSIST_RECALL_DISTANCE := 50.0
+const SUPPORT_ASSIST_LEASH_DISTANCE := 62.0
+const SUPPORT_ASSIST_SPEED_RESPONSE := 1.25
+const SUPPORT_ASSIST_EMERGENCY_THREAT_RANGE := 58.0
+const SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE := 80.0
+const SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE := 92.0
+const SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE := 2.05
+const SUPPORT_ASSIST_SEPARATION_RADIUS := 10.0
+const SUPPORT_ASSIST_SEPARATION_FORCE := 1.1
+const SUPPORT_ASSIST_TARGET_ID_META := "support_assist_target_id"
+const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
+const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
+const SUPPORT_ASSIST_TARGET_LOCK_DURATION := 3.25
+const SUPPORT_ASSIST_SWITCH_MARGIN := 10.0
+const SUPPORT_BOARDING_CONTACT_PAD := 0.85
+const SUPPORT_BOARDING_PURPOSE := "support_boarding"
+const SUPPORT_RESCUE_BOARDING_PURPOSE := "support_rescue_boarding"
 
 static func process_minion_ai(ship, delta: float) -> void:
 	var is_support_ship: bool = ship.get_meta("support_fleet_ship", false) == true
@@ -76,6 +95,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var support_lead_ship: Node3D = ship.target
 	var support_lead_fwd: Vector3 = player_fwd
 	var support_lead_speed: float = float(player_speed)
+	var support_assist_target: Node3D = null
 
 	var to_target_vec = target_pos - ship.global_position
 	var direction = to_target_vec.normalized()
@@ -89,6 +109,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 		var support_goal: Dictionary = _get_support_chain_goal(ship, minions, my_index, SUPPORT_FORMATION_SPACING)
 		target_pos = support_goal.get("position", ship.global_position)
 		support_lead_fwd = support_goal.get("forward", _get_ship_forward_flat(support_lead_ship))
+		support_assist_target = _get_support_assist_target(ship, ship.target, delta)
 		to_target_vec = target_pos - ship.global_position
 		if to_target_vec.length_squared() > 0.0001:
 			direction = to_target_vec.normalized()
@@ -108,6 +129,11 @@ static func process_minion_ai(ship, delta: float) -> void:
 			ship.set_meta("support_joining", false)
 			is_joining_support = false
 	dist_to_target = ship.global_position.distance_to(target_pos)
+	if is_support_ship and not is_joining_support and is_instance_valid(support_assist_target):
+		if _try_start_support_boarding(ship, support_assist_target, delta):
+			return
+		_process_support_assist_ai(ship, delta, support_assist_target, minions, my_index)
+		return
 
 	var target_final_speed = player_speed
 	if is_joining_support:
@@ -205,6 +231,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 		ship.set_meta("support_debug_player_speed", float(player_speed))
 		ship.set_meta("support_debug_lead_speed", float(support_lead_speed))
 		ship.set_meta("support_debug_target_speed", float(target_final_speed))
+		ship.set_meta("support_debug_mode", "trail")
 
 static func _is_ship_disabled(node: Node3D) -> bool:
 	if not is_instance_valid(node):
@@ -292,6 +319,264 @@ static func _process_support_idle_patrol(ship, delta: float) -> void:
 	ship.set_meta("support_debug_lead_speed", 0.0)
 	ship.set_meta("support_debug_target_speed", desired_speed)
 
+static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D, minions: Array, my_index: int) -> void:
+	if not is_instance_valid(assist_target) or _is_ship_disabled(assist_target):
+		return
+	var emergency_assist: bool = _is_player_deck_emergency(ship.target)
+
+	var nav: Dictionary = _build_support_assist_navigation(ship, assist_target, my_index)
+	var desired_point: Vector3 = nav["desired_point"]
+	var heading_point: Vector3 = nav["heading_point"]
+	var dist_to_target: float = float(nav["dist_to_target"])
+	var desired_speed_mult: float = float(nav["desired_speed_mult"])
+
+	var move_vector: Vector3 = desired_point - ship.global_position
+	move_vector.y = 0.0
+	var move_dir: Vector3 = move_vector.normalized() if move_vector.length_squared() > 0.001 else Vector3.ZERO
+	var local_sep: Vector3 = _calculate_support_assist_separation(ship, minions, assist_target)
+	if local_sep.length_squared() > 0.001:
+		move_dir = local_sep.normalized() if move_dir == Vector3.ZERO else (move_dir + local_sep).normalized()
+
+	var heading_vector: Vector3 = heading_point - ship.global_position
+	heading_vector.y = 0.0
+	if heading_vector.length_squared() <= 0.001:
+		heading_vector = move_dir if move_dir.length_squared() > 0.001 else _get_ship_forward_flat(assist_target)
+	var target_rotation_y: float = atan2(-heading_vector.x, -heading_vector.z)
+	var angle_diff: float = wrapf(target_rotation_y - ship.rotation.y, -PI, PI)
+	var desired_rudder: float = clamp(-rad_to_deg(angle_diff) * ship.ai_rudder_gain, -40.0, 40.0)
+	var close_turn_blend: float = 0.0
+	if ship.ai_close_turn_soft_radius > 0.01:
+		close_turn_blend = clamp(1.0 - (dist_to_target / ship.ai_close_turn_soft_radius), 0.0, 1.0)
+	var close_turn_factor: float = lerp(1.0, ship.ai_close_turn_scale, close_turn_blend)
+	desired_rudder *= close_turn_factor
+	var rudder_speed_adjusted: float = ship.ai_rudder_response_speed * ship.get_rudder_response_multiplier()
+	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
+
+	var leak_speed_mult: float = clamp(1.0 - (ship.leaking_rate * 0.05), 0.3, 1.0)
+	var desired_speed: float = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier()
+	var assist_speed_response: float = SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE if emergency_assist else SUPPORT_ASSIST_SPEED_RESPONSE
+	ship._last_ai_speed = lerp(float(ship._last_ai_speed), desired_speed, delta * assist_speed_response)
+	var assist_accel_mult: float = 1.45 if emergency_assist else 1.0
+	if ship._last_ai_speed > ship.current_speed:
+		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.acceleration * assist_accel_mult * delta)
+	else:
+		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.deceleration * delta)
+
+	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship) * ship.get_shiphandling_multiplier()
+	if ship.current_speed > 0.1:
+		var speed_ratio: float = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
+		var turn_scale: float = ship.ai_turn_authority * close_turn_factor
+		var actual_turn: float = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_scale * delta
+		var max_turn_this_frame: float = ship.ai_max_turn_rate * (0.82 if emergency_assist else 0.68) * delta
+		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
+		ship.rotation.y -= deg_to_rad(actual_turn)
+
+	var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
+	var velocity: Vector3 = forward_vec * ship.current_speed * wind_mult
+	velocity += local_sep
+	velocity += ship._calculate_collision_repulsion() * 0.45 * delta
+
+	var prev_pos: Vector3 = ship.global_position
+	var next_pos: Vector3 = prev_pos + velocity * delta
+	next_pos = ship._apply_ship_collision_guard(assist_target, prev_pos, next_pos, 0.9, velocity.length(), false)
+	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, assist_target)
+	ship.global_position = next_pos
+	_record_support_trail_point(ship)
+
+	ship._update_rudder_visual()
+	if ship.leaking_rate > 0:
+		ship.take_damage(ship.leaking_rate * delta)
+	ship._apply_bobbing_effect()
+	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+	ship.set_meta("support_debug_lead_name", assist_target.name)
+	ship.set_meta("support_debug_target_pos", desired_point)
+	ship.set_meta("support_debug_slot_dist", ship.global_position.distance_to(desired_point))
+	ship.set_meta("support_debug_rel_depth", 0.0)
+	ship.set_meta("support_debug_player_speed", 0.0)
+	ship.set_meta("support_debug_lead_speed", _get_ship_speed(assist_target, 0.0))
+	ship.set_meta("support_debug_target_speed", desired_speed)
+	ship.set_meta("support_debug_assist_target", assist_target.name)
+	ship.set_meta("support_debug_mode", "assist")
+
+
+static func _try_start_support_boarding(ship, assist_target: Node3D, delta: float) -> bool:
+	if not _can_support_board_target(ship, assist_target):
+		return false
+	if ship.has_method("_can_start_boarding_latched"):
+		var dist_to_target: float = ship.global_position.distance_to(assist_target.global_position)
+		var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", assist_target) == true
+		var can_cleanup_board: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", assist_target) == true
+		ship.call("_can_start_boarding_latched", assist_target, dist_to_target, can_side_board, false, can_cleanup_board, delta)
+
+	_start_support_boarding_link(ship, assist_target)
+	if ship.is_boarding and ship.has_method("_process_boarding"):
+		ship._process_boarding(delta)
+	return ship.is_boarding
+
+
+static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
+		return false
+	if ship.get_meta("support_fleet_ship", false) != true:
+		return false
+	if ship.get_team_tag() != "player":
+		return false
+	if ship.is_boarding:
+		return false
+	if _is_ship_disabled(assist_target):
+		return false
+	var target_team: String = assist_target.get_team_tag() if assist_target.has_method("get_team_tag") else str(assist_target.get("team"))
+	var rescue_boarding: bool = _is_support_rescue_target(ship, assist_target)
+	if rescue_boarding:
+		if target_team != "player":
+			return false
+	else:
+		if target_team != "enemy":
+			return false
+		if assist_target.get("is_derelict") == true:
+			return false
+	if ship.has_method("get_alive_crew_count") and ship.get_alive_crew_count() <= 1:
+		return false
+
+	var center_distance: float = ship.global_position.distance_to(assist_target.global_position)
+	var collision_distance: float = ship.max_boarding_distance
+	if ship.has_method("get_collision_distance_to"):
+		collision_distance = float(ship.get_collision_distance_to(assist_target))
+	var contact_boarding_limit: float = maxf(ship.max_boarding_distance + 0.45, collision_distance + SUPPORT_BOARDING_CONTACT_PAD)
+	if center_distance > contact_boarding_limit:
+		return false
+
+	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(assist_target):
+		return true
+	if ship.has_method("_can_force_cleanup_boarding") and ship._can_force_cleanup_boarding(assist_target):
+		return true
+	return false
+
+
+static func _start_support_boarding_link(ship, assist_target: Node3D) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
+		return
+	var rescue_boarding: bool = _is_support_rescue_target(ship, assist_target)
+	ship.is_boarding = true
+	ship.boarding_target = assist_target
+	ship.set_meta("boarding_purpose", SUPPORT_RESCUE_BOARDING_PURPOSE if rescue_boarding else SUPPORT_BOARDING_PURPOSE)
+	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(assist_target):
+		ship.set_meta("boarding_contact_mode", "side")
+	else:
+		ship.set_meta("boarding_contact_mode", "cleanup")
+
+	var hold_forward: Vector3 = -ship.global_transform.basis.z
+	hold_forward.y = 0.0
+	if hold_forward.length_squared() > 0.001:
+		ship.set_meta("boarding_hold_forward", hold_forward.normalized())
+	if not rescue_boarding and assist_target.has_method("set_boarding_attacker_ship"):
+		assist_target.set_boarding_attacker_ship(ship)
+	if ship.has_method("_clear_ropes"):
+		ship._clear_ropes()
+	ship.boarding_timer = 0.0
+	ship.boarding_prep_timer = 0.0
+	ship.boarding_contact_timer = 0.0
+	ship.boarding_hook_timer = 0.0
+	ship.boarding_secondary_rope_timer = 0.0
+	ship.set_meta("boarding_motion_settle_timer", 0.0)
+	ship._initial_rope_deployed = false
+	ship._full_rope_deployed = false
+	if ship.has_method("_clear_boarding_latch"):
+		ship._clear_boarding_latch()
+	ship.set_meta("support_debug_mode", "boarding")
+	ship.set_meta("support_debug_assist_target", assist_target.name)
+
+static func _build_support_assist_navigation(ship, assist_target: Node3D, my_index: int) -> Dictionary:
+	var player_ship: Node3D = ship.target if is_instance_valid(ship.target) else null
+	var emergency_assist: bool = _is_player_deck_emergency(player_ship)
+	var rescue_assist: bool = _is_support_rescue_target(ship, assist_target)
+	var player_fwd: Vector3 = _get_ship_forward_flat(player_ship) if is_instance_valid(player_ship) else _get_ship_forward_flat(ship)
+	var player_right: Vector3 = player_fwd.cross(Vector3.UP)
+	if player_right.length_squared() <= 0.0001:
+		player_right = Vector3.RIGHT
+	else:
+		player_right = player_right.normalized()
+
+	var target_id: int = assist_target.get_instance_id()
+	var current_target_id: int = int(ship.get_meta(SUPPORT_ASSIST_TARGET_ID_META, 0))
+	var lane_side: float = float(ship.get_meta(SUPPORT_ASSIST_LANE_SIDE_META, 0.0))
+	if current_target_id != target_id or absf(lane_side) < 0.5:
+		var rel_to_player: Vector3 = ship.global_position - player_ship.global_position if is_instance_valid(player_ship) else ship.global_position - assist_target.global_position
+		rel_to_player.y = 0.0
+		lane_side = signf(rel_to_player.dot(player_right))
+		if absf(lane_side) < 0.5:
+			lane_side = 1.0 if (my_index % 2) == 0 else -1.0
+		ship.set_meta(SUPPORT_ASSIST_LANE_SIDE_META, lane_side)
+	ship.set_meta(SUPPORT_ASSIST_TARGET_ID_META, target_id)
+
+	var pair_index: int = int(floor(float(my_index) / 2.0))
+	var collision_distance: float = ship.get_collision_distance_to(assist_target)
+	var lane_distance: float = 0.0
+	var rear_bias: float = 0.0
+	if rescue_assist:
+		lane_distance = maxf(4.0, collision_distance * 0.92) + float(pair_index) * 0.8
+		rear_bias = float(pair_index) * 0.4
+	else:
+		var lane_base: float = 8.0 if emergency_assist else 11.0
+		var lane_step: float = 1.6 if emergency_assist else 2.5
+		var lane_clearance: float = 1.6 if emergency_assist else 3.2
+		lane_distance = maxf(lane_base + float(pair_index) * lane_step, collision_distance + lane_clearance)
+		rear_bias = (0.8 + float(pair_index) * 0.8) if emergency_assist else (2.4 + float(pair_index) * 1.2)
+	var desired_point: Vector3 = assist_target.global_position
+	desired_point += player_right * lane_side * lane_distance
+	desired_point -= player_fwd * rear_bias
+	desired_point.y = ship.global_position.y
+
+	if is_instance_valid(player_ship) and not rescue_assist:
+		var player_clearance: float = maxf(10.0, ship.get_collision_distance_to(player_ship) + 3.0)
+		var from_player: Vector3 = desired_point - player_ship.global_position
+		from_player.y = 0.0
+		if from_player.length_squared() < player_clearance * player_clearance:
+			desired_point = player_ship.global_position + from_player.normalized() * player_clearance if from_player.length_squared() > 0.001 else player_ship.global_position + player_right * lane_side * player_clearance
+			desired_point.y = ship.global_position.y
+
+	var dist_to_lane: float = ship.global_position.distance_to(desired_point)
+	var heading_point: Vector3 = assist_target.global_position
+	if dist_to_lane > (9.0 if emergency_assist else 13.0):
+		heading_point = desired_point
+	var desired_speed_mult: float = clampf(
+		dist_to_lane / (9.0 if rescue_assist else (11.0 if emergency_assist else 16.0)),
+		0.42 if rescue_assist else (0.35 if emergency_assist else 0.18),
+		1.22 if rescue_assist else (1.18 if emergency_assist else 0.78)
+	)
+	return {
+		"desired_point": desired_point,
+		"heading_point": heading_point,
+		"dist_to_target": ship.global_position.distance_to(assist_target.global_position),
+		"desired_speed_mult": desired_speed_mult,
+		"permit_sprint": emergency_assist,
+	}
+
+static func _calculate_support_assist_separation(ship, minions: Array, assist_target: Node3D) -> Vector3:
+	var force: Vector3 = Vector3.ZERO
+	var count: int = 0
+	for other in minions:
+		if other == ship or not is_instance_valid(other):
+			continue
+		var offset: Vector3 = ship.global_position - other.global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		if dist <= 0.1 or dist >= SUPPORT_ASSIST_SEPARATION_RADIUS:
+			continue
+		var strength: float = pow((SUPPORT_ASSIST_SEPARATION_RADIUS - dist) / SUPPORT_ASSIST_SEPARATION_RADIUS, 2.0)
+		force += offset.normalized() * strength * SUPPORT_ASSIST_SEPARATION_FORCE
+		count += 1
+	if is_instance_valid(assist_target):
+		var target_offset: Vector3 = ship.global_position - assist_target.global_position
+		target_offset.y = 0.0
+		var target_dist: float = target_offset.length()
+		var collision_dist: float = ship.get_collision_distance_to(assist_target)
+		if target_dist > 0.1 and target_dist < collision_dist + 2.0:
+			var strength: float = (collision_dist + 2.0 - target_dist) / maxf(collision_dist + 2.0, 0.001)
+			force += target_offset.normalized() * strength * SUPPORT_ASSIST_SEPARATION_FORCE
+			count += 1
+	return force / max(count, 1)
+
 static func _get_minion_roster(ship, support_only: bool) -> Array:
 	var roster: Array = []
 	var all_minions: Array = ship.get_minions_cached(ship.get_tree())
@@ -339,6 +624,150 @@ static func _get_support_chain_goal(ship, minions: Array, my_index: int, trailin
 	var lead_fwd: Vector3 = _get_ship_forward_flat(lead_ship)
 	var follow_distance: float = _get_support_follow_distance(ship, lead_ship, trailing_distance)
 	return _get_support_trail_goal(lead_ship, follow_distance, lead_fwd)
+
+static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) -> Node3D:
+	if not is_instance_valid(ship) or not is_instance_valid(player_ship):
+		return null
+	var deck_emergency: bool = _is_player_deck_emergency(player_ship)
+	var recall_distance: float = SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE if deck_emergency else SUPPORT_ASSIST_RECALL_DISTANCE
+	var leash_distance: float = SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE if deck_emergency else SUPPORT_ASSIST_LEASH_DISTANCE
+	var threat_range: float = SUPPORT_ASSIST_EMERGENCY_THREAT_RANGE if deck_emergency else SUPPORT_ASSIST_THREAT_RANGE
+	if ship.global_position.distance_to(player_ship.global_position) > recall_distance:
+		_clear_support_assist_target_lock(ship)
+		return null
+
+	var best_target: Node3D = null
+	var best_score: float = INF
+	var locked_target: Node3D = null
+	var locked_score: float = INF
+	var locked_target_id: int = int(ship.get_meta(SUPPORT_ASSIST_TARGET_ID_META, 0))
+	var lock_timer: float = maxf(0.0, float(ship.get_meta(SUPPORT_ASSIST_LOCK_TIMER_META, 0.0)) - delta)
+	ship.set_meta(SUPPORT_ASSIST_LOCK_TIMER_META, lock_timer)
+	var deck_contested: bool = player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true
+	var deck_overrun: bool = player_ship.get("deck_is_overrun") == true
+	if _is_support_rescue_target(ship, player_ship):
+		var support_dist_to_player: float = ship.global_position.distance_to(player_ship.global_position)
+		if support_dist_to_player <= leash_distance:
+			_set_support_assist_target_lock(ship, player_ship)
+			return player_ship
+	if _is_support_formation_hold_enabled(ship):
+		var hold_boarding_attacker: Node3D = null
+		if player_ship.has_method("get_boarding_attacker_ship"):
+			hold_boarding_attacker = player_ship.call("get_boarding_attacker_ship")
+		if is_instance_valid(hold_boarding_attacker) and not _is_ship_disabled(hold_boarding_attacker):
+			var hold_support_dist: float = ship.global_position.distance_to(hold_boarding_attacker.global_position)
+			if hold_support_dist <= leash_distance:
+				_set_support_assist_target_lock(ship, hold_boarding_attacker)
+				return hold_boarding_attacker
+		_clear_support_assist_target_lock(ship)
+		return null
+	for enemy in EntityRegistry.get_ships_by_team("enemy"):
+		if not is_instance_valid(enemy):
+			continue
+		if _is_ship_disabled(enemy):
+			continue
+		if enemy.get("is_derelict") == true:
+			continue
+		var offset: Vector3 = enemy.global_position - player_ship.global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		var is_boarding_player: bool = enemy.has_method("get_boarding_target_ship") and enemy.call("get_boarding_target_ship") == player_ship
+		var is_close_threat: bool = dist <= SUPPORT_ASSIST_CLOSE_RANGE
+		if dist > threat_range and not is_boarding_player:
+			continue
+		var support_dist: float = ship.global_position.distance_to(enemy.global_position)
+		if support_dist > leash_distance and not is_boarding_player:
+			continue
+		var score: float = (dist * 0.55 + support_dist * 0.2) if deck_emergency else (dist + support_dist * 0.35)
+		if is_boarding_player:
+			score -= 34.0 if deck_emergency else 18.0
+		elif deck_overrun:
+			score -= 22.0
+		elif deck_contested:
+			score -= 12.0
+		elif is_close_threat:
+			score -= 4.0
+		if enemy.get_instance_id() == locked_target_id:
+			locked_target = enemy
+			locked_score = score
+			if lock_timer > 0.0:
+				score -= SUPPORT_ASSIST_SWITCH_MARGIN
+		if score < best_score:
+			best_score = score
+			best_target = enemy
+
+	var boarding_attacker: Node3D = null
+	if player_ship.has_method("get_boarding_attacker_ship"):
+		boarding_attacker = player_ship.call("get_boarding_attacker_ship")
+	if is_instance_valid(boarding_attacker) and not _is_ship_disabled(boarding_attacker):
+		var support_dist_to_attacker: float = ship.global_position.distance_to(boarding_attacker.global_position)
+		if support_dist_to_attacker <= leash_distance:
+			_set_support_assist_target_lock(ship, boarding_attacker)
+			return boarding_attacker
+
+	if is_instance_valid(locked_target) and lock_timer > 0.0:
+		return locked_target
+	if is_instance_valid(locked_target) and is_instance_valid(best_target) and locked_target != best_target:
+		if locked_score <= best_score + SUPPORT_ASSIST_SWITCH_MARGIN:
+			_set_support_assist_target_lock(ship, locked_target)
+			return locked_target
+	if is_instance_valid(best_target):
+		_set_support_assist_target_lock(ship, best_target)
+	else:
+		_clear_support_assist_target_lock(ship)
+	return best_target
+
+
+static func _is_player_deck_emergency(player_ship: Node3D) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	var hostile_count: int = 0
+	if player_ship.get("deck_hostile_boarder_count") != null:
+		hostile_count = int(player_ship.get("deck_hostile_boarder_count"))
+	return player_ship.get("deck_is_overrun") == true \
+		or player_ship.get("deck_is_contested") == true \
+		or hostile_count > 0
+
+
+static func _is_support_rescue_target(ship, assist_target: Node3D) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
+		return false
+	if ship.get_meta("support_fleet_ship", false) != true:
+		return false
+	if not is_instance_valid(ship.target) or assist_target != ship.target:
+		return false
+	var target_team: String = assist_target.get_team_tag() if assist_target.has_method("get_team_tag") else str(assist_target.get("team"))
+	if target_team != "player":
+		return false
+	if assist_target.get("deck_is_overrun") == true:
+		return true
+	var hostile_count: int = int(assist_target.get("deck_hostile_boarder_count")) if assist_target.get("deck_hostile_boarder_count") != null else 0
+	var deck_contested: bool = assist_target.get("deck_is_contested") == true
+	return hostile_count > 0 and deck_contested
+
+
+static func _is_support_formation_hold_enabled(ship) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if "support_hold_formation" in ship:
+		return ship.get("support_hold_formation") == true
+	return ship.get_meta("support_hold_formation", false) == true
+
+
+static func _set_support_assist_target_lock(ship, assist_target: Node3D) -> void:
+	var previous_target_id: int = int(ship.get_meta(SUPPORT_ASSIST_TARGET_ID_META, 0))
+	if previous_target_id != assist_target.get_instance_id() and ship.has_meta(SUPPORT_ASSIST_LANE_SIDE_META):
+		ship.remove_meta(SUPPORT_ASSIST_LANE_SIDE_META)
+	ship.set_meta(SUPPORT_ASSIST_TARGET_ID_META, assist_target.get_instance_id())
+	ship.set_meta(SUPPORT_ASSIST_LOCK_TIMER_META, SUPPORT_ASSIST_TARGET_LOCK_DURATION)
+
+static func _clear_support_assist_target_lock(ship) -> void:
+	if ship.has_meta(SUPPORT_ASSIST_TARGET_ID_META):
+		ship.remove_meta(SUPPORT_ASSIST_TARGET_ID_META)
+	if ship.has_meta(SUPPORT_ASSIST_LOCK_TIMER_META):
+		ship.remove_meta(SUPPORT_ASSIST_LOCK_TIMER_META)
+	if ship.has_meta(SUPPORT_ASSIST_LANE_SIDE_META):
+		ship.remove_meta(SUPPORT_ASSIST_LANE_SIDE_META)
 
 static func _get_support_follow_distance(follower_ship: Node3D, lead_ship: Node3D, minimum_spacing: float) -> float:
 	if not is_instance_valid(follower_ship) or not is_instance_valid(lead_ship):

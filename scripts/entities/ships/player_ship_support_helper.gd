@@ -43,6 +43,7 @@ static func spawn_or_repair_ally(ship) -> void:
 	var next_support_order: int = int(ship.get_meta(SUPPORT_FLEET_NEXT_ORDER_META, 0))
 	ally.set_meta("support_joining", true)
 	ally.set_meta("support_fleet_ship", true)
+	ally.set_meta("defer_initial_crew_setup", true)
 	ally.set_meta(SUPPORT_FLEET_ORDER_META, next_support_order)
 
 	ship.get_parent().add_child(ally)

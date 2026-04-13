@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
+source "$script_dir/harness_log_gate.sh"
 probe_scene="res://scenes/test/scene_load_probe.tscn"
 
 declare -a targets=(
@@ -24,23 +25,23 @@ run_case() {
 	local target="$2"
 	local log_file
 	log_file="$(mktemp -t "battleship_chaser_script_isolation_${label}.XXXXXX.log")"
+	local probe_status=0
 	(
 		cd "$project_root"
 		env BATTLESHIP_PROBE_SCENE_PATH="$target" bash scripts/test/run_leak_probe.sh "$probe_scene"
-	) >"$log_file" 2>&1
+	) >"$log_file" 2>&1 || probe_status=$?
 	cat "$log_file"
-	local summary
-	summary="$(grep -F "[LeakProbe] scene=" "$log_file" | tail -n 1 || true)"
-	rm -f "$log_file"
-	if [[ -z "$summary" ]]; then
-		echo "[ChaserScriptIsolation] missing leak summary for $label" >&2
+	if [[ "$probe_status" -ne 0 ]]; then
+		rm -f "$log_file"
+		echo "[ChaserScriptIsolation] probe failed for $label with status $probe_status" >&2
+		exit "$probe_status"
+	fi
+	if ! harness_read_leak_summary "ChaserScriptIsolation" "$log_file" "$label"; then
+		rm -f "$log_file"
 		exit 1
 	fi
-	local rid
-	local resources
-	rid="$(sed -E 's/.* rid_total=([0-9]+) resources=.*/\1/' <<<"$summary")"
-	resources="$(sed -E 's/.* resources=([0-9]+) objectdb.*/\1/' <<<"$summary")"
-	echo "[ChaserScriptIsolation] $label rid=$rid resources=$resources target=$target"
+	rm -f "$log_file"
+	echo "[ChaserScriptIsolation] $label rid=$HARNESS_LEAK_RID resources=$HARNESS_LEAK_RESOURCES target=$target"
 }
 
 for target_entry in "${targets[@]}"; do

@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://bilro8ijftry1"]
 
+[ext_resource type="Script" path="res://scripts/effects/fire_effect.gd" id="1_script"]
 [ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="2_smoke01"]
 
 [sub_resource type="Gradient" id="Gradient_smoke"]
@@ -52,9 +53,11 @@ material = SubResource("StandardMaterial3D_smoke")
 size = Vector2(2.8, 2.8)
 
 [node name="FireEffect" type="Node3D" unique_id=1847126054]
+script = ExtResource("1_script")
 
 [node name="SmokeParticles" type="GPUParticles3D" parent="." unique_id=1301637500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+emitting = false
 amount = 6
 lifetime = 2.2
 randomness = 0.6

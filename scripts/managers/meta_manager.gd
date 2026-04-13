@@ -64,8 +64,8 @@ var UPGRADES = {
 		"max_level": 5
 	},
 	"crew_attack": {
-		"name": "병사 공격력",
-		"description": "공격력 +2",
+		"name": "무기",
+		"description": "검과 활 피해 +2",
 		"base_cost": 750,
 		"cost_multiplier": 1.8,
 		"max_level": 5

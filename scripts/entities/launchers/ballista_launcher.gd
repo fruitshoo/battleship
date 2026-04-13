@@ -87,9 +87,11 @@ func _is_owner_combat_ready() -> bool:
 		_owner_ship = _resolve_owner_ship()
 	if not is_instance_valid(_owner_ship):
 		return true
+	if _owner_ship.has_method("are_weapons_disabled") and _owner_ship.are_weapons_disabled():
+		return false
 	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
 		return false
-	return true
+	return _owner_ship.get("deck_is_overrun") != true
 
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null

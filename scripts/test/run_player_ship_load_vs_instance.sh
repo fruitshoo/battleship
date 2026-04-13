@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
+source "$script_dir/harness_log_gate.sh"
 probe_scene="res://scenes/test/scene_load_probe.tscn"
 target_scene="${1:-res://scenes/ships/player_ship.tscn}"
 
@@ -11,23 +12,23 @@ run_case() {
 	shift
 	local log_file
 	log_file="$(mktemp -t "battleship_scene_load_probe_${label}.XXXXXX.log")"
+	local probe_status=0
 	(
 		cd "$project_root"
 		env BATTLESHIP_PROBE_SCENE_PATH="$target_scene" "$@" bash scripts/test/run_leak_probe.sh "$probe_scene"
-	) >"$log_file" 2>&1
-	cat "$log_file"
-	local summary
-	summary="$(grep -F "[LeakProbe] scene=" "$log_file" | tail -n 1 || true)"
-	rm -f "$log_file"
-	if [[ -z "$summary" ]]; then
-		echo "[SceneLoadVsInstance] missing leak summary for $label" >&2
+	) >"$log_file" 2>&1 || probe_status=$?
+	cat "$log_file" >&2
+	if [[ "$probe_status" -ne 0 ]]; then
+		rm -f "$log_file"
+		echo "[SceneLoadVsInstance] probe failed for $label with status $probe_status" >&2
+		exit "$probe_status"
+	fi
+	if ! harness_read_leak_summary "SceneLoadVsInstance" "$log_file" "$label"; then
+		rm -f "$log_file"
 		exit 1
 	fi
-	local rid
-	local resources
-	rid="$(sed -E 's/.* rid_total=([0-9]+) resources=.*/\1/' <<<"$summary")"
-	resources="$(sed -E 's/.* resources=([0-9]+) objectdb.*/\1/' <<<"$summary")"
-	echo "[SceneLoadVsInstance] $label rid=$rid resources=$resources"
+	rm -f "$log_file"
+	echo "[SceneLoadVsInstance] $label rid=$HARNESS_LEAK_RID resources=$HARNESS_LEAK_RESOURCES"
 }
 
 load_output="$(run_case load_only)"

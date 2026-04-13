@@ -57,9 +57,6 @@ static func refresh_hud_item_icons(manager) -> void:
 	var ship = manager._get_player_ship()
 	if not ship:
 		return
-	for item_id in manager.acquired_items:
-		if item_id in manager.ITEMS:
-			manager._apply_item_to_ship(item_id, ship)
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
 	if not hud:
 		return

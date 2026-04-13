@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/test/mid_boss_balance_preview.gd" id="2_script"]
+
+[node name="MidBossBalancePreview" instance=ExtResource("1_base")]
+script = ExtResource("2_script")
+auto_open_debug_panel = true
+stop_regular_spawns = true
+run_duration_seconds = 60.0
+auto_print_summary = true
+support_fleet_limit = 1

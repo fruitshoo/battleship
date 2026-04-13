@@ -28,14 +28,14 @@ static func handle_input(ship, delta: float) -> void:
 		toggle_fleet_formation(ship)
 
 static func toggle_fleet_formation(ship) -> void:
-	if ship.CHASER_SHIP_SCRIPT.fleet_formation == ship.CHASER_SHIP_SCRIPT.Formation.COLUMN:
-		ship.CHASER_SHIP_SCRIPT.fleet_formation = ship.CHASER_SHIP_SCRIPT.Formation.WING
-		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-			ship._cached_hud.show_message("함대 진형: 학익진 (Wing)", 2.0)
-	else:
+	ship.CHASER_SHIP_SCRIPT.support_hold_formation = not bool(ship.CHASER_SHIP_SCRIPT.support_hold_formation)
+	if ship.CHASER_SHIP_SCRIPT.support_hold_formation:
 		ship.CHASER_SHIP_SCRIPT.fleet_formation = ship.CHASER_SHIP_SCRIPT.Formation.COLUMN
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-			ship._cached_hud.show_message("함대 진형: 장사진 (Column)", 2.0)
+			ship._cached_hud.show_message("지원함: 진형 유지", 2.0)
+	else:
+		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
+			ship._cached_hud.show_message("지원함: 자유 교전", 2.0)
 
 static func update_rowing_audio(ship, delta: float) -> void:
 	if ship.is_rowing:

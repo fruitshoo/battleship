@@ -1,5 +1,6 @@
 extends Node3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DEBUG_COMBAT_LOGS := false
 
 ## 장군전 발사기 (Janggun Launcher)
@@ -24,6 +25,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not _is_owner_combat_ready():
+		_cached_target = null
 		return
 	
 	if cooldown_timer > 0:
@@ -59,9 +61,11 @@ func _is_owner_combat_ready() -> bool:
 		_owner_ship = _resolve_owner_ship()
 	if not is_instance_valid(_owner_ship):
 		return true
+	if _owner_ship.has_method("are_weapons_disabled") and _owner_ship.are_weapons_disabled():
+		return false
 	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
 		return false
-	return true
+	return _owner_ship.get("deck_is_overrun") != true
 
 func _is_target_valid(target: Variant) -> bool:
 	if not is_instance_valid(target) or not (target is Node3D):
@@ -112,39 +116,47 @@ func fire(target: Variant) -> void:
 	# 5레벨 체계: 쿨다운 감소폭 상향 (레벨당 1.4초 감소, 5레벨에서 약 5초대 도달)
 	cooldown_timer = maxf(5.0, fire_cooldown - janggun_lv * 1.4)
 	
-	var missile = ScenePool.acquire(get_tree(), missile_scene)
-	missile.start_pos = global_position + Vector3(0, 1.0, 0)
+	var spawn_pos: Vector3 = global_position + Vector3(0, 1.0, 0)
 	
 	# 예측 사격 (Predictive Aiming)
-	var dist = global_position.distance_to(target_node.global_position)
+	var dist = spawn_pos.distance_to(target_node.global_position)
 	# 레벨당 속도 증가폭 상향 (0.1 -> 0.15)
-	var projectile_speed = 18.0 * (1.0 + janggun_lv * 0.15)
+	var projectile_speed = 16.5 * (1.0 + janggun_lv * 0.15)
 	var travel_time = dist / projectile_speed
 	
 	# 타겟의 속도와 방향 가져오기
-	var target_speed = 0.0
-	if "current_speed" in target_node:
-		target_speed = target_node.current_speed
-	elif "move_speed" in target_node: # chaser_ship 등
-		target_speed = target_node.move_speed
-		
-	var target_dir = - target_node.global_transform.basis.z
-	var target_velocity = target_dir * target_speed
+	var target_speed: float = NodeContractHelper.get_current_speed_value(target_node)
+	var target_dir: Vector3 = target_node.get_move_direction_value() if target_node.has_method("get_move_direction_value") else - target_node.global_transform.basis.z
+	target_dir.y = 0.0
+	if target_dir.length_squared() > 0.001:
+		target_dir = target_dir.normalized()
+	else:
+		target_dir = Vector3.FORWARD
 	
 	# 예상 도달 위치 계산
-	var predicted_pos = target_node.global_position + (target_velocity * travel_time)
+	var lead_offset: Vector3 = target_dir * target_speed * travel_time * 0.62
+	var max_lead: float = clampf(dist * 0.24, 1.2, 5.5)
+	if lead_offset.length() > max_lead:
+		lead_offset = lead_offset.normalized() * max_lead
+	var predicted_pos: Vector3 = target_node.global_position + lead_offset
 	
-	missile.target_pos = predicted_pos
 	# 레벨당 데미지 증가폭 상향 (0.3 -> 0.5)
-	missile.damage = damage * (1.0 + janggun_lv * 0.5)
-	missile.speed = projectile_speed
-	if "team" in missile:
-		missile.team = team
-	if "janggun_lv" in missile:
-		missile.janggun_lv = janggun_lv
+	var missile_damage: float = damage * (1.0 + janggun_lv * 0.5)
 	
+	var missile = ScenePool.acquire(get_tree(), missile_scene)
 	get_tree().root.add_child(missile)
-	missile.global_position = missile.start_pos
+	if missile.has_method("launch"):
+		missile.launch(spawn_pos, predicted_pos, team, missile_damage, projectile_speed, janggun_lv)
+	else:
+		missile.start_pos = spawn_pos
+		missile.target_pos = predicted_pos
+		missile.damage = missile_damage
+		missile.speed = projectile_speed
+		if "team" in missile:
+			missile.team = team
+		if "janggun_lv" in missile:
+			missile.janggun_lv = janggun_lv
+		missile.global_position = spawn_pos
 	
 	if DEBUG_COMBAT_LOGS:
 		print("🪵 장군전 예측 사격 발사! (예상 시간: %.1fs)" % travel_time)

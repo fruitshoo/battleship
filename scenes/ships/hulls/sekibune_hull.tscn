@@ -1,6 +1,5 @@
 [gd_scene format=3 uid="uid://qv4d3dnh8v4u"]
 
-[ext_resource type="PackedScene" path="res://scenes/entities/launchers/cannon_enemy_light.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
@@ -24,8 +23,3 @@ sail_uv_offset = Vector2(0.02, 0.26)
 
 [node name="RudderVisual" parent="." unique_id=1052874943 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.5)
-
-[node name="Cannons" type="Node3D" parent="." unique_id=1806470902]
-
-[node name="CannonFront" parent="Cannons" unique_id=1612720500 instance=ExtResource("cannon_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -3.8)

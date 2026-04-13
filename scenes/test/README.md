@@ -28,6 +28,9 @@
 - `boarding_navigation_preview.tscn`
   Front, port, rear, and starboard boarding approach scenarios.
   Script: `scripts/test/boarding_navigation_preview.gd`
+- `boarding_impact_contract.tscn`, `boarding_navigation_contract.tscn`, `boarding_chaos_contract.tscn`, `support_boarding_contract.tscn`, `auto_raid_recall_contract.tscn`, `soldier_incapacitation_contract.tscn`
+  Focused boarding contract scenes for impact gating, approach geometry, cleanup/chaos handling, support boarding, raid recall, and incapacitation behavior.
+  Wrapper: `scripts/test/run_boarding_contracts.sh`
 - `firepot_preview.tscn`
   Fire pot attack gating scenarios such as no target, no tosser, and out of range.
   Script: `scripts/test/firepot_preview.gd`
@@ -52,6 +55,11 @@
   Script: `scripts/test/ship_combat_gauntlet_preview.gd`
   Wrapper: `scripts/test/run_ship_combat_gauntlet_preview.sh`
   Pass `crew_sustain`, `cannon_pressure`, `crew_sustain_cannon`, `fleet_screen`, or `crew_sustain_fleet` as the first wrapper argument to inject an upgrade preset and compare long-run attrition.
+- `mid_boss_balance_preview.tscn`
+  Single-run mid-boss encounter harness with the player ship, support fleet, mid-boss, and escorts.
+  Prints outcome, hull loss, crew loss, boarding, support, and escort survival metrics.
+  Script: `scripts/test/mid_boss_balance_preview.gd`
+  Wrapper: `scripts/test/run_mid_boss_balance_preview.sh`
 - `upgrade_choice_preview.tscn`
   Early upgrade draft harness that simulates the first six ship/crew picks across repeated trials.
   Prints per-round offer and pick counts so core upgrades can be checked without a full run.
@@ -66,10 +74,16 @@
 - `midgame_fleet_battle_preview.tscn`
   Midgame fleet battle harness that stages repeating mixed and heavy waves at a fixed combat state.
   Supports `visual_compare` to compare lean battle load against full debug/visual load.
-  Prints phase summaries with average and p95 frame time.
+  Supports runtime leak probing in stress mode with periodic combat-load cleanup cycles.
+  Prints phase summaries with average and p95 frame time, or runtime monitor summaries with memory, object, resource, node, and orphan-node counts.
   Script: `scripts/test/midgame_fleet_battle_preview.gd`
-  Wrapper: `scripts/test/run_midgame_performance_compare.sh`
-  The wrapper auto-quits after the compare report, fails on common runtime errors, and can gate deltas with `MIDGAME_MAX_DELTA_AVG_MS` and `MIDGAME_MAX_DELTA_P95_MS`.
+  Wrappers: `scripts/test/run_midgame_performance_compare.sh`, `scripts/test/run_midgame_runtime_leak_probe.sh`
+  The compare wrapper auto-quits after the compare report, fails on common runtime errors, and can gate deltas with `MIDGAME_MAX_DELTA_AVG_MS` and `MIDGAME_MAX_DELTA_P95_MS`.
+  The runtime leak wrapper defaults to a 300s run with 60s cleanup cycles and can gate orphan nodes and static-memory delta with `MIDGAME_RUNTIME_MAX_ORPHAN_NODES` and `MIDGAME_RUNTIME_MAX_STATIC_MB_DELTA`.
+- `startup_hitch_probe.tscn`
+  Startup frame-time probe for warmup and early cannon-fire hitch checks.
+  Script: `scripts/test/startup_hitch_probe.gd`
+  Wrapper: `scripts/test/run_startup_hitch_probe.sh`
 
 ## Sandbox
 
@@ -107,6 +121,11 @@
   Scene wiring smoke for player, enemy, boss, and firepot ship scene contracts.
 - `scripts/test/run_project_contract_sweep.sh`
   Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
+- `scripts/test/run_boarding_contracts.sh`
+  Shell wrapper for focused boarding contracts covering impact gating, navigation, chaos, support boarding, auto-raid recall, and soldier incapacitation.
+  Runs each contract through the generic scene load probe and fails on common script/runtime log errors.
+- `scripts/test/harness_log_gate.sh`
+  Shared shell helper for common Godot script/runtime log error gates used by headless test wrappers.
 - `scripts/test/run_soldier_balance_preview.sh`
   Headless wrapper for the soldier balance harness.
   Auto-quits after the summary report and fails on common runtime log errors or missing summary output.
@@ -118,6 +137,12 @@
   Auto-quits after the summary report, skips startup prewarm, disables runtime rewards/autosave, and fails on common runtime log errors or missing summary output.
   Accepts an optional first argument such as `crew_sustain`, `cannon_pressure`, `crew_sustain_cannon`, `fleet_screen`, or `crew_sustain_fleet` to apply a gauntlet upgrade preset before the encounter chain begins.
   Accepts an optional second argument `no_recovery` to disable survivor, floating loot, and treasure recovery pickups during the gauntlet.
+- `scripts/test/run_mid_boss_balance_preview.sh`
+  Headless wrapper for the mid-boss balance harness.
+  Defaults to a 60 second run with one support ship; pass duration and support limit as optional arguments.
+- `scripts/test/run_mid_boss_balance_compare.sh`
+  Runs the mid-boss balance harness across support-fleet limits.
+  Defaults to a 60 second run with support limits 0, 1, and 2; pass duration first and optional support limits after it.
 - `scripts/test/run_upgrade_choice_preview.sh`
   Headless wrapper for the upgrade choice draft harness.
   Auto-quits after the summary report and fails on common runtime log errors or missing summary output.

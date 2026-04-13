@@ -124,9 +124,11 @@ static func become_derelict(ship) -> void:
 	tilt_tween.set_parallel(true)
 	tilt_tween.tween_property(ship, "position:y", ship.base_y - 1.0, 2.0)
 
+	var ship_id: int = ship.get_instance_id()
 	ship.get_tree().create_timer(DERELICT_NONBLOCKING_DELAY).timeout.connect(func():
-		if is_instance_valid(ship) and ship.is_derelict and not ship.is_sinking:
-			ship.set_meta("derelict_nonblocking", true)
+		var derelict_ship = instance_from_id(ship_id)
+		if is_instance_valid(derelict_ship) and derelict_ship.is_derelict and not derelict_ship.is_sinking:
+			derelict_ship.set_meta("derelict_nonblocking", true)
 	)
 
 

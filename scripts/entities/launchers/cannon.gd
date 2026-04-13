@@ -20,6 +20,8 @@ const DEBUG_CANNON_FIRE_LOGS := false
 @export_range(0.0, 8.0, 0.1) var base_inaccuracy_deg: float = 1.0
 @export_range(0.0, 8.0, 0.1) var moving_target_inaccuracy_deg: float = 2.2
 @export_range(0.1, 1.0, 0.05) var prediction_lead_factor: float = 0.72
+@export_range(1.0, 4.0, 0.05) var boarding_reload_cooldown_mult: float = 1.55
+@export_range(1.0, 4.0, 0.05) var boarded_reload_cooldown_mult: float = 1.85
 @export var team: String = "player" # "player" or "enemy"
 
 @onready var muzzle: Marker3D = $Muzzle
@@ -101,14 +103,11 @@ func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 
 
 func _process(delta: float) -> void:
-	# 0. 소유 배 상태 체크: 배가 침몰/파괴/폐선이면 발사 불가
-	if not is_instance_valid(_owner_ship):
-		_owner_ship = _resolve_owner_ship()
-	if is_instance_valid(_owner_ship):
-		if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
-			is_preparing = false
-			current_target = null
-			return
+	# 0. 소유 배 상태 체크: 배가 침몰/파괴/폐선이거나 갑판을 빼앗기면 발사 불가
+	if not _is_owner_weapon_ready():
+		is_preparing = false
+		current_target = null
+		return
 
 	if is_preparing:
 		# 발사 대기 중에도 타겟이 유효한지 실시간 체크
@@ -151,6 +150,17 @@ func _resolve_owner_ship() -> Node:
 			return node
 		node = node.get_parent()
 	return null
+
+func _is_owner_weapon_ready() -> bool:
+	if not is_instance_valid(_owner_ship):
+		_owner_ship = _resolve_owner_ship()
+	if not is_instance_valid(_owner_ship):
+		return true
+	if _owner_ship.has_method("are_weapons_disabled") and _owner_ship.are_weapons_disabled():
+		return false
+	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
+		return false
+	return _owner_ship.get("deck_is_overrun") != true
 
 func _get_current_range() -> float:
 	return detection_range * _cached_range_mult
@@ -334,7 +344,18 @@ func _get_current_cooldown() -> float:
 	var cooldown_mult: float = _cached_cd_mult * fleet_cooldown_mult
 	if is_instance_valid(_owner_ship) and _owner_ship.has_method("get_gunnery_reload_multiplier"):
 		cooldown_mult *= float(_owner_ship.call("get_gunnery_reload_multiplier"))
+	cooldown_mult *= _get_boarding_reload_cooldown_mult()
 	return fire_cooldown * cooldown_mult
+
+func _get_boarding_reload_cooldown_mult() -> float:
+	if not is_instance_valid(_owner_ship):
+		return 1.0
+	var mult: float = 1.0
+	if _owner_ship.has_method("is_boarding_ship") and _owner_ship.is_boarding_ship():
+		mult = maxf(mult, boarding_reload_cooldown_mult)
+	if _owner_ship.has_method("get_boarding_attacker_ship") and is_instance_valid(_owner_ship.get_boarding_attacker_ship()):
+		mult = maxf(mult, boarded_reload_cooldown_mult)
+	return mult
 
 func _get_next_reload_cooldown() -> float:
 	var base_cooldown: float = _get_current_cooldown()
@@ -364,10 +385,9 @@ func fire(target_enemy: Node3D) -> void:
 
 func _execute_fire() -> void:
 	is_preparing = false
-	if is_instance_valid(_owner_ship):
-		if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
-			current_target = null
-			return
+	if not _is_owner_weapon_ready():
+		current_target = null
+		return
 	
 	# 최종 발사 직전 다시 한번 타겟 유효성 검증
 	if not _is_target_valid(current_target):

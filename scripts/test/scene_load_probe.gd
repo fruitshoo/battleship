@@ -4,6 +4,7 @@ extends Node
 
 
 func _ready() -> void:
+	auto_quit_delay_seconds = _get_auto_quit_delay_seconds(auto_quit_delay_seconds)
 	var scene_path := _get_probe_scene_path()
 	var loaded_resource: Resource = load(scene_path)
 	if loaded_resource == null:
@@ -36,3 +37,10 @@ func _quit_after_probe() -> void:
 func _env_flag_enabled(name: String) -> bool:
 	var value := OS.get_environment(name).strip_edges().to_lower()
 	return value == "1" or value == "true" or value == "yes" or value == "on"
+
+
+func _get_auto_quit_delay_seconds(default_value: float) -> float:
+	var value := OS.get_environment("BATTLESHIP_PROBE_AUTO_QUIT_DELAY").strip_edges()
+	if value.is_empty():
+		return default_value
+	return maxf(0.0, value.to_float())

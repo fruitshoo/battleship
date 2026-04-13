@@ -151,7 +151,8 @@ func _expire_and_free() -> void:
 	tween.tween_property(self , "position:y", position.y - 2.0, 3.0)
 	if visual:
 		tween.tween_property(visual, "scale", Vector3.ZERO, 3.0)
-	tween.chain().tween_callback(func(): ScenePool.release(self))
+	var self_id: int = get_instance_id()
+	tween.chain().tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 
 
 func _apply_floating(delta: float) -> void:
@@ -258,7 +259,7 @@ func _collect_loot() -> void:
 			_cached_lm.add_score(gold_amount)
 			
 	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
-	if is_instance_valid(target_player) and target_player.is_inside_tree() and "hull_hp" in target_player and "max_hull_hp" in target_player:
+	if is_instance_valid(target_player) and target_player.is_inside_tree() and "hull_hp" in target_player and "max_hull_hp" in target_player and _can_apply_loot_hull_heal(target_player):
 		var heal_amount: float = 5.0
 		var stamina_recover: float = 0.0
 		if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
@@ -279,6 +280,17 @@ func _collect_loot() -> void:
 	if visual:
 		var tween = create_tween()
 		tween.tween_property(visual, "scale", Vector3.ZERO, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-		tween.tween_callback(func(): ScenePool.release(self))
+		var self_id: int = get_instance_id()
+		tween.tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 	else:
 		ScenePool.release(self)
+
+
+func _can_apply_loot_hull_heal(player_ship: Node) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	if player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true:
+		return false
+	if player_ship.get("deck_hostile_boarder_count") != null and int(player_ship.get("deck_hostile_boarder_count")) > 0:
+		return false
+	return true

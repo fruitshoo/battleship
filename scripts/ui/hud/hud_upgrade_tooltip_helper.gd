@@ -108,6 +108,10 @@ static func update_upgrade_track_slot(hud, upgrade_id: String, level: int, track
 		return
 	var actual_icon: String = HudUpgradeInfoHelper.get_upgrade_icon(upgrade_id)
 	var actual_color: Color = HudUpgradeInfoHelper.get_upgrade_color(upgrade_id)
+	var actual_texture: Texture2D = null
+	var icon_texture_path: String = HudUpgradeInfoHelper.get_upgrade_icon_texture_path(upgrade_id)
+	if not icon_texture_path.is_empty():
+		actual_texture = ResourceLoader.load(icon_texture_path, "", ResourceLoader.CACHE_MODE_REUSE) as Texture2D
 	var track_node = hud.weapon_track if track == "ship" else hud.support_track
 	if not track_node:
 		return
@@ -126,7 +130,7 @@ static func update_upgrade_track_slot(hud, upgrade_id: String, level: int, track
 			slot_idx = hud.active_supports.size()
 			hud.active_supports[upgrade_id] = slot_idx
 
-	var slot = track_node.update_slot(slot_idx, upgrade_id, level, actual_icon, actual_color)
+	var slot = track_node.update_slot(slot_idx, upgrade_id, level, actual_icon, actual_color, actual_texture)
 	if is_instance_valid(slot) and slot.get_meta("hover_bound", false) != true:
 		bind_upgrade_slot_hover(hud, slot)
 		slot.set_meta("hover_bound", true)

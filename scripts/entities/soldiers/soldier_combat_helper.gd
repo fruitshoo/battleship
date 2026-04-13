@@ -1,36 +1,10 @@
 extends RefCounted
 
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
-const SceneGroupCache = preload("res://scripts/helpers/scene_group_cache.gd")
-const IMPACT_PUFF_SCENE = preload("res://scenes/effects/impact_puff.tscn")
-
-
 static func perform_special_attack(soldier, target: Node3D) -> void:
 	if not is_instance_valid(target):
 		return
 
-	if is_instance_valid(soldier.owned_ship) and target == soldier.owned_ship.get("boarding_attacker"):
-		if soldier.team == "player":
-			if soldier.owned_ship.has_method("take_rope_damage"):
-				soldier.owned_ship.take_rope_damage(soldier.attack_damage * 1.5)
-				play_rope_hit_effects(soldier)
-				return
-
 	perform_attack(soldier)
-
-
-static func play_rope_hit_effects(soldier) -> void:
-	var audio_manager = soldier.get_node_or_null("/root/AudioManager")
-	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("impact_wood", soldier.global_position, randf_range(1.1, 1.3))
-
-	var effect = ScenePool.acquire(soldier.get_tree(), IMPACT_PUFF_SCENE)
-	if effect.has_method("configure_as_hit"):
-		effect.configure_as_hit()
-	soldier.get_tree().root.add_child(effect)
-	effect.global_position = soldier.global_position + (soldier.global_transform.basis.z * -1.0)
-	if effect.has_method("pool_activate"):
-		effect.pool_activate()
 
 
 static func perform_attack(soldier) -> void:

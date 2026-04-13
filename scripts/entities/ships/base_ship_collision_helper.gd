@@ -205,7 +205,7 @@ static func _repair_player_from_derelict_contact(player_ship, source_ship: Node 
 	var rescued_crew: int = 0
 	if is_boss_salvage and player_ship.has_method("add_survivor"):
 		for _i in range(BOSS_DERELICT_CONTACT_SURVIVOR_RESCUES):
-			if player_ship.add_survivor():
+			if player_ship.add_survivor(true):
 				rescued_crew += 1
 
 	var level_manager: Node = null

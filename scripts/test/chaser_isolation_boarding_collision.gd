@@ -10,6 +10,27 @@ func can_board_targets() -> bool:
 	return allow_boarding
 
 
+func get_target_ship() -> Node3D:
+	return target if is_instance_valid(target) else null
+
+
+func _mark_boarding_impact(target_ship: Node3D, grace_duration: float = 1.25) -> void:
+	if not is_instance_valid(target_ship):
+		return
+	set_meta("boarding_impact_target_id", target_ship.get_instance_id())
+	set_meta("boarding_impact_grace_timer", grace_duration)
+
+
+func _has_recent_boarding_impact(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if not has_meta("boarding_impact_grace_timer"):
+		return false
+	if float(get_meta("boarding_impact_grace_timer", 0.0)) <= 0.0:
+		return false
+	return int(get_meta("boarding_impact_target_id", 0)) == target_ship.get_instance_id()
+
+
 func _process_boarding(delta: float) -> void:
 	ChaserShipBoardingHelper.process_boarding(self, delta)
 
@@ -38,6 +59,9 @@ func _on_body_entered(body: Node3D) -> void:
 	if not can_board_targets():
 		return
 	if body.is_in_group("player") or (body.get_parent() and body.get_parent().is_in_group("player")):
+		var ship_node := body if body.is_in_group("player") else body.get_parent()
+		if is_instance_valid(ship_node) and ship_node is Node3D:
+			_mark_boarding_impact(ship_node as Node3D)
 		_board_ship(body)
 
 
@@ -85,7 +109,11 @@ func _board_ship(target_ship: Node3D) -> void:
 	if is_derelict:
 		return
 
-	if not _is_side_boarding_approach(ship_node):
+	var can_side_board: bool = _is_side_boarding_approach(ship_node)
+	var can_head_on_board: bool = _can_force_head_on_boarding(ship_node)
+	if not can_side_board and not can_head_on_board:
+		return
+	if not _has_recent_boarding_impact(ship_node):
 		return
 
 	if not has_rammed:
@@ -106,9 +134,10 @@ func _board_ship(target_ship: Node3D) -> void:
 	var remote_defenders_engaged: bool = _has_remote_engaged_boarding_defenders(ship_node)
 	set_meta("boarding_remote_defenders_engaged", remote_defenders_engaged)
 	var contact_allows_boarding: bool = remote_defenders_engaged and (contact_defenders <= 0 or my_crew > contact_defenders)
-	if my_crew > enemy_crew or contact_allows_boarding:
+	if my_crew > enemy_crew or can_head_on_board or contact_allows_boarding:
 		is_boarding = true
 		boarding_target = ship_node
+		set_meta("boarding_contact_mode", "head_on" if can_head_on_board and not can_side_board else "side")
 
 		if boarding_target.has_method("set_boarding_attacker_ship"):
 			boarding_target.set_boarding_attacker_ship(self)
@@ -127,6 +156,37 @@ func _board_ship(target_ship: Node3D) -> void:
 	else:
 		if DEBUG_COMBAT_LOGS:
 			print("[Skirmish] 접점 방어를 돌파하지 못해 도선하지 않고 대치합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
+
+
+func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if not target_ship.is_in_group("player"):
+		return false
+	var enemy_crew: int = int(target_ship.call("get_alive_crew_count")) if target_ship.has_method("get_alive_crew_count") else 0
+	var state: Dictionary = _get_boarding_alignment_state(target_ship)
+	if state.is_empty():
+		return false
+	var my_contact_dot: float = float(state.get("my_contact_dot", -1.0))
+	var target_contact_abs: float = absf(float(state.get("target_contact_dot", 1.0)))
+	var closing_speed: float = float(state.get("closing_speed", 999.0))
+	var center_distance: float = global_position.distance_to(target_ship.global_position)
+	var collision_distance: float = get_collision_distance_to(target_ship)
+	if center_distance > collision_distance + 1.0:
+		return false
+	if enemy_crew <= 0:
+		return true
+	var bow_to_side_contact: bool = (
+		my_contact_dot >= 0.58
+		and target_contact_abs <= 0.72
+		and center_distance <= collision_distance + 0.85
+		and closing_speed <= boarding_max_relative_speed * 2.6
+	)
+	if bow_to_side_contact:
+		return true
+	if enemy_crew == 1 and center_distance <= collision_distance + 0.45:
+		return true
+	return enemy_crew <= 1 and my_contact_dot >= 0.52 and target_contact_abs <= 0.92 and closing_speed <= boarding_max_relative_speed * 2.4
 
 
 func _count_boarding_contact_defenders(target_ship: Node3D) -> int:

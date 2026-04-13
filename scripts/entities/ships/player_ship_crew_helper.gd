@@ -1,7 +1,10 @@
 extends RefCounted
 
 const RAID_SWITCH_BUFFER: float = 2.0
+const RAID_LARGE_TARGET_EDGE_BUFFER: float = 1.45
+const RAID_LARGE_TARGET_ALONG_BUFFER: float = 1.0
 const RAID_MAX_ACTIVE_THREATS: int = 1
+const AUTO_RAID_BOARDING_PURPOSE := "auto_raid"
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 static func get_desired_player_captain_count(ship) -> int:
@@ -65,6 +68,22 @@ static func spawn_player_soldier(ship, soldiers_node: Node, role: String, captai
 		ship._cached_um._apply_current_stats_to_soldier(soldier)
 	return soldier
 
+static func get_player_roster_count(ship) -> int:
+	var count := 0
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(child):
+			continue
+		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
+			continue
+		elif not child.has_method("is_player_team_soldier") and str(child.get("team")) != "player":
+			continue
+		var is_incapacitated: bool = child.has_method("is_incapacitated_soldier") and child.is_incapacitated_soldier()
+		if is_incapacitated:
+			count += 1
+		elif child.has_method("is_dead_soldier") and not child.is_dead_soldier():
+			count += 1
+	return count
+
 static func sync_player_crew_roster(ship) -> void:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if not soldiers_node:
@@ -117,29 +136,26 @@ static func sync_player_crew_roster(ship) -> void:
 		for _i in range(max(0, missing)):
 			spawn_player_soldier(ship, soldiers_node, role)
 
-static func add_survivor(ship) -> bool:
+static func add_survivor(ship, allow_over_capacity: bool = false) -> bool:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if not soldiers_node:
 		return false
-	var alive_count = 0
+	var roster_count: int = get_player_roster_count(ship)
+	if not allow_over_capacity and roster_count >= int(ship.max_crew_count):
+		return false
+	var alive_count = roster_count
 	var soldiers = EntityRegistry.get_soldiers_by_ship(ship)
 	for child in soldiers:
-		if child.has_method("is_dead_soldier") and not child.is_dead_soldier():
-			alive_count += 1
+		if child.has_method("is_player_team_soldier") and child.is_player_team_soldier():
+			continue
+		elif not child.has_method("is_player_team_soldier") and str(child.get("team")) == "player":
+			continue
+		if child.has_method("is_incapacitated_soldier") and child.is_incapacitated_soldier():
+			continue
+		elif child.has_method("is_dead_soldier") and not child.is_dead_soldier():
+			continue
 		else:
 			child.queue_free()
-
-	if alive_count >= ship.max_crew_count:
-		var reward: int = max(1, int(ship.survivor_merit_reward))
-		if is_instance_valid(ship._cached_level_manager) and ship._cached_level_manager.has_method("add_merit"):
-			ship._cached_level_manager.add_merit(reward)
-		print("[Rescue] 생존자 구조 성공! 정원이 가득 차 지휘 포인트 %d를 획득했습니다. (현재: %d/%d)" % [reward, alive_count, ship.max_crew_count])
-		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-			ship._cached_hud.show_message("생존자 구조: 지휘 +%d" % reward, 2.0)
-		var overflow_audio_manager = ship.get_node_or_null("/root/AudioManager")
-		if is_instance_valid(overflow_audio_manager) and overflow_audio_manager.has_method("play_sfx"):
-			overflow_audio_manager.play_sfx("soldier_hit", ship.global_position, 1.3)
-		return true
 
 	var desired = get_desired_player_crew_roles(ship)
 	var desired_captains: int = get_desired_player_captain_count(ship)
@@ -175,10 +191,14 @@ static func add_survivor(ship) -> bool:
 		return true
 
 	var role_to_add = ship.CREW_ROLE_GENERAL
+	var found_slot := false
 	for candidate in [ship.CREW_ROLE_SPEARMAN, ship.CREW_ROLE_REPEATING_CROSSBOW, ship.CREW_ROLE_SINGIGEON, ship.CREW_ROLE_FIRE_POT, ship.CREW_ROLE_GENERAL]:
 		if int(current_by_role.get(candidate, 0)) < int(desired.get(candidate, 0)):
 			role_to_add = candidate
+			found_slot = true
 			break
+	if not found_slot and not allow_over_capacity:
+		return false
 	spawn_player_soldier(ship, soldiers_node, role_to_add)
 
 	print("[Rescue] 생존자 구조 성공! 아군 병사 1명 합류. (현재: %d/%d)" % [alive_count + 1, ship.max_crew_count])
@@ -259,10 +279,13 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 static func update_auto_boarding_raid(ship, delta: float) -> void:
 	if ship.auto_raid_enabled != true:
 		_recall_raid_boarders(ship)
+		_cancel_auto_raid_boarding_link(ship)
 		ship.auto_raid_target = null
 		return
-	if ship.is_sinking or ship.is_dying or ship.is_boarding:
+	var is_auto_raid_boarding: bool = ship.is_boarding and str(ship.get_meta("boarding_purpose", "")) == AUTO_RAID_BOARDING_PURPOSE
+	if ship.is_sinking or ship.is_dying or (ship.is_boarding and not is_auto_raid_boarding):
 		_recall_raid_boarders(ship)
+		_cancel_auto_raid_boarding_link(ship)
 		ship.auto_raid_target = null
 		return
 
@@ -270,13 +293,19 @@ static func update_auto_boarding_raid(ship, delta: float) -> void:
 
 	var current_target: Node3D = ship.auto_raid_target
 	if is_instance_valid(current_target) and not _can_continue_raid(ship, current_target):
+		if _recall_raid_boarders_with_link(ship, current_target):
+			ship.auto_raid_target = current_target
+			return
 		current_target = null
 
 	if ship.auto_raid_eval_timer <= 0.0:
 		ship.auto_raid_eval_timer = float(ship.auto_raid_eval_interval)
 		var next_target: Node3D = _find_raid_target(ship)
 		if current_target != next_target and _count_boarders_from_home(ship) > 0:
-			_recall_raid_boarders(ship)
+			if _recall_raid_boarders_with_link(ship, current_target):
+				ship.auto_raid_target = current_target
+				return
+			_recall_raid_boarders(ship, current_target)
 			current_target = null
 		else:
 			current_target = next_target
@@ -284,8 +313,10 @@ static func update_auto_boarding_raid(ship, delta: float) -> void:
 	ship.auto_raid_target = current_target
 
 	if is_instance_valid(current_target):
+		_ensure_auto_raid_boarding_link(ship, current_target)
 		_dispatch_raid_boarders(ship, current_target)
 	else:
+		_cancel_auto_raid_boarding_link(ship)
 		_recall_raid_boarders(ship)
 
 
@@ -406,6 +437,8 @@ static func _dispatch_raid_boarders(ship, target_ship: Node3D) -> void:
 	if desired_boarders <= 0:
 		_recall_raid_boarders(ship)
 		return
+	if not _has_auto_raid_boarding_rope_ready(ship, target_ship):
+		return
 
 	var current_boarders: Array = _get_home_boarders_on_ship(ship, target_ship)
 	if current_boarders.size() >= desired_boarders:
@@ -428,7 +461,84 @@ static func _dispatch_raid_boarders(ship, target_ship: Node3D) -> void:
 		current_boarders.append(soldier)
 
 
-static func _recall_raid_boarders(ship) -> void:
+static func _ensure_auto_raid_boarding_link(ship, target_ship: Node3D) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(target_ship):
+		return
+	if ship.is_boarding and ship.get_boarding_target_ship() == target_ship and str(ship.get_meta("boarding_purpose", "")) == AUTO_RAID_BOARDING_PURPOSE:
+		return
+	if ship.is_boarding:
+		if str(ship.get_meta("boarding_purpose", "")) != AUTO_RAID_BOARDING_PURPOSE:
+			return
+		_cancel_auto_raid_boarding_link(ship)
+
+	ship.is_boarding = true
+	ship.boarding_target = target_ship
+	ship.set_meta("boarding_purpose", AUTO_RAID_BOARDING_PURPOSE)
+	ship.set_meta("boarding_transfer_suppressed", true)
+	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(target_ship):
+		ship.set_meta("boarding_contact_mode", "side")
+	else:
+		ship.set_meta("boarding_contact_mode", "cleanup")
+
+	var hold_forward: Vector3 = -ship.global_transform.basis.z
+	hold_forward.y = 0.0
+	if hold_forward.length_squared() > 0.001:
+		ship.set_meta("boarding_hold_forward", hold_forward.normalized())
+	if target_ship.has_method("set_boarding_attacker_ship"):
+		target_ship.set_boarding_attacker_ship(ship)
+	if ship.has_method("_clear_ropes"):
+		ship._clear_ropes()
+	ship.boarding_timer = 0.0
+	ship.boarding_prep_timer = 0.0
+	ship.boarding_contact_timer = 0.0
+	ship.boarding_hook_timer = 0.0
+	ship.boarding_secondary_rope_timer = 0.0
+	ship.set_meta("boarding_motion_settle_timer", 0.0)
+	if "_initial_rope_deployed" in ship:
+		ship.set("_initial_rope_deployed", false)
+	if "_full_rope_deployed" in ship:
+		ship.set("_full_rope_deployed", false)
+
+
+static func _cancel_auto_raid_boarding_link(ship) -> void:
+	if not is_instance_valid(ship):
+		return
+	if str(ship.get_meta("boarding_purpose", "")) != AUTO_RAID_BOARDING_PURPOSE:
+		return
+	if ship.has_method("_cancel_boarding"):
+		ship._cancel_boarding()
+		return
+	ship.is_boarding = false
+	ship.boarding_target = null
+	ship.remove_meta("boarding_purpose")
+	ship.remove_meta("boarding_transfer_suppressed")
+
+
+static func _has_auto_raid_boarding_rope_ready(ship, target_ship: Node3D) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(target_ship):
+		return false
+	if str(ship.get_meta("boarding_purpose", "")) != AUTO_RAID_BOARDING_PURPOSE:
+		return false
+	if not ship.is_boarding or ship.get_boarding_target_ship() != target_ship:
+		return false
+	if ship.has_method("has_boarding_rope_link_to"):
+		return ship.has_boarding_rope_link_to(target_ship) == true
+	if "_initial_rope_deployed" in ship:
+		return ship.get("_initial_rope_deployed") == true
+	return false
+
+
+static func _recall_raid_boarders_with_link(ship, target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if _get_home_boarders_on_ship(ship, target_ship).is_empty():
+		return false
+	_ensure_auto_raid_boarding_link(ship, target_ship)
+	_recall_raid_boarders(ship, target_ship)
+	return not _get_home_boarders_on_ship(ship, target_ship).is_empty()
+
+
+static func _recall_raid_boarders(ship, target_ship: Node3D = null) -> void:
 	var all_soldiers = EntityRegistry.get_soldiers_by_team("player")
 	for soldier in all_soldiers:
 		if not is_instance_valid(soldier):
@@ -440,6 +550,8 @@ static func _recall_raid_boarders(ship) -> void:
 		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
 		if soldier.has_method("get_owned_ship_node") and soldier.get_owned_ship_node() == ship:
+			continue
+		if is_instance_valid(target_ship) and soldier.has_method("get_owned_ship_node") and soldier.get_owned_ship_node() != target_ship:
 			continue
 		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
 			continue
@@ -600,19 +712,17 @@ static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
 	var max_distance: float = my_ext.y + other_ext.y + RAID_SWITCH_BUFFER
 	var large_target: bool = _is_large_raid_target(target_ship, other_ext)
 	if large_target:
-		# 대형 선체는 측면으로 길게 접촉하는 경우가 많아서
-		# 폭 성분도 같이 고려한 더 넉넉한 접현 거리로 본다.
-		max_distance += maxf(my_ext.x, other_ext.x) * 1.35
-		max_distance = maxf(max_distance, 18.0 + my_ext.x * 0.6)
+		var broad_phase_distance: float = max_distance + maxf(my_ext.x, other_ext.x) * 0.75
+		if ship.has_method("get_collision_distance_to"):
+			broad_phase_distance = maxf(broad_phase_distance, float(ship.call("get_collision_distance_to", target_ship)) + RAID_SWITCH_BUFFER)
+		if center_distance > broad_phase_distance:
+			return false
+		return _has_raid_deck_edge_contact(ship, target_ship, my_ext, other_ext)
 	var hull_contact_distance: float = max_distance
 	if ship.has_method("get_collision_distance_to"):
 		hull_contact_distance = maxf(hull_contact_distance, float(ship.call("get_collision_distance_to", target_ship)) + RAID_SWITCH_BUFFER)
 	if center_distance > hull_contact_distance:
 		return false
-	if large_target:
-		# 아타케부네처럼 긴 대형 선체는 중심선 정렬이 조금 어긋나도
-		# 실제로는 접현 가능한 경우가 많아서 거리 조건만 만족하면 월선 후보로 본다.
-		return true
 	if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_ship) == true:
 		return true
 
@@ -632,6 +742,39 @@ static func _is_ship_close_for_raid(ship, target_ship: Node3D) -> bool:
 	var target_contact_abs: float = absf(float(boarding_state.get("target_contact_dot", 1.0)))
 	var parallel_dot: float = float(boarding_state.get("parallel_dot", -1.0))
 	return my_contact_abs <= 0.82 and target_contact_abs <= 0.82 and parallel_dot >= -0.15
+
+
+static func _has_raid_deck_edge_contact(ship, target_ship: Node3D, my_ext: Vector2, other_ext: Vector2) -> bool:
+	if not ship.has_method("_get_boarding_alignment_state"):
+		return false
+	var state: Variant = ship.call("_get_boarding_alignment_state", target_ship)
+	if typeof(state) != TYPE_DICTIONARY:
+		return false
+	var boarding_state: Dictionary = state as Dictionary
+	if boarding_state.is_empty():
+		return false
+
+	var my_contact_abs: float = absf(float(boarding_state.get("my_contact_dot", 1.0)))
+	var target_contact_abs: float = absf(float(boarding_state.get("target_contact_dot", 1.0)))
+	var parallel_dot: float = float(boarding_state.get("parallel_dot", -1.0))
+	if my_contact_abs > 0.86 or target_contact_abs > 0.86 or parallel_dot < -0.2:
+		return false
+
+	var target_local_on_ship: Vector3 = ship.to_local(target_ship.global_position)
+	var ship_local_on_target: Vector3 = target_ship.to_local(ship.global_position)
+	var total_width: float = my_ext.x + other_ext.x
+	var total_length: float = my_ext.y + other_ext.y
+	var lateral_gap: float = maxf(
+		absf(target_local_on_ship.x) - total_width,
+		absf(ship_local_on_target.x) - total_width
+	)
+	if lateral_gap > RAID_LARGE_TARGET_EDGE_BUFFER:
+		return false
+	var along_gap: float = maxf(
+		absf(target_local_on_ship.z) - total_length,
+		absf(ship_local_on_target.z) - total_length
+	)
+	return along_gap <= RAID_LARGE_TARGET_ALONG_BUFFER
 
 
 static func _is_large_raid_target(target_ship: Node3D, target_ext: Vector2) -> bool:

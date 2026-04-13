@@ -98,25 +98,35 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
 			var rocket_damage: float = rocket_base_damage * (1.0 + 0.15 * float(next_level))
 			var cooldown: float = maxf(2.2, float(s.get("base_cooldown", 5.0)) - (float(next_level - 1) * float(s.get("cooldown_reduce_per_lv", 0.35))))
-			return "신기전병 %d명 편성 | 로켓 데미지 %.1f | 재사용 %.1f초" % [rocketeers, rocket_damage, cooldown]
+			return "신기전 %d명 | 로켓 %.1f | 재사용 %.1f초" % [rocketeers, rocket_damage, cooldown]
 		"crew_numbers":
 			var spearmen: int = get_specialist_unit_count(upgrades, current_levels, "crew_numbers", next_level)
-			return "전열 병력 %d명 | 창병/갑판 방어 강화" % spearmen
+			return "창병 %d명 편성" % spearmen
 		"crew_reserve":
-			var reserve_respawn: float = maxf(
-				float(s.get("min_respawn_interval", 9.0)),
-				12.0 - (float(next_level) * float(s.get("respawn_reduce_per_lv", 0.75)))
+			var recovery_delay: float = maxf(
+				float(s.get("min_incapacitated_recovery_delay", 7.0)),
+				16.0 - (float(next_level) * float(s.get("incapacitated_recovery_reduce_per_lv", 1.8)))
 			)
-			var heal_bonus: float = float(next_level) * float(s.get("survivor_hull_heal_per_lv", 0.5))
-			return "병사 자동 보충 %.1f초 | 구조 회복 +%.0f" % [reserve_respawn, heal_bonus]
+			var recovery_health_ratio: float = clampf(
+				0.35 + (float(next_level) * float(s.get("incapacitated_recovery_health_add_per_lv", 0.08))),
+				0.35,
+				float(s.get("max_incapacitated_recovery_health_ratio", 0.75))
+			)
+			return "전투불능 회복 %.1f초 | 회복 체력 %.0f%%" % [recovery_delay, recovery_health_ratio * 100.0]
 		"boarding_resist":
 			var capture_delay_pct: int = int(round(float(next_level) * float(s.get("capture_duration_mult_per_lv", 0.08)) * 100.0))
 			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.08)) * 100.0))
 			return "적 장악 %d%% 지연 | 갑판 혼란 피해 -%d%%" % [capture_delay_pct, boarding_fire_reduce_pct]
 		"crew_attack":
-			return "병사 공격력 +%.0f" % [next_level * float(s.get("attack_add_per_lv", 2.0))]
+			return "무기 피해 +%.0f" % [next_level * float(s.get("attack_add_per_lv", 2.0))]
 		"crew_defense":
-			return "병사 방어력 +%.0f" % [next_level * float(s.get("defense_add_per_lv", 1.0))]
+			var defense_bonus: float = next_level * float(s.get("defense_add_per_lv", 1.0))
+			var damage_reduction: float = clampf(
+				float(next_level) * float(s.get("damage_reduction_per_lv", 0.04)),
+				0.0,
+				float(s.get("max_damage_reduction", 0.22))
+			)
+			return "병사 방어력 +%.0f | 받는 피해 -%.0f%%" % [defense_bonus, damage_reduction * 100.0]
 		"hull_defense":
 			if level_matches(next_level, s.get("repair_levels", [])):
 				if level_matches(next_level, s.get("regen_levels", [])):
@@ -166,7 +176,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				cd = 3.5
 			if next_level >= 5:
 				cd = 3.0
-			return "화통병 %d명 편성 | 화염 데미지 %.0f | 재사용 %.1f초" % [throwers, dmg, cd]
+			return "화통 %d명 | 화염 %.0f | 재사용 %.1f초" % [throwers, dmg, cd]
 		"repeating_crossbow":
 			var repeaters: int = get_specialist_unit_count(upgrades, current_levels, "repeating_crossbow", next_level)
 			var burst: int = 3
@@ -175,7 +185,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			if next_level >= 5:
 				burst = 5
 			var repeater_damage: float = s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 2.0)
-			return "연노병 %d명 편성 | %d연발 | 데미지 %.0f" % [repeaters, burst, repeater_damage]
+			return "연노 %d명 | %d연발 | 피해 %.0f" % [repeaters, burst, repeater_damage]
 		"supply_bonus":
 			if level_matches(next_level, s.get("radius_levels", [])):
 				return "보급 습득 반경 +%.1fm" % float(s.get("radius_add", 5.0))
@@ -189,6 +199,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var pierce: int = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))
 			return "관통 화살 데미지 %.0f, 최대 %d명 관통 및 넉백" % [ballista_damage, pierce]
 		"fleet_signal":
+			if next_level >= int(s.get("limit_add_level", 2)):
+				return "지원함 한계 +%d | 즉시 추가 소집" % int(s.get("limit_add", 1))
 			return "희귀 카드: 지원함을 호출합니다.\n(이미 지원함이 있으면 수리 및 재정비)"
 		"fleet_crew":
 			var reduce_per_level: float = float(s.get("respawn_reduce_per_lv", 4.0))

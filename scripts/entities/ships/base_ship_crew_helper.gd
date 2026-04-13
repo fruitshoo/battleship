@@ -195,7 +195,7 @@ static func build_debug_crew_snapshot(ship) -> Dictionary:
 
 	result["sample_hp"] = float(sample_soldier.get("max_health")) if sample_soldier.get("max_health") != null else 0.0
 	var defense_bonus: float = 0.0
-	if sample_soldier.get_meta("defense_flat_bonus") != null:
+	if sample_soldier.has_meta("defense_flat_bonus"):
 		defense_bonus = float(sample_soldier.get_meta("defense_flat_bonus"))
 	result["sample_defense"] = float(sample_soldier.get("defense")) if sample_soldier.get("defense") != null else 0.0
 	result["sample_defense"] += defense_bonus

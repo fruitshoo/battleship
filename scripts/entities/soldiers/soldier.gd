@@ -72,6 +72,7 @@ var decision_timer: float = 0.0 # 의사결정 스로틀링용
 var combat_timer: float = 0.0 # 전투/사격 체크 스로틀링용
 var home_ground_timer: float = 0.0 # 홈그라운드 체력 재생 타이머
 var _is_jumping: bool = false # 점프/도선 중인지 여부
+var boarding_status: String = "on_deck"
 
 # 성능 최적화: UpgradeManager 캐싱
 var _cached_upgrade_manager: Node = null
@@ -97,12 +98,14 @@ var _lod_is_combat_priority: bool = false
 var _cached_nearest_enemy: Node3D = null
 var _nearest_enemy_cache_timer: float = 0.0
 var _nearest_enemy_cache_interval_runtime: float = 0.2
+var soldier_level: int = 1
+var soldier_xp: float = 0.0
 
 # === 도선 약탈 및 방화 (Boarding Chaos) 페널티 ===
 var is_boarder_on_player_ship: bool = false
-var chaos_duration_timer: float = 8.0 # 최대 8초간 약탈 후 도망감
+var chaos_duration_timer: float = 0.0 # 호환/디버그용: 적 도선병은 이제 시간으로 퇴각하지 않음
 var chaos_tick_timer: float = 0.0 # 1초마다 데미지 틱
-var chaos_damage_per_tick: float = 5.0 # 상향: 초당 5의 화재 피해 (배 체력 비례)
+var chaos_damage_per_tick: float = 3.0 # 적 도선병은 퇴각하지 않으므로 지속 피해는 낮게 유지
 var _base_max_health_stat: float = 0.0
 var _base_attack_damage_stat: float = 0.0
 var _base_defense_stat: float = 0.0
@@ -116,6 +119,14 @@ const RANGED_DAMAGE_SOURCES := {
 	"singigeon": true,
 	"fire_pot": true,
 }
+const SOLDIER_MAX_LEVEL := 5
+const SOLDIER_XP_BASE_REQUIREMENT := 2.0
+const SOLDIER_XP_REQUIREMENT_STEP := 2.0
+const SOLDIER_ATTACK_BONUS_PER_LEVEL := 0.75
+const BOARDING_STATUS_ON_DECK := "on_deck"
+const BOARDING_STATUS_BOARDING := "boarding"
+const BOARDING_STATUS_RETURNING := "returning"
+const BOARDING_STATUS_STRANDED := "stranded"
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_soldiers: Array = []
@@ -175,6 +186,7 @@ func _ready() -> void:
 		
 	# 모든 병사에게 home_ship 기록 (원래 소속 배 추적용)
 	home_ship = owned_ship
+	set_boarding_status(BOARDING_STATUS_ON_DECK)
 	
 	_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
 			
@@ -218,6 +230,7 @@ func _ready() -> void:
 	_start_wander()
 	_update_team_color()
 	_update_role_visual()
+	_apply_soldier_level_stats()
 	
 	# AI 실행 시점 분산 (Staggering)
 	decision_timer = randf_range(0.0, 0.2)
@@ -308,6 +321,8 @@ func _update_weapon_stats() -> void:
 			attack_flat_bonus += float(meta_manager.get_crew_damage_bonus())
 	if has_meta("attack_flat_bonus"):
 		attack_flat_bonus += float(get_meta("attack_flat_bonus"))
+	if team == "player" and has_meta("soldier_level_attack_bonus"):
+		attack_flat_bonus += float(get_meta("soldier_level_attack_bonus"))
 	var effective_attack: float = attack_damage + attack_flat_bonus
 		
 	if is_instance_valid(weapon_sword):
@@ -393,12 +408,64 @@ func _ensure_role_marker() -> MeshInstance3D:
 func _update_role_visual() -> void:
 	SoldierVisualHelper.update_role_visual(self)
 
+func _update_level_visual() -> void:
+	SoldierVisualHelper.update_level_visual(self)
+
+func add_soldier_xp(amount: float, _reason: String = "") -> void:
+	if team != "player":
+		return
+	if amount <= 0.0:
+		return
+
+	soldier_xp += amount
+	while soldier_level < SOLDIER_MAX_LEVEL:
+		var required_xp := _get_soldier_xp_required_for_next_level()
+		if soldier_xp + 0.001 < required_xp:
+			break
+		soldier_xp -= required_xp
+		soldier_level += 1
+
+	if soldier_level >= SOLDIER_MAX_LEVEL:
+		soldier_xp = 0.0
+	_apply_soldier_level_stats()
+
+func _apply_soldier_level_stats() -> void:
+	soldier_level = clampi(soldier_level, 1, SOLDIER_MAX_LEVEL)
+	soldier_xp = maxf(soldier_xp, 0.0)
+	set_meta("soldier_level", soldier_level)
+	set_meta("soldier_xp", soldier_xp)
+	set_meta("soldier_level_attack_bonus", _get_soldier_level_attack_bonus())
+	if is_inside_tree():
+		_update_weapon_stats()
+		_update_level_visual()
+
+func _get_soldier_xp_required_for_next_level() -> float:
+	if soldier_level >= SOLDIER_MAX_LEVEL:
+		return 0.0
+	return SOLDIER_XP_BASE_REQUIREMENT + float(soldier_level - 1) * SOLDIER_XP_REQUIREMENT_STEP
+
+func _get_soldier_level_attack_bonus() -> float:
+	if team != "player":
+		return 0.0
+	return float(maxi(0, soldier_level - 1)) * SOLDIER_ATTACK_BONUS_PER_LEVEL
+
+func get_soldier_level_value() -> int:
+	return soldier_level
+
+func get_soldier_xp_value() -> float:
+	return soldier_xp
+
+func get_soldier_next_level_xp_requirement() -> float:
+	return _get_soldier_xp_required_for_next_level()
+
 
 func set_team(new_team: String) -> void:
 	var old_team = team
 	team = new_team
 	EntityRegistry.update_soldier_team(self, old_team, team)
 	_update_team_color()
+	if is_inside_tree():
+		_apply_soldier_level_stats()
 
 func get_team_tag() -> String:
 	return team
@@ -435,6 +502,9 @@ func get_home_ship_node() -> Node3D:
 func is_dead_soldier() -> bool:
 	return current_state == State.DEAD
 
+func is_incapacitated_soldier() -> bool:
+	return current_state == State.DEAD and get_meta("incapacitated", false) == true
+
 
 func is_player_team_soldier() -> bool:
 	return team == "player"
@@ -462,6 +532,15 @@ func is_stationary_value() -> bool:
 
 func is_jumping_value() -> bool:
 	return _is_jumping
+
+
+func set_boarding_status(next_status: String) -> void:
+	boarding_status = next_status
+	set_meta("boarding_status", boarding_status)
+
+
+func get_boarding_status_value() -> String:
+	return boarding_status
 
 
 func _update_team_color() -> void:
@@ -643,9 +722,6 @@ func _state_attack(_delta: float) -> void:
 func _perform_special_attack(target: Node3D) -> void:
 	SoldierCombatHelper.perform_special_attack(self, target)
 
-func _play_rope_hit_effects() -> void:
-	SoldierCombatHelper.play_rope_hit_effects(self)
-
 ## 공격 실행
 func _perform_attack() -> void:
 	SoldierCombatHelper.perform_attack(self)
@@ -721,6 +797,12 @@ func _get_ship_ranged_cover_reduction(damage_source: String) -> float:
 ## 피격 시 하얀색으로 깜빡임
 func _flash_hit(flash_color: Color = Color.WHITE) -> void:
 	SoldierVisualHelper.flash_hit(self, flash_color)
+
+func _play_death_pose() -> void:
+	SoldierVisualHelper.play_death_pose(self)
+
+func _play_recovery_pose() -> void:
+	SoldierVisualHelper.play_recovery_pose(self)
 
 ## 적군 도선병 약탈 및 방화 처리 (초당 DoT 데미지)
 func _update_boarding_chaos(delta: float) -> void:

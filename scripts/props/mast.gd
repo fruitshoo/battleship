@@ -62,6 +62,7 @@ const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 	set(value):
 		sail_uv_offset = value
 		_apply_sail_material_settings()
+@export_range(1.0, 20.0, 0.5) var sail_view_fade_speed: float = 7.5
 # Geometry is edited directly in the scene tree now.
 # Keep these as plain runtime fields so older code paths remain harmless,
 # but do not expose them in the inspector.
@@ -105,6 +106,9 @@ var _sail_smoke_instance: Node3D = null
 var _cached_wind_manager: Node = null
 var _current_wind_intake: float = 0.0
 var _last_applied_wind_strength: float = -1.0
+var _last_applied_flutter_strength: float = -1.0
+var _sail_view_fade_alpha: float = 1.0
+var _sail_view_fade_target_alpha: float = 1.0
 
 func _enter_tree() -> void:
 	# Apply the instance's exported sail settings as soon as the scene enters the tree,
@@ -131,10 +135,11 @@ func set_sail_angle(angle: float) -> void:
 		return
 	_update_sail_wind_visual()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
 	_update_sail_wind_visual()
+	_update_sail_view_fade(delta)
 
 func set_team_color(team: String) -> void:
 	if flag and flag.has_method("set_team_color"):
@@ -143,6 +148,23 @@ func set_team_color(team: String) -> void:
 func set_sail_color(color: Color) -> void:
 	for mesh in _get_sail_meshes():
 		mesh.set_instance_shader_parameter("albedo", color)
+
+func set_sail_view_fade_alpha(alpha: float) -> void:
+	var target_alpha: float = clampf(alpha, 0.0, 1.0)
+	_sail_view_fade_target_alpha = target_alpha
+
+func _update_sail_view_fade(delta: float) -> void:
+	if is_equal_approx(_sail_view_fade_alpha, _sail_view_fade_target_alpha):
+		return
+	_sail_view_fade_alpha = lerpf(
+		_sail_view_fade_alpha,
+		_sail_view_fade_target_alpha,
+		clampf(sail_view_fade_speed * delta, 0.0, 1.0)
+	)
+	if absf(_sail_view_fade_alpha - _sail_view_fade_target_alpha) <= 0.01:
+		_sail_view_fade_alpha = _sail_view_fade_target_alpha
+	for mesh in _get_sail_meshes():
+		mesh.set_instance_shader_parameter("view_fade_alpha", _sail_view_fade_alpha)
 
 func set_sail_texture(texture: Texture2D) -> void:
 	sail_texture = texture
@@ -220,6 +242,9 @@ func _update_sail_wind_visual() -> void:
 
 func _apply_wind_strength_to_sails(wind_strength_value: float) -> void:
 	MastWindHelper.apply_wind_strength_to_sails(self, wind_strength_value)
+
+func _apply_sail_flutter_to_sails(flutter_strength_value: float) -> void:
+	MastWindHelper.apply_sail_flutter_to_sails(self, flutter_strength_value)
 
 func _apply_mast_geometry() -> void:
 	MastGeometryHelper.apply_mast_geometry(self)

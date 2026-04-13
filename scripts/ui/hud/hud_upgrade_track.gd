@@ -28,16 +28,21 @@ func setup_track(title_text: String, title_color: Color, slot_panel_bg: Color, s
 	for _i in range(slot_count):
 		_ensure_slot(_i)
 
-func update_slot(slot_idx: int, upgrade_id: String, level: int, icon_text: String, icon_color: Color) -> PanelContainer:
+func update_slot(slot_idx: int, upgrade_id: String, level: int, icon_text: String, icon_color: Color, icon_texture: Texture2D = null) -> PanelContainer:
 	if slot_idx < 0:
 		return null
 	_ensure_slot(slot_idx)
 	var slot = slots[slot_idx]
 	var icon_label = slot.get_node_or_null("Icon") as Label
+	var icon_texture_rect = slot.get_node_or_null("IconTexture") as TextureRect
 	var lv_label = slot.get_node_or_null("Level") as Label
+	if icon_texture_rect:
+		icon_texture_rect.texture = icon_texture
+		icon_texture_rect.visible = icon_texture != null
 	if icon_label:
 		icon_label.text = icon_text
 		icon_label.add_theme_color_override("font_color", icon_color)
+		icon_label.visible = icon_texture == null
 	if lv_label:
 		lv_label.text = str(level)
 		lv_label.visible = true
@@ -68,6 +73,19 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	var slot_sb = StyleBoxFlat.new()
 	slot_sb = NavalUiTheme.make_slot_style(panel_bg, border_color, 6)
 	slot_bg.add_theme_stylebox_override("panel", slot_sb)
+
+	var icon_texture := TextureRect.new()
+	icon_texture.name = "IconTexture"
+	icon_texture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon_texture.offset_left = 3.0
+	icon_texture.offset_top = 3.0
+	icon_texture.offset_right = -3.0
+	icon_texture.offset_bottom = -3.0
+	icon_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_texture.visible = false
+	slot_bg.add_child(icon_texture)
 
 	var icon_label = Label.new()
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

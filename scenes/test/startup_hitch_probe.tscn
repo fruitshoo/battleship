@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/test/startup_hitch_probe.gd" id="2_script"]
+
+[node name="StartupHitchProbe" instance=ExtResource("1_main")]
+script = ExtResource("2_script")
+auto_open_debug_panel = false
+stop_regular_spawns = true
+enemy_spawn_delay_seconds = 2.0
+probe_duration_seconds = 8.0
+hitch_report_threshold_ms = 28.0
+hitch_fail_threshold_ms = 48.0

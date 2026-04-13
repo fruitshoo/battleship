@@ -163,7 +163,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 				int(crew_stats.get("fire_pot_count", 0)),
 				int(crew_stats.get("repeater_count", 0)),
 			]},
-			{"icon": "rocket_launch", "label": "신기전병", "value": "%d명" % [
+			{"icon": "rocket_launch", "label": "신기전", "value": "%d명" % [
 				int(crew_stats.get("singigeon_count", 0)),
 			]},
 			{"icon": "health_and_safety", "label": "대표 병사 HP / 방어", "value": "%.0f / %.1f" % [
@@ -359,7 +359,7 @@ static func _collect_crew_stats(ship) -> Dictionary:
 
 	result["sample_hp"] = _get_float(sample_soldier, "max_health", 0.0)
 	var defense_bonus: float = 0.0
-	if sample_soldier.get_meta("defense_flat_bonus") != null:
+	if sample_soldier.has_meta("defense_flat_bonus"):
 		defense_bonus = float(sample_soldier.get_meta("defense_flat_bonus"))
 	result["sample_defense"] = _get_float(sample_soldier, "defense", 0.0) + defense_bonus
 	result["crit_chance"] = _get_float(sample_soldier, "crit_chance", 0.0)

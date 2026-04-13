@@ -40,12 +40,16 @@ static func die(ship) -> void:
 		audio_manager.play_sfx("water_splash_large", ship.global_position, randf_range(0.8, 1.0), 3.0)
 
 	sink_tween.set_parallel(false)
+	var ship_id: int = ship.get_instance_id()
 	sink_tween.tween_callback(func():
-		var hud = find_hud(ship)
+		var player_ship = instance_from_id(ship_id)
+		if not is_instance_valid(player_ship):
+			return
+		var hud = find_hud(player_ship)
 		if hud and hud.has_method("show_game_over"):
 			hud.show_game_over()
-		if ship._cached_level_manager and "current_score" in ship._cached_level_manager:
-			print("[GameOver] 침몰! 최종 점수: %d" % ship._cached_level_manager.current_score)
+		if player_ship._cached_level_manager and "current_score" in player_ship._cached_level_manager:
+			print("[GameOver] 침몰! 최종 점수: %d" % player_ship._cached_level_manager.current_score)
 	)
 
 static func disable_combat_modules_on_sink(ship) -> void:

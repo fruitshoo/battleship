@@ -57,27 +57,38 @@ static func release(node: Node) -> void:
 	if node.has_meta(PENDING_RELEASE_META) and node.get_meta(PENDING_RELEASE_META) == true:
 		return
 	node.set_meta(PENDING_RELEASE_META, true)
+	var node_id: int = node.get_instance_id()
+	var pool_root := _get_root_node(tree)
+	var pool_root_id: int = pool_root.get_instance_id() if is_instance_valid(pool_root) else 0
 	tree.process_frame.connect(
 		func() -> void:
-			if not is_instance_valid(node) or not is_instance_valid(tree):
-				return
-			node.set_meta(PENDING_RELEASE_META, false)
-			var deferred_store := _get_store(tree)
-			var deferred_pool: Array = deferred_store.get(key, [])
-			if deferred_pool.size() >= capacity:
-				node.queue_free()
-				return
-				if node.get_parent():
-					node.get_parent().remove_child(node)
-				var root := _get_root_node(tree)
-				if root == null:
-					node.queue_free()
-					return
-				root.add_child(node)
-			deferred_pool.append(node)
-			deferred_store[key] = deferred_pool,
+			_finish_release_deferred(node_id, pool_root_id, key, capacity),
 		CONNECT_ONE_SHOT
 	)
+
+static func release_by_instance_id(node_id: int) -> void:
+	var node := instance_from_id(node_id) as Node
+	if not is_instance_valid(node):
+		return
+	release(node)
+
+static func _finish_release_deferred(node_id: int, pool_root_id: int, key: String, capacity: int) -> void:
+	var node := instance_from_id(node_id) as Node
+	var pool_root := instance_from_id(pool_root_id) as Node
+	if not is_instance_valid(node) or not is_instance_valid(pool_root):
+		return
+	node.set_meta(PENDING_RELEASE_META, false)
+	var deferred_store: Dictionary = pool_root.get_meta(STORE_META) if pool_root.has_meta(STORE_META) else {}
+	var deferred_pool: Array = deferred_store.get(key, [])
+	if deferred_pool.size() >= capacity:
+		node.queue_free()
+		return
+	if node.get_parent():
+		node.get_parent().remove_child(node)
+	pool_root.add_child(node)
+	deferred_pool.append(node)
+	deferred_store[key] = deferred_pool
+	pool_root.set_meta(STORE_META, deferred_store)
 
 static func _get_store(tree: SceneTree) -> Dictionary:
 	var root := _get_root_node(tree)

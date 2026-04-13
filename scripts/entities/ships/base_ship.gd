@@ -13,6 +13,7 @@ const BaseShipVisualHelper = preload("res://scripts/entities/ships/base_ship_vis
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
+const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -99,8 +100,8 @@ var boarding_target: Node3D = null
 var max_boarding_distance: float = 9.0
 var boarding_break_distance: float = 12.0
 var rope_instances: Array[MeshInstance3D] = []
-var boarding_rope_hp: float = 100.0 # 밧줄 내구도 추가
-var max_boarding_rope_hp: float = 100.0
+const BOARDING_ROPE_RADIUS := 0.18
+const BOARDING_ROPE_EXTRA_CULL_MARGIN := 24.0
 @export_range(0.0, 3.0) var boarding_contact_grace_duration: float = 0.8
 @export_range(0.0, 2.0) var boarding_hook_throw_delay: float = 0.35
 @export_range(0.0, 3.0) var boarding_secondary_rope_delay: float = 0.9
@@ -458,6 +459,9 @@ func get_team_tag() -> String:
 func is_combat_disabled() -> bool:
 	return is_dying or is_sinking or is_derelict or hull_hp <= 0.0
 
+func are_weapons_disabled() -> bool:
+	return is_combat_disabled() or deck_is_overrun
+
 func get_hull_hp_value() -> float:
 	return hull_hp
 
@@ -503,6 +507,9 @@ func is_boarding_ship() -> bool:
 
 func get_boarding_target_ship() -> Node3D:
 	return boarding_target if is_instance_valid(boarding_target) else null
+
+func has_boarding_rope_link_to(other_ship: Node3D) -> bool:
+	return is_boarding and is_instance_valid(other_ship) and get_boarding_target_ship() == other_ship and _initial_rope_deployed
 
 func is_player_controlled_ship() -> bool:
 	if not ("is_player_controlled" in self):
@@ -681,10 +688,18 @@ func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node: return
 	
+	var applied_min: float = INF
+	var applied_max: float = 0.0
+	var hit_count: int = 0
 	for child in soldiers_node.get_children():
 		if child.has_method("take_damage") and not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
+			var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
+			var final_damage: float = damage * PLAYER_CREW_RAMMING_AOE_MULTIPLIER if child_team == "player" else damage
+			applied_min = minf(applied_min, final_damage)
+			applied_max = maxf(applied_max, final_damage)
+			hit_count += 1
 			# 병사들에게 충격파 데미지 전달
-			child.take_damage(damage, impact_pos)
+			child.take_damage(final_damage, impact_pos, "ramming_aoe")
 			
 			# 물리적 비틀거림/스턴 연출을 위해 일시적으로 공격 타이머 초기화 (딜레이 보장)
 			if "attack_timer" in child:
@@ -695,16 +710,25 @@ func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
 				# XZ축 랜덤 넉발만 적용
 				var push = Vector3(randf_range(-1, 1), 0.0, randf_range(-1, 1)).normalized()
 				child.velocity += push * 2.0
-				
-	print("[%s] 함선 충돌로 인해 갑판 위 병사들이 %d의 충격 피해를 입었습니다." % [name, int(damage)])
+
+	if hit_count <= 0:
+		return
+	if is_equal_approx(applied_min, applied_max):
+		print("[%s] 함선 충돌로 인해 갑판 위 병사들이 %d의 충격 피해를 입었습니다." % [name, int(applied_max)])
+	else:
+		print("[%s] 함선 충돌로 인해 갑판 위 병사들이 %.1f~%.1f의 충격 피해를 입었습니다." % [name, applied_min, applied_max])
 
 ## 현재 생존 중인 선원(병사) 수 반환
 func get_alive_crew_count() -> int:
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node: return 0
 	
+	var ship_team: String = get_team_tag()
 	var count = 0
 	for child in soldiers_node.get_children():
+		var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
+		if child_team != ship_team:
+			continue
 		# current_state != 4 (DEAD) 인 병사만 카운트
 		if not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
 			count += 1
@@ -788,22 +812,21 @@ func _calculate_boarding_pull() -> Vector3:
 	var dir = diff / max(dist, 0.001)
 	
 	# 1. 스프링 힘 (F = k * x) — 가속도(m/s²) 단위
-	var rest_length = 8.5 # 충격 완화를 위해 거리 상향 (6.2 -> 8.5)
-	var spring_k = 4.0
+	var rest_length = 8.5
+	var spring_k = 2.7
 	var stretch = dist - rest_length
 	
 	# 거리가 rest_length보다 작으면(겹치려 하면) 밀어내는 반발력(Repulsion) 발생
 	var propulsion_force = Vector3.ZERO
 	if stretch < 0:
-		# 작을수록 더 강하게 밀어냄 (제곱 비례)
-		var repulsion_k = 8.0
+		var repulsion_k = 5.0
 		propulsion_force = - dir * (abs(stretch) * repulsion_k)
 		stretch = 0 # 인동력은 발생시키지 않음
 	
 	# 거리가 도선 한계치(9.0)에 가까워지면 힘을 점진적으로 증가
 	var tension_multiplier = 1.0
-	if dist > 8.5:
-		tension_multiplier = 1.0 + (dist - 8.5) * 2.0
+	if dist > rest_length:
+		tension_multiplier = 1.0 + (dist - rest_length) * 1.1
 		
 	var spring_force = dir * (stretch * spring_k * tension_multiplier)
 	
@@ -831,12 +854,12 @@ func _calculate_boarding_pull() -> Vector3:
 	
 	# 멀어질 때만 저항 (가속도 단위)
 	if rel_vel_on_rope > 0:
-		var damping_c = 3.0
+		var damping_c = 2.0
 		final_damping_force = dir * (rel_vel_on_rope * damping_c)
 	
 	# 3. 최종 힘 계산 및 제한 (가속도 상한)
 	var final_pull = spring_force + propulsion_force + final_damping_force
-	var max_pull_accel = 18.0 # 최대 가속도 상향 (15.0 -> 18.0)
+	var max_pull_accel = 11.0
 	if final_pull.length() > max_pull_accel:
 		final_pull = final_pull.normalized() * max_pull_accel
 		
@@ -864,22 +887,6 @@ func _is_engagement_pair(other: Node3D) -> bool:
 func can_capture_more_ships() -> bool:
 	return EntityRegistry.count_captured_minions() < 3
 
-## 밧줄에 데미지 적용
-func take_rope_damage(amount: float) -> void:
-	boarding_rope_hp -= amount
-	# 시각적 깜빡임 (빨간색)
-	for mesh in rope_instances:
-		var mat = mesh.get_active_material(0) as StandardMaterial3D
-		if mat:
-			mat.albedo_color = Color(1.0, 0.2, 0.2) # 적색 깜빡임
-			get_tree().create_timer(0.1).timeout.connect(func():
-				if is_instance_valid(mat): mat.albedo_color = Color(0.4, 0.3, 0.2)
-			)
-			
-	if boarding_rope_hp <= 0:
-		print("[Boarding] 밧줄이 병사에 의해 절단되었습니다.")
-		_cancel_boarding()
-
 ## 충격(충각) 타격 로직 - 타원형 각도 판정 포함
 func apply_ramming_damage(other: Node3D, impact_speed: float) -> void:
 	BaseShipCollisionHelper.apply_ramming_damage(self, other, impact_speed)
@@ -899,7 +906,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	if damage_source == "boarding_capture" and has_meta("boarding_capture_damage_reduction"):
 		var capture_reduction: float = clampf(float(get_meta("boarding_capture_damage_reduction")), 0.0, 0.75)
 		amount *= 1.0 - capture_reduction
-	var final_damage = maxf(amount - hull_defense, 1.0)
+	var final_damage: float = maxf(amount, 1.0) if damage_source == "boarding_capture" else maxf(amount - hull_defense, 1.0)
 	hull_hp -= final_damage
 	_apply_sail_damage_from_hit(final_damage, damage_source)
 	_apply_rudder_damage_from_hit(final_damage, hit_position, damage_source)
@@ -1096,21 +1103,23 @@ func _spawn_ropes(count_override: int = -1) -> void:
 	for i in range(count):
 		var mesh_instance = MeshInstance3D.new()
 		var cylinder = CylinderMesh.new()
-		cylinder.top_radius = 0.13
-		cylinder.bottom_radius = 0.13
+		cylinder.top_radius = BOARDING_ROPE_RADIUS
+		cylinder.bottom_radius = BOARDING_ROPE_RADIUS
 		cylinder.height = 1.0 # 기본 길이는 1로 설정 (scale로 조절)
 		mesh_instance.mesh = cylinder
 		mesh_instance.top_level = true
 		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mesh_instance.extra_cull_margin = 8.0
+		mesh_instance.extra_cull_margin = BOARDING_ROPE_EXTRA_CULL_MARGIN
+		mesh_instance.ignore_occlusion_culling = true
 		
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = Color(1.0, 0.88, 0.52, 1.0)
 		mat.roughness = 0.55
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.emission_enabled = true
 		mat.emission = Color(1.0, 0.66, 0.24, 1.0)
 		mat.emission_energy_multiplier = 1.8
-		mat.no_depth_test = true
+		mat.no_depth_test = false
 		mesh_instance.material_override = mat
 		
 		add_child(mesh_instance)
@@ -1126,11 +1135,13 @@ func _spawn_ropes(count_override: int = -1) -> void:
 		hook_mat.emission = Color(1.0, 0.72, 0.28, 1.0)
 		hook_mat.emission_energy_multiplier = 2.2
 		hook_mat.roughness = 0.35
-		hook_mat.no_depth_test = true
+		hook_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		hook_mat.no_depth_test = false
 		hook_visual.material_override = hook_mat
 		hook_visual.top_level = true
 		hook_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		hook_visual.extra_cull_margin = 8.0
+		hook_visual.extra_cull_margin = BOARDING_ROPE_EXTRA_CULL_MARGIN
+		hook_visual.ignore_occlusion_culling = true
 		add_child(hook_visual)
 		
 		var offset_z = 0.0
@@ -1261,6 +1272,15 @@ func _is_side_boarding_approach(target_ship: Node3D) -> bool:
 func _is_boarding_contact_stable() -> bool:
 	if not is_instance_valid(boarding_target):
 		return false
+
+	var contact_mode: String = str(get_meta("boarding_contact_mode", ""))
+	if contact_mode == "head_on" or contact_mode == "cleanup":
+		var relaxed_state = _get_boarding_alignment_state(boarding_target)
+		var closing_speed: float = float(relaxed_state.get("closing_speed", 0.0)) if not relaxed_state.is_empty() else 0.0
+		var center_distance: float = global_position.distance_to(boarding_target.global_position)
+		var contact_distance: float = get_collision_distance_to(boarding_target)
+		var stable_distance: float = maxf(max_boarding_distance + 0.6, contact_distance + 1.0)
+		return center_distance <= stable_distance and closing_speed <= boarding_max_relative_speed * 5.0
 
 	if not _is_side_boarding_approach(boarding_target):
 		return false

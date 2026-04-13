@@ -33,7 +33,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	current_target_pos.y += 0.5
 	
 	# === 예측 샷 (Predictive Aiming) ===
-	var arrow_speed = 25.0
+	var arrow_speed = 23.0
 	var distance = spawn_pos.distance_to(current_target_pos)
 	var time_to_reach = distance / arrow_speed
 	
@@ -59,8 +59,12 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 				
 			ship_vel = s_dir * s_speed
 			
-	var total_vel = local_vel + ship_vel
-	current_target_pos += total_vel * time_to_reach * 0.92 # 예측을 조금 더 적극적으로
+	var total_vel = local_vel + ship_vel * 0.45
+	var lead_offset: Vector3 = total_vel * time_to_reach * 0.72
+	var max_lead: float = clampf(distance * 0.28, 0.45, 3.0)
+	if lead_offset.length() > max_lead:
+		lead_offset = lead_offset.normalized() * max_lead
+	current_target_pos += lead_offset
 
 	
 	# 약간의 오차 (흩뿌림) 적용 - 기존보다 하향하여 명중률 상승 (-0.2 ~ 0.2)
@@ -94,7 +98,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	# 활 쏘는 소리
 	var audio_manager = attacker.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager):
-		audio_manager.play_sfx("arrow_shoot", attacker.global_position, randf_range(0.9, 1.1))
+		audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(0.9, 1.1))
 
 func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 	var current = node

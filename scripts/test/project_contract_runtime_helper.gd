@@ -4,6 +4,9 @@ class_name ProjectContractRuntimeHelper
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+
+const FIRE_EFFECT_SCENE_PATH := "res://scenes/effects/fire_effect.tscn"
 
 
 static func run_runtime_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int, smoke_spawn_boss: bool, smoke_spawn_final_boss: bool, smoke_spawn_ship_types: Array[String], smoke_spawn_launcher_scenes: Array[String], smoke_spawn_projectile_scenes: Array[String]) -> void:
@@ -27,6 +30,8 @@ static func run_runtime_smoke(owner: Node, failures: Array[String], smoke_scene_
 		await _run_launcher_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn, str(launcher_scene_path))
 	for projectile_scene_path in smoke_spawn_projectile_scenes:
 		await _run_projectile_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn, str(projectile_scene_path))
+	if smoke_spawn_projectile_scenes.has("res://scenes/projectiles/fire_pot.tscn"):
+		await _run_fire_pot_residual_smoke_contract(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
 
 
 static func _run_single_smoke_pass(owner: Node, failures: Array[String], packed: PackedScene, smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int, spawn_method: String, label: String) -> void:
@@ -272,6 +277,10 @@ static func _run_projectile_smoke_pass(owner: Node, failures: Array[String], pac
 					var before_projectiles := EntityRegistry.count_projectiles()
 					smoke_root.add_child(projectile)
 					await _wait_frames(owner, wait_frames_after_attach)
+					if not is_instance_valid(projectile):
+						smoke_root.queue_free()
+						await _wait_frames(owner, 1)
+						return
 					if projectile.has_method("set_team"):
 						projectile.set_team("player")
 					elif projectile.get("team") != null:
@@ -321,6 +330,181 @@ static func _configure_projectile_smoke(projectile: Node, projectile_scene_path:
 			projectile.call("setup_flight", projectile.start_pos, projectile.target_pos, 0.8, 3.5)
 
 
+static func _run_fire_pot_residual_smoke_contract(owner: Node, failures: Array[String], packed: PackedScene, smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
+	var smoke_root := packed.instantiate()
+	if smoke_root == null:
+		failures.append("smoke scene instantiate failed for fire pot residual smoke contract: %s" % smoke_scene_path)
+		return
+
+	owner.add_child(smoke_root)
+	PreviewHarnessHelper.setup_common(smoke_root, false, true)
+	await _wait_frames(owner, wait_frames_after_attach)
+
+	var player_ship: Node3D = smoke_root.get_node_or_null("PlayerShip") as Node3D
+	if not is_instance_valid(player_ship):
+		failures.append("fire pot residual smoke contract missing player ship")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	var target_ship := _create_fire_pot_contract_ship_hitbox(smoke_root, player_ship.global_position + Vector3(12.0, 0.0, 0.0))
+	await _wait_frames(owner, wait_frames_after_spawn)
+	await _wait_physics_frames(owner, 1)
+	if not is_instance_valid(target_ship):
+		failures.append("fire pot residual smoke contract target hitbox setup failed")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	var fire_pot_scene := load("res://scenes/projectiles/fire_pot.tscn") as PackedScene
+	if fire_pot_scene == null:
+		failures.append("fire pot residual smoke contract failed to load fire pot scene")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	var hit_pos := target_ship.global_position + Vector3(0.0, 0.4, 0.0)
+	var hit_projectile := fire_pot_scene.instantiate()
+	if hit_projectile == null:
+		failures.append("fire pot residual smoke contract failed to instantiate hit projectile")
+	else:
+		hit_projectile.set("team", "player")
+		hit_projectile.set("explosion_radius", 8.0)
+		smoke_root.add_child(hit_projectile)
+		await _wait_frames(owner, wait_frames_after_attach)
+		var hit_projectile_node := hit_projectile as Node3D
+		hit_projectile_node.global_position = hit_pos
+		await _wait_physics_frames(owner, 1)
+		var affected_hit: bool = hit_projectile.call("_apply_area_damage") == true
+		if not affected_hit:
+			failures.append("fire pot residual smoke contract did not recognize a ship hitbox hit")
+		ScenePool.release(hit_projectile)
+		await _wait_frames(owner, 2)
+
+	var miss_pos := player_ship.global_position + Vector3(80.0, 0.4, 80.0)
+	var miss_before := _count_active_fire_effects_near(owner.get_tree().root, miss_pos, 8.0)
+	var miss_projectile := fire_pot_scene.instantiate()
+	if miss_projectile == null:
+		failures.append("fire pot residual smoke contract failed to instantiate miss projectile")
+	else:
+		miss_projectile.set("team", "player")
+		miss_projectile.set("explosion_radius", 3.0)
+		smoke_root.add_child(miss_projectile)
+		await _wait_frames(owner, wait_frames_after_attach)
+		var miss_projectile_node := miss_projectile as Node3D
+		miss_projectile_node.global_position = miss_pos
+		await _wait_physics_frames(owner, 1)
+		miss_projectile.call("explode")
+		await _wait_frames(owner, 3)
+		var miss_after := _count_active_fire_effects_near(owner.get_tree().root, miss_pos, 8.0)
+		if miss_after > miss_before:
+			failures.append("fire pot residual smoke contract spawned residual smoke on water miss")
+		_release_active_fire_effects_near(owner.get_tree().root, miss_pos, 8.0)
+		await _wait_frames(owner, 2)
+
+	await _run_fire_effect_pool_reset_contract(owner, failures)
+
+	smoke_root.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _create_fire_pot_contract_ship_hitbox(parent: Node, position: Vector3) -> Node3D:
+	var ship_root := Node3D.new()
+	ship_root.name = "FirePotContractShip"
+	ship_root.add_to_group("enemy")
+	ship_root.add_to_group("ships")
+	parent.add_child(ship_root)
+	ship_root.global_position = position
+
+	var hitbox := Area3D.new()
+	hitbox.name = "HitArea"
+	hitbox.collision_layer = 4
+	hitbox.collision_mask = 0
+	hitbox.add_to_group("ship_hitbox")
+	ship_root.add_child(hitbox)
+
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4.0, 3.0, 8.0)
+	shape.shape = box
+	hitbox.add_child(shape)
+	return ship_root
+
+
+static func _run_fire_effect_pool_reset_contract(owner: Node, failures: Array[String]) -> void:
+	var fire_effect_scene := load(FIRE_EFFECT_SCENE_PATH) as PackedScene
+	if fire_effect_scene == null:
+		failures.append("fire effect pool reset contract failed to load fire effect scene")
+		return
+
+	var fire_effect := ScenePool.acquire(owner.get_tree(), fire_effect_scene)
+	if not is_instance_valid(fire_effect):
+		failures.append("fire effect pool reset contract failed to acquire fire effect")
+		return
+
+	owner.get_tree().root.add_child(fire_effect)
+	if fire_effect.has_method("pool_activate"):
+		fire_effect.call("pool_activate")
+	await _wait_frames(owner, 1)
+	if not _is_fire_effect_active(fire_effect):
+		failures.append("fire effect pool reset contract did not activate particles")
+
+	var fire_effect_id := fire_effect.get_instance_id()
+	ScenePool.release(fire_effect)
+	await _wait_frames(owner, 2)
+	var pooled_effect := instance_from_id(fire_effect_id) as Node
+	if is_instance_valid(pooled_effect) and _is_fire_effect_active(pooled_effect):
+		failures.append("fire effect pool reset contract left smoke particles active after release")
+
+
+static func _count_active_fire_effects_near(node: Node, center: Vector3, radius: float) -> int:
+	if node == null:
+		return 0
+	return _count_active_fire_effects_near_node(node, center, radius * radius)
+
+
+static func _count_active_fire_effects_near_node(node: Node, center: Vector3, radius_squared: float) -> int:
+	var count := 0
+	if node.name == "FireEffect" and node is Node3D:
+		var node_3d := node as Node3D
+		if node_3d.global_position.distance_squared_to(center) <= radius_squared and _is_fire_effect_active(node):
+			count += 1
+	for child in node.get_children():
+		count += _count_active_fire_effects_near_node(child, center, radius_squared)
+	return count
+
+
+static func _release_active_fire_effects_near(node: Node, center: Vector3, radius: float) -> void:
+	if node == null:
+		return
+	_release_active_fire_effects_near_node(node, center, radius * radius)
+
+
+static func _release_active_fire_effects_near_node(node: Node, center: Vector3, radius_squared: float) -> void:
+	if node.name == "FireEffect" and node is Node3D:
+		var node_3d := node as Node3D
+		if node_3d.global_position.distance_squared_to(center) <= radius_squared and _is_fire_effect_active(node):
+			ScenePool.release(node)
+			return
+	for child in node.get_children():
+		_release_active_fire_effects_near_node(child, center, radius_squared)
+
+
+static func _is_fire_effect_active(node: Node) -> bool:
+	if node is Node3D and (node as Node3D).visible:
+		return true
+	return _has_emitting_particles(node)
+
+
+static func _has_emitting_particles(node: Node) -> bool:
+	if node is GPUParticles3D and (node as GPUParticles3D).emitting:
+		return true
+	for child in node.get_children():
+		if _has_emitting_particles(child):
+			return true
+	return false
+
+
 static func _validate_registry_smoke(failures: Array[String], player_ship: Node3D, label: String) -> void:
 	if not is_instance_valid(player_ship):
 		return
@@ -360,6 +544,13 @@ static func _validate_spawned_boss(failures: Array[String], spawned_boss: Node3D
 	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_boss)
 	if not registered_enemy:
 		failures.append("%s instance was not registered in enemy team bucket" % label)
+	var expected_crew_count: int = 6 if int(spawned_boss.get("tier")) == 1 else 4
+	var actual_crew_count: int = EntityRegistry.get_soldiers_by_ship(spawned_boss).size()
+	if actual_crew_count != expected_crew_count:
+		failures.append("%s crew count contract failed: %d != %d" % [label, actual_crew_count, expected_crew_count])
+	var max_hull_hp: float = float(spawned_boss.get("max_hull_hp"))
+	if int(spawned_boss.get("tier")) == 1 and max_hull_hp > 720.0:
+		failures.append("%s mid boss hull contract failed: %.1f > 720.0" % [label, max_hull_hp])
 
 
 static func _validate_spawned_ship(failures: Array[String], spawned_ship: Node3D, label: String) -> void:
@@ -379,3 +570,8 @@ static func _validate_spawned_ship(failures: Array[String], spawned_ship: Node3D
 static func _wait_frames(owner: Node, count: int) -> void:
 	for _index in range(max(0, count)):
 		await owner.get_tree().process_frame
+
+
+static func _wait_physics_frames(owner: Node, count: int) -> void:
+	for _index in range(max(0, count)):
+		await owner.get_tree().physics_frame

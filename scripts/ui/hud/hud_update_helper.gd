@@ -307,10 +307,14 @@ static func update_boarding_display(hud) -> void:
 	var target_hostile_count: int = 0
 	var target_overrun: bool = false
 	var target_name: String = _get_short_ship_name(boarding_target)
+	var target_capture_ratio: float = 0.0
+	var target_capture_remaining: float = 0.0
 	if is_instance_valid(boarding_target):
 		target_friendly_count = int(boarding_target.get("deck_friendly_crew_count")) if boarding_target.get("deck_friendly_crew_count") != null else 0
 		target_hostile_count = int(boarding_target.get("deck_hostile_boarder_count")) if boarding_target.get("deck_hostile_boarder_count") != null else 0
 		target_overrun = boarding_target.get("deck_is_overrun") == true
+		target_capture_ratio = _get_boarding_capture_ratio(boarding_target)
+		target_capture_remaining = _get_boarding_capture_remaining(boarding_target)
 	if is_boarding:
 		hud.boarding_ui.visible = true
 		var target_suffix := " [%s]" % target_name if not target_name.is_empty() else ""
@@ -321,13 +325,21 @@ static func update_boarding_display(hud) -> void:
 			if fill:
 				fill.bg_color = Color(1.0, 1.0, 1.0, 0.7)
 		else:
-			hud.boarding_label.text = "도선 진행 중%s  승조 %d | 월선 %d%s" % [
-				target_suffix,
-				target_friendly_count,
-				target_hostile_count,
-				" | 갑판 장악" if target_overrun else ""
-			]
-			hud.boarding_bar.value = 100
+			if target_overrun:
+				hud.boarding_label.text = "갑판 장악 중%s  승조 %d | 월선 %d | %.1f초" % [
+					target_suffix,
+					target_friendly_count,
+					target_hostile_count,
+					target_capture_remaining
+				]
+				hud.boarding_bar.value = target_capture_ratio * 100.0
+			else:
+				hud.boarding_label.text = "도선 진행 중%s  승조 %d | 월선 %d" % [
+					target_suffix,
+					target_friendly_count,
+					target_hostile_count
+				]
+				hud.boarding_bar.value = 100
 			var fill_active = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
 			if fill_active:
 				fill_active.bg_color = NavalUiTheme.STATUS_WARN if target_overrun else NavalUiTheme.STATUS_ACTIVE_BLUE
@@ -516,11 +528,14 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 		var is_contested: bool = ship.get("deck_is_contested") == true
 		var is_overrun: bool = ship.get("deck_is_overrun") == true
 		if hostile_count > 0 or is_contested:
+			var capture_suffix: String = ""
+			if is_overrun:
+				capture_suffix = " | %s" % _get_boarding_capture_short_text(ship, "위기" if team_tag == "player" else "장악")
 			if team_tag == "player":
-				boarding_label.text = "갑판 %d | 적 %d%s" % [friendly_count, hostile_count, " | 위기" if is_overrun else ""]
+				boarding_label.text = "갑판 %d | 적 %d%s" % [friendly_count, hostile_count, capture_suffix]
 				boarding_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.56, 1.0) if is_overrun else Color(1.0, 0.88, 0.62, 1.0))
 			else:
-				boarding_label.text = "승조 %d | 월선 %d%s" % [friendly_count, hostile_count, " | 장악" if is_overrun else ""]
+				boarding_label.text = "승조 %d | 월선 %d%s" % [friendly_count, hostile_count, capture_suffix]
 				boarding_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.46, 1.0) if is_overrun else Color(1.0, 0.80, 0.64, 1.0))
 			boarding_label.visible = true
 		else:
@@ -529,7 +544,7 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 		var is_contested_state: bool = ship.get("deck_is_contested") == true
 		var is_overrun_state: bool = ship.get("deck_is_overrun") == true
 		if is_overrun_state:
-			state_label.text = "장악" if team_tag != "player" else "위기"
+			state_label.text = _get_boarding_capture_short_text(ship, "장악" if team_tag != "player" else "위기")
 			state_label.add_theme_color_override("font_color", Color(1.0, 0.80, 0.32, 1.0))
 			state_label.visible = true
 		elif is_contested_state:
@@ -539,6 +554,39 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 		else:
 			state_label.visible = false
 	return true
+
+static func _get_boarding_capture_short_text(ship, label: String) -> String:
+	var ratio: float = _get_boarding_capture_ratio(ship)
+	return "%s %d%%" % [label, int(round(ratio * 100.0))]
+
+static func _get_boarding_capture_ratio(ship) -> float:
+	var duration: float = _get_boarding_capture_duration(ship)
+	if duration <= 0.01:
+		return 0.0
+	var progress: float = 0.0
+	if is_instance_valid(ship) and ship.get("boarding_capture_progress") != null:
+		progress = float(ship.get("boarding_capture_progress"))
+	return clampf(progress / duration, 0.0, 1.0)
+
+static func _get_boarding_capture_remaining(ship) -> float:
+	var duration: float = _get_boarding_capture_duration(ship)
+	var progress: float = 0.0
+	if is_instance_valid(ship) and ship.get("boarding_capture_progress") != null:
+		progress = float(ship.get("boarding_capture_progress"))
+	return maxf(0.0, duration - progress)
+
+static func _get_boarding_capture_duration(ship) -> float:
+	if not is_instance_valid(ship):
+		return 0.0
+	var duration: float = 0.0
+	if ship.get("boarding_capture_duration") != null:
+		duration = float(ship.get("boarding_capture_duration"))
+	if ship.has_method("get_effective_boarding_capture_duration"):
+		var attacker_ship: Node = null
+		if ship.has_method("get_boarding_attacker_ship"):
+			attacker_ship = ship.call("get_boarding_attacker_ship")
+		duration = float(ship.call("get_effective_boarding_capture_duration", attacker_ship))
+	return maxf(duration, 0.01)
 
 static func _cleanup_stale_ship_hp_bars(hud, active_ids: Dictionary) -> void:
 	var stale_ids: Array = []

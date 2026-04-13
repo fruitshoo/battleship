@@ -28,6 +28,10 @@ enum BattleMode {
 @export var compare_phase_seconds: float = 0.35
 @export var auto_print_compare_results: bool = true
 @export var auto_quit_delay_seconds: float = 0.05
+@export var runtime_probe_enabled: bool = false
+@export var runtime_probe_duration_seconds: float = 300.0
+@export var runtime_probe_cycle_seconds: float = 60.0
+@export var runtime_probe_sample_interval_seconds: float = 5.0
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
@@ -44,6 +48,18 @@ var _compare_collecting: bool = false
 var _compare_phase_finished: bool = false
 var _compare_final_reported: bool = false
 var _midgame_initialized: bool = false
+var _runtime_probe_final_reported: bool = false
+var _runtime_probe_sample_timer: float = 0.0
+var _runtime_probe_cycle_elapsed: float = 0.0
+var _runtime_probe_cleanup_pending: bool = false
+var _runtime_probe_cleanup_wait_frames: int = 0
+var _runtime_probe_cycle_index: int = 0
+var _runtime_monitor_start: Dictionary = {}
+var _runtime_monitor_cycle_start: Dictionary = {}
+var _runtime_monitor_last: Dictionary = {}
+var _runtime_monitor_peak_static_bytes: float = 0.0
+var _runtime_monitor_peak_objects: float = 0.0
+var _runtime_monitor_sample_count: int = 0
 
 
 func _ready() -> void:
@@ -53,17 +69,25 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_elapsed_time += delta
 	_wave_elapsed += delta
+	if runtime_probe_enabled and battle_mode == BattleMode.STRESS:
+		_runtime_probe_cycle_elapsed += delta
+		_sample_runtime_monitors(delta)
+		_handle_runtime_probe_cleanup()
 	_track_compare_sample(delta)
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = 0.25
 		_update_overlay()
 	if _midgame_initialized and battle_mode == BattleMode.STRESS:
-		_maybe_spawn_next_wave()
+		_maybe_reset_runtime_probe_cycle()
+		_maybe_finish_runtime_probe()
+		if not _runtime_probe_cleanup_pending and not _runtime_probe_final_reported:
+			_maybe_spawn_next_wave()
 
 
 func _configure_preview() -> void:
 	PreviewHarnessHelper.setup_common(self, auto_open_debug_panel, stop_regular_spawns)
+	_apply_env_overrides()
 	_ensure_stat_panel()
 	_configure_midgame_state()
 	_clear_existing_preview_spawns()
@@ -71,6 +95,43 @@ func _configure_preview() -> void:
 	_configure_compare_state()
 	_ensure_overlay()
 	_update_overlay()
+	if runtime_probe_enabled:
+		_capture_runtime_monitor_sample()
+		_runtime_monitor_cycle_start = _runtime_monitor_last.duplicate()
+		print("[MidgameRuntime] start duration=%.1f cycle=%.1f wave_limit=%d wave_interval=%.1f" % [
+			runtime_probe_duration_seconds,
+			runtime_probe_cycle_seconds,
+			wave_limit,
+			wave_interval,
+		])
+
+
+func _apply_env_overrides() -> void:
+	var mode_text := OS.get_environment("BATTLESHIP_MIDGAME_BATTLE_MODE").strip_edges().to_lower()
+	if mode_text == "stress" or mode_text == "runtime" or mode_text == "runtime_probe":
+		battle_mode = BattleMode.STRESS
+	elif mode_text == "visual_compare" or mode_text == "compare":
+		battle_mode = BattleMode.VISUAL_COMPARE
+
+	runtime_probe_enabled = runtime_probe_enabled or _env_flag_enabled("BATTLESHIP_MIDGAME_RUNTIME_PROBE")
+	var duration_text := OS.get_environment("BATTLESHIP_MIDGAME_RUNTIME_DURATION").strip_edges()
+	if not duration_text.is_empty():
+		runtime_probe_duration_seconds = maxf(1.0, float(duration_text))
+	var cycle_text := OS.get_environment("BATTLESHIP_MIDGAME_RUNTIME_CYCLE_SECONDS").strip_edges()
+	if not cycle_text.is_empty():
+		runtime_probe_cycle_seconds = maxf(1.0, float(cycle_text))
+	var sample_text := OS.get_environment("BATTLESHIP_MIDGAME_RUNTIME_SAMPLE_INTERVAL").strip_edges()
+	if not sample_text.is_empty():
+		runtime_probe_sample_interval_seconds = maxf(0.25, float(sample_text))
+	var wave_limit_text := OS.get_environment("BATTLESHIP_MIDGAME_WAVE_LIMIT").strip_edges()
+	if not wave_limit_text.is_empty():
+		wave_limit = maxi(1, int(wave_limit_text))
+	var wave_interval_text := OS.get_environment("BATTLESHIP_MIDGAME_WAVE_INTERVAL").strip_edges()
+	if not wave_interval_text.is_empty():
+		wave_interval = maxf(0.1, float(wave_interval_text))
+	var initial_wave_delay_text := OS.get_environment("BATTLESHIP_MIDGAME_INITIAL_WAVE_DELAY").strip_edges()
+	if not initial_wave_delay_text.is_empty():
+		initial_wave_delay = maxf(0.0, float(initial_wave_delay_text))
 
 
 func _ensure_stat_panel() -> void:
@@ -98,6 +159,8 @@ func _configure_midgame_state() -> void:
 	var player: Node3D = get_node_or_null("PlayerShip")
 	if is_instance_valid(player) and open_deck_for_combat:
 		PreviewHarnessHelper.apply_preview_deck_state(player, true, false)
+	if runtime_probe_enabled and is_instance_valid(player):
+		_prepare_runtime_probe_player(player)
 
 	var level_manager: Node = LevelManagerRegistry.get_level_manager(get_tree())
 	if is_instance_valid(level_manager):
@@ -122,6 +185,19 @@ func _configure_midgame_state() -> void:
 	_wave_elapsed = 0.0
 	_wave_index = -1
 	_last_spawned_fleet = ""
+
+
+func _prepare_runtime_probe_player(player: Node3D) -> void:
+	if "max_hull_hp" in player:
+		player.set("max_hull_hp", maxf(float(player.get("max_hull_hp")), 99999.0))
+	if "hull_hp" in player:
+		player.set("hull_hp", maxf(float(player.get("hull_hp")), 99999.0))
+	if "is_sinking" in player:
+		player.set("is_sinking", false)
+	if "is_dying" in player:
+		player.set("is_dying", false)
+	if "is_derelict" in player:
+		player.set("is_derelict", false)
 
 
 func _clear_existing_preview_spawns() -> void:
@@ -176,8 +252,171 @@ func _spawn_fleet_wave(fleet_class: String) -> void:
 	var spawner: Node = get_node_or_null("EnemySpawner")
 	if not is_instance_valid(spawner) or not spawner.has_method("debug_spawn_fleet"):
 		return
+	var known_enemy_ids: Dictionary = {}
+	for enemy in EntityRegistry.get_ships_by_team("enemy"):
+		if is_instance_valid(enemy):
+			known_enemy_ids[enemy.get_instance_id()] = true
 	spawner.call("debug_spawn_fleet", fleet_class)
+	for enemy in EntityRegistry.get_ships_by_team("enemy"):
+		if is_instance_valid(enemy) and not known_enemy_ids.has(enemy.get_instance_id()):
+			enemy.set_meta("midgame_fleet_battle_spawn", true)
 	_last_spawned_fleet = fleet_class
+
+
+func _sample_runtime_monitors(delta: float) -> void:
+	if runtime_probe_sample_interval_seconds <= 0.0:
+		return
+	_runtime_probe_sample_timer -= delta
+	if _runtime_probe_sample_timer > 0.0:
+		return
+	_runtime_probe_sample_timer = runtime_probe_sample_interval_seconds
+	_capture_runtime_monitor_sample()
+
+
+func _capture_runtime_monitor_sample() -> void:
+	var snapshot := {
+		"static_bytes": float(Performance.get_monitor(Performance.MEMORY_STATIC)),
+		"objects": float(Performance.get_monitor(Performance.OBJECT_COUNT)),
+		"resources": float(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)),
+		"nodes": float(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"orphan_nodes": float(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)),
+		"ships": float(_count_ships()),
+		"soldiers": float(_count_soldiers()),
+		"projectiles": float(_count_projectiles()),
+	}
+	if _runtime_monitor_sample_count <= 0:
+		_runtime_monitor_start = snapshot.duplicate()
+	_runtime_monitor_last = snapshot.duplicate()
+	_runtime_monitor_peak_static_bytes = maxf(_runtime_monitor_peak_static_bytes, _runtime_monitor_value(snapshot, "static_bytes"))
+	_runtime_monitor_peak_objects = maxf(_runtime_monitor_peak_objects, _runtime_monitor_value(snapshot, "objects"))
+	_runtime_monitor_sample_count += 1
+
+
+func _maybe_reset_runtime_probe_cycle() -> void:
+	if not runtime_probe_enabled:
+		return
+	if _runtime_probe_cleanup_pending:
+		return
+	if runtime_probe_cycle_seconds <= 0.0:
+		return
+	if _runtime_probe_cycle_elapsed < runtime_probe_cycle_seconds:
+		return
+	_begin_runtime_probe_cycle_reset()
+
+
+func _begin_runtime_probe_cycle_reset() -> void:
+	_runtime_probe_cycle_index += 1
+	_capture_runtime_monitor_sample()
+	_print_runtime_probe_cycle("before_cleanup")
+	_clear_runtime_probe_load()
+	_runtime_probe_cleanup_pending = true
+	_runtime_probe_cleanup_wait_frames = 3
+	_runtime_probe_cycle_elapsed = 0.0
+	_wave_index = -1
+	_wave_elapsed = 0.0
+	_last_spawned_fleet = ""
+
+
+func _handle_runtime_probe_cleanup() -> void:
+	if not _runtime_probe_cleanup_pending:
+		return
+	_runtime_probe_cleanup_wait_frames -= 1
+	if _runtime_probe_cleanup_wait_frames > 0:
+		return
+	_runtime_probe_cleanup_pending = false
+	_capture_runtime_monitor_sample()
+	_runtime_monitor_cycle_start = _runtime_monitor_last.duplicate()
+	_print_runtime_probe_cycle("after_cleanup")
+	_wave_elapsed = initial_wave_delay
+
+
+func _clear_runtime_probe_load() -> void:
+	for projectile in EntityRegistry.get_projectiles():
+		if is_instance_valid(projectile):
+			projectile.queue_free()
+	for soldier in EntityRegistry.get_soldiers_by_team("enemy"):
+		if is_instance_valid(soldier):
+			soldier.queue_free()
+	for enemy in EntityRegistry.get_ships_by_team("enemy"):
+		if is_instance_valid(enemy):
+			enemy.queue_free()
+
+
+func _maybe_finish_runtime_probe() -> void:
+	if not runtime_probe_enabled:
+		return
+	if _runtime_probe_final_reported:
+		return
+	if _runtime_probe_cleanup_pending:
+		return
+	if _elapsed_time < runtime_probe_duration_seconds:
+		return
+	_runtime_probe_final_reported = true
+	_capture_runtime_monitor_sample()
+	_print_runtime_probe_summary()
+	if _should_auto_quit_after_report():
+		call_deferred("_quit_after_compare_report")
+
+
+func _print_runtime_probe_cycle(phase: String) -> void:
+	var static_mb: float = _runtime_monitor_value(_runtime_monitor_last, "static_bytes") / 1048576.0
+	var cycle_static_start_mb: float = _runtime_monitor_value(_runtime_monitor_cycle_start, "static_bytes") / 1048576.0
+	print("[MidgameRuntime] cycle=%d phase=%s elapsed=%.2f static_mb=%.2f cycle_static_mb_delta=%.2f objects=%d resources=%d nodes=%d orphan_nodes=%d ships=%d soldiers=%d projectiles=%d" % [
+		_runtime_probe_cycle_index,
+		phase,
+		_elapsed_time,
+		static_mb,
+		static_mb - cycle_static_start_mb,
+		int(_runtime_monitor_value(_runtime_monitor_last, "objects")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "resources")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "nodes")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "orphan_nodes")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "ships")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "soldiers")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "projectiles")),
+	])
+
+
+func _print_runtime_probe_summary() -> void:
+	if _runtime_monitor_sample_count <= 0:
+		return
+	var static_start_mb: float = _runtime_monitor_value(_runtime_monitor_start, "static_bytes") / 1048576.0
+	var static_end_mb: float = _runtime_monitor_value(_runtime_monitor_last, "static_bytes") / 1048576.0
+	var static_peak_mb: float = _runtime_monitor_peak_static_bytes / 1048576.0
+	var objects_start: int = int(_runtime_monitor_value(_runtime_monitor_start, "objects"))
+	var objects_end: int = int(_runtime_monitor_value(_runtime_monitor_last, "objects"))
+	var resources_start: int = int(_runtime_monitor_value(_runtime_monitor_start, "resources"))
+	var resources_end: int = int(_runtime_monitor_value(_runtime_monitor_last, "resources"))
+	var nodes_start: int = int(_runtime_monitor_value(_runtime_monitor_start, "nodes"))
+	var nodes_end: int = int(_runtime_monitor_value(_runtime_monitor_last, "nodes"))
+	var orphan_nodes_end: int = int(_runtime_monitor_value(_runtime_monitor_last, "orphan_nodes"))
+	print("[MidgameRuntime] summary samples=%d cycles=%d elapsed=%.2f static_mb_start=%.2f static_mb_end=%.2f static_mb_delta=%.2f static_mb_peak=%.2f objects_start=%d objects_end=%d objects_delta=%d objects_peak=%d resources_start=%d resources_end=%d resources_delta=%d nodes_start=%d nodes_end=%d nodes_delta=%d orphan_nodes_end=%d ships=%d soldiers=%d projectiles=%d" % [
+		_runtime_monitor_sample_count,
+		_runtime_probe_cycle_index,
+		_elapsed_time,
+		static_start_mb,
+		static_end_mb,
+		static_end_mb - static_start_mb,
+		static_peak_mb,
+		objects_start,
+		objects_end,
+		objects_end - objects_start,
+		int(_runtime_monitor_peak_objects),
+		resources_start,
+		resources_end,
+		resources_end - resources_start,
+		nodes_start,
+		nodes_end,
+		nodes_end - nodes_start,
+		orphan_nodes_end,
+		int(_runtime_monitor_value(_runtime_monitor_last, "ships")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "soldiers")),
+		int(_runtime_monitor_value(_runtime_monitor_last, "projectiles")),
+	])
+
+
+func _runtime_monitor_value(snapshot: Dictionary, key: String) -> float:
+	return float(snapshot.get(key, 0.0))
 
 
 func _ensure_overlay() -> void:

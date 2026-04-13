@@ -191,6 +191,14 @@ static func process_physics(ship, delta: float) -> void:
 			ship.remove_meta("post_impact_follow_timer")
 		else:
 			ship.set_meta("post_impact_follow_timer", follow_timer)
+	if ship.has_meta("boarding_impact_grace_timer"):
+		var impact_grace_timer: float = maxf(0.0, float(ship.get_meta("boarding_impact_grace_timer")) - delta)
+		if impact_grace_timer <= 0.0:
+			ship.remove_meta("boarding_impact_grace_timer")
+			if ship.has_meta("boarding_impact_target_id"):
+				ship.remove_meta("boarding_impact_target_id")
+		else:
+			ship.set_meta("boarding_impact_grace_timer", impact_grace_timer)
 
 	if ship.is_derelict:
 		var wind_manager = ship.get_node_or_null("/root/WindManager")
@@ -214,6 +222,9 @@ static func process_physics(ship, delta: float) -> void:
 		update_logic_throttled(ship)
 
 	if ship.get_team_tag() == "player":
+		if ship.is_boarding:
+			ship._process_boarding(delta)
+			return
 		ship._process_minion_ai(delta)
 		return
 
@@ -241,7 +252,8 @@ static func process_physics(ship, delta: float) -> void:
 		var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
 		var can_latched_board: bool = ship.has_method("_can_start_boarding_latched") and ship.call("_can_start_boarding_latched", current_target, dist_to_target, can_side_board, can_force_head_on, can_force_cleanup, delta)
 		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= ship.max_boarding_distance + 0.35
-		if can_latched_board or can_direct_board:
+		var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
+		if (can_latched_board or can_direct_board) and impact_confirmed:
 			if ship.has_method("_board_ship"):
 				ship.call("_board_ship", current_target)
 				if ship.is_boarding:

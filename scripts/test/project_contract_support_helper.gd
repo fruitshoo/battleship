@@ -75,6 +75,30 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	if target_ship != player_ship:
 		failures.append("support fleet smoke support ship target mismatch")
 
+	var spawner: Node = smoke_root.get_node_or_null("EnemySpawner")
+	if is_instance_valid(spawner) and spawner.has_method("debug_spawn_ship"):
+		support_ship.set("target", player_ship)
+		support_ship.set_meta("support_joining", false)
+		var player_forward: Vector3 = -player_ship.global_transform.basis.z
+		player_forward.y = 0.0
+		if player_forward.length_squared() <= 0.001:
+			player_forward = Vector3.FORWARD
+		else:
+			player_forward = player_forward.normalized()
+		support_ship.global_position = player_ship.global_position - player_forward * 14.0
+		support_ship.global_position.y = 0.0
+		var threat_a: Node3D = spawner.call("debug_spawn_ship", "kobayabune_melee", 16.0, -7.0) as Node3D
+		var threat_b: Node3D = spawner.call("debug_spawn_ship", "sekibune_melee", 18.0, 7.0) as Node3D
+		for threat in [threat_a, threat_b]:
+			if is_instance_valid(threat):
+				if "current_speed" in threat:
+					threat.set("current_speed", 0.0)
+				if "_last_ai_speed" in threat:
+					threat.set("_last_ai_speed", 0.0)
+		await _wait_frames(owner, wait_frames_after_spawn + 4)
+		if support_ship.get_meta("support_debug_mode", "") != "assist":
+			failures.append("support fleet smoke support ship did not enter assist engagement mode")
+
 	var support_before_idle_pos: Vector3 = support_ship.global_position
 	support_ship.set("target", null)
 	await _wait_frames(owner, wait_frames_after_spawn + 2)
@@ -99,8 +123,38 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	if support_ship.get("hull_hp") != null and float(support_ship.get("hull_hp")) <= repair_before:
 		failures.append("support fleet smoke repair path did not heal support ship")
 
+	await _run_support_signal_level_two_limit_smoke(owner, failures, player_ship, wait_frames_after_spawn)
+
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
+
+
+static func _run_support_signal_level_two_limit_smoke(owner: Node, failures: Array[String], player_ship: Node3D, wait_frames_after_spawn: int) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("support fleet smoke missing UpgradeManager for signal level 2")
+		return
+	if not UpgradeManager.has_method("_refresh_support_fleet_upgrade_state"):
+		failures.append("support fleet smoke missing support fleet refresh helper")
+		return
+
+	var original_signal_level: int = int(UpgradeManager.current_levels.get("fleet_signal", 0))
+	var original_crew_level: int = int(UpgradeManager.current_levels.get("fleet_crew", 0))
+	UpgradeManager.current_levels["fleet_signal"] = 2
+	UpgradeManager.current_levels["fleet_crew"] = 0
+	UpgradeManager.call("_refresh_support_fleet_upgrade_state", player_ship)
+
+	if int(player_ship.get("support_fleet_limit")) < 2:
+		failures.append("support fleet smoke signal Lv2 did not increase support limit")
+
+	player_ship.call("_spawn_or_repair_ally")
+	await _wait_frames(owner, wait_frames_after_spawn + 2)
+	var support_ships: Array = player_ship.call("_get_support_fleet_ships")
+	if support_ships.size() < 2:
+		failures.append("support fleet smoke signal Lv2 did not spawn second support ship")
+
+	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
+	UpgradeManager.current_levels["fleet_crew"] = original_crew_level
+	UpgradeManager.call("_refresh_support_fleet_upgrade_state", player_ship)
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:

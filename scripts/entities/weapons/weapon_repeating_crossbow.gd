@@ -77,7 +77,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		current_target_pos.y += 0.5
 		
 		# === 예측 샷 (Predictive Aiming) ===
-		var arrow_speed = 30.0 # 연노 화살은 약간 더 빠름
+		var arrow_speed = 27.0 # 연노 화살은 약간 더 빠름
 		var distance = spawn_pos.distance_to(current_target_pos)
 		var time_to_reach = distance / arrow_speed
 		
@@ -95,8 +95,12 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 				var s_dir = ship.get_move_direction_value() if ship.has_method("get_move_direction_value") else -ship.global_transform.basis.z.normalized()
 				ship_vel = s_dir * s_speed
 				
-		var total_vel = local_vel + ship_vel
-		current_target_pos += total_vel * time_to_reach * 0.92
+		var total_vel = local_vel + ship_vel * 0.45
+		var lead_offset: Vector3 = total_vel * time_to_reach * 0.72
+		var max_lead: float = clampf(distance * 0.28, 0.45, 3.0)
+		if lead_offset.length() > max_lead:
+			lead_offset = lead_offset.normalized() * max_lead
+		current_target_pos += lead_offset
 		
 		# 약간의 오차 (흩뿌림) 적용 - 연사 시 오차를 더 크게 (현실감)
 		current_target_pos.x += randf_range(-0.22, 0.22)
@@ -128,7 +132,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		
 		var audio_manager = attacker.get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager):
-			audio_manager.play_sfx("arrow_shoot", attacker.global_position, randf_range(1.1, 1.3), 4.0) # 조금 높은 피치, 볼륨 증가
+			audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(1.0, 1.15)) # 조금 높은 피치
 			
 		# 다음 발사 대기
 		if i < burst_count - 1:

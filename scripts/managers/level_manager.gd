@@ -82,12 +82,12 @@ var _boss_boundary_hidden_for_current_boss: bool = false
 
 const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
-	"singigeon": "신기전병",
+	"singigeon": "신기전",
 	"janggun": "대장군전",
 	"crew_numbers": "창병",
-	"fire_pot": "화통병",
+	"fire_pot": "화통",
 	"ballista": "팔우노",
-	"repeating_crossbow": "연노병",
+	"repeating_crossbow": "연노",
 	"bow": "활",
 	"sword": "검",
 	"spear": "창",
@@ -259,6 +259,9 @@ func _apply_reward_rules_root(root: Dictionary) -> void:
 
 func _run_startup_prewarm_async() -> void:
 	await LevelManagerStartupHelper.run_startup_prewarm_async(self)
+
+func _run_startup_bootstrap_async() -> void:
+	await LevelManagerStartupHelper.run_startup_bootstrap_async(self)
 
 func _prewarm_shaders(show_blocking_overlay: bool = true) -> void:
 	await LevelManagerStartupHelper.prewarm_shaders(self, show_blocking_overlay)
@@ -868,4 +871,9 @@ func show_meta_shop() -> void:
 	shop.title_text = "[항구] 영구 강화"
 	shop.close_button_text = "항해 복귀"
 	add_child(shop)
-	shop.closed.connect(func(): get_tree().paused = false)
+	var level_manager_id: int = get_instance_id()
+	shop.closed.connect(func():
+		var level_manager := instance_from_id(level_manager_id) as Node
+		if is_instance_valid(level_manager):
+			level_manager.get_tree().paused = false
+	)

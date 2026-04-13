@@ -1,8 +1,18 @@
 extends RefCounted
 class_name ChaserShipBoardingHelper
 
+const BOARDING_MOTION_SETTLE_DURATION := 1.35
+const LATCHED_CORRECTION_BLEND := 0.42
+const LATCHED_PULL_BLEND := 0.62
+
 static func process_boarding(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
+		if ship.get_team_tag() == "player":
+			if ship.has_method("_cancel_boarding"):
+				ship._cancel_boarding()
+			else:
+				ship.is_boarding = false
+			return
 		ship.die()
 		return
 	var target_pos = ship.boarding_target.global_position
@@ -11,16 +21,26 @@ static func process_boarding(ship, delta: float) -> void:
 	var dist_to_target = flat_to_target.length()
 
 	var motion := _build_boarding_motion(ship, ship.boarding_target, target_pos, flat_to_target, dist_to_target)
+	var contact_mode: String = str(ship.get_meta("boarding_contact_mode", ""))
+	var motion_settle: float = _update_motion_settle(ship, delta)
 	var heading_dir: Vector3 = motion["heading_dir"]
 	var target_rot = atan2(-heading_dir.x, -heading_dir.z)
-	ship.rotation.y = lerp_angle(ship.rotation.y, target_rot, delta * 2.0)
+	var turn_response: float = _get_boarding_turn_response(contact_mode, motion.get("parallel_hold", false) == true, motion_settle)
+	ship.rotation.y = lerp_angle(ship.rotation.y, target_rot, minf(delta * turn_response, 1.0))
 
 	var desired_boarding_speed: float = float(motion["desired_speed"])
-	ship.current_speed = move_toward(ship.current_speed, desired_boarding_speed, ship.acceleration * 2.0 * delta)
+	var speed_change_rate: float = ship.acceleration if desired_boarding_speed > ship.current_speed else ship.deceleration
+	speed_change_rate *= lerpf(0.78, 1.12, motion_settle)
+	ship.current_speed = move_toward(ship.current_speed, desired_boarding_speed, speed_change_rate * delta)
 
 	var correction_velocity: Vector3 = motion["correction_velocity"]
+	var correction_blend: float = lerpf(0.72, 1.0, motion_settle)
+	if ship._initial_rope_deployed:
+		correction_blend *= LATCHED_CORRECTION_BLEND
+	correction_velocity *= correction_blend
 	var approach_velocity: Vector3 = heading_dir * ship.current_speed + correction_velocity
-	var pull_force = ship._calculate_boarding_pull()
+	var pull_blend: float = LATCHED_PULL_BLEND if ship._initial_rope_deployed else lerpf(0.25, 0.7, motion_settle)
+	var pull_force = ship._calculate_boarding_pull() * pull_blend
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + (approach_velocity + pull_force * delta) * delta
 	if is_instance_valid(ship.boarding_target):
@@ -31,6 +51,22 @@ static func process_boarding(ship, delta: float) -> void:
 
 	ship._apply_bobbing_effect()
 	ship._process_boarding_common(delta)
+
+
+static func _update_motion_settle(ship, delta: float) -> float:
+	var timer: float = float(ship.get_meta("boarding_motion_settle_timer", 0.0)) + delta
+	ship.set_meta("boarding_motion_settle_timer", timer)
+	var t: float = clampf(timer / BOARDING_MOTION_SETTLE_DURATION, 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+
+static func _get_boarding_turn_response(contact_mode: String, parallel_hold: bool, motion_settle: float) -> float:
+	var max_response: float = 1.25 if parallel_hold else 0.95
+	if contact_mode == "head_on":
+		max_response = 0.82
+	elif contact_mode == "cleanup":
+		max_response = 0.72
+	return lerpf(0.45, max_response, motion_settle)
 
 
 static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector3, flat_to_target: Vector3, dist_to_target: float) -> Dictionary:
@@ -67,14 +103,14 @@ static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector
 	correction.y = 0.0
 	var correction_velocity := Vector3.ZERO
 	if correction.length_squared() > 0.01:
-		correction_velocity = correction.normalized() * minf(ship.move_speed * 0.38, correction.length() * 1.45)
+		correction_velocity = correction.normalized() * minf(ship.move_speed * 0.34, correction.length() * 1.25)
 
 	var target_speed: float = 0.0
 	if target_ship.has_method("get_current_speed_value"):
 		target_speed = float(target_ship.call("get_current_speed_value"))
 	elif "current_speed" in target_ship:
 		target_speed = float(target_ship.get("current_speed"))
-	var desired_speed: float = clampf(maxf(target_speed * 0.86, 0.65), 0.0, ship.move_speed * 0.62)
+	var desired_speed: float = clampf(maxf(target_speed * 0.82, 0.6), 0.0, ship.move_speed * 0.6)
 	return {
 		"heading_dir": target_forward,
 		"desired_speed": desired_speed,
@@ -96,7 +132,7 @@ static func _build_contact_hold_motion(ship, fallback_dir: Vector3, dist_to_targ
 	var correction_velocity := Vector3.ZERO
 	var desired_contact_dist: float = ship.max_boarding_distance - 0.75
 	if dist_to_target > desired_contact_dist and fallback_dir.length_squared() > 0.001:
-		var correction_speed: float = clampf((dist_to_target - desired_contact_dist) * 1.8, 0.0, ship.move_speed * 0.55)
+		var correction_speed: float = clampf((dist_to_target - desired_contact_dist) * 1.05, 0.0, ship.move_speed * 0.32)
 		correction_velocity = fallback_dir.normalized() * correction_speed
 
 	return {
@@ -215,6 +251,8 @@ static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: 
 				side_sign = 1.0 if rel_side >= 0.0 else -1.0
 			ship.set_meta("boarding_side_sign", side_sign)
 		ship.set_meta("post_impact_follow_timer", 2.1)
+		if ship.has_method("_mark_boarding_impact"):
+			ship.call("_mark_boarding_impact", other_ship)
 	var impact_speed = maxf(impact_speed_hint, ship.min_ramming_speed * 0.72)
 	ship.apply_ramming_damage(other_ship, impact_speed)
 	if other_ship.has_method("apply_ramming_damage"):

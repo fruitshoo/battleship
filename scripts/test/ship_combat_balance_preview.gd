@@ -346,6 +346,8 @@ func _set_ship_launcher_detection_range(ship: Node, detection_range: float) -> v
 	if not is_instance_valid(ship):
 		return
 	for child in ship.get_children():
+		if child.is_in_group("soldiers") or child.has_method("is_dead_soldier"):
+			continue
 		if "detection_range" in child:
 			child.set("detection_range", detection_range)
 		_set_ship_launcher_detection_range(child, detection_range)
@@ -396,6 +398,7 @@ func _build_current_result() -> Dictionary:
 	var player_boarders_on_enemy := _count_boarders_from_home_to_target(_current_player_ship, _current_enemy_ship)
 	var enemy_boarders_on_player := _count_boarders_from_home_to_target(_current_enemy_ship, _current_player_ship)
 	var raid_debug: Dictionary = PlayerShipCrewHelper.get_auto_raid_debug_snapshot(_current_player_ship, _current_enemy_ship)
+	var boarding_debug: String = _build_boarding_debug_snapshot()
 
 	var winner := "draw"
 	if _is_ship_out(_current_enemy_ship) and not _is_ship_out(_current_player_ship):
@@ -431,6 +434,7 @@ func _build_current_result() -> Dictionary:
 		"player_boarders_on_enemy": player_boarders_on_enemy,
 		"enemy_boarders_on_player": enemy_boarders_on_player,
 		"raid_debug": raid_debug,
+		"boarding_debug": boarding_debug,
 		"winner": winner,
 		"event_summary": _build_event_summary(
 			player_hull_ratio,
@@ -532,6 +536,88 @@ func _count_boarders_from_home_to_target(home_ship: Node3D, target_ship: Node3D)
 		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() == home_ship:
 			count += 1
 	return count
+
+
+func _is_boarding_debug_scenario() -> bool:
+	var scenario_name := _get_current_scenario_name()
+	return scenario_name == "Head-on Cleanup" or scenario_name == "Cleanup Drift"
+
+
+func _get_current_scenario_name() -> String:
+	if _current_scenario_index >= 0 and _current_scenario_index < _scenario_defs.size():
+		return str(_scenario_defs[_current_scenario_index].get("name", "Scenario"))
+	return ""
+
+
+func _build_boarding_debug_snapshot() -> String:
+	if not _is_boarding_debug_scenario() or not is_instance_valid(_current_player_ship) or not is_instance_valid(_current_enemy_ship):
+		return ""
+
+	var contact_mode: String = str(_current_enemy_ship.get_meta("boarding_contact_mode", "-"))
+	var contact_defenders: int = int(_current_enemy_ship.get_meta("boarding_local_defenders_at_contact", -1))
+	var player_defenders: int = 0
+	var enemy_boarders: int = 0
+	var home_enemy_boarders: int = 0
+	var defender_hp_total: float = 0.0
+	var defender_hp_min: float = INF
+	var boarder_chaos_min: float = INF
+	var boarder_chaos_max: float = 0.0
+	var boarder_target_notes: Array[String] = []
+
+	for soldier in EntityRegistry.get_soldiers_by_ship(_current_player_ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team == "player":
+			player_defenders += 1
+			var hp: float = float(soldier.get("current_health")) if "current_health" in soldier else 0.0
+			defender_hp_total += hp
+			defender_hp_min = minf(defender_hp_min, hp)
+		elif soldier_team == "enemy":
+			enemy_boarders += 1
+			if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() == _current_enemy_ship:
+				home_enemy_boarders += 1
+			var chaos_left: float = float(soldier.get("chaos_duration_timer")) if "chaos_duration_timer" in soldier else 0.0
+			boarder_chaos_min = minf(boarder_chaos_min, chaos_left)
+			boarder_chaos_max = maxf(boarder_chaos_max, chaos_left)
+			if boarder_target_notes.size() < 3:
+				boarder_target_notes.append(_describe_soldier_target(soldier))
+
+	var defender_hp_avg: float = defender_hp_total / maxf(1.0, float(player_defenders))
+	if defender_hp_min == INF:
+		defender_hp_min = 0.0
+	if boarder_chaos_min == INF:
+		boarder_chaos_min = 0.0
+
+	return "mode=%s contact_def=%d enemy_boarding=%s player_def=%d def_hp_min=%.1f def_hp_avg=%.1f enemy_boarders=%d home_boarders=%d chaos_min=%.1f chaos_max=%.1f targets=%s enemy_home_crew=%d" % [
+		contact_mode,
+		contact_defenders,
+		"Y" if _is_boarding(_current_enemy_ship) else "N",
+		player_defenders,
+		defender_hp_min,
+		defender_hp_avg,
+		enemy_boarders,
+		home_enemy_boarders,
+		boarder_chaos_min,
+		boarder_chaos_max,
+		"|".join(boarder_target_notes) if not boarder_target_notes.is_empty() else "-",
+		_get_ship_crew(_current_enemy_ship),
+	]
+
+
+func _describe_soldier_target(soldier: Node3D) -> String:
+	var target_value: Variant = soldier.get("current_target") if "current_target" in soldier else null
+	if not is_instance_valid(target_value):
+		return "target=-"
+	var target := target_value as Node3D
+	if not is_instance_valid(target):
+		return "target=-"
+	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
+	var target_hp: float = float(target.get("current_health")) if "current_health" in target else 0.0
+	var dist_xz := Vector2(soldier.global_position.x - target.global_position.x, soldier.global_position.z - target.global_position.z).length()
+	return "%s hp=%.1f dist=%.1f" % [target_team, target_hp, dist_xz]
 
 
 func _ensure_overlay() -> void:
@@ -734,6 +820,12 @@ func _report_summary() -> void:
 				int(raid_debug.get("available_boarders", 0)),
 				str(result.get("event_summary", "")),
 			])
+			var boarding_debug: String = str(result.get("boarding_debug", ""))
+			if not boarding_debug.is_empty():
+				print("[ShipCombat] result_debug name=%s %s" % [
+					str(result.get("name", "Scenario")),
+					boarding_debug,
+				])
 		print("[ShipCombat] summary scenarios=%d player_wins=%d enemy_wins=%d draws=%d" % [
 			_scenario_results.size(),
 			player_wins,

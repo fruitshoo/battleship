@@ -144,13 +144,7 @@ func _setup_soldiers() -> void:
 		add_child(soldiers_node)
 		soldiers_node.position = Vector3(0, 1.0, 0)
 	
-	# 보스 함선 갑판에 4명의 병사 배치
-	var spawn_points = [
-		Vector3(-1.5, 0, -3),
-		Vector3(1.5, 0, -3),
-		Vector3(-1.5, 0, 3),
-		Vector3(1.5, 0, 3)
-	]
+	var spawn_points: Array[Vector3] = _get_boss_soldier_spawn_points(maxi(crew_composition.size(), 4))
 	
 	var i = 0
 	for pos in spawn_points:
@@ -179,11 +173,25 @@ func _load_crew_composition_from_stats(stats: Dictionary) -> void:
 	if typeof(composition_variant) != TYPE_DICTIONARY:
 		return
 	var composition: Dictionary = composition_variant as Dictionary
-	var ordered_types: Array[String] = ["general", "melee", "ranged"]
+	var ordered_types: Array[String] = ["general", "melee", "ranged", "fire_pot"]
 	for soldier_type_name in ordered_types:
 		var count: int = int(composition.get(soldier_type_name, 0))
 		for _i in range(maxi(count, 0)):
 			crew_composition.append(soldier_type_name)
+
+
+func _get_boss_soldier_spawn_points(required_count: int) -> Array[Vector3]:
+	var base_points: Array[Vector3] = [
+		Vector3(-1.5, 0, -3),
+		Vector3(1.5, 0, -3),
+		Vector3(-1.5, 0, 3),
+		Vector3(1.5, 0, 3),
+		Vector3(0.0, 0, -1.5),
+		Vector3(0.0, 0, 1.5),
+		Vector3(-2.2, 0, 0.0),
+		Vector3(2.2, 0, 0.0),
+	]
+	return base_points.slice(0, clampi(required_count, 1, base_points.size()))
 
 
 func _get_crew_type_for_index(index: int) -> String:
@@ -202,6 +210,8 @@ func _configure_boss_soldier(soldier, soldier_type_name: String) -> void:
 			soldier.is_melee_only = true
 		"ranged":
 			soldier.is_ranged_only = true
+		"fire_pot":
+			soldier.crew_role = "fire_pot"
 	if soldier.is_node_ready():
 		soldier._apply_role_loadout()
 		soldier._update_role_visual()
@@ -389,10 +399,14 @@ func die() -> void:
 	tween.tween_property(self , "position:y", -5.0, 4.0)
 	tween.tween_property(self , "rotation:z", deg_to_rad(25.0), 3.0)
 	
+	var boss_id: int = get_instance_id()
 	tween.chain().tween_callback(func():
+		var boss_ship = instance_from_id(boss_id)
+		if not is_instance_valid(boss_ship):
+			return
 		# 중간 보스(tier 1) 격침은 승리 조건이 아니다.
-		if tier >= 2 and is_instance_valid(cached_lm) and cached_lm.has_method("show_victory"):
-			cached_lm.show_victory()
+		if int(boss_ship.get("tier")) >= 2 and is_instance_valid(boss_ship.cached_lm) and boss_ship.cached_lm.has_method("show_victory"):
+			boss_ship.cached_lm.show_victory()
 	)
 	
 	# 아이템은 최종 보스(tier 2 이상)만 드롭한다.

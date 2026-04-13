@@ -3,6 +3,7 @@ class_name BaseShipStatusHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
+const SUPPORT_RESCUE_BOARDING_PURPOSE := "support_rescue_boarding"
 
 static func update_fire_effect(ship) -> void:
 	if (ship.is_burning or ship.is_derelict) and not ship.is_sinking and not ship.is_dying:
@@ -105,10 +106,16 @@ static func update_boarding_state(ship, delta: float) -> void:
 
 	if overrun:
 		var attacker_ship: Node = ship.get_boarding_attacker_ship() if ship.has_method("get_boarding_attacker_ship") else null
+		if not is_instance_valid(attacker_ship):
+			attacker_ship = _find_attacker_ship_from_boarders(ship, ship_team)
+			if is_instance_valid(attacker_ship) and ship.has_method("set_boarding_attacker_ship"):
+				ship.call("set_boarding_attacker_ship", attacker_ship)
 		var effective_capture_duration: float = ship.boarding_capture_duration
 		if ship.has_method("get_effective_boarding_capture_duration"):
 			effective_capture_duration = float(ship.call("get_effective_boarding_capture_duration", attacker_ship))
-		ship.boarding_capture_progress = minf(effective_capture_duration, ship.boarding_capture_progress + delta)
+		var support_rescue_active: bool = ship_team == "player" and _is_support_rescue_boarding_active(ship)
+		if not support_rescue_active:
+			ship.boarding_capture_progress = minf(effective_capture_duration, ship.boarding_capture_progress + delta)
 		if ship_team == "player" and not ship._deck_overrun_announced:
 			ship._deck_overrun_announced = true
 			if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
@@ -117,10 +124,8 @@ static func update_boarding_state(ship, delta: float) -> void:
 			var attacker_team: String = attacker_ship.get_team_tag() if attacker_ship.has_method("get_team_tag") else str(attacker_ship.get("team"))
 			if attacker_team == "player" and is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
 				ship._cached_hud.show_message("월선 성공! 적 갑판 장악 중", 1.65)
-		if ship_team == "player" and ship.boarding_capture_progress >= effective_capture_duration:
-			ship.boarding_capture_progress = 0.0
-			var capture_tick_damage: float = maxf(float(ship.boarding_capture_damage_tick), float(ship.max_hull_hp) * 0.12)
-			ship.take_damage(capture_tick_damage, ship.global_position, "boarding_capture")
+		if not support_rescue_active and ship.boarding_capture_progress >= effective_capture_duration:
+			_resolve_boarding_capture_tick(ship, ship_team, attacker_ship)
 	elif contested:
 		ship.boarding_capture_progress = move_toward(ship.boarding_capture_progress, 0.0, delta * 0.7)
 		if ship_team != "player" and not was_contested:
@@ -136,6 +141,59 @@ static func update_boarding_state(ship, delta: float) -> void:
 	else:
 		ship.boarding_capture_progress = 0.0
 		ship._deck_overrun_announced = false
+
+
+static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(child):
+			continue
+		if child.has_method("is_dead") and child.is_dead():
+			continue
+		var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
+		if child_team == ship_team:
+			continue
+		var home_ship: Variant = child.get("home_ship") if child.get("home_ship") != null else null
+		if is_instance_valid(home_ship) and home_ship is Node:
+			return home_ship as Node
+	return null
+
+
+static func _is_support_rescue_boarding_active(player_ship: Node) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	for support_ship in EntityRegistry.get_ships_by_team("player"):
+		if not is_instance_valid(support_ship) or support_ship == player_ship:
+			continue
+		if support_ship.get_meta("support_fleet_ship", false) != true:
+			continue
+		if support_ship.get("is_boarding") != true:
+			continue
+		if support_ship.get("boarding_target") != player_ship:
+			continue
+		if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
+			continue
+		return true
+	return false
+
+
+static func _resolve_boarding_capture_tick(ship, ship_team: String, attacker_ship: Node) -> void:
+	ship.boarding_capture_progress = 0.0
+	var capture_tick_damage: float = maxf(float(ship.boarding_capture_damage_tick), float(ship.max_hull_hp) * 0.12)
+	if ship_team == "player":
+		ship.take_damage(capture_tick_damage, ship.global_position, "boarding_capture")
+		return
+	if not is_instance_valid(attacker_ship):
+		return
+	var attacker_team: String = attacker_ship.get_team_tag() if attacker_ship.has_method("get_team_tag") else str(attacker_ship.get("team"))
+	if attacker_team != "player":
+		return
+	if ship.has_method("capture_ship"):
+		ship.call_deferred("capture_ship")
+		return
+	if ship.has_method("take_damage"):
+		ship.take_damage(capture_tick_damage, ship.global_position, "boarding_capture")
+	if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
+		ship._cached_hud.show_message("갑판 장악! 적선 선체를 파괴 중", 1.5)
 
 
 static func take_fire_damage(ship, duration: float) -> void:
@@ -172,6 +230,8 @@ static func update_burning_status(ship, delta: float) -> void:
 
 static func update_hull_regeneration(ship, delta: float) -> void:
 	if ship.is_sinking or ship.is_dying or ship.hull_regen_rate <= 0:
+		return
+	if ship.deck_is_contested or ship.deck_is_overrun or ship.deck_hostile_boarder_count > 0:
 		return
 
 	if ship.hull_hp < ship.max_hull_hp:

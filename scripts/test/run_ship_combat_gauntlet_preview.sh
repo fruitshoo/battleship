@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
+source "$script_dir/harness_log_gate.sh"
 godot_bin="${GODOT_BIN:-/Applications/Godot.app/Contents/MacOS/Godot}"
 log_file="$(mktemp -t battleship_ship_gauntlet.XXXXXX.log)"
 preset="${1:-}"
@@ -26,24 +27,7 @@ BATTLESHIP_DISABLE_AUTOSAVE=1 \
 	--path "$project_root" \
 	res://scenes/test/ship_combat_gauntlet_preview.tscn 2>&1 | tee "$log_file"
 
-bad_patterns=(
-	"Parse Error"
-	"Invalid call"
-	"Nonexistent"
-	"Cannot infer the type"
-	"Attempt to call function"
-	"Script error"
-	"Error calling"
-	"call to function"
-	"Lambda capture at index"
-)
-
-for pattern in "${bad_patterns[@]}"; do
-	if grep -Fq "$pattern" "$log_file"; then
-		echo "[ShipGauntlet] log gate failed: $pattern" >&2
-		exit 1
-	fi
-done
+harness_check_log_gate "ShipGauntlet" "$log_file"
 
 if ! grep -Fq "[ShipGauntlet] summary" "$log_file"; then
 	echo "[ShipGauntlet] missing summary output" >&2

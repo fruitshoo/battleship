@@ -1,12 +1,18 @@
 extends RefCounted
 class_name SoldierLifecycleHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+
 const MELEE_DAMAGE_SOURCES := {
 	"sword": true,
 	"spear": true,
 	"trident": true,
 	"harpoon": true,
 }
+const PLAYER_INCAPACITATED_RECOVERY_DELAY: float = 16.0
+const PLAYER_INCAPACITATED_RECOVERY_HEALTH_RATIO: float = 0.35
+const PLAYER_INCAPACITATED_MIN_RECOVERY_DELAY: float = 3.0
+const SUPPORT_RESCUE_BOARDING_PURPOSE := "support_rescue_boarding"
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -42,6 +48,9 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 			soldier.velocity += knock_dir * minf(final_damage * 0.2, 3.5)
 
 	if soldier.current_health <= 0.0:
+		if _should_incapacitate_instead_of_die(soldier):
+			incapacitate(soldier)
+			return
 		die(soldier)
 
 
@@ -68,7 +77,14 @@ static func update_boarding_chaos(soldier, delta: float) -> void:
 		return
 
 	soldier.is_boarder_on_player_ship = true
-	soldier.chaos_duration_timer -= delta
+	if not is_instance_valid(soldier.current_target):
+		var nearest_target: Node3D = _find_nearest_hostile_on_owned_ship(soldier)
+		if is_instance_valid(nearest_target) and soldier.has_method("move_to_target"):
+			soldier.move_to_target(nearest_target)
+	if _is_fighting_defender_on_owned_ship(soldier) or _is_support_rescue_boarding_active(soldier.owned_ship):
+		soldier.chaos_tick_timer = maxf(soldier.chaos_tick_timer, 0.35)
+		return
+
 	soldier.chaos_tick_timer -= delta
 
 	if soldier.chaos_tick_timer <= 0.0:
@@ -82,22 +98,122 @@ static func update_boarding_chaos(soldier, delta: float) -> void:
 		elif soldier.owned_ship.has_method("take_damage"):
 			soldier.owned_ship.take_damage(chaos_damage, soldier.global_position, "boarding_fire")
 
-	if soldier.chaos_duration_timer <= 0.0:
-		soldier.is_boarder_on_player_ship = false
-		soldier.chaos_duration_timer = 8.0
-		soldier.chaos_tick_timer = 0.0
-		if soldier.has_method("_try_evacuate_to_home"):
-			soldier._try_evacuate_to_home()
+
+static func _is_fighting_defender_on_owned_ship(soldier) -> bool:
+	if not is_instance_valid(soldier.owned_ship):
+		return false
+	if not is_instance_valid(soldier.current_target):
+		return false
+	var target: Node = soldier.current_target
+	if target.has_method("is_dead_soldier") and target.is_dead_soldier():
+		return false
+	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
+	if target_team == soldier.team:
+		return false
+	var target_ship: Variant = target.get("owned_ship") if target.get("owned_ship") != null else null
+	if is_instance_valid(target_ship):
+		return target_ship == soldier.owned_ship
+	var parent := target.get_parent()
+	if parent == soldier.owned_ship:
+		return true
+	if is_instance_valid(parent) and parent.get_parent() == soldier.owned_ship:
+		return true
+	return false
+
+
+static func _is_support_rescue_boarding_active(player_ship: Node) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	for support_ship in EntityRegistry.get_ships_by_team("player"):
+		if not is_instance_valid(support_ship) or support_ship == player_ship:
+			continue
+		if support_ship.get_meta("support_fleet_ship", false) != true:
+			continue
+		if support_ship.get("is_boarding") != true:
+			continue
+		if support_ship.get("boarding_target") != player_ship:
+			continue
+		if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
+			continue
+		return true
+	return false
+
+
+static func _find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
+	if not is_instance_valid(soldier.owned_ship):
+		return null
+	var candidates: Array = []
+	var soldiers_node: Node = soldier.owned_ship.get_node_or_null("Soldiers")
+	if is_instance_valid(soldiers_node):
+		candidates = soldiers_node.get_children()
+	for registered_soldier in EntityRegistry.get_soldiers_by_ship(soldier.owned_ship):
+		if not candidates.has(registered_soldier):
+			candidates.append(registered_soldier)
+	var nearest: Node3D = null
+	var nearest_distance_sq: float = INF
+	for other in candidates:
+		if other == soldier or not is_instance_valid(other):
+			continue
+		if not (other is Node3D):
+			continue
+		if other.has_method("is_dead_soldier") and other.is_dead_soldier():
+			continue
+		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
+		if other_team == soldier.team:
+			continue
+		var other_node := other as Node3D
+		var distance_sq: float = soldier.global_position.distance_squared_to(other_node.global_position)
+		if distance_sq < nearest_distance_sq:
+			nearest_distance_sq = distance_sq
+			nearest = other_node
+	return nearest
 
 
 static func heal_full(soldier) -> void:
+	if soldier.current_state == soldier.State.DEAD and soldier.get_meta("incapacitated", false) == true:
+		_recover_incapacitated_now(soldier, 1.0)
+		return
 	if soldier.current_state != soldier.State.DEAD:
 		soldier.current_health = soldier.max_health
 
 
-static func die(soldier) -> void:
+static func incapacitate(soldier) -> void:
 	if soldier.current_state == soldier.State.DEAD:
 		return
+
+	soldier.current_state = soldier.State.DEAD
+	soldier.current_target = null
+	soldier.attack_timer = 0.0
+	soldier.is_boarder_on_player_ship = false
+	soldier.current_health = 0.0
+	soldier.velocity = Vector3.ZERO
+	soldier.set_meta("incapacitated", true)
+	soldier.set_meta("incapacitated_recovery_pending", true)
+
+	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("check_derelict_status"):
+		soldier.home_ship.call_deferred("check_derelict_status")
+
+	_snap_dead_body_to_deck(soldier)
+	soldier.set_physics_process(false)
+	if soldier.is_in_group("soldiers"):
+		soldier.remove_from_group("soldiers")
+
+	if soldier.has_node("CollisionShape3D"):
+		soldier.get_node("CollisionShape3D").set_deferred("disabled", true)
+
+	if soldier.has_method("_play_death_pose"):
+		soldier._play_death_pose()
+
+	_schedule_incapacitated_recovery(soldier)
+
+
+static func die(soldier) -> void:
+	if soldier.current_state == soldier.State.DEAD:
+		if soldier.get_meta("incapacitated", false) == true:
+			soldier.remove_meta("incapacitated")
+			soldier.remove_meta("incapacitated_recovery_pending")
+		else:
+			return
 
 	soldier.current_state = soldier.State.DEAD
 	soldier.current_target = null
@@ -110,6 +226,7 @@ static func die(soldier) -> void:
 	if soldier.team == "enemy":
 		_apply_enemy_kill_rewards(soldier)
 
+	_snap_dead_body_to_deck(soldier)
 	var death_position: Vector3 = soldier.global_position
 	var tree: SceneTree = soldier.get_tree()
 	var audio_manager = soldier.get_node_or_null("/root/AudioManager")
@@ -134,7 +251,136 @@ static func die(soldier) -> void:
 	if soldier.has_node("CollisionShape3D"):
 		soldier.get_node("CollisionShape3D").set_deferred("disabled", true)
 
-	soldier.visible = false
+	var owned_ship_team: String = ""
+	if is_instance_valid(soldier.owned_ship):
+		owned_ship_team = str(soldier.owned_ship.get("team"))
+	var should_show_death_pose: bool = soldier.team == "player" or soldier.team == "enemy" or owned_ship_team == "player"
+	if should_show_death_pose and soldier.has_method("_play_death_pose"):
+		soldier._play_death_pose()
+	else:
+		soldier.visible = false
+
+
+static func _snap_dead_body_to_deck(soldier) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if not is_instance_valid(soldier.owned_ship):
+		return
+	if soldier.has_method("_keep_within_owned_ship_bounds"):
+		soldier._keep_within_owned_ship_bounds()
+
+
+static func _should_incapacitate_instead_of_die(soldier) -> bool:
+	if soldier.team != "player":
+		return false
+	var death_cause: String = str(soldier.get_meta("last_death_cause", "combat"))
+	if death_cause == "drowned":
+		return false
+	var last_damage_source: String = str(soldier.get_meta("last_damage_source", ""))
+	if last_damage_source == "drowned":
+		return false
+	if is_instance_valid(soldier.owned_ship):
+		if soldier.owned_ship.has_method("is_sinking_or_dying") and soldier.owned_ship.is_sinking_or_dying():
+			return false
+		if soldier.owned_ship.get("is_sinking") == true or soldier.owned_ship.get("is_dying") == true:
+			return false
+	return true
+
+
+static func _schedule_incapacitated_recovery(soldier) -> void:
+	var tree: SceneTree = soldier.get_tree()
+	if not is_instance_valid(tree):
+		return
+	var soldier_id: int = soldier.get_instance_id()
+	tree.create_timer(_get_incapacitated_recovery_delay(soldier)).timeout.connect(func() -> void:
+		_try_recover_incapacitated_by_id(soldier_id)
+	)
+
+
+static func _try_recover_incapacitated_by_id(soldier_id: int) -> void:
+	var soldier = instance_from_id(soldier_id)
+	if not is_instance_valid(soldier):
+		return
+	_try_recover_incapacitated(soldier)
+
+
+static func _try_recover_incapacitated(soldier) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if soldier.get_meta("incapacitated", false) != true:
+		return
+	if not is_instance_valid(soldier.owned_ship):
+		_schedule_incapacitated_recovery(soldier)
+		return
+	if soldier.owned_ship.has_method("is_sinking_or_dying") and soldier.owned_ship.is_sinking_or_dying():
+		return
+	if soldier.owned_ship.get("is_sinking") == true or soldier.owned_ship.get("is_dying") == true:
+		return
+	if _has_hostile_on_owned_ship(soldier):
+		_schedule_incapacitated_recovery(soldier)
+		return
+
+	_recover_incapacitated_now(soldier, _get_incapacitated_recovery_health_ratio(soldier))
+
+
+static func _recover_incapacitated_now(soldier, health_ratio: float) -> void:
+	soldier.remove_meta("incapacitated")
+	soldier.remove_meta("incapacitated_recovery_pending")
+	soldier.current_health = maxf(8.0, soldier.max_health * health_ratio)
+	soldier.current_target = null
+	soldier.attack_timer = 1.2
+	soldier.current_state = soldier.State.IDLE
+	if not soldier.is_in_group("soldiers"):
+		soldier.add_to_group("soldiers")
+	if soldier.has_node("CollisionShape3D"):
+		soldier.get_node("CollisionShape3D").set_deferred("disabled", false)
+	if soldier.has_method("_play_recovery_pose"):
+		soldier._play_recovery_pose()
+	if soldier.has_method("add_soldier_xp"):
+		soldier.add_soldier_xp(1.0, "recovery")
+	soldier.set_physics_process(true)
+	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("check_derelict_status"):
+		soldier.home_ship.call_deferred("check_derelict_status")
+
+
+static func _has_hostile_on_owned_ship(soldier) -> bool:
+	for other in EntityRegistry.get_soldiers_by_ship(soldier.owned_ship):
+		if other == soldier or not is_instance_valid(other):
+			continue
+		if other.has_method("is_dead_soldier") and other.is_dead_soldier():
+			continue
+		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
+		if other_team != soldier.team:
+			return true
+	return false
+
+
+static func _get_incapacitated_recovery_delay(soldier) -> float:
+	var stat_ship := _get_incapacitated_recovery_stat_ship(soldier)
+	if is_instance_valid(stat_ship) and stat_ship.has_meta("incapacitated_recovery_delay"):
+		return maxf(PLAYER_INCAPACITATED_MIN_RECOVERY_DELAY, float(stat_ship.get_meta("incapacitated_recovery_delay")))
+	return PLAYER_INCAPACITATED_RECOVERY_DELAY
+
+
+static func _get_incapacitated_recovery_health_ratio(soldier) -> float:
+	var stat_ship := _get_incapacitated_recovery_stat_ship(soldier)
+	if is_instance_valid(stat_ship) and stat_ship.has_meta("incapacitated_recovery_health_ratio"):
+		return clampf(float(stat_ship.get_meta("incapacitated_recovery_health_ratio")), 0.05, 1.0)
+	return PLAYER_INCAPACITATED_RECOVERY_HEALTH_RATIO
+
+
+static func _get_incapacitated_recovery_stat_ship(soldier) -> Node:
+	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_meta("incapacitated_recovery_delay"):
+		return soldier.owned_ship
+	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_meta("incapacitated_recovery_delay"):
+		return soldier.home_ship
+	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_meta("incapacitated_recovery_health_ratio"):
+		return soldier.owned_ship
+	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_meta("incapacitated_recovery_health_ratio"):
+		return soldier.home_ship
+	if is_instance_valid(soldier.owned_ship):
+		return soldier.owned_ship
+	return soldier.home_ship
 
 
 static func _apply_melee_kill_bonus(soldier) -> void:

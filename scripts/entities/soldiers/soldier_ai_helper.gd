@@ -220,7 +220,7 @@ static func state_attack(soldier) -> void:
 	)
 
 	if soldier.attack_timer <= 0:
-		if soldier.current_target.has_method("take_rope_damage") or soldier.current_target.has_method("get_hull_ratio"):
+		if soldier.current_target.has_method("get_hull_ratio"):
 			soldier._perform_special_attack(soldier.current_target)
 		else:
 			soldier._perform_attack()

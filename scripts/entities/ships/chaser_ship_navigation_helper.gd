@@ -240,6 +240,14 @@ static func _classify_boarding_approach_smoothed(ship, rel_forward: float, rel_s
 	return _classify_boarding_approach(rel_forward, rel_side)
 
 
+static func _is_bow_sector_approach(rel_forward: float, rel_side: float, collision_dist: float) -> bool:
+	if rel_forward <= maxf(1.4, collision_dist * 0.16):
+		return false
+	var abs_side: float = absf(rel_side)
+	var side_limit: float = minf(maxf(3.6, rel_forward * 1.05 + 0.8), maxf(4.8, collision_dist * 0.68))
+	return abs_side <= side_limit
+
+
 static func _build_side_follow_navigation(ship, target_node: Node3D, target_pos: Vector3, target_forward: Vector3, target_right: Vector3, rel_forward: float, rel_side: float, collision_dist: float, dist_to_target: float, tight_hold: bool = false) -> Dictionary:
 	var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 	if absf(side_sign) < 0.5:
@@ -481,28 +489,33 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 			var rel_forward: float = rel_vector.dot(target_forward)
 			var rel_side: float = rel_vector.dot(target_right)
 			var approach_mode: String = _classify_boarding_approach_smoothed(ship, rel_forward, rel_side)
-			ship.set_meta("boarding_approach_mode", approach_mode)
 			var collision_dist: float = ship.get_collision_distance_to(target_node)
+			var bow_sector_approach: bool = _is_bow_sector_approach(rel_forward, rel_side, collision_dist)
+			if bow_sector_approach and approach_mode == "side":
+				approach_mode = "front"
+			ship.set_meta("boarding_approach_mode", approach_mode)
 			var post_impact_follow_timer: float = float(ship.get_meta("post_impact_follow_timer", 0.0))
 			var current_side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
 			var side_alignment_locked: bool = false
-			if post_impact_follow_timer <= 0.0 and absf(current_side_sign) > 0.5:
+			if not bow_sector_approach and post_impact_follow_timer <= 0.0 and absf(current_side_sign) > 0.5:
 				if absf(rel_side) >= collision_dist * 0.30 and absf(rel_forward) <= 10.0:
 					approach_mode = "side"
-			if ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_node) == true:
+					ship.set_meta("boarding_approach_mode", approach_mode)
+			if not bow_sector_approach and ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_node) == true:
 				if dist_to_target <= ship.boarding_break_distance - 0.4:
 					var refreshed_timer: float = maxf(post_impact_follow_timer, 2.0)
 					ship.set_meta("post_impact_follow_timer", refreshed_timer)
 					post_impact_follow_timer = refreshed_timer
 					side_alignment_locked = true
 
-			if target_deck_contested and approach_mode != "rear" and dist_to_target <= ship.max_boarding_distance + 2.0:
+			if target_deck_contested and not bow_sector_approach and approach_mode != "rear" and dist_to_target <= ship.max_boarding_distance + 2.0:
 				approach_mode = "side"
+				ship.set_meta("boarding_approach_mode", approach_mode)
 				side_alignment_locked = true
 				post_impact_follow_timer = maxf(post_impact_follow_timer, 1.6)
 				ship.set_meta("post_impact_follow_timer", post_impact_follow_timer)
 
-			if post_impact_follow_timer > 0.0:
+			if post_impact_follow_timer > 0.0 and not bow_sector_approach:
 				var follow_nav: Dictionary = _build_side_follow_navigation(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, true)
 				desired_point = follow_nav["desired_point"]
 				heading_point = follow_nav["heading_point"]
@@ -552,6 +565,10 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 				permit_sprint = false
 			elif target_deck_overrun:
 				desired_speed_mult = minf(desired_speed_mult, 0.78)
+				permit_sprint = false
+			elif dist_to_target <= ship.max_boarding_distance + 3.0:
+				var final_approach_blend: float = clampf((ship.max_boarding_distance + 3.0 - dist_to_target) / 3.0, 0.0, 1.0)
+				desired_speed_mult = minf(desired_speed_mult, lerpf(0.88, 0.62, final_approach_blend))
 				permit_sprint = false
 	else:
 		if ship.has_meta("boarding_slot_id"):
