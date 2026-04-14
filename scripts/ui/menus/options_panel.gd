@@ -48,7 +48,7 @@ func _apply_theme() -> void:
 		fullscreen_check.add_theme_color_override("font_hover_color", NavalUiTheme.TEXT_ACCENT)
 		fullscreen_check.add_theme_color_override("font_pressed_color", NavalUiTheme.TEXT_ACCENT)
 	for slider in [master_slider, music_slider, sfx_slider, ui_slider]:
-		NavalUiTheme.apply_progress_bar(slider, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.STATUS_ACTIVE_BLUE, 4)
+		NavalUiTheme.apply_slider(slider, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.STATUS_ACTIVE_BLUE, 4)
 	if is_instance_valid(back_button):
 		NavalUiTheme.apply_menu_button(back_button, 16)
 

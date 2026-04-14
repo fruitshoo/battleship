@@ -86,11 +86,20 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 	var s: Dictionary = data.get("stats", {})
 	match upgrade_id:
 		"cannon":
-			var desc := ""
-			if next_level == 3 or next_level == 5:
-				desc = "대포 추가 배치 (+1문) 및 "
-			return desc + "화력 +%d%%, 사거리 +%d%%, 장전속도 +%d%%" % [
-				s.get("dmg_pct_per_lv", 20), s.get("range_pct_per_lv", 10), s.get("cd_pct_per_lv", 6)]
+			var player_count := int(s.get("player_base_cannon_count", 3))
+			for entry in s.get("player_extra_cannon_levels", [2, 3, 4, 5]):
+				if next_level >= int(entry):
+					player_count += 1
+			var support_count := int(s.get("support_base_cannon_count", 1))
+			for entry in s.get("player_extra_cannon_levels", [2, 3, 4, 5]):
+				if next_level >= int(entry):
+					support_count += 1
+			support_count = mini(support_count, int(s.get("support_max_cannon_count", 3)))
+			return "포문 %d문 | 지원함 %d문" % [player_count, support_count]
+		"cannon_damage":
+			return "대포 데미지 +%d%%" % int(s.get("dmg_pct_per_lv", 8))
+		"cannon_reload":
+			return "대포 재장전 -%d%%" % int(s.get("cd_pct_per_lv", 4))
 		"janggun":
 			return "대장군전 파괴력 및 디버프 효과(화염/둔화) 대폭 강화"
 		"singigeon":

@@ -45,7 +45,6 @@ var _cached_cd_mult: float = 1.0
 var _cached_dmg_mult: float = 1.0
 var _cached_crit_chance: float = 0.0
 var _cached_crit_multiplier: float = 1.5
-var _cached_ammo_type: String = "roundshot"
 var _cached_projectile_speed: float = 50.0
 
 func _ready() -> void:
@@ -59,7 +58,7 @@ func _ready() -> void:
 		upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
 
 func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
-	if upgrade_id == "cannon":
+	if upgrade_id in ["cannon_damage", "cannon_reload"]:
 		_update_cached_stats()
 
 func _update_cached_stats() -> void:
@@ -73,15 +72,16 @@ func _update_cached_stats() -> void:
 		return
 	var upgrade_manager = _get_upgrade_manager()
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager and "UPGRADES" in upgrade_manager:
-		var cannon_lv = upgrade_manager.current_levels.get("cannon", 0)
-		var s = upgrade_manager.UPGRADES.get("cannon", {}).get("stats", {})
-		
-		# 5레벨 체계: 매 레벨마다 보너스가 중첩됨
-		_cached_range_mult = 1.0 + (s.get("range_pct_per_lv", 10) / 100.0) * (cannon_lv - 1)
-		_cached_cd_mult = maxf(0.5, 1.0 - (s.get("cd_pct_per_lv", 6) / 100.0) * (cannon_lv - 1))
-		_cached_dmg_mult = 1.0 + (s.get("dmg_pct_per_lv", 20) / 100.0) * (cannon_lv - 1)
-		_cached_crit_chance = maxf(0.0, (s.get("crit_pct_per_lv", 2.5) / 100.0) * (cannon_lv - 1))
-		_cached_crit_multiplier = float(s.get("crit_multiplier", 1.5))
+		var damage_lv: int = int(upgrade_manager.current_levels.get("cannon_damage", 0))
+		var reload_lv: int = int(upgrade_manager.current_levels.get("cannon_reload", 0))
+		var damage_stats: Dictionary = upgrade_manager.UPGRADES.get("cannon_damage", {}).get("stats", {})
+		var reload_stats: Dictionary = upgrade_manager.UPGRADES.get("cannon_reload", {}).get("stats", {})
+
+		_cached_dmg_mult = 1.0 + (float(damage_stats.get("dmg_pct_per_lv", 8)) / 100.0) * float(damage_lv)
+		_cached_cd_mult = maxf(
+			float(reload_stats.get("min_cd_mult", 0.75)),
+			1.0 - (float(reload_stats.get("cd_pct_per_lv", 4)) / 100.0) * float(reload_lv)
+		)
 
 
 func _get_upgrade_manager() -> Node:
@@ -165,19 +165,11 @@ func _is_owner_weapon_ready() -> bool:
 func _get_current_range() -> float:
 	return detection_range * _cached_range_mult
 
-func _get_current_ammo_type() -> String:
-	if team != "player":
-		return "roundshot"
-	if is_instance_valid(_owner_ship) and _owner_ship.get("current_cannon_ammo") != null:
-		_cached_ammo_type = str(_owner_ship.get("current_cannon_ammo"))
-	return _cached_ammo_type
-
-
 func get_debug_cannon_snapshot() -> Dictionary:
 	var projectile_stats: Dictionary = _get_projectile_stats_snapshot()
 	var base_damage: float = float(projectile_stats.get("damage", 0.0))
 	if base_damage <= 1.0 and team == "player":
-		base_damage = 25.0
+		base_damage = 22.0
 	var cannon_damage: float = base_damage * _cached_dmg_mult * fleet_damage_mult
 	var current_cooldown: float = _get_current_cooldown()
 	var expected_shot_damage: float = cannon_damage * (1.0 + _cached_crit_chance * (_cached_crit_multiplier - 1.0))
@@ -193,7 +185,6 @@ func get_debug_cannon_snapshot() -> Dictionary:
 		"crit_chance": _cached_crit_chance,
 		"crit_multiplier": _cached_crit_multiplier,
 		"expected_dps": expected_shot_damage / current_cooldown if current_cooldown > 0.0 else 0.0,
-		"ammo_type": _get_current_ammo_type(),
 		"projectile_stats": projectile_stats,
 	}
 
@@ -426,7 +417,6 @@ func _execute_fire() -> void:
 	fire_direction = _apply_cannon_inaccuracy(fire_direction, target_node, dist)
 
 	var final_damage = 1.0
-	var ammo_type: String = _get_current_ammo_type()
 	var ball = ScenePool.acquire(get_tree(), cannonball_scene)
 	get_tree().root.add_child(ball)
 	var projectile_base_damage: float = 0.0
@@ -440,13 +430,11 @@ func _execute_fire() -> void:
 	if team == "player" and "crit_multiplier" in ball:
 		ball.crit_multiplier = _cached_crit_multiplier
 	if ball.has_method("launch"):
-		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult, ammo_type)
+		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult)
 	else:
 		ball.position = muzzle.global_position
 		ball.team = team
 		ball.damage = final_damage
-		if "ammo_type" in ball:
-			ball.ammo_type = ammo_type
 		if team == "player":
 			ball.crit_chance = _cached_crit_chance
 			ball.crit_multiplier = _cached_crit_multiplier

@@ -8,15 +8,15 @@ const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
 const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
 const SUPPORT_ANCHOR_FWD_META := "support_anchor_forward"
 const SUPPORT_IDLE_ORBIT_TIME_META := "support_idle_orbit_time"
-const SUPPORT_SLOT_SPEED_GAIN := 0.42
+const SUPPORT_SLOT_SPEED_GAIN := 0.38
 const SUPPORT_SLOT_BRAKE_GAIN := 0.55
-const SUPPORT_MAX_CATCHUP_SPEED := 4.5
+const SUPPORT_MAX_CATCHUP_SPEED := 4.0
 const SUPPORT_MAX_BRAKE_SPEED := 5.0
-const SUPPORT_SPEED_RESPONSE := 3.0
+const SUPPORT_SPEED_RESPONSE := 2.7
 const SUPPORT_LATERAL_SEP_SCALE := 0.18
 const SUPPORT_FORMUP_DISTANCE := 1.75
-const SUPPORT_FORMUP_SPEED_GAIN := 0.44
-const SUPPORT_MAX_FORMUP_SPEED := 5.2
+const SUPPORT_FORMUP_SPEED_GAIN := 0.40
+const SUPPORT_MAX_FORMUP_SPEED := 4.7
 const SUPPORT_HEADING_CORRECTION_GAIN := 0.07
 const SUPPORT_MAX_HEADING_CORRECTION := 0.42
 const SUPPORT_TARGET_GUARD_RATIO := 0.84
@@ -27,17 +27,21 @@ const SUPPORT_TRAIL_MAX_POINTS := 96
 const SUPPORT_IDLE_ORBIT_RADIUS := 11.0
 const SUPPORT_IDLE_ORBIT_SPEED := 0.65
 const SUPPORT_IDLE_SPEED_RESPONSE := 2.4
-const SUPPORT_ASSIST_THREAT_RANGE := 40.0
+const SUPPORT_ASSIST_THREAT_RANGE := 34.0
 const SUPPORT_ASSIST_CLOSE_RANGE := 22.0
-const SUPPORT_ASSIST_RECALL_DISTANCE := 50.0
-const SUPPORT_ASSIST_LEASH_DISTANCE := 62.0
-const SUPPORT_ASSIST_SPEED_RESPONSE := 1.25
+const SUPPORT_ASSIST_RECALL_DISTANCE := 40.0
+const SUPPORT_ASSIST_LEASH_DISTANCE := 50.0
+const SUPPORT_ASSIST_SPEED_RESPONSE := 1.55
 const SUPPORT_ASSIST_EMERGENCY_THREAT_RANGE := 58.0
 const SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE := 80.0
 const SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE := 92.0
 const SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE := 2.05
 const SUPPORT_ASSIST_SEPARATION_RADIUS := 10.0
 const SUPPORT_ASSIST_SEPARATION_FORCE := 1.1
+const SUPPORT_ASSIST_ROWING_WIND_FLOOR := 0.72
+const SUPPORT_ASSIST_EMERGENCY_ROWING_WIND_FLOOR := 0.76
+const SUPPORT_ASSIST_ROWING_SPEED_BONUS := 0.18
+const SUPPORT_ASSIST_EMERGENCY_ROWING_SPEED_BONUS := 0.22
 const SUPPORT_ASSIST_TARGET_ID_META := "support_assist_target_id"
 const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
 const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
@@ -354,6 +358,8 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 
 	var leak_speed_mult: float = clamp(1.0 - (ship.leaking_rate * 0.05), 0.3, 1.0)
 	var desired_speed: float = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier()
+	var rowing_speed_mult := _get_support_assist_rowing_speed_multiplier(dist_to_target, emergency_assist)
+	desired_speed *= rowing_speed_mult
 	var assist_speed_response: float = SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE if emergency_assist else SUPPORT_ASSIST_SPEED_RESPONSE
 	ship._last_ai_speed = lerp(float(ship._last_ai_speed), desired_speed, delta * assist_speed_response)
 	var assist_accel_mult: float = 1.45 if emergency_assist else 1.0
@@ -362,7 +368,8 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	else:
 		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.deceleration * delta)
 
-	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship) * ship.get_shiphandling_multiplier()
+	var wind_floor := _get_support_assist_rowing_wind_floor(emergency_assist)
+	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor) * ship.get_shiphandling_multiplier()
 	if ship.current_speed > 0.1:
 		var speed_ratio: float = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 		var turn_scale: float = ship.ai_turn_authority * close_turn_factor
@@ -395,8 +402,20 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	ship.set_meta("support_debug_player_speed", 0.0)
 	ship.set_meta("support_debug_lead_speed", _get_ship_speed(assist_target, 0.0))
 	ship.set_meta("support_debug_target_speed", desired_speed)
+	ship.set_meta("support_debug_rowing_speed_mult", rowing_speed_mult)
+	ship.set_meta("support_debug_wind_floor", wind_floor)
 	ship.set_meta("support_debug_assist_target", assist_target.name)
 	ship.set_meta("support_debug_mode", "assist")
+
+
+static func _get_support_assist_rowing_speed_multiplier(dist_to_target: float, emergency_assist: bool) -> float:
+	var distance_blend := clampf((dist_to_target - 10.0) / 28.0, 0.0, 1.0)
+	var max_bonus := SUPPORT_ASSIST_EMERGENCY_ROWING_SPEED_BONUS if emergency_assist else SUPPORT_ASSIST_ROWING_SPEED_BONUS
+	return 1.0 + (max_bonus * distance_blend)
+
+
+static func _get_support_assist_rowing_wind_floor(emergency_assist: bool) -> float:
+	return SUPPORT_ASSIST_EMERGENCY_ROWING_WIND_FLOOR if emergency_assist else SUPPORT_ASSIST_ROWING_WIND_FLOOR
 
 
 static func _try_start_support_boarding(ship, assist_target: Node3D, delta: float) -> bool:

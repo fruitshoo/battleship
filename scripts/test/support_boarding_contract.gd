@@ -5,7 +5,9 @@ const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship
 const BaseShipBoardingHelper = preload("res://scripts/entities/ships/base_ship_boarding_helper.gd")
 const BaseShipStatusHelper = preload("res://scripts/entities/ships/base_ship_status_helper.gd")
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
+const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
+const SoldierSpeechHelper = preload("res://scripts/entities/soldiers/soldier_speech_helper.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const CannonScript = preload("res://scripts/entities/launchers/cannon.gd")
 const SingigeonLauncherScript = preload("res://scripts/entities/launchers/singigeon_launcher.gd")
@@ -174,6 +176,45 @@ class MockTransferSoldier:
 	func get_boarding_status_value() -> String:
 		return boarding_status
 
+	func _try_evacuate_to_home() -> void:
+		SoldierBoardingHelper.try_evacuate_to_home(self)
+
+
+class MockCombatSoldier:
+	extends Node3D
+
+	enum State {
+		IDLE,
+		MOVE,
+		ATTACK,
+		DEAD,
+	}
+
+	var team: String = "player"
+	var owned_ship: Node3D = null
+	var current_state: int = State.MOVE
+	var current_target: Node3D = null
+	var current_weapon: Node3D = null
+	var detection_range: float = 35.0
+	var is_captain: bool = false
+	var is_stationary: bool = false
+	var _is_jumping: bool = false
+
+	func get_team_tag() -> String:
+		return team
+
+	func is_dead_soldier() -> bool:
+		return false
+
+	func get_current_state_value() -> int:
+		return current_state
+
+	func _change_state(next_state: int) -> void:
+		current_state = next_state
+
+	func find_nearest_hostile_on_owned_ship() -> Node3D:
+		return SoldierShipHelper.find_nearest_hostile_on_owned_ship(self)
+
 
 func _ready() -> void:
 	var failures: Array[String] = []
@@ -183,6 +224,7 @@ func _ready() -> void:
 	_verify_support_ship_rescues_contested_player_deck(failures)
 	_verify_support_hold_formation_ignores_normal_threats(failures)
 	_verify_support_hold_formation_allows_boarding_attacker(failures)
+	_verify_support_free_assist_recalls_near_player(failures)
 	_verify_boarding_transfer_snaps_soldier_to_target_deck(failures)
 	await _verify_boarding_transfer_tracks_moving_target_deck(failures)
 	_verify_soldier_deck_recovery_repairs_parent_and_bounds(failures)
@@ -190,7 +232,10 @@ func _ready() -> void:
 	_verify_player_support_boarding_cancels_when_target_is_missing(failures)
 	_verify_overrun_deck_suppresses_ship_weapons(failures)
 	_verify_player_deck_emergency_speeds_support_assist(failures)
+	_verify_soldier_retargets_hostile_boarder_on_owned_ship(failures)
+	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
 	_verify_support_rescue_boarding_holds_player_capture_progress(failures)
+	_verify_support_rescue_boarders_return_after_deck_safe(failures)
 	if failures.is_empty():
 		print("[SupportBoardingContract] ok")
 		return
@@ -388,6 +433,40 @@ func _verify_support_hold_formation_allows_boarding_attacker(failures: Array[Str
 		failures.append("support hold formation ignored the player boarding attacker")
 
 	enemy_attacker.queue_free()
+	player.queue_free()
+	support.queue_free()
+
+
+func _verify_support_free_assist_recalls_near_player(failures: Array[String]) -> void:
+	var support := MockSupportShip.new()
+	add_child(support)
+	support.global_position = Vector3(41.0, 0.0, 0.0)
+	support.support_hold_formation = false
+
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.team = "player"
+	player.global_position = Vector3.ZERO
+	support.target = player
+
+	var enemy := MockTargetShip.new()
+	add_child(enemy)
+	enemy.team = "enemy"
+	enemy.global_position = Vector3(35.0, 0.0, 0.0)
+	EntityRegistry.register_ship(enemy)
+
+	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	if selected != null:
+		failures.append("support free assist stayed in combat after exceeding player recall distance")
+	if support.has_meta("support_assist_target_id"):
+		failures.append("support free assist kept target lock after player recall")
+	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false) < 0.72:
+		failures.append("support free assist rowing wind floor is too weak for player follow")
+	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.15:
+		failures.append("support free assist rowing speed bonus is too weak at follow distance")
+
+	EntityRegistry.unregister_ship(enemy)
+	enemy.queue_free()
 	player.queue_free()
 	support.queue_free()
 
@@ -592,10 +671,109 @@ func _verify_player_deck_emergency_speeds_support_assist(failures: Array[String]
 		failures.append("player deck emergency did not increase support assist desired speed")
 	if emergency_nav.get("permit_sprint") != true:
 		failures.append("player deck emergency did not mark support assist as sprint-capable")
+	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false) < 0.65:
+		failures.append("support assist rowing wind floor is too weak for free combat")
+	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(true) <= ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false):
+		failures.append("support emergency assist did not increase rowing wind floor")
+	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.05:
+		failures.append("support assist rowing speed multiplier is too weak at distance")
+	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, true) <= ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false):
+		failures.append("support emergency assist did not increase rowing speed multiplier")
 
 	attacker.queue_free()
 	player.queue_free()
 	support.queue_free()
+
+
+func _verify_soldier_retargets_hostile_boarder_on_owned_ship(failures: Array[String]) -> void:
+	var player_ship := MockTargetShip.new()
+	add_child(player_ship)
+	player_ship.team = "player"
+	player_ship.global_position = Vector3.ZERO
+
+	var enemy_ship := MockTargetShip.new()
+	add_child(enemy_ship)
+	enemy_ship.team = "enemy"
+	enemy_ship.global_position = Vector3(7.0, 0.0, 0.0)
+
+	var defender := MockCombatSoldier.new()
+	add_child(defender)
+	defender.team = "player"
+	defender.owned_ship = player_ship
+	defender.global_position = Vector3.ZERO
+
+	var remote_enemy := MockCombatSoldier.new()
+	add_child(remote_enemy)
+	remote_enemy.team = "enemy"
+	remote_enemy.owned_ship = enemy_ship
+	remote_enemy.global_position = Vector3(7.0, 0.0, 0.0)
+
+	var boarder := MockCombatSoldier.new()
+	add_child(boarder)
+	boarder.team = "enemy"
+	boarder.owned_ship = player_ship
+	boarder.global_position = Vector3(0.9, 0.0, 0.0)
+
+	EntityRegistry.register_soldier(defender)
+	EntityRegistry.register_soldier(remote_enemy)
+	EntityRegistry.register_soldier(boarder)
+	defender.current_target = remote_enemy
+
+	var nearest := SoldierShipHelper.find_nearest_enemy(defender)
+	if nearest != boarder:
+		failures.append("soldier targeting did not prioritize hostile boarder on owned ship")
+
+	SoldierAiHelper.state_move(defender)
+	if defender.current_target != boarder:
+		failures.append("soldier move state did not retarget from cross-ship enemy to local boarder")
+	if defender.current_state != defender.State.MOVE:
+		failures.append("soldier retarget did not keep defender in move state")
+
+	EntityRegistry.unregister_soldier(boarder)
+	EntityRegistry.unregister_soldier(remote_enemy)
+	EntityRegistry.unregister_soldier(defender)
+	boarder.queue_free()
+	remote_enemy.queue_free()
+	defender.queue_free()
+	enemy_ship.queue_free()
+	player_ship.queue_free()
+
+
+func _verify_enemy_boarder_speaks_only_on_player_deck(failures: Array[String]) -> void:
+	var player_ship := MockTargetShip.new()
+	add_child(player_ship)
+	player_ship.team = "player"
+
+	var enemy_ship := MockTargetShip.new()
+	add_child(enemy_ship)
+	enemy_ship.team = "enemy"
+
+	var boarder := MockCombatSoldier.new()
+	add_child(boarder)
+	boarder.team = "enemy"
+	boarder.owned_ship = enemy_ship
+
+	SoldierSpeechHelper.reset(boarder)
+	boarder.set_meta("speech_timer", 0.0)
+	SoldierSpeechHelper.update(boarder, 1.0)
+	if boarder.get_node_or_null("SpeechLabel") != null:
+		failures.append("enemy soldier spoke before boarding the player deck")
+
+	boarder.owned_ship = player_ship
+	boarder.set_meta("speech_timer", 0.0)
+	SoldierSpeechHelper.update(boarder, 1.0)
+
+	var label := boarder.get_node_or_null("SpeechLabel") as Label3D
+	if label == null:
+		failures.append("enemy boarder did not create a speech label on player deck")
+	elif label.visible != true or label.text.is_empty():
+		failures.append("enemy boarder did not speak after reaching player deck")
+	elif label.modulate.r <= label.modulate.b:
+		failures.append("enemy boarder speech did not use hostile label color")
+
+	boarder.queue_free()
+	enemy_ship.queue_free()
+	player_ship.queue_free()
 
 
 func _verify_support_rescue_boarding_holds_player_capture_progress(failures: Array[String]) -> void:
@@ -632,4 +810,47 @@ func _verify_support_rescue_boarding_holds_player_capture_progress(failures: Arr
 	EntityRegistry.unregister_soldier(enemy_boarder)
 	support.queue_free()
 	enemy_boarder.queue_free()
+	player.queue_free()
+
+
+func _verify_support_rescue_boarders_return_after_deck_safe(failures: Array[String]) -> void:
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.team = "player"
+	player.global_position = Vector3.ZERO
+
+	var support := MockSupportShip.new()
+	add_child(support)
+	support.target = player
+	support.global_position = Vector3(8.0, 0.0, 0.0)
+	support.is_boarding = true
+	support.boarding_target = player
+	support._initial_rope_deployed = true
+	support.set_meta("boarding_purpose", "support_rescue_boarding")
+	EntityRegistry.register_ship(support)
+
+	var support_boarder := MockTransferSoldier.new()
+	add_child(support_boarder)
+	support_boarder.team = "player"
+	support_boarder.owned_ship = player
+	support_boarder.home_ship = support
+	EntityRegistry.register_soldier(support_boarder)
+
+	BaseShipStatusHelper.update_boarding_state(player, 0.25)
+
+	if support_boarder.owned_ship != support:
+		failures.append("support rescue boarder did not return to support ship after deck was safe")
+	if support_boarder.get_boarding_status_value() != "returning":
+		failures.append("support rescue boarder was not marked returning while jumping home")
+	if support.is_boarding == true:
+		failures.append("support rescue boarding link stayed active after boarders returned")
+	if support.has_meta("boarding_purpose"):
+		failures.append("support rescue boarding purpose meta was not cleared after return")
+	if support.has_meta("boarding_transfer_suppressed"):
+		failures.append("support rescue transfer suppression meta was not cleared after return")
+
+	EntityRegistry.unregister_ship(support)
+	EntityRegistry.unregister_soldier(support_boarder)
+	support_boarder.queue_free()
+	support.queue_free()
 	player.queue_free()

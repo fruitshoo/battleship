@@ -137,6 +137,12 @@ static func sync_player_crew_roster(ship) -> void:
 			spawn_player_soldier(ship, soldiers_node, role)
 
 static func add_survivor(ship, allow_over_capacity: bool = false) -> bool:
+	return _add_player_crew(ship, allow_over_capacity, "survivor")
+
+static func add_respawn_crew(ship) -> bool:
+	return _add_player_crew(ship, false, "respawn")
+
+static func _add_player_crew(ship, allow_over_capacity: bool, source: String) -> bool:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if not soldiers_node:
 		return false
@@ -182,9 +188,10 @@ static func add_survivor(ship, allow_over_capacity: bool = false) -> bool:
 
 	if current_captains < desired_captains:
 		spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
-		print("[Rescue] 생존자 구조 성공! 장군 1명이 복귀했습니다. (현재: %d/%d)" % [alive_count + 1, ship.max_crew_count])
+		var captain_message: String = "생존자 구조: 장군 복귀" if source == "survivor" else "병사 보충: 장군 복귀"
+		print("[%s] 장군 1명이 복귀했습니다. (현재: %d/%d)" % [_get_crew_add_log_tag(source), alive_count + 1, ship.max_crew_count])
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-			ship._cached_hud.show_message("생존자 구조: 장군 복귀", 2.0)
+			ship._cached_hud.show_message(captain_message, 2.0)
 		var captain_audio_manager = ship.get_node_or_null("/root/AudioManager")
 		if is_instance_valid(captain_audio_manager) and captain_audio_manager.has_method("play_sfx"):
 			captain_audio_manager.play_sfx("soldier_hit", ship.global_position, 1.45)
@@ -201,13 +208,17 @@ static func add_survivor(ship, allow_over_capacity: bool = false) -> bool:
 		return false
 	spawn_player_soldier(ship, soldiers_node, role_to_add)
 
-	print("[Rescue] 생존자 구조 성공! 아군 병사 1명 합류. (현재: %d/%d)" % [alive_count + 1, ship.max_crew_count])
+	var crew_message: String = "생존자 구조 완료!" if source == "survivor" else "병사 보충 완료!"
+	print("[%s] 아군 병사 1명 합류. (현재: %d/%d)" % [_get_crew_add_log_tag(source), alive_count + 1, ship.max_crew_count])
 	if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-		ship._cached_hud.show_message("생존자 구조 완료!", 2.0)
+		ship._cached_hud.show_message(crew_message, 2.0)
 	var audio_manager = ship.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("soldier_hit", ship.global_position, 1.5)
 	return true
+
+static func _get_crew_add_log_tag(source: String) -> String:
+	return "Rescue" if source == "survivor" else "Crew"
 
 static func update_fire_pot_logic(ship, delta: float) -> void:
 	if ship.is_sinking or ship.is_dying or ship.hull_hp <= 0.0:

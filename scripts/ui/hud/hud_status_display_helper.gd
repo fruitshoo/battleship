@@ -74,19 +74,11 @@ static func update_ammo_mode_display(hud) -> void:
 		if hud.ammo_mode_label.visible:
 			hud.ammo_mode_label.visible = false
 		return
-	var ammo_key := "roundshot"
-	if hud.player_ship.get("current_cannon_ammo") != null:
-		ammo_key = str(hud.player_ship.get("current_cannon_ammo"))
 	var ammo_text := "탄종: 실선탄"
-	match ammo_key:
-		"chainshot":
-			ammo_text = "탄종: 사슬탄"
-		"grapeshot":
-			ammo_text = "탄종: 포도탄"
 	if hud._last_ammo_mode_text != ammo_text:
 		hud._last_ammo_mode_text = ammo_text
 		hud.ammo_mode_label.text = ammo_text
-	hud.ammo_mode_label.visible = true
+	hud.ammo_mode_label.visible = false
 
 
 static func show_gust_warning_message(hud, message: String, duration: float = 0.35) -> void:

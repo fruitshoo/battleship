@@ -1,6 +1,6 @@
 extends RefCounted
 
-const PLAYER_CANNON_BASE_DAMAGE := 25.0
+const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
@@ -112,7 +112,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var cannon_count: int = 0
 	var cannon_base_damage: float = 0.0
 	var cannon_damage_mult: float = 1.0
-	var cannon_fleet_mult: float = 1.0
 	var cannon_damage: float = 0.0
 	var cannon_range: float = 0.0
 	var cannon_cooldown: float = 0.0
@@ -132,7 +131,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		cannon_base_damage = float(cannon_snapshot.get("base_damage", 0.0))
 		cannon_damage = float(cannon_snapshot.get("damage", 0.0))
 		cannon_damage_mult = float(cannon_snapshot.get("damage_mult", 1.0))
-		cannon_fleet_mult = float(cannon_snapshot.get("fleet_damage_mult", 1.0))
 		cannon_crit_chance = float(cannon_snapshot.get("crit_chance", 0.0))
 		cannon_crit_multiplier = float(cannon_snapshot.get("crit_multiplier", 1.0))
 		cannon_expected_dps = float(cannon_snapshot.get("expected_dps", 0.0))
@@ -142,7 +140,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"rows": [
 			{"icon": "apps", "label": "포문 수", "value": str(cannon_count)},
 			{"icon": "adjust", "label": "기본 / 최종 데미지", "value": "%.1f / %.1f" % [cannon_base_damage, cannon_damage]},
-			{"icon": "network_node", "label": "배율", "value": "업그레이드 x%.2f | 함대 x%.2f" % [cannon_damage_mult, cannon_fleet_mult]},
+			{"icon": "network_node", "label": "데미지 배율", "value": "화약 x%.2f" % cannon_damage_mult},
 			{"icon": "radar", "label": "사거리", "value": "%.1fm" % cannon_range},
 			{"icon": "timer", "label": "재장전", "value": "%.2fs" % cannon_cooldown},
 			{"icon": "grade", "label": "치명타", "value": "%.1f%% x%.1f" % [cannon_crit_chance * 100.0, cannon_crit_multiplier]},

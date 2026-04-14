@@ -201,8 +201,7 @@ func _spawn_projectile(world_pos: Vector3, direction: Vector3, team: String, pro
 				direction,
 				null,
 				1.0,
-				projectile_lifetime_multiplier,
-				"roundshot"
+				projectile_lifetime_multiplier
 			)
 		elif projectile_kind == ProjectileKind.ARROW:
 			var target_pos := world_pos + direction * projectile_ring_radius

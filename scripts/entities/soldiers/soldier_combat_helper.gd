@@ -1,5 +1,7 @@
 extends RefCounted
 
+const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
+
 static func perform_special_attack(soldier, target: Node3D) -> void:
 	if not is_instance_valid(target):
 		return
@@ -23,16 +25,16 @@ static func _play_attack_animation(soldier) -> void:
 	var weapon_visual := _get_weapon_visual_node(weapon)
 	_cache_attack_rest_transforms(hand_pivot, weapon_visual)
 
-	var mesh_instance = soldier.get_node_or_null("MeshInstance3D")
-	if mesh_instance:
+	var pose_node := SoldierVisualHelper.get_pose_node(soldier)
+	if pose_node:
 		_stop_tracked_tween(soldier, "_attack_body_tween")
-		if not mesh_instance.has_meta("_attack_rest_position"):
-			mesh_instance.set_meta("_attack_rest_position", mesh_instance.position)
-		var mesh_rest_position: Vector3 = mesh_instance.get_meta("_attack_rest_position", mesh_instance.position)
+		if not pose_node.has_meta("_attack_rest_position"):
+			pose_node.set_meta("_attack_rest_position", pose_node.position)
+		var mesh_rest_position: Vector3 = pose_node.get_meta("_attack_rest_position", pose_node.position)
 		var body_tween: Tween = soldier.create_tween()
 		soldier.set_meta("_attack_body_tween", body_tween)
-		body_tween.tween_property(mesh_instance, "position", mesh_rest_position + Vector3(0.0, 0.0, -0.28), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		body_tween.tween_property(mesh_instance, "position", mesh_rest_position, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		body_tween.tween_property(pose_node, "position", mesh_rest_position + Vector3(0.0, 0.0, -0.28), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		body_tween.tween_property(pose_node, "position", mesh_rest_position, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 	if not is_instance_valid(hand_pivot):
 		return

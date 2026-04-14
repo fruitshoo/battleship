@@ -5,6 +5,12 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 
 static func find_nearest_enemy(soldier) -> Node3D:
+	var home_ship: Variant = soldier.get("home_ship")
+	var is_player_boarder: bool = soldier.team == "player" and is_instance_valid(home_ship) and home_ship != soldier.owned_ship
+	var nearest_local_boarder := find_nearest_hostile_on_owned_ship(soldier)
+	if nearest_local_boarder != null and not is_player_boarder:
+		return nearest_local_boarder
+
 	var local_soldiers: Array = []
 	if is_instance_valid(soldier.owned_ship):
 		local_soldiers = EntityRegistry.get_soldiers_by_ship(soldier.owned_ship)
@@ -17,7 +23,6 @@ static func find_nearest_enemy(soldier) -> Node3D:
 
 	var nearest_global: Node3D = null
 	var nearest_distance_global: float = INF
-	var is_player_boarder: bool = soldier.team == "player" and is_instance_valid(soldier.home_ship) and soldier.home_ship != soldier.owned_ship
 
 	var detection_range_sq: float = soldier.detection_range * soldier.detection_range
 
@@ -102,6 +107,31 @@ static func find_nearest_enemy(soldier) -> Node3D:
 	if soldier.is_melee_only:
 		return nearest_on_ship if nearest_on_ship else nearest_global
 	return nearest_on_ship if nearest_on_ship else nearest_global
+
+
+static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
+	if not is_instance_valid(soldier.owned_ship):
+		return null
+	var nearest: Node3D = null
+	var nearest_distance_sq: float = INF
+	var detection_range_sq: float = soldier.detection_range * soldier.detection_range
+	for other in EntityRegistry.get_soldiers_by_ship(soldier.owned_ship):
+		if other == soldier or not is_instance_valid(other):
+			continue
+		if other.has_method("get_current_state_value") and other.get_current_state_value() == soldier.State.DEAD:
+			continue
+		if other.get_team_tag() == soldier.team:
+			continue
+		var dist_sq_xz := Vector2(
+			soldier.global_position.x - other.global_position.x,
+			soldier.global_position.z - other.global_position.z
+		).length_squared()
+		if dist_sq_xz > detection_range_sq:
+			continue
+		if dist_sq_xz < nearest_distance_sq:
+			nearest_distance_sq = dist_sq_xz
+			nearest = other
+	return nearest
 
 
 static func is_ship_pair_in_melee_range(soldier, other_ship: Node3D) -> bool:

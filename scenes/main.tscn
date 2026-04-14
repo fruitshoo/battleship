@@ -10,10 +10,14 @@
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
 [ext_resource type="PackedScene" uid="uid://bilro8ijftry1" path="res://scenes/effects/fire_effect.tscn" id="12_a8y0u"]
+[ext_resource type="PackedScene" path="res://scenes/effects/wood_splinter.tscn" id="12_splinter"]
 [ext_resource type="PackedScene" uid="uid://cn32xp1401yfh" path="res://scenes/effects/floating_loot.tscn" id="13_jkv2x"]
+[ext_resource type="PackedScene" uid="uid://cm4c0u30p0035" path="res://scenes/effects/water_burst.tscn" id="13_splash"]
 [ext_resource type="PackedScene" path="res://scenes/effects/survivor.tscn" id="14_jbj1t"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
 [ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
+[ext_resource type="Script" uid="uid://b3sxf5qk2myeh" path="res://scripts/world/decor/sea_decor_spawner.gd" id="sea_decor_spawner"]
+[ext_resource type="Script" uid="uid://covouwc1mtv57" path="res://scripts/world/sea_sites/sea_site_spawner.gd" id="sea_site_spawner"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_choun"]
 size = Vector3(8, 8, 8)
@@ -35,7 +39,7 @@ script = ExtResource("4_o6xl0")
 target_path = NodePath("../PlayerShip")
 pitch_degrees = -42.0
 lead_distance = 6.2
-offset = Vector3(0, 18, 24)
+offset = Vector3(0, 23, 30)
 zoom_speed = 3.2
 min_zoom = 18.0
 max_zoom = 66.0
@@ -43,6 +47,12 @@ zoom_smooth_speed = 24.0
 
 [node name="EnemySpawner" type="Node" parent="." unique_id=2113834434]
 script = ExtResource("5_spawner")
+
+[node name="SeaSiteSpawner" type="Node" parent="." unique_id=682725109]
+script = ExtResource("sea_site_spawner")
+
+[node name="SeaDecorSpawner" type="Node" parent="." unique_id=525644591]
+script = ExtResource("sea_decor_spawner")
 
 [node name="GameHUD" parent="." unique_id=744026074 instance=ExtResource("game_hud_scene")]
 
@@ -75,18 +85,15 @@ mesh = SubResource("BoxMesh_choun")
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7088671, 0, 15.67263)
-corpse_cleanup_enabled = null
-corpse_cleanup_delay = null
-corpse_cleanup_interval = null
-corpse_cleanup_throw_duration = null
 boarding_contact_grace_duration = 0.9
 boarding_hook_throw_delay = 2.5
 boarding_secondary_rope_delay = 1.0
 boarding_max_relative_speed = 0.28
 boarding_initial_rope_count = 0
 boarding_rope_throw_duration = 0.0
-wood_splinter_scene = ExtResource("12_a8y0u")
-water_splash_scene = ExtResource("13_jkv2x")
-fire_effect_scene = ExtResource("14_jbj1t")
+wood_splinter_scene = ExtResource("12_splinter")
+water_splash_scene = ExtResource("13_splash")
+fire_effect_scene = ExtResource("12_a8y0u")
 loot_scene = null
+survivor_scene = ExtResource("14_jbj1t")
 deck_light_player_only = true

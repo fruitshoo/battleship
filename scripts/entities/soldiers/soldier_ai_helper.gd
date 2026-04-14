@@ -113,6 +113,9 @@ static func state_move(soldier) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
+	if _retarget_owned_ship_hostile(soldier):
+		return
+
 	if not is_instance_valid(soldier.current_target):
 		if _try_muster_to_cross_ship_contact(soldier, 1.0):
 			return
@@ -177,6 +180,9 @@ static func state_move(soldier) -> void:
 
 
 static func state_attack(soldier) -> void:
+	if _retarget_owned_ship_hostile(soldier):
+		return
+
 	if not is_instance_valid(soldier.current_target):
 		soldier._change_state(soldier.State.IDLE)
 		return
@@ -254,4 +260,22 @@ static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0)
 	if muster_target == Vector3.INF:
 		return false
 	_move_toward_point(soldier, muster_target, speed_scale)
+	return true
+
+
+static func _retarget_owned_ship_hostile(soldier) -> bool:
+	if not soldier.has_method("find_nearest_hostile_on_owned_ship"):
+		return false
+	if not is_instance_valid(soldier.owned_ship):
+		return false
+	var owned_team: String = soldier.owned_ship.get_team_tag() if soldier.owned_ship.has_method("get_team_tag") else str(soldier.owned_ship.get("team"))
+	if owned_team != soldier.team:
+		return false
+	var boarder: Node3D = soldier.find_nearest_hostile_on_owned_ship()
+	if not is_instance_valid(boarder):
+		return false
+	if soldier.current_target == boarder:
+		return false
+	soldier.current_target = boarder
+	soldier._change_state(soldier.State.MOVE)
 	return true

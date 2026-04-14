@@ -2,6 +2,53 @@
 
 `scenes/test` contains lightweight preview and validation scenes used during iteration.
 
+## Harness Map
+
+Use the harnesses in four layers:
+
+- Contract harnesses are for small deterministic regressions.
+  Use these when a rule should never break again, such as boarding impact gating, rope pull lifetime, support rescue behavior, soldier incapacitation, HUD state, upgrade data, recovery pickups, or scene wiring.
+- Preview harnesses are for feel and balance checks.
+  Use these when the answer depends on watching motion, scale, sound, formation behavior, battle pacing, or encounter outcomes.
+- Performance probes are for frame-time and runtime growth.
+  Use these when the issue is a hitch, expensive visual option, projectile load, midgame stress, or leak-like long-run drift.
+- Isolation probes are for narrowing a load or shutdown leak budget.
+  Use these when a headless leak summary points at a broad scene/script chain and the next step is finding the subsystem bucket.
+
+Default quick checks:
+
+- `scripts/test/run_project_contract_sweep.sh`
+  Broad smoke for scripts, scenes, save/load, HUD, support fleet, bootstrap, recovery effects, upgrades, scene wiring, and runtime spawning.
+- `scripts/test/run_boarding_contracts.sh`
+  Focused boarding and soldier regression suite for impact, navigation, chaos, support rescue, auto-raid recall, and incapacitation/weapon-state behavior.
+- `scripts/test/run_ship_combat_balance_preview.sh`
+  Short encounter feel check for ship combat balance.
+- `scripts/test/run_midgame_performance_compare.sh`
+  Compare harness for midgame frame-time cost.
+
+Recent regression coverage to keep together:
+
+- Rope pull must require an active rope visual, so a cleared hook graphic cannot keep dragging ships.
+- Support free-combat assist must recall near the player and keep rowing/wind compensation so it does not feel abandoned in free engagement mode.
+- Enemy boarders on the player deck may speak, but ordinary enemy soldiers on their own ship should not spam speech labels.
+- Cross-ship rail standoffs should prefer bow fire until the sword can actually reach; stuck melee attack state should recover back to movement/weapon selection.
+- Sail and rudder field repair should be scheduled by real rigging damage, wait before starting, recover only to emergency function, and pause while burning.
+- Survivors, floating loot, static sea sites, sea decor, compass markers, and overcap crew recovery live under the project recovery contract helper rather than a separate ad hoc scene.
+
+Current harness gaps:
+
+- Sail, rope, and rock occlusion/transparency issues still need visual preview or screenshot-style checks; headless contract tests can only check state, not whether the player actually sees the mesh.
+- Formation and support combat feel still needs preview/balance harness runs because small AI constant changes can be technically valid but feel too passive or too slippery.
+- Sea decor pop-in/pop-out should be checked with a visibility/distance preview if it regresses again, since the current recovery contract mostly verifies spawn shape and collision semantics.
+- Audio mix changes should be checked in-game or with a dedicated audio bus/sample report; the current sweep only catches wiring/runtime errors, not loudness feel.
+
+When adding a new harness:
+
+- Prefer a focused contract when the bug can be represented with a few mock nodes and a precise assertion.
+- Prefer a preview when the bug is mostly visual, audio, balance, or pathing feel.
+- Prefer a probe when the bug depends on time, density, memory, ObjectDB/RID summaries, or startup cost.
+- Add the wrapper command here when it becomes part of the normal debugging loop.
+
 ## Shared Base
 
 - `preview_base.tscn`
@@ -84,6 +131,10 @@
   Startup frame-time probe for warmup and early cannon-fire hitch checks.
   Script: `scripts/test/startup_hitch_probe.gd`
   Wrapper: `scripts/test/run_startup_hitch_probe.sh`
+- `sea_site_preview.tscn`
+  Visual preview for static sea site scale, waterline height, labels, and compass marker direction.
+  Script: `scripts/test/sea_site_preview.gd`
+  Wrapper: `scripts/test/run_sea_site_preview.sh`
 
 ## Sandbox
 
@@ -113,6 +164,8 @@
   HUD state smoke for boarding, capture, stat panel, and ship debug UI states.
 - `scripts/test/project_contract_support_helper.gd`
   Support-fleet lifecycle smoke for summon, registry, targeting, and repair paths.
+- `scripts/test/project_contract_upgrade_helper.gd`
+  Upgrade data and upgrade manager smoke for required fields, offer pools, and shared cannon/crew progression contracts.
 - `scripts/test/project_contract_bootstrap_helper.gd`
   Startup audio mute/prewarm and effect prewarm smoke.
 - `scripts/test/project_contract_recovery_helper.gd`

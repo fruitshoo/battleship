@@ -126,14 +126,22 @@ static func _update_support_force_status(hud) -> void:
 	var support_ships: Array = []
 	if hud.player_ship.has_method("_get_support_fleet_ships"):
 		support_ships = hud.player_ship._get_support_fleet_ships()
-	_ensure_support_slot_count(hud, support_ships.size())
+	var support_limit: int = int(hud.player_ship.get("support_fleet_limit")) if hud.player_ship.get("support_fleet_limit") != null else support_ships.size()
+	var respawn_active := _is_support_respawn_active(hud.player_ship)
+	var slot_count: int = support_ships.size()
+	if respawn_active:
+		slot_count = maxi(slot_count, support_limit)
+	_ensure_support_slot_count(hud, slot_count)
 
 	for i in range(hud.support_fleet_hud_slots.size()):
 		var slot: PanelContainer = hud.support_fleet_hud_slots[i]
 		if not is_instance_valid(slot):
 			continue
 		var ship = support_ships[i] if i < support_ships.size() else null
-		_update_support_slot(slot, ship, "")
+		var timer_text := ""
+		if not is_instance_valid(ship):
+			timer_text = _get_support_respawn_timer_text(hud.player_ship) if i == support_ships.size() else "대기"
+		_update_support_slot(slot, ship, timer_text)
 
 static func update_crew_count(hud) -> void:
 	if Engine.get_process_frames() % 30 != 0:
@@ -150,6 +158,16 @@ static func _is_support_respawn_active(player_ship) -> bool:
 	if player_ship.get("is_sinking") == true or player_ship.get("is_dying") == true:
 		return false
 	return int(UpgradeManager.current_levels.get("fleet_signal", 0)) > 0
+
+static func _get_support_respawn_timer_text(player_ship) -> String:
+	if not is_instance_valid(player_ship):
+		return ""
+	if player_ship.get("support_fleet_respawn_interval") == null or player_ship.get("support_fleet_respawn_timer") == null:
+		return ""
+	var interval: float = maxf(float(player_ship.get("support_fleet_respawn_interval")), 0.1)
+	var elapsed: float = clampf(float(player_ship.get("support_fleet_respawn_timer")), 0.0, interval)
+	var remaining: float = maxf(0.0, interval - elapsed)
+	return "%ds" % int(ceil(remaining))
 
 static func _ensure_support_slot_count(hud, slot_count: int) -> void:
 	while hud.support_fleet_hud_slots.size() < slot_count:
@@ -249,21 +267,14 @@ static func _create_support_slot() -> PanelContainer:
 
 static func _update_support_slot(slot: PanelContainer, ship, timer_text: String = "") -> void:
 	var slot_style: StyleBoxFlat = slot.get_theme_stylebox("panel") as StyleBoxFlat
-	var damage_fill: ColorRect = slot.get_node("Root/DamageFill") as ColorRect
-	var dead_overlay: ColorRect = slot.get_node("Root/DeadOverlay") as ColorRect
+	var damage_fill: Panel = slot.get_node("Root/DamageFill") as Panel
+	var dead_overlay: Panel = slot.get_node("Root/DeadOverlay") as Panel
 	var icon: TextureRect = slot.get_node("Root/Icon") as TextureRect
 	var timer: Label = slot.get_node("Root/Timer") as Label
 	if not is_instance_valid(icon) or not is_instance_valid(dead_overlay) or not is_instance_valid(damage_fill) or not is_instance_valid(timer):
 		return
 	if is_instance_valid(ship) and ship.get("hull_hp") != null and ship.get("max_hull_hp") != null:
-		var max_hp: float = maxf(float(ship.max_hull_hp), 1.0)
-		var hull_hp: float = clampf(float(ship.hull_hp), 0.0, max_hp)
-		var lost_ratio: float = clampf(1.0 - (hull_hp / max_hp), 0.0, 1.0)
-		damage_fill.visible = lost_ratio > 0.01
-		damage_fill.anchor_top = 1.0 - lost_ratio
-		damage_fill.anchor_bottom = 1.0
-		damage_fill.offset_top = 0.0
-		damage_fill.offset_bottom = 0.0
+		damage_fill.visible = false
 		dead_overlay.visible = false
 		icon.visible = true
 		icon.texture = SUPPORT_FLEET_ICON

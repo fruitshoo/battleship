@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://cl1cb1aajn8m"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+radius = 0.22
+height = 1.32
+
+[sub_resource type="StandardMaterial3D" id="Material_body"]
+albedo_color = Color(0.2, 0.4, 0.8, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_0jqwl"]
+radius = 0.25
+height = 0.5
+
+[node name="SoldierCaptainVisual" type="Node3D" unique_id=544552770]
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=965470992]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.66, 0)
+mesh = SubResource("CapsuleMesh_body")
+surface_material_override/0 = SubResource("Material_body")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=562351841]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2235799, 0)
+mesh = SubResource("SphereMesh_0jqwl")

@@ -12,6 +12,7 @@ const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_help
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
+const SoldierSpeechHelper = preload("res://scripts/entities/soldiers/soldier_speech_helper.gd")
 const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
 const SWORD_SCENE = preload("res://scenes/entities/weapons/weapon_sword.tscn")
 const SPEARMAN_MELEE_SCENES := [
@@ -51,6 +52,7 @@ enum State {
 	set(value):
 		team = value
 		if is_inside_tree():
+			_setup_soldier_visual()
 			_update_team_color()
 			_update_weapon_stats()
 @export_enum("general", "spearman", "fire_pot", "repeating_crossbow", "singigeon") var crew_role: String = "general"
@@ -60,6 +62,12 @@ enum State {
 @export var cross_ship_melee_switch_distance: float = 6.8 # 인접 적선과 교전 시 근접 무기로 전환하는 거리
 @export var is_melee_only: bool = false ## 근접 무기만 사용 (백병전용)
 @export var is_ranged_only: bool = false ## 원거리 무기만 사용 (포격 지원용)
+@export_group("Visuals")
+@export var soldier_visual_scene: PackedScene
+@export var player_visual_scene: PackedScene
+@export var enemy_visual_scene: PackedScene
+@export var captain_visual_scene: PackedScene
+@export_group("")
 # === 내부 상태 ===
 var current_health: float = 70.0
 var current_state: State = State.IDLE
@@ -175,6 +183,7 @@ func _ready() -> void:
 		
 	current_health = max_health
 	_cache_base_combat_stats()
+	_setup_soldier_visual()
 	
 	# 부모 노드 구조에 따라 배 참조 찾기
 	# 구조: Ship -> Soldiers -> Soldier
@@ -236,6 +245,7 @@ func _ready() -> void:
 	decision_timer = randf_range(0.0, 0.2)
 	combat_timer = randf_range(0.0, 0.12)
 	_nearest_enemy_cache_timer = randf_range(0.0, 0.18)
+	SoldierSpeechHelper.reset(self)
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
 	add_to_group("soldiers")
@@ -301,12 +311,25 @@ func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_mu
 	current_health = minf(max_health, maxf(0.0, max_health * health_ratio))
 
 	if is_inside_tree():
+		_setup_soldier_visual()
 		_update_weapon_stats()
 		if enabled:
 			_set_active_weapon("sword")
 		else:
 			_apply_role_loadout()
 		_update_role_visual()
+
+func _setup_soldier_visual() -> void:
+	SoldierVisualHelper.setup_visual_scene(self, _get_selected_soldier_visual_scene())
+
+func _get_selected_soldier_visual_scene() -> PackedScene:
+	if is_captain and captain_visual_scene != null:
+		return captain_visual_scene
+	if team == "player" and player_visual_scene != null:
+		return player_visual_scene
+	if team == "enemy" and enemy_visual_scene != null:
+		return enemy_visual_scene
+	return soldier_visual_scene
 
 func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
 	if upgrade_id in ["crew_attack", "crew_defense"]:
@@ -577,6 +600,8 @@ func _physics_process(delta: float) -> void:
 			
 		_die()
 		return
+
+	SoldierSpeechHelper.update(self, delta)
 		
 	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
 	if not _is_jumping and current_state != State.DEAD:
@@ -732,9 +757,19 @@ func _perform_attack() -> void:
 
 ## 가장 가까운 적 찾기 (탐지 범위 및 동일 함선 우선순위 적용)
 func find_nearest_enemy() -> Node3D:
+	if is_instance_valid(owned_ship):
+		var owned_team: String = owned_ship.get_team_tag() if owned_ship.has_method("get_team_tag") else str(owned_ship.get("team"))
+		if owned_team == team:
+			var local_hostile := find_nearest_hostile_on_owned_ship()
+			if is_instance_valid(local_hostile):
+				_cached_nearest_enemy = local_hostile
+				return local_hostile
 	if _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
 		return _cached_nearest_enemy
 	return _refresh_nearest_enemy_cache(true)
+
+func find_nearest_hostile_on_owned_ship() -> Node3D:
+	return SoldierShipHelper.find_nearest_hostile_on_owned_ship(self)
 
 ## 전이 로직은 통제됨 (개별 나포 기회 체크 삭제)
 func _check_ship_capture_opportunity() -> void:
@@ -799,9 +834,11 @@ func _flash_hit(flash_color: Color = Color.WHITE) -> void:
 	SoldierVisualHelper.flash_hit(self, flash_color)
 
 func _play_death_pose() -> void:
+	SoldierSpeechHelper.hide(self)
 	SoldierVisualHelper.play_death_pose(self)
 
 func _play_recovery_pose() -> void:
+	SoldierSpeechHelper.reset(self)
 	SoldierVisualHelper.play_recovery_pose(self)
 
 ## 적군 도선병 약탈 및 방화 처리 (초당 DoT 데미지)

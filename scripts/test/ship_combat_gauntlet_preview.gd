@@ -266,6 +266,8 @@ func _apply_upgrade_preset() -> void:
 		"cannon_pressure":
 			preset_levels = {
 				"cannon": 3,
+				"cannon_damage": 2,
+				"cannon_reload": 2,
 				"janggun": 2,
 			}
 		"crew_sustain_cannon":
@@ -273,13 +275,15 @@ func _apply_upgrade_preset() -> void:
 				"crew_reserve": 2,
 				"boarding_resist": 2,
 				"cannon": 2,
+				"cannon_damage": 1,
+				"cannon_reload": 1,
 				"janggun": 1,
 			}
 		"fleet_screen":
 			preset_levels = {
 				"fleet_signal": 1,
 				"fleet_hull": 2,
-				"fleet_cannon": 2,
+				"cannon": 2,
 				"fleet_crew": 2,
 			}
 		"crew_sustain_fleet":
@@ -288,7 +292,7 @@ func _apply_upgrade_preset() -> void:
 				"boarding_resist": 2,
 				"fleet_signal": 1,
 				"fleet_hull": 2,
-				"fleet_cannon": 1,
+				"cannon": 2,
 				"fleet_crew": 2,
 			}
 		"crew_sustain_heavy":
@@ -305,7 +309,7 @@ func _apply_upgrade_preset() -> void:
 	_keep_support_fleet_between_encounters = (
 		int(preset_levels.get("fleet_signal", 0)) > 0
 		or int(preset_levels.get("fleet_hull", 0)) > 0
-		or int(preset_levels.get("fleet_cannon", 0)) > 0
+		or int(preset_levels.get("cannon", 0)) > 1
 		or int(preset_levels.get("fleet_crew", 0)) > 0
 	)
 	if _keep_support_fleet_between_encounters:

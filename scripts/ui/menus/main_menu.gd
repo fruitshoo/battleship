@@ -5,23 +5,18 @@ const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
 @export var background_texture: Texture2D
-@export_range(0.0, 1.0, 0.01) var background_dim: float = 0.08
+@export_range(0.0, 1.0, 0.01) var background_dim: float = 0.18
+@export var fallback_version_text: String = "v0.1.0"
 
 @onready var background_image: TextureRect = $BackgroundImage
 @onready var background_overlay: ColorRect = $Background
-@onready var frame_panel: PanelContainer = $Margin/Frame
-@onready var gold_panel: PanelContainer = $Margin/Frame/Layout/LeftColumn/GoldPanel
-@onready var eyebrow_label: Label = $Margin/Frame/Layout/LeftColumn/Eyebrow
-@onready var title_label: Label = $Margin/Frame/Layout/LeftColumn/Title
-@onready var body_label: Label = $Margin/Frame/Layout/LeftColumn/Body
-@onready var gold_label: Label = $Margin/Frame/Layout/LeftColumn/GoldPanel/GoldLabel
-@onready var hint_label: Label = $Margin/Frame/Layout/LeftColumn/Hint
-@onready var menu_title_label: Label = $Margin/Frame/Layout/RightColumn/MenuTitle
-@onready var footer_label: Label = $Margin/Frame/Layout/RightColumn/Footer
-@onready var start_button: Button = $Margin/Frame/Layout/RightColumn/Buttons/StartButton
-@onready var meta_button: Button = $Margin/Frame/Layout/RightColumn/Buttons/MetaButton
-@onready var options_button: Button = $Margin/Frame/Layout/RightColumn/Buttons/OptionsButton
-@onready var quit_button: Button = $Margin/Frame/Layout/RightColumn/Buttons/QuitButton
+@onready var eyebrow_label: Label = $TitleBlock/Eyebrow
+@onready var title_label: Label = $TitleBlock/Title
+@onready var start_button: Button = $ButtonBlock/StartButton
+@onready var meta_button: Button = $ButtonBlock/MetaButton
+@onready var options_button: Button = $ButtonBlock/OptionsButton
+@onready var quit_button: Button = $ButtonBlock/QuitButton
+@onready var version_label: Label = $VersionLabel
 
 var _modal_open: bool = false
 var _menu_buttons: Array[Button] = []
@@ -39,7 +34,7 @@ func _ready() -> void:
 	_menu_buttons = [start_button, meta_button, options_button]
 	if quit_button.visible:
 		_menu_buttons.append(quit_button)
-	_refresh_gold_label()
+	_refresh_version_label()
 	SaveManager.apply_settings()
 	_focus_first_menu_button()
 
@@ -98,23 +93,15 @@ func _apply_background_settings() -> void:
 	if is_instance_valid(background_image):
 		background_image.texture = background_texture
 		background_image.visible = background_texture != null
-	if is_instance_valid(background_overlay):
-		background_overlay.color = Color(0.03, 0.07, 0.12, clamp(background_dim, 0.0, 1.0))
+	if is_instance_valid(background_overlay) and background_overlay.material is ShaderMaterial:
+		var vignette_material := background_overlay.material as ShaderMaterial
+		vignette_material.set_shader_parameter("vignette_color", Color(0.02, 0.04, 0.07, clamp(background_dim, 0.0, 1.0)))
 
 
 func _apply_ui_theme() -> void:
-	if is_instance_valid(frame_panel):
-		frame_panel.add_theme_stylebox_override("panel", NavalUiTheme.make_menu_frame_style())
-	if is_instance_valid(gold_panel):
-		gold_panel.add_theme_stylebox_override("panel", NavalUiTheme.make_gold_panel_style())
-	NavalUiTheme.style_heading(eyebrow_label, 15)
-	NavalUiTheme.style_heading(menu_title_label, 24)
-	NavalUiTheme.style_body(body_label, 18)
-	NavalUiTheme.style_muted(hint_label, 14)
-	NavalUiTheme.style_muted(footer_label, 13)
-	NavalUiTheme.style_gold(gold_label, 22)
+	NavalUiTheme.style_heading(eyebrow_label, 16)
 	if is_instance_valid(title_label):
-		title_label.add_theme_font_size_override("font_size", 62)
+		title_label.add_theme_font_size_override("font_size", 68)
 		title_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 		title_label.add_theme_color_override("font_shadow_color", NavalUiTheme.OUTLINE_DARK)
 		title_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
@@ -122,10 +109,28 @@ func _apply_ui_theme() -> void:
 		title_label.add_theme_constant_override("shadow_offset_y", 4)
 		title_label.add_theme_constant_override("outline_size", 2)
 	for button in [start_button, meta_button, options_button, quit_button]:
-		NavalUiTheme.apply_menu_button(button, 20)
+		_apply_compact_menu_button(button)
 
-func _refresh_gold_label() -> void:
-	gold_label.text = "보유 골드 %d G" % SaveManager.gold
+
+func _apply_compact_menu_button(button: Button) -> void:
+	if not is_instance_valid(button):
+		return
+	NavalUiTheme.apply_menu_button(button, 18)
+	button.add_theme_stylebox_override("normal", NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_SOFT, 8, 1, 16.0, 8.0, 16.0, 8.0))
+	button.add_theme_stylebox_override("hover", NavalUiTheme.make_panel_style(Color(0.16, 0.23, 0.31, 0.82), NavalUiTheme.BORDER_GOLD, 8, 1, 16.0, 8.0, 16.0, 8.0))
+	button.add_theme_stylebox_override("pressed", NavalUiTheme.make_panel_style(Color(0.09, 0.13, 0.18, 0.90), Color(0.93, 0.84, 0.56, 0.92), 8, 1, 16.0, 8.0, 16.0, 8.0))
+	button.add_theme_stylebox_override("focus", NavalUiTheme.make_panel_style(Color(0.16, 0.23, 0.31, 0.82), NavalUiTheme.BORDER_GOLD, 8, 1, 16.0, 8.0, 16.0, 8.0))
+
+func _refresh_version_label() -> void:
+	if not is_instance_valid(version_label):
+		return
+	var project_version := str(ProjectSettings.get_setting("application/config/version", "")).strip_edges()
+	if project_version.is_empty():
+		version_label.text = fallback_version_text
+	elif project_version.begins_with("v"):
+		version_label.text = project_version
+	else:
+		version_label.text = "v%s" % project_version
 
 func _set_buttons_disabled(disabled: bool) -> void:
 	start_button.disabled = disabled
@@ -154,7 +159,6 @@ func _on_meta_pressed() -> void:
 	ui.closed.connect(func():
 		_modal_open = false
 		_set_buttons_disabled(false)
-		_refresh_gold_label()
 	)
 
 func _on_options_pressed() -> void:

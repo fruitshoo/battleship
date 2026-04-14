@@ -177,3 +177,22 @@ static func apply_progress_bar(bar: ProgressBar, bg_color: Color, fill_color: Co
 	fill.bg_color = fill_color
 	fill.set_corner_radius_all(radius)
 	bar.add_theme_stylebox_override("fill", fill)
+
+
+static func apply_slider(slider: Slider, bg_color: Color, fill_color: Color, radius: int = 4) -> void:
+	if not is_instance_valid(slider):
+		return
+	var rail := StyleBoxFlat.new()
+	rail.bg_color = bg_color
+	rail.set_corner_radius_all(radius)
+	rail.content_margin_top = 4.0
+	rail.content_margin_bottom = 4.0
+	slider.add_theme_stylebox_override("slider", rail)
+
+	var grabber_area := StyleBoxFlat.new()
+	grabber_area.bg_color = fill_color
+	grabber_area.set_corner_radius_all(radius)
+	grabber_area.content_margin_top = 4.0
+	grabber_area.content_margin_bottom = 4.0
+	slider.add_theme_stylebox_override("grabber_area", grabber_area)
+	slider.add_theme_stylebox_override("grabber_area_highlight", grabber_area)

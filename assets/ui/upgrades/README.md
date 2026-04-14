@@ -27,6 +27,8 @@ Constraints: no text, no letters, no watermark, no UI frame, no extra background
 Use one PNG per upgrade id:
 
 - `cannon.png`
+- `cannon_damage.png`
+- `cannon_reload.png`
 - `janggun.png`
 - `hull_defense.png`
 - `sailing.png`
@@ -41,7 +43,6 @@ Use one PNG per upgrade id:
 - `fire_pot.png`
 - `repeating_crossbow.png`
 - `fleet_signal.png`
-- `fleet_cannon.png`
 - `fleet_hull.png`
 - `fleet_crew.png`
 

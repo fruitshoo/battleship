@@ -251,7 +251,10 @@ static func process_physics(ship, delta: float) -> void:
 		var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
 		var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
 		var can_latched_board: bool = ship.has_method("_can_start_boarding_latched") and ship.call("_can_start_boarding_latched", current_target, dist_to_target, can_side_board, can_force_head_on, can_force_cleanup, delta)
-		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= ship.max_boarding_distance + 0.35
+		var direct_board_pad: float = 0.35
+		if ship.has_method("get_team_tag") and ship.call("get_team_tag") == "enemy":
+			direct_board_pad += 0.15
+		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= ship.max_boarding_distance + direct_board_pad
 		var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
 		if (can_latched_board or can_direct_board) and impact_confirmed:
 			if ship.has_method("_board_ship"):

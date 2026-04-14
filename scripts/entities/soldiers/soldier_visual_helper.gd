@@ -3,8 +3,180 @@ extends RefCounted
 const ROLE_MARKER_NAME := "RoleMarker"
 const CAPTAIN_MARKER_NAME := "CaptainMarker"
 const LEVEL_MARKER_NAME := "LevelMarker"
+const VISUAL_ROOT_NAME := "VisualRoot"
+const CUSTOM_VISUAL_NAME := "CustomVisual"
+const BODY_MESH_NAME := "Body"
 const TEAM_MATERIAL_META := "team_material_instance"
 const DEAD_BODY_MATERIAL_META := "dead_body_material_instance"
+const BODY_MESH_META := "body_mesh_instance"
+const BODY_MESH_REST_POSITION_META := "body_mesh_rest_position"
+const BODY_MESH_REST_ROTATION_META := "body_mesh_rest_rotation"
+const BODY_MESH_REST_SCALE_META := "body_mesh_rest_scale"
+const POSE_NODE_META := "pose_node_instance"
+const POSE_NODE_REST_POSITION_META := "pose_node_rest_position"
+const POSE_NODE_REST_ROTATION_META := "pose_node_rest_rotation"
+const POSE_NODE_REST_SCALE_META := "pose_node_rest_scale"
+const ACTIVE_VISUAL_SCENE_ID_META := "active_visual_scene_id"
+
+
+static func ensure_visual_root(soldier) -> Node3D:
+	var visual_root := soldier.get_node_or_null(VISUAL_ROOT_NAME) as Node3D
+	if visual_root != null:
+		return visual_root
+	visual_root = Node3D.new()
+	visual_root.name = VISUAL_ROOT_NAME
+	soldier.add_child(visual_root)
+	return visual_root
+
+
+static func setup_visual_scene(soldier, visual_scene: PackedScene) -> void:
+	var visual_root := ensure_visual_root(soldier)
+	var custom_visual := visual_root.get_node_or_null(CUSTOM_VISUAL_NAME) as Node3D
+	var fallback_mesh := visual_root.get_node_or_null("MeshInstance3D") as MeshInstance3D
+
+	if visual_scene == null:
+		if custom_visual != null:
+			visual_root.remove_child(custom_visual)
+			custom_visual.queue_free()
+		if fallback_mesh != null:
+			fallback_mesh.visible = true
+		_clear_body_mesh_cache(soldier)
+		return
+
+	var scene_id := visual_scene.get_instance_id()
+	if custom_visual != null and int(custom_visual.get_meta(ACTIVE_VISUAL_SCENE_ID_META, -1)) == scene_id:
+		if fallback_mesh != null:
+			fallback_mesh.visible = false
+		return
+
+	if custom_visual != null:
+		visual_root.remove_child(custom_visual)
+		custom_visual.queue_free()
+
+	var visual_instance := visual_scene.instantiate() as Node3D
+	if visual_instance == null:
+		if fallback_mesh != null:
+			fallback_mesh.visible = true
+		return
+
+	visual_instance.name = CUSTOM_VISUAL_NAME
+	visual_instance.set_meta(ACTIVE_VISUAL_SCENE_ID_META, scene_id)
+	visual_root.add_child(visual_instance)
+	if fallback_mesh != null:
+		fallback_mesh.visible = false
+	_clear_body_mesh_cache(soldier)
+
+
+static func get_visual_root(soldier) -> Node3D:
+	var visual_root := soldier.get_node_or_null(VISUAL_ROOT_NAME) as Node3D
+	if visual_root != null:
+		return visual_root
+	return soldier as Node3D
+
+
+static func get_body_mesh(soldier) -> MeshInstance3D:
+	if soldier.has_meta(BODY_MESH_META):
+		var cached_mesh := soldier.get_meta(BODY_MESH_META) as MeshInstance3D
+		if is_instance_valid(cached_mesh):
+			return cached_mesh
+
+	var visual_root := get_visual_root(soldier)
+	var custom_visual := visual_root.get_node_or_null(CUSTOM_VISUAL_NAME) as Node3D
+	var mesh := _find_body_mesh_instance(custom_visual) if custom_visual != null else null
+	if mesh == null:
+		mesh = visual_root.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if mesh == null:
+		mesh = soldier.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if mesh == null:
+		mesh = _find_first_mesh_instance(visual_root)
+
+	if mesh != null:
+		soldier.set_meta(BODY_MESH_META, mesh)
+		_cache_body_mesh_rest_transform(soldier, mesh)
+	return mesh
+
+
+static func get_pose_node(soldier) -> Node3D:
+	if soldier.has_meta(POSE_NODE_META):
+		var cached_node := soldier.get_meta(POSE_NODE_META) as Node3D
+		if is_instance_valid(cached_node):
+			return cached_node
+
+	var visual_root := get_visual_root(soldier)
+	var pose_node := visual_root.get_node_or_null(CUSTOM_VISUAL_NAME) as Node3D
+	if pose_node == null:
+		pose_node = get_body_mesh(soldier) as Node3D
+
+	if pose_node != null:
+		soldier.set_meta(POSE_NODE_META, pose_node)
+		_cache_pose_node_rest_transform(soldier, pose_node)
+	return pose_node
+
+
+static func _find_body_mesh_instance(node: Node) -> MeshInstance3D:
+	if node == null:
+		return null
+	var named_body := _find_named_mesh_instance(node, BODY_MESH_NAME)
+	if named_body != null:
+		return named_body
+	return _find_first_mesh_instance(node)
+
+
+static func _find_named_mesh_instance(node: Node, mesh_name: String) -> MeshInstance3D:
+	if node == null:
+		return null
+	if node is MeshInstance3D and node.name == mesh_name:
+		return node as MeshInstance3D
+	for child in node.get_children():
+		var found := _find_named_mesh_instance(child, mesh_name)
+		if found != null:
+			return found
+	return null
+
+
+static func _find_first_mesh_instance(node: Node) -> MeshInstance3D:
+	if node == null:
+		return null
+	if node is MeshInstance3D:
+		return node as MeshInstance3D
+	for child in node.get_children():
+		var found := _find_first_mesh_instance(child)
+		if found != null:
+			return found
+	return null
+
+
+static func _cache_body_mesh_rest_transform(soldier, mesh: MeshInstance3D) -> void:
+	if not soldier.has_meta(BODY_MESH_REST_POSITION_META):
+		soldier.set_meta(BODY_MESH_REST_POSITION_META, mesh.position)
+		soldier.set_meta(BODY_MESH_REST_ROTATION_META, mesh.rotation)
+		soldier.set_meta(BODY_MESH_REST_SCALE_META, mesh.scale)
+
+
+static func _cache_pose_node_rest_transform(soldier, pose_node: Node3D) -> void:
+	if not soldier.has_meta(POSE_NODE_REST_POSITION_META):
+		soldier.set_meta(POSE_NODE_REST_POSITION_META, pose_node.position)
+		soldier.set_meta(POSE_NODE_REST_ROTATION_META, pose_node.rotation)
+		soldier.set_meta(POSE_NODE_REST_SCALE_META, pose_node.scale)
+
+
+static func _clear_body_mesh_cache(soldier) -> void:
+	if soldier.has_meta(BODY_MESH_META):
+		soldier.remove_meta(BODY_MESH_META)
+	if soldier.has_meta(BODY_MESH_REST_POSITION_META):
+		soldier.remove_meta(BODY_MESH_REST_POSITION_META)
+	if soldier.has_meta(BODY_MESH_REST_ROTATION_META):
+		soldier.remove_meta(BODY_MESH_REST_ROTATION_META)
+	if soldier.has_meta(BODY_MESH_REST_SCALE_META):
+		soldier.remove_meta(BODY_MESH_REST_SCALE_META)
+	if soldier.has_meta(POSE_NODE_META):
+		soldier.remove_meta(POSE_NODE_META)
+	if soldier.has_meta(POSE_NODE_REST_POSITION_META):
+		soldier.remove_meta(POSE_NODE_REST_POSITION_META)
+	if soldier.has_meta(POSE_NODE_REST_ROTATION_META):
+		soldier.remove_meta(POSE_NODE_REST_ROTATION_META)
+	if soldier.has_meta(POSE_NODE_REST_SCALE_META):
+		soldier.remove_meta(POSE_NODE_REST_SCALE_META)
 
 
 static func ensure_role_marker(soldier) -> MeshInstance3D:
@@ -21,21 +193,13 @@ static func ensure_role_marker(soldier) -> MeshInstance3D:
 	return marker
 
 
-static func ensure_captain_marker(soldier) -> MeshInstance3D:
-	var marker := soldier.get_node_or_null(CAPTAIN_MARKER_NAME) as MeshInstance3D
-	if marker != null:
-		return marker
-	marker = MeshInstance3D.new()
-	marker.name = CAPTAIN_MARKER_NAME
-	marker.position = Vector3(0.0, 1.5, 0.0)
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.16
-	mesh.bottom_radius = 0.16
-	mesh.height = 0.05
-	mesh.radial_segments = 12
-	marker.mesh = mesh
-	soldier.add_child(marker)
-	return marker
+static func remove_captain_marker(soldier) -> void:
+	var marker: Node = soldier.get_node_or_null(CAPTAIN_MARKER_NAME)
+	if marker == null:
+		return
+	soldier.remove_child(marker)
+	marker.queue_free()
+
 
 
 static func ensure_level_marker(soldier) -> Label3D:
@@ -57,7 +221,7 @@ static func update_role_visual(soldier) -> void:
 	var marker = ensure_role_marker(soldier)
 	if marker == null:
 		return
-	var captain_marker = ensure_captain_marker(soldier)
+	remove_captain_marker(soldier)
 
 	var material := StandardMaterial3D.new()
 	material.resource_local_to_scene = true
@@ -103,19 +267,6 @@ static func update_role_visual(soldier) -> void:
 
 	marker.material_override = material
 
-	if captain_marker != null:
-		var captain_material := StandardMaterial3D.new()
-		captain_material.resource_local_to_scene = true
-		captain_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		captain_material.emission_enabled = true
-		captain_material.albedo_color = Color(1.0, 0.82, 0.28, 0.95)
-		captain_material.emission = Color(1.0, 0.76, 0.22, 1.0)
-		captain_material.emission_energy_multiplier = 0.55
-		captain_marker.visible = soldier.get("is_captain") == true
-		captain_marker.rotation_degrees = Vector3.ZERO
-		captain_marker.scale = Vector3(1.0, 1.0, 1.0)
-		captain_marker.material_override = captain_material
-
 
 static func update_level_visual(soldier) -> void:
 	var level := 1
@@ -139,12 +290,12 @@ static func update_level_visual(soldier) -> void:
 
 
 static func update_team_color(soldier) -> void:
-	var mesh_instance = soldier.get_node_or_null("MeshInstance3D")
+	var mesh_instance := get_body_mesh(soldier)
 	if mesh_instance:
 		mesh_instance.material_override = get_or_create_team_material(soldier)
 
 static func get_or_create_team_material(soldier) -> StandardMaterial3D:
-	var mesh_instance = soldier.get_node_or_null("MeshInstance3D")
+	var mesh_instance := get_body_mesh(soldier)
 	if mesh_instance == null:
 		return null
 
@@ -168,7 +319,7 @@ static func get_team_color(team_name: String) -> Color:
 
 
 static func flash_hit(soldier, flash_color: Color = Color.WHITE) -> void:
-	var mesh = soldier.get_node_or_null("MeshInstance3D")
+	var mesh := get_body_mesh(soldier)
 	if not mesh:
 		return
 	if mesh.material_override == null:
@@ -189,20 +340,20 @@ static func flash_hit(soldier, flash_color: Color = Color.WHITE) -> void:
 
 
 static func play_death_pose(soldier) -> void:
-	var mesh := soldier.get_node_or_null("MeshInstance3D") as MeshInstance3D
-	if mesh == null:
+	var mesh := get_body_mesh(soldier)
+	var pose_node := get_pose_node(soldier)
+	if mesh == null or pose_node == null:
 		soldier.visible = false
 		return
 
 	soldier.visible = true
 	mesh.visible = true
+	pose_node.visible = true
 
 	var role_marker := soldier.get_node_or_null(ROLE_MARKER_NAME) as MeshInstance3D
 	if role_marker != null:
 		role_marker.visible = false
-	var captain_marker := soldier.get_node_or_null(CAPTAIN_MARKER_NAME) as MeshInstance3D
-	if captain_marker != null:
-		captain_marker.visible = false
+	remove_captain_marker(soldier)
 	var level_marker := soldier.get_node_or_null(LEVEL_MARKER_NAME) as Label3D
 	if level_marker != null:
 		level_marker.visible = false
@@ -229,23 +380,28 @@ static func play_death_pose(soldier) -> void:
 	if soldier.is_inside_tree():
 		var tween: Tween = soldier.create_tween()
 		tween.set_parallel(true)
-		tween.tween_property(mesh, "rotation", target_rotation, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tween.tween_property(mesh, "position", target_position, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tween.tween_property(mesh, "scale", target_scale, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(pose_node, "rotation", target_rotation, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(pose_node, "position", target_position, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(pose_node, "scale", target_scale, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	else:
-		mesh.rotation = target_rotation
-		mesh.position = target_position
-		mesh.scale = target_scale
+		pose_node.rotation = target_rotation
+		pose_node.position = target_position
+		pose_node.scale = target_scale
 
 
 static func play_recovery_pose(soldier) -> void:
-	var mesh := soldier.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	var mesh := get_body_mesh(soldier)
+	var pose_node := get_pose_node(soldier)
 	if mesh != null:
+		_cache_body_mesh_rest_transform(soldier, mesh)
 		mesh.visible = true
-		mesh.rotation = Vector3.ZERO
-		mesh.position = Vector3.ZERO
-		mesh.scale = Vector3.ONE
 		mesh.material_override = get_or_create_team_material(soldier)
+	if pose_node != null:
+		_cache_pose_node_rest_transform(soldier, pose_node)
+		pose_node.visible = true
+		pose_node.rotation = soldier.get_meta(POSE_NODE_REST_ROTATION_META, pose_node.rotation)
+		pose_node.position = soldier.get_meta(POSE_NODE_REST_POSITION_META, pose_node.position)
+		pose_node.scale = soldier.get_meta(POSE_NODE_REST_SCALE_META, pose_node.scale)
 
 	if soldier.get("crew_role") != null:
 		update_role_visual(soldier)

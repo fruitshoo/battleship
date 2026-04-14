@@ -156,9 +156,9 @@ const SHIP_HP_BAR_HEIGHT: float = 10.0
 const SHIP_HP_BAR_OFFSET_Y: float = 34.0
 
 const SHIP_UPGRADE_IDS := [
-	"cannon", "janggun",
+	"cannon", "cannon_damage", "cannon_reload", "janggun",
 	"hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal",
-	"fleet_cannon", "fleet_hull", "supply", "gold"
+	"fleet_hull", "supply", "gold"
 ]
 const CREW_UPGRADE_IDS := [
 	"crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow",

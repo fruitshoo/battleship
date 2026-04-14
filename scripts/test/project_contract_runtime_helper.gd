@@ -309,8 +309,7 @@ static func _configure_projectile_smoke(projectile: Node, projectile_scene_path:
 				-target_ship.global_transform.basis.z,
 				target_ship,
 				12.0,
-				1.0,
-				"roundshot"
+				1.0
 			)
 	elif projectile_scene_path.ends_with("arrow.tscn"):
 		if projectile.has_method("launch"):

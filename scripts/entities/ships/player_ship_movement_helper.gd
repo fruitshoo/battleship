@@ -51,7 +51,9 @@ static func get_boarding_drag_multiplier(ship) -> float:
 	var drag = 1.0
 	var neighbors = ship._get_ships_cached(ship.get_tree())
 	for other in neighbors:
-		if other.has_method("is_boarding_ship") and other.is_boarding_ship() and other.has_method("get_boarding_target_ship") and other.get_boarding_target_ship() == ship:
+		if other.has_method("has_boarding_rope_link_to") and other.call("has_boarding_rope_link_to", ship) == true:
+			drag *= 0.6
+		elif other.has_method("is_boarding_ship") and other.is_boarding_ship() and other.has_method("get_boarding_target_ship") and other.get_boarding_target_ship() == ship and not other.has_method("has_boarding_rope_link_to"):
 			drag *= 0.6
 	return maxf(0.1, drag)
 

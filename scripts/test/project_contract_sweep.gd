@@ -8,6 +8,7 @@ const ProjectContractScanHelper = preload("res://scripts/test/project_contract_s
 const ProjectContractSaveHelper = preload("res://scripts/test/project_contract_save_helper.gd")
 const ProjectContractSceneWiringHelper = preload("res://scripts/test/project_contract_scene_wiring_helper.gd")
 const ProjectContractSupportHelper = preload("res://scripts/test/project_contract_support_helper.gd")
+const ProjectContractUpgradeHelper = preload("res://scripts/test/project_contract_upgrade_helper.gd")
 
 @export var script_roots: Array[String] = ["res://scripts"]
 @export var scene_roots: Array[String] = ["res://scenes"]
@@ -41,6 +42,7 @@ const ProjectContractSupportHelper = preload("res://scripts/test/project_contrac
 @export var smoke_run_bootstrap_contract: bool = true
 @export var smoke_run_recovery_effect_contract: bool = true
 @export var smoke_run_scene_wiring_contract: bool = true
+@export var smoke_run_upgrade_contract: bool = true
 
 var _failures: Array[String] = []
 var _loaded_scripts: int = 0
@@ -58,6 +60,8 @@ func _run_contract_checks() -> void:
 	await _run_runtime_smoke()
 	if smoke_run_save_contract:
 		_run_save_contract_smoke()
+	if smoke_run_upgrade_contract:
+		_run_upgrade_contract_smoke()
 	if smoke_run_hud_contract:
 		await _run_hud_contract_smoke()
 	if smoke_run_support_fleet_contract:
@@ -88,6 +92,10 @@ func _run_runtime_smoke() -> void:
 
 func _run_save_contract_smoke() -> void:
 	ProjectContractSaveHelper.run_save_contract_smoke(_failures)
+
+
+func _run_upgrade_contract_smoke() -> void:
+	ProjectContractUpgradeHelper.run_upgrade_contract_smoke(_failures)
 
 
 func _run_hud_contract_smoke() -> void:

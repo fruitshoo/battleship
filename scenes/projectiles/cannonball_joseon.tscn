@@ -56,7 +56,7 @@ collision_layer = 4
 collision_mask = 4
 script = ExtResource("1")
 speed = 55.0
-damage = 25.0
+damage = 22.0
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 mesh = SubResource("SphereMesh_ball")

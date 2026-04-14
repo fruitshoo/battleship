@@ -66,6 +66,42 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 			wait_frames_after_attach
 		)
 
+	_run_main_player_effect_scene_wiring_pass(failures)
+
+
+static func _run_main_player_effect_scene_wiring_pass(failures: Array[String]) -> void:
+	var packed := load("res://scenes/main.tscn") as PackedScene
+	if packed == null:
+		failures.append("main scene wiring load failed")
+		return
+	var main_root := packed.instantiate()
+	if main_root == null:
+		failures.append("main scene wiring instantiate failed")
+		return
+	var player_ship := main_root.get_node_or_null("PlayerShip")
+	if not is_instance_valid(player_ship):
+		failures.append("main scene wiring missing PlayerShip")
+		main_root.queue_free()
+		return
+
+	_validate_packed_scene_path(player_ship, "wood_splinter_scene", "res://scenes/effects/wood_splinter.tscn", failures)
+	_validate_packed_scene_path(player_ship, "water_splash_scene", "res://scenes/effects/water_burst.tscn", failures)
+	_validate_packed_scene_path(player_ship, "fire_effect_scene", "res://scenes/effects/fire_effect.tscn", failures)
+	_validate_packed_scene_path(player_ship, "survivor_scene", "res://scenes/effects/survivor.tscn", failures)
+	if player_ship.get("loot_scene") != null:
+		failures.append("main scene PlayerShip loot_scene should stay null")
+	main_root.queue_free()
+
+
+static func _validate_packed_scene_path(node: Node, property_name: String, expected_path: String, failures: Array[String]) -> void:
+	var value = node.get(property_name)
+	if not (value is PackedScene):
+		failures.append("main scene PlayerShip %s is not a PackedScene" % property_name)
+		return
+	var actual_path := (value as PackedScene).resource_path
+	if actual_path != expected_path:
+		failures.append("main scene PlayerShip %s mismatch: %s" % [property_name, actual_path])
+
 
 static func _run_single_scene_wiring_pass(owner: Node, failures: Array[String], scene_path: String, label: String, expected_team: String, expected_player_controlled: bool, expected_groups: Array, required_nodes: Array, require_hull: bool, require_boss_group: bool, expected_allow_boarding, wait_frames_after_attach: int) -> void:
 	var packed := load(scene_path) as PackedScene

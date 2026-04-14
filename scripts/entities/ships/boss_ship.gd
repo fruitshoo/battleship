@@ -224,6 +224,7 @@ func _physics_process(delta: float) -> void:
 	_update_sail_visual()
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
+	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
 	
 	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true or target.get("is_dead") == true:

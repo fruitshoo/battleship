@@ -1,6 +1,7 @@
 extends Node
 
 const AttackerScript = preload("res://scripts/test/chaser_isolation_boarding_collision.gd")
+const ChaserShipScript = preload("res://scripts/entities/ships/chaser_ship.gd")
 
 
 class MockTarget:
@@ -57,6 +58,30 @@ class MockSoldier:
 		damage_source = source
 
 
+class MockMast:
+	extends Node
+
+	var sail_damage: float = 0.0
+
+	func add_sail_damage(amount: float) -> void:
+		sail_damage = clampf(sail_damage + maxf(amount, 0.0), 0.0, 1.0)
+
+	func repair_sail_damage(amount: float) -> void:
+		sail_damage = clampf(sail_damage - maxf(amount, 0.0), 0.0, 1.0)
+
+	func get_sail_damage() -> float:
+		return sail_damage
+
+
+class MockHud:
+	extends Node
+
+	var messages: Array[String] = []
+
+	func show_message(message: String, _duration: float = 1.5) -> void:
+		messages.append(message)
+
+
 func _ready() -> void:
 	var failures: Array[String] = []
 	_run_boarding_requires_impact_contract(failures)
@@ -76,6 +101,10 @@ func _run_boarding_requires_impact_contract(failures: Array[String]) -> void:
 	_verify_expired_impact_blocks_boarding(failures)
 	_verify_bow_to_side_impact_allows_boarding(failures)
 	_verify_player_crew_takes_reduced_ramming_aoe(failures)
+	_verify_enemy_boarding_latch_bonus_is_scoped(failures)
+	_verify_enemy_boarding_pull_bonus_is_scoped(failures)
+	_verify_boarding_pull_requires_active_rope_visual(failures)
+	_verify_rigging_field_repair_waits_then_recovers(failures)
 
 
 func _verify_proximity_does_not_board(failures: Array[String]) -> void:
@@ -180,6 +209,168 @@ func _verify_player_crew_takes_reduced_ramming_aoe(failures: Array[String]) -> v
 		failures.append("enemy ramming aoe was unexpectedly reduced: %.2f" % enemy_soldier.damage_taken)
 	if player_soldier.damage_source != "ramming_aoe" or enemy_soldier.damage_source != "ramming_aoe":
 		failures.append("ramming aoe damage source was not tagged")
+
+
+func _verify_enemy_boarding_latch_bonus_is_scoped(failures: Array[String]) -> void:
+	var enemy_ship: Node = ChaserShipScript.new()
+	var player_ship: Node = ChaserShipScript.new()
+	enemy_ship.set("team", "enemy")
+	player_ship.set("team", "player")
+
+	var enemy_distance_bonus: float = float(enemy_ship.call("_get_enemy_boarding_latch_distance_bonus"))
+	var player_distance_bonus: float = float(player_ship.call("_get_enemy_boarding_latch_distance_bonus"))
+	var enemy_duration_bonus: float = float(enemy_ship.call("_get_enemy_boarding_latch_duration_bonus"))
+	var player_duration_bonus: float = float(player_ship.call("_get_enemy_boarding_latch_duration_bonus"))
+	var enemy_speed_bonus: float = float(enemy_ship.call("_get_enemy_boarding_latch_speed_bonus"))
+	var player_speed_bonus: float = float(player_ship.call("_get_enemy_boarding_latch_speed_bonus"))
+
+	if not is_equal_approx(enemy_distance_bonus, 0.25) or not is_equal_approx(player_distance_bonus, 0.0):
+		failures.append("enemy boarding latch distance bonus scope changed: enemy %.2f player %.2f" % [enemy_distance_bonus, player_distance_bonus])
+	if not is_equal_approx(enemy_duration_bonus, 0.15) or not is_equal_approx(player_duration_bonus, 0.0):
+		failures.append("enemy boarding latch duration bonus scope changed: enemy %.2f player %.2f" % [enemy_duration_bonus, player_duration_bonus])
+	if not is_equal_approx(enemy_speed_bonus, 0.15) or not is_equal_approx(player_speed_bonus, 0.0):
+		failures.append("enemy boarding latch speed bonus scope changed: enemy %.2f player %.2f" % [enemy_speed_bonus, player_speed_bonus])
+
+	enemy_ship.free()
+	player_ship.free()
+
+
+func _verify_enemy_boarding_pull_bonus_is_scoped(failures: Array[String]) -> void:
+	var defender: Node = AttackerScript.new()
+	var enemy_attacker: Node3D = AttackerScript.new()
+	var player_attacker: Node3D = AttackerScript.new()
+	enemy_attacker.set("team", "enemy")
+	player_attacker.set("team", "player")
+
+	defender.set("boarding_attacker", enemy_attacker)
+	var enemy_pull_mult: float = float(defender.call("_get_enemy_boarding_pull_multiplier", enemy_attacker))
+	defender.set("boarding_attacker", player_attacker)
+	var player_pull_mult: float = float(defender.call("_get_enemy_boarding_pull_multiplier", player_attacker))
+
+	if not is_equal_approx(enemy_pull_mult, 1.08):
+		failures.append("enemy boarding pull multiplier changed: %.2f" % enemy_pull_mult)
+	if not is_equal_approx(player_pull_mult, 1.0):
+		failures.append("player boarding pull multiplier should stay neutral: %.2f" % player_pull_mult)
+
+	defender.free()
+	enemy_attacker.free()
+	player_attacker.free()
+
+
+func _verify_boarding_pull_requires_active_rope_visual(failures: Array[String]) -> void:
+	var attacker: Node = AttackerScript.new()
+	add_child(attacker)
+	attacker.set("team", "enemy")
+	attacker.set("is_boarding", true)
+	attacker.set("current_speed", 0.0)
+	attacker.global_position = Vector3.ZERO
+
+	var defender: Node3D = AttackerScript.new()
+	add_child(defender)
+	defender.set("team", "player")
+	defender.set("current_speed", 0.0)
+	defender.global_position = Vector3(12.0, 0.0, 0.0)
+
+	attacker.set("boarding_target", defender)
+	defender.set("boarding_attacker", attacker)
+	attacker.set("_initial_rope_deployed", false)
+
+	var attacker_pull_without_rope: Vector3 = attacker.call("_calculate_boarding_pull")
+	var defender_pull_without_rope: Vector3 = defender.call("_calculate_boarding_pull")
+	if attacker_pull_without_rope.length() > 0.001:
+		failures.append("boarding attacker kept pulling before a rope visual existed")
+	if defender_pull_without_rope.length() > 0.001:
+		failures.append("boarding defender kept being pulled before a rope visual existed")
+
+	attacker.call("_spawn_ropes", 1)
+	attacker.set("_initial_rope_deployed", true)
+
+	var attacker_pull_with_rope: Vector3 = attacker.call("_calculate_boarding_pull")
+	var defender_pull_with_rope: Vector3 = defender.call("_calculate_boarding_pull")
+	if attacker_pull_with_rope.length() <= 0.001:
+		failures.append("boarding attacker lost pull while a rope visual was active")
+	if defender_pull_with_rope.length() <= 0.001:
+		failures.append("boarding defender lost pull while a rope visual was active")
+
+	attacker.call("_clear_ropes")
+	attacker.set("_initial_rope_deployed", false)
+
+	var attacker_pull_after_clear: Vector3 = attacker.call("_calculate_boarding_pull")
+	var defender_pull_after_clear: Vector3 = defender.call("_calculate_boarding_pull")
+	if attacker_pull_after_clear.length() > 0.001:
+		failures.append("boarding attacker kept pulling after rope visuals were cleared")
+	if defender_pull_after_clear.length() > 0.001:
+		failures.append("boarding defender kept being pulled after rope visuals were cleared")
+
+	attacker.free()
+	defender.free()
+
+
+func _verify_rigging_field_repair_waits_then_recovers(failures: Array[String]) -> void:
+	var ship: Node = AttackerScript.new()
+	add_child(ship)
+	var hud := MockHud.new()
+	add_child(hud)
+	ship.set("_cached_hud", hud)
+	ship.set_meta("show_rigging_repair_feedback", true)
+	var mast := MockMast.new()
+	ship.add_child(mast)
+	var test_masts: Array[Node] = []
+	test_masts.append(mast)
+	ship.set("masts", test_masts)
+	ship.set("rigging_repair_delay", 2.0)
+	ship.set("rigging_repair_target_ratio", 0.65)
+	ship.set("sail_field_repair_rate", 1.0)
+	ship.set("rudder_field_repair_rate", 200.0)
+	ship.set("rudder_max_health", 100.0)
+	ship.set("rudder_health", 10.0)
+	mast.sail_damage = 0.9
+
+	ship.set("_rigging_repair_cooldown", 0.0)
+	ship.call("apply_rudder_damage", 20.0)
+	if float(ship.get("_rigging_repair_cooldown")) <= 0.0:
+		failures.append("rudder damage did not schedule rigging field repair")
+
+	ship.set("_rigging_repair_cooldown", 0.0)
+	mast.sail_damage = 0.0
+	ship.call("_apply_sail_damage_from_hit", 30.0, "cannon")
+	if mast.get_sail_damage() <= 0.0:
+		failures.append("sail damage fixture did not damage the mock mast")
+	if float(ship.get("_rigging_repair_cooldown")) <= 0.0:
+		failures.append("sail damage did not schedule rigging field repair")
+
+	ship.set("rudder_health", 10.0)
+	mast.sail_damage = 0.9
+	ship.call("_mark_rigging_damage_for_repair")
+	ship.call("_update_rigging_recovery", 1.0)
+	if not is_equal_approx(float(ship.get("rudder_health")), 10.0):
+		failures.append("rigging field repair started before its delay elapsed")
+	if not is_equal_approx(mast.get_sail_damage(), 0.9):
+		failures.append("sail field repair started before its delay elapsed")
+
+	ship.call("_update_rigging_recovery", 1.1)
+	ship.call("_update_rigging_recovery", 30.0)
+	if float(ship.get("rudder_health")) < 64.9:
+		failures.append("rudder field repair did not recover to emergency function")
+	if float(ship.get("rudder_health")) > 65.1:
+		failures.append("rudder field repair exceeded the emergency repair cap")
+	if mast.get_sail_damage() > 0.351:
+		failures.append("sail field repair did not recover to emergency function: %.3f" % mast.get_sail_damage())
+	if mast.get_sail_damage() < 0.349:
+		failures.append("sail field repair exceeded the emergency repair cap: %.3f" % mast.get_sail_damage())
+	if not hud.messages.has("응급 수리 중"):
+		failures.append("rigging field repair did not show active feedback")
+	if not hud.messages.has("응급 수리 완료"):
+		failures.append("rigging field repair did not show completion feedback")
+
+	ship.set("rudder_health", 10.0)
+	mast.sail_damage = 0.9
+	ship.set("is_burning", true)
+	ship.call("_update_rigging_recovery", 5.0)
+	if not is_equal_approx(float(ship.get("rudder_health")), 10.0) or not is_equal_approx(mast.get_sail_damage(), 0.9):
+		failures.append("rigging field repair ran while the ship was burning")
+
+	ship.free()
 
 
 func _build_side_contact_pair() -> Dictionary:

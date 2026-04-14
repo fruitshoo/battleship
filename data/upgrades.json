@@ -1,17 +1,37 @@
 {
 	"upgrades": {
 		"cannon": {
-			"name": "대포",
+			"name": "포문",
 			"category": 0,
-			"description": "대미지, 사거리, 장전 강화",
+			"description": "대포 수 증가. 지원함은 3문까지 공유",
 			"max_level": 5,
 			"color": "ff7f33",
 			"stats": {
-				"dmg_pct_per_lv": 20,
-				"range_pct_per_lv": 10,
-				"cd_pct_per_lv": 6,
-				"crit_pct_per_lv": 2.5,
-				"crit_multiplier": 1.5
+				"player_base_cannon_count": 3,
+				"player_extra_cannon_levels": [2, 3, 4, 5],
+				"support_base_cannon_count": 1,
+				"support_max_cannon_count": 3
+			}
+		},
+		"cannon_damage": {
+			"name": "화약",
+			"category": 0,
+			"description": "대포 데미지 강화",
+			"max_level": 5,
+			"color": "ff9b42",
+			"stats": {
+				"dmg_pct_per_lv": 8
+			}
+		},
+		"cannon_reload": {
+			"name": "장전",
+			"category": 0,
+			"description": "대포 재장전 강화",
+			"max_level": 5,
+			"color": "ffd166",
+			"stats": {
+				"cd_pct_per_lv": 4,
+				"min_cd_mult": 0.75
 			}
 		},
 		"janggun": {
@@ -245,17 +265,6 @@
 			"stats": {
 				"limit_add_level": 2,
 				"limit_add": 1
-			}
-		},
-		"fleet_cannon": {
-			"name": "지원함 대포",
-			"category": 5,
-			"description": "지원함 포격 강화",
-			"max_level": 5,
-			"color": "ff33e5",
-			"stats": {
-				"dmg_pct_per_lv": 20,
-				"cd_pct_per_lv": 6
 			}
 		},
 		"fleet_hull": {

@@ -141,6 +141,8 @@ static func update_boarding_state(ship, delta: float) -> void:
 	else:
 		ship.boarding_capture_progress = 0.0
 		ship._deck_overrun_announced = false
+		if ship_team == "player":
+			_finish_support_rescue_boarding_if_safe(ship)
 
 
 static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
@@ -161,6 +163,34 @@ static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
 static func _is_support_rescue_boarding_active(player_ship: Node) -> bool:
 	if not is_instance_valid(player_ship):
 		return false
+	return not _get_support_rescue_boarding_ships(player_ship).is_empty()
+
+
+static func _finish_support_rescue_boarding_if_safe(player_ship: Node) -> void:
+	var rescue_ships := _get_support_rescue_boarding_ships(player_ship)
+	if rescue_ships.is_empty():
+		return
+	for support_ship in rescue_ships:
+		support_ship.set_meta("boarding_transfer_suppressed", true)
+
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if not _is_support_rescue_boarder_on_player_ship(soldier, player_ship):
+			continue
+		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
+			continue
+		if soldier.has_method("_try_evacuate_to_home"):
+			soldier.call("_try_evacuate_to_home")
+
+	if _count_support_rescue_boarders_on_player_ship(player_ship) > 0:
+		return
+	for support_ship in rescue_ships:
+		_cancel_support_rescue_boarding(support_ship)
+
+
+static func _get_support_rescue_boarding_ships(player_ship: Node) -> Array[Node]:
+	var rescue_ships: Array[Node] = []
+	if not is_instance_valid(player_ship):
+		return rescue_ships
 	for support_ship in EntityRegistry.get_ships_by_team("player"):
 		if not is_instance_valid(support_ship) or support_ship == player_ship:
 			continue
@@ -172,8 +202,60 @@ static func _is_support_rescue_boarding_active(player_ship: Node) -> bool:
 			continue
 		if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
 			continue
-		return true
-	return false
+		rescue_ships.append(support_ship)
+	return rescue_ships
+
+
+static func _count_support_rescue_boarders_on_player_ship(player_ship: Node) -> int:
+	var count := 0
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if _is_support_rescue_boarder_on_player_ship(soldier, player_ship):
+			count += 1
+	return count
+
+
+static func _is_support_rescue_boarder_on_player_ship(soldier: Node, player_ship: Node) -> bool:
+	if not is_instance_valid(soldier) or not is_instance_valid(player_ship):
+		return false
+	if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		return false
+	var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+	if soldier_team != "player":
+		return false
+	var owned_ship: Variant = soldier.get("owned_ship") if soldier.get("owned_ship") != null else null
+	if owned_ship != player_ship:
+		return false
+	var home_ship: Variant = soldier.get("home_ship") if soldier.get("home_ship") != null else null
+	if not is_instance_valid(home_ship) or home_ship == player_ship:
+		return false
+	if not (home_ship is Node):
+		return false
+	var home_node := home_ship as Node
+	if home_node.get_meta("support_fleet_ship", false) != true:
+		return false
+	if home_node.get("is_sinking") == true or home_node.get("is_dying") == true:
+		return false
+	return true
+
+
+static func _cancel_support_rescue_boarding(support_ship: Node) -> void:
+	if not is_instance_valid(support_ship):
+		return
+	if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
+		return
+	if support_ship.has_method("_cancel_boarding"):
+		support_ship.call("_cancel_boarding")
+	else:
+		if support_ship.get("is_boarding") != null:
+			support_ship.set("is_boarding", false)
+		if support_ship.get("boarding_target") != null:
+			support_ship.set("boarding_target", null)
+	if support_ship.has_meta("boarding_purpose"):
+		support_ship.remove_meta("boarding_purpose")
+	if support_ship.has_meta("boarding_transfer_suppressed"):
+		support_ship.remove_meta("boarding_transfer_suppressed")
+	if support_ship.has_meta("support_debug_mode"):
+		support_ship.set_meta("support_debug_mode", "trail")
 
 
 static func _resolve_boarding_capture_tick(ship, ship_team: String, attacker_ship: Node) -> void:
@@ -216,6 +298,8 @@ static func update_burning_status(ship, delta: float) -> void:
 		for mast in ship.masts:
 			if is_instance_valid(mast) and mast.has_method("add_sail_damage"):
 				mast.add_sail_damage(delta * 0.04)
+				if ship.has_method("_mark_rigging_damage_for_repair"):
+					ship.call("_mark_rigging_damage_for_repair")
 		if ship.hull_hp <= 0:
 			ship.die()
 
@@ -236,3 +320,109 @@ static func update_hull_regeneration(ship, delta: float) -> void:
 
 	if ship.hull_hp < ship.max_hull_hp:
 		ship.hull_hp = move_toward(ship.hull_hp, ship.max_hull_hp, ship.hull_regen_rate * delta)
+
+
+static func mark_rigging_damage_for_repair(ship) -> void:
+	if ship == null or not ship.rigging_field_repair_enabled:
+		return
+	ship._rigging_repair_cooldown = maxf(ship._rigging_repair_cooldown, ship.rigging_repair_delay)
+	ship._rigging_repair_feedback_pending = true
+	ship._rigging_repair_active_feedback_shown = false
+	ship._rigging_repair_complete_feedback_shown = false
+
+
+static func update_rigging_recovery(ship, delta: float) -> void:
+	if ship == null or delta <= 0.0:
+		return
+	if not ship.rigging_field_repair_enabled:
+		return
+	if ship.is_sinking or ship.is_dying or ship.is_derelict:
+		return
+	if ship.is_burning or ship.deck_is_contested or ship.deck_is_overrun:
+		ship._rigging_repair_cooldown = maxf(ship._rigging_repair_cooldown, minf(ship.rigging_repair_delay, 2.0))
+		return
+	if not _has_repairable_rigging_damage(ship):
+		_show_rigging_repair_complete_feedback_if_needed(ship)
+		ship._rigging_repair_cooldown = 0.0
+		return
+	if ship._rigging_repair_cooldown > 0.0:
+		ship._rigging_repair_cooldown = maxf(0.0, ship._rigging_repair_cooldown - delta)
+		return
+	_show_rigging_repair_active_feedback_if_needed(ship)
+	_repair_rudder_to_field_target(ship, delta)
+	_repair_sails_to_field_target(ship, delta)
+	if not _has_repairable_rigging_damage(ship):
+		_show_rigging_repair_complete_feedback_if_needed(ship)
+
+
+static func _has_repairable_rigging_damage(ship) -> bool:
+	var target_ratio: float = clampf(float(ship.rigging_repair_target_ratio), 0.0, 1.0)
+	if ship.rudder_max_health > 0.0 and ship.rudder_health < ship.rudder_max_health * target_ratio - 0.001:
+		return true
+	var max_field_damage: float = 1.0 - target_ratio
+	for mast in ship.masts:
+		if not is_instance_valid(mast) or not mast.has_method("get_sail_damage"):
+			continue
+		if float(mast.call("get_sail_damage")) > max_field_damage + 0.001:
+			return true
+	return false
+
+
+static func _repair_rudder_to_field_target(ship, delta: float) -> void:
+	if ship.rudder_max_health <= 0.0 or ship.rudder_field_repair_rate <= 0.0:
+		return
+	var target_health: float = ship.rudder_max_health * clampf(float(ship.rigging_repair_target_ratio), 0.0, 1.0)
+	if ship.rudder_health >= target_health:
+		return
+	ship.rudder_health = minf(target_health, ship.rudder_health + ship.rudder_field_repair_rate * delta)
+	if ship.rudder_health > ship.rudder_max_health * ship.rudder_critical_threshold:
+		ship._rudder_critical_announced = false
+
+
+static func _repair_sails_to_field_target(ship, delta: float) -> void:
+	if ship.sail_field_repair_rate <= 0.0:
+		return
+	var max_field_damage: float = 1.0 - clampf(float(ship.rigging_repair_target_ratio), 0.0, 1.0)
+	for mast in ship.masts:
+		if not is_instance_valid(mast) or not mast.has_method("get_sail_damage") or not mast.has_method("repair_sail_damage"):
+			continue
+		var current_damage: float = float(mast.call("get_sail_damage"))
+		if current_damage <= max_field_damage:
+			continue
+		var repair_amount: float = minf(ship.sail_field_repair_rate * delta, current_damage - max_field_damage)
+		mast.call("repair_sail_damage", repair_amount)
+
+
+static func _show_rigging_repair_active_feedback_if_needed(ship) -> void:
+	if not ship._rigging_repair_feedback_pending or ship._rigging_repair_active_feedback_shown:
+		return
+	ship._rigging_repair_active_feedback_shown = true
+	_show_rigging_repair_feedback(ship, "응급 수리 중", 1.2)
+
+
+static func _show_rigging_repair_complete_feedback_if_needed(ship) -> void:
+	if not ship._rigging_repair_feedback_pending or ship._rigging_repair_complete_feedback_shown:
+		return
+	if not ship._rigging_repair_active_feedback_shown:
+		ship._rigging_repair_feedback_pending = false
+		return
+	ship._rigging_repair_complete_feedback_shown = true
+	ship._rigging_repair_feedback_pending = false
+	_show_rigging_repair_feedback(ship, "응급 수리 완료", 1.2)
+
+
+static func _show_rigging_repair_feedback(ship, message: String, duration: float) -> void:
+	if not _should_show_rigging_repair_feedback(ship):
+		return
+	if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
+		ship._cached_hud.show_message(message, duration)
+
+
+static func _should_show_rigging_repair_feedback(ship) -> bool:
+	if ship == null:
+		return false
+	if ship.get_meta("show_rigging_repair_feedback", false) == true:
+		return true
+	if ship.has_method("is_player_controlled_ship"):
+		return ship.call("is_player_controlled_ship") == true
+	return ship.get("is_player_controlled") == true if ship.get("is_player_controlled") != null else false

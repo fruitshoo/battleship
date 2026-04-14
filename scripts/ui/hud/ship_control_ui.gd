@@ -12,6 +12,9 @@ var ship: Node3D = null
 @onready var compass_wheel: Node2D = %CompassWheel
 @onready var compass_art: Node2D = %CompassWheel/Art
 @onready var compass_background: Panel = %CompassWheel/Background
+@onready var site_marker: Node2D = %SiteMarker
+@onready var site_marker_glow: Polygon2D = %SiteMarker/Glow
+@onready var site_marker_dot: Polygon2D = %SiteMarker/Dot
 @onready var north_label: Label = %CompassWheel/NorthLabel
 @onready var east_label: Label = %CompassWheel/EastLabel
 @onready var south_label: Label = %CompassWheel/SouthLabel
@@ -25,7 +28,17 @@ var ship: Node3D = null
 var _displayed_compass_rotation: float = 0.0
 var _displayed_arrow_rotation: float = 0.0
 var _displayed_arrow_scale: float = 1.0
+var _displayed_site_marker_position := Vector2.ZERO
+var _nearest_site: Node3D = null
+var _site_marker_refresh_left: float = 0.0
+var _site_marker_alpha: float = 0.0
 var _glow_phase: float = 0.0
+
+const SITE_MARKER_REFRESH_INTERVAL: float = 0.18
+const SITE_MARKER_INNER_RADIUS: float = 24.0
+const SITE_MARKER_OUTER_RADIUS: float = 64.0
+const SITE_MARKER_DISTANCE_AT_EDGE: float = 90.0
+const SITE_MARKER_FADE_SPEED: float = 5.5
 
 
 func _resolve_controlled_ship() -> void:
@@ -121,6 +134,10 @@ func _apply_theme() -> void:
 		arrow_glow.visible = false
 	if is_instance_valid(arrow_center_cap):
 		arrow_center_cap.color = cap_color
+	if is_instance_valid(site_marker_glow):
+		site_marker_glow.color = Color(0.24, 0.64, 1.0, 0.18)
+	if is_instance_valid(site_marker_dot):
+		site_marker_dot.color = Color(1.0, 0.88, 0.28, 0.96)
 
 func _update_wind_indicator(delta: float) -> void:
 	if not is_instance_valid(WindManager):
@@ -151,3 +168,75 @@ func _update_wind_indicator(delta: float) -> void:
 		var glow_color: Color = arrow_glow.color
 		glow_color.a = clampf(glow_alpha * 0.35, 0.02, 0.08)
 		arrow_glow.color = glow_color
+	_update_site_marker(delta)
+
+
+func _update_site_marker(delta: float) -> void:
+	if not is_instance_valid(site_marker) or not is_instance_valid(ship):
+		return
+
+	_site_marker_refresh_left -= delta
+	var previous_site := _nearest_site
+	if _site_marker_refresh_left <= 0.0 or not _is_valid_site_marker_target(_nearest_site):
+		_site_marker_refresh_left = SITE_MARKER_REFRESH_INTERVAL
+		_nearest_site = _find_nearest_site()
+
+	if not _is_valid_site_marker_target(_nearest_site):
+		_site_marker_alpha = move_toward(_site_marker_alpha, 0.0, delta * SITE_MARKER_FADE_SPEED)
+		site_marker.modulate = Color(1.0, 1.0, 1.0, _site_marker_alpha)
+		site_marker.visible = false
+		return
+
+	var offset := _nearest_site.global_position - ship.global_position
+	offset.y = 0.0
+	var distance := offset.length()
+	if distance <= 0.01:
+		site_marker.visible = false
+		return
+
+	var angle := atan2(offset.x, -offset.z)
+	var distance_ratio := clampf(distance / SITE_MARKER_DISTANCE_AT_EDGE, 0.0, 1.0)
+	var marker_radius := lerpf(SITE_MARKER_INNER_RADIUS, SITE_MARKER_OUTER_RADIUS, distance_ratio)
+	var target_position := Vector2(sin(angle), -cos(angle)) * marker_radius
+	if previous_site != _nearest_site or not site_marker.visible or _site_marker_alpha <= 0.01:
+		_displayed_site_marker_position = target_position
+		_site_marker_alpha = 0.0
+	else:
+		var follow_weight := minf(1.0, delta * 9.0)
+		_displayed_site_marker_position = _displayed_site_marker_position.lerp(target_position, follow_weight)
+	site_marker.position = _displayed_site_marker_position
+	_site_marker_alpha = move_toward(_site_marker_alpha, 1.0, delta * SITE_MARKER_FADE_SPEED)
+	site_marker.modulate = Color(1.0, 1.0, 1.0, _site_marker_alpha)
+	site_marker.visible = true
+
+	var pulse := 0.12 + sin(_glow_phase * 1.7) * 0.035
+	if is_instance_valid(site_marker_glow):
+		site_marker_glow.modulate = Color(1.0, 1.0, 1.0, clampf(pulse, 0.06, 0.18))
+	if is_instance_valid(site_marker_dot):
+		site_marker_dot.modulate = Color(1.0, 1.0, 1.0, lerpf(0.82, 1.0, 1.0 - distance_ratio))
+
+
+func _find_nearest_site() -> Node3D:
+	var closest_site: Node3D = null
+	var closest_distance_sq := INF
+	for candidate in get_tree().get_nodes_in_group("sea_site"):
+		var site := candidate as Node3D
+		if not _is_valid_site_marker_target(site):
+			continue
+		var offset := site.global_position - ship.global_position
+		offset.y = 0.0
+		var distance_sq := offset.length_squared()
+		if distance_sq < closest_distance_sq:
+			closest_distance_sq = distance_sq
+			closest_site = site
+	return closest_site
+
+
+func _is_valid_site_marker_target(site: Node) -> bool:
+	if not is_instance_valid(site) or not (site is Node3D):
+		return false
+	if site.is_queued_for_deletion():
+		return false
+	if site.get("is_collected") != null and site.get("is_collected") == true:
+		return false
+	return true

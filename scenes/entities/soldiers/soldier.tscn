@@ -1,6 +1,9 @@
 [gd_scene format=3 uid="uid://bykgjn3jeng2p"]
 
 [ext_resource type="Script" path="res://scripts/entities/soldiers/soldier.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/entities/soldiers/visuals/soldier_player_visual.tscn" id="2_player_visual"]
+[ext_resource type="PackedScene" path="res://scenes/entities/soldiers/visuals/soldier_enemy_visual.tscn" id="3_enemy_visual"]
+[ext_resource type="PackedScene" path="res://scenes/entities/soldiers/visuals/soldier_captain_visual.tscn" id="4_captain_visual"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
 radius = 0.2
@@ -15,8 +18,13 @@ height = 1.25
 
 [node name="Soldier" type="CharacterBody3D" unique_id=1637527619 groups=["soldiers"]]
 script = ExtResource("1")
+player_visual_scene = ExtResource("2_player_visual")
+enemy_visual_scene = ExtResource("3_enemy_visual")
+captain_visual_scene = ExtResource("4_captain_visual")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1387958528]
+[node name="VisualRoot" type="Node3D" parent="." unique_id=968324139]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="VisualRoot" unique_id=1387958528]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.625, 0)
 mesh = SubResource("CapsuleMesh_body")
 surface_material_override/0 = SubResource("Material_soldier")
@@ -24,5 +32,3 @@ surface_material_override/0 = SubResource("Material_soldier")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=539607817]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.625, 0)
 shape = SubResource("CapsuleShape_collision")
-
-

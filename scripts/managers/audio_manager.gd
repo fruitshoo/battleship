@@ -88,11 +88,22 @@ var sfx_streams = {
 const DEFAULT_3D_SFX_VOLUME_DB := 3.0
 const DEFAULT_3D_SFX_MAX_DISTANCE := 220.0
 const DEFAULT_3D_SFX_UNIT_SIZE := 55.0
+const GILGUNAK_VOLUME_DB := -4.0
 const SFX_ALIASES := {
 	"arrow_shoot": "bow_shoot",
 	"critical_hit": "soldier_hit",
 }
 const SFX_3D_PROFILES := {
+	"wave_splash": {
+		"volume_db": 2.0,
+		"max_distance": 260.0,
+		"unit_size": 75.0,
+	},
+	"oars_rowing": {
+		"volume_db": 2.0,
+		"max_distance": 240.0,
+		"unit_size": 70.0,
+	},
 	"bow_shoot": {
 		"volume_db": -1.0,
 		"max_distance": 220.0,
@@ -432,8 +443,8 @@ var _gilgunak_player: AudioStreamPlayer = null
 func _setup_gilgunak() -> void:
 	_gilgunak_player = AudioStreamPlayer.new()
 	_gilgunak_player.name = "GilgunakPlayer"
-	_gilgunak_player.bus = "Master" # 버스 안전을 위해 Master로 설정
-	_gilgunak_player.volume_db = 6.0
+	_gilgunak_player.bus = "SFX"
+	_gilgunak_player.volume_db = GILGUNAK_VOLUME_DB
 	
 	var stream = load("res://assets/audio/sfx/sfx_gilgunak.ogg") as AudioStream
 	if stream:

@@ -24,9 +24,6 @@ static func handle_input(ship, delta: float) -> void:
 		if ship.is_rowing:
 			ship.set_rowing(false)
 
-	if Input.is_key_pressed(KEY_F) and Engine.get_physics_frames() % 30 == 0:
-		toggle_fleet_formation(ship)
-
 static func toggle_fleet_formation(ship) -> void:
 	ship.CHASER_SHIP_SCRIPT.support_hold_formation = not bool(ship.CHASER_SHIP_SCRIPT.support_hold_formation)
 	if ship.CHASER_SHIP_SCRIPT.support_hold_formation:

@@ -1,0 +1,95 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/sea_sites/static_reward_site.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.57, 0.52, 0.32, 1)
+roughness = 0.86
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grass"]
+albedo_color = Color(0.17, 0.38, 0.18, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock"]
+albedo_color = Color(0.36, 0.38, 0.36, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
+albedo_color = Color(0.37, 0.22, 0.12, 1)
+roughness = 0.82
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_islet"]
+material = SubResource("StandardMaterial3D_ground")
+top_radius = 2.4
+bottom_radius = 2.9
+height = 0.52
+radial_segments = 18
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_grass"]
+material = SubResource("StandardMaterial3D_grass")
+top_radius = 1.72
+bottom_radius = 1.82
+height = 0.14
+radial_segments = 16
+
+[sub_resource type="SphereMesh" id="SphereMesh_rock"]
+material = SubResource("StandardMaterial3D_rock")
+radius = 0.58
+height = 0.68
+radial_segments = 10
+rings = 5
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_stump"]
+material = SubResource("StandardMaterial3D_wood")
+top_radius = 0.16
+bottom_radius = 0.22
+height = 0.9
+radial_segments = 8
+
+[sub_resource type="BoxMesh" id="BoxMesh_plank"]
+material = SubResource("StandardMaterial3D_wood")
+size = Vector3(1.2, 0.12, 0.26)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_interact"]
+radius = 10.5
+
+[node name="TinyIsletSite" type="Area3D"]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("1_script")
+site_label = "작은 섬"
+completed_label = "섬 탐색 완료"
+
+[node name="Visual" type="Node3D" parent="."]
+transform = Transform3D(1.45, 0, 0, 0, 1.45, 0, 0, 0, 1.45, 0, 0.46, 0)
+
+[node name="Ground" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1.35, 0, 0.22, 0, 1, 0, -0.22, 0, 0.95, 0, -0.28, 0)
+mesh = SubResource("CylinderMesh_islet")
+
+[node name="Grass" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1.18, 0, -0.1, 0, 1, 0, 0.1, 0, 0.72, -0.15, 0.04, 0.04)
+mesh = SubResource("CylinderMesh_grass")
+
+[node name="RockA" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.88, 0, 0.24, 0, 0.5, 0, -0.24, 0, 0.7, -1.42, 0.24, 0.4)
+mesh = SubResource("SphereMesh_rock")
+
+[node name="RockB" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.6, 0, -0.14, 0, 0.38, 0, 0.14, 0, 0.54, 1.25, 0.16, -0.7)
+mesh = SubResource("SphereMesh_rock")
+
+[node name="Stump" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.8, 0, 0.2, 0, 1, 0, -0.2, 0, 0.8, 0.45, 0.55, 0.32)
+mesh = SubResource("CylinderMesh_stump")
+
+[node name="WashedPlankA" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.906308, 0, -0.422618, 0, 1, 0, 0.422618, 0, 0.906308, -0.55, 0.26, -0.78)
+mesh = SubResource("BoxMesh_plank")
+
+[node name="WashedPlankB" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.422618, 0, 0.906308, 0, 1, 0, -0.906308, 0, 0.422618, -0.32, 0.32, -0.86)
+mesh = SubResource("BoxMesh_plank")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_interact")

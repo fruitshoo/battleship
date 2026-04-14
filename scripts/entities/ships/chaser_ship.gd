@@ -14,6 +14,9 @@ const DEFAULT_FIRE_POT_SCENE_PATH := "res://scenes/projectiles/fire_pot.tscn"
 const DEFER_INITIAL_CREW_SETUP_META := "defer_initial_crew_setup"
 const BOARDING_CONTACT_DEFENSE_RADIUS_MIN := 2.4
 const BOARDING_CONTACT_DEFENSE_RADIUS_MAX := 5.5
+const ENEMY_BOARDING_LATCH_DURATION_BONUS := 0.15
+const ENEMY_BOARDING_LATCH_DISTANCE_BONUS := 0.25
+const ENEMY_BOARDING_LATCH_SPEED_BONUS := 0.15
 
 ## 추적선 (Chaser Ship)
 ## 플레이어를 단순 추적하고, 충돌 시 병사를 도선(Boarding)시키고 자폭
@@ -670,6 +673,7 @@ func _process(delta: float) -> void:
 	_update_oar_visual(delta)
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
+	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
 	_update_enemy_fire_pot_logic(delta)
 	
@@ -973,10 +977,8 @@ func apply_fleet_weapon_upgrade(level: int) -> void:
 		if child.name.begins_with("FleetCannon_"):
 			cannons.append(child)
 	
-	# 레벨에 따라 활성화 (Lv1: 1문, Lv2: 2문, Lv3+: 3문)
-	var active_count = 1
-	if level >= 2: active_count = 2
-	if level >= 3: active_count = 3
+	# 플레이어 포문 업그레이드를 공유하되 지원함은 전방/양현 3문까지만 활성화한다.
+	var active_count: int = clampi(level, 1, 3)
 	
 	for i in range(cannons.size()):
 		var cannon = cannons[i]
@@ -989,7 +991,7 @@ func apply_fleet_weapon_upgrade(level: int) -> void:
 			cannon.set_process(false)
 			cannon.set_physics_process(false)
 	
-	print("[Fleet] 함대 무장 업그레이드 적용: Lv.%d (대포 %d문 활성화)" % [level, active_count])
+	print("[Fleet] 공유 포문 적용: Lv.%d (지원함 대포 %d문 활성화)" % [level, active_count])
 
 
 ## 함선 수리 (초요기/공적 보너스)
@@ -1291,7 +1293,7 @@ func _can_start_boarding_latched(target_ship: Node3D, dist_to_target: float, can
 
 	if not latch_mode.is_empty():
 		set_meta("boarding_latch_target_id", target_ship.get_instance_id())
-		set_meta("boarding_latch_timer", boarding_latch_duration)
+		set_meta("boarding_latch_timer", boarding_latch_duration + _get_enemy_boarding_latch_duration_bonus())
 		set_meta("boarding_latch_mode", latch_mode)
 		return true
 
@@ -1309,15 +1311,17 @@ func _is_relaxed_boarding_latch_contact(target_ship: Node3D, dist_to_target: flo
 	var target_contact_abs: float = absf(float(state.get("target_contact_dot", 1.0)))
 	var parallel_dot: float = float(state.get("parallel_dot", -1.0))
 	var closing_speed: float = float(state.get("closing_speed", 999.0))
+	var relative_speed_mult: float = boarding_latch_relative_speed_mult + _get_enemy_boarding_latch_speed_bonus()
 	return my_contact_abs <= 0.78 \
 		and target_contact_abs <= 0.88 \
 		and parallel_dot >= -0.28 \
-		and closing_speed <= boarding_max_relative_speed * boarding_latch_relative_speed_mult
+		and closing_speed <= boarding_max_relative_speed * relative_speed_mult
 
 
 func _get_boarding_latch_distance(target_ship: Node3D) -> float:
 	var collision_distance: float = get_collision_distance_to(target_ship) if is_instance_valid(target_ship) else max_boarding_distance
-	return maxf(max_boarding_distance + boarding_latch_distance_pad, collision_distance + 1.15)
+	var distance_bonus: float = _get_enemy_boarding_latch_distance_bonus()
+	return maxf(max_boarding_distance + boarding_latch_distance_pad + distance_bonus, collision_distance + 1.15 + distance_bonus)
 
 
 func _get_active_boarding_latch_mode(target_ship: Node3D) -> String:
@@ -1352,6 +1356,18 @@ func _clear_boarding_latch() -> void:
 		remove_meta("boarding_latch_timer")
 	if has_meta("boarding_latch_mode"):
 		remove_meta("boarding_latch_mode")
+
+
+func _get_enemy_boarding_latch_duration_bonus() -> float:
+	return ENEMY_BOARDING_LATCH_DURATION_BONUS if get_team_tag() == "enemy" else 0.0
+
+
+func _get_enemy_boarding_latch_distance_bonus() -> float:
+	return ENEMY_BOARDING_LATCH_DISTANCE_BONUS if get_team_tag() == "enemy" else 0.0
+
+
+func _get_enemy_boarding_latch_speed_bonus() -> float:
+	return ENEMY_BOARDING_LATCH_SPEED_BONUS if get_team_tag() == "enemy" else 0.0
 
 
 func _can_force_cleanup_boarding(target_ship: Node3D) -> bool:

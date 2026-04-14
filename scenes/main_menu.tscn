@@ -1,87 +1,25 @@
 [gd_scene format=3 uid="uid://b03iq8feraytu"]
 
-[ext_resource type="Script" path="res://scripts/ui/menus/main_menu.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://bv1ra5tstvtbq" path="res://scripts/ui/menus/main_menu.gd" id="1_script"]
 [ext_resource type="Texture2D" uid="uid://bxyt040k77j8j" path="res://assets/ui/menu/main_menu_background.png" id="2_bg"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_frame"]
-content_margin_left = 32.0
-content_margin_top = 28.0
-content_margin_right = 32.0
-content_margin_bottom = 28.0
-bg_color = Color(0.04, 0.09, 0.14, 0.28)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.78, 0.67, 0.39, 0.52)
-corner_radius_top_left = 22
-corner_radius_top_right = 22
-corner_radius_bottom_right = 22
-corner_radius_bottom_left = 22
+[sub_resource type="Shader" id="Shader_vignette"]
+code = "shader_type canvas_item;
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gold"]
-content_margin_left = 18.0
-content_margin_top = 14.0
-content_margin_right = 18.0
-content_margin_bottom = 14.0
-bg_color = Color(0.13, 0.12, 0.08, 0.72)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.8, 0.67, 0.33, 0.9)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
+uniform vec4 vignette_color : source_color = vec4(0.02, 0.04, 0.07, 0.18);
+uniform float inner_radius = 0.42;
+uniform float outer_radius = 0.72;
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
-content_margin_left = 20.0
-content_margin_top = 14.0
-content_margin_right = 20.0
-content_margin_bottom = 14.0
-bg_color = Color(0.12, 0.16, 0.2, 0.82)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.78, 0.67, 0.39, 0.7)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
+void fragment() {
+	float edge = smoothstep(inner_radius, outer_radius, distance(UV, vec2(0.5)));
+	COLOR = vec4(vignette_color.rgb, vignette_color.a * edge);
+}"
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
-content_margin_left = 20.0
-content_margin_top = 14.0
-content_margin_right = 20.0
-content_margin_bottom = 14.0
-bg_color = Color(0.1, 0.13, 0.17, 0.95)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.95, 0.84, 0.52, 0.95)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
-content_margin_left = 20.0
-content_margin_top = 14.0
-content_margin_right = 20.0
-content_margin_bottom = 14.0
-bg_color = Color(0.18, 0.24, 0.3, 0.9)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.91, 0.8, 0.48, 0.92)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = SubResource("Shader_vignette")
+shader_parameter/vignette_color = Color(0.02, 0.04, 0.07, 0.18)
+shader_parameter/inner_radius = 0.42
+shader_parameter/outer_radius = 0.72
 
 [node name="MainMenu" type="Control" unique_id=1717124113]
 layout_mode = 3
@@ -103,160 +41,118 @@ expand_mode = 1
 stretch_mode = 6
 
 [node name="Background" type="ColorRect" parent="." unique_id=641482294]
+material = SubResource("ShaderMaterial_vignette")
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(3.0637257e-05, 7.6319244e-05, 0.00017288172, 0.25882354)
+mouse_filter = 2
 
-[node name="Margin" type="MarginContainer" parent="." unique_id=427532768]
+[node name="TitleBlock" type="VBoxContainer" parent="." unique_id=398840718]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 48.0
-offset_top = 40.0
-offset_right = -48.0
-offset_bottom = -36.0
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -430.0
+offset_top = 68.0
+offset_right = 430.0
+offset_bottom = 220.0
 grow_horizontal = 2
-grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 1
 
-[node name="Frame" type="PanelContainer" parent="Margin" unique_id=1580894192]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_frame")
-
-[node name="Layout" type="HBoxContainer" parent="Margin/Frame" unique_id=28306966]
-layout_mode = 2
-theme_override_constants/separation = 30
-
-[node name="LeftColumn" type="VBoxContainer" parent="Margin/Frame/Layout" unique_id=398840718]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 20
-
-[node name="Eyebrow" type="Label" parent="Margin/Frame/Layout/LeftColumn" unique_id=1679661248]
+[node name="Eyebrow" type="Label" parent="TitleBlock" unique_id=1679661248]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.86, 0.77, 0.49, 1)
 theme_override_colors/font_shadow_color = Color(0.07, 0.1, 0.15, 0.85)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 16
 text = "조선 수군 로그라이트 해전"
+horizontal_alignment = 1
 
-[node name="Title" type="Label" parent="Margin/Frame/Layout/LeftColumn" unique_id=942562398]
+[node name="Title" type="Label" parent="TitleBlock" unique_id=942562398]
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.95, 0.97, 0.98, 1)
 theme_override_colors/font_shadow_color = Color(0.05, 0.08, 0.12, 0.85)
 theme_override_colors/font_outline_color = Color(0.08, 0.13, 0.18, 0.95)
-theme_override_constants/line_spacing = -10
 theme_override_constants/shadow_offset_x = 3
 theme_override_constants/shadow_offset_y = 4
 theme_override_constants/outline_size = 2
-theme_override_font_sizes/font_size = 62
+theme_override_font_sizes/font_size = 68
 text = "남해 서바이버즈"
+horizontal_alignment = 1
 
-[node name="Body" type="Label" parent="Margin/Frame/Layout/LeftColumn" unique_id=2114835836]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.76, 0.82, 0.88, 1)
-theme_override_font_sizes/font_size = 18
-text = "조선과 일본의 전선이 맞부딪히는 바다에서 함대를 지휘하십시오. 한 판의 성장과 항구의 영구 강화를 오가며 더 깊은 해전으로 나아갑니다."
-autowrap_mode = 3
+[node name="ButtonBlock" type="VBoxContainer" parent="." unique_id=1038452393]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.54
+anchor_right = 0.5
+anchor_bottom = 0.54
+offset_left = -150.0
+offset_right = 150.0
+offset_bottom = 246.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
 
-[node name="GoldPanel" type="PanelContainer" parent="Margin/Frame/Layout/LeftColumn" unique_id=928542068]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_gold")
-
-[node name="GoldLabel" type="Label" parent="Margin/Frame/Layout/LeftColumn/GoldPanel" unique_id=1883229221]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.87, 0.36, 1)
-theme_override_font_sizes/font_size = 22
-text = "보유 골드 0 G"
-
-[node name="Hint" type="Label" parent="Margin/Frame/Layout/LeftColumn" unique_id=2069431289]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 0.66, 0.76, 1)
-theme_override_font_sizes/font_size = 14
-text = "항구에서는 선체, 항해, 병사 성능을 영구 강화할 수 있습니다."
-autowrap_mode = 3
-
-[node name="RightColumn" type="VBoxContainer" parent="Margin/Frame/Layout" unique_id=1038452393]
-custom_minimum_size = Vector2(280, 0)
-layout_mode = 2
-theme_override_constants/separation = 18
-
-[node name="MenuTitle" type="Label" parent="Margin/Frame/Layout/RightColumn" unique_id=1602472603]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.9, 0.74, 1)
-theme_override_colors/font_shadow_color = Color(0.06, 0.08, 0.1, 0.75)
-theme_override_constants/shadow_offset_x = 2
-theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 24
-text = "메뉴"
-
-[node name="Buttons" type="VBoxContainer" parent="Margin/Frame/Layout/RightColumn" unique_id=1505930830]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 14
-
-[node name="StartButton" type="Button" parent="Margin/Frame/Layout/RightColumn/Buttons" unique_id=2034750384]
-custom_minimum_size = Vector2(0, 56)
+[node name="StartButton" type="Button" parent="ButtonBlock" unique_id=2034750384]
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.96, 0.94, 1)
 theme_override_colors/font_focus_color = Color(1, 0.97, 0.9, 1)
 theme_override_colors/font_pressed_color = Color(1, 0.96, 0.88, 1)
 theme_override_colors/font_hover_color = Color(1, 0.97, 0.9, 1)
-theme_override_font_sizes/font_size = 20
-theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-theme_override_styles/focus = SubResource("StyleBoxFlat_button_hover")
+theme_override_font_sizes/font_size = 18
 text = "항해 시작"
 
-[node name="MetaButton" type="Button" parent="Margin/Frame/Layout/RightColumn/Buttons" unique_id=1964063712]
-custom_minimum_size = Vector2(0, 56)
+[node name="MetaButton" type="Button" parent="ButtonBlock" unique_id=1964063712]
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.96, 0.94, 1)
 theme_override_colors/font_focus_color = Color(1, 0.97, 0.9, 1)
 theme_override_colors/font_pressed_color = Color(1, 0.96, 0.88, 1)
 theme_override_colors/font_hover_color = Color(1, 0.97, 0.9, 1)
-theme_override_font_sizes/font_size = 20
-theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-theme_override_styles/focus = SubResource("StyleBoxFlat_button_hover")
+theme_override_font_sizes/font_size = 18
 text = "영구 업그레이드"
 
-[node name="OptionsButton" type="Button" parent="Margin/Frame/Layout/RightColumn/Buttons" unique_id=683776601]
-custom_minimum_size = Vector2(0, 56)
+[node name="OptionsButton" type="Button" parent="ButtonBlock" unique_id=683776601]
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.96, 0.94, 1)
 theme_override_colors/font_focus_color = Color(1, 0.97, 0.9, 1)
 theme_override_colors/font_pressed_color = Color(1, 0.96, 0.88, 1)
 theme_override_colors/font_hover_color = Color(1, 0.97, 0.9, 1)
-theme_override_font_sizes/font_size = 20
-theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-theme_override_styles/focus = SubResource("StyleBoxFlat_button_hover")
+theme_override_font_sizes/font_size = 18
 text = "옵션"
 
-[node name="QuitButton" type="Button" parent="Margin/Frame/Layout/RightColumn/Buttons" unique_id=769592080]
-custom_minimum_size = Vector2(0, 56)
+[node name="QuitButton" type="Button" parent="ButtonBlock" unique_id=769592080]
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.96, 0.94, 1)
 theme_override_colors/font_focus_color = Color(1, 0.97, 0.9, 1)
 theme_override_colors/font_pressed_color = Color(1, 0.96, 0.88, 1)
 theme_override_colors/font_hover_color = Color(1, 0.97, 0.9, 1)
-theme_override_font_sizes/font_size = 20
-theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-theme_override_styles/focus = SubResource("StyleBoxFlat_button_hover")
+theme_override_font_sizes/font_size = 18
 text = "종료"
 
-[node name="Footer" type="Label" parent="Margin/Frame/Layout/RightColumn" unique_id=431636206]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.65, 0.73, 1)
+[node name="VersionLabel" type="Label" parent="." unique_id=1883229221]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -116.0
+offset_top = -34.0
+offset_right = -20.0
+offset_bottom = -12.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.86, 0.9, 0.92, 0.78)
+theme_override_colors/font_shadow_color = Color(0.02, 0.04, 0.06, 0.85)
+theme_override_constants/shadow_outline_size = 2
 theme_override_font_sizes/font_size = 13
-text = "항해 시작은 즉시 전투로 진입합니다. 영구 강화와 옵션은 여기서 정비할 수 있습니다."
-autowrap_mode = 3
+text = "v0.1.0"
+horizontal_alignment = 2

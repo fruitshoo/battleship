@@ -18,11 +18,12 @@ const RESCUE_CALL_LINES: Array[String] = [
 @export var float_speed: float = 1.5 # 둥실거리는 속도
 @export var float_height: float = 0.2 # 둥실거리는 진폭
 @export var rotation_speed: float = 0.5 # 회전 속도
-@export_range(0.0, 2.0, 0.05) var waterline_offset: float = 0.35
+@export_range(-0.5, 2.0, 0.05) var waterline_offset: float = -0.05
+@export_range(-0.5, 1.0, 0.05) var visual_waterline_offset: float = 0.22
 @export_range(0.2, 3.0, 0.05) var wave_tilt_strength: float = 0.7
 @export_range(0.5, 8.0, 0.1) var rescue_call_interval_min: float = 2.6
 @export_range(0.5, 10.0, 0.1) var rescue_call_interval_max: float = 5.2
-@export_range(0.4, 4.0, 0.1) var rescue_call_duration: float = 1.5
+@export_range(0.4, 4.0, 0.1) var rescue_call_duration: float = 2.0
 
 var target_player: Node3D = null
 var current_magnet_speed: float = 0.0
@@ -65,12 +66,12 @@ func pool_reset() -> void:
 	target_player = null
 	current_magnet_speed = 0.0
 	_player_search_timer = randf_range(0.0, player_search_interval)
-	_rescue_call_timer = randf_range(0.4, rescue_call_interval_max)
+	_rescue_call_timer = randf_range(0.2, 0.8)
 	_rescue_call_visible_timer = 0.0
 	_hide_rescue_call()
 	_float_phase = randf_range(0.0, TAU)
 	
-	base_y = maxf(global_position.y, waterline_offset)
+	base_y = global_position.y
 	
 	# 파란색 캡슐 이미지 설정 (병사 캐릭터와 동일하게)
 	if visual and visual is MeshInstance3D:
@@ -80,6 +81,7 @@ func pool_reset() -> void:
 		mat.emission = Color(0.2, 0.4, 0.8)
 		mat.emission_energy_multiplier = 0.5
 		visual.set_surface_override_material(0, mat)
+		visual.position.y = visual_waterline_offset
 		
 		# 초기 등장 페이드인 및 스케일 업
 		visual.scale = Vector3.ZERO
@@ -216,12 +218,12 @@ func _ensure_rescue_call_label() -> Label3D:
 		return _rescue_call_label
 	_rescue_call_label = Label3D.new()
 	_rescue_call_label.name = RESCUE_CALL_LABEL_NAME
-	_rescue_call_label.position = Vector3(0.0, 1.25, 0.0)
+	_rescue_call_label.position = Vector3(0.0, 2.15, 0.0)
 	_rescue_call_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_rescue_call_label.font_size = 24
-	_rescue_call_label.outline_size = 6
-	_rescue_call_label.modulate = Color(0.96, 1.0, 0.72, 0.0)
-	_rescue_call_label.extra_cull_margin = 8.0
+	_rescue_call_label.font_size = 84
+	_rescue_call_label.outline_size = 18
+	_rescue_call_label.modulate = Color(1.0, 0.96, 0.58, 0.0)
+	_rescue_call_label.extra_cull_margin = 24.0
 	_rescue_call_label.visible = false
 	add_child(_rescue_call_label)
 	return _rescue_call_label
@@ -240,8 +242,8 @@ func _update_rescue_call(delta: float) -> void:
 		var fade_out: float = clampf(_rescue_call_visible_timer / 0.35, 0.0, 1.0)
 		var alpha: float = minf(fade_in, fade_out)
 		label.visible = alpha > 0.03
-		label.modulate = Color(0.96, 1.0, 0.72, alpha)
-		label.position.y = 1.25 + (1.0 - alpha) * 0.12 + sin(time_alive * 3.1) * 0.025
+		label.modulate = Color(1.0, 0.96, 0.58, alpha)
+		label.position.y = 2.15 + (1.0 - alpha) * 0.16 + sin(time_alive * 3.1) * 0.035
 		return
 
 	_hide_rescue_call()
@@ -252,13 +254,13 @@ func _update_rescue_call(delta: float) -> void:
 	_rescue_call_visible_timer = rescue_call_duration
 	label.text = RESCUE_CALL_LINES.pick_random()
 	label.visible = true
-	label.modulate = Color(0.96, 1.0, 0.72, 0.0)
+	label.modulate = Color(1.0, 0.96, 0.58, 0.0)
 
 
 func _hide_rescue_call() -> void:
 	if is_instance_valid(_rescue_call_label):
 		_rescue_call_label.visible = false
-		_rescue_call_label.modulate = Color(0.96, 1.0, 0.72, 0.0)
+		_rescue_call_label.modulate = Color(1.0, 0.96, 0.58, 0.0)
 
 
 func _find_target_player() -> void:

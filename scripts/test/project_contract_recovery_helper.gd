@@ -3,6 +3,8 @@ class_name ProjectContractRecoveryHelper
 
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const SeaDecorSpawnerScript = preload("res://scripts/world/decor/sea_decor_spawner.gd")
+const SeaSiteSpawnerScript = preload("res://scripts/world/sea_sites/sea_site_spawner.gd")
 
 
 static func run_recovery_effect_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int) -> void:
@@ -35,6 +37,11 @@ static func run_recovery_effect_contract_smoke(owner: Node, failures: Array[Stri
 
 	await _run_floating_loot_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_survivor_smoke(owner, failures, smoke_root, player_ship)
+	await _run_drifting_supply_site_smoke(owner, failures, smoke_root, player_ship, level_manager)
+	await _run_static_reward_site_smoke(owner, failures, smoke_root, player_ship, level_manager)
+	await _run_static_sea_site_shape_contract(owner, failures, smoke_root)
+	await _run_sea_site_spawner_contract(owner, failures, smoke_root, player_ship)
+	await _run_sea_decor_contract(owner, failures, smoke_root, player_ship)
 	await _run_treasure_chest_smoke(owner, failures, smoke_root, player_ship)
 
 	smoke_root.queue_free()
@@ -133,6 +140,393 @@ static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smok
 		failures.append("recovery treasure smoke did not queue chest for deletion")
 
 
+static func _run_drifting_supply_site_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
+	var site_scene := load("res://scenes/world/sea_sites/drifting_supply_site.tscn") as PackedScene
+	if site_scene == null:
+		failures.append("recovery drifting supply site scene load failed")
+		return
+	var site := site_scene.instantiate()
+	if site == null:
+		failures.append("recovery drifting supply site instantiate failed")
+		return
+	smoke_root.add_child(site)
+	if site is Node3D:
+		(site as Node3D).global_position = player_ship.global_position + Vector3(2.5, 0.0, 0.0)
+	await _wait_frames(owner, 1)
+
+	if site.has_method("_collect"):
+		site.call("_collect", player_ship)
+	await _wait_frames(owner, 2)
+
+	if site.get("is_collected") != true:
+		failures.append("recovery drifting supply site did not mark collected")
+	var upgrade_ui: Variant = level_manager.get("_upgrade_ui_instance")
+	if not is_instance_valid(upgrade_ui):
+		failures.append("recovery drifting supply site did not open upgrade choices")
+	else:
+		upgrade_ui.queue_free()
+		level_manager.set("_upgrade_ui_instance", null)
+	owner.get_tree().paused = false
+
+
+static func _run_static_reward_site_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
+	var site_scene := load("res://scenes/world/sea_sites/reef_marker_site.tscn") as PackedScene
+	if site_scene == null:
+		failures.append("recovery static reward site scene load failed")
+		return
+	var site := site_scene.instantiate()
+	if site == null:
+		failures.append("recovery static reward site instantiate failed")
+		return
+	smoke_root.add_child(site)
+	if site is Node3D:
+		(site as Node3D).global_position = player_ship.global_position + Vector3(3.5, 0.0, 0.0)
+	await _wait_frames(owner, 1)
+
+	if site.has_method("_collect"):
+		site.call("_collect", player_ship)
+	await _wait_frames(owner, 2)
+
+	if site.get("is_collected") != true:
+		failures.append("recovery static reward site did not mark collected")
+	var upgrade_ui: Variant = level_manager.get("_upgrade_ui_instance")
+	if not is_instance_valid(upgrade_ui):
+		failures.append("recovery static reward site did not open upgrade choices")
+	else:
+		upgrade_ui.queue_free()
+		level_manager.set("_upgrade_ui_instance", null)
+	if site.is_queued_for_deletion():
+		failures.append("recovery static reward site queued for deletion after reward")
+	site.queue_free()
+	owner.get_tree().paused = false
+
+
+static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[String], smoke_root: Node) -> void:
+	var checks := [
+		{
+			"path": "res://scenes/world/sea_sites/reef_marker_site.tscn",
+			"label": "reef marker site",
+			"min_scale": 1.25,
+			"min_visual_y": 0.24,
+			"min_radius": 9.0,
+			"min_world_width": 3.8,
+			"min_top_y": 2.5,
+			"min_bottom_y": -0.3,
+		},
+		{
+			"path": "res://scenes/world/sea_sites/tiny_islet_site.tscn",
+			"label": "tiny islet site",
+			"min_scale": 1.35,
+			"min_visual_y": 0.36,
+			"min_radius": 10.0,
+			"min_world_width": 7.0,
+			"min_top_y": 1.0,
+			"min_bottom_y": -0.3,
+		},
+		{
+			"path": "res://scenes/world/sea_sites/temporary_outpost_site.tscn",
+			"label": "temporary outpost site",
+			"min_scale": 1.25,
+			"min_visual_y": 0.18,
+			"min_radius": 9.5,
+			"min_world_width": 4.5,
+			"min_top_y": 3.0,
+			"min_bottom_y": -0.3,
+		},
+	]
+
+	for check in checks:
+		await _run_single_static_sea_site_shape_check(owner, failures, smoke_root, check)
+
+
+static func _run_single_static_sea_site_shape_check(owner: Node, failures: Array[String], smoke_root: Node, check: Dictionary) -> void:
+	var site_path := str(check.get("path", ""))
+	var label := str(check.get("label", site_path))
+	var site_scene := load(site_path) as PackedScene
+	if site_scene == null:
+		failures.append("recovery %s load failed" % label)
+		return
+	var site := site_scene.instantiate() as Node3D
+	if site == null:
+		failures.append("recovery %s instantiate failed" % label)
+		return
+	smoke_root.add_child(site)
+	await _wait_frames(owner, 1)
+
+	var visual := site.get_node_or_null("Visual") as Node3D
+	if not is_instance_valid(visual):
+		failures.append("recovery %s missing Visual node" % label)
+	else:
+		var visual_scale := visual.scale
+		var smallest_axis := minf(visual_scale.x, minf(visual_scale.y, visual_scale.z))
+		if smallest_axis < float(check.get("min_scale", 1.0)):
+			failures.append("recovery %s visual scale too small: %.2f" % [label, smallest_axis])
+		if visual.position.y < float(check.get("min_visual_y", 0.0)):
+			failures.append("recovery %s visual is too low: %.2f" % [label, visual.position.y])
+		var bounds := _compute_mesh_tree_aabb(visual)
+		if bounds.size == Vector3.ZERO:
+			failures.append("recovery %s has no visible mesh bounds" % label)
+		else:
+			var horizontal_width := maxf(bounds.size.x, bounds.size.z)
+			if horizontal_width < float(check.get("min_world_width", 0.0)):
+				failures.append("recovery %s visual bounds too narrow: %.2f" % [label, horizontal_width])
+			if bounds.end.y < float(check.get("min_top_y", 0.0)):
+				failures.append("recovery %s visual top is too low: %.2f" % [label, bounds.end.y])
+			if bounds.position.y < float(check.get("min_bottom_y", -INF)):
+				failures.append("recovery %s visual bottom is too submerged: %.2f" % [label, bounds.position.y])
+
+	var collision := site.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if not is_instance_valid(collision):
+		failures.append("recovery %s missing CollisionShape3D" % label)
+	elif collision.shape is SphereShape3D:
+		var sphere := collision.shape as SphereShape3D
+		if sphere.radius < float(check.get("min_radius", 0.0)):
+			failures.append("recovery %s interaction radius too small: %.2f" % [label, sphere.radius])
+	else:
+		failures.append("recovery %s interaction shape is not a sphere" % label)
+
+	if not site.is_in_group("sea_site"):
+		failures.append("recovery %s missing sea_site group" % label)
+	if not site.is_in_group("static_reward_site"):
+		failures.append("recovery %s missing static_reward_site group" % label)
+	if site.get("is_collected") != null and site.get("is_collected") == true:
+		failures.append("recovery %s should start uncollected" % label)
+
+	site.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _compute_mesh_tree_aabb(root: Node3D) -> AABB:
+	var found_any := false
+	var combined := AABB()
+	for child in _collect_mesh_instances(root):
+		if not is_instance_valid(child.mesh):
+			continue
+		var child_aabb := child.mesh.get_aabb()
+		for local_corner in _aabb_corners(child_aabb):
+			var root_space_point := root.to_local(child.to_global(local_corner))
+			if not found_any:
+				combined = AABB(root_space_point, Vector3.ZERO)
+				found_any = true
+			else:
+				combined = combined.expand(root_space_point)
+	return combined if found_any else AABB()
+
+
+static func _collect_mesh_instances(root: Node) -> Array[MeshInstance3D]:
+	var meshes: Array[MeshInstance3D] = []
+	if root is MeshInstance3D:
+		meshes.append(root as MeshInstance3D)
+	for child in root.get_children():
+		meshes.append_array(_collect_mesh_instances(child))
+	return meshes
+
+
+static func _has_collision_shape(root: Node) -> bool:
+	if root is CollisionShape3D:
+		return true
+	for child in root.get_children():
+		if _has_collision_shape(child):
+			return true
+	return false
+
+
+static func _has_shader_material(root: Node) -> bool:
+	if root is MeshInstance3D:
+		var mesh_instance := root as MeshInstance3D
+		if mesh_instance.material_override is ShaderMaterial:
+			return true
+		if mesh_instance.mesh != null:
+			var material := mesh_instance.mesh.surface_get_material(0)
+			if material is ShaderMaterial:
+				return true
+	for child in root.get_children():
+		if _has_shader_material(child):
+			return true
+	return false
+
+
+static func _get_first_instance_shader_float(root: Node, parameter_name: String) -> float:
+	if root is MeshInstance3D:
+		var mesh_instance := root as MeshInstance3D
+		var value: Variant = mesh_instance.get_instance_shader_parameter(parameter_name)
+		if value != null:
+			return float(value)
+	for child in root.get_children():
+		var child_value := _get_first_instance_shader_float(child, parameter_name)
+		if child_value >= 0.0:
+			return child_value
+	return -1.0
+
+
+static func _shader_source_contains_any(shader_path: String, tokens: Array[String]) -> bool:
+	var source := FileAccess.get_file_as_string(shader_path)
+	if source.is_empty():
+		return false
+	for token in tokens:
+		if source.contains(token):
+			return true
+	return false
+
+
+static func _aabb_corners(aabb: AABB) -> Array[Vector3]:
+	var p := aabb.position
+	var s := aabb.size
+	return [
+		p,
+		p + Vector3(s.x, 0.0, 0.0),
+		p + Vector3(0.0, s.y, 0.0),
+		p + Vector3(0.0, 0.0, s.z),
+		p + Vector3(s.x, s.y, 0.0),
+		p + Vector3(s.x, 0.0, s.z),
+		p + Vector3(0.0, s.y, s.z),
+		p + s,
+	]
+
+
+static func _run_sea_site_spawner_contract(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+	var spawner := Node.new()
+	spawner.name = "SeaSiteSpawnerSmoke"
+	spawner.set_script(SeaSiteSpawnerScript)
+	spawner.set("enabled", false)
+	spawner.set("_player", player_ship)
+	smoke_root.add_child(spawner)
+	await _wait_frames(owner, 1)
+
+	if not spawner.has_method("debug_spawn_site"):
+		failures.append("recovery sea site spawner missing debug_spawn_site")
+		spawner.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	if not spawner.has_method("_is_spawn_direction_wind_friendly"):
+		failures.append("recovery sea site spawner missing wind-friendly spawn policy")
+	else:
+		spawner.set("wind_spawn_bias_enabled", true)
+		spawner.set("min_spawn_wind_alignment", -0.35)
+		spawner.set("wind_bias_relax_attempts", 10)
+		if bool(spawner.call("_is_spawn_direction_wind_friendly", Vector3(0.0, 0.0, 1.0), Vector3(0.0, 0.0, -1.0), 0)):
+			failures.append("recovery sea site spawner allowed a direct headwind site before relax")
+		if not bool(spawner.call("_is_spawn_direction_wind_friendly", Vector3(1.0, 0.0, 0.0), Vector3(0.0, 0.0, -1.0), 0)):
+			failures.append("recovery sea site spawner rejected a crosswind site")
+		if not bool(spawner.call("_is_spawn_direction_wind_friendly", Vector3(0.0, 0.0, 1.0), Vector3(0.0, 0.0, -1.0), 10)):
+			failures.append("recovery sea site spawner did not relax headwind bias after fallback attempts")
+
+	var site := spawner.call("debug_spawn_site", 32.0, 0.0) as Node3D
+	await _wait_frames(owner, 1)
+	if not is_instance_valid(site):
+		failures.append("recovery sea site spawner debug spawn failed")
+	else:
+		if not site.is_in_group("sea_site"):
+			failures.append("recovery sea site spawner spawned node missing sea_site group")
+		if not site.is_in_group("static_reward_site"):
+			failures.append("recovery sea site spawner did not spawn a static reward site by default")
+		if site.is_in_group("drifting_supply_site"):
+			failures.append("recovery sea site spawner default spawned drifting supply site")
+		if absf(site.global_position.y) > 0.05:
+			failures.append("recovery sea site spawner spawned site off waterline: %.2f" % site.global_position.y)
+		site.queue_free()
+
+	spawner.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_sea_decor_contract(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+	var decor_scene := load("res://scenes/world/decor/sea_rock_cluster.tscn") as PackedScene
+	if decor_scene == null:
+		failures.append("recovery sea rock decor scene load failed")
+		return
+	var decor := decor_scene.instantiate() as Node3D
+	if decor == null:
+		failures.append("recovery sea rock decor instantiate failed")
+		return
+	smoke_root.add_child(decor)
+	await _wait_frames(owner, 1)
+
+	if not decor.is_in_group("sea_decor"):
+		failures.append("recovery sea rock decor missing sea_decor group")
+	if not decor.is_in_group("sea_rock_decor"):
+		failures.append("recovery sea rock decor missing sea_rock_decor group")
+	if decor.is_in_group("sea_site"):
+		failures.append("recovery sea rock decor should not be a sea_site")
+	if decor.is_in_group("static_reward_site"):
+		failures.append("recovery sea rock decor should not be a reward site")
+	if _has_collision_shape(decor):
+		failures.append("recovery sea rock decor should not add collision")
+	if not decor.has_method("set_rock_view_fade_alpha"):
+		failures.append("recovery sea rock decor missing view fade hook")
+	var visual := decor.get_node_or_null("Visual") as Node3D
+	if not is_instance_valid(visual):
+		failures.append("recovery sea rock decor missing Visual node")
+	else:
+		if not _has_shader_material(visual):
+			failures.append("recovery sea rock decor missing procedural shader material")
+		if _shader_source_contains_any("res://assets/shaders/sea_rock_procedural.gdshader", ["edge_", "crack_", "voronoi", "strata", "blend_mix", "view_fade_alpha", "ALPHA"]):
+			failures.append("recovery sea rock shader restored removed edge/crack/stripe/transparent pattern")
+		if decor.has_method("set_rock_view_fade_alpha"):
+			decor.call("set_rock_view_fade_alpha", 0.0)
+		var bounds := _compute_mesh_tree_aabb(visual)
+		if bounds.size == Vector3.ZERO:
+			failures.append("recovery sea rock decor has no visible mesh bounds")
+		else:
+			var horizontal_width := maxf(bounds.size.x, bounds.size.z)
+			if horizontal_width < 3.0:
+				failures.append("recovery sea rock decor visual bounds too narrow: %.2f" % horizontal_width)
+			if bounds.end.y < 1.2:
+				failures.append("recovery sea rock decor visual top is too low: %.2f" % bounds.end.y)
+			if bounds.position.y > 0.15:
+				failures.append("recovery sea rock decor is not waterline-submerged enough: %.2f" % bounds.position.y)
+			if bounds.position.y > -0.8:
+				failures.append("recovery sea rock decor underwater depth is too shallow: %.2f" % bounds.position.y)
+	decor.queue_free()
+
+	var spawner := Node.new()
+	spawner.name = "SeaDecorSpawnerSmoke"
+	spawner.set_script(SeaDecorSpawnerScript)
+	spawner.set("enabled", false)
+	spawner.set("_player", player_ship)
+	smoke_root.add_child(spawner)
+	await _wait_frames(owner, 1)
+
+	if float(spawner.get("despawn_distance")) < 300.0:
+		failures.append("recovery sea decor spawner despawn distance too short: %.2f" % float(spawner.get("despawn_distance")))
+
+	if not spawner.has_method("debug_spawn_decor"):
+		failures.append("recovery sea decor spawner missing debug_spawn_decor")
+	else:
+		var contact_decor := spawner.call("debug_spawn_decor", 0.0, 0.0) as Node3D
+		await _wait_frames(owner, 1)
+		if not is_instance_valid(contact_decor):
+			failures.append("recovery sea decor contact spawn failed")
+		else:
+			if contact_decor is Area3D:
+				failures.append("recovery sea rock decor should not be collectible Area3D")
+			if contact_decor.get("is_collected") != null:
+				failures.append("recovery sea rock decor should not expose collectible state")
+			if spawner.has_method("_cleanup_active_decor"):
+				spawner.call("_cleanup_active_decor")
+				await _wait_frames(owner, 2)
+				if not is_instance_valid(contact_decor) or contact_decor.is_queued_for_deletion():
+					failures.append("recovery sea rock decor was removed while touching player")
+			if is_instance_valid(contact_decor):
+				contact_decor.queue_free()
+
+		var spawned_decor := spawner.call("debug_spawn_decor", 36.0, 0.0) as Node3D
+		await _wait_frames(owner, 1)
+		if not is_instance_valid(spawned_decor):
+			failures.append("recovery sea decor spawner debug spawn failed")
+		else:
+			if not spawned_decor.is_in_group("sea_decor"):
+				failures.append("recovery sea decor spawner spawned node missing sea_decor group")
+			if spawned_decor.is_in_group("sea_site"):
+				failures.append("recovery sea decor spawner spawned decor as sea_site")
+			if absf(spawned_decor.global_position.y) > 0.05:
+				failures.append("recovery sea decor spawner spawned decor off waterline: %.2f" % spawned_decor.global_position.y)
+			spawned_decor.queue_free()
+
+	spawner.queue_free()
+	await _wait_frames(owner, 1)
+
+
 static func _run_survivor_full_crew_still_joins_roster(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
 	var survivor_scene := load("res://scenes/effects/survivor.tscn") as PackedScene
 	if survivor_scene == null:
@@ -168,6 +562,25 @@ static func _run_survivor_full_crew_still_joins_roster(owner: Node, failures: Ar
 		failures.append("recovery survivor full crew did not collect despite ignoring roster limit")
 	if alive_after <= alive_before:
 		failures.append("recovery survivor full crew did not add crew beyond roster limit")
+	await _run_survivor_overcap_does_not_expand_respawn_target(owner, failures, player_ship)
+
+
+static func _run_survivor_overcap_does_not_expand_respawn_target(owner: Node, failures: Array[String], player_ship: Node3D) -> void:
+	if not player_ship.has_method("add_respawn_crew") or not player_ship.has_method("get_debug_crew_snapshot"):
+		return
+	var alive_before: int = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	if alive_before <= 1 or player_ship.get("max_crew_count") == null:
+		return
+	var original_max_crew_count = player_ship.get("max_crew_count")
+	player_ship.set("max_crew_count", alive_before - 1)
+	var added: bool = bool(player_ship.call("add_respawn_crew"))
+	await _wait_frames(owner, 2)
+	var alive_after: int = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	player_ship.set("max_crew_count", original_max_crew_count)
+	if added:
+		failures.append("recovery respawn added crew while survivor overcap roster was still above max")
+	if alive_after != alive_before:
+		failures.append("recovery respawn changed crew count while survivor overcap roster was still above max")
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:

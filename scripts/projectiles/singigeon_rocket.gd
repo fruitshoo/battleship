@@ -101,6 +101,9 @@ func pool_reset() -> void:
 	if is_instance_valid(trail):
 		var enable_trail = VfxBudget.allow_spawn(get_tree(), "rocket_trail", global_position, 8, 75.0)
 		trail.emitting = enable_trail
+
+func restart_flight() -> void:
+	pool_reset()
 	
 	# 발사 사운드 재생 (01, 02, 03 무작위 선택)
 	var audio_manager = get_node_or_null("/root/AudioManager")

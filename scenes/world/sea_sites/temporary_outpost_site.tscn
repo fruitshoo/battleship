@@ -1,0 +1,93 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/sea_sites/static_reward_site.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dh3bmbsqdseax" path="res://assets/models/props/barrel/barrel.glb" id="2_barrel"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_plank"]
+albedo_color = Color(0.39, 0.24, 0.13, 1)
+roughness = 0.84
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pole"]
+albedo_color = Color(0.54, 0.5, 0.42, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_canvas"]
+albedo_color = Color(0.84, 0.78, 0.58, 1)
+roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flag"]
+albedo_color = Color(0.1, 0.24, 0.32, 1)
+roughness = 0.68
+
+[sub_resource type="BoxMesh" id="BoxMesh_long_plank"]
+material = SubResource("StandardMaterial3D_plank")
+size = Vector3(3.2, 0.13, 0.36)
+
+[sub_resource type="BoxMesh" id="BoxMesh_short_plank"]
+material = SubResource("StandardMaterial3D_plank")
+size = Vector3(1.55, 0.12, 0.32)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pole"]
+material = SubResource("StandardMaterial3D_pole")
+top_radius = 0.08
+bottom_radius = 0.1
+height = 2.4
+radial_segments = 8
+
+[sub_resource type="BoxMesh" id="BoxMesh_canvas"]
+material = SubResource("StandardMaterial3D_canvas")
+size = Vector3(1.45, 0.75, 0.05)
+
+[sub_resource type="BoxMesh" id="BoxMesh_flag"]
+material = SubResource("StandardMaterial3D_flag")
+size = Vector3(0.78, 0.36, 0.04)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_interact"]
+radius = 10.0
+
+[node name="TemporaryOutpostSite" type="Area3D"]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("1_script")
+site_label = "임시 거점"
+completed_label = "거점 조사 완료"
+
+[node name="Visual" type="Node3D" parent="."]
+transform = Transform3D(1.35, 0, 0, 0, 1.35, 0, 0, 0, 1.35, 0, 0.24, 0)
+
+[node name="PlankA" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0.12, -0.45)
+mesh = SubResource("BoxMesh_long_plank")
+
+[node name="PlankB" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.965926, 0, 0.258819, 0, 1, 0, -0.258819, 0, 0.965926, 0.25, 0.16, 0.05)
+mesh = SubResource("BoxMesh_long_plank")
+
+[node name="PlankC" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.0871557, 0, 0.996195, 0, 1, 0, -0.996195, 0, 0.0871557, -0.72, 0.22, 0.28)
+mesh = SubResource("BoxMesh_short_plank")
+
+[node name="PlankD" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, 0.173648, 0.78, 0.2, -0.12)
+mesh = SubResource("BoxMesh_short_plank")
+
+[node name="BarrelA" parent="Visual" instance=ExtResource("2_barrel")]
+transform = Transform3D(0.52, 0, 0, 0, 0.52, 0, 0, 0, 0.52, -0.9, 0.46, -0.22)
+
+[node name="BarrelB" parent="Visual" instance=ExtResource("2_barrel")]
+transform = Transform3D(0.42, 0, 0, 0, 0.42, 0, 0, 0, 0.42, 0.85, 0.42, 0.44)
+
+[node name="SignalPole" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.08, 1.05, 0.12)
+mesh = SubResource("CylinderMesh_pole")
+
+[node name="Canvas" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 0.573576, 0.819152, 0, -0.819152, 0.573576, -0.48, 1.45, 0.12)
+mesh = SubResource("BoxMesh_canvas")
+
+[node name="SmallFlag" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 0.939693, 0.34202, 0, -0.34202, 0.939693, 0.52, 2.15, 0.12)
+mesh = SubResource("BoxMesh_flag")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_interact")

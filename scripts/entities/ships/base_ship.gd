@@ -14,6 +14,8 @@ const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.g
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
 const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35
+const DAMAGE_ROCK_FORWARD_MULT := 1.6
+const DAMAGE_ROCK_BACK_MULT := 1.1
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -43,6 +45,17 @@ const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35
 var rudder_health: float = 100.0
 @export_range(0.1, 0.9, 0.05) var rudder_critical_threshold: float = 0.35
 var _rudder_critical_announced: bool = false
+
+@export_group("Field Repair")
+@export var rigging_field_repair_enabled: bool = true
+@export_range(0.0, 60.0, 0.5) var rigging_repair_delay: float = 10.0
+@export_range(0.2, 1.0, 0.05) var rigging_repair_target_ratio: float = 0.65
+@export_range(0.0, 0.25, 0.005) var sail_field_repair_rate: float = 0.035
+@export_range(0.0, 20.0, 0.25) var rudder_field_repair_rate: float = 4.0
+var _rigging_repair_cooldown: float = 0.0
+var _rigging_repair_feedback_pending: bool = false
+var _rigging_repair_active_feedback_shown: bool = false
+var _rigging_repair_complete_feedback_shown: bool = false
 
 @export var bobbing_amplitude: float = 0.3
 @export var bobbing_speed: float = 1.0
@@ -509,7 +522,13 @@ func get_boarding_target_ship() -> Node3D:
 	return boarding_target if is_instance_valid(boarding_target) else null
 
 func has_boarding_rope_link_to(other_ship: Node3D) -> bool:
-	return is_boarding and is_instance_valid(other_ship) and get_boarding_target_ship() == other_ship and _initial_rope_deployed
+	return is_boarding and is_instance_valid(other_ship) and get_boarding_target_ship() == other_ship and _initial_rope_deployed and has_active_boarding_rope_visual()
+
+func has_active_boarding_rope_visual() -> bool:
+	for rope in rope_instances:
+		if is_instance_valid(rope):
+			return true
+	return false
 
 func is_player_controlled_ship() -> bool:
 	if not ("is_player_controlled" in self):
@@ -799,8 +818,12 @@ func get_hostile_boarder_count() -> int:
 func _calculate_boarding_pull() -> Vector3:
 	var target_node = null
 	if is_boarding and is_instance_valid(boarding_target):
+		if not has_boarding_rope_link_to(boarding_target):
+			return Vector3.ZERO
 		target_node = boarding_target
 	elif is_instance_valid(boarding_attacker):
+		if not _has_incoming_boarding_rope_link(boarding_attacker):
+			return Vector3.ZERO
 		target_node = boarding_attacker
 		
 	if not target_node:
@@ -813,7 +836,8 @@ func _calculate_boarding_pull() -> Vector3:
 	
 	# 1. 스프링 힘 (F = k * x) — 가속도(m/s²) 단위
 	var rest_length = 8.5
-	var spring_k = 2.7
+	var enemy_boarding_pull_mult: float = _get_enemy_boarding_pull_multiplier(target_node)
+	var spring_k = 2.7 * enemy_boarding_pull_mult
 	var stretch = dist - rest_length
 	
 	# 거리가 rest_length보다 작으면(겹치려 하면) 밀어내는 반발력(Repulsion) 발생
@@ -854,16 +878,50 @@ func _calculate_boarding_pull() -> Vector3:
 	
 	# 멀어질 때만 저항 (가속도 단위)
 	if rel_vel_on_rope > 0:
-		var damping_c = 2.0
+		var damping_c = 2.0 * enemy_boarding_pull_mult
 		final_damping_force = dir * (rel_vel_on_rope * damping_c)
 	
 	# 3. 최종 힘 계산 및 제한 (가속도 상한)
 	var final_pull = spring_force + propulsion_force + final_damping_force
-	var max_pull_accel = 11.0
+	var max_pull_accel = 11.0 * enemy_boarding_pull_mult
 	if final_pull.length() > max_pull_accel:
 		final_pull = final_pull.normalized() * max_pull_accel
 		
 	return final_pull
+
+
+func _get_enemy_boarding_pull_multiplier(target_node: Node) -> float:
+	var attacker_node: Node = null
+	if is_boarding:
+		attacker_node = self
+	elif is_instance_valid(boarding_attacker) and target_node == boarding_attacker:
+		attacker_node = boarding_attacker
+	if is_instance_valid(attacker_node) and attacker_node.has_method("get_team_tag") and attacker_node.call("get_team_tag") == "enemy":
+		return 1.08
+	return 1.0
+
+func _has_incoming_boarding_rope_link(attacker_node: Node) -> bool:
+	if not is_instance_valid(attacker_node):
+		return false
+	if attacker_node.has_method("has_boarding_rope_link_to"):
+		return attacker_node.call("has_boarding_rope_link_to", self) == true
+	if attacker_node.get("is_boarding") != true:
+		return false
+	if attacker_node.has_method("get_boarding_target_ship"):
+		if attacker_node.call("get_boarding_target_ship") != self:
+			return false
+	elif attacker_node.get("boarding_target") != self:
+		return false
+	if attacker_node.get("_initial_rope_deployed") != true:
+		return false
+	var ropes_variant: Variant = attacker_node.get("rope_instances")
+	if ropes_variant is Array:
+		var ropes: Array = ropes_variant
+		for rope in ropes:
+			if is_instance_valid(rope):
+				return true
+		return false
+	return true
 
 ## 밧줄 연결 전/후로 배끼리 겹치는(통과하는) 것을 막아주는 강한 물리 반발력
 func _calculate_collision_repulsion() -> Vector3:
@@ -1001,7 +1059,12 @@ func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> 
 		return
 	var chosen_index: int = randi() % intact_masts.size()
 	var chosen_mast: Node = intact_masts[chosen_index]
+	var previous_damage: float = 0.0
+	if chosen_mast.has_method("get_sail_damage"):
+		previous_damage = float(chosen_mast.call("get_sail_damage"))
 	chosen_mast.call("add_sail_damage", sail_damage_delta)
+	if chosen_mast.has_method("get_sail_damage") and float(chosen_mast.call("get_sail_damage")) > previous_damage + 0.001:
+		_mark_rigging_damage_for_repair()
 
 
 func update_crew_allocation_state(delta: float) -> void:
@@ -1067,11 +1130,19 @@ func _apply_rudder_damage_from_hit(final_damage: float, hit_position: Vector3, d
 func _get_stern_hit_factor(hit_position: Vector3) -> float:
 	return BaseShipRudderHelper.get_stern_hit_factor(self, hit_position)
 
+
+func _mark_rigging_damage_for_repair() -> void:
+	BaseShipStatusHelper.mark_rigging_damage_for_repair(self)
+
+
+func _update_rigging_recovery(delta: float) -> void:
+	BaseShipStatusHelper.update_rigging_recovery(self, delta)
+
 func _flash_damage(amount: float = 10.0) -> void:
-	var shake_mult = clamp(amount / 10.0, 0.15, 2.0)
+	var shake_mult = clamp(amount / 10.0, 0.12, 1.35)
 	var shake_tween = create_tween()
-	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * 3.0 * shake_mult, 0.1)
-	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * 2.0 * shake_mult, 0.1)
+	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * DAMAGE_ROCK_FORWARD_MULT * shake_mult, 0.1)
+	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * DAMAGE_ROCK_BACK_MULT * shake_mult, 0.1)
 	shake_tween.tween_property(self , "rotation:z", 0.0, 0.2)
 
 ## 화염 데미지
@@ -1145,13 +1216,17 @@ func _spawn_ropes(count_override: int = -1) -> void:
 		add_child(hook_visual)
 		
 		var offset_z = 0.0
+		var deck_half_extents := get_deck_half_extents()
 		if count > 1:
-			offset_z = lerp(-2.0, 2.0, float(i) / float(count - 1))
-		var offset = Vector3(1.15, 1.55, offset_z)
+			var rope_spread: float = maxf(0.15, minf(2.0, deck_half_extents.y * 0.55))
+			offset_z = lerp(-rope_spread, rope_spread, float(i) / float(count - 1))
+		var anchor_side := 1.0
 		if is_instance_valid(boarding_target):
 			var to_target = (boarding_target.global_position - global_position).normalized()
 			var local_to_target = global_transform.basis.inverse() * to_target
-			if local_to_target.x < 0: offset.x = -1.0
+			if local_to_target.x < 0:
+				anchor_side = -1.0
+		var offset = _get_boarding_rope_source_anchor_local(anchor_side, offset_z)
 			
 		mesh_instance.position = offset
 		mesh_instance.set_meta("anchor_offset", offset)
@@ -1165,13 +1240,12 @@ func _update_ropes(delta: float = 0.0) -> void:
 		_clear_ropes()
 		return
 		
-	var target_center = boarding_target.global_position + Vector3(0, 1.6, 0)
-	
 	for rope in rope_instances:
 		if not is_instance_valid(rope): continue
 		
 		var offset = rope.get_meta("anchor_offset", Vector3.ZERO)
-		var start_pos = global_transform * offset
+		var start_pos = to_global(offset)
+		var target_anchor = _get_boarding_rope_target_anchor_global(start_pos)
 		
 		var deploy_progress = float(rope.get_meta("deploy_progress", 1.0))
 		var deploy_duration = maxf(0.05, float(rope.get_meta("deploy_duration", boarding_rope_throw_duration)))
@@ -1180,7 +1254,7 @@ func _update_ropes(delta: float = 0.0) -> void:
 			rope.set_meta("deploy_progress", deploy_progress)
 		
 		# 밧줄 투척 연출: 시작점에서 목표점까지 전개 길이가 점진적으로 늘어난다.
-		var current_end = start_pos.lerp(target_center, deploy_progress)
+		var current_end = start_pos.lerp(target_anchor, deploy_progress)
 		var dist = maxf(0.05, start_pos.distance_to(current_end))
 		var rope_dir = (current_end - start_pos).normalized()
 		var sag_amount = minf(0.28, dist * 0.025) * deploy_progress
@@ -1201,6 +1275,46 @@ func _update_ropes(delta: float = 0.0) -> void:
 			var hook_basis := Basis.looking_at(-rope_dir, Vector3.UP)
 			hook_visual.global_transform = Transform3D(hook_basis, current_end)
 			hook_visual.scale = Vector3.ONE * lerpf(0.65, 1.0, deploy_progress)
+
+func _get_boarding_rope_source_anchor_local(side_sign: float, along_offset: float) -> Vector3:
+	var half_extents := get_deck_half_extents()
+	var x_margin: float = minf(0.24, half_extents.x * 0.35)
+	var z_margin: float = minf(0.45, half_extents.y * 0.25)
+	var safe_half_x: float = maxf(0.12, half_extents.x - x_margin)
+	var safe_half_z: float = maxf(0.12, half_extents.y - z_margin)
+	var local_x: float = signf(side_sign) * safe_half_x
+	var local_z: float = clampf(along_offset, -safe_half_z, safe_half_z)
+	return Vector3(local_x, _get_boarding_rope_local_anchor_height(self), local_z)
+
+func _get_boarding_rope_target_anchor_global(start_global: Vector3) -> Vector3:
+	if not is_instance_valid(boarding_target):
+		return start_global
+	var target_local: Vector3 = boarding_target.to_local(start_global)
+	var half_extents := _get_boarding_rope_target_deck_half_extents(boarding_target)
+	var x_margin: float = minf(0.24, half_extents.x * 0.35)
+	var z_margin: float = minf(0.45, half_extents.y * 0.25)
+	var safe_half_x: float = maxf(0.12, half_extents.x - x_margin)
+	var safe_half_z: float = maxf(0.12, half_extents.y - z_margin)
+	target_local.x = clampf(target_local.x, -safe_half_x, safe_half_x)
+	target_local.z = clampf(target_local.z, -safe_half_z, safe_half_z)
+	target_local.y = _get_boarding_rope_local_anchor_height(boarding_target)
+	return boarding_target.to_global(target_local)
+
+func _get_boarding_rope_target_deck_half_extents(target_ship: Node3D) -> Vector2:
+	if is_instance_valid(target_ship) and target_ship.has_method("get_deck_half_extents"):
+		var extents = target_ship.call("get_deck_half_extents")
+		if extents is Vector2 and extents.x > 0.01 and extents.y > 0.01:
+			return extents
+	if is_instance_valid(target_ship) and target_ship.has_method("get_collision_half_extents"):
+		var collision_extents = target_ship.call("get_collision_half_extents")
+		if collision_extents is Vector2 and collision_extents.x > 0.01 and collision_extents.y > 0.01:
+			return collision_extents
+	return Vector2(1.0, 1.5)
+
+func _get_boarding_rope_local_anchor_height(ship_node: Node) -> float:
+	if is_instance_valid(ship_node) and ship_node.get("deck_height") != null:
+		return maxf(0.65, float(ship_node.get("deck_height")) + 0.85)
+	return 1.25
 
 func _clear_ropes() -> void:
 	for rope in rope_instances:

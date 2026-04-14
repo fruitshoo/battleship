@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://lrfsrkv7xetb"]
+
+[ext_resource type="Script" uid="uid://cj0kb4v06qeyq" path="res://scripts/world/sea_sites/drifting_supply_site.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dh3bmbsqdseax" path="res://assets/models/props/barrel/barrel.glb" id="2_barrel"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_plank"]
+albedo_color = Color(0.42, 0.26, 0.13, 1)
+roughness = 0.82
+
+[sub_resource type="BoxMesh" id="BoxMesh_plank"]
+material = SubResource("StandardMaterial3D_plank")
+size = Vector3(2.4, 0.12, 0.34)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_collect"]
+radius = 6.5
+
+[node name="DriftingSupplySite" type="Area3D" unique_id=1899782381]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("1_script")
+
+[node name="Visual" type="Node3D" parent="." unique_id=438394162]
+
+[node name="PlankA" type="MeshInstance3D" parent="Visual" unique_id=1415177446]
+transform = Transform3D(0.906308, 0, -0.422618, 0, 1, 0, 0.422618, 0, 0.906308, 0, 0.16, 0)
+mesh = SubResource("BoxMesh_plank")
+
+[node name="PlankB" type="MeshInstance3D" parent="Visual" unique_id=170071242]
+transform = Transform3D(0.422618, 0, 0.906308, 0, 1, 0, -0.906308, 0, 0.422618, 0.12, 0.22, -0.05)
+mesh = SubResource("BoxMesh_plank")
+
+[node name="Barrel" parent="Visual" unique_id=1634369922 instance=ExtResource("2_barrel")]
+transform = Transform3D(0.62, 0, 0, 0, 0.62, 0, 0, 0, 0.62, -0.35, 0.42, 0.1)
+
+[node name="Marker" type="MeshInstance3D" parent="Visual" unique_id=155067656]
+transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 0.78, 0.48, -0.18)
+mesh = SubResource("BoxMesh_plank")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1849208051]
+shape = SubResource("SphereShape3D_collect")

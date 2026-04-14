@@ -1,8 +1,8 @@
 extends RefCounted
 
-const PLAYER_CANNON_BASE_DAMAGE := 25.0
+const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_CANNON_BASE_RANGE := 24.0
-const PLAYER_CANNON_BASE_COOLDOWN := 2.5
+const PLAYER_CANNON_BASE_COOLDOWN := 3.2
 const PLAYER_HULL_BASE_HP := 200.0
 const PLAYER_BASE_MAX_SPEED := 6.0
 const PLAYER_ROWING_BASE_SPEED := 4.8
@@ -72,15 +72,20 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 
 	match upgrade_id:
 		"cannon":
-			var dmg_mult := 1.0 + (float(stats.get("dmg_pct_per_lv", 20)) / 100.0) * (level - 1)
-			var range_mult := 1.0 + (float(stats.get("range_pct_per_lv", 10)) / 100.0) * (level - 1)
-			var cd_mult := maxf(0.5, 1.0 - (float(stats.get("cd_pct_per_lv", 8)) / 100.0) * (level - 1))
-			var crit_chance := maxf(0.0, (float(stats.get("crit_pct_per_lv", 2.5)) / 100.0) * (level - 1))
-			var crit_multiplier := float(stats.get("crit_multiplier", 1.5))
+			var player_count := _get_player_cannon_count_for_level(level, stats)
+			var support_count := _get_support_cannon_count_for_level(level, stats)
+			return "포문 %d문 | 지원함 %d문" % [player_count, support_count]
+		"cannon_damage":
+			var dmg_mult := 1.0 + (float(stats.get("dmg_pct_per_lv", 8)) / 100.0) * float(level)
 			var shot_damage := PLAYER_CANNON_BASE_DAMAGE * dmg_mult
-			var shot_range := PLAYER_CANNON_BASE_RANGE * range_mult
+			return "1발 데미지 %.1f | 포격 +%d%%" % [shot_damage, _percent_delta_from_ratio(dmg_mult)]
+		"cannon_reload":
+			var cd_mult := maxf(
+				float(stats.get("min_cd_mult", 0.75)),
+				1.0 - (float(stats.get("cd_pct_per_lv", 4)) / 100.0) * float(level)
+			)
 			var shot_cooldown := PLAYER_CANNON_BASE_COOLDOWN * cd_mult
-			return "1발 데미지 %.0f | 사거리 %.1fm | 재장전 %.2f초 | 치명 %.1f%% x%.1f" % [shot_damage, shot_range, shot_cooldown, crit_chance * 100.0, crit_multiplier]
+			return "재장전 %.2f초 | 재장전 -%d%%" % [shot_cooldown, int(round((1.0 - cd_mult) * 100.0))]
 		"singigeon":
 			var rocketeers = int(UpgradeManager.get_specialist_unit_count("singigeon", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
 			var base_damage := float(stats.get("base_damage", 2.5))
@@ -133,19 +138,6 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			if level >= int(stats.get("limit_add_level", 2)):
 				signal_fleet_limit += int(stats.get("limit_add", 1))
 			return "지원함 소집 | 한계 %d척" % signal_fleet_limit
-		"fleet_cannon":
-			var active_count := 1
-			if level >= 2:
-				active_count = 2
-			if level >= 3:
-				active_count = 3
-			var dmg_mult := 1.0 + (float(stats.get("dmg_pct_per_lv", 25)) / 100.0) * level
-			var cd_mult := maxf(0.5, 1.0 - (float(stats.get("cd_pct_per_lv", 8)) / 100.0) * level)
-			return "포문 %d문 | 포격 +%d%% | 재장전 -%d%%" % [
-				active_count,
-				_percent_delta_from_ratio(dmg_mult),
-				int(round((1.0 - cd_mult) * 100.0)),
-			]
 		"fleet_hull":
 			return "선체 체력 +%d | 방어력 +%d" % [
 				int(float(stats.get("hp_add", 80)) * level),
@@ -217,6 +209,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 static func get_upgrade_icon(upgrade_id: String) -> String:
 	var icon_map = {
 		"cannon": "sports_baseball",
+		"cannon_damage": "local_fire_department",
+		"cannon_reload": "timer",
 		"singigeon": "rocket_launch",
 		"janggun": "hardware",
 		"ballista": "arrow_selector_tool",
@@ -225,7 +219,6 @@ static func get_upgrade_icon(upgrade_id: String) -> String:
 		"rowing": "rowing",
 		"supply_bonus": "medical_services",
 		"fleet_signal": "groups",
-		"fleet_cannon": "flaky",
 		"fleet_hull": "security",
 		"fleet_crew": "update",
 		"crew_numbers": "swords",
@@ -247,6 +240,8 @@ static func get_upgrade_icon_texture_path(upgrade_id: String) -> String:
 static func get_upgrade_color(upgrade_id: String) -> Color:
 	var color_map = {
 		"cannon": Color(1.0, 0.7, 0.3),
+		"cannon_damage": Color(1.0, 0.55, 0.25),
+		"cannon_reload": Color(1.0, 0.82, 0.35),
 		"singigeon": Color(1.0, 0.4, 0.4),
 		"janggun": Color(0.8, 0.5, 0.2),
 		"ballista": Color(0.9, 0.6, 0.25),
@@ -255,7 +250,6 @@ static func get_upgrade_color(upgrade_id: String) -> Color:
 		"rowing": Color(1.0, 0.78, 0.32),
 		"supply_bonus": Color(0.35, 0.95, 0.35),
 		"fleet_signal": Color(1.0, 0.75, 0.35),
-		"fleet_cannon": Color(1.0, 0.45, 0.85),
 		"fleet_hull": Color(0.3, 1.0, 0.8),
 		"fleet_crew": Color(0.35, 0.9, 1.0),
 		"crew_numbers": Color(0.5, 0.82, 1.0),
@@ -270,6 +264,20 @@ static func get_upgrade_color(upgrade_id: String) -> Color:
 
 static func _percent_delta_from_ratio(ratio: float) -> int:
 	return int(round((ratio - 1.0) * 100.0))
+
+static func _get_player_cannon_count_for_level(level: int, stats: Dictionary) -> int:
+	var count := int(stats.get("player_base_cannon_count", 3))
+	for entry in stats.get("player_extra_cannon_levels", [2, 3, 4, 5]):
+		if level >= int(entry):
+			count += 1
+	return count
+
+static func _get_support_cannon_count_for_level(level: int, stats: Dictionary) -> int:
+	var count := int(stats.get("support_base_cannon_count", 1))
+	for entry in stats.get("player_extra_cannon_levels", [2, 3, 4, 5]):
+		if level >= int(entry):
+			count += 1
+	return mini(count, int(stats.get("support_max_cannon_count", 3)))
 
 static func _level_matches(level: int, level_list: Variant) -> bool:
 	if level_list is Array:

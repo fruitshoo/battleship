@@ -3,6 +3,12 @@ extends RefCounted
 
 static func apply_overlay_theme(hud) -> void:
 	if is_instance_valid(hud.gust_warning):
+		hud.gust_warning.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		hud.gust_warning.offset_left = -260.0
+		hud.gust_warning.offset_top = 104.0
+		hud.gust_warning.offset_right = 260.0
+		hud.gust_warning.offset_bottom = 134.0
+		hud.gust_warning.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		hud.NavalUiTheme.style_accent(hud.gust_warning, 22)
 		hud.gust_warning.add_theme_color_override("font_outline_color", hud.NavalUiTheme.OUTLINE_DARK)
 		hud.gust_warning.add_theme_constant_override("outline_size", 4)

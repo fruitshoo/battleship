@@ -65,6 +65,8 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	if not EntityRegistry.get_captured_minions().has(support_ship):
 		failures.append("support fleet smoke support ship missing from registry bucket")
 
+	_run_support_shared_cannon_cap_smoke(failures, support_ship)
+
 	var target_ship: Node3D = null
 	if support_ship.has_method("get_target_ship"):
 		target_ship = support_ship.get_target_ship()
@@ -155,6 +157,40 @@ static func _run_support_signal_level_two_limit_smoke(owner: Node, failures: Arr
 	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
 	UpgradeManager.current_levels["fleet_crew"] = original_crew_level
 	UpgradeManager.call("_refresh_support_fleet_upgrade_state", player_ship)
+
+
+static func _run_support_shared_cannon_cap_smoke(failures: Array[String], support_ship: Node3D) -> void:
+	if not is_instance_valid(support_ship):
+		return
+	if not is_instance_valid(UpgradeManager):
+		failures.append("support fleet smoke missing UpgradeManager for shared cannon cap")
+		return
+	if not support_ship.has_method("apply_fleet_weapon_upgrade"):
+		failures.append("support fleet smoke support ship missing apply_fleet_weapon_upgrade")
+		return
+
+	var original_cannon_level: int = int(UpgradeManager.current_levels.get("cannon", 0))
+	for level in [1, 2, 3, 4, 5]:
+		UpgradeManager.current_levels["cannon"] = level
+		UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+		var visible_count := _count_visible_fleet_cannons(support_ship)
+		var expected_count: int = mini(level, 3)
+		if visible_count != expected_count:
+			failures.append("support fleet smoke shared cannon cap mismatch Lv.%d: %d != %d" % [level, visible_count, expected_count])
+	UpgradeManager.current_levels["cannon"] = original_cannon_level
+	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+
+
+static func _count_visible_fleet_cannons(ship: Node) -> int:
+	var count := 0
+	for child in ship.get_children():
+		if not is_instance_valid(child):
+			continue
+		if not str(child.name).begins_with("FleetCannon_"):
+			continue
+		if child is Node3D and (child as Node3D).visible:
+			count += 1
+	return count
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:

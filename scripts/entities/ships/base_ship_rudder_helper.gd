@@ -5,7 +5,10 @@ static func apply_rudder_damage(ship, amount: float) -> void:
 	if amount <= 0.0 or ship.rudder_max_health <= 0.0:
 		return
 	var prev_ratio: float = get_rudder_health_ratio(ship)
+	var prev_health: float = ship.rudder_health
 	ship.rudder_health = clampf(ship.rudder_health - amount, 0.0, ship.rudder_max_health)
+	if ship.rudder_health < prev_health - 0.001 and ship.has_method("_mark_rigging_damage_for_repair"):
+		ship.call("_mark_rigging_damage_for_repair")
 	var current_ratio: float = get_rudder_health_ratio(ship)
 	if current_ratio <= ship.rudder_critical_threshold and prev_ratio > ship.rudder_critical_threshold and not ship._rudder_critical_announced:
 		ship._rudder_critical_announced = true

@@ -63,7 +63,6 @@ var rowing_locked: bool = false
 @export var support_fleet_limit: int = 1
 @export var support_fleet_respawn_interval: float = 30.0
 var support_fleet_respawn_timer: float = 0.0
-@export_enum("roundshot", "chainshot", "grapeshot") var current_cannon_ammo: String = "roundshot"
 
 @export_group("Post Combat Cleanup")
 @export var corpse_cleanup_enabled: bool = true
@@ -264,6 +263,7 @@ func _physics_process(delta: float) -> void:
 	_update_oar_visual(delta)
 	_update_hull_regeneration(delta)
 	_update_burning_status(delta)
+	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
 	_update_support_fleet_respawn(delta)
 	_update_crew_respawn(delta)
@@ -281,16 +281,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_sinking or is_dying or not is_player_controlled: return
 	
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_G:
-			cycle_cannon_ammo()
+		if event.keycode == KEY_F:
+			_toggle_fleet_formation()
 			return
 		# 치트키: F2 누르면 바로 지휘(병영) 레벨업
 		if OS.is_debug_build() and event.keycode == KEY_F2:
 			if is_instance_valid(_cached_level_manager):
 				_cached_level_manager.add_merit(999)
 				
-		# if event.keycode == KEY_F:
-		# 	_execute_merit_action()
 		pass
 
 func _execute_merit_action() -> void:
@@ -325,15 +323,16 @@ func _update_crew_respawn(delta: float) -> void:
 	if not soldiers_node: return
 	
 	# 전투불능 병사는 정원을 차지하므로 자동 보충으로 대체하지 않는다.
+	var respawn_target_count: int = int(max_crew_count)
 	var roster_count: int = PlayerShipCrewHelper.get_player_roster_count(self)
 			
-	if roster_count < max_crew_count:
+	if roster_count < respawn_target_count:
 		crew_respawn_timer += delta
 		if crew_respawn_timer >= crew_respawn_interval:
 			crew_respawn_timer = 0.0
-			if add_survivor(): # 기존의 add_survivor 로직 재사용 (HUD 메시지 포함됨)
+			if PlayerShipCrewHelper.add_respawn_crew(self):
 				_sync_player_crew_roster()
-				print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [roster_count + 1, max_crew_count])
+				print("[Crew] 자동 보충! 아군 병사가 합류했습니다. (현재: %d/%d)" % [roster_count + 1, respawn_target_count])
 	else:
 		crew_respawn_timer = 0.0 # 정원이 차면 타이머 초기화
 
@@ -626,26 +625,6 @@ func toggle_rowing() -> void:
 	is_rowing = not is_rowing
 
 
-func cycle_cannon_ammo() -> void:
-	var ammo_order: Array[String] = ["roundshot", "chainshot", "grapeshot"]
-	var current_index: int = ammo_order.find(current_cannon_ammo)
-	if current_index < 0:
-		current_index = 0
-	current_cannon_ammo = ammo_order[(current_index + 1) % ammo_order.size()]
-	if _cached_hud and _cached_hud.has_method("show_message"):
-		_cached_hud.show_message("탄종: %s" % _get_cannon_ammo_display_name(), 1.1)
-
-
-func _get_cannon_ammo_display_name() -> String:
-	match current_cannon_ammo:
-		"chainshot":
-			return "사슬탄"
-		"grapeshot":
-			return "포도탄"
-		_:
-			return "실선탄"
-
-
 ## === 선체 내구도 시스템 ===
 
 ## 게임 오버 (침몰)
@@ -685,6 +664,9 @@ func replenish_crew(soldier_scene: PackedScene) -> void:
 ## 생존자 구조 및 병사 합류 처리
 func add_survivor(allow_over_capacity: bool = false) -> bool:
 	return PlayerShipCrewHelper.add_survivor(self, allow_over_capacity)
+
+func add_respawn_crew() -> bool:
+	return PlayerShipCrewHelper.add_respawn_crew(self)
 
 ## 갑판 방어 무기 2: 화통 투척 로직 (병사가 수행)
 func _update_fire_pot_logic(delta: float) -> void:

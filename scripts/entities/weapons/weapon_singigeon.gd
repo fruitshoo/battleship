@@ -94,6 +94,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var spawn_parent := _resolve_spawn_parent(attacker.get_tree())
 	spawn_parent.add_child(rocket)
 	rocket.global_position = spawn_pos
+	if rocket.has_method("restart_flight"):
+		rocket.restart_flight()
 	rocket.look_at(current_target_pos, Vector3.UP)
 
 func _apply_upgrade_stats() -> void:

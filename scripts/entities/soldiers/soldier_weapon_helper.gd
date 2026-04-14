@@ -69,7 +69,7 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 		var cross_ship_contact_ready: bool = false
 		if cross_ship_close and soldier.has_method("_is_in_cross_ship_contact_zone"):
 			cross_ship_contact_ready = soldier._is_in_cross_ship_contact_zone(target_ship) == true
-		var cross_ship_melee_ready: bool = cross_ship_contact_ready and dist_xz <= maxf(soldier.cross_ship_melee_switch_distance, soldier.weapon_switch_distance)
+		var cross_ship_melee_ready: bool = cross_ship_contact_ready and _can_cross_ship_melee_reach_target(soldier, dist_xz)
 
 		if soldier.is_melee_only:
 			soldier._set_active_weapon("sword")
@@ -92,3 +92,12 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 		soldier._set_active_weapon("sword")
 	else:
 		soldier._set_active_weapon("bow")
+
+
+static func _can_cross_ship_melee_reach_target(soldier, dist_xz: float) -> bool:
+	if not is_instance_valid(soldier.weapon_sword):
+		return false
+	var melee_range: float = float(soldier.weapon_sword.get("attack_range")) if soldier.weapon_sword.get("attack_range") != null else soldier.weapon_switch_distance
+	var reach_buffer: float = 0.35
+	var max_switch_distance: float = minf(maxf(soldier.cross_ship_melee_switch_distance, soldier.weapon_switch_distance), melee_range + reach_buffer)
+	return dist_xz <= max_switch_distance

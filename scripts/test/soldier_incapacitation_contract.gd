@@ -1,7 +1,11 @@
 extends Node
 
 const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
+const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
+const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
+const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 const SoldierScript = preload("res://scripts/entities/soldiers/soldier.gd")
+const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
 
 
 class MockShip:
@@ -22,11 +26,30 @@ class MockShip:
 		derelict_checks += 1
 
 
+class MockWeapon:
+	extends Node3D
+
+	var attack_range: float = 1.2
+	var max_range: float = 0.0
+	var weapon_id: String = ""
+
+	func _init(next_weapon_id: String = "", next_attack_range: float = 1.2, next_max_range: float = 0.0) -> void:
+		weapon_id = next_weapon_id
+		attack_range = next_attack_range
+		max_range = next_max_range
+		set_meta("weapon_id", weapon_id)
+
+	func set_visual_visible(_make_visible: bool) -> void:
+		pass
+
+
 class MockSoldier:
 	extends Node3D
 
 	enum State {
 		IDLE,
+		MOVE,
+		ATTACK,
 		DEAD,
 	}
 
@@ -50,6 +73,18 @@ class MockSoldier:
 	var soldier_xp: float = 0.0
 	var xp_awards: int = 0
 
+	var weapon_sword: Node3D = null
+	var weapon_bow: Node3D = null
+	var current_weapon: Node3D = null
+	var weapon_switch_distance: float = 4.0
+	var cross_ship_melee_switch_distance: float = 6.8
+	var crew_role: String = "general"
+	var is_melee_only: bool = false
+	var is_ranged_only: bool = false
+	var cross_ship_close: bool = false
+	var cross_ship_contact_ready: bool = false
+	var detection_range: float = 35.0
+
 	func _flash_hit() -> void:
 		pass
 
@@ -63,6 +98,30 @@ class MockSoldier:
 		soldier_xp += amount
 		xp_awards += 1
 
+	func _set_active_weapon(type: String) -> void:
+		if type == "sword":
+			current_weapon = weapon_sword
+		elif type == "bow":
+			current_weapon = weapon_bow
+
+	func _is_ship_pair_in_melee_range(_other_ship: Node3D) -> bool:
+		return cross_ship_close
+
+	func _is_in_cross_ship_contact_zone(_other_ship: Node3D) -> bool:
+		return cross_ship_contact_ready
+
+	func _change_state(next_state: int) -> void:
+		current_state = next_state
+
+	func get_current_state_value() -> int:
+		return current_state
+
+	func get_team_tag() -> String:
+		return team
+
+	func get_owned_ship_node() -> Node3D:
+		return owned_ship
+
 
 func _ready() -> void:
 	var failures: Array[String] = []
@@ -71,6 +130,9 @@ func _ready() -> void:
 	_verify_heal_full_recovers_incapacitated_player(failures)
 	_verify_recovery_uses_ship_medical_upgrade_stats(failures)
 	_verify_player_soldier_level_progression(failures)
+	_verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures)
+	_verify_cross_ship_attack_state_exits_unreachable_melee(failures)
+	_verify_soldier_visual_slot_contract(failures)
 	_verify_enemy_combat_damage_still_dies(failures)
 	_verify_player_drowning_still_dies(failures)
 	if failures.is_empty():
@@ -185,6 +247,134 @@ func _verify_player_soldier_level_progression(failures: Array[String]) -> void:
 	if not is_equal_approx(soldier.get_soldier_xp_value(), 0.0):
 		failures.append("player soldier xp did not clear at level cap")
 	soldier.free()
+
+
+func _verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures: Array[String]) -> void:
+	var player_ship := _make_ship("player")
+	player_ship.global_position = Vector3.ZERO
+	var enemy_ship := _make_ship("enemy")
+	enemy_ship.global_position = Vector3(5.0, 0.0, 0.0)
+
+	var soldier := _make_soldier("player", player_ship)
+	soldier.global_position = Vector3.ZERO
+	soldier.weapon_sword = MockWeapon.new("sword", 1.2, 0.0)
+	soldier.weapon_bow = MockWeapon.new("bow", 20.0, 20.0)
+	add_child(soldier.weapon_sword)
+	add_child(soldier.weapon_bow)
+	soldier.current_weapon = soldier.weapon_sword
+	soldier.cross_ship_close = true
+	soldier.cross_ship_contact_ready = true
+
+	var target := _make_soldier("enemy", enemy_ship)
+	target.global_position = Vector3(5.0, 0.0, 0.0)
+
+	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
+	if soldier.current_weapon != soldier.weapon_bow:
+		failures.append("cross-ship rail standoff did not prefer bow while melee could not reach")
+
+	target.global_position = Vector3(1.35, 0.0, 0.0)
+	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
+	if soldier.current_weapon != soldier.weapon_sword:
+		failures.append("cross-ship close contact did not allow melee after it could reach")
+
+
+func _verify_cross_ship_attack_state_exits_unreachable_melee(failures: Array[String]) -> void:
+	var player_ship := _make_ship("player")
+	player_ship.global_position = Vector3.ZERO
+	var enemy_ship := _make_ship("enemy")
+	enemy_ship.global_position = Vector3(5.0, 0.0, 0.0)
+
+	var soldier := _make_soldier("player", player_ship)
+	soldier.global_position = Vector3.ZERO
+	soldier.weapon_sword = MockWeapon.new("sword", 1.2, 0.0)
+	soldier.weapon_bow = MockWeapon.new("bow", 20.0, 20.0)
+	add_child(soldier.weapon_sword)
+	add_child(soldier.weapon_bow)
+	soldier.current_weapon = soldier.weapon_sword
+	soldier.current_state = soldier.State.ATTACK
+	soldier.cross_ship_close = true
+	soldier.cross_ship_contact_ready = true
+
+	var target := _make_soldier("enemy", enemy_ship)
+	target.global_position = Vector3(5.0, 0.0, 0.0)
+	soldier.current_target = target
+
+	SoldierAiHelper.state_attack(soldier)
+	if soldier.current_state != soldier.State.MOVE:
+		failures.append("cross-ship attacker stayed in unreachable melee attack state")
+
+	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
+	if soldier.current_weapon != soldier.weapon_bow:
+		failures.append("cross-ship attacker did not switch to bow after leaving unreachable melee")
+
+
+func _verify_soldier_visual_slot_contract(failures: Array[String]) -> void:
+	var soldier := SOLDIER_SCENE.instantiate()
+	if soldier == null:
+		failures.append("soldier visual scene contract could not instantiate soldier")
+		return
+	soldier.team = "player"
+	soldier.set("player_visual_scene", null)
+	soldier.set("enemy_visual_scene", null)
+	soldier.set("captain_visual_scene", null)
+	add_child(soldier)
+
+	var visual_root := soldier.get_node_or_null("VisualRoot") as Node3D
+	if visual_root == null:
+		failures.append("soldier visual scene contract missing VisualRoot")
+		soldier.queue_free()
+		return
+
+	var fallback_mesh := soldier.get_node_or_null("VisualRoot/MeshInstance3D") as MeshInstance3D
+	if fallback_mesh == null:
+		failures.append("soldier visual scene contract missing fallback body mesh")
+	if SoldierVisualHelper.get_body_mesh(soldier) != fallback_mesh:
+		failures.append("soldier visual helper did not resolve fallback body mesh")
+	soldier.set("is_captain", true)
+	soldier.call("_update_role_visual")
+	if soldier.get_node_or_null("CaptainMarker") != null:
+		failures.append("soldier visual helper still creates captain marker")
+
+	var custom_root := Node3D.new()
+	custom_root.name = "CustomSoldierVisual"
+	var custom_hat := MeshInstance3D.new()
+	custom_hat.name = "Hat"
+	custom_hat.mesh = BoxMesh.new()
+	custom_root.add_child(custom_hat)
+	custom_hat.owner = custom_root
+	var custom_model_root := Node3D.new()
+	custom_model_root.name = "ModelRoot"
+	custom_root.add_child(custom_model_root)
+	custom_model_root.owner = custom_root
+	var custom_body := MeshInstance3D.new()
+	custom_body.name = "Body"
+	custom_body.mesh = BoxMesh.new()
+	custom_model_root.add_child(custom_body)
+	custom_body.owner = custom_root
+	var custom_scene := PackedScene.new()
+	var pack_result := custom_scene.pack(custom_root)
+	custom_root.free()
+	if pack_result != OK:
+		failures.append("soldier visual scene contract could not pack custom visual")
+		soldier.queue_free()
+		return
+
+	soldier.set("player_visual_scene", custom_scene)
+	soldier.call("_setup_soldier_visual")
+	var custom_visual := soldier.get_node_or_null("VisualRoot/CustomVisual") as Node3D
+	var custom_mesh: MeshInstance3D = null
+	if custom_visual != null:
+		custom_mesh = custom_visual.get_node_or_null("ModelRoot/Body") as MeshInstance3D
+	if custom_visual == null or custom_mesh == null:
+		failures.append("soldier visual scene contract did not instantiate custom visual")
+	elif SoldierVisualHelper.get_body_mesh(soldier) != custom_mesh:
+		failures.append("soldier visual helper did not resolve custom visual body mesh")
+	if custom_visual != null and SoldierVisualHelper.get_pose_node(soldier) != custom_visual:
+		failures.append("soldier visual helper did not resolve custom visual pose root")
+	if fallback_mesh != null and fallback_mesh.visible:
+		failures.append("soldier visual scene contract did not hide fallback mesh behind custom visual")
+
+	soldier.queue_free()
 
 
 func _verify_enemy_combat_damage_still_dies(failures: Array[String]) -> void:

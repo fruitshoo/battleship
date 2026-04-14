@@ -77,6 +77,18 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_round")
 [node name="Art" type="Node2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=137842191]
 script = ExtResource("2_wind_art")
 
+[node name="SiteMarker" type="Node2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=2071370995]
+unique_name_in_owner = true
+visible = false
+
+[node name="Glow" type="Polygon2D" parent="WindPanel/WindIndicator/CompassWheel/SiteMarker" unique_id=1763371592]
+color = Color(0.35, 0.75, 1, 0.18)
+polygon = PackedVector2Array(0, -8, 5.657, -5.657, 8, 0, 5.657, 5.657, 0, 8, -5.657, 5.657, -8, 0, -5.657, -5.657)
+
+[node name="Dot" type="Polygon2D" parent="WindPanel/WindIndicator/CompassWheel/SiteMarker" unique_id=884655868]
+color = Color(1, 0.88, 0.28, 0.95)
+polygon = PackedVector2Array(0, -5, 5, 0, 0, 5, -5, 0)
+
 [node name="NorthLabel" type="Label" parent="WindPanel/WindIndicator/CompassWheel" unique_id=1269305894]
 anchors_preset = 8
 anchor_left = 0.5

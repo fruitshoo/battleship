@@ -134,56 +134,62 @@ static func setup_top_center_layout(hud) -> void:
 	if hud == null:
 		return
 	hud.timer_label = hud._ensure_hud_label(hud.timer_label, "TimerLabel", "0:00")
-	var top_center_container = PanelContainer.new()
+	var top_center_container := Control.new()
+	top_center_container.name = "TimerOnly"
 	hud.add_child(top_center_container)
 	top_center_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	top_center_container.offset_left = -90
 	top_center_container.offset_top = 40
+	top_center_container.offset_right = 90
+	top_center_container.offset_bottom = 72
 	top_center_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
 
-	var time_sb := NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_SOFT, 12, 1, 16.0, 4.0, 16.0, 4.0)
-	top_center_container.add_theme_stylebox_override("panel", time_sb)
-
-	var top_center_box := VBoxContainer.new()
-	top_center_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	top_center_box.add_theme_constant_override("separation", 1)
-	top_center_container.add_child(top_center_box)
-
-	move_label_to_container(hud.timer_label, top_center_box)
+	move_label_to_container(hud.timer_label, top_center_container)
+	hud.timer_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.timer_label.add_theme_font_size_override("font_size", 22)
+	hud.timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hud.timer_label.add_theme_font_size_override("font_size", 28)
 	hud.timer_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 	hud.timer_label.add_theme_color_override("font_shadow_color", NavalUiTheme.OUTLINE_DARK)
-	hud.timer_label.add_theme_constant_override("shadow_outline_size", 2)
+	hud.timer_label.add_theme_constant_override("shadow_outline_size", 3)
 
 	hud.capture_opportunity_label = Label.new()
 	hud.capture_opportunity_label.name = "CaptureOpportunityLabel"
 	hud.capture_opportunity_label.text = ""
 	hud.capture_opportunity_label.visible = false
+	hud.capture_opportunity_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	hud.capture_opportunity_label.offset_left = -180
+	hud.capture_opportunity_label.offset_top = 74
+	hud.capture_opportunity_label.offset_right = 180
+	hud.capture_opportunity_label.offset_bottom = 96
+	hud.capture_opportunity_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	hud.capture_opportunity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	NavalUiTheme.style_gold(hud.capture_opportunity_label, 11)
 	hud.capture_opportunity_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	hud.capture_opportunity_label.add_theme_constant_override("outline_size", 3)
-	top_center_box.add_child(hud.capture_opportunity_label)
+	hud.add_child(hud.capture_opportunity_label)
 
 	hud.ammo_mode_label = Label.new()
 	hud.ammo_mode_label.name = "AmmoModeLabel"
-	hud.ammo_mode_label.text = "탄종: 실선탄"
-	hud.ammo_mode_label.visible = true
-	hud.ammo_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_muted(hud.ammo_mode_label, 10)
-	hud.ammo_mode_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-	hud.ammo_mode_label.add_theme_constant_override("outline_size", 3)
-	top_center_box.add_child(hud.ammo_mode_label)
+	hud.ammo_mode_label.text = ""
+	hud.ammo_mode_label.visible = false
+	hud.add_child(hud.ammo_mode_label)
 
 	hud.debug_distance_label = Label.new()
 	hud.debug_distance_label.name = "DebugDistanceLabel"
 	hud.debug_distance_label.text = ""
 	hud.debug_distance_label.visible = false
+	hud.debug_distance_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	hud.debug_distance_label.offset_left = -180
+	hud.debug_distance_label.offset_top = 78
+	hud.debug_distance_label.offset_right = 180
+	hud.debug_distance_label.offset_bottom = 100
+	hud.debug_distance_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	hud.debug_distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	NavalUiTheme.style_muted(hud.debug_distance_label, 10)
 	hud.debug_distance_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	hud.debug_distance_label.add_theme_constant_override("outline_size", 3)
-	top_center_box.add_child(hud.debug_distance_label)
+	hud.add_child(hud.debug_distance_label)
 
 # Right side
 static func setup_top_right_layout(hud) -> void:

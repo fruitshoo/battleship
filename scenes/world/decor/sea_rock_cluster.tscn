@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://c7fvnkdvs1lht"]
+
+[ext_resource type="Script" path="res://scripts/world/decor/sea_rock_cluster.gd" id="2_rock_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock_warm"]
+albedo_color = Color(0.27, 0.3, 0.25, 1)
+roughness = 0.96
+
+[sub_resource type="SphereMesh" id="SphereMesh_boulder"]
+material = SubResource("StandardMaterial3D_rock_warm")
+radius = 1.0
+radial_segments = 9
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock_cool"]
+albedo_color = Color(0.2, 0.25, 0.24, 1)
+roughness = 0.98
+
+[sub_resource type="SphereMesh" id="SphereMesh_sharp"]
+material = SubResource("StandardMaterial3D_rock_cool")
+radius = 1.0
+height = 1.45
+radial_segments = 7
+rings = 4
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_stack"]
+material = SubResource("StandardMaterial3D_rock_warm")
+top_radius = 0.78
+bottom_radius = 1.0
+height = 0.5
+radial_segments = 8
+
+[node name="SeaRockCluster" type="Node3D" unique_id=1561861493 groups=["sea_decor", "sea_rock_decor"]]
+script = ExtResource("2_rock_script")
+
+[node name="Visual" type="Node3D" parent="." unique_id=124934550]
+transform = Transform3D(3, 0, 0, 0, 3, 0, 0, 0, 3, 0, -2.538309, 0)
+
+[node name="BoulderA" type="MeshInstance3D" parent="Visual" unique_id=763451003]
+transform = Transform3D(-0.39172587, 1.1687524, -0.72337765, -1.4690943, 0.030639648, 0.42910132, 0.37311292, 1.3476971, 0.6175733, -1.0026584, 0.42769158, 0.2411969)
+mesh = SubResource("SphereMesh_boulder")
+
+[node name="BoulderB" type="MeshInstance3D" parent="Visual" unique_id=1207176658]
+transform = Transform3D(-0.06161623, -1.9973569, -0.015383494, 1.4278266, -0.08619365, 0.35648012, -0.4614981, 0, 0.9208049, 1.3419386, 0.02000001, 0.5092136)
+mesh = SubResource("SphereMesh_boulder")
+
+[node name="BoulderC" type="MeshInstance3D" parent="Visual" unique_id=1662110632]
+transform = Transform3D(0.62, -0.32535195, -0.08649945, 0, 0.5202366, -0.98180425, 0.17, 1.1865777, 0.4067392, 0.08, -0.08000001, 1.3424066)
+mesh = SubResource("SphereMesh_boulder")
+
+[node name="SpireA" type="MeshInstance3D" parent="Visual" unique_id=1813638405]
+transform = Transform3D(0.7991699, 0.7436101, 0.22505513, -0.39118958, 1.605557, 0, -0.17427264, -0.19398521, 0.8627114, -2.9144883, -0.33742422, 0.005945742)
+mesh = SubResource("SphereMesh_sharp")
+
+[node name="SpireB" type="MeshInstance3D" parent="Visual" unique_id=1629490818]
+transform = Transform3D(0.108982965, 0.018963357, -1.0662801, -0.20164877, 2.027286, 2.9939053e-09, 1.2470196, 0.3261641, 0.06199404, 0.5959425, 1.1215141, -0.22220445)
+mesh = SubResource("SphereMesh_sharp")
+
+[node name="StackA" type="MeshInstance3D" parent="Visual" unique_id=374751128]
+transform = Transform3D(2.4150443, 0, 0.95677733, 0, 1.4728482, 0, -0.7684232, 0, 2.4602845, -1.32, -0.80397666, -0.48)
+mesh = SubResource("CylinderMesh_stack")
+
+[node name="StackB" type="MeshInstance3D" parent="Visual" unique_id=1647468164]
+transform = Transform3D(1.691949, 0, -0.40036377, 0, 2.8306751, 0, 0.46998578, 0, 1.2010913, -1.6196327, -0.11332652, -0.45579445)
+mesh = SubResource("CylinderMesh_stack")
+
+[node name="SubmergedBaseA" type="MeshInstance3D" parent="Visual" unique_id=1342482092]
+transform = Transform3D(-0.03583413, 0.8161629, 1.1118968, 1.8790814, 0.08768486, -0.120700665, -0.076616846, 1.7688105, -0.5070672, -0.36, -0.64, -1.3635478)
+mesh = SubResource("SphereMesh_boulder")
+
+[node name="SubmergedBaseB" type="MeshInstance3D" parent="Visual" unique_id=620565530]
+transform = Transform3D(-0.1892881, 1.5568002, -0.033918235, -1.8129082, -0.1630436, -0.3104981, -0.42740655, 0.0021032407, 1.0361425, 1.4602317, -0.6999999, -1.2282416)
+mesh = SubResource("SphereMesh_sharp")

@@ -31,6 +31,12 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 @export_range(0.02, 0.4, 0.01) var sail_occlusion_update_interval: float = 0.08
 @export_range(0.0, 80.0, 1.0) var sail_occlusion_screen_padding: float = 28.0
 @export_range(6.0, 60.0, 1.0) var sail_occlusion_world_distance: float = 34.0
+@export_group("Decor Occlusion Fade")
+@export var decor_occlusion_fade_enabled: bool = false
+@export_range(0.55, 1.0, 0.01) var decor_occlusion_alpha: float = 0.78
+@export_range(0.0, 120.0, 1.0) var decor_occlusion_screen_padding: float = 18.0
+@export_range(0.0, 40.0, 1.0) var decor_occlusion_min_world_distance: float = 11.0
+@export_range(12.0, 180.0, 1.0) var decor_occlusion_world_distance: float = 110.0
 
 var target: Node3D = null
 var current_zoom: float = 0.0
@@ -118,6 +124,8 @@ func _physics_process(delta: float) -> void:
 	# 5. 동적 포그 조절 (줌에 따라 안개 거리 조정)
 	_update_dynamic_fog()
 	_update_sail_occlusion_fade(delta)
+	if decor_occlusion_fade_enabled:
+		_update_decor_occlusion_fade()
 	
 	# 오디오 리스너 위치 고정 (카메라 줌에 상관없이 타겟 근처 유지하되, 약간의 거리감 허용)
 	if is_instance_valid(audio_listener):
@@ -198,6 +206,59 @@ func _reset_all_sail_occlusion_fades(ships: Array = []) -> void:
 			var mast: Node3D = mast_variant as Node3D
 			if is_instance_valid(mast) and mast.has_method("set_sail_view_fade_alpha"):
 				mast.call("set_sail_view_fade_alpha", 1.0)
+
+func _update_decor_occlusion_fade() -> void:
+	if not decor_occlusion_fade_enabled:
+		_reset_all_decor_occlusion_fades()
+		return
+	if not is_instance_valid(target):
+		_reset_all_decor_occlusion_fades()
+		return
+
+	var ships: Array = EntityRegistry.get_ships()
+	var faded_decor_ids: Dictionary = {}
+	for decor_variant in get_tree().get_nodes_in_group("sea_rock_decor"):
+		var decor: Node3D = decor_variant as Node3D
+		if not _is_decor_occlusion_candidate_valid(decor):
+			continue
+		var decor_rect: Rect2 = _get_decor_screen_rect(decor)
+		if decor_rect.size == Vector2.ZERO:
+			continue
+		var decor_cam_dist: float = _get_decor_nearest_camera_distance_squared(decor)
+		for ship_variant in ships:
+			var ship: Node3D = ship_variant as Node3D
+			if not _is_sail_occlusion_ship_valid(ship):
+				continue
+			var decor_ship_distance := decor.global_position.distance_to(ship.global_position)
+			if decor_ship_distance < decor_occlusion_min_world_distance:
+				continue
+			if decor_ship_distance > decor_occlusion_world_distance:
+				continue
+			if _does_sail_cover_ship_points(decor_rect, decor_cam_dist, ship):
+				faded_decor_ids[decor.get_instance_id()] = true
+				break
+
+	for decor_variant in get_tree().get_nodes_in_group("sea_rock_decor"):
+		var decor: Node3D = decor_variant as Node3D
+		if not is_instance_valid(decor) or not decor.has_method("set_rock_view_fade_alpha"):
+			continue
+		var alpha: float = decor_occlusion_alpha if faded_decor_ids.has(decor.get_instance_id()) else 1.0
+		decor.call("set_rock_view_fade_alpha", alpha)
+
+
+func _reset_all_decor_occlusion_fades() -> void:
+	for decor_variant in get_tree().get_nodes_in_group("sea_rock_decor"):
+		var decor: Node3D = decor_variant as Node3D
+		if is_instance_valid(decor) and decor.has_method("set_rock_view_fade_alpha"):
+			decor.call("set_rock_view_fade_alpha", 1.0)
+
+
+func _is_decor_occlusion_candidate_valid(decor: Node3D) -> bool:
+	if not is_instance_valid(decor) or not decor.visible:
+		return false
+	if is_position_behind(decor.global_position):
+		return false
+	return true
 
 func _is_sail_occlusion_ship_valid(ship: Node3D) -> bool:
 	if not is_instance_valid(ship):
@@ -289,6 +350,52 @@ func _get_mast_sail_screen_rect(mast: Node3D) -> Rect2:
 	if not found:
 		return Rect2()
 	return rect.grow(sail_occlusion_screen_padding)
+
+func _get_decor_nearest_camera_distance_squared(decor: Node3D) -> float:
+	var visual := decor.get_node_or_null("Visual") as Node3D
+	if not is_instance_valid(visual):
+		visual = decor
+	var min_dist: float = INF
+	for mesh in _collect_mesh_instances(visual):
+		if not is_instance_valid(mesh.mesh):
+			continue
+		for local_corner in _aabb_corners(mesh.mesh.get_aabb()):
+			var world_corner: Vector3 = mesh.global_transform * local_corner
+			min_dist = minf(min_dist, global_position.distance_squared_to(world_corner))
+	if min_dist == INF:
+		return global_position.distance_squared_to(decor.global_position)
+	return min_dist
+
+func _get_decor_screen_rect(decor: Node3D) -> Rect2:
+	var visual := decor.get_node_or_null("Visual") as Node3D
+	if not is_instance_valid(visual):
+		visual = decor
+	var found: bool = false
+	var rect: Rect2 = Rect2()
+	for mesh in _collect_mesh_instances(visual):
+		if not is_instance_valid(mesh.mesh) or not mesh.visible:
+			continue
+		for local_corner in _aabb_corners(mesh.mesh.get_aabb()):
+			var world_corner: Vector3 = mesh.global_transform * local_corner
+			if is_position_behind(world_corner):
+				continue
+			var screen_point: Vector2 = unproject_position(world_corner)
+			if not found:
+				rect = Rect2(screen_point, Vector2.ZERO)
+				found = true
+			else:
+				rect = rect.expand(screen_point)
+	if not found:
+		return Rect2()
+	return rect.grow(decor_occlusion_screen_padding)
+
+func _collect_mesh_instances(root: Node) -> Array[MeshInstance3D]:
+	var meshes: Array[MeshInstance3D] = []
+	if root is MeshInstance3D:
+		meshes.append(root as MeshInstance3D)
+	for child in root.get_children():
+		meshes.append_array(_collect_mesh_instances(child))
+	return meshes
 
 func _aabb_corners(aabb: AABB) -> Array[Vector3]:
 	var p: Vector3 = aabb.position

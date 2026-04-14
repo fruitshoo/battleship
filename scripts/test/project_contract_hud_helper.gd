@@ -56,9 +56,11 @@ static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_s
 		target_ship.set("is_dying", false)
 
 	_run_hud_state_baselines(hud, player_ship, failures)
+	_run_hud_support_respawn_slot_check(hud, player_ship, failures)
 	_run_hud_boarding_state_check(hud, player_ship, target_ship, failures)
 	_run_hud_capture_state_check(hud, player_ship, failures)
 	_run_hud_debug_state_check(hud, player_ship, failures)
+	await _run_compass_site_marker_check(owner, failures, smoke_root, player_ship)
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
@@ -92,6 +94,8 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 		hud.call("_update_stamina_display")
 	if hud.has_method("_update_boarding_display"):
 		hud.call("_update_boarding_display")
+	if hud.has_method("_update_ammo_mode_display"):
+		hud.call("_update_ammo_mode_display")
 	if hud.has_method("_update_ship_health_bars"):
 		hud.call("_update_ship_health_bars", false)
 	if hud.has_method("_sync_ship_debug_panel_from_player"):
@@ -121,6 +125,43 @@ static func _run_hud_boarding_state_check(hud: Node, player_ship: Node3D, target
 		hud.call("_update_boarding_display")
 	if is_instance_valid(hud.boarding_label) and hud.boarding_label.text != "도선 진행 중!":
 		failures.append("hud smoke boarding progress label mismatch")
+
+
+static func _run_hud_support_respawn_slot_check(hud: Node, player_ship: Node3D, failures: Array[String]) -> void:
+	if not is_instance_valid(hud) or not is_instance_valid(player_ship) or not is_instance_valid(hud.support_slot_container):
+		return
+	if not is_instance_valid(UpgradeManager) or "current_levels" not in UpgradeManager:
+		return
+	var previous_fleet_signal: int = int(UpgradeManager.current_levels.get("fleet_signal", 0))
+	var previous_limit: int = int(player_ship.get("support_fleet_limit")) if player_ship.get("support_fleet_limit") != null else 0
+	var previous_interval: float = float(player_ship.get("support_fleet_respawn_interval")) if player_ship.get("support_fleet_respawn_interval") != null else 30.0
+	var previous_timer: float = float(player_ship.get("support_fleet_respawn_timer")) if player_ship.get("support_fleet_respawn_timer") != null else 0.0
+	var current_support_count: int = 0
+	if player_ship.has_method("_get_support_fleet_ships"):
+		current_support_count = player_ship.call("_get_support_fleet_ships").size()
+
+	UpgradeManager.current_levels["fleet_signal"] = max(1, previous_fleet_signal)
+	player_ship.set("support_fleet_limit", current_support_count + 1)
+	player_ship.set("support_fleet_respawn_interval", 30.0)
+	player_ship.set("support_fleet_respawn_timer", 12.0)
+	if hud.has_method("_update_force_panel"):
+		hud.call("_update_force_panel")
+
+	if hud.support_fleet_hud_slots.size() < current_support_count + 1:
+		failures.append("hud smoke support respawn slots did not stay at fleet limit")
+	else:
+		var first_empty_index: int = min(current_support_count, hud.support_fleet_hud_slots.size() - 1)
+		var slot: PanelContainer = hud.support_fleet_hud_slots[first_empty_index]
+		var timer := slot.get_node_or_null("Root/Timer") as Label
+		if not is_instance_valid(timer) or not timer.visible or timer.text != "18s":
+			failures.append("hud smoke support respawn timer mismatch")
+
+	UpgradeManager.current_levels["fleet_signal"] = previous_fleet_signal
+	player_ship.set("support_fleet_limit", previous_limit)
+	player_ship.set("support_fleet_respawn_interval", previous_interval)
+	player_ship.set("support_fleet_respawn_timer", previous_timer)
+	if hud.has_method("_update_force_panel"):
+		hud.call("_update_force_panel")
 
 
 static func _run_hud_capture_state_check(hud: Node, player_ship: Node3D, failures: Array[String]) -> void:
@@ -170,6 +211,44 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, failures:
 		failures.append("hud smoke speed label mismatch")
 
 
+static func _run_compass_site_marker_check(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+	var panel_scene := load("res://scenes/ui/ship_control_panel.tscn") as PackedScene
+	if panel_scene == null:
+		failures.append("hud smoke ship control panel load failed")
+		return
+	var ui_layer := CanvasLayer.new()
+	ui_layer.name = "CompassMarkerSmokeUI"
+	smoke_root.add_child(ui_layer)
+	var control_panel := panel_scene.instantiate()
+	if control_panel == null:
+		failures.append("hud smoke ship control panel instantiate failed")
+		ui_layer.queue_free()
+		return
+	ui_layer.add_child(control_panel)
+
+	var site := Node3D.new()
+	site.name = "CompassSiteSmoke"
+	site.add_to_group("sea_site")
+	smoke_root.add_child(site)
+	site.global_position = player_ship.global_position + Vector3(0.0, 0.0, -72.0)
+	await _wait_frames(owner, 5)
+
+	var marker := control_panel.get_node_or_null("WindPanel/WindIndicator/CompassWheel/SiteMarker") as Node2D
+	if not is_instance_valid(marker):
+		failures.append("hud smoke compass site marker missing")
+	elif not marker.visible:
+		failures.append("hud smoke compass site marker did not become visible")
+	elif marker.position.length() <= 1.0:
+		failures.append("hud smoke compass site marker did not move toward site")
+	elif marker.position.length() < 48.0:
+		failures.append("hud smoke compass far site marker was not near the rim: %.2f" % marker.position.length())
+
+	site.queue_free()
+	control_panel.queue_free()
+	ui_layer.queue_free()
+	await _wait_frames(owner, 1)
+
+
 static func _validate_hud_baseline_state(hud: Node, failures: Array[String]) -> void:
 	if is_instance_valid(hud.boarding_ui) and hud.boarding_ui.visible:
 		failures.append("hud smoke baseline boarding ui should be hidden")
@@ -177,6 +256,8 @@ static func _validate_hud_baseline_state(hud: Node, failures: Array[String]) -> 
 		failures.append("hud smoke baseline capture label should be hidden")
 	if is_instance_valid(hud.debug_distance_label) and hud.debug_distance_label.visible:
 		failures.append("hud smoke baseline distance label should be hidden")
+	if is_instance_valid(hud.ammo_mode_label) and hud.ammo_mode_label.visible:
+		failures.append("hud smoke ammo mode label should be hidden")
 	if is_instance_valid(hud.debug_ship_status_value) and not hud.debug_ship_status_value.text.contains("선체"):
 		failures.append("hud smoke ship debug status was not populated")
 	if is_instance_valid(hud.debug_ship_config_value) and not hud.debug_ship_config_value.text.contains("설정"):
@@ -197,6 +278,19 @@ static func _validate_hud_message_api(hud: Node, failures: Array[String]) -> voi
 		return
 	if not hud.gust_warning.visible or hud.gust_warning.text != "하네스 메시지":
 		failures.append("hud smoke show_message did not update warning label")
+	_validate_hud_message_does_not_overlap_timer(hud, failures)
+
+
+static func _validate_hud_message_does_not_overlap_timer(hud: Node, failures: Array[String]) -> void:
+	if not is_instance_valid(hud.gust_warning) or not is_instance_valid(hud.timer_label):
+		return
+	var timer_panel := hud.timer_label.get_parent() as Control
+	if not is_instance_valid(timer_panel):
+		return
+	var timer_rect: Rect2 = timer_panel.get_global_rect()
+	var message_rect: Rect2 = hud.gust_warning.get_global_rect()
+	if message_rect.position.y < timer_rect.end.y + 8.0:
+		failures.append("hud smoke warning message overlaps timer: message_y %.1f timer_bottom %.1f" % [message_rect.position.y, timer_rect.end.y])
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:
