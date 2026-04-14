@@ -20,7 +20,7 @@ Default quick checks:
 - `scripts/test/run_project_contract_sweep.sh`
   Broad smoke for scripts, scenes, save/load, HUD, support fleet, bootstrap, recovery effects, upgrades, scene wiring, and runtime spawning.
 - `scripts/test/run_boarding_contracts.sh`
-  Focused boarding and soldier regression suite for impact, navigation, chaos, support rescue, auto-raid recall, and incapacitation/weapon-state behavior.
+  Focused combat regression suite for boarding impact, navigation, chaos, support rescue, auto-raid recall, ship damage, and soldier incapacitation/weapon-state behavior.
 - `scripts/test/run_ship_combat_balance_preview.sh`
   Short encounter feel check for ship combat balance.
 - `scripts/test/run_midgame_performance_compare.sh`
@@ -75,8 +75,8 @@ When adding a new harness:
 - `boarding_navigation_preview.tscn`
   Front, port, rear, and starboard boarding approach scenarios.
   Script: `scripts/test/boarding_navigation_preview.gd`
-- `boarding_impact_contract.tscn`, `boarding_navigation_contract.tscn`, `boarding_chaos_contract.tscn`, `support_boarding_contract.tscn`, `auto_raid_recall_contract.tscn`, `soldier_incapacitation_contract.tscn`
-  Focused boarding contract scenes for impact gating, approach geometry, cleanup/chaos handling, support boarding, raid recall, and incapacitation behavior.
+- `boarding_impact_contract.tscn`, `boarding_navigation_contract.tscn`, `boarding_chaos_contract.tscn`, `support_boarding_contract.tscn`, `auto_raid_recall_contract.tscn`, `soldier_incapacitation_contract.tscn`, `ship_damage_contract.tscn`
+  Focused combat contract scenes for impact gating, approach geometry, cleanup/chaos handling, support boarding, raid recall, incapacitation behavior, and rigging field repair.
   Wrapper: `scripts/test/run_boarding_contracts.sh`
 - `firepot_preview.tscn`
   Fire pot attack gating scenarios such as no target, no tosser, and out of range.
@@ -175,7 +175,7 @@ When adding a new harness:
 - `scripts/test/run_project_contract_sweep.sh`
   Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
 - `scripts/test/run_boarding_contracts.sh`
-  Shell wrapper for focused boarding contracts covering impact gating, navigation, chaos, support boarding, auto-raid recall, and soldier incapacitation.
+  Shell wrapper for focused combat contracts covering impact gating, ship damage, navigation, chaos, support boarding, auto-raid recall, and soldier incapacitation.
   Runs each contract through the generic scene load probe and fails on common script/runtime log errors.
 - `scripts/test/harness_log_gate.sh`
   Shared shell helper for common Godot script/runtime log error gates used by headless test wrappers.

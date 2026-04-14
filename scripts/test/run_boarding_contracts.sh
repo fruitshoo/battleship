@@ -8,6 +8,7 @@ probe_scene="res://scenes/test/scene_load_probe.tscn"
 
 declare -a contract_targets=(
 	"boarding_impact_contract|res://scenes/test/boarding_impact_contract.tscn|[BoardingImpactContract] ok|0.05|0"
+	"ship_damage_contract|res://scenes/test/ship_damage_contract.tscn|[ShipDamageContract] ok|0.05|0"
 	"boarding_navigation_contract|res://scenes/test/boarding_navigation_contract.tscn|[BoardingNavigationContract] ok|0.05|0"
 	"boarding_chaos_contract|res://scenes/test/boarding_chaos_contract.tscn|[BoardingChaosContract] ok|0.05|0"
 	"support_boarding_contract|res://scenes/test/support_boarding_contract.tscn|[SupportBoardingContract] ok|1.30|1"
