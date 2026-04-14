@@ -1,0 +1,153 @@
+[gd_scene format=3 uid="uid://cgf6m5j8jll08"]
+
+[ext_resource type="Script" path="res://scripts/ui/results/result_screen.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://bxyt040k77j8j" path="res://assets/ui/menu/main_menu_background.png" id="2_bg"]
+
+[sub_resource type="Shader" id="Shader_vignette"]
+code = "shader_type canvas_item;
+
+uniform vec4 tint_color : source_color = vec4(0.02, 0.04, 0.07, 0.20);
+uniform vec4 vignette_color : source_color = vec4(0.02, 0.04, 0.07, 0.42);
+uniform float inner_radius = 0.40;
+uniform float outer_radius = 0.78;
+
+void fragment() {
+	float edge = smoothstep(inner_radius, outer_radius, distance(UV, vec2(0.5)));
+	COLOR = vec4(mix(tint_color.rgb, vignette_color.rgb, edge), tint_color.a + vignette_color.a * edge);
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = SubResource("Shader_vignette")
+shader_parameter/tint_color = Color(0.02, 0.04, 0.07, 0.2)
+shader_parameter/vignette_color = Color(0.02, 0.04, 0.07, 0.42)
+shader_parameter/inner_radius = 0.4
+shader_parameter/outer_radius = 0.78
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_result_panel"]
+bg_color = Color(0.05, 0.08, 0.12, 0.64)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.8, 0.68, 0.41, 0.52)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 20.0
+content_margin_top = 18.0
+content_margin_right = 20.0
+content_margin_bottom = 18.0
+
+[node name="ResultScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+background_texture = ExtResource("2_bg")
+
+[node name="BackgroundImage" type="TextureRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BackgroundTint" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_vignette")
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.08
+anchor_right = 0.5
+anchor_bottom = 0.95
+offset_left = -430.0
+offset_right = 430.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 22
+
+[node name="TitleBlock" type="VBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="Subtitle" type="Label" parent="Content/TitleBlock"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.91, 0.68, 1)
+theme_override_font_sizes/font_size = 18
+text = "최종 보스 격침"
+horizontal_alignment = 1
+
+[node name="Title" type="Label" parent="Content/TitleBlock"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.94, 0.9, 1)
+theme_override_font_sizes/font_size = 54
+text = "항해 결과"
+horizontal_alignment = 1
+
+[node name="Body" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="SummaryPanel" type="PanelContainer" parent="Content/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_result_panel")
+
+[node name="Margin" type="MarginContainer" parent="Content/Body/SummaryPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="SummaryList" type="VBoxContainer" parent="Content/Body/SummaryPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="WeaponPanel" type="PanelContainer" parent="Content/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_result_panel")
+
+[node name="Margin" type="MarginContainer" parent="Content/Body/WeaponPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="WeaponList" type="VBoxContainer" parent="Content/Body/WeaponPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ButtonBlock" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 14
+
+[node name="RestartButton" type="Button" parent="Content/ButtonBlock"]
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "다시 항해"
+
+[node name="MainMenuButton" type="Button" parent="Content/ButtonBlock"]
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "항구로"

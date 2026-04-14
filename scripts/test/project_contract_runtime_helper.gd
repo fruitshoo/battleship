@@ -5,6 +5,7 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const RunResultStore = preload("res://scripts/ui/results/run_result_store.gd")
 
 const FIRE_EFFECT_SCENE_PATH := "res://scenes/effects/fire_effect.tscn"
 
@@ -566,11 +567,34 @@ static func _validate_final_boss_victory_on_death(owner: Node, failures: Array[S
 	if level_manager.get("_victory_triggered") == true:
 		failures.append("%s victory contract started with victory already triggered" % label)
 		return
+	var time_scale_before: float = Engine.time_scale
 	if spawned_boss.has_method("die"):
 		spawned_boss.call("die")
 		await _wait_frames(owner, 1)
+	if spawned_boss.get("_defeat_flourish_started") != true:
+		failures.append("%s death did not start the defeat flourish" % label)
+	_validate_final_boss_defeat_message(failures, level_manager, label)
+	if DisplayServer.get_name() == "headless" and not is_equal_approx(Engine.time_scale, time_scale_before):
+		failures.append("%s headless defeat flourish changed Engine.time_scale" % label)
 	if level_manager.get("_victory_triggered") != true:
 		failures.append("%s death did not trigger victory" % label)
+	var result_data: Dictionary = RunResultStore.get_latest_result()
+	if str(result_data.get("outcome", "")) != "최종 보스 격침":
+		failures.append("%s death did not populate final boss result data" % label)
+
+
+static func _validate_final_boss_defeat_message(failures: Array[String], level_manager: Node, label: String) -> void:
+	var hud: Node = level_manager.get("hud") if is_instance_valid(level_manager) else null
+	if not is_instance_valid(hud):
+		failures.append("%s defeat flourish missing HUD" % label)
+		return
+	var warning_variant: Variant = hud.get("gust_warning")
+	var warning_label := warning_variant as Label
+	if not is_instance_valid(warning_label):
+		failures.append("%s defeat flourish missing warning label" % label)
+		return
+	if warning_label.text != "최종 보스 격침!" or not warning_label.visible:
+		failures.append("%s defeat flourish did not show the boss defeat message" % label)
 
 
 static func _validate_spawned_ship(failures: Array[String], spawned_ship: Node3D, label: String) -> void:

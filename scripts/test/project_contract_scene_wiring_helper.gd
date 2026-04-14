@@ -67,6 +67,25 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 		)
 
 	_run_main_player_effect_scene_wiring_pass(failures)
+	await _run_result_scene_wiring_pass(owner, failures, wait_frames_after_attach)
+
+
+static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], wait_frames_after_attach: int) -> void:
+	var packed := load("res://scenes/ui/result_screen.tscn") as PackedScene
+	if packed == null:
+		failures.append("result scene wiring load failed")
+		return
+	var result_root := packed.instantiate()
+	if result_root == null:
+		failures.append("result scene wiring instantiate failed")
+		return
+	owner.add_child(result_root)
+	await _wait_frames(owner, wait_frames_after_attach)
+	for node_path in ["Content/TitleBlock/Title", "Content/TitleBlock/Subtitle", "Content/Body/SummaryPanel/Margin/SummaryList", "Content/Body/WeaponPanel/Margin/WeaponList", "Content/ButtonBlock/RestartButton", "Content/ButtonBlock/MainMenuButton"]:
+		if result_root.get_node_or_null(str(node_path)) == null:
+			failures.append("result scene wiring missing node: %s" % node_path)
+	result_root.queue_free()
+	await _wait_frames(owner, 1)
 
 
 static func _run_main_player_effect_scene_wiring_pass(failures: Array[String]) -> void:

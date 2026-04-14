@@ -5,10 +5,12 @@ const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.
 const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
 const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
 const LevelManagerUpgradeFlowHelper = preload("res://scripts/managers/level_manager_upgrade_flow_helper.gd")
+const RunResultStore = preload("res://scripts/ui/results/run_result_store.gd")
 const DEBUG_LEVEL_LOGS := false
 const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
 const REWARD_RULES_DATA_PATH := "res://data/reward_rules.json"
 const PAUSE_MENU_SCENE := preload("res://scenes/ui/pause_menu.tscn")
+const RESULT_SCENE_PATH := "res://scenes/ui/result_screen.tscn"
 
 ## 레벨 매니저 (Level Manager)
 ## 게임 시간 경과에 따라 난이도(레벨)를 관리하고 스포너에게 지시
@@ -79,6 +81,7 @@ var _boss_arena_half_extents_runtime: Vector2 = Vector2.ZERO
 var _boss_boundary_container: Node3D = null
 var _boss_boundary_elapsed: float = 0.0
 var _boss_boundary_hidden_for_current_boss: bool = false
+var _victory_result_transition_started: bool = false
 
 const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
@@ -852,6 +855,7 @@ func show_victory() -> void:
 	if _victory_triggered:
 		return
 	_victory_triggered = true
+	RunResultStore.set_latest_result(_build_victory_result())
 	
 	# 실시간 저장이므로 여기서는 메시지만 처리
 	print("[Win] 승리! 현재 판에서 %d 골드 획득" % current_score)
@@ -861,6 +865,71 @@ func show_victory() -> void:
 			hud.show_victory_with_damage(get_weapon_damage_rows(8), get_total_weapon_damage())
 		elif hud.has_method("show_victory"):
 			hud.show_victory()
+	_schedule_result_scene_transition()
+
+
+func _build_victory_result() -> Dictionary:
+	var player_ship: Node = EntityRegistry.get_first_ship_by_team("player")
+	var crew_alive: int = 0
+	var crew_capacity: int = 0
+	var support_count: int = 0
+	var hull_hp: float = 0.0
+	var hull_hp_max: float = 0.0
+	if is_instance_valid(player_ship):
+		crew_alive = int(player_ship.call("get_alive_crew_count")) if player_ship.has_method("get_alive_crew_count") else 0
+		if player_ship.get("max_crew_count") != null:
+			crew_capacity = int(player_ship.get("max_crew_count"))
+		if player_ship.has_method("_get_support_fleet_ships"):
+			support_count = player_ship.call("_get_support_fleet_ships").size()
+		if player_ship.get("current_hull_hp") != null:
+			hull_hp = float(player_ship.get("current_hull_hp"))
+		if player_ship.get("max_hull_hp") != null:
+			hull_hp_max = float(player_ship.get("max_hull_hp"))
+	var result: Dictionary = {
+		"title": "항해 결과",
+		"outcome": _get_victory_outcome_text(),
+		"survived_seconds": current_time,
+		"gold": current_score,
+		"level": current_level,
+		"difficulty": game_difficulty,
+		"ships_sunk": ships_sunk,
+		"ships_derelicted": ships_derelicted,
+		"soldiers_killed": soldiers_killed,
+		"soldiers_slain": soldiers_slain,
+		"soldiers_drowned": soldiers_drowned,
+		"crew_alive": crew_alive,
+		"crew_capacity": crew_capacity,
+		"support_count": support_count,
+		"hull_hp": hull_hp,
+		"hull_hp_max": hull_hp_max,
+		"total_weapon_damage": get_total_weapon_damage(),
+		"weapon_rows": get_weapon_damage_rows(12),
+	}
+	return result
+
+
+func _get_victory_outcome_text() -> String:
+	if _boss_triggered:
+		return "최종 보스 격침"
+	return "항해 생존"
+
+
+func _schedule_result_scene_transition() -> void:
+	if _victory_result_transition_started:
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	_victory_result_transition_started = true
+	var timer := get_tree().create_timer(2.2, true, false, true)
+	timer.timeout.connect(_go_to_result_scene)
+
+
+func _go_to_result_scene() -> void:
+	if not is_inside_tree():
+		return
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file(RESULT_SCENE_PATH)
 
 
 func show_meta_shop() -> void:

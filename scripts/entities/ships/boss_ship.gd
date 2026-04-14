@@ -25,6 +25,7 @@ var cached_lm: Node = null
 var _merit_granted: bool = false
 var _victory_reported: bool = false
 var _victory_report_retry_count: int = 0
+var _defeat_flourish_started: bool = false
 var crew_composition: Array[String] = []
 
 @export var ship_type: String = "atakebune_mid":
@@ -370,6 +371,7 @@ func die() -> void:
 	is_dying = true
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
 		cached_lm.update_boss_hp(0.0, max_hull_hp)
+	_play_final_boss_defeat_flourish()
 	_try_report_final_boss_victory()
 	
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
@@ -427,6 +429,64 @@ func die() -> void:
 	# 삭제 지연
 	leaking_rate = 0.0 # 사망 시 누수 중단
 	get_tree().create_timer(5.0).timeout.connect(queue_free)
+
+
+func _play_final_boss_defeat_flourish() -> void:
+	if tier < 2 or _defeat_flourish_started:
+		return
+	_defeat_flourish_started = true
+	if not is_instance_valid(cached_lm):
+		cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
+	if is_instance_valid(cached_lm) and "hud" in cached_lm:
+		_cached_hud = cached_lm.hud
+	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_gust_warning_message"):
+		_cached_hud.show_gust_warning_message("최종 보스 격침!", 2.4)
+	if not is_instance_valid(_cached_audio_manager):
+		_cached_audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+		_cached_audio_manager.play_sfx("rocket_launch", global_position, 0.75, 6.0)
+		_cached_audio_manager.play_sfx("water_splash_large", global_position, 0.8, 5.0)
+		_cached_audio_manager.play_sfx("level_up", null, 0.9, 0.0)
+	_spawn_final_boss_defeat_splashes()
+	_start_final_boss_defeat_slowdown()
+
+
+func _spawn_final_boss_defeat_splashes() -> void:
+	if not water_splash_scene:
+		return
+	var splash_offsets: Array[Vector3] = [
+		Vector3.ZERO,
+		Vector3(-3.2, 0.0, -2.6),
+		Vector3(3.0, 0.0, 2.4),
+	]
+	for offset in splash_offsets:
+		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
+		get_tree().root.add_child(splash)
+		splash.global_position = global_position + offset
+		splash.global_position.y = 0.15
+		if splash.has_method("configure_as_sink"):
+			splash.configure_as_sink()
+		if splash.has_method("set_intensity"):
+			splash.set_intensity(1.35)
+		if splash.has_method("pool_activate"):
+			splash.pool_activate()
+
+
+func _start_final_boss_defeat_slowdown() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var previous_time_scale: float = Engine.time_scale
+	if previous_time_scale <= 0.45:
+		return
+	Engine.time_scale = 0.38
+	var tree := get_tree()
+	if not is_instance_valid(tree):
+		Engine.time_scale = previous_time_scale
+		return
+	var restore_time_scale := func() -> void:
+		if Engine.time_scale <= 0.45:
+			Engine.time_scale = previous_time_scale
+	tree.create_timer(0.42, true, false, true).timeout.connect(restore_time_scale, CONNECT_ONE_SHOT)
 
 
 func _try_report_final_boss_victory() -> void:
