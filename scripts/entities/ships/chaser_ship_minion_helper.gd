@@ -29,19 +29,20 @@ const SUPPORT_IDLE_ORBIT_SPEED := 0.65
 const SUPPORT_IDLE_SPEED_RESPONSE := 2.4
 const SUPPORT_ASSIST_THREAT_RANGE := 34.0
 const SUPPORT_ASSIST_CLOSE_RANGE := 22.0
-const SUPPORT_ASSIST_RECALL_DISTANCE := 40.0
-const SUPPORT_ASSIST_LEASH_DISTANCE := 50.0
-const SUPPORT_ASSIST_SPEED_RESPONSE := 1.55
+const SUPPORT_ASSIST_SOFT_RECALL_DISTANCE := 32.0
+const SUPPORT_ASSIST_RECALL_DISTANCE := 36.0
+const SUPPORT_ASSIST_LEASH_DISTANCE := 46.0
+const SUPPORT_ASSIST_SPEED_RESPONSE := 1.85
 const SUPPORT_ASSIST_EMERGENCY_THREAT_RANGE := 58.0
 const SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE := 80.0
 const SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE := 92.0
 const SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE := 2.05
 const SUPPORT_ASSIST_SEPARATION_RADIUS := 10.0
 const SUPPORT_ASSIST_SEPARATION_FORCE := 1.1
-const SUPPORT_ASSIST_ROWING_WIND_FLOOR := 0.72
-const SUPPORT_ASSIST_EMERGENCY_ROWING_WIND_FLOOR := 0.76
-const SUPPORT_ASSIST_ROWING_SPEED_BONUS := 0.18
-const SUPPORT_ASSIST_EMERGENCY_ROWING_SPEED_BONUS := 0.22
+const SUPPORT_ASSIST_ROWING_WIND_FLOOR := 0.78
+const SUPPORT_ASSIST_EMERGENCY_ROWING_WIND_FLOOR := 0.82
+const SUPPORT_ASSIST_ROWING_SPEED_BONUS := 0.24
+const SUPPORT_ASSIST_EMERGENCY_ROWING_SPEED_BONUS := 0.30
 const SUPPORT_ASSIST_TARGET_ID_META := "support_assist_target_id"
 const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
 const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
@@ -560,8 +561,8 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 		heading_point = desired_point
 	var desired_speed_mult: float = clampf(
 		dist_to_lane / (9.0 if rescue_assist else (11.0 if emergency_assist else 16.0)),
-		0.42 if rescue_assist else (0.35 if emergency_assist else 0.18),
-		1.22 if rescue_assist else (1.18 if emergency_assist else 0.78)
+		0.42 if rescue_assist else (0.35 if emergency_assist else 0.24),
+		1.22 if rescue_assist else (1.18 if emergency_assist else 0.92)
 	)
 	return {
 		"desired_point": desired_point,
@@ -651,7 +652,8 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 	var recall_distance: float = SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE if deck_emergency else SUPPORT_ASSIST_RECALL_DISTANCE
 	var leash_distance: float = SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE if deck_emergency else SUPPORT_ASSIST_LEASH_DISTANCE
 	var threat_range: float = SUPPORT_ASSIST_EMERGENCY_THREAT_RANGE if deck_emergency else SUPPORT_ASSIST_THREAT_RANGE
-	if ship.global_position.distance_to(player_ship.global_position) > recall_distance:
+	var support_dist_to_player: float = ship.global_position.distance_to(player_ship.global_position)
+	if support_dist_to_player > recall_distance:
 		_clear_support_assist_target_lock(ship)
 		return null
 
@@ -664,15 +666,18 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 	ship.set_meta(SUPPORT_ASSIST_LOCK_TIMER_META, lock_timer)
 	var deck_contested: bool = player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true
 	var deck_overrun: bool = player_ship.get("deck_is_overrun") == true
+	var player_boarding_attacker: Node3D = null
+	if player_ship.has_method("get_boarding_attacker_ship"):
+		player_boarding_attacker = player_ship.call("get_boarding_attacker_ship")
 	if _is_support_rescue_target(ship, player_ship):
-		var support_dist_to_player: float = ship.global_position.distance_to(player_ship.global_position)
 		if support_dist_to_player <= leash_distance:
 			_set_support_assist_target_lock(ship, player_ship)
 			return player_ship
+	if not deck_emergency and support_dist_to_player > SUPPORT_ASSIST_SOFT_RECALL_DISTANCE and not is_instance_valid(player_boarding_attacker):
+		_clear_support_assist_target_lock(ship)
+		return null
 	if _is_support_formation_hold_enabled(ship):
-		var hold_boarding_attacker: Node3D = null
-		if player_ship.has_method("get_boarding_attacker_ship"):
-			hold_boarding_attacker = player_ship.call("get_boarding_attacker_ship")
+		var hold_boarding_attacker: Node3D = player_boarding_attacker
 		if is_instance_valid(hold_boarding_attacker) and not _is_ship_disabled(hold_boarding_attacker):
 			var hold_support_dist: float = ship.global_position.distance_to(hold_boarding_attacker.global_position)
 			if hold_support_dist <= leash_distance:
@@ -715,9 +720,7 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 			best_score = score
 			best_target = enemy
 
-	var boarding_attacker: Node3D = null
-	if player_ship.has_method("get_boarding_attacker_ship"):
-		boarding_attacker = player_ship.call("get_boarding_attacker_ship")
+	var boarding_attacker: Node3D = player_boarding_attacker
 	if is_instance_valid(boarding_attacker) and not _is_ship_disabled(boarding_attacker):
 		var support_dist_to_attacker: float = ship.global_position.distance_to(boarding_attacker.global_position)
 		if support_dist_to_attacker <= leash_distance:

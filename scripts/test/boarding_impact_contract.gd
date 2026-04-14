@@ -80,6 +80,7 @@ func _run_boarding_requires_impact_contract(failures: Array[String]) -> void:
 	_verify_enemy_boarding_latch_bonus_is_scoped(failures)
 	_verify_enemy_boarding_pull_bonus_is_scoped(failures)
 	_verify_boarding_pull_requires_active_rope_visual(failures)
+	_verify_lost_contact_without_rope_does_not_drive_boarding_motion(failures)
 
 
 func _verify_proximity_does_not_board(failures: Array[String]) -> void:
@@ -276,6 +277,35 @@ func _verify_boarding_pull_requires_active_rope_visual(failures: Array[String]) 
 		failures.append("boarding attacker kept pulling after rope visuals were cleared")
 	if defender_pull_after_clear.length() > 0.001:
 		failures.append("boarding defender kept being pulled after rope visuals were cleared")
+
+	attacker.free()
+	defender.free()
+
+
+func _verify_lost_contact_without_rope_does_not_drive_boarding_motion(failures: Array[String]) -> void:
+	var attacker: Node = AttackerScript.new()
+	add_child(attacker)
+	attacker.set("team", "enemy")
+	attacker.set("is_boarding", true)
+	attacker.set("current_speed", 0.0)
+	attacker.set("boarding_break_distance", 20.0)
+	attacker.set("_initial_rope_deployed", false)
+	attacker.set("_full_rope_deployed", false)
+	attacker.global_position = Vector3.ZERO
+
+	var defender := MockTarget.new()
+	add_child(defender)
+	defender.global_position = Vector3(12.0, 0.0, 0.0)
+	attacker.set("boarding_target", defender)
+	defender.set_boarding_attacker_ship(attacker)
+
+	var before_pos: Vector3 = attacker.global_position
+	attacker.call("_process_boarding", 0.5)
+	var moved: float = attacker.global_position.distance_to(before_pos)
+	if moved > 0.01:
+		failures.append("boarding ship kept driving contact motion after rope visual was gone")
+	if attacker.get("is_boarding") != true:
+		failures.append("boarding lost-contact fixture canceled before the break distance")
 
 	attacker.free()
 	defender.free()

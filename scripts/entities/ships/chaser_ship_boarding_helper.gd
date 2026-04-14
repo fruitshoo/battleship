@@ -19,6 +19,11 @@ static func process_boarding(ship, delta: float) -> void:
 	var flat_to_target = target_pos - ship.global_position
 	flat_to_target.y = 0.0
 	var dist_to_target = flat_to_target.length()
+	var rope_link_active: bool = _has_active_boarding_rope_link(ship, ship.boarding_target)
+	if dist_to_target > _get_effective_boarding_distance(ship, ship.boarding_target) and not rope_link_active:
+		ship._process_boarding_common(delta)
+		ship._apply_bobbing_effect()
+		return
 
 	var motion := _build_boarding_motion(ship, ship.boarding_target, target_pos, flat_to_target, dist_to_target)
 	var contact_mode: String = str(ship.get_meta("boarding_contact_mode", ""))
@@ -35,11 +40,11 @@ static func process_boarding(ship, delta: float) -> void:
 
 	var correction_velocity: Vector3 = motion["correction_velocity"]
 	var correction_blend: float = lerpf(0.72, 1.0, motion_settle)
-	if ship._initial_rope_deployed:
+	if rope_link_active:
 		correction_blend *= LATCHED_CORRECTION_BLEND
 	correction_velocity *= correction_blend
 	var approach_velocity: Vector3 = heading_dir * ship.current_speed + correction_velocity
-	var pull_blend: float = LATCHED_PULL_BLEND if ship._initial_rope_deployed else lerpf(0.25, 0.7, motion_settle)
+	var pull_blend: float = LATCHED_PULL_BLEND if rope_link_active else lerpf(0.25, 0.7, motion_settle)
 	var pull_force = ship._calculate_boarding_pull() * pull_blend
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + (approach_velocity + pull_force * delta) * delta
@@ -51,6 +56,23 @@ static func process_boarding(ship, delta: float) -> void:
 
 	ship._apply_bobbing_effect()
 	ship._process_boarding_common(delta)
+
+
+static func _has_active_boarding_rope_link(ship, target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if ship.has_method("has_boarding_rope_link_to"):
+		return ship.call("has_boarding_rope_link_to", target_ship) == true
+	return ship.get("_initial_rope_deployed") == true
+
+
+static func _get_effective_boarding_distance(ship, target_ship: Node3D) -> float:
+	if not is_instance_valid(target_ship):
+		return ship.max_boarding_distance
+	if not ship.has_method("get_collision_distance_to"):
+		return ship.max_boarding_distance
+	var contact_distance: float = float(ship.call("get_collision_distance_to", target_ship))
+	return maxf(ship.max_boarding_distance, contact_distance * 0.94)
 
 
 static func _update_motion_settle(ship, delta: float) -> float:

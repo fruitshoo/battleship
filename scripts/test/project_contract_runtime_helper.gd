@@ -53,16 +53,18 @@ static func _run_single_smoke_pass(owner: Node, failures: Array[String], packed:
 		failures.append("preview base is missing PlayerShip for %s smoke" % label)
 
 	var spawner: Node = smoke_root.get_node_or_null("EnemySpawner")
+	var spawned_boss: Node3D = null
 	if not is_instance_valid(spawner):
 		failures.append("preview base is missing EnemySpawner for %s smoke" % label)
 	else:
-		var spawned_boss: Node3D = null
 		if spawner.has_method(spawn_method):
 			spawned_boss = spawner.call(spawn_method) as Node3D
 			await _wait_frames(owner, wait_frames_after_spawn)
 		_validate_spawned_boss(failures, spawned_boss, label)
 
 	_validate_registry_smoke(failures, player_ship, label)
+	if label == "final boss":
+		await _validate_final_boss_victory_on_death(owner, failures, spawned_boss, level_manager, label)
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
@@ -550,6 +552,25 @@ static func _validate_spawned_boss(failures: Array[String], spawned_boss: Node3D
 	var max_hull_hp: float = float(spawned_boss.get("max_hull_hp"))
 	if int(spawned_boss.get("tier")) == 1 and max_hull_hp > 720.0:
 		failures.append("%s mid boss hull contract failed: %.1f > 720.0" % [label, max_hull_hp])
+
+
+static func _validate_final_boss_victory_on_death(owner: Node, failures: Array[String], spawned_boss: Node3D, level_manager: Node, label: String) -> void:
+	if not is_instance_valid(spawned_boss):
+		return
+	if int(spawned_boss.get("tier")) < 2:
+		failures.append("%s victory contract fixture was not tier 2" % label)
+		return
+	if not is_instance_valid(level_manager):
+		failures.append("%s victory contract missing level manager" % label)
+		return
+	if level_manager.get("_victory_triggered") == true:
+		failures.append("%s victory contract started with victory already triggered" % label)
+		return
+	if spawned_boss.has_method("die"):
+		spawned_boss.call("die")
+		await _wait_frames(owner, 1)
+	if level_manager.get("_victory_triggered") != true:
+		failures.append("%s death did not trigger victory" % label)
 
 
 static func _validate_spawned_ship(failures: Array[String], spawned_ship: Node3D, label: String) -> void:

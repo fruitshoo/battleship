@@ -23,6 +23,8 @@ var leaking_rate: float = 0.0
 var _leak_tick_timer: float = 0.0
 var cached_lm: Node = null
 var _merit_granted: bool = false
+var _victory_reported: bool = false
+var _victory_report_retry_count: int = 0
 var crew_composition: Array[String] = []
 
 @export var ship_type: String = "atakebune_mid":
@@ -368,6 +370,7 @@ func die() -> void:
 	is_dying = true
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
 		cached_lm.update_boss_hp(0.0, max_hull_hp)
+	_try_report_final_boss_victory()
 	
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
 	_evacuate_player_soldiers_as_survivors()
@@ -405,9 +408,7 @@ func die() -> void:
 		var boss_ship = instance_from_id(boss_id)
 		if not is_instance_valid(boss_ship):
 			return
-		# 중간 보스(tier 1) 격침은 승리 조건이 아니다.
-		if int(boss_ship.get("tier")) >= 2 and is_instance_valid(boss_ship.cached_lm) and boss_ship.cached_lm.has_method("show_victory"):
-			boss_ship.cached_lm.show_victory()
+		boss_ship.call("_try_report_final_boss_victory")
 	)
 	
 	# 아이템은 최종 보스(tier 2 이상)만 드롭한다.
@@ -426,6 +427,20 @@ func die() -> void:
 	# 삭제 지연
 	leaking_rate = 0.0 # 사망 시 누수 중단
 	get_tree().create_timer(5.0).timeout.connect(queue_free)
+
+
+func _try_report_final_boss_victory() -> void:
+	if _victory_reported or tier < 2:
+		return
+	if not is_instance_valid(cached_lm):
+		cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
+	if not is_instance_valid(cached_lm) or not cached_lm.has_method("show_victory"):
+		if _victory_report_retry_count < 3:
+			_victory_report_retry_count += 1
+			call_deferred("_try_report_final_boss_victory")
+		return
+	_victory_reported = true
+	cached_lm.show_victory()
 
 
 func _drop_treasure_chest() -> void:

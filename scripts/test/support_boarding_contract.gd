@@ -440,7 +440,7 @@ func _verify_support_hold_formation_allows_boarding_attacker(failures: Array[Str
 func _verify_support_free_assist_recalls_near_player(failures: Array[String]) -> void:
 	var support := MockSupportShip.new()
 	add_child(support)
-	support.global_position = Vector3(41.0, 0.0, 0.0)
+	support.global_position = Vector3(33.5, 0.0, 0.0)
 	support.support_hold_formation = false
 
 	var player := MockTargetShip.new()
@@ -452,17 +452,17 @@ func _verify_support_free_assist_recalls_near_player(failures: Array[String]) ->
 	var enemy := MockTargetShip.new()
 	add_child(enemy)
 	enemy.team = "enemy"
-	enemy.global_position = Vector3(35.0, 0.0, 0.0)
+	enemy.global_position = Vector3(12.0, 0.0, 0.0)
 	EntityRegistry.register_ship(enemy)
 
 	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
 	if selected != null:
-		failures.append("support free assist stayed in combat after exceeding player recall distance")
+		failures.append("support free assist stayed in combat after exceeding player soft recall distance")
 	if support.has_meta("support_assist_target_id"):
-		failures.append("support free assist kept target lock after player recall")
-	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false) < 0.72:
+		failures.append("support free assist kept target lock after player soft recall")
+	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false) < 0.78:
 		failures.append("support free assist rowing wind floor is too weak for player follow")
-	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.15:
+	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.20:
 		failures.append("support free assist rowing speed bonus is too weak at follow distance")
 
 	EntityRegistry.unregister_ship(enemy)
