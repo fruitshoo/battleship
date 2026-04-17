@@ -133,6 +133,7 @@ func _ready() -> void:
 	_verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures)
 	_verify_cross_ship_attack_state_exits_unreachable_melee(failures)
 	_verify_soldier_visual_slot_contract(failures)
+	_verify_dead_boarding_jump_finish_keeps_death_pose(failures)
 	_verify_enemy_combat_damage_still_dies(failures)
 	_verify_player_drowning_still_dies(failures)
 	if failures.is_empty():
@@ -373,6 +374,46 @@ func _verify_soldier_visual_slot_contract(failures: Array[String]) -> void:
 		failures.append("soldier visual helper did not resolve custom visual pose root")
 	if fallback_mesh != null and fallback_mesh.visible:
 		failures.append("soldier visual scene contract did not hide fallback mesh behind custom visual")
+
+	soldier.queue_free()
+
+
+func _verify_dead_boarding_jump_finish_keeps_death_pose(failures: Array[String]) -> void:
+	var ship := _make_ship("player")
+	var soldiers := Node3D.new()
+	soldiers.name = "Soldiers"
+	ship.add_child(soldiers)
+
+	var soldier := SOLDIER_SCENE.instantiate()
+	if soldier == null:
+		failures.append("boarding jump death contract could not instantiate soldier")
+		return
+	soldier.team = "enemy"
+	soldier.set("player_visual_scene", null)
+	soldier.set("enemy_visual_scene", null)
+	soldier.set("captain_visual_scene", null)
+	soldiers.add_child(soldier)
+	soldier.owned_ship = ship
+	soldier.home_ship = ship
+
+	soldier.begin_boarding_jump_pose("boarding")
+	SoldierLifecycleHelper.die(soldier)
+	var hand_pivot := soldier.get_node_or_null("HandPivot") as Node3D
+	if hand_pivot == null:
+		failures.append("boarding jump death contract missing hand pivot")
+		soldier.queue_free()
+		return
+	if hand_pivot.visible:
+		failures.append("dead boarding jumper did not hide weapon hand on death")
+
+	soldier.finish_boarding_jump_pose("on_deck")
+
+	if soldier.current_state != soldier.State.DEAD:
+		failures.append("finishing a dead boarding jump changed the soldier state")
+	if soldier.is_jumping_value() != false:
+		failures.append("finishing a dead boarding jump did not clear jumping flag")
+	if hand_pivot.visible:
+		failures.append("finishing a dead boarding jump restored the standing/recovery pose")
 
 	soldier.queue_free()
 

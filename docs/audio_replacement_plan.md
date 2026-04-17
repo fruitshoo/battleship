@@ -65,6 +65,44 @@ These can be swapped later without blocking release prep.
 - `metal_drop`
 - miscellaneous one-off placeholder clips
 
+### Future Flavor: Cute Soldier Charge Shouts
+
+This is a future task, not part of the current audio pass.
+Reference mood: `Shieldwall`-style small, cute soldier charge voices rather than realistic war screams.
+
+Target feel:
+
+- Short toy-soldier shouts, about 0.3-0.7 seconds each.
+- Cute and lively, not harsh, scary, or overly realistic.
+- Best for emotional attachment to individual soldiers as the crew-survival loop becomes more important.
+
+Suggested trigger points:
+
+- Charge start: when a small group commits to boarding or rushes into melee.
+- Boarding jump / deck clash: low random chance on the first contact moment.
+- Capture success: a tiny cheer after an enemy ship is secured.
+
+Implementation guardrails:
+
+- Do not let every soldier shout. Pick 1-3 voices from a group event.
+- Add a group cooldown, roughly 6-12 seconds, so it does not become noisy.
+- Use small pitch variation per playback to create several soldier-like voices from a few recordings.
+- Keep camera-distance attenuation mild, similar to recent melee/bow SFX tuning.
+- Avoid triggering during constant idle guard standoffs; it should mark commitment or success.
+
+Candidate file plan:
+
+- `sfx_soldier_charge_wa_01.ogg`
+- `sfx_soldier_charge_wa_02.ogg`
+- `sfx_soldier_charge_gaja_01.ogg`
+- `sfx_soldier_charge_chyeora_01.ogg`
+- `sfx_soldier_cheer_manse_01.ogg`
+
+Preferred source:
+
+- First-party recordings or custom-made voice clips.
+- If using an external pack, record exact source and license in [audio_license_inventory.md](/Users/shk/Godot/battleship/docs/audio_license_inventory.md).
+
 ## Release blockers
 
 These should not remain unresolved near release:

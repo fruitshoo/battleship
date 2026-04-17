@@ -7,89 +7,120 @@
     "max_distance_limit": 115.0,
     "reposition_check_interval": 1.0
   },
-  "formation": {
-    "blockade_spacing": 14.0,
-    "fleet_templates": {
-      "light": [
-        {
-          "name": "light_raiders",
-          "formation_type": "column",
-          "ships": [
-            { "ship_type": "kobayabune_melee", "role": "flanker" },
-            { "ship_type": "kobayabune_melee", "role": "vanguard" }
-          ]
-        },
-        {
-          "name": "light_hunters",
-          "formation_type": "wedge",
-          "ships": [
-            { "ship_type": "kobayabune_melee", "role": "vanguard" },
-            { "ship_type": "sekibune_melee", "role": "vanguard" }
-          ]
-        },
-        {
-          "name": "light_swarm",
-          "formation_type": "wedge",
-          "ships": [
-            { "ship_type": "kobayabune_melee", "role": "flanker" },
-            { "ship_type": "kobayabune_melee", "role": "vanguard" },
-            { "ship_type": "kobayabune_melee", "role": "flanker" }
-          ]
-        }
-      ],
-      "heavy": [
-        {
-          "name": "cannon_line",
-          "formation_type": "line_abreast",
-          "ships": [
-            { "ship_type": "sekibune_cannon", "role": "gunline" },
-            { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
-          ]
-        },
-        {
-          "name": "assault_line",
-          "formation_type": "echelon",
-          "ships": [
-            { "ship_type": "sekibune_melee", "role": "vanguard" },
-            { "ship_type": "sekibune_cannon", "role": "gunline" }
-          ]
-        }
-      ],
-      "mixed": [
-        {
-          "name": "mixed_assault",
-          "formation_type": "wedge",
-          "ships": [
-            { "ship_type": "kobayabune_melee", "role": "flanker" },
-            { "ship_type": "sekibune_melee", "role": "vanguard" },
-            { "ship_type": "sekibune_cannon", "role": "gunline" }
-          ]
-        },
-        {
-          "name": "mixed_crossfire",
-          "formation_type": "line_abreast",
-          "ships": [
-            { "ship_type": "sekibune_cannon", "role": "gunline" },
-            { "ship_type": "kobayabune_melee", "role": "vanguard" },
-            { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
-          ]
-        },
-        {
-          "name": "mixed_breaker",
-          "formation_type": "echelon",
-          "ships": [
-            { "ship_type": "sekibune_melee", "role": "vanguard" },
-            { "ship_type": "kobayabune_melee", "role": "flanker" },
-            { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
-          ]
-        }
+  "spawn_recipes": {
+    "light_raiders": {
+      "formation_type": "column",
+      "ships": [
+        { "ship_type": "kobayabune_melee", "role": "flanker" },
+        { "ship_type": "kobayabune_melee", "role": "vanguard" }
       ]
     },
-    "fleet_progression": [
-      { "start_time": 0.0, "end_time": 120.0, "light_weight": 0.8, "mixed_weight": 0.2, "heavy_weight": 0.0 },
-      { "start_time": 120.0, "end_time": 300.0, "light_weight": 0.45, "mixed_weight": 0.45, "heavy_weight": 0.10 },
-      { "start_time": 300.0, "end_time": 9999.0, "light_weight": 0.20, "mixed_weight": 0.50, "heavy_weight": 0.30 }
-    ]
+    "light_hunters": {
+      "formation_type": "wedge",
+      "ships": [
+        { "ship_type": "kobayabune_melee", "role": "vanguard" },
+        { "ship_type": "sekibune_melee", "role": "vanguard" }
+      ]
+    },
+    "light_swarm": {
+      "formation_type": "wedge",
+      "ships": [
+        { "ship_type": "kobayabune_melee", "role": "flanker" },
+        { "ship_type": "kobayabune_melee", "role": "vanguard" },
+        { "ship_type": "kobayabune_melee", "role": "flanker" }
+      ]
+    },
+    "cannon_line": {
+      "formation_type": "line_abreast",
+      "ships": [
+        { "ship_type": "sekibune_cannon", "role": "gunline" },
+        { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+      ]
+    },
+    "assault_line": {
+      "formation_type": "echelon",
+      "ships": [
+        { "ship_type": "sekibune_melee", "role": "vanguard" },
+        { "ship_type": "sekibune_cannon", "role": "gunline" }
+      ]
+    },
+    "mixed_assault": {
+      "formation_type": "wedge",
+      "ships": [
+        { "ship_type": "kobayabune_melee", "role": "flanker" },
+        { "ship_type": "sekibune_melee", "role": "vanguard" },
+        { "ship_type": "sekibune_cannon", "role": "gunline" }
+      ]
+    },
+    "mixed_crossfire": {
+      "formation_type": "line_abreast",
+      "ships": [
+        { "ship_type": "sekibune_cannon", "role": "gunline" },
+        { "ship_type": "kobayabune_melee", "role": "vanguard" },
+        { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+      ]
+    },
+    "mixed_breaker": {
+      "formation_type": "echelon",
+      "ships": [
+        { "ship_type": "sekibune_melee", "role": "vanguard" },
+        { "ship_type": "kobayabune_melee", "role": "flanker" },
+        { "ship_type": "sekibune_cannon", "role": "pressure_gunner" }
+      ]
+    }
+  },
+  "encounter_profiles": {
+    "opening_pressure": {
+      "fleet_progression": [
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.80, "mixed": 0.20 } }
+      ]
+    },
+    "midgame_pressure": {
+      "fleet_progression": [
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.45, "mixed": 0.45, "heavy": 0.10 } }
+      ]
+    },
+    "late_battle_pressure": {
+      "fleet_progression": [
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.20, "mixed": 0.50, "heavy": 0.30 } }
+      ]
+    }
+  },
+  "scenario_triggers": [
+    {
+      "id": "enter_midgame_pressure",
+      "condition": { "elapsed_time": 120.0 },
+      "actions": [
+        { "type": "set_encounter_profile", "profile": "midgame_pressure" }
+      ]
+    },
+    {
+      "id": "enter_late_battle_pressure",
+      "condition": { "elapsed_time": 300.0 },
+      "actions": [
+        { "type": "set_encounter_profile", "profile": "late_battle_pressure" }
+      ]
+    }
+  ],
+  "formation": {
+    "blockade_spacing": 14.0,
+    "encounter_profile": "opening_pressure",
+    "fleet_templates": {
+      "light": [
+        { "recipe": "light_raiders" },
+        { "recipe": "light_hunters" },
+        { "recipe": "light_swarm" }
+      ],
+      "heavy": [
+        { "recipe": "cannon_line" },
+        { "recipe": "assault_line" }
+      ],
+      "mixed": [
+        { "recipe": "mixed_assault" },
+        { "recipe": "mixed_crossfire" },
+        { "recipe": "mixed_breaker" }
+      ]
+    }
   },
   "enemy_mix": {
     "cannon_chance_start_time": 75.0,

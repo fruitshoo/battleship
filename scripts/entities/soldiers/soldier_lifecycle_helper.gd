@@ -2,6 +2,8 @@ extends RefCounted
 class_name SoldierLifecycleHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const MELEE_DAMAGE_SOURCES := {
 	"sword": true,
@@ -12,7 +14,7 @@ const MELEE_DAMAGE_SOURCES := {
 const PLAYER_INCAPACITATED_RECOVERY_DELAY: float = 16.0
 const PLAYER_INCAPACITATED_RECOVERY_HEALTH_RATIO: float = 0.35
 const PLAYER_INCAPACITATED_MIN_RECOVERY_DELAY: float = 3.0
-const SUPPORT_RESCUE_BOARDING_PURPOSE := "support_rescue_boarding"
+const SUPPORT_RESCUE_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_SUPPORT_RESCUE
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -105,7 +107,7 @@ static func _is_fighting_defender_on_owned_ship(soldier) -> bool:
 	if not is_instance_valid(soldier.current_target):
 		return false
 	var target: Node = soldier.current_target
-	if target.has_method("is_dead_soldier") and target.is_dead_soldier():
+	if SoldierStateHelper.is_dead_soldier(target):
 		return false
 	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
 	if target_team == soldier.team:
@@ -133,7 +135,7 @@ static func _is_support_rescue_boarding_active(player_ship: Node) -> bool:
 			continue
 		if support_ship.get("boarding_target") != player_ship:
 			continue
-		if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
+		if not ShipBoardingMetaHelper.is_boarding_purpose(support_ship, SUPPORT_RESCUE_BOARDING_PURPOSE):
 			continue
 		return true
 	return false
@@ -156,7 +158,7 @@ static func _find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 			continue
 		if not (other is Node3D):
 			continue
-		if other.has_method("is_dead_soldier") and other.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(other):
 			continue
 		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
 		if other_team == soldier.team:
@@ -347,7 +349,7 @@ static func _has_hostile_on_owned_ship(soldier) -> bool:
 	for other in EntityRegistry.get_soldiers_by_ship(soldier.owned_ship):
 		if other == soldier or not is_instance_valid(other):
 			continue
-		if other.has_method("is_dead_soldier") and other.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(other):
 			continue
 		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
 		if other_team != soldier.team:

@@ -44,8 +44,9 @@ static func add_command_xp_from_soldier_kill(lm: Node, kill_count: int = 1) -> v
 static func add_player_weapon_damage(lm: Node, source_id: String, amount: float) -> void:
 	if source_id.is_empty() or amount <= 0.0:
 		return
-	var current = float(lm.weapon_damage_stats.get(source_id, 0.0))
-	lm.weapon_damage_stats[source_id] = current + amount
+	var normalized_source_id := _normalize_damage_source_id(source_id)
+	var current = float(lm.weapon_damage_stats.get(normalized_source_id, 0.0))
+	lm.weapon_damage_stats[normalized_source_id] = current + amount
 
 static func get_total_weapon_damage(lm: Node) -> float:
 	var total: float = 0.0
@@ -54,9 +55,14 @@ static func get_total_weapon_damage(lm: Node) -> float:
 	return total
 
 static func get_weapon_damage_rows(lm: Node, max_rows: int = 8) -> Array:
-	var rows: Array = []
+	var grouped_stats: Dictionary = {}
 	for key in lm.weapon_damage_stats.keys():
-		var dmg = float(lm.weapon_damage_stats[key])
+		var normalized_key := _normalize_damage_source_id(str(key))
+		grouped_stats[normalized_key] = float(grouped_stats.get(normalized_key, 0.0)) + float(lm.weapon_damage_stats[key])
+
+	var rows: Array = []
+	for key in grouped_stats.keys():
+		var dmg = float(grouped_stats[key])
 		if dmg <= 0.0:
 			continue
 		rows.append({
@@ -70,6 +76,14 @@ static func get_weapon_damage_rows(lm: Node, max_rows: int = 8) -> Array:
 	if rows.size() > max_rows:
 		return rows.slice(0, max_rows)
 	return rows
+
+static func _normalize_damage_source_id(source_id: String) -> String:
+	var normalized := source_id.strip_edges()
+	if normalized.is_empty():
+		return normalized
+	if normalized.begins_with("cannon"):
+		return "cannon"
+	return normalized.split(":", false, 1)[0]
 
 static func add_xp(lm: Node, amount: int) -> void:
 	if _env_flag_enabled("BATTLESHIP_DISABLE_RUNTIME_REWARDS"):

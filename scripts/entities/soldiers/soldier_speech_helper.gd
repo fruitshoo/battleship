@@ -7,6 +7,7 @@ const SPEECH_TIMER_META := "speech_timer"
 const SPEECH_VISIBLE_TIMER_META := "speech_visible_timer"
 const SPEECH_DURATION_META := "speech_duration"
 const SPEECH_LAST_CONTEXT_META := "speech_last_context"
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const CAPTAIN_GENERAL_LINES: Array[String] = [
 	"대열을 지켜라!",
@@ -127,7 +128,7 @@ static func _can_speak(soldier) -> bool:
 	var team := str(soldier.get("team"))
 	if team != "player" and not _is_enemy_boarder_on_player_ship(soldier):
 		return false
-	if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+	if SoldierStateHelper.is_dead_soldier(soldier):
 		return false
 	if bool(soldier.get("_is_jumping")):
 		return false
@@ -165,6 +166,9 @@ static func _configure_label(soldier, label: Label3D) -> void:
 	label.font_size = 72 if is_captain else 64
 	label.outline_size = 16 if is_captain else 14
 	label.extra_cull_margin = 16.0
+	label.no_depth_test = true
+	label.render_priority = 20
+	label.outline_render_priority = 21
 	label.modulate = _get_label_color(soldier, 0.0)
 
 

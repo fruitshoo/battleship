@@ -175,7 +175,8 @@ func _resolve_terminal_hit() -> void:
 		return
 	if NodeContractHelper.get_team_tag(target_node) == team:
 		return
-	if global_position.distance_to(target_node.global_position) > terminal_hit_radius:
+	var target_aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.5)
+	if global_position.distance_to(target_aim_point) > terminal_hit_radius:
 		return
 	if target_node.has_method("take_damage"):
 		target_node.take_damage(damage, global_position, damage_source)

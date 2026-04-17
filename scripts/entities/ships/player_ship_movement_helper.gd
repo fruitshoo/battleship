@@ -81,7 +81,7 @@ static func update_movement(ship, delta: float) -> void:
 	var velocity = forward * ship.current_speed
 	var sep = calculate_separation(ship)
 	velocity += sep
-	velocity += ship._calculate_boarding_pull() * delta
+	velocity += ship._calculate_boarding_pull_velocity(delta)
 	velocity += ship._calculate_collision_repulsion() * delta
 	ship.position += velocity * delta
 	var wake_active = ship.current_speed > 0.5 or sep.length() > 0.2

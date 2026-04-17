@@ -329,8 +329,7 @@ static func _collect_crew_stats(ship) -> Dictionary:
 		var team_tag: String = str(child.get("team"))
 		if team_tag != "player":
 			continue
-		var state_value = child.get("current_state")
-		if state_value != null and int(state_value) == 4:
+		if _is_dead_soldier_node(child):
 			continue
 		result["alive_count"] = int(result.get("alive_count", 0)) + 1
 		var role: String = "general"
@@ -371,6 +370,17 @@ static func _collect_crew_stats(ship) -> Dictionary:
 	result["sword_damage"] = melee_damage
 	result["bow_damage"] = ranged_damage
 	return result
+
+
+static func _is_dead_soldier_node(soldier: Node) -> bool:
+	if not is_instance_valid(soldier):
+		return true
+	if soldier.has_method("is_dead_soldier"):
+		return soldier.call("is_dead_soldier") == true
+	var state_value = soldier.get("current_state")
+	if soldier.has_method("is_state_value_dead"):
+		return soldier.call("is_state_value_dead", state_value) == true
+	return state_value != null and int(state_value) == 4
 
 static func _get_item_names() -> Array[String]:
 	var item_names: Array[String] = []

@@ -1,0 +1,76 @@
+{
+  "block_schema_version": 1,
+  "assembly_blocks": [
+    { "id": "ship_archetype", "catalog": "ship_archetypes", "label": "Ship Archetype", "slot": "ship", "kind": "reference", "source_path": "res://data/ship_stats.json" },
+    { "id": "ship_type", "catalog": "ship_types", "label": "Ship Type", "slot": "ship", "kind": "action", "source_path": "res://data/ship_stats.json", "action_type": "spawn_ship" },
+    { "id": "weapon_profile", "catalog": "weapon_profiles", "label": "Weapon Profile", "slot": "weapon", "kind": "reference", "source_path": "res://data/ship_stats.json" },
+    { "id": "combat_profile", "catalog": "combat_profiles", "label": "Combat Profile", "slot": "combat", "kind": "authoring_meta", "source_path": "res://data/ship_stats.json", "authoring_key": "combat_profile" },
+    { "id": "movement_intent", "catalog": "movement_intents", "label": "Movement Intent", "slot": "movement", "kind": "authoring_meta", "source_path": "res://data/authoring_palette.json", "authoring_key": "movement_intent" },
+    { "id": "spawn_recipe", "catalog": "spawn_recipes", "label": "Spawn Recipe", "slot": "encounter", "kind": "action", "source_path": "res://data/enemy_spawn_rules.json", "action_type": "spawn_recipe" },
+    { "id": "fleet_class", "catalog": "fleet_classes", "label": "Fleet Class", "slot": "encounter", "kind": "reference", "source_path": "res://data/enemy_spawn_rules.json" },
+    { "id": "encounter_profile", "catalog": "encounter_profiles", "label": "Encounter Profile", "slot": "encounter", "kind": "action", "source_path": "res://data/enemy_spawn_rules.json", "action_type": "set_encounter_profile" },
+    { "id": "scenario_trigger", "catalog": "scenario_triggers", "label": "Scenario Trigger", "slot": "trigger", "kind": "action", "source_path": "res://data/enemy_spawn_rules.json", "action_type": "run_scenario_trigger" }
+  ],
+  "ship_archetypes": [
+    { "id": "kobayabune_raider", "label": "Kobayabune Raider", "tags": ["enemy", "light", "boarding"] },
+    { "id": "sekibune_boarder", "label": "Sekibune Boarder", "tags": ["enemy", "medium", "boarding"] },
+    { "id": "sekibune_gunner", "label": "Sekibune Gunner", "tags": ["enemy", "medium", "ranged"] },
+    { "id": "atakebune_mid_boss", "label": "Atakebune Mid Boss", "tags": ["enemy", "boss", "elite"] },
+    { "id": "atakebune_final_boss", "label": "Atakebune Final Boss", "tags": ["enemy", "boss", "final"] },
+    { "id": "maengseon_support", "label": "Maengseon Support", "tags": ["player", "support"] },
+    { "id": "panokseon_player_default", "label": "Panokseon Player Default", "tags": ["player", "starter"] }
+  ],
+  "ship_types": [
+    { "id": "kobayabune_melee", "ship_archetype": "kobayabune_raider", "label": "Kobayabune Melee", "tags": ["enemy", "light", "boarding"] },
+    { "id": "sekibune_melee", "ship_archetype": "sekibune_boarder", "label": "Sekibune Melee", "tags": ["enemy", "medium", "boarding"] },
+    { "id": "sekibune_cannon", "ship_archetype": "sekibune_gunner", "label": "Sekibune Cannon", "tags": ["enemy", "medium", "ranged"] },
+    { "id": "atakebune_mid", "ship_archetype": "atakebune_mid_boss", "label": "Atakebune Mid", "tags": ["enemy", "boss", "elite"] },
+    { "id": "atakebune_final", "ship_archetype": "atakebune_final_boss", "label": "Atakebune Final", "tags": ["enemy", "boss", "final"] },
+    { "id": "maengseon_ally", "ship_archetype": "maengseon_support", "label": "Maengseon Ally", "tags": ["player", "support"] },
+    { "id": "panokseon_player", "ship_archetype": "panokseon_player_default", "label": "Panokseon Player", "tags": ["player", "starter"] }
+  ],
+  "weapon_profiles": [
+    { "id": "enemy_heavy_cannon", "label": "Enemy Heavy Cannon", "tags": ["enemy", "cannon"] },
+    { "id": "joseon_light_cannon", "label": "Joseon Light Cannon", "tags": ["player", "cannon"] },
+    { "id": "boss_singigeon", "label": "Boss Singigeon", "tags": ["enemy", "boss", "rocket"] }
+  ],
+  "combat_profiles": [
+    { "id": "raider_charger", "label": "Raider Charger", "tags": ["boarding", "close"] },
+    { "id": "boarding_charger", "label": "Boarding Charger", "tags": ["boarding", "close"] },
+    { "id": "stand_off_gunner", "label": "Stand-Off Gunner", "tags": ["ranged", "medium"] },
+    { "id": "mid_boss_gunner", "label": "Mid Boss Gunner", "tags": ["boss", "ranged"] },
+    { "id": "final_boss_gunner", "label": "Final Boss Gunner", "tags": ["boss", "ranged"] }
+  ],
+  "movement_intents": [
+    { "id": "gunner_standoff", "mode": "gunner_standoff", "family": "enemy_runtime", "label": "Gunner Standoff", "description": "Hold preferred range, face the target, and fire without boarding.", "speed": "0.18-0.95", "speed_min": 0.18, "speed_max": 0.95, "sprint": false, "tags": ["ranged", "spacing"] },
+    { "id": "boarding_side_follow", "mode": "side", "family": "enemy_runtime", "label": "Boarding Side Follow", "description": "Track alongside the target hull before committing boarders.", "speed": "0.56-1.02", "speed_min": 0.56, "speed_max": 1.02, "sprint": true, "tags": ["boarding", "side"] },
+    { "id": "boarding_contact_settle", "mode": "contact_settle", "family": "enemy_runtime", "label": "Boarding Contact Settle", "description": "Slow into a stable side-contact point for transfer.", "speed": "0.34-0.56", "speed_min": 0.34, "speed_max": 0.56, "sprint": false, "tags": ["boarding", "contact"] },
+    { "id": "rear_recovery", "mode": "rear", "family": "enemy_runtime", "label": "Rear Recovery", "description": "Recover from a rear approach into a side boarding lane.", "speed": "0.78-0.98", "speed_min": 0.78, "speed_max": 0.98, "sprint": true, "tags": ["boarding", "recovery"] },
+    { "id": "yield_overrun", "mode": "yield_overrun", "family": "enemy_runtime", "label": "Yield Overrun", "description": "Hold outside an already overrun target so closer allies can finish boarding.", "speed": "0.16-0.42", "speed_min": 0.16, "speed_max": 0.42, "sprint": false, "tags": ["spacing", "safety"] },
+    { "id": "support_assist", "mode": "support_assist", "family": "support_runtime", "label": "Support Assist", "description": "Move toward an ally or rescue target while keeping fleet spacing.", "speed": "0.24-1.22", "speed_min": 0.24, "speed_max": 1.22, "sprint": true, "tags": ["support", "assist"] }
+  ],
+  "spawn_recipes": [
+    { "id": "light_raiders", "fleet_class": "light", "label": "Light Raiders", "tags": ["opening", "boarding"] },
+    { "id": "light_hunters", "fleet_class": "light", "label": "Light Hunters", "tags": ["opening", "mixed"] },
+    { "id": "light_swarm", "fleet_class": "light", "label": "Light Swarm", "tags": ["opening", "swarm"] },
+    { "id": "cannon_line", "fleet_class": "heavy", "label": "Cannon Line", "tags": ["heavy", "ranged"] },
+    { "id": "assault_line", "fleet_class": "heavy", "label": "Assault Line", "tags": ["heavy", "boarding"] },
+    { "id": "mixed_assault", "fleet_class": "mixed", "label": "Mixed Assault", "tags": ["midgame", "boarding"] },
+    { "id": "mixed_crossfire", "fleet_class": "mixed", "label": "Mixed Crossfire", "tags": ["midgame", "ranged"] },
+    { "id": "mixed_breaker", "fleet_class": "mixed", "label": "Mixed Breaker", "tags": ["late", "pressure"] }
+  ],
+  "fleet_classes": [
+    { "id": "light", "label": "Light Pool", "recipes": ["light_raiders", "light_hunters", "light_swarm"], "tags": ["opening"] },
+    { "id": "mixed", "label": "Mixed Pool", "recipes": ["mixed_assault", "mixed_crossfire", "mixed_breaker"], "tags": ["midgame"] },
+    { "id": "heavy", "label": "Heavy Pool", "recipes": ["cannon_line", "assault_line"], "tags": ["late"] }
+  ],
+  "encounter_profiles": [
+    { "id": "opening_pressure", "label": "Opening Pressure", "tags": ["opening"] },
+    { "id": "midgame_pressure", "label": "Midgame Pressure", "tags": ["midgame"] },
+    { "id": "late_battle_pressure", "label": "Late Battle Pressure", "tags": ["late"] }
+  ],
+  "scenario_triggers": [
+    { "id": "enter_midgame_pressure", "label": "Enter Midgame Pressure", "tags": ["time", "profile_switch"] },
+    { "id": "enter_late_battle_pressure", "label": "Enter Late Battle Pressure", "tags": ["time", "profile_switch"] }
+  ]
+}

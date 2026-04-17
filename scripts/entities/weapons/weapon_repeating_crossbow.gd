@@ -1,6 +1,8 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const DEFAULT_BASE_DAMAGE: float = 7.0
 const OWNER_ATTACK_BONUS_SCALE: float = 0.25
@@ -66,15 +68,14 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 			break
 			
 		# 적이 도중에 죽었으면 발사 중단
-		if target.has_method("get_current_state_value") and target.get_current_state_value() == 3: # 3 = DEAD
+		if _is_target_dead(target):
 			break
 			
 		# 발사 위치는 활 부근으로 약간 보정 (매번 갱신)
 		var spawn_pos = attacker.global_position
 		spawn_pos.y += 0.8
 		
-		var current_target_pos = target.global_position
-		current_target_pos.y += 0.5
+		var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
 		
 		# === 예측 샷 (Predictive Aiming) ===
 		var arrow_speed = 27.0 # 연노 화살은 약간 더 빠름
@@ -137,6 +138,11 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		# 다음 발사 대기
 		if i < burst_count - 1:
 			await attacker.get_tree().create_timer(burst_delay).timeout
+
+
+func _is_target_dead(target: Node) -> bool:
+	return SoldierStateHelper.is_dead_soldier(target)
+
 
 func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 	var current = node

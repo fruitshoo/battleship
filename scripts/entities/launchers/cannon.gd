@@ -1,7 +1,8 @@
 @tool
 extends Node3D
-const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
@@ -142,25 +143,12 @@ func _process(delta: float) -> void:
 		current_target = null
 
 func _resolve_owner_ship() -> Node:
-	var node: Node = get_parent()
-	while is_instance_valid(node):
-		if node.is_in_group("ships"):
-			return node
-		if "is_sinking" in node and "is_dying" in node:
-			return node
-		node = node.get_parent()
-	return null
+	return LauncherCombatHelper.resolve_owner_ship(self)
 
 func _is_owner_weapon_ready() -> bool:
 	if not is_instance_valid(_owner_ship):
 		_owner_ship = _resolve_owner_ship()
-	if not is_instance_valid(_owner_ship):
-		return true
-	if _owner_ship.has_method("are_weapons_disabled") and _owner_ship.are_weapons_disabled():
-		return false
-	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
-		return false
-	return _owner_ship.get("deck_is_overrun") != true
+	return LauncherCombatHelper.is_owner_combat_ready(_owner_ship)
 
 func _get_current_range() -> float:
 	return detection_range * _cached_range_mult
@@ -208,17 +196,6 @@ func _get_projectile_stats_snapshot() -> Dictionary:
 		(projectile as Node).free()
 	return stats
 
-func _enemy_team_tag() -> String:
-	return "enemy" if team == "player" else "player"
-
-func _is_enemy_ship(node: Node) -> bool:
-	if not is_instance_valid(node):
-		return false
-	var resolved = HitTargetResolver.resolve_team_tag(node)
-	if not resolved.is_empty():
-		return resolved == _enemy_team_tag()
-	return node.is_in_group(_enemy_team_tag())
-
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
 	var current_range = _get_current_range()
@@ -227,13 +204,11 @@ func _update_target() -> void:
 	# 현재까지 찾은 가장 '매력적인' 타겟의 가중치 적용 거리
 	var best_score_sq: float = INF
 	
-	var enemies = EntityRegistry.get_ships_by_team(_enemy_team_tag())
+	var enemies = EntityRegistry.get_ships_by_team(LauncherCombatHelper.enemy_team_tag(team))
 	
 	for enemy in enemies:
-		if not is_instance_valid(enemy) or not (enemy is Node3D):
-			continue
-		var enemy_ship := enemy as Node3D
-		if not _is_enemy_ship(enemy_ship):
+		var enemy_ship := LauncherCombatHelper.get_enemy_combat_target(enemy, team)
+		if enemy_ship == null:
 			continue
 		if is_instance_valid(_owner_ship) and enemy_ship == _owner_ship:
 			continue
@@ -271,36 +246,33 @@ func _update_target() -> void:
 	current_target = nearest_enemy
 
 func _is_target_valid(target: Variant) -> bool:
-	if not is_instance_valid(target) or not (target is Node3D):
-		return false
-	var target_node := target as Node3D
-	if target_node.is_queued_for_deletion():
-		return false
-	
-	if target_node.has_method("is_combat_disabled") and target_node.is_combat_disabled():
-		return false
-		
-	# 팀 체크 (그룹 꼬임보다 우선)
-	if not _is_enemy_ship(target_node):
+	var target_node := LauncherCombatHelper.get_enemy_combat_target(target, team)
+	if target_node == null:
 		return false
 		
 	var current_range = _get_current_range()
-	if global_position.distance_squared_to(target_node.global_position) > current_range * current_range: return false
+	if not LauncherCombatHelper.is_target_in_range(self, target_node, current_range): return false
 	if not _is_within_arc(target_node): return false
 	
 	# 도선 중이거나 폐선인 배인지 최종 체크
-	if target_node.has_method("is_combat_disabled") and target_node.is_combat_disabled(): return false
-	if target_node.has_method("get_boarding_attacker_ship"):
-		var attacker: Variant = target_node.get_boarding_attacker_ship()
-		if is_instance_valid(attacker) and attacker is Node and attacker.has_method("get_team_tag") and attacker.get_team_tag() == team:
-			return false
+	if LauncherCombatHelper.has_friendly_boarding_attacker(target_node, team): return false
 		
 	if _is_ship_occupied_by_friendly(target_node): return false
 	return true
 
 func _is_within_arc(target: Node3D) -> bool:
-	var to_target = (target.global_position - global_position).normalized()
+	var aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.55)
+	var to_target = aim_point - global_position
+	to_target.y = 0.0
+	if to_target.length_squared() <= 0.0001:
+		return true
+	to_target = to_target.normalized()
 	var forward = - global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.0001:
+		forward = Vector3.FORWARD
+	else:
+		forward = forward.normalized()
 	var dot = forward.dot(to_target)
 	var angle = rad_to_deg(acos(clamp(dot, -1.0, 1.0)))
 	return angle < detection_arc
@@ -308,26 +280,11 @@ func _is_within_arc(target: Node3D) -> bool:
 
 ## 아군 오사 방지를 위해 배에 아군이 있는지 체크
 func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
-	var soldiers_node = target_ship.get_node_or_null("Soldiers")
-	if not soldiers_node: return false
-	
-	for child in soldiers_node.get_children():
-		# 살아있는 아군 병사가 한 명이라도 있으면 True
-		if child.has_method("get_team_tag") and child.get_team_tag() == team and child.has_method("is_dead") and not child.is_dead():
-			return true
-	return false
+	return LauncherCombatHelper.has_alive_soldier_on_team(target_ship, team)
 
 ## 타겟 우선순위를 위해 배에 적군이 있는지 체크
 func _is_ship_occupied_by_enemy(target_ship: Node3D) -> bool:
-	var soldiers_node = target_ship.get_node_or_null("Soldiers")
-	if not soldiers_node: return false
-	
-	var enemy_team = "enemy" if team == "player" else "player"
-	for child in soldiers_node.get_children():
-		# 살아있는 적군 병사가 한 명이라도 있으면 True
-		if child.has_method("get_team_tag") and child.get_team_tag() == enemy_team and child.has_method("is_dead") and not child.is_dead():
-			return true
-	return false
+	return LauncherCombatHelper.has_alive_soldier_on_team(target_ship, LauncherCombatHelper.enemy_team_tag(team))
 
 
 func _get_current_cooldown() -> float:
@@ -355,10 +312,7 @@ func _get_next_reload_cooldown() -> float:
 	return base_cooldown * randf_range(1.0, 1.0 + reload_extra_jitter_pct)
 
 func _get_target_scan_interval(has_valid_target: bool) -> float:
-	var base_interval: float = target_scan_interval
-	if has_valid_target:
-		base_interval *= target_tracking_scan_multiplier
-	return base_interval + randf_range(0.0, 0.04)
+	return LauncherCombatHelper.get_target_scan_interval(target_scan_interval, target_tracking_scan_multiplier, has_valid_target, 0.04)
 
 
 func fire(target_enemy: Node3D) -> void:
@@ -399,9 +353,12 @@ func _execute_fire() -> void:
 	
 	# 쿨타임 시작
 	cooldown_timer = _get_next_reload_cooldown()
+	if is_instance_valid(_owner_ship) and _owner_ship.has_method("request_cannon_reload_pose"):
+		_owner_ship.request_cannon_reload_pose(self, minf(1.2, maxf(0.55, cooldown_timer * 0.35)))
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
-	var dist = global_position.distance_to(target_node.global_position)
+	var target_aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.55)
+	var dist = muzzle.global_position.distance_to(target_aim_pos)
 	
 	var projectile_speed: float = _cached_projectile_speed
 	var time_to_hit = dist / maxf(projectile_speed, 1.0)
@@ -410,7 +367,7 @@ func _execute_fire() -> void:
 	var enemy_dir = - target_node.global_transform.basis.z
 	var enemy_velocity = enemy_dir * enemy_speed
 	
-	var predicted_pos = target_node.global_position + enemy_velocity * time_to_hit * prediction_lead_factor
+	var predicted_pos = target_aim_pos + enemy_velocity * time_to_hit * prediction_lead_factor
 	var fire_direction = (predicted_pos - muzzle.global_position).normalized()
 	if fire_direction.is_zero_approx():
 		fire_direction = - global_transform.basis.z

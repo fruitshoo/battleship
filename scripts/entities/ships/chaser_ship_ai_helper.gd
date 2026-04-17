@@ -3,6 +3,11 @@ class_name ChaserShipAiHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
+const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
+const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
+const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
@@ -11,15 +16,11 @@ static func _is_true(value: Variant) -> bool:
 	return value == true
 
 static func _is_gunner(ship) -> bool:
-	if ship.has_method("is_gunner_role"):
-		return ship.call("is_gunner_role") == true
-	return int(ship.combat_role) == int(ship.CombatRole.GUNNER)
+	return ShipCombatModeHelper.is_gunner(ship)
 
 
 static func _can_board(ship) -> bool:
-	if ship.has_method("can_board_targets"):
-		return ship.call("can_board_targets") == true
-	return ship.allow_boarding == true
+	return ShipCombatModeHelper.can_board(ship)
 
 
 static func _target_ship(ship) -> Node3D:
@@ -43,9 +44,7 @@ static func _is_sinking_or_dying(node: Node) -> bool:
 static func _is_player_controlled(node: Node) -> bool:
 	if not is_instance_valid(node):
 		return false
-	if node.has_method("is_player_controlled_ship"):
-		return node.is_player_controlled_ship()
-	return _is_true(node.get("is_player_controlled"))
+	return ShipTargetingHelper.is_player_controlled_ship(node)
 
 
 static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) -> float:
@@ -115,7 +114,7 @@ static func get_separation_update_interval_runtime(ship, seed_value: int) -> flo
 	var role_adjust: float = 0.0
 	if _is_gunner(ship):
 		role_adjust = 0.02
-	elif ship.has_method("is_charger_role") and ship.is_charger_role():
+	elif ShipCombatModeHelper.is_charger(ship):
 		role_adjust = -0.01
 	var phase_jitter: float = float(seed_value % 7) * 0.005
 	return clampf(base_interval + role_adjust + phase_jitter, 0.05, 0.35)
@@ -148,7 +147,7 @@ static func calculate_separation(ship) -> Vector3:
 
 		var dist := sqrt(dist_sq)
 		var coll_dist: float = ship.get_collision_distance_to(other)
-		if ship.has_method("is_charger_role") and ship.is_charger_role() and is_instance_valid(_target_ship(ship)) and other == _target_ship(ship) and dist < coll_dist + 1.2:
+		if ShipCombatModeHelper.is_charger(ship) and is_instance_valid(_target_ship(ship)) and other == _target_ship(ship) and dist < coll_dist + 1.2:
 			continue
 		var separation_trigger_dist: float = coll_dist + (0.18 * ship.separation_pad_scale)
 
@@ -181,16 +180,16 @@ static func process_physics(ship, delta: float) -> void:
 	ship.separation_timer -= delta
 	if ship.separation_timer <= 0.0:
 		ship.separation_timer = _get_separation_update_interval(ship)
-		if ship.team == "player" and _is_true(ship.get_meta("support_fleet_ship", false)):
+		if ship.team == "player" and ShipAllyRoleHelper.is_support_ship(ship):
 			ship.separation_force = Vector3.ZERO
 		else:
 			ship.separation_force = calculate_separation(ship)
-	if ship.has_meta("post_impact_follow_timer"):
-		var follow_timer: float = maxf(0.0, float(ship.get_meta("post_impact_follow_timer")) - delta)
+	if ship.has_meta(ShipBoardingMetaHelper.KEY_POST_IMPACT_FOLLOW_TIMER):
+		var follow_timer: float = maxf(0.0, ShipBoardingMetaHelper.get_post_impact_follow_timer(ship) - delta)
 		if follow_timer <= 0.0:
-			ship.remove_meta("post_impact_follow_timer")
+			ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_POST_IMPACT_FOLLOW_TIMER)
 		else:
-			ship.set_meta("post_impact_follow_timer", follow_timer)
+			ShipBoardingMetaHelper.set_post_impact_follow_timer(ship, follow_timer)
 	if ship.has_meta("boarding_impact_grace_timer"):
 		var impact_grace_timer: float = maxf(0.0, float(ship.get_meta("boarding_impact_grace_timer")) - delta)
 		if impact_grace_timer <= 0.0:
@@ -238,15 +237,18 @@ static func process_physics(ship, delta: float) -> void:
 	var current_target: Node3D = _target_ship(ship)
 
 	var nav := ChaserShipNavigationHelper.build_navigation(ship, current_target)
-	var target_pos: Vector3 = nav["target_pos"]
-	var desired_point: Vector3 = nav["desired_point"]
-	var heading_point: Vector3 = nav["heading_point"]
-	var dist_to_target: float = nav["dist_to_target"]
-	var desired_speed_mult: float = nav["desired_speed_mult"]
-	var permit_sprint: bool = nav["permit_sprint"]
-	var dir_to_target: Vector3 = nav["dir_to_target"]
+	var target_pos: Vector3 = ShipMovementIntent.get_target_pos(nav, current_target.global_position)
+	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, current_target.global_position)
+	var heading_point: Vector3 = ShipMovementIntent.get_heading_point(nav, desired_point)
+	var dist_to_target: float = ShipMovementIntent.get_dist_to_target(nav, ship.global_position.distance_to(current_target.global_position))
+	var desired_speed_mult: float = ShipMovementIntent.get_desired_speed_mult(nav)
+	var permit_sprint: bool = ShipMovementIntent.get_permit_sprint(nav)
+	var dir_to_target: Vector3 = ShipMovementIntent.get_dir_to_target(nav, Vector3.ZERO)
 
-	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= ship.boarding_break_distance:
+	var boarding_attempt_distance: float = ship.boarding_break_distance
+	if ship.has_method("get_collision_distance_to"):
+		boarding_attempt_distance = maxf(boarding_attempt_distance, float(ship.call("get_collision_distance_to", current_target)) + 2.2)
+	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= boarding_attempt_distance:
 		var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
 		var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
 		var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
@@ -254,7 +256,10 @@ static func process_physics(ship, delta: float) -> void:
 		var direct_board_pad: float = 0.35
 		if ship.has_method("get_team_tag") and ship.call("get_team_tag") == "enemy":
 			direct_board_pad += 0.15
-		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= ship.max_boarding_distance + direct_board_pad
+		var direct_board_distance: float = ship.max_boarding_distance + direct_board_pad
+		if ship.has_method("get_collision_distance_to"):
+			direct_board_distance = maxf(direct_board_distance, float(ship.call("get_collision_distance_to", current_target)) + 0.85)
+		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= direct_board_distance
 		var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
 		if (can_latched_board or can_direct_board) and impact_confirmed:
 			if ship.has_method("_board_ship"):
@@ -329,7 +334,7 @@ static func process_physics(ship, delta: float) -> void:
 	var forward_vec = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
 	var velocity = forward_vec * ship.current_speed * wind_mult
 	velocity += ship.separation_force
-	velocity += ship._calculate_boarding_pull() * delta
+	velocity += ship._calculate_boarding_pull_velocity(delta)
 	var collision_repulsion = ship._calculate_collision_repulsion()
 	if not _is_gunner(ship) and dist_to_target < ship.max_boarding_distance + 1.2:
 		var to_target_flat = ship.target.global_position - ship.global_position
@@ -377,31 +382,7 @@ static func _get_separation_update_interval(ship) -> float:
 
 
 static func find_player(ship) -> void:
-	var players = EntityRegistry.get_ships_by_team("player")
-
-	if ship.team == "player":
-		for p in players:
-			if _is_player_controlled(p):
-				ship.target = p
-				break
-		return
-
-	var closest_dist = INF
-	var closest_player = null
-	for p in players:
-		if p == ship:
-			continue
-		if not _is_sinking_or_dying(p):
-			var dist = ship.global_position.distance_squared_to(p.global_position)
-			var weight = 1.0
-			if _is_player_controlled(p):
-				weight = 0.8
-			var weighted_dist = dist * weight
-			if weighted_dist < closest_dist:
-				closest_dist = weighted_dist
-				closest_player = p
-
-	ship.target = closest_player
+	ship.target = ShipTargetingHelper.select_player_target_for(ship)
 
 
 static func update_wave_sounds(ship, delta: float) -> void:

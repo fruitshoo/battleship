@@ -4,6 +4,7 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
+const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 
 const CLOSE_RANGE_HULL_FALLOFF_DISTANCE: float = 8.0
 const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
@@ -137,15 +138,18 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 			smoke.pool_activate()
 
 	# 포탄이 선체에 꽂힐 때는 목재 파편이 확실히 보여야 한다.
-	if wood_splinter_scene and VfxBudget.allow_spawn(get_tree(), "cannon_hit_splinter", global_position, 6, 140.0):
-		var splinter = ScenePool.acquire(get_tree(), wood_splinter_scene)
-		get_tree().root.add_child(splinter)
-		splinter.position = global_position + Vector3(0.0, 0.35, 0.0)
-		splinter.rotation.y = randf() * TAU
-		if splinter.has_method("set_amount_by_damage"):
-			splinter.set_amount_by_damage(damage * (1.0 if _is_crit else 0.8) + 6.0)
-		if splinter.has_method("pool_activate"):
-			splinter.pool_activate()
+	if wood_splinter_scene:
+		var splinter_damage := damage * (1.0 if _is_crit else 0.8) + 6.0
+		WoodSplinter.spawn_burst(
+			get_tree(),
+			wood_splinter_scene,
+			global_position + Vector3(0.0, 0.35, 0.0),
+			splinter_damage,
+			direction,
+			"cannon_hit_splinter",
+			6,
+			140.0
+		)
 
 func _ready() -> void:
 	_base_lifetime = lifetime
@@ -200,7 +204,7 @@ func _physics_process(delta: float) -> void:
 		return
 	# 부드러운 유도 (Soft Homing) - 초반만 작동 (사용 시)
 	if time_alive < homing_duration and is_instance_valid(target_node):
-		var to_target = (target_node.global_position - global_position).normalized()
+		var to_target = (NodeContractHelper.get_projectile_aim_point(target_node, 0.55) - global_position).normalized()
 		direction = direction.lerp(to_target, homing_strength * delta).normalized()
 		var up_vec = Vector3.UP
 		if abs(direction.y) > 0.999:

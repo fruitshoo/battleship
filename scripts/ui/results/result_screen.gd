@@ -13,8 +13,8 @@ const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 @onready var subtitle_label: Label = $Content/TitleBlock/Subtitle
 @onready var summary_list: VBoxContainer = $Content/Body/SummaryPanel/Margin/SummaryList
 @onready var weapon_list: VBoxContainer = $Content/Body/WeaponPanel/Margin/WeaponList
-@onready var restart_button: Button = $Content/ButtonBlock/RestartButton
-@onready var main_menu_button: Button = $Content/ButtonBlock/MainMenuButton
+@onready var restart_button: Button = $ButtonBlock/RestartButton
+@onready var main_menu_button: Button = $ButtonBlock/MainMenuButton
 
 
 func _ready() -> void:
@@ -38,7 +38,7 @@ func _apply_background() -> void:
 func _apply_theme() -> void:
 	NavalUiTheme.style_heading(subtitle_label, 18)
 	if is_instance_valid(title_label):
-		title_label.add_theme_font_size_override("font_size", 54)
+		title_label.add_theme_font_size_override("font_size", 50)
 		title_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 		title_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 		title_label.add_theme_constant_override("outline_size", 3)

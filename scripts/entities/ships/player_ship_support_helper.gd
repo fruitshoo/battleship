@@ -1,10 +1,14 @@
 extends RefCounted
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const SUPPORT_SHIP_SCENE = preload("res://scenes/ships/support_ship.tscn")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_FLEET_NEXT_ORDER_META := "support_fleet_next_order"
 
 static func spawn_or_repair_ally(ship) -> void:
+	if not ShipAllyRoleHelper.is_player_flagship(ship):
+		return
 	var support_ships: Array = get_support_fleet_ships(ship)
 
 	if ship._cached_hud and ship._cached_hud.has_method("show_message"):
@@ -24,17 +28,10 @@ static func spawn_or_repair_ally(ship) -> void:
 		if support_ships.size() >= ship.support_fleet_limit:
 			return
 
-	if not ship.ENEMY_SHIP_SCENE:
+	if not SUPPORT_SHIP_SCENE:
 		return
 
-	var ally = ship.ENEMY_SHIP_SCENE.instantiate()
-
-	if "ship_type" in ally:
-		ally.ship_type = "maengseon_ally"
-	if "hull_scene" in ally:
-		ally.hull_scene = ship.MAENGSEON_HULL_SCENE
-		if "cannon_scene" in ally:
-			ally.cannon_scene = ship.JOSEON_CANNON_SCENE
+	var ally = SUPPORT_SHIP_SCENE.instantiate()
 
 	if ally.has_method("set_team"):
 		ally.set_team("player")
@@ -42,7 +39,7 @@ static func spawn_or_repair_ally(ship) -> void:
 		ally.team = "player"
 	var next_support_order: int = int(ship.get_meta(SUPPORT_FLEET_NEXT_ORDER_META, 0))
 	ally.set_meta("support_joining", true)
-	ally.set_meta("support_fleet_ship", true)
+	ShipAllyRoleHelper.mark_support_ship(ally)
 	ally.set_meta("defer_initial_crew_setup", true)
 	ally.set_meta(SUPPORT_FLEET_ORDER_META, next_support_order)
 
@@ -70,18 +67,15 @@ static func spawn_or_repair_ally(ship) -> void:
 
 	print("[Summon] 정규군 함선을 소환했습니다!")
 
-static func _get_support_repair_fraction(ship) -> float:
-	var fleet_hull_level: int = 0
-	if is_instance_valid(ship._cached_um):
-		fleet_hull_level = int(ship._cached_um.current_levels.get("fleet_hull", 0))
-	return minf(0.4, 0.2 + float(fleet_hull_level) * 0.04)
+static func _get_support_repair_fraction(_ship) -> float:
+	return 0.2
 
 static func get_support_fleet_ships(ship) -> Array:
 	var support_ships: Array = []
 	for minion in EntityRegistry.get_ships_by_team("player"):
 		if not is_instance_valid(minion):
 			continue
-		if minion.get_meta("support_fleet_ship", false) != true:
+		if not ShipAllyRoleHelper.is_support_ship(minion):
 			continue
 		if minion.has_method("is_combat_disabled") and minion.is_combat_disabled():
 			continue

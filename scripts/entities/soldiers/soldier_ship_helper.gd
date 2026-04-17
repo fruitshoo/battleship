@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierShipHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 
 static func find_nearest_enemy(soldier) -> Node3D:
@@ -29,7 +30,7 @@ static func find_nearest_enemy(soldier) -> Node3D:
 	for other in local_soldiers:
 		if other == soldier or not is_instance_valid(other):
 			continue
-		if other.has_method("get_current_state_value") and other.get_current_state_value() == soldier.State.DEAD:
+		if SoldierStateHelper.is_dead_soldier(other):
 			continue
 		if other.get_team_tag() == soldier.team:
 			continue
@@ -72,7 +73,7 @@ static func find_nearest_enemy(soldier) -> Node3D:
 		for other in ship_soldiers:
 			if not is_instance_valid(other):
 				continue
-			if (other.has_method("get_current_state_value") and other.get_current_state_value() == soldier.State.DEAD) or other.get_team_tag() == soldier.team:
+			if SoldierStateHelper.is_dead_soldier(other) or other.get_team_tag() == soldier.team:
 				continue
 
 			var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
@@ -118,7 +119,7 @@ static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 	for other in EntityRegistry.get_soldiers_by_ship(soldier.owned_ship):
 		if other == soldier or not is_instance_valid(other):
 			continue
-		if other.has_method("get_current_state_value") and other.get_current_state_value() == soldier.State.DEAD:
+		if SoldierStateHelper.is_dead_soldier(other):
 			continue
 		if other.get_team_tag() == soldier.team:
 			continue

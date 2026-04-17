@@ -1,6 +1,7 @@
 extends RefCounted
 
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 static func handle_input(ship, delta: float) -> void:
 	var sail_turn_speed: float = float(ship.sail_turn_speed)
@@ -75,13 +76,13 @@ static func capture_derelict_ship(ship) -> void:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if soldiers_node:
 		for child in soldiers_node.get_children():
-			if child.has_method("heal_full") and not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
+			if child.has_method("heal_full") and SoldierStateHelper.is_alive_soldier(child):
 				child.heal_full()
 
 	var alive_count = 0
 	if soldiers_node:
 		for child in soldiers_node.get_children():
-			if not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
+			if SoldierStateHelper.is_alive_soldier(child):
 				alive_count += 1
 
 		if alive_count < ship.max_crew_count and is_instance_valid(ship._cached_level_manager) and ship._cached_level_manager.has_node("LevelLogic"):
@@ -101,7 +102,7 @@ static func replenish_crew(ship, soldier_scene: PackedScene) -> void:
 	if not soldiers_node or not soldier_scene:
 		return
 	for child in soldiers_node.get_children():
-		var is_alive = not (child.has_method("is_dead_soldier") and child.is_dead_soldier())
+		var is_alive = SoldierStateHelper.is_alive_soldier(child)
 		var is_player = child.has_method("is_player_team_soldier") and child.is_player_team_soldier()
 		if not is_alive:
 			child.queue_free()

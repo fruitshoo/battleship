@@ -4,12 +4,20 @@ class_name BaseShip
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
+const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const BaseShipCollisionHelper = preload("res://scripts/entities/ships/base_ship_collision_helper.gd")
 const BaseShipBoardingHelper = preload("res://scripts/entities/ships/base_ship_boarding_helper.gd")
 const BaseShipCrewHelper = preload("res://scripts/entities/ships/base_ship_crew_helper.gd")
 const BaseShipRudderHelper = preload("res://scripts/entities/ships/base_ship_rudder_helper.gd")
 const BaseShipStatusHelper = preload("res://scripts/entities/ships/base_ship_status_helper.gd")
 const BaseShipVisualHelper = preload("res://scripts/entities/ships/base_ship_visual_helper.gd")
+const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
+const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint_helper.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const ShipWeaponLoadoutHelper = preload("res://scripts/entities/ships/ship_weapon_loadout_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const BaseShipSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const SoldierShipWorkPriorityHelper = preload("res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
@@ -32,6 +40,8 @@ const DAMAGE_ROCK_BACK_MULT := 1.1
 @export_range(0.1, 3.0) var length_multiplier: float = 1.0 ## 앞/뒤 범위를 늘리거나 줄일 비율 (타원형 길이)
 @export_range(0.1, 3.0) var width_multiplier: float = 1.0 ## 좌/우 범위를 늘리거나 줄일 비율 (타원형 폭)
 @export var auto_fit_collision_to_hull: bool = true ## 선체 메시 기준으로 충돌 타원값 자동 정렬
+@export var auto_fit_contact_areas_to_hull: bool = true ## 선체 메시 기준으로 HitArea/ProximityArea 박스 자동 정렬
+@export var prefer_authoring_boarding_anchors: bool = true ## Authoring/BoardingAnchors 마커가 있으면 밧줄 연결점으로 우선 사용
 @export_range(0.75, 1.1) var auto_fit_scale: float = 1.0 ## 선체 자동 충돌 타원 전체 스케일
 @export_range(0.0, 2.0) var collision_padding: float = 0.02 ## 충돌 판정 여유치(반폭/반길이에 추가)
 @export_range(0.6, 1.0) var deck_bounds_ratio: float = 0.88 ## 병사 덱 이동 범위 축소 비율
@@ -115,6 +125,17 @@ var boarding_break_distance: float = 12.0
 var rope_instances: Array[MeshInstance3D] = []
 const BOARDING_ROPE_RADIUS := 0.18
 const BOARDING_ROPE_EXTRA_CULL_MARGIN := 24.0
+const BOARDING_ROPE_DECK_HEIGHT_OFFSET := 0.85
+const BOARDING_ROPE_MIN_ANCHOR_HEIGHT := 0.65
+const BOARDING_PULL_BASE_REST_LENGTH := 8.5
+const BOARDING_PULL_EDGE_SLACK := 0.25
+const BOARDING_PULL_MIN_REST_LENGTH := 4.25
+const BOARDING_PULL_MAX_REST_LENGTH := 18.0
+const BOARDING_PULL_VELOCITY_MAX := 5.8
+const BOARDING_PULL_DEFENDER_ACCEL_MULT := 0.22
+const BOARDING_PULL_DEFENDER_VELOCITY_MAX_MULT := 0.28
+const BOARDING_PULL_VELOCITY_DAMPING := 1.7
+const BOARDING_PULL_VELOCITY_RELEASE_DAMPING := 8.5
 @export_range(0.0, 3.0) var boarding_contact_grace_duration: float = 0.8
 @export_range(0.0, 2.0) var boarding_hook_throw_delay: float = 0.35
 @export_range(0.0, 3.0) var boarding_secondary_rope_delay: float = 0.9
@@ -126,6 +147,7 @@ var boarding_hook_timer: float = 0.0
 var boarding_secondary_rope_timer: float = 0.0
 var _initial_rope_deployed: bool = false
 var _full_rope_deployed: bool = false
+var boarding_pull_velocity: Vector3 = Vector3.ZERO
 
 var fire_build_up: float = 0.0
 var fire_threshold: float = 100.0
@@ -313,6 +335,7 @@ func _refresh_collision_bounds_from_hull() -> void:
 		hull_ext = get_collision_half_extents()
 		
 	_hull_half_extents = hull_ext
+	_sync_contact_area_shapes_from_hull()
 	
 	if not auto_fit_collision_to_hull:
 		_sync_profile_from_runtime()
@@ -330,6 +353,81 @@ func _refresh_collision_bounds_from_hull() -> void:
 	width_multiplier = clampf(padded.x / base, 0.1, 3.0)
 	length_multiplier = clampf(padded.y / base, 0.1, 3.0)
 	_sync_profile_from_runtime()
+
+func _sync_contact_area_shapes_from_hull() -> void:
+	if not auto_fit_contact_areas_to_hull:
+		return
+	if _hull_half_extents.x <= 0.01 or _hull_half_extents.y <= 0.01:
+		return
+
+	var hit_size := Vector3(
+		maxf(0.8, _hull_half_extents.x * 2.0 + 0.12),
+		_get_contact_area_height("HitArea"),
+		maxf(1.2, _hull_half_extents.y * 2.0 + 0.12)
+	)
+	var proximity_size := Vector3(
+		hit_size.x + 0.6,
+		hit_size.y + 0.2,
+		hit_size.z + 0.8
+	)
+	_fit_contact_area_box_shape("HitArea", hit_size)
+	_fit_contact_area_box_shape("ProximityArea", proximity_size)
+
+func _get_contact_area_height(area_name: String) -> float:
+	var existing_height := 0.0
+	var area := get_node_or_null(area_name)
+	if area is Area3D:
+		var shape_node := area.get_node_or_null("CollisionShape3D")
+		if shape_node is CollisionShape3D and shape_node.shape is BoxShape3D:
+			existing_height = (shape_node.shape as BoxShape3D).size.y
+	return maxf(maxf(existing_height, deck_height + 2.0), 2.0)
+
+func _fit_contact_area_box_shape(area_name: String, size: Vector3) -> void:
+	var area := get_node_or_null(area_name)
+	if not (area is Area3D):
+		return
+	var shape_node := area.get_node_or_null("CollisionShape3D")
+	if not (shape_node is CollisionShape3D):
+		return
+
+	var box_shape: BoxShape3D = null
+	if shape_node.shape is BoxShape3D:
+		box_shape = (shape_node.shape as BoxShape3D).duplicate() as BoxShape3D
+	else:
+		box_shape = BoxShape3D.new()
+	box_shape.size = size
+	shape_node.shape = box_shape
+
+func _sync_contact_area_layers(layer_override: int = -1) -> void:
+	var current_layer: int = layer_override
+	if current_layer < 0:
+		var layer_val = get("collision_layer")
+		current_layer = int(layer_val) if layer_val != null else _get_team_collision_layer(get_team_tag())
+	var proximity_area = get_node_or_null("ProximityArea")
+	if proximity_area is Area3D:
+		proximity_area.set_deferred("collision_layer", current_layer)
+		proximity_area.set_deferred("collision_mask", _get_opposing_team_collision_layer(get_team_tag()))
+
+	var hit_area = get_node_or_null("HitArea")
+	if hit_area is Area3D:
+		hit_area.set_deferred("collision_layer", current_layer)
+		hit_area.set_deferred("collision_mask", 0)
+
+func _set_contact_areas_enabled(enabled: bool) -> void:
+	_set_contact_area_enabled("ProximityArea", enabled)
+	_set_contact_area_enabled("HitArea", enabled)
+
+func _set_contact_area_enabled(area_name: String, enabled: bool) -> void:
+	var area = get_node_or_null(area_name)
+	if area is Area3D:
+		area.set_deferred("monitoring", enabled)
+		area.set_deferred("monitorable", enabled)
+		var shape_node = area.get_node_or_null("CollisionShape3D")
+		if shape_node is CollisionShape3D:
+			shape_node.set_deferred("disabled", not enabled)
+
+func _get_opposing_team_collision_layer(team_name: String) -> int:
+	return 4 if team_name == "player" else 2
 
 func _compute_hull_half_extents() -> Vector2:
 	if not is_inside_tree():
@@ -403,21 +501,9 @@ func _aabb_corners(aabb: AABB) -> Array[Vector3]:
 
 ## JSON 데이터에서 함선 스탯 로드
 func load_ship_stats(type_name: String) -> Dictionary:
-	# 에디터에서는 파일 접근 빈도를 줄이기 위해 가드 (필요시 호출되도록 함)
-	var path = "res://data/ship_stats.json"
-	if not FileAccess.file_exists(path):
-		print("[BaseShip] Error: ship_stats.json not found!")
+	var stats := ShipBlueprintHelper.load_stats(type_name)
+	if stats.is_empty():
 		return {}
-		
-	var file = FileAccess.open(path, FileAccess.READ)
-	var json_text = file.get_as_text()
-	var data = JSON.parse_string(json_text)
-	
-	if data == null or not data.has(type_name):
-		print("[BaseShip] Warning: Stats for type '%s' not found in JSON." % type_name)
-		return {}
-		
-	var stats = data[type_name]
 	
 	# 필드가 존재할 경우 인스턴스 변수에 적용
 	if stats.has("hull_hp"):
@@ -478,6 +564,12 @@ func are_weapons_disabled() -> bool:
 func get_hull_hp_value() -> float:
 	return hull_hp
 
+func get_projectile_aim_point(vertical_offset: float = 0.55) -> Vector3:
+	return global_position + Vector3(0.0, maxf(0.55, deck_height + maxf(0.0, vertical_offset)), 0.0)
+
+func get_ship_authoring_summary() -> Dictionary:
+	return ShipAuthoringHelper.build_summary(self)
+
 func get_base_collision_radius_value() -> float:
 	return base_collision_radius
 
@@ -531,9 +623,22 @@ func has_active_boarding_rope_visual() -> bool:
 	return false
 
 func is_player_controlled_ship() -> bool:
-	if not ("is_player_controlled" in self):
-		return false
-	return get("is_player_controlled") == true
+	return ShipAllyRoleHelper.is_player_flagship(self)
+
+func set_ally_ship_role(role_name: String) -> void:
+	ShipAllyRoleHelper.set_ally_role(self, role_name)
+
+func get_ally_ship_role() -> String:
+	return ShipAllyRoleHelper.get_ally_role(self)
+
+func is_player_flagship() -> bool:
+	return ShipAllyRoleHelper.is_player_flagship(self)
+
+func is_support_fleet_ship() -> bool:
+	return ShipAllyRoleHelper.is_support_ship(self)
+
+func is_ally_support_ship() -> bool:
+	return is_support_fleet_ship()
 
 func is_player_team() -> bool:
 	return get_team_tag() == "player"
@@ -597,6 +702,7 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		"fire_threshold": fire_threshold,
 		"crew_respawn_interval": crew_respawn_interval_value,
 		"boarding_capture_duration": boarding_capture_duration,
+		"ally_ship_role": get_ally_ship_role(),
 		"combat_crew_ratio": combat_crew_ratio,
 		"shiphandling_crew_ratio": shiphandling_crew_ratio,
 		"gunnery_crew_ratio": gunnery_crew_ratio,
@@ -711,7 +817,7 @@ func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
 	var applied_max: float = 0.0
 	var hit_count: int = 0
 	for child in soldiers_node.get_children():
-		if child.has_method("take_damage") and not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
+		if child.has_method("take_damage") and BaseShipSoldierStateHelper.is_alive_soldier(child):
 			var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
 			var final_damage: float = damage * PLAYER_CREW_RAMMING_AOE_MULTIPLIER if child_team == "player" else damage
 			applied_min = minf(applied_min, final_damage)
@@ -748,10 +854,46 @@ func get_alive_crew_count() -> int:
 		var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
 		if child_team != ship_team:
 			continue
-		# current_state != 4 (DEAD) 인 병사만 카운트
-		if not (child.has_method("is_dead_soldier") and child.is_dead_soldier()):
+		# DEAD 상태가 아닌 병사만 카운트
+		if BaseShipSoldierStateHelper.is_alive_soldier(child):
 			count += 1
 	return count
+
+
+func request_cannon_reload_pose(cannon_node: Node3D, duration: float = 0.9) -> void:
+	if not is_instance_valid(cannon_node):
+		return
+	if deck_is_contested or deck_is_overrun:
+		return
+	if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(cannon_node, null, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD):
+		return
+	var own_team: String = get_team_tag()
+	var best_soldier: Node3D = null
+	var best_score: float = -INF
+	var max_distance_sq: float = 64.0
+	for soldier in EntityRegistry.get_soldiers_by_ship(self):
+		if not is_instance_valid(soldier):
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != own_team:
+			continue
+		if not soldier.has_method("is_available_for_cannon_reload_pose") or not soldier.is_available_for_cannon_reload_pose():
+			continue
+		var work_score: float = SoldierShipWorkPriorityHelper.score_worker_for_task(
+			soldier,
+			SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD,
+			cannon_node.global_position,
+			max_distance_sq,
+			cannon_node
+		)
+		if work_score <= best_score:
+			continue
+		best_score = work_score
+		best_soldier = soldier
+	if is_instance_valid(best_soldier) \
+			and best_soldier.has_method("play_cannon_reload_pose") \
+			and SoldierShipWorkPriorityHelper.reserve_work_slot(cannon_node, best_soldier, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD, duration + 0.45):
+		best_soldier.play_cannon_reload_pose(cannon_node, duration)
 
 
 func set_preview_deck_state(is_contested: bool, is_overrun: bool = false) -> void:
@@ -769,7 +911,7 @@ func has_active_crew_role(role_name: String) -> bool:
 		for child in soldiers_node.get_children():
 			if not is_instance_valid(child):
 				continue
-			if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+			if BaseShipSoldierStateHelper.is_dead_soldier(child):
 				continue
 			if child.has_method("get_crew_role_value") and str(child.get_crew_role_value()).strip_edges().to_lower() == normalized_role:
 				return true
@@ -787,7 +929,7 @@ func replace_preview_crew_role(from_role: String, to_role: String = "general") -
 	for child in soldiers_node.get_children():
 		if not is_instance_valid(child):
 			continue
-		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+		if BaseShipSoldierStateHelper.is_dead_soldier(child):
 			continue
 		if child.has_method("get_crew_role_value") and str(child.get_crew_role_value()).strip_edges().to_lower() != normalized_from:
 			continue
@@ -835,22 +977,25 @@ func _calculate_boarding_pull() -> Vector3:
 	var dir = diff / max(dist, 0.001)
 	
 	# 1. 스프링 힘 (F = k * x) — 가속도(m/s²) 단위
-	var rest_length = 8.5
+	var contact_distance := _get_boarding_pull_contact_distance(target_node)
+	var rest_length := _get_boarding_pull_rest_length(contact_distance)
+	var pull_size_scale := _get_boarding_pull_size_scale(contact_distance)
 	var enemy_boarding_pull_mult: float = _get_enemy_boarding_pull_multiplier(target_node)
-	var spring_k = 2.7 * enemy_boarding_pull_mult
+	var pull_role_accel_mult: float = _get_boarding_pull_role_accel_multiplier(target_node)
+	var spring_k = 3.6 * enemy_boarding_pull_mult * pull_size_scale
 	var stretch = dist - rest_length
 	
 	# 거리가 rest_length보다 작으면(겹치려 하면) 밀어내는 반발력(Repulsion) 발생
 	var propulsion_force = Vector3.ZERO
 	if stretch < 0:
-		var repulsion_k = 5.0
+		var repulsion_k = 5.8 * pull_size_scale
 		propulsion_force = - dir * (abs(stretch) * repulsion_k)
 		stretch = 0 # 인동력은 발생시키지 않음
 	
 	# 거리가 도선 한계치(9.0)에 가까워지면 힘을 점진적으로 증가
 	var tension_multiplier = 1.0
 	if dist > rest_length:
-		tension_multiplier = 1.0 + (dist - rest_length) * 1.1
+		tension_multiplier = 1.0 + (dist - rest_length) * 1.25
 		
 	var spring_force = dir * (stretch * spring_k * tension_multiplier)
 	
@@ -878,16 +1023,64 @@ func _calculate_boarding_pull() -> Vector3:
 	
 	# 멀어질 때만 저항 (가속도 단위)
 	if rel_vel_on_rope > 0:
-		var damping_c = 2.0 * enemy_boarding_pull_mult
+		var damping_c = 2.8 * enemy_boarding_pull_mult * pull_size_scale
 		final_damping_force = dir * (rel_vel_on_rope * damping_c)
 	
 	# 3. 최종 힘 계산 및 제한 (가속도 상한)
-	var final_pull = spring_force + propulsion_force + final_damping_force
-	var max_pull_accel = 11.0 * enemy_boarding_pull_mult
+	var final_pull = (spring_force + propulsion_force + final_damping_force) * pull_role_accel_mult
+	var max_pull_accel = 15.5 * enemy_boarding_pull_mult * pull_size_scale * pull_role_accel_mult
 	if final_pull.length() > max_pull_accel:
 		final_pull = final_pull.normalized() * max_pull_accel
 		
 	return final_pull
+
+
+func _calculate_boarding_pull_velocity(delta: float) -> Vector3:
+	var pull_accel := _calculate_boarding_pull()
+	if pull_accel.length_squared() > 0.0001:
+		boarding_pull_velocity += pull_accel * delta
+		boarding_pull_velocity.y = 0.0
+		var max_velocity := _get_boarding_pull_velocity_max()
+		if boarding_pull_velocity.length() > max_velocity:
+			boarding_pull_velocity = boarding_pull_velocity.normalized() * max_velocity
+		boarding_pull_velocity = boarding_pull_velocity.move_toward(Vector3.ZERO, BOARDING_PULL_VELOCITY_DAMPING * delta)
+	else:
+		boarding_pull_velocity = boarding_pull_velocity.move_toward(Vector3.ZERO, BOARDING_PULL_VELOCITY_RELEASE_DAMPING * delta)
+	return boarding_pull_velocity
+
+
+func _get_boarding_pull_velocity_max() -> float:
+	var target_node: Node = null
+	if is_boarding and is_instance_valid(boarding_target):
+		target_node = boarding_target
+	elif is_instance_valid(boarding_attacker):
+		target_node = boarding_attacker
+	var contact_distance := _get_boarding_pull_contact_distance(target_node) if is_instance_valid(target_node) else 0.0
+	return BOARDING_PULL_VELOCITY_MAX * _get_boarding_pull_size_scale(contact_distance) * _get_boarding_pull_role_velocity_multiplier(target_node)
+
+
+func _get_boarding_pull_contact_distance(target_node: Node) -> float:
+	if not (target_node is Node3D):
+		return 0.0
+	if not has_method("get_collision_distance_to"):
+		return 0.0
+	return maxf(0.0, get_collision_distance_to(target_node as Node3D))
+
+
+func _get_boarding_pull_rest_length(contact_distance: float) -> float:
+	if contact_distance <= 0.01:
+		return BOARDING_PULL_BASE_REST_LENGTH
+	return clampf(
+		contact_distance + BOARDING_PULL_EDGE_SLACK,
+		BOARDING_PULL_MIN_REST_LENGTH,
+		BOARDING_PULL_MAX_REST_LENGTH
+	)
+
+
+func _get_boarding_pull_size_scale(contact_distance: float) -> float:
+	if contact_distance <= 0.01:
+		return 1.0
+	return clampf(maxf(1.0, contact_distance / BOARDING_PULL_BASE_REST_LENGTH), 1.0, 1.55)
 
 
 func _get_enemy_boarding_pull_multiplier(target_node: Node) -> float:
@@ -898,6 +1091,22 @@ func _get_enemy_boarding_pull_multiplier(target_node: Node) -> float:
 		attacker_node = boarding_attacker
 	if is_instance_valid(attacker_node) and attacker_node.has_method("get_team_tag") and attacker_node.call("get_team_tag") == "enemy":
 		return 1.08
+	return 1.0
+
+
+func _get_boarding_pull_role_accel_multiplier(target_node: Node) -> float:
+	if is_boarding and is_instance_valid(boarding_target) and target_node == boarding_target:
+		return 1.0
+	if is_instance_valid(boarding_attacker) and target_node == boarding_attacker:
+		return BOARDING_PULL_DEFENDER_ACCEL_MULT
+	return 1.0
+
+
+func _get_boarding_pull_role_velocity_multiplier(target_node: Node) -> float:
+	if is_boarding and is_instance_valid(boarding_target) and target_node == boarding_target:
+		return 1.0
+	if is_instance_valid(boarding_attacker) and target_node == boarding_attacker:
+		return BOARDING_PULL_DEFENDER_VELOCITY_MAX_MULT
 	return 1.0
 
 func _has_incoming_boarding_rope_link(attacker_node: Node) -> bool:
@@ -943,7 +1152,7 @@ func _is_engagement_pair(other: Node3D) -> bool:
 
 ## 나포 가능한 함대 정원(최대 3척)이 남았는지 확인
 func can_capture_more_ships() -> bool:
-	return EntityRegistry.count_captured_minions() < 3
+	return ShipAllyRoleHelper.count_captured_minions(EntityRegistry.get_captured_minions()) < 3
 
 ## 충격(충각) 타격 로직 - 타원형 각도 판정 포함
 func apply_ramming_damage(other: Node3D, impact_speed: float) -> void:
@@ -997,17 +1206,12 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	var current_time = Time.get_ticks_msec() / 1000.0
 	if wood_splinter_scene and (current_time - _last_splinter_time > 0.2):
 		_last_splinter_time = current_time
-		var splinter = ScenePool.acquire(get_tree(), wood_splinter_scene)
-		get_tree().root.add_child(splinter)
+		var splinter_position := Vector3.ZERO
 		if hit_position != Vector3.ZERO:
-			splinter.global_position = hit_position + Vector3(0, 0.5, 0)
+			splinter_position = hit_position + Vector3(0, 0.5, 0)
 		else:
-			splinter.global_position = global_position + Vector3(randf_range(-1, 1), 1.5, randf_range(-1, 1))
-		splinter.rotation.y = randf() * TAU
-		if splinter.has_method("set_amount_by_damage"):
-			splinter.set_amount_by_damage(final_damage)
-		if splinter.has_method("pool_activate"):
-			splinter.pool_activate()
+			splinter_position = global_position + Vector3(randf_range(-1, 1), 1.5, randf_range(-1, 1))
+		WoodSplinter.spawn_burst(get_tree(), wood_splinter_scene, splinter_position, final_damage, splinter_position - global_position)
 			
 	_flash_damage(final_damage)
 	
@@ -1168,7 +1372,7 @@ func die() -> void:
 # ==========================================
 
 func _spawn_ropes(count_override: int = -1) -> void:
-	_clear_ropes()
+	_clear_ropes(false)
 	var count = count_override if count_override > 0 else randi_range(2, 3)
 	count = max(1, count)
 	for i in range(count):
@@ -1284,7 +1488,10 @@ func _get_boarding_rope_source_anchor_local(side_sign: float, along_offset: floa
 	var safe_half_z: float = maxf(0.12, half_extents.y - z_margin)
 	var local_x: float = signf(side_sign) * safe_half_x
 	var local_z: float = clampf(along_offset, -safe_half_z, safe_half_z)
-	return Vector3(local_x, _get_boarding_rope_local_anchor_height(self), local_z)
+	var fallback := Vector3(local_x, _get_boarding_rope_local_anchor_height(self), local_z)
+	if prefer_authoring_boarding_anchors:
+		return ShipAuthoringHelper.get_boarding_anchor_local(self, side_sign, local_z, fallback)
+	return fallback
 
 func _get_boarding_rope_target_anchor_global(start_global: Vector3) -> Vector3:
 	if not is_instance_valid(boarding_target):
@@ -1298,7 +1505,10 @@ func _get_boarding_rope_target_anchor_global(start_global: Vector3) -> Vector3:
 	target_local.x = clampf(target_local.x, -safe_half_x, safe_half_x)
 	target_local.z = clampf(target_local.z, -safe_half_z, safe_half_z)
 	target_local.y = _get_boarding_rope_local_anchor_height(boarding_target)
-	return boarding_target.to_global(target_local)
+	var fallback_global: Vector3 = boarding_target.to_global(target_local)
+	if prefer_authoring_boarding_anchors:
+		return ShipAuthoringHelper.get_nearest_boarding_anchor_global(boarding_target, start_global, fallback_global)
+	return fallback_global
 
 func _get_boarding_rope_target_deck_half_extents(target_ship: Node3D) -> Vector2:
 	if is_instance_valid(target_ship) and target_ship.has_method("get_deck_half_extents"):
@@ -1313,10 +1523,10 @@ func _get_boarding_rope_target_deck_half_extents(target_ship: Node3D) -> Vector2
 
 func _get_boarding_rope_local_anchor_height(ship_node: Node) -> float:
 	if is_instance_valid(ship_node) and ship_node.get("deck_height") != null:
-		return maxf(0.65, float(ship_node.get("deck_height")) + 0.85)
-	return 1.25
+		return maxf(BOARDING_ROPE_MIN_ANCHOR_HEIGHT, float(ship_node.get("deck_height")) + BOARDING_ROPE_DECK_HEIGHT_OFFSET)
+	return BOARDING_ROPE_MIN_ANCHOR_HEIGHT + BOARDING_ROPE_DECK_HEIGHT_OFFSET
 
-func _clear_ropes() -> void:
+func _clear_ropes(reset_pull_velocity: bool = true) -> void:
 	for rope in rope_instances:
 		if is_instance_valid(rope):
 			var hook_visual = rope.get_meta("hook_visual", null) as MeshInstance3D
@@ -1324,6 +1534,8 @@ func _clear_ropes() -> void:
 				hook_visual.queue_free()
 			rope.queue_free()
 	rope_instances.clear()
+	if reset_pull_velocity:
+		boarding_pull_velocity = Vector3.ZERO
 
 func _get_boarding_alignment_state(target_ship: Node3D) -> Dictionary:
 	if not is_instance_valid(target_ship):
@@ -1387,8 +1599,8 @@ func _is_boarding_contact_stable() -> bool:
 	if not is_instance_valid(boarding_target):
 		return false
 
-	var contact_mode: String = str(get_meta("boarding_contact_mode", ""))
-	if contact_mode == "head_on" or contact_mode == "cleanup":
+	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(self)
+	if contact_mode == ShipBoardingMetaHelper.CONTACT_HEAD_ON or contact_mode == ShipBoardingMetaHelper.CONTACT_CLEANUP:
 		var relaxed_state = _get_boarding_alignment_state(boarding_target)
 		var closing_speed: float = float(relaxed_state.get("closing_speed", 0.0)) if not relaxed_state.is_empty() else 0.0
 		var center_distance: float = global_position.distance_to(boarding_target.global_position)

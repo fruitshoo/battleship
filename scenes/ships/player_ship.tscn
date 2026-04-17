@@ -6,11 +6,16 @@
 [ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
 
-[sub_resource type="BoxShape3D" id="BoxShape_proximity"]
-size = Vector3(4, 3, 9)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0dgdr"]
+size = Vector3(4.9047456, 3.2, 10.164231)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r4bi8"]
+size = Vector3(4.3047457, 3, 9.364231)
 
 [node name="PlayerShip" type="Node3D" unique_id=2118299445]
 script = ExtResource("1")
+base_collision_radius = 4.6421156
+width_multiplier = 0.45504529840202923
 floating_offset = 0.5
 
 [node name="ProximityArea" type="Area3D" parent="." unique_id=244065699 groups=["ship_proximity"]]
@@ -18,7 +23,7 @@ collision_layer = 2
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
-shape = SubResource("BoxShape_proximity")
+shape = SubResource("BoxShape3D_0dgdr")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=195625511 groups=["ship_hitbox"]]
 collision_layer = 2
@@ -26,7 +31,7 @@ collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-shape = SubResource("BoxShape_proximity")
+shape = SubResource("BoxShape3D_r4bi8")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=351081976]
 
@@ -48,6 +53,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
 [node name="ShipAudio" type="AudioStreamPlayer3D" parent="." unique_id=739675513]
 
 [node name="CollisionVisualizer" type="Node3D" parent="." unique_id=2033846630]
+visible = false
 script = ExtResource("sys_vis_script")
 
 [node name="PanokseonHull" parent="." unique_id=2050703077 instance=ExtResource("hull_scene")]

@@ -4,6 +4,7 @@ const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
+const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 
 ## 장군전 미사일 (Janggun Missile)
 ## 느리지만 고데미지 통나무 미사일. 범위 피해.
@@ -213,14 +214,14 @@ func _splash_and_sink() -> void:
 
 func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트
-	if wood_splinter_scene and VfxBudget.allow_spawn(get_tree(), "wood_splinter", global_position, 3, 60.0):
-		var splinter = ScenePool.acquire(get_tree(), wood_splinter_scene)
-		splinter.position = global_position
-		get_tree().root.add_child(splinter)
-		if splinter.has_method("set_amount_by_damage"):
-			splinter.set_amount_by_damage(damage)
-		if splinter.has_method("pool_activate"):
-			splinter.pool_activate()
+	if wood_splinter_scene:
+		WoodSplinter.spawn_burst(
+			get_tree(),
+			wood_splinter_scene,
+			global_position,
+			damage,
+			target_pos - start_pos
+		)
 			
 	# 타격 시 검은 연기 (발사 연기 재사용)
 	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):

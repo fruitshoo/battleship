@@ -1,5 +1,6 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
@@ -35,8 +36,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var spawn_pos: Vector3 = attacker.global_position
 	spawn_pos.y += 1.0
 
-	var current_target_pos: Vector3 = target.global_position
-	current_target_pos.y += 0.8
+	var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.8)
 	var time_to_reach: float = clampf(spawn_pos.distance_to(current_target_pos) / maxf(projectile_speed, 1.0), 0.18, 0.9)
 	var local_velocity: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
 	var ship_velocity: Vector3 = Vector3.ZERO

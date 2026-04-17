@@ -3,6 +3,8 @@ class_name BaseShipCollisionHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
 const BOSS_DERELICT_CONTACT_REPAIR_BONUS: float = 18.0
 const BOSS_DERELICT_CONTACT_SCORE_REWARD: int = 120
@@ -262,10 +264,10 @@ static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
 		return false
 	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
-	var ship_is_support: bool = ship.has_meta("support_fleet_ship") and ship.get_meta("support_fleet_ship", false) == true
-	var other_is_support: bool = other_ship.has_meta("support_fleet_ship") and other_ship.get_meta("support_fleet_ship", false) == true
-	var ship_is_player: bool = NodeContractHelper.is_player_controlled_ship(ship)
-	var other_is_player: bool = NodeContractHelper.is_player_controlled_ship(other_ship)
+	var ship_is_support: bool = ShipAllyRoleHelper.is_support_ship(ship)
+	var other_is_support: bool = ShipAllyRoleHelper.is_support_ship(other_ship)
+	var ship_is_player: bool = ShipAllyRoleHelper.is_player_flagship(ship)
+	var other_is_player: bool = ShipAllyRoleHelper.is_player_flagship(other_ship)
 	return (ship_is_support and other_is_player) or (other_is_support and ship_is_player)
 
 
@@ -317,17 +319,18 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 		return
 
 	# 우드 스플린터 (파편) - 충격 시 수면 효과 대신 나무 파편이 튀도록 함
-	if ship.wood_splinter_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_splinter", impact_pos, 4, 80.0):
-		var splinter = ship.ScenePool.acquire(ship.get_tree(), ship.wood_splinter_scene)
-		ship.get_tree().root.add_child(splinter)
-		splinter.global_position = impact_pos + Vector3(0, 0.4, 0)
-		splinter.rotation.y = randf() * TAU
-		if splinter.has_method("set_amount_by_damage"):
-			# 충격 속도에 비례하여 파편 양 조절 (기존 5.0에서 2.8로 낮춤)
-			var pseudo_damage = impact_speed * 2.8
-			splinter.set_amount_by_damage(pseudo_damage)
-		if splinter.has_method("pool_activate"):
-			splinter.pool_activate()
+	if ship.wood_splinter_scene:
+		var pseudo_damage := impact_speed * 2.8
+		WoodSplinter.spawn_burst(
+			ship.get_tree(),
+			ship.wood_splinter_scene,
+			impact_pos + Vector3(0, 0.4, 0),
+			pseudo_damage,
+			impact_pos - ship.global_position,
+			"ship_collision_splinter",
+			4,
+			80.0
+		)
 
 	# 임팩트 퍼프 (연기/먼지)
 	if ship.impact_puff_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_smoke", impact_pos, 4, 85.0):

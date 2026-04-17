@@ -2,6 +2,7 @@ extends RefCounted
 class_name BaseShipCrewHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 static func update_crew_allocation_state(ship, delta: float) -> void:
 	ship._crew_allocation_eval_left -= delta
@@ -81,7 +82,7 @@ static func estimate_available_crew_count(ship) -> int:
 				continue
 			if child.has_method("get_team_tag") and child.get_team_tag() != own_team:
 				continue
-			if child.has_method("is_dead") and child.is_dead():
+			if SoldierStateHelper.is_dead_soldier(child):
 				continue
 			alive_count += 1
 		if alive_count > 0:
@@ -169,8 +170,7 @@ static func build_debug_crew_snapshot(ship) -> Dictionary:
 		var team_tag: String = str(child.get("team"))
 		if team_tag != "player":
 			continue
-		var state_value = child.get("current_state")
-		if state_value != null and int(state_value) == 4:
+		if _is_dead_soldier_node(child):
 			continue
 		result["alive_count"] = int(result.get("alive_count", 0)) + 1
 		var role: String = "general"
@@ -206,3 +206,7 @@ static func build_debug_crew_snapshot(ship) -> Dictionary:
 	if sample_soldier.get("weapon_bow") != null:
 		result["bow_damage"] = float(sample_soldier.get("weapon_bow").get("damage")) if sample_soldier.get("weapon_bow").get("damage") != null else 0.0
 	return result
+
+
+static func _is_dead_soldier_node(soldier: Node) -> bool:
+	return SoldierStateHelper.is_dead_soldier(soldier)

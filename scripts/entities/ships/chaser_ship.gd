@@ -7,6 +7,8 @@ const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_sh
 const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship_minion_helper.gd")
 const ChaserShipSupportHelper = preload("res://scripts/entities/ships/chaser_ship_support_helper.gd")
 const ChaserShipAiHelper = preload("res://scripts/entities/ships/chaser_ship_ai_helper.gd")
+const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
+const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
@@ -227,8 +229,8 @@ func _apply_default_combat_profile_for_ship_type() -> void:
 
 func _apply_combat_profile_from_stats(stats: Dictionary) -> void:
 	if stats.has("combat_role"):
-		var role_name := str(stats["combat_role"]).to_lower()
-		combat_role = CombatRole.GUNNER if role_name == "gunner" else CombatRole.CHARGER
+		var role_name := ShipCombatModeHelper.normalize_role_name(str(stats["combat_role"]))
+		combat_role = CombatRole.GUNNER if role_name == ShipCombatModeHelper.ROLE_GUNNER else CombatRole.CHARGER
 	if stats.has("allow_boarding"):
 		allow_boarding = stats["allow_boarding"] == true
 	if stats.has("preferred_range"):
@@ -239,20 +241,13 @@ func _apply_combat_profile_from_stats(stats: Dictionary) -> void:
 		retreat_distance = float(stats["retreat_distance"])
 
 
+func _sync_combat_profile_from_role_accessors() -> void:
+	ShipCombatModeHelper.sync_exported_profile_from_accessors(self)
+
+
 func _load_enemy_crew_composition_from_stats(stats: Dictionary) -> void:
-	enemy_crew_composition.clear()
+	enemy_crew_composition = ShipBlueprintHelper.build_crew_composition(stats)
 	_enemy_crew_spawn_index = 0
-
-	var composition_variant: Variant = stats.get("crew_composition", {})
-	if typeof(composition_variant) != TYPE_DICTIONARY:
-		return
-
-	var composition: Dictionary = composition_variant as Dictionary
-	var ordered_types: Array[String] = ["general", "melee", "ranged", "fire_pot"]
-	for soldier_type_name in ordered_types:
-		var count: int = int(composition.get(soldier_type_name, 0))
-		for _i in range(maxi(count, 0)):
-			enemy_crew_composition.append(soldier_type_name)
 
 
 func _get_next_enemy_soldier_type() -> String:
@@ -336,19 +331,7 @@ func _update_editor_hull() -> void:
 	
 	var stats = load_ship_stats(ship_type)
 	if stats.is_empty(): return
-	
-	# 함종에 따른 선체 씬 경로 결정 (임시 매핑 - 나포 시스템 등에서 정의한 것과 동일하게)
-	var type_lower = ship_type.to_lower()
-	var h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
-	if type_lower.contains("kobayabune"):
-		h_path = "res://scenes/ships/hulls/kobayabune_hull.tscn"
-	elif type_lower == "sekibune_melee":
-		h_path = "res://scenes/ships/hulls/sekibune_melee_hull.tscn"
-	elif type_lower.contains("panokseon"): h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
-	elif type_lower.contains("atakebune"): h_path = "res://scenes/ships/hulls/atakebune_hull.tscn"
-	elif type_lower.contains("maengseon"): h_path = "res://scenes/ships/hulls/maengseon_hull.tscn"
-	
-	var new_hull = load(h_path)
+	var new_hull := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
 	if new_hull:
 		var inst = new_hull.instantiate()
 		inst.name = "EditorHull"
@@ -366,37 +349,21 @@ func _ready() -> void:
 				break
 		if not has_hull:
 			_update_editor_hull()
+		_cache_hull_references(self)
+		_refresh_collision_bounds_from_hull()
 		return
 
 	# JSON 데이터 로드 및 적용
 	_ensure_runtime_scene_refs()
 	var stats = load_ship_stats(ship_type)
 	if not stats.is_empty():
-		if stats.has("hull_hp"): max_hull_hp = stats["hull_hp"]
-		if stats.has("move_speed"): move_speed = stats["move_speed"]
-		if stats.has("boarders"): boarders_count = stats["boarders"]
-		if stats.has("has_cannons"): has_cannons = stats["has_cannons"]
-		if stats.has("soldier_type"): preferred_soldier_type = stats["soldier_type"]
+		ShipBlueprintHelper.apply_chaser_stats(self, stats)
 		_load_enemy_crew_composition_from_stats(stats)
-		if stats.has("separation_pad_scale"): separation_pad_scale = float(stats["separation_pad_scale"])
 		_apply_combat_profile_from_stats(stats)
 	_apply_formation_role_profile()
 		
 	# 선체(Hull) 씬 인스턴스화 및 추가 (런타임)
-	var runtime_hull_scene: PackedScene = hull_scene
-	var type_lower = ship_type.to_lower()
-	if type_lower.contains("kobayabune"):
-		runtime_hull_scene = load("res://scenes/ships/hulls/kobayabune_hull.tscn")
-	elif type_lower == "sekibune_melee":
-		runtime_hull_scene = load("res://scenes/ships/hulls/sekibune_melee_hull.tscn")
-	elif type_lower.contains("atakebune"):
-		runtime_hull_scene = load("res://scenes/ships/hulls/atakebune_hull.tscn")
-	elif type_lower.contains("sekibune"):
-		runtime_hull_scene = load("res://scenes/ships/hulls/sekibune_hull.tscn")
-	elif type_lower.contains("panokseon"):
-		runtime_hull_scene = load("res://scenes/ships/hulls/panokseon_hull.tscn")
-	elif type_lower.contains("maengseon"):
-		runtime_hull_scene = load("res://scenes/ships/hulls/maengseon_hull.tscn")
+	var runtime_hull_scene: PackedScene = ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
 	if is_instance_valid(runtime_hull_scene):
 		var hull_inst = runtime_hull_scene.instantiate()
 		add_child(hull_inst)
@@ -412,15 +379,15 @@ func _ready() -> void:
 	if not has_cannons:
 		_remove_all_cannons()
 	
-	# 초기 돛 색상 설정 (Enemy 기본: Red)
+	# 초기 팀 표식 설정. 돛 색은 선체/돛대 기본 재질을 유지한다.
 	for mast in masts:
-		if mast.has_method("set_sail_color"):
-			mast.set_sail_color(Color(0.7, 0.1, 0.1, 1.0))
 		if mast.has_method("set_team_color"):
 			mast.set_team_color("enemy")
 	add_to_group("ships")
 	set_team(team)
 	if team == "player":
+		if get_ally_ship_role() == ShipAllyRoleHelper.ROLE_NONE:
+			set_ally_ship_role(ShipAllyRoleHelper.ROLE_CAPTURED_MINION)
 		add_to_group("captured_minion")
 		EntityRegistry.register_captured_minion(self)
 		_apply_minion_visuals()
@@ -463,40 +430,6 @@ func _ensure_runtime_scene_refs() -> void:
 func _load_packed_scene(path: String) -> PackedScene:
 	var loaded_resource: Resource = load(path)
 	return loaded_resource as PackedScene if loaded_resource is PackedScene else null
-
-func _sync_contact_area_layers(layer_override: int = -1) -> void:
-	var current_layer: int = layer_override
-	if current_layer < 0:
-		var layer_val = get("collision_layer")
-		current_layer = int(layer_val) if layer_val != null else 4
-	var proximity_area = get_node_or_null("ProximityArea")
-	if proximity_area is Area3D:
-		proximity_area.set_deferred("collision_layer", current_layer)
-		# 도선/접근 감지는 플레이어 레이어(2)만 본다.
-		proximity_area.set_deferred("collision_mask", 2)
-		
-	var hit_area = get_node_or_null("HitArea")
-	if hit_area is Area3D:
-		hit_area.set_deferred("collision_layer", current_layer)
-		# 피격 영역은 다른 Area를 능동 감지할 필요가 없다.
-		hit_area.set_deferred("collision_mask", 0)
-
-func _set_contact_areas_enabled(enabled: bool) -> void:
-	var proximity_area = get_node_or_null("ProximityArea")
-	if proximity_area is Area3D:
-		proximity_area.set_deferred("monitoring", enabled)
-		proximity_area.set_deferred("monitorable", enabled)
-		var prox_shape = proximity_area.get_node_or_null("CollisionShape3D")
-		if prox_shape is CollisionShape3D:
-			prox_shape.set_deferred("disabled", not enabled)
-			
-	var hit_area = get_node_or_null("HitArea")
-	if hit_area is Area3D:
-		hit_area.set_deferred("monitoring", enabled)
-		hit_area.set_deferred("monitorable", enabled)
-		var hit_shape = hit_area.get_node_or_null("CollisionShape3D")
-		if hit_shape is CollisionShape3D:
-			hit_shape.set_deferred("disabled", not enabled)
 
 func _setup_soldiers() -> void:
 	if not soldier_scene: return
@@ -548,8 +481,7 @@ func _spawn_one_soldier(s_team: String, soldier_type_override: String = "") -> v
 	s.set_team(s_team)
 	_configure_spawned_soldier(s, soldier_type_name)
 		
-	var offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-2.5, 2.5))
-	s.position = offset
+	s.transform = _get_next_crew_spawn_transform(1.0, 2.5)
 
 
 func die() -> void:
@@ -642,7 +574,7 @@ func add_survivor(_allow_over_capacity: bool = true) -> bool:
 	# 현재 살아있는 병사 수 체크
 	var alive_count = 0
 	for child in soldiers_node.get_children():
-		if child.get("current_state") != 4: # NOT DEAD
+		if _is_alive_soldier_node(child):
 			alive_count += 1
 		else:
 			child.queue_free() # 시체 정리
@@ -657,12 +589,17 @@ func add_survivor(_allow_over_capacity: bool = true) -> bool:
 	soldiers_node.add_child(s)
 	s.set_team("player")
 	
-	# 위치 설정 (갑판 위 랜덤)
-	var offset = Vector3(randf_range(-0.8, 0.8), 0.5, randf_range(-1.5, 1.5))
-	s.position = offset
+	s.transform = _get_next_crew_spawn_transform(0.8, 1.5)
 	
 	print("[Crew] 나포함이 생존자를 구조했습니다! (현재: %d/%d)" % [alive_count + 1, max_minion_crew])
 	return true
+
+func _get_next_crew_spawn_transform(fallback_x: float, fallback_z: float) -> Transform3D:
+	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-fallback_x, fallback_x), 0.5, randf_range(-fallback_z, fallback_z)))
+	var soldiers_node := get_node_or_null("Soldiers") as Node3D
+	if not is_instance_valid(soldiers_node):
+		return fallback
+	return ShipAuthoringHelper.get_least_occupied_crew_slot_transform(self, soldiers_node, fallback)
 
 func _process(delta: float) -> void:
 	if is_dying: return
@@ -745,13 +682,14 @@ func capture_ship() -> void:
 	if team == "player": return
 	
 	# 기존 함대 수 체크 (정예 함선 1척 체제)
-	if EntityRegistry.count_captured_minions() >= 1:
+	if ShipAllyRoleHelper.count_captured_minions(EntityRegistry.get_captured_minions()) >= 1:
 		# ✅ 정원 초과 시 나포 대신 배를 파괴함
 		print("[Limitation] 함대 정원 초과! 적함을 파괴합니다.")
 		die()
 		return
 			
 	set_team("player")
+	set_ally_ship_role(ShipAllyRoleHelper.ROLE_CAPTURED_MINION)
 	
 	# ✅ 상태 초기화 및 긴급 수리 (나포 후 즉시 가라앉는 현상 방지)
 	is_dying = false
@@ -832,32 +770,39 @@ func capture_ship() -> void:
 		
 	print("[Capture] 나포 성공! 함대에 합류합니다. (target: %s)" % str(target))
 
+func _store_boarding_contact_anchor(target_ship: Node3D) -> void:
+	ChaserShipBoardingHelper.store_boarding_contact_anchor(self, target_ship)
+
 func _equip_minion_cannons() -> void:
-	if not cannon_scene: return
-	
 	# 중복 방지: 선체에 미리 달려있는 대포가 있다면 제거 후 FleetCannon으로 통일
 	_remove_all_cannons()
 	
-	# 장착 위치 정의 (전방, 좌측, 우측)
-	var spawn_points = [
-		{"pos": Vector3(0, 0.8, -3.5), "rot": 0}, # 전방
-		{"pos": Vector3(-1.0, 0.8, -0.5), "rot": 90}, # 좌측 (90도 회전)
-		{"pos": Vector3(1.0, 0.8, -0.5), "rot": - 90} # 우측 (-90도 회전)
-	]
+	var stats := ShipBlueprintHelper.load_stats(ship_type)
+	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, ShipWeaponLoadoutHelper.get_default_support_cannon_loadout())
+	loadout = ShipWeaponLoadoutHelper.apply_authored_weapon_slots(self, self, loadout)
 	
 	var i = 0
-	for p in spawn_points:
-		var cannon = cannon_scene.instantiate()
-		cannon.name = "FleetCannon_" + str(i)
+	for spec in loadout:
+		if ShipWeaponLoadoutHelper.get_kind(spec) != ShipWeaponLoadoutHelper.KIND_CANNON:
+			continue
+		var cannon = ShipWeaponLoadoutHelper.instantiate_weapon(spec, cannon_scene)
+		if not is_instance_valid(cannon):
+			continue
+		cannon.name = ShipWeaponLoadoutHelper.get_node_name(spec, "FleetCannon_" + str(i))
 		add_child(cannon)
-		cannon.position = p["pos"]
-		cannon.rotation_degrees.y = p["rot"]
-		# 팀 설정
-		if cannon.has_method("set_team"):
-			cannon.set_team("player")
+		if cannon is Node3D:
+			var cannon_node := cannon as Node3D
+			cannon_node.position = ShipWeaponLoadoutHelper.get_position(spec)
+			if ShipWeaponLoadoutHelper.has_basis(spec):
+				var authored_basis: Basis = ShipWeaponLoadoutHelper.get_basis(spec)
+				cannon_node.rotation = authored_basis.get_euler()
+			else:
+				cannon_node.rotation_degrees.y = ShipWeaponLoadoutHelper.get_rotation_y(spec)
+		# Loadout-authored runtime tuning.
+		ShipWeaponLoadoutHelper.apply_weapon_config(cannon, spec, "player")
 		
 		# 초기 레벨에선 전방 대포(index 0) 외에는 비활성
-		if i > 0:
+		if ShipWeaponLoadoutHelper.get_required_level(spec, i + 1) > 1:
 			cannon.visible = false
 			cannon.set_process(false)
 			cannon.set_physics_process(false)
@@ -954,7 +899,7 @@ func _update_minion_respawn(delta: float) -> void:
 	
 	var alive_count = 0
 	for child in soldiers_node.get_children():
-		if child.get("current_state") != 4: # NOT DEAD
+		if _is_alive_soldier_node(child):
 			alive_count += 1
 			
 	if alive_count < max_minion_crew:
@@ -992,6 +937,10 @@ func apply_fleet_weapon_upgrade(level: int) -> void:
 			cannon.set_physics_process(false)
 	
 	print("[Fleet] 공유 포문 적용: Lv.%d (지원함 대포 %d문 활성화)" % [level, active_count])
+
+
+func _is_alive_soldier_node(soldier: Node) -> bool:
+	return ChaserSoldierStateHelper.is_alive_soldier(soldier)
 
 
 ## 함선 수리 (초요기/공적 보너스)
@@ -1093,20 +1042,22 @@ func _board_ship(target_ship: Node3D) -> void:
 	var remote_defenders_engaged: bool = _has_remote_engaged_boarding_defenders(ship_node)
 	set_meta("boarding_remote_defenders_engaged", remote_defenders_engaged)
 	var contact_allows_boarding: bool = remote_defenders_engaged and (contact_defenders <= 0 or my_crew > contact_defenders)
-	var latch_allows_boarding: bool = not active_latch_mode.is_empty() and (active_latch_mode != "side" or contact_allows_boarding)
+	var latch_allows_boarding: bool = not active_latch_mode.is_empty() and (active_latch_mode != ShipBoardingMetaHelper.CONTACT_SIDE or contact_allows_boarding)
 	if my_crew > enemy_crew or can_head_on_board or can_cleanup_board or (can_side_board and contact_allows_boarding) or latch_allows_boarding:
 		is_boarding = true
 		boarding_target = ship_node
 		if can_side_board:
-			set_meta("boarding_contact_mode", "side")
+			ShipBoardingMetaHelper.set_contact_mode(self, ShipBoardingMetaHelper.CONTACT_SIDE)
 		elif can_head_on_board:
-			set_meta("boarding_contact_mode", "head_on")
+			ShipBoardingMetaHelper.set_contact_mode(self, ShipBoardingMetaHelper.CONTACT_HEAD_ON)
 		else:
-			set_meta("boarding_contact_mode", "cleanup" if active_latch_mode.is_empty() else active_latch_mode)
+			var contact_mode: String = ShipBoardingMetaHelper.CONTACT_CLEANUP if active_latch_mode.is_empty() else active_latch_mode
+			ShipBoardingMetaHelper.set_contact_mode(self, contact_mode)
+		_store_boarding_contact_anchor(ship_node)
 		var hold_forward: Vector3 = -global_transform.basis.z
 		hold_forward.y = 0.0
 		if hold_forward.length_squared() > 0.001:
-			set_meta("boarding_hold_forward", hold_forward.normalized())
+			ShipBoardingMetaHelper.set_hold_forward(self, hold_forward.normalized())
 		
 		# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
 		if boarding_target.has_method("set_boarding_attacker_ship"):
@@ -1118,7 +1069,7 @@ func _board_ship(target_ship: Node3D) -> void:
 		boarding_contact_timer = 0.0
 		boarding_hook_timer = 0.0
 		boarding_secondary_rope_timer = 0.0
-		set_meta("boarding_motion_settle_timer", 0.0)
+		ShipBoardingMetaHelper.set_motion_settle_timer(self, 0.0)
 		_initial_rope_deployed = false
 		_full_rope_deployed = false
 		_clear_boarding_latch()
@@ -1169,7 +1120,7 @@ func _count_boarding_contact_defenders(target_ship: Node3D) -> int:
 	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
 		if not is_instance_valid(soldier):
 			continue
-		if soldier.has_method("is_dead") and soldier.is_dead():
+		if ChaserSoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != target_team:
@@ -1196,7 +1147,7 @@ func _has_remote_engaged_boarding_defenders(target_ship: Node3D) -> bool:
 	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
 		if not is_instance_valid(soldier):
 			continue
-		if soldier.has_method("is_dead") and soldier.is_dead():
+		if ChaserSoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != target_team:
@@ -1283,18 +1234,21 @@ func _can_start_boarding_latched(target_ship: Node3D, dist_to_target: float, can
 
 	var latch_mode: String = ""
 	if can_side_board:
-		latch_mode = "side"
+		latch_mode = ShipBoardingMetaHelper.CONTACT_SIDE
 	elif can_head_on_board:
-		latch_mode = "head_on"
+		latch_mode = ShipBoardingMetaHelper.CONTACT_HEAD_ON
 	elif can_cleanup_board:
-		latch_mode = "cleanup"
+		latch_mode = ShipBoardingMetaHelper.CONTACT_CLEANUP
 	elif _is_relaxed_boarding_latch_contact(target_ship, dist_to_target):
-		latch_mode = "side"
+		latch_mode = ShipBoardingMetaHelper.CONTACT_SIDE
 
 	if not latch_mode.is_empty():
-		set_meta("boarding_latch_target_id", target_ship.get_instance_id())
-		set_meta("boarding_latch_timer", boarding_latch_duration + _get_enemy_boarding_latch_duration_bonus())
-		set_meta("boarding_latch_mode", latch_mode)
+		ShipBoardingMetaHelper.set_latch(
+			self,
+			target_ship.get_instance_id(),
+			boarding_latch_duration + _get_enemy_boarding_latch_duration_bonus(),
+			latch_mode
+		)
 		return true
 
 	_decay_boarding_latch(target_ship, delta)
@@ -1327,35 +1281,30 @@ func _get_boarding_latch_distance(target_ship: Node3D) -> float:
 func _get_active_boarding_latch_mode(target_ship: Node3D) -> String:
 	if not is_instance_valid(target_ship):
 		return ""
-	if not has_meta("boarding_latch_timer") or float(get_meta("boarding_latch_timer", 0.0)) <= 0.0:
+	if not has_meta(ShipBoardingMetaHelper.KEY_LATCH_TIMER) or ShipBoardingMetaHelper.get_latch_timer(self) <= 0.0:
 		return ""
-	if int(get_meta("boarding_latch_target_id", 0)) != target_ship.get_instance_id():
+	if ShipBoardingMetaHelper.get_latch_target_id(self) != target_ship.get_instance_id():
 		return ""
 	if global_position.distance_to(target_ship.global_position) > _get_boarding_latch_distance(target_ship) + 0.75:
 		return ""
-	return str(get_meta("boarding_latch_mode", ""))
+	return ShipBoardingMetaHelper.get_latch_mode(self)
 
 
 func _decay_boarding_latch(target_ship: Node3D, delta: float) -> void:
-	if not has_meta("boarding_latch_timer"):
+	if not has_meta(ShipBoardingMetaHelper.KEY_LATCH_TIMER):
 		return
-	if not is_instance_valid(target_ship) or int(get_meta("boarding_latch_target_id", 0)) != target_ship.get_instance_id():
+	if not is_instance_valid(target_ship) or ShipBoardingMetaHelper.get_latch_target_id(self) != target_ship.get_instance_id():
 		_clear_boarding_latch()
 		return
-	var remaining: float = float(get_meta("boarding_latch_timer", 0.0)) - delta
+	var remaining: float = ShipBoardingMetaHelper.get_latch_timer(self) - delta
 	if remaining <= 0.0 or global_position.distance_to(target_ship.global_position) > _get_boarding_latch_distance(target_ship) + 0.75:
 		_clear_boarding_latch()
 		return
-	set_meta("boarding_latch_timer", remaining)
+	ShipBoardingMetaHelper.set_latch_timer(self, remaining)
 
 
 func _clear_boarding_latch() -> void:
-	if has_meta("boarding_latch_target_id"):
-		remove_meta("boarding_latch_target_id")
-	if has_meta("boarding_latch_timer"):
-		remove_meta("boarding_latch_timer")
-	if has_meta("boarding_latch_mode"):
-		remove_meta("boarding_latch_mode")
+	ShipBoardingMetaHelper.clear_latch_meta(self)
 
 
 func _get_enemy_boarding_latch_duration_bonus() -> float:

@@ -2,8 +2,10 @@ extends RefCounted
 class_name BaseShipStatusHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const SupportBoardingHelper = preload("res://scripts/entities/ships/support_boarding_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
-const SUPPORT_RESCUE_BOARDING_PURPOSE := "support_rescue_boarding"
 
 static func update_fire_effect(ship) -> void:
 	if (ship.is_burning or ship.is_derelict) and not ship.is_sinking and not ship.is_dying:
@@ -52,7 +54,7 @@ static func check_derelict_status(ship) -> void:
 			var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
 			if child_team != ship_team:
 				continue
-			if not child.has_method("is_dead") or not child.is_dead():
+			if SoldierStateHelper.is_alive_soldier(child):
 				all_crew_dead = false
 				break
 
@@ -62,12 +64,12 @@ static func check_derelict_status(ship) -> void:
 			var soldier_team: String = s.get_team_tag() if s.has_method("get_team_tag") else str(s.get("team"))
 			if soldier_team != ship_team:
 				continue
-			if s.get("home_ship") == ship and (not s.has_method("is_dead") or not s.is_dead()):
+			if s.get("home_ship") == ship and SoldierStateHelper.is_alive_soldier(s):
 				all_crew_dead = false
 				break
 
 	if all_crew_dead and ship.has_method("_become_derelict"):
-		if ship.get_meta("support_fleet_ship", false) == true:
+		if ShipAllyRoleHelper.is_support_ship(ship):
 			return
 		ship.call("_become_derelict")
 
@@ -86,7 +88,7 @@ static func update_boarding_state(ship, delta: float) -> void:
 	var friendly_count: int = 0
 	var hostile_count: int = 0
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.has_method("is_dead") and child.is_dead():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		if child.has_method("get_team_tag") and child.get_team_tag() == ship_team:
 			friendly_count += 1
@@ -113,7 +115,9 @@ static func update_boarding_state(ship, delta: float) -> void:
 		var effective_capture_duration: float = ship.boarding_capture_duration
 		if ship.has_method("get_effective_boarding_capture_duration"):
 			effective_capture_duration = float(ship.call("get_effective_boarding_capture_duration", attacker_ship))
-		var support_rescue_active: bool = ship_team == "player" and _is_support_rescue_boarding_active(ship)
+		var support_rescue_active: bool = ship_team == "player" and SupportBoardingHelper.is_support_rescue_boarding_active(ship)
+		if ship_team != "player" and SupportBoardingHelper.finish_support_attack_boarding_if_safe(ship, ship_team):
+			return
 		if not support_rescue_active:
 			ship.boarding_capture_progress = minf(effective_capture_duration, ship.boarding_capture_progress + delta)
 		if ship_team == "player" and not ship._deck_overrun_announced:
@@ -142,14 +146,14 @@ static func update_boarding_state(ship, delta: float) -> void:
 		ship.boarding_capture_progress = 0.0
 		ship._deck_overrun_announced = false
 		if ship_team == "player":
-			_finish_support_rescue_boarding_if_safe(ship)
+			SupportBoardingHelper.finish_support_rescue_boarding_if_safe(ship)
 
 
 static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
 		if not is_instance_valid(child):
 			continue
-		if child.has_method("is_dead") and child.is_dead():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
 		if child_team == ship_team:
@@ -158,104 +162,6 @@ static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
 		if is_instance_valid(home_ship) and home_ship is Node:
 			return home_ship as Node
 	return null
-
-
-static func _is_support_rescue_boarding_active(player_ship: Node) -> bool:
-	if not is_instance_valid(player_ship):
-		return false
-	return not _get_support_rescue_boarding_ships(player_ship).is_empty()
-
-
-static func _finish_support_rescue_boarding_if_safe(player_ship: Node) -> void:
-	var rescue_ships := _get_support_rescue_boarding_ships(player_ship)
-	if rescue_ships.is_empty():
-		return
-	for support_ship in rescue_ships:
-		support_ship.set_meta("boarding_transfer_suppressed", true)
-
-	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
-		if not _is_support_rescue_boarder_on_player_ship(soldier, player_ship):
-			continue
-		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
-			continue
-		if soldier.has_method("_try_evacuate_to_home"):
-			soldier.call("_try_evacuate_to_home")
-
-	if _count_support_rescue_boarders_on_player_ship(player_ship) > 0:
-		return
-	for support_ship in rescue_ships:
-		_cancel_support_rescue_boarding(support_ship)
-
-
-static func _get_support_rescue_boarding_ships(player_ship: Node) -> Array[Node]:
-	var rescue_ships: Array[Node] = []
-	if not is_instance_valid(player_ship):
-		return rescue_ships
-	for support_ship in EntityRegistry.get_ships_by_team("player"):
-		if not is_instance_valid(support_ship) or support_ship == player_ship:
-			continue
-		if support_ship.get_meta("support_fleet_ship", false) != true:
-			continue
-		if support_ship.get("is_boarding") != true:
-			continue
-		if support_ship.get("boarding_target") != player_ship:
-			continue
-		if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
-			continue
-		rescue_ships.append(support_ship)
-	return rescue_ships
-
-
-static func _count_support_rescue_boarders_on_player_ship(player_ship: Node) -> int:
-	var count := 0
-	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
-		if _is_support_rescue_boarder_on_player_ship(soldier, player_ship):
-			count += 1
-	return count
-
-
-static func _is_support_rescue_boarder_on_player_ship(soldier: Node, player_ship: Node) -> bool:
-	if not is_instance_valid(soldier) or not is_instance_valid(player_ship):
-		return false
-	if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
-		return false
-	var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
-	if soldier_team != "player":
-		return false
-	var owned_ship: Variant = soldier.get("owned_ship") if soldier.get("owned_ship") != null else null
-	if owned_ship != player_ship:
-		return false
-	var home_ship: Variant = soldier.get("home_ship") if soldier.get("home_ship") != null else null
-	if not is_instance_valid(home_ship) or home_ship == player_ship:
-		return false
-	if not (home_ship is Node):
-		return false
-	var home_node := home_ship as Node
-	if home_node.get_meta("support_fleet_ship", false) != true:
-		return false
-	if home_node.get("is_sinking") == true or home_node.get("is_dying") == true:
-		return false
-	return true
-
-
-static func _cancel_support_rescue_boarding(support_ship: Node) -> void:
-	if not is_instance_valid(support_ship):
-		return
-	if str(support_ship.get_meta("boarding_purpose", "")) != SUPPORT_RESCUE_BOARDING_PURPOSE:
-		return
-	if support_ship.has_method("_cancel_boarding"):
-		support_ship.call("_cancel_boarding")
-	else:
-		if support_ship.get("is_boarding") != null:
-			support_ship.set("is_boarding", false)
-		if support_ship.get("boarding_target") != null:
-			support_ship.set("boarding_target", null)
-	if support_ship.has_meta("boarding_purpose"):
-		support_ship.remove_meta("boarding_purpose")
-	if support_ship.has_meta("boarding_transfer_suppressed"):
-		support_ship.remove_meta("boarding_transfer_suppressed")
-	if support_ship.has_meta("support_debug_mode"):
-		support_ship.set_meta("support_debug_mode", "trail")
 
 
 static func _resolve_boarding_capture_tick(ship, ship_team: String, attacker_ship: Node) -> void:

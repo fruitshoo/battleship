@@ -1,5 +1,11 @@
 extends RefCounted
 
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+
+const WANDER_TURN_SPEED := 7.0
+const MOVE_TURN_SPEED := 10.0
+const ATTACK_TURN_SPEED := 16.0
+
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
@@ -24,13 +30,13 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 		if soldier.has_method("_find_cross_ship_muster_target"):
 			var muster_target: Vector3 = soldier._find_cross_ship_muster_target()
 			if muster_target != Vector3.INF:
-				_move_toward_point(soldier, muster_target, 0.9)
+				_move_toward_point(soldier, muster_target, 0.9, delta, WANDER_TURN_SPEED)
 				return
 
 		if soldier.has_method("_find_ship_duty_target"):
 			var duty_target: Vector3 = soldier._find_ship_duty_target()
 			if duty_target != Vector3.INF:
-				_move_toward_point(soldier, duty_target, 0.75)
+				_move_toward_point(soldier, duty_target, 0.75, delta, WANDER_TURN_SPEED)
 				return
 
 	if soldier.wander_timer > 0:
@@ -39,7 +45,13 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 		start_wander(soldier)
 
 
-static func state_wander(soldier, run_heavy_logic: bool) -> void:
+static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run_heavy_logic: bool = false) -> void:
+	var delta := 0.016
+	if typeof(delta_or_run_heavy_logic) == TYPE_BOOL:
+		run_heavy_logic = bool(delta_or_run_heavy_logic)
+	else:
+		delta = float(delta_or_run_heavy_logic)
+
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
 		soldier.velocity = Vector3.ZERO
 		soldier.wander_timer = randf_range(1.5, 3.0)
@@ -63,13 +75,13 @@ static func state_wander(soldier, run_heavy_logic: bool) -> void:
 		if soldier.has_method("_find_cross_ship_muster_target"):
 			var muster_target: Vector3 = soldier._find_cross_ship_muster_target()
 			if muster_target != Vector3.INF:
-				_move_toward_point(soldier, muster_target, 0.85)
+				_move_toward_point(soldier, muster_target, 0.85, delta, WANDER_TURN_SPEED)
 				return
 
 		if soldier.has_method("_find_ship_duty_target"):
 			var duty_target: Vector3 = soldier._find_ship_duty_target()
 			if duty_target != Vector3.INF:
-				_move_toward_point(soldier, duty_target, 0.7)
+				_move_toward_point(soldier, duty_target, 0.7, delta, WANDER_TURN_SPEED)
 				return
 
 	if not is_instance_valid(soldier.owned_ship):
@@ -92,8 +104,7 @@ static func state_wander(soldier, run_heavy_logic: bool) -> void:
 	if direction.length_squared() > 0.01:
 		var target_look = soldier.global_position + direction
 		target_look.y = soldier.global_position.y
-		if not soldier.global_position.is_equal_approx(target_look):
-			soldier.look_at(target_look, Vector3.UP)
+		turn_toward_position(soldier, target_look, WANDER_TURN_SPEED, delta)
 
 
 static func start_wander(soldier) -> void:
@@ -108,7 +119,7 @@ static func start_wander(soldier) -> void:
 	soldier._change_state(soldier.State.WANDER)
 
 
-static func state_move(soldier) -> void:
+static func state_move(soldier, delta: float = 0.016) -> void:
 	if soldier.is_stationary:
 		soldier._change_state(soldier.State.IDLE)
 		return
@@ -117,14 +128,14 @@ static func state_move(soldier) -> void:
 		return
 
 	if not is_instance_valid(soldier.current_target):
-		if _try_muster_to_cross_ship_contact(soldier, 1.0):
+		if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
 			return
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	if soldier.current_target.has_method("get_current_state_value") and soldier.current_target.get_current_state_value() == soldier.State.DEAD:
+	if SoldierStateHelper.is_dead_soldier(soldier.current_target):
 		soldier.current_target = null
-		if _try_muster_to_cross_ship_contact(soldier, 1.0):
+		if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
 			return
 		soldier._change_state(soldier.State.IDLE)
 		return
@@ -133,7 +144,7 @@ static func state_move(soldier) -> void:
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
 			soldier.current_target = null
-			if _try_muster_to_cross_ship_contact(soldier, 1.0):
+			if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
 				return
 			soldier._change_state(soldier.State.IDLE)
 			return
@@ -150,7 +161,7 @@ static func state_move(soldier) -> void:
 			if soldier.has_method("_get_cross_ship_contact_point_global"):
 				var muster_target: Vector3 = soldier._get_cross_ship_contact_point_global(target_ship)
 				if muster_target != Vector3.INF:
-					_move_toward_point(soldier, muster_target, 1.0)
+					_move_toward_point(soldier, muster_target, 1.0, delta, MOVE_TURN_SPEED)
 					return
 		var engage_distance: float = soldier._get_cross_ship_engage_max_distance(target_ship)
 		if distance_xz > engage_distance:
@@ -175,11 +186,10 @@ static func state_move(soldier) -> void:
 	if direction.length_squared() > 0.01:
 		var target_look = soldier.global_position + direction
 		target_look.y = soldier.global_position.y
-		if not soldier.global_position.is_equal_approx(target_look):
-			soldier.look_at(target_look, Vector3.UP)
+		turn_toward_position(soldier, target_look, MOVE_TURN_SPEED, delta)
 
 
-static func state_attack(soldier) -> void:
+static func state_attack(soldier, delta: float = 0.016) -> void:
 	if _retarget_owned_ship_hostile(soldier):
 		return
 
@@ -187,9 +197,9 @@ static func state_attack(soldier) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	if (soldier.current_target.has_method("get_current_state_value") and soldier.current_target.get_current_state_value() == soldier.State.DEAD) or soldier.current_target.get_team_tag() == soldier.team:
+	if SoldierStateHelper.is_dead_soldier(soldier.current_target) or soldier.current_target.get_team_tag() == soldier.team:
 		soldier.current_target = null
-		if _try_muster_to_cross_ship_contact(soldier, 0.95):
+		if _try_muster_to_cross_ship_contact(soldier, 0.95, delta, ATTACK_TURN_SPEED):
 			return
 		soldier._change_state(soldier.State.IDLE)
 		return
@@ -198,7 +208,7 @@ static func state_attack(soldier) -> void:
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
 			soldier.current_target = null
-			if _try_muster_to_cross_ship_contact(soldier, 0.95):
+			if _try_muster_to_cross_ship_contact(soldier, 0.95, delta, ATTACK_TURN_SPEED):
 				return
 			soldier._change_state(soldier.State.IDLE)
 			return
@@ -220,9 +230,11 @@ static func state_attack(soldier) -> void:
 		soldier._change_state(soldier.State.MOVE)
 		return
 
-	soldier.look_at(
+	turn_toward_position(
+		soldier,
 		Vector3(soldier.current_target.global_position.x, soldier.global_position.y, soldier.current_target.global_position.z),
-		Vector3.UP
+		ATTACK_TURN_SPEED,
+		delta
 	)
 
 	if soldier.attack_timer <= 0:
@@ -233,7 +245,7 @@ static func state_attack(soldier) -> void:
 		soldier.attack_timer = soldier.current_weapon.attack_cooldown if soldier.current_weapon and "attack_cooldown" in soldier.current_weapon else 1.0
 
 
-static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0) -> void:
+static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:
 	var flat_target := Vector3(target_pos.x, soldier.global_position.y, target_pos.z)
 	var diff: Vector3 = flat_target - soldier.global_position
 	diff.y = 0.0
@@ -249,18 +261,35 @@ static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float 
 	if direction.length_squared() > 0.01:
 		var target_look: Vector3 = soldier.global_position + direction
 		target_look.y = soldier.global_position.y
-		if not soldier.global_position.is_equal_approx(target_look):
-			soldier.look_at(target_look, Vector3.UP)
+		turn_toward_position(soldier, target_look, turn_speed, delta)
 
 
-static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0) -> bool:
+static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> bool:
 	if not soldier.has_method("_find_cross_ship_muster_target"):
 		return false
 	var muster_target: Vector3 = soldier._find_cross_ship_muster_target()
 	if muster_target == Vector3.INF:
 		return false
-	_move_toward_point(soldier, muster_target, speed_scale)
+	_move_toward_point(soldier, muster_target, speed_scale, delta, turn_speed)
 	return true
+
+
+static func turn_toward_position(soldier, target_pos: Vector3, turn_speed: float, delta: float) -> void:
+	var parent_node := soldier.get_parent() as Node3D
+	var local_target: Vector3 = parent_node.to_local(target_pos) if is_instance_valid(parent_node) else target_pos
+	var local_origin: Vector3 = soldier.position if is_instance_valid(parent_node) else soldier.global_position
+	var flat_dir: Vector3 = local_target - local_origin
+	flat_dir.y = 0.0
+	if flat_dir.length_squared() <= 0.0001:
+		return
+
+	var target_yaw := atan2(-flat_dir.x, -flat_dir.z)
+	var step := clampf(1.0 - exp(-turn_speed * maxf(delta, 0.0)), 0.0, 1.0)
+	var current_rotation: Vector3 = soldier.rotation
+	current_rotation.x = 0.0
+	current_rotation.y = lerp_angle(current_rotation.y, target_yaw, step)
+	current_rotation.z = 0.0
+	soldier.rotation = current_rotation
 
 
 static func _retarget_owned_ship_hostile(soldier) -> bool:

@@ -1,5 +1,6 @@
 extends Area3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
@@ -24,6 +25,8 @@ const RESCUE_CALL_LINES: Array[String] = [
 @export_range(0.5, 8.0, 0.1) var rescue_call_interval_min: float = 2.6
 @export_range(0.5, 10.0, 0.1) var rescue_call_interval_max: float = 5.2
 @export_range(0.4, 4.0, 0.1) var rescue_call_duration: float = 2.0
+@export var rescue_contact_margin: float = 0.7
+@export var rescue_finish_duration: float = 0.32
 
 var target_player: Node3D = null
 var current_magnet_speed: float = 0.0
@@ -130,16 +133,15 @@ func _physics_process(delta: float) -> void:
 			# 자석 효과: 거리가 가까울수록 더 빠르게 가속
 			var ship_speed_bonus: float = 0.0
 			ship_speed_bonus = maxf(0.0, NodeContractHelper.get_current_speed_value(target_player)) * 0.75
-			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (16.0 / max(dist, 0.8))
+			var pull_target: Vector3 = FieldItemHelper.get_ship_side_anchor(self, target_player, false)
+			var pull_distance: float = global_position.distance_to(pull_target)
+			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (16.0 / max(pull_distance, 0.8))
 			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 24.0 * delta)
-			var direction: Vector3 = target_player.global_position - global_position
-			direction.y = 0.0
-			direction = direction.normalized() if direction.length_squared() > 0.001 else Vector3.ZERO
-			global_position += direction * current_magnet_speed * delta
+			FieldItemHelper.move_item_toward_ship_side_anchor(self, target_player, current_magnet_speed * delta)
 			_apply_floating(delta)
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
-			if dist < 3.0:
+			if _is_close_enough_to_collect(target_player):
 				_collect_by_proximity()
 		else:
 			current_magnet_speed = 0.0
@@ -264,33 +266,11 @@ func _hide_rescue_call() -> void:
 
 
 func _find_target_player() -> void:
-	var players = EntityRegistry.get_ships_by_team("player")
-	var closest_dist = INF
-	var closest_p = null
-	
-	for p in players:
-		if NodeContractHelper.is_sinking_or_dying(p): continue
-		
-		var d = global_position.distance_to(p.global_position)
-		if d < closest_dist:
-			closest_dist = d
-			closest_p = p
-			
-	if closest_dist <= _get_current_magnet_radius() * 1.5:
-		target_player = closest_p
-	else:
-		target_player = null
+	target_player = FieldItemHelper.find_closest_player_ship(self, _get_current_magnet_radius())
 
 
 func _get_current_magnet_radius() -> float:
-	var meta_bonus := 0.0
-	var meta_manager = get_node_or_null("/root/MetaManager")
-	if is_instance_valid(meta_manager) and meta_manager.has_method("get_collection_radius_bonus"):
-		meta_bonus = float(meta_manager.get_collection_radius_bonus())
-	if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
-		var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
-		return base_magnet_radius + meta_bonus + float(supply_stats.get("radius_bonus", 0.0))
-	return base_magnet_radius + meta_bonus
+	return FieldItemHelper.get_current_magnet_radius(self, base_magnet_radius, _cached_um)
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -311,31 +291,56 @@ func _collect_by_proximity() -> void:
 		_try_collect(target_player)
 
 func _get_ship_from_node(node: Node) -> Node3D:
-	if not node: return null
-	if node.is_in_group("player"): return node
-	
-	# 부모나 주인(owner)이 함선인지 확인
-	var p = node.get_parent()
-	if p and p.is_in_group("player"): return p
-	
-	if node is CollisionShape3D or node is Area3D:
-		var pp = node.get_parent()
-		if pp and pp.is_in_group("player"): return pp
-		
-	if node.owner and node.owner.is_in_group("player"):
-		return node.owner
-		
-	return null
+	return FieldItemHelper.get_ship_from_node(node)
+
+
+func _is_close_enough_to_collect(player_ship: Node3D) -> bool:
+	if not is_instance_valid(player_ship):
+		return false
+	return FieldItemHelper.is_item_close_to_ship_edge(self, player_ship, rescue_contact_margin)
+
+
+func _get_ship_rescue_anchor(ship: Node3D, lift_to_deck: bool) -> Vector3:
+	if not is_instance_valid(ship):
+		return global_position
+	return FieldItemHelper.get_ship_side_anchor(self, ship, lift_to_deck, 0.25, 0.75)
 
 
 func _try_collect(player_ship: Node3D) -> void:
 	if is_collected: return
-	
+	if not is_instance_valid(player_ship) or not player_ship.has_method("add_survivor"):
+		return
+	if not _is_close_enough_to_collect(player_ship):
+		target_player = player_ship
+		return
+
+	is_collected = true
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
+	_finish_collection(player_ship)
+
+
+func _finish_collection(player_ship: Node3D) -> void:
+	var anchor: Vector3 = _get_ship_rescue_anchor(player_ship, true)
+	if visual:
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(self, "global_position", anchor, rescue_finish_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(visual, "scale", Vector3(0.25, 0.25, 0.25), rescue_finish_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(visual, "rotation:z", 0.0, rescue_finish_duration)
+		tween.chain().tween_callback(func(): _complete_collection(player_ship))
+	else:
+		_complete_collection(player_ship)
+
+
+func _complete_collection(player_ship: Node3D) -> void:
+	if not is_instance_valid(player_ship) or not player_ship.has_method("add_survivor"):
+		ScenePool.release(self)
+		return
+
 	# 플레이어 배에 병사 추가 시도
 	if player_ship and player_ship.has_method("add_survivor"):
 		if player_ship.add_survivor(true):
-			is_collected = true
-			
 			# 생존자 구조 시에도 체력 소폭 회복 로직 추가
 			if "hull_hp" in player_ship and "max_hull_hp" in player_ship and _can_apply_hull_rescue_heal(player_ship):
 				var um = get_node_or_null("/root/UpgradeManager")
@@ -356,15 +361,18 @@ func _try_collect(player_ship: Node3D) -> void:
 					if hud and hud.has_method("update_hull_hp"):
 						hud.update_hull_hp(player_ship.hull_hp, player_ship.max_hull_hp)
 			
-			_finish_collection()
+			_finish_collection_effect()
 		else:
 			# 정원이 가득 찬 경우: 획득하지 않고 그냥 밀려남 (튕겨나가는 연출)
 			var bounce_dir = (global_position - player_ship.global_position).normalized()
 			global_position += bounce_dir * 2.0
 			current_magnet_speed = 0.0
+			is_collected = false
+			set_deferred("monitoring", true)
+			set_deferred("monitorable", true)
 
 
-func _finish_collection() -> void:
+func _finish_collection_effect() -> void:
 	_hide_rescue_call()
 	# 획득 시 사라지는 연출
 	if visual:

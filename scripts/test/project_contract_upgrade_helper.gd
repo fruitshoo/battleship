@@ -4,6 +4,7 @@ class_name ProjectContractUpgradeHelper
 
 static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_cannon_upgrade_split(failures)
+	_validate_support_hull_upgrade_retired(failures)
 
 
 static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
@@ -58,6 +59,19 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 장전 missing from ship upgrade pool")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
 		failures.append("upgrade smoke fleet_cannon should not be in support ship pool")
+
+
+static func _validate_support_hull_upgrade_retired(failures: Array[String]) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("upgrade smoke missing UpgradeManager")
+		return
+	var upgrades: Dictionary = UpgradeManager.UPGRADES
+	if "fleet_hull" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
+		failures.append("upgrade smoke fleet_hull should be retired from support ship choices")
+	if "fleet_hull" in UpgradeManager.ACTIVE_SUPPORT_UPGRADE_IDS:
+		failures.append("upgrade smoke fleet_hull should not drive active support upgrades")
+	if upgrades.has("fleet_hull") and upgrades["fleet_hull"].get("disabled", false) != true:
+		failures.append("upgrade smoke fleet_hull data should stay disabled")
 
 
 static func _get_player_cannon_count_for_level(level: int, stats: Dictionary) -> int:

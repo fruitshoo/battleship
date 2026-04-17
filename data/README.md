@@ -8,6 +8,7 @@
 - `level_progression.json`
 - `reward_rules.json`
 - `enemy_spawn_rules.json`
+- `authoring_palette.json`
 - `soldier_rules.json`
 
 추가 후보:
@@ -30,13 +31,21 @@
 
 3. `enemy_spawn_rules.json`
 - 일반 적 스폰 거리/간격
-- 차단진 편성 규칙
+- `spawn_recipes` 기반 차단진/편대 조립 규칙
+- `encounter_profiles` 기반 시간대별 편대 풀 선택
+- `scenario_triggers` 기반 조건/액션형 전개 전환
 - 함종 비율 변화
 - 엘리트/중간보스 호위 구성
 
+4. `authoring_palette.json`
+- 조립 가능한 함선/무기/전투/스폰/전개 부품 목록
+- `assembly_blocks` 기반 실행/카드/참조 블록 스키마
+- 맵에디터식 팔레트 UI나 디버그 메뉴에서 참조할 stable id 묶음
+- 원본 데이터와의 참조 무결성 검증
+
 ## Recommended 2nd Phase
 
-4. `soldier_rules.json`
+5. `soldier_rules.json`
 - 병사 기본 체력, 공격력, 이동속도
 - 탐지/무기 전환 거리
 - cross-ship 교전 기준 거리

@@ -3,6 +3,8 @@ class_name ChaserShipSupportHelper
 
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
 const DERELICT_OFFSCREEN_DESPAWN_DISTANCE: float = 42.0
@@ -60,7 +62,7 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 
 static func _find_fire_pot_tosser(ship):
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		if child.has_method("get_team_tag") and child.get_team_tag() != ship.team:
 			continue
@@ -80,7 +82,7 @@ static func _is_player_ship(node: Node) -> bool:
 
 
 static func _get_fire_pot_target_pos(target_ship: Node3D) -> Vector3:
-	var target_pos: Vector3 = target_ship.global_position + Vector3(0.0, 1.8, 0.0)
+	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_ship, 0.8)
 	var masts: Array = target_ship.get("masts")
 	if masts != null and not masts.is_empty():
 		for mast in masts:
@@ -219,7 +221,7 @@ static func evacuate_player_soldiers_as_survivors(ship) -> void:
 
 	var converted_count = 0
 	for child in soldiers_node.get_children():
-		if child.has_method("is_player_team_soldier") and child.is_player_team_soldier() and child.has_method("is_dead_soldier") and not child.is_dead_soldier():
+		if child.has_method("is_player_team_soldier") and child.is_player_team_soldier() and SoldierStateHelper.is_alive_soldier(child):
 			var spawn_pos = child.global_position
 			spawn_pos.y = 0.5
 
@@ -241,7 +243,7 @@ static func evacuate_soldiers_to_home(ship) -> void:
 
 	var returned_count = 0
 	for child in soldiers_node.get_children():
-		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 
 		var h_ship = child.get("home_ship")

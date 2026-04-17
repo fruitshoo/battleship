@@ -1,6 +1,7 @@
 extends Node
 
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
+const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
 
 
 class MockShip:
@@ -10,12 +11,17 @@ class MockShip:
 	var allow_boarding: bool = true
 	var current_speed: float = 0.0
 	var move_speed: float = 10.0
+	var acceleration: float = 10.0
+	var deceleration: float = 10.0
 	var max_boarding_distance: float = 9.0
 	var boarding_break_distance: float = 12.0
+	var boarding_target: Node3D = null
+	var boarding_pull_velocity: Vector3 = Vector3.ZERO
 	var preferred_combat_range: float = 18.0
 	var combat_range_tolerance: float = 2.0
 	var retreat_distance: float = 5.0
 	var side_boarding_approach: bool = false
+	var min_ramming_speed: float = 6.0
 
 	func get_team_tag() -> String:
 		return team
@@ -37,6 +43,15 @@ class MockShip:
 
 	func get_ships_cached(_tree: SceneTree) -> Array:
 		return []
+
+	func _calculate_boarding_pull_velocity(_delta: float) -> Vector3:
+		return boarding_pull_velocity
+
+	func _apply_bobbing_effect() -> void:
+		pass
+
+	func _process_boarding_common(_delta: float) -> void:
+		pass
 
 	func _is_side_boarding_approach(_target_ship: Node3D) -> bool:
 		return side_boarding_approach
@@ -65,6 +80,7 @@ func _ready() -> void:
 	var failures: Array[String] = []
 	_verify_bow_sector_keeps_front_navigation(failures)
 	_verify_true_side_still_uses_side_navigation(failures)
+	_verify_head_on_boarding_holds_contact_anchor(failures)
 	if failures.is_empty():
 		print("[BoardingNavigationContract] ok")
 		return
@@ -111,6 +127,29 @@ func _verify_true_side_still_uses_side_navigation(failures: Array[String]) -> vo
 	var mode: String = str(ship.get_meta("boarding_approach_mode", ""))
 	if mode != "side":
 		failures.append("true side approach should remain side, got %s" % mode)
+
+
+func _verify_head_on_boarding_holds_contact_anchor(failures: Array[String]) -> void:
+	var pair := _build_pair()
+	var ship: MockShip = pair["ship"]
+	var target: MockTarget = pair["target"]
+	ship.boarding_target = target
+	ship.global_position = Vector3(7.3, 0.0, 1.6)
+	ship.rotation = Vector3(0.0, PI * 0.5, 0.0)
+	ship.current_speed = 3.0
+	ship.set_meta("boarding_contact_mode", "head_on")
+	ship.set_meta("boarding_hold_forward", -ship.global_transform.basis.z)
+	ship.set_meta("boarding_contact_anchor_local", target.to_local(Vector3(4.0, 0.0, 0.0)))
+
+	var start_local: Vector3 = target.to_local(ship.global_position)
+	for _index in range(12):
+		ChaserShipBoardingHelper.process_boarding(ship, 0.1)
+	var end_local: Vector3 = target.to_local(ship.global_position)
+
+	if absf(end_local.z) > absf(start_local.z) + 0.1:
+		failures.append("head-on boarding slid too far along target hull: %.2f" % end_local.z)
+	if absf(end_local.z) > 1.5:
+		failures.append("head-on boarding did not settle back toward contact anchor: %.2f" % end_local.z)
 
 
 func _build_pair() -> Dictionary:

@@ -17,6 +17,7 @@ const POSE_NODE_REST_POSITION_META := "pose_node_rest_position"
 const POSE_NODE_REST_ROTATION_META := "pose_node_rest_rotation"
 const POSE_NODE_REST_SCALE_META := "pose_node_rest_scale"
 const ACTIVE_VISUAL_SCENE_ID_META := "active_visual_scene_id"
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 
 static func ensure_visual_root(soldier) -> Node3D:
@@ -275,11 +276,7 @@ static func update_level_visual(soldier) -> void:
 	elif soldier.has_meta("soldier_level"):
 		level = int(soldier.get_meta("soldier_level", 1))
 
-	var is_dead := false
-	if soldier.has_method("is_dead_soldier"):
-		is_dead = bool(soldier.is_dead_soldier())
-
-	var should_show := str(soldier.get("team")) == "player" and level > 1 and not is_dead
+	var should_show := str(soldier.get("team")) == "player" and level > 1 and SoldierStateHelper.is_alive_soldier(soldier)
 	var marker := soldier.get_node_or_null(LEVEL_MARKER_NAME) as Label3D
 	if marker == null and not should_show:
 		return
@@ -387,6 +384,25 @@ static func play_death_pose(soldier) -> void:
 		pose_node.rotation = target_rotation
 		pose_node.position = target_position
 		pose_node.scale = target_scale
+
+
+static func play_boarding_jump_pose(soldier) -> void:
+	var pose_node := get_pose_node(soldier)
+	if pose_node == null:
+		return
+	_cache_pose_node_rest_transform(soldier, pose_node)
+	var rest_rotation: Vector3 = soldier.get_meta(POSE_NODE_REST_ROTATION_META, pose_node.rotation)
+	var rest_position: Vector3 = soldier.get_meta(POSE_NODE_REST_POSITION_META, pose_node.position)
+	var rest_scale: Vector3 = soldier.get_meta(POSE_NODE_REST_SCALE_META, pose_node.scale)
+	var lean_sign: float = -1.0 if (soldier.get_instance_id() % 2) == 0 else 1.0
+	var target_rotation := rest_rotation + Vector3(deg_to_rad(-10.0), 0.0, deg_to_rad(lean_sign * 8.0))
+	var target_position := rest_position + Vector3(0.0, 0.08, -0.04)
+	var target_scale := Vector3(rest_scale.x * 0.92, rest_scale.y * 1.08, rest_scale.z * 0.92)
+	var tween: Tween = soldier.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(pose_node, "rotation", target_rotation, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pose_node, "position", target_position, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pose_node, "scale", target_scale, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 static func play_recovery_pose(soldier) -> void:

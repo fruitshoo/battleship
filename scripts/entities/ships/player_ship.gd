@@ -13,16 +13,27 @@ var team: String = "player"
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
 const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const ENEMY_SHIP_SCENE = preload("res://scenes/ships/enemy_ship.tscn")
-const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
-const JOSEON_CANNON_SCENE = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
+const PLAYER_DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
+const PLAYER_DEFAULT_WATER_SPLASH_SCENE = preload("res://scenes/effects/water_burst.tscn")
+const PLAYER_DEFAULT_FIRE_EFFECT_SCENE = preload("res://scenes/effects/fire_effect.tscn")
+const PLAYER_DEFAULT_SURVIVOR_SCENE = preload("res://scenes/effects/survivor.tscn")
 const PlayerShipCrewHelper = preload("res://scripts/entities/ships/player_ship_crew_helper.gd")
 const PlayerShipMovementHelper = preload("res://scripts/entities/ships/player_ship_movement_helper.gd")
 const PlayerShipSinkHelper = preload("res://scripts/entities/ships/player_ship_sink_helper.gd")
 const PlayerShipRuntimeHelper = preload("res://scripts/entities/ships/player_ship_runtime_helper.gd")
 const PlayerShipAuxHelper = preload("res://scripts/entities/ships/player_ship_aux_helper.gd")
+const PlayerSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
+
+const PLAYER_MIN_VALID_HULL_HP := 100.0
+const PLAYER_FALLBACK_HULL_HP := 200.0
+const PLAYER_START_NODE_NAME := "PlayerStart"
+const PLAYER_RUNTIME_FLOATING_OFFSET := 1.0
+const CORPSE_CLEANUP_CARRY_FORWARD_OFFSET := 0.08
+const CORPSE_CLEANUP_CARRY_SIDE_OFFSET := 0.08
+const CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET := 0.46
 
 # === 러더(키) 관련 ===
 
@@ -134,13 +145,7 @@ func _update_editor_hull() -> void:
 	var stats = load_ship_stats(ship_type)
 	if stats.is_empty(): return
 	
-	var type_lower = ship_type.to_lower()
-	var h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
-	if type_lower.contains("sekibune"): h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
-	elif type_lower.contains("atakebune"): h_path = "res://scenes/ships/hulls/atakebune_hull.tscn"
-	elif type_lower.contains("maengseon"): h_path = "res://scenes/ships/hulls/maengseon_hull.tscn"
-	
-	var new_hull = load(h_path)
+	var new_hull := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
 	if new_hull:
 		var inst = new_hull.instantiate()
 		inst.name = "EditorHull"
@@ -148,6 +153,7 @@ func _update_editor_hull() -> void:
 		_cache_hull_references(self )
 
 func _ready() -> void:
+	set_ally_ship_role("player_flagship")
 	if Engine.is_editor_hint():
 		# 에디터용 Hull이 이미 있다면 중복 생성 방지
 		var has_hull = false
@@ -157,9 +163,13 @@ func _ready() -> void:
 				break
 		if not has_hull:
 			_update_editor_hull()
+		_cache_hull_references(self)
+		_refresh_collision_bounds_from_hull()
 		return
 
 	_apply_soldier_rules_data()
+	_apply_runtime_scene_safety_defaults()
+	_apply_start_marker_transform_from_parent()
 	super._ready()
 	fire_effect_offset = Vector3(0, 1.0, 0.0)
 	print("[Ship] Total masts connected: ", masts.size())
@@ -189,6 +199,38 @@ func _ready() -> void:
 		set_meta("base_support_fleet_limit", support_fleet_limit)
 	if not has_meta("base_support_fleet_respawn_interval"):
 		set_meta("base_support_fleet_respawn_interval", support_fleet_respawn_interval)
+
+
+func _apply_runtime_scene_safety_defaults() -> void:
+	if max_hull_hp < PLAYER_MIN_VALID_HULL_HP:
+		var stats := load_ship_stats(ship_type)
+		max_hull_hp = float(stats.get("hull_hp", PLAYER_FALLBACK_HULL_HP))
+		hull_hp = max_hull_hp
+
+	wood_splinter_scene = PLAYER_DEFAULT_WOOD_SPLINTER_SCENE
+	water_splash_scene = PLAYER_DEFAULT_WATER_SPLASH_SCENE
+	fire_effect_scene = PLAYER_DEFAULT_FIRE_EFFECT_SCENE
+	survivor_scene = PLAYER_DEFAULT_SURVIVOR_SCENE
+	loot_scene = null
+	deck_light_player_only = true
+	floating_offset = PLAYER_RUNTIME_FLOATING_OFFSET
+
+	boarding_contact_grace_duration = 0.9
+	boarding_hook_throw_delay = 2.5
+	boarding_secondary_rope_delay = 1.0
+	boarding_max_relative_speed = 0.28
+	boarding_initial_rope_count = 0
+	boarding_rope_throw_duration = 0.0
+
+
+func _apply_start_marker_transform_from_parent() -> void:
+	var parent_node := get_parent() as Node3D
+	if not is_instance_valid(parent_node):
+		return
+	var start_marker := parent_node.get_node_or_null(PLAYER_START_NODE_NAME) as Node3D
+	if not is_instance_valid(start_marker):
+		return
+	global_transform = start_marker.global_transform
 
 
 func _apply_soldier_rules_data() -> void:
@@ -393,9 +435,11 @@ func _try_cleanup_enemy_corpse() -> void:
 	var cleaner: Node3D = _find_corpse_cleanup_actor(corpse)
 	if not is_instance_valid(cleaner):
 		return
+	if not SoldierShipWorkPriorityHelper.reserve_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP, corpse_cleanup_throw_duration + 4.0):
+		return
 
 	corpse.set_meta("corpse_cleanup_in_progress", true)
-	cleaner.set_meta("corpse_cleanup_busy", true)
+	_set_corpse_cleanup_actor_action(cleaner, SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH)
 	_prepare_cleaner_for_corpse_cleanup(cleaner, corpse)
 	_throw_corpse_overboard(cleaner, corpse)
 
@@ -406,12 +450,14 @@ func _find_cleanup_enemy_corpse() -> Node3D:
 			continue
 		if soldier.get_meta("corpse_cleanup_in_progress", false) == true:
 			continue
+		if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(soldier, null, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP):
+			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != "enemy":
 			continue
-		if not (soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier()):
+		if not PlayerSoldierStateHelper.is_dead_soldier(soldier):
 			continue
-		if soldier.get_meta("incapacitated", false) == true:
+		if PlayerSoldierStateHelper.is_incapacitated_soldier(soldier):
 			continue
 		return soldier as Node3D
 	return null
@@ -423,12 +469,14 @@ func _find_corpse_cleanup_actor(corpse: Node3D) -> Node3D:
 	for soldier in EntityRegistry.get_soldiers_by_ship(self):
 		if not is_instance_valid(soldier) or not (soldier is Node3D):
 			continue
-		if soldier.get_meta("corpse_cleanup_busy", false) == true:
+		if _is_corpse_cleanup_actor_busy(soldier):
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != "player":
 			continue
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if not SoldierShipWorkPriorityHelper.can_accept_immediate_work(soldier, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP):
+			continue
+		if PlayerSoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		var soldier_node := soldier as Node3D
 		var distance_sq: float = soldier_node.global_position.distance_squared_to(corpse.global_position)
@@ -442,7 +490,7 @@ func _prepare_cleaner_for_corpse_cleanup(cleaner: Node3D, corpse: Node3D) -> voi
 	if "current_target" in cleaner:
 		cleaner.set("current_target", null)
 	if "attack_timer" in cleaner:
-		cleaner.set("attack_timer", maxf(float(cleaner.get("attack_timer")), corpse_cleanup_throw_duration + 0.5))
+		cleaner.set("attack_timer", maxf(float(cleaner.get("attack_timer")), corpse_cleanup_throw_duration + 2.0))
 	if "velocity" in cleaner:
 		cleaner.set("velocity", Vector3.ZERO)
 	if cleaner.has_method("_change_state"):
@@ -452,27 +500,241 @@ func _prepare_cleaner_for_corpse_cleanup(cleaner: Node3D, corpse: Node3D) -> voi
 		cleaner.look_at(look_target, Vector3.UP)
 
 
+func _is_corpse_cleanup_actor_busy(soldier) -> bool:
+	if not is_instance_valid(soldier):
+		return true
+	if soldier.has_method("has_named_action"):
+		return bool(soldier.call("has_named_action"))
+	return SoldierActionHelper.has_action(soldier)
+
+
+func _set_corpse_cleanup_actor_action(cleaner: Node3D, action_name: String) -> void:
+	if not is_instance_valid(cleaner):
+		return
+	if cleaner.has_method("begin_corpse_cleanup_action"):
+		cleaner.call("begin_corpse_cleanup_action", action_name)
+	else:
+		SoldierActionHelper.begin_corpse_cleanup_action(cleaner, action_name)
+
+
 func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
 	var throw_target: Vector3 = _get_corpse_cleanup_throw_target(corpse)
+	var pickup_point: Vector3 = _get_corpse_cleanup_pickup_point(cleaner, corpse)
+	var rail_stand_point: Vector3 = _get_corpse_cleanup_rail_stand_point(cleaner, corpse, throw_target)
 	var corpse_id: int = corpse.get_instance_id()
 	var cleaner_id: int = cleaner.get_instance_id()
-	var start_position: Vector3 = corpse.global_position
+	var pickup_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, pickup_point)
+	var rail_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, rail_stand_point)
+	var pickup_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, pickup_point, throw_target)
+	var rail_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, rail_stand_point, throw_target)
+	var throw_origin: Vector3 = _get_corpse_cleanup_throw_origin_from_actor_position(rail_stand_point, corpse, throw_target)
+	var pickup_start_position: Vector3 = corpse.global_position
 	var start_rotation: Vector3 = corpse.rotation
-	var arc_control: Vector3 = start_position.lerp(throw_target, 0.52)
-	arc_control.y = maxf(start_position.y, throw_target.y) + randf_range(1.85, 2.45)
+	var arc_control: Vector3 = throw_origin.lerp(throw_target, 0.52)
+	arc_control.y = maxf(throw_origin.y, throw_target.y) + randf_range(1.85, 2.45)
 	var spin_rotation: Vector3 = corpse.rotation + Vector3(randf_range(1.7, 2.8), randf_range(-0.9, 0.9), randf_range(-1.8, 1.8))
-	var windup_seconds: float = 0.22
+	var approach_seconds: float = _get_corpse_cleanup_walk_seconds(cleaner.global_position, pickup_point, cleaner)
+	var pickup_seconds: float = 0.22
+	var carry_seconds: float = _get_corpse_cleanup_walk_seconds(pickup_point, rail_stand_point, cleaner)
+	var windup_seconds: float = 0.14
 	var throw_seconds: float = maxf(0.25, corpse_cleanup_throw_duration * randf_range(1.05, 1.18))
 
+	_face_corpse_cleanup_actor(cleaner, pickup_point)
+
 	var tween := create_tween()
+	tween.tween_property(cleaner, "position", pickup_actor_position, approach_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, corpse.global_position))
+	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY))
+	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_method(
+		Callable(self, "_apply_corpse_cleanup_payload_pickup").bind(corpse_id, cleaner_id, pickup_start_position, start_rotation, pickup_carry_rotation),
+		0.0,
+		1.0,
+		pickup_seconds
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, rail_stand_point))
+	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_property(cleaner, "position", rail_actor_position, carry_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_method(
+		Callable(self, "_apply_corpse_cleanup_payload_follow").bind(corpse_id, cleaner_id, pickup_carry_rotation, rail_carry_rotation),
+		0.0,
+		1.0,
+		carry_seconds
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, throw_target))
+	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_THROW))
+	tween.tween_callback(Callable(self, "_finish_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_interval(windup_seconds)
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_throw_arc").bind(corpse_id, start_position, arc_control, throw_target, start_rotation, spin_rotation),
+		Callable(self, "_apply_corpse_cleanup_throw_arc").bind(corpse_id, throw_origin, arc_control, throw_target, start_rotation, spin_rotation),
 		0.0,
 		1.0,
 		throw_seconds
 	).set_trans(Tween.TRANS_LINEAR)
 	tween.finished.connect(_finish_corpse_cleanup_throw.bind(corpse_id, cleaner_id, throw_target))
+
+
+func _get_corpse_cleanup_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector3:
+	var corpse_local: Vector3 = to_local(corpse.global_position)
+	var cleaner_local: Vector3 = to_local(cleaner.global_position)
+	var approach_dir: Vector3 = cleaner_local - corpse_local
+	approach_dir.y = 0.0
+	if approach_dir.length_squared() <= 0.001:
+		approach_dir = Vector3(-1.0 if corpse_local.x >= 0.0 else 1.0, 0.0, 0.0)
+	approach_dir = approach_dir.normalized()
+	var local_point: Vector3 = corpse_local + approach_dir * 0.72
+	local_point = _clamp_corpse_cleanup_deck_local(local_point, 0.38)
+	var global_point: Vector3 = to_global(local_point)
+	global_point.y = cleaner.global_position.y
+	return global_point
+
+
+func _get_corpse_cleanup_rail_stand_point(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
+	var local_pos: Vector3 = to_local(corpse.global_position)
+	var local_throw: Vector3 = to_local(throw_target)
+	var side_sign: float = 1.0 if local_throw.x >= 0.0 else -1.0
+	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
+	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
+	local_pos.x = side_sign * maxf(0.3, deck_half_width - 0.58)
+	local_pos.z = clampf(local_pos.z, -deck_half_length + 0.32, deck_half_length - 0.32)
+	var global_point: Vector3 = to_global(local_pos)
+	global_point.y = cleaner.global_position.y
+	return global_point
+
+
+func _get_corpse_cleanup_actor_local_target(cleaner: Node3D, global_target: Vector3) -> Vector3:
+	var parent_3d := cleaner.get_parent() as Node3D
+	if not is_instance_valid(parent_3d):
+		return global_target
+	var local_target: Vector3 = parent_3d.to_local(global_target)
+	local_target.y = cleaner.position.y
+	return local_target
+
+
+func _get_corpse_cleanup_carry_rotation(corpse: Node3D, actor_position: Vector3, throw_target: Vector3) -> Vector3:
+	var to_rail: Vector3 = throw_target - actor_position
+	to_rail.y = 0.0
+	if to_rail.length_squared() <= 0.001:
+		return corpse.rotation + Vector3(deg_to_rad(8.0), 0.0, deg_to_rad(6.0))
+	to_rail = to_rail.normalized()
+	var yaw := atan2(to_rail.x, to_rail.z)
+	var side_roll := deg_to_rad(18.0 if to_local(actor_position).x >= 0.0 else -18.0)
+	return Vector3(deg_to_rad(8.0), yaw, side_roll)
+
+
+func _get_corpse_cleanup_walk_seconds(from_position: Vector3, to_position: Vector3, cleaner: Node3D) -> float:
+	var planar_delta: Vector3 = to_position - from_position
+	planar_delta.y = 0.0
+	var move_speed_value: float = float(cleaner.get("move_speed")) if cleaner.get("move_speed") != null else 3.0
+	return clampf(planar_delta.length() / maxf(move_speed_value * 1.05, 0.1), 0.18, 1.45)
+
+
+func _clamp_corpse_cleanup_deck_local(local_point: Vector3, inset: float) -> Vector3:
+	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
+	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
+	local_point.x = clampf(local_point.x, -deck_half_width + inset, deck_half_width - inset)
+	local_point.z = clampf(local_point.z, -deck_half_length + inset, deck_half_length - inset)
+	return local_point
+
+
+func _face_corpse_cleanup_actor(cleaner: Node3D, look_position: Vector3) -> void:
+	if not is_instance_valid(cleaner):
+		return
+	var look_target := Vector3(look_position.x, cleaner.global_position.y, look_position.z)
+	if not cleaner.global_position.is_equal_approx(look_target):
+		cleaner.look_at(look_target, Vector3.UP)
+
+
+func _face_corpse_cleanup_actor_by_id(cleaner_id: int, look_position: Vector3) -> void:
+	var cleaner := instance_from_id(cleaner_id)
+	if is_instance_valid(cleaner) and cleaner is Node3D:
+		_face_corpse_cleanup_actor(cleaner as Node3D, look_position)
+
+
+func _set_corpse_cleanup_action_by_id(cleaner_id: int, action_name: String) -> void:
+	var cleaner := instance_from_id(cleaner_id)
+	if is_instance_valid(cleaner) and cleaner is Node3D:
+		_set_corpse_cleanup_actor_action(cleaner as Node3D, action_name)
+
+
+func _begin_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
+	var cleaner := instance_from_id(cleaner_id)
+	var corpse := instance_from_id(corpse_id)
+	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
+		_begin_corpse_cleanup_carry_payload(cleaner as Node3D, corpse as Node3D)
+
+
+func _begin_corpse_cleanup_carry_payload(cleaner: Node3D, corpse: Node3D) -> void:
+	var side_sign := 1.0 if to_local(cleaner.global_position).x >= 0.0 else -1.0
+	var offset_overrides := _get_corpse_cleanup_carry_payload_offsets()
+	if cleaner.has_method("begin_typed_carry_payload"):
+		cleaner.call(
+			"begin_typed_carry_payload",
+			corpse,
+			SoldierActionHelper.CARRY_PAYLOAD_KIND_CORPSE,
+			side_sign,
+			offset_overrides
+		)
+	else:
+		SoldierActionHelper.begin_typed_carry_payload(
+			cleaner,
+			corpse,
+			SoldierActionHelper.CARRY_PAYLOAD_KIND_CORPSE,
+			side_sign,
+			offset_overrides
+		)
+
+
+func _get_corpse_cleanup_carry_payload_offsets() -> Dictionary:
+	return {
+		SoldierActionHelper.PAYLOAD_DEF_FORWARD_OFFSET: CORPSE_CLEANUP_CARRY_FORWARD_OFFSET,
+		SoldierActionHelper.PAYLOAD_DEF_SIDE_OFFSET: CORPSE_CLEANUP_CARRY_SIDE_OFFSET,
+		SoldierActionHelper.PAYLOAD_DEF_HEIGHT_OFFSET: CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET,
+	}
+
+
+func _finish_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
+	var cleaner := instance_from_id(cleaner_id)
+	var corpse := instance_from_id(corpse_id)
+	if is_instance_valid(cleaner) and cleaner is Node3D:
+		if cleaner.has_method("finish_carry_payload") and is_instance_valid(corpse) and corpse is Node3D:
+			cleaner.call("finish_carry_payload", corpse)
+		else:
+			SoldierActionHelper.finish_carry_payload(cleaner, corpse as Node3D if is_instance_valid(corpse) and corpse is Node3D else null)
+
+
+func _get_corpse_cleanup_throw_origin(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
+	return _get_corpse_cleanup_throw_origin_from_actor_position(cleaner.global_position, corpse, throw_target)
+
+
+func _get_corpse_cleanup_throw_origin_from_actor_position(actor_position: Vector3, corpse: Node3D, throw_target: Vector3) -> Vector3:
+	var to_rail: Vector3 = throw_target - actor_position
+	to_rail.y = 0.0
+	if to_rail.length_squared() <= 0.001:
+		to_rail = corpse.global_position - actor_position
+		to_rail.y = 0.0
+	if to_rail.length_squared() <= 0.001:
+		to_rail = Vector3.RIGHT
+	to_rail = to_rail.normalized()
+	var origin := actor_position + to_rail * 0.62
+	origin.y = maxf(corpse.global_position.y, actor_position.y + 0.48)
+	return origin
+
+
+func _apply_corpse_cleanup_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, start_position: Vector3, start_rotation: Vector3, target_rotation: Vector3) -> void:
+	var corpse := instance_from_id(corpse_id)
+	var cleaner := instance_from_id(cleaner_id)
+	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
+		return
+	SoldierActionHelper.apply_carry_payload_pickup(cleaner, corpse, progress, start_position, start_rotation, target_rotation)
+
+
+func _apply_corpse_cleanup_payload_follow(progress: float, corpse_id: int, cleaner_id: int, start_rotation: Vector3, target_rotation: Vector3) -> void:
+	var corpse := instance_from_id(corpse_id)
+	var cleaner := instance_from_id(cleaner_id)
+	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
+		return
+	SoldierActionHelper.apply_carry_payload_follow(cleaner, corpse, progress, start_rotation, target_rotation)
 
 
 func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, start_position: Vector3, arc_control: Vector3, throw_target: Vector3, start_rotation: Vector3, spin_rotation: Vector3) -> void:
@@ -507,11 +769,15 @@ func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
 func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int, splash_pos: Vector3) -> void:
 	_play_corpse_cleanup_splash(splash_pos)
 	var corpse := instance_from_id(corpse_id)
-	if is_instance_valid(corpse):
-		corpse.queue_free()
 	var cleaner := instance_from_id(cleaner_id)
-	if is_instance_valid(cleaner) and cleaner.has_meta("corpse_cleanup_busy"):
-		cleaner.remove_meta("corpse_cleanup_busy")
+	if is_instance_valid(corpse):
+		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
+		corpse.queue_free()
+	if is_instance_valid(cleaner):
+		if cleaner.has_method("finish_corpse_cleanup_action"):
+			cleaner.call("finish_corpse_cleanup_action")
+		else:
+			SoldierActionHelper.finish_corpse_cleanup_action(cleaner)
 
 
 func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:

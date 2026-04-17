@@ -138,11 +138,6 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			if level >= int(stats.get("limit_add_level", 2)):
 				signal_fleet_limit += int(stats.get("limit_add", 1))
 			return "지원함 소집 | 한계 %d척" % signal_fleet_limit
-		"fleet_hull":
-			return "선체 체력 +%d | 방어력 +%d" % [
-				int(float(stats.get("hp_add", 80)) * level),
-				int(stats.get("def_per_lv", 3) * level),
-			]
 		"fleet_crew":
 			var reduce_levels := mini(level, int(stats.get("respawn_reduce_max_level", 4)))
 			var reduce_per_level := float(stats.get("respawn_reduce_per_lv", 4.0))
@@ -219,7 +214,6 @@ static func get_upgrade_icon(upgrade_id: String) -> String:
 		"rowing": "rowing",
 		"supply_bonus": "medical_services",
 		"fleet_signal": "groups",
-		"fleet_hull": "security",
 		"fleet_crew": "update",
 		"crew_numbers": "swords",
 		"crew_attack": "swords",
@@ -250,7 +244,6 @@ static func get_upgrade_color(upgrade_id: String) -> Color:
 		"rowing": Color(1.0, 0.78, 0.32),
 		"supply_bonus": Color(0.35, 0.95, 0.35),
 		"fleet_signal": Color(1.0, 0.75, 0.35),
-		"fleet_hull": Color(0.3, 1.0, 0.8),
 		"fleet_crew": Color(0.35, 0.9, 1.0),
 		"crew_numbers": Color(0.5, 0.82, 1.0),
 		"crew_attack": Color(1.0, 0.9, 0.35),

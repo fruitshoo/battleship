@@ -1,6 +1,11 @@
 extends RefCounted
 class_name ChaserShipMinionHelper
 
+const SupportBoardingHelper = preload("res://scripts/entities/ships/support_boarding_helper.gd")
+const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+
 const SUPPORT_FORMATION_SPACING := 10.0
 const SUPPORT_JOIN_SPACING := 14.0
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
@@ -8,15 +13,15 @@ const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
 const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
 const SUPPORT_ANCHOR_FWD_META := "support_anchor_forward"
 const SUPPORT_IDLE_ORBIT_TIME_META := "support_idle_orbit_time"
-const SUPPORT_SLOT_SPEED_GAIN := 0.38
+const SUPPORT_SLOT_SPEED_GAIN := 0.31
 const SUPPORT_SLOT_BRAKE_GAIN := 0.55
-const SUPPORT_MAX_CATCHUP_SPEED := 4.0
+const SUPPORT_MAX_CATCHUP_SPEED := 3.25
 const SUPPORT_MAX_BRAKE_SPEED := 5.0
-const SUPPORT_SPEED_RESPONSE := 2.7
+const SUPPORT_SPEED_RESPONSE := 2.25
 const SUPPORT_LATERAL_SEP_SCALE := 0.18
 const SUPPORT_FORMUP_DISTANCE := 1.75
-const SUPPORT_FORMUP_SPEED_GAIN := 0.40
-const SUPPORT_MAX_FORMUP_SPEED := 4.7
+const SUPPORT_FORMUP_SPEED_GAIN := 0.32
+const SUPPORT_MAX_FORMUP_SPEED := 3.85
 const SUPPORT_HEADING_CORRECTION_GAIN := 0.07
 const SUPPORT_MAX_HEADING_CORRECTION := 0.42
 const SUPPORT_TARGET_GUARD_RATIO := 0.84
@@ -49,11 +54,10 @@ const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 const SUPPORT_ASSIST_TARGET_LOCK_DURATION := 3.25
 const SUPPORT_ASSIST_SWITCH_MARGIN := 10.0
 const SUPPORT_BOARDING_CONTACT_PAD := 0.85
-const SUPPORT_BOARDING_PURPOSE := "support_boarding"
-const SUPPORT_RESCUE_BOARDING_PURPOSE := "support_rescue_boarding"
+const SUPPORT_RESCUE_BOARDING_START_PAD := 2.35
 
 static func process_minion_ai(ship, delta: float) -> void:
-	var is_support_ship: bool = ship.get_meta("support_fleet_ship", false) == true
+	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
 	if not is_instance_valid(ship.target) or _is_ship_disabled(ship.target):
 		ship._find_player()
 		if not is_instance_valid(ship.target) or _is_ship_disabled(ship.target):
@@ -236,7 +240,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 		ship.set_meta("support_debug_player_speed", float(player_speed))
 		ship.set_meta("support_debug_lead_speed", float(support_lead_speed))
 		ship.set_meta("support_debug_target_speed", float(target_final_speed))
-		ship.set_meta("support_debug_mode", "trail")
+		ShipBoardingMetaHelper.set_support_debug_mode(ship, ShipBoardingMetaHelper.SUPPORT_DEBUG_TRAIL)
 
 static func _is_ship_disabled(node: Node3D) -> bool:
 	if not is_instance_valid(node):
@@ -330,10 +334,10 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	var emergency_assist: bool = _is_player_deck_emergency(ship.target)
 
 	var nav: Dictionary = _build_support_assist_navigation(ship, assist_target, my_index)
-	var desired_point: Vector3 = nav["desired_point"]
-	var heading_point: Vector3 = nav["heading_point"]
-	var dist_to_target: float = float(nav["dist_to_target"])
-	var desired_speed_mult: float = float(nav["desired_speed_mult"])
+	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, assist_target.global_position)
+	var heading_point: Vector3 = ShipMovementIntent.get_heading_point(nav, desired_point)
+	var dist_to_target: float = ShipMovementIntent.get_dist_to_target(nav, ship.global_position.distance_to(assist_target.global_position))
+	var desired_speed_mult: float = ShipMovementIntent.get_desired_speed_mult(nav)
 
 	var move_vector: Vector3 = desired_point - ship.global_position
 	move_vector.y = 0.0
@@ -406,7 +410,7 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	ship.set_meta("support_debug_rowing_speed_mult", rowing_speed_mult)
 	ship.set_meta("support_debug_wind_floor", wind_floor)
 	ship.set_meta("support_debug_assist_target", assist_target.name)
-	ship.set_meta("support_debug_mode", "assist")
+	ShipBoardingMetaHelper.set_support_debug_mode(ship, ShipBoardingMetaHelper.SUPPORT_DEBUG_ASSIST)
 
 
 static func _get_support_assist_rowing_speed_multiplier(dist_to_target: float, emergency_assist: bool) -> float:
@@ -437,7 +441,7 @@ static func _try_start_support_boarding(ship, assist_target: Node3D, delta: floa
 static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
 		return false
-	if ship.get_meta("support_fleet_ship", false) != true:
+	if not ShipAllyRoleHelper.is_support_ship(ship):
 		return false
 	if ship.get_team_tag() != "player":
 		return false
@@ -462,10 +466,16 @@ static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
 	var collision_distance: float = ship.max_boarding_distance
 	if ship.has_method("get_collision_distance_to"):
 		collision_distance = float(ship.get_collision_distance_to(assist_target))
-	var contact_boarding_limit: float = maxf(ship.max_boarding_distance + 0.45, collision_distance + SUPPORT_BOARDING_CONTACT_PAD)
+	var contact_pad: float = SUPPORT_RESCUE_BOARDING_START_PAD if rescue_boarding else SUPPORT_BOARDING_CONTACT_PAD
+	var contact_boarding_limit: float = maxf(ship.max_boarding_distance + 0.45, collision_distance + contact_pad)
 	if center_distance > contact_boarding_limit:
 		return false
 
+	# Rescue boarding is an emergency docking action. Once the support ship is
+	# close enough, let boarding motion settle the exact angle instead of
+	# falling back to ranged support while the flagship deck is being overrun.
+	if rescue_boarding:
+		return true
 	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(assist_target):
 		return true
 	if ship.has_method("_can_force_cleanup_boarding") and ship._can_force_cleanup_boarding(assist_target):
@@ -479,16 +489,16 @@ static func _start_support_boarding_link(ship, assist_target: Node3D) -> void:
 	var rescue_boarding: bool = _is_support_rescue_target(ship, assist_target)
 	ship.is_boarding = true
 	ship.boarding_target = assist_target
-	ship.set_meta("boarding_purpose", SUPPORT_RESCUE_BOARDING_PURPOSE if rescue_boarding else SUPPORT_BOARDING_PURPOSE)
+	ShipBoardingMetaHelper.set_boarding_purpose(ship, SupportBoardingHelper.get_boarding_purpose(rescue_boarding))
 	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(assist_target):
-		ship.set_meta("boarding_contact_mode", "side")
+		ShipBoardingMetaHelper.set_contact_mode(ship, ShipBoardingMetaHelper.CONTACT_SIDE)
 	else:
-		ship.set_meta("boarding_contact_mode", "cleanup")
+		ShipBoardingMetaHelper.set_contact_mode(ship, ShipBoardingMetaHelper.CONTACT_CLEANUP)
 
 	var hold_forward: Vector3 = -ship.global_transform.basis.z
 	hold_forward.y = 0.0
 	if hold_forward.length_squared() > 0.001:
-		ship.set_meta("boarding_hold_forward", hold_forward.normalized())
+		ShipBoardingMetaHelper.set_hold_forward(ship, hold_forward.normalized())
 	if not rescue_boarding and assist_target.has_method("set_boarding_attacker_ship"):
 		assist_target.set_boarding_attacker_ship(ship)
 	if ship.has_method("_clear_ropes"):
@@ -498,12 +508,12 @@ static func _start_support_boarding_link(ship, assist_target: Node3D) -> void:
 	ship.boarding_contact_timer = 0.0
 	ship.boarding_hook_timer = 0.0
 	ship.boarding_secondary_rope_timer = 0.0
-	ship.set_meta("boarding_motion_settle_timer", 0.0)
+	ShipBoardingMetaHelper.set_motion_settle_timer(ship, 0.0)
 	ship._initial_rope_deployed = false
 	ship._full_rope_deployed = false
 	if ship.has_method("_clear_boarding_latch"):
 		ship._clear_boarding_latch()
-	ship.set_meta("support_debug_mode", "boarding")
+	ShipBoardingMetaHelper.set_support_debug_mode(ship, ShipBoardingMetaHelper.SUPPORT_DEBUG_BOARDING)
 	ship.set_meta("support_debug_assist_target", assist_target.name)
 
 static func _build_support_assist_navigation(ship, assist_target: Node3D, my_index: int) -> Dictionary:
@@ -564,13 +574,20 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 		0.42 if rescue_assist else (0.35 if emergency_assist else 0.24),
 		1.22 if rescue_assist else (1.18 if emergency_assist else 0.92)
 	)
-	return {
-		"desired_point": desired_point,
-		"heading_point": heading_point,
-		"dist_to_target": ship.global_position.distance_to(assist_target.global_position),
-		"desired_speed_mult": desired_speed_mult,
-		"permit_sprint": emergency_assist,
-	}
+	var dir_to_target: Vector3 = assist_target.global_position - ship.global_position
+	dir_to_target.y = 0.0
+	if dir_to_target.length_squared() > 0.001:
+		dir_to_target = dir_to_target.normalized()
+	return ShipMovementIntent.build(
+		assist_target.global_position,
+		desired_point,
+		heading_point,
+		ship.global_position.distance_to(assist_target.global_position),
+		desired_speed_mult,
+		emergency_assist,
+		dir_to_target,
+		"support_assist"
+	)
 
 static func _calculate_support_assist_separation(ship, minions: Array, assist_target: Node3D) -> Vector3:
 	var force: Vector3 = Vector3.ZERO
@@ -603,7 +620,10 @@ static func _get_minion_roster(ship, support_only: bool) -> Array:
 	for minion in all_minions:
 		if not is_instance_valid(minion):
 			continue
-		if support_only and minion.get_meta("support_fleet_ship", false) != true:
+		var is_roster_support := ShipAllyRoleHelper.is_support_ship(minion)
+		if support_only and not is_roster_support:
+			continue
+		if not support_only and is_roster_support:
 			continue
 		roster.append(minion)
 	if support_only:
@@ -754,7 +774,7 @@ static func _is_player_deck_emergency(player_ship: Node3D) -> bool:
 static func _is_support_rescue_target(ship, assist_target: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
 		return false
-	if ship.get_meta("support_fleet_ship", false) != true:
+	if not ShipAllyRoleHelper.is_support_ship(ship):
 		return false
 	if not is_instance_valid(ship.target) or assist_target != ship.target:
 		return false

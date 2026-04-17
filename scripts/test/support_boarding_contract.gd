@@ -8,6 +8,7 @@ const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 const SoldierSpeechHelper = preload("res://scripts/entities/soldiers/soldier_speech_helper.gd")
+const SupportBoardingHelper = preload("res://scripts/entities/ships/support_boarding_helper.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const CannonScript = preload("res://scripts/entities/launchers/cannon.gd")
 const SingigeonLauncherScript = preload("res://scripts/entities/launchers/singigeon_launcher.gd")
@@ -222,6 +223,7 @@ func _ready() -> void:
 	_verify_support_ship_waits_for_contact_before_boarding(failures)
 	_verify_support_ship_rescues_overrun_player_deck(failures)
 	_verify_support_ship_rescues_contested_player_deck(failures)
+	_verify_support_rescue_boarding_relaxes_bad_alignment(failures)
 	_verify_support_hold_formation_ignores_normal_threats(failures)
 	_verify_support_hold_formation_allows_boarding_attacker(failures)
 	_verify_support_free_assist_recalls_near_player(failures)
@@ -236,6 +238,7 @@ func _ready() -> void:
 	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
 	_verify_support_rescue_boarding_holds_player_capture_progress(failures)
 	_verify_support_rescue_boarders_return_after_deck_safe(failures)
+	_verify_support_attack_boarders_return_after_enemy_deck_safe(failures)
 	if failures.is_empty():
 		print("[SupportBoardingContract] ok")
 		return
@@ -259,7 +262,7 @@ func _verify_support_ship_can_start_boarding_link(failures: Array[String]) -> vo
 		failures.append("support ship did not enter boarding state against assist target")
 	if support.boarding_target != target:
 		failures.append("support boarding target was not assigned")
-	if str(support.get_meta("boarding_purpose", "")) != "support_boarding":
+	if str(support.get_meta("boarding_purpose", "")) != SupportBoardingHelper.SUPPORT_BOARDING_PURPOSE:
 		failures.append("support boarding purpose meta was not set")
 	if str(support.get_meta("boarding_contact_mode", "")) != "side":
 		failures.append("support boarding did not preserve side contact mode")
@@ -333,7 +336,7 @@ func _verify_support_ship_rescues_overrun_player_deck(failures: Array[String]) -
 	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
 	if started != true or support.boarding_target != player:
 		failures.append("support ship did not start rescue boarding onto overrun player deck")
-	if str(support.get_meta("boarding_purpose", "")) != "support_rescue_boarding":
+	if str(support.get_meta("boarding_purpose", "")) != SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE:
 		failures.append("support rescue boarding purpose meta was not set")
 	if player.get_boarding_attacker_ship() != enemy_attacker:
 		failures.append("support rescue boarding overwrote the enemy boarding attacker")
@@ -371,11 +374,38 @@ func _verify_support_ship_rescues_contested_player_deck(failures: Array[String])
 	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
 	if started != true or support.boarding_target != player:
 		failures.append("support ship did not start rescue boarding onto contested player deck")
-	if str(support.get_meta("boarding_purpose", "")) != "support_rescue_boarding":
+	if str(support.get_meta("boarding_purpose", "")) != SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE:
 		failures.append("support contested rescue boarding purpose meta was not set")
 
 	EntityRegistry.unregister_ship(enemy_attacker)
 	enemy_attacker.queue_free()
+	player.queue_free()
+	support.queue_free()
+
+
+func _verify_support_rescue_boarding_relaxes_bad_alignment(failures: Array[String]) -> void:
+	var support := MockSupportShip.new()
+	add_child(support)
+	support.global_position = Vector3.ZERO
+	support.collision_distance = 8.0
+	support.side_boarding = false
+	support.cleanup_boarding = false
+
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.team = "player"
+	player.global_position = Vector3(9.9, 0.0, 0.0)
+	player.deck_is_overrun = true
+	player.deck_friendly_crew_count = 0
+	player.deck_hostile_boarder_count = 2
+	support.target = player
+
+	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	if started != true or support.boarding_target != player:
+		failures.append("support rescue boarding stayed in assist mode when close but not side-aligned")
+	if str(support.get_meta("boarding_contact_mode", "")) != "cleanup":
+		failures.append("support rescue boarding did not fall back to cleanup contact when alignment was poor")
+
 	player.queue_free()
 	support.queue_free()
 
@@ -770,6 +800,10 @@ func _verify_enemy_boarder_speaks_only_on_player_deck(failures: Array[String]) -
 		failures.append("enemy boarder did not speak after reaching player deck")
 	elif label.modulate.r <= label.modulate.b:
 		failures.append("enemy boarder speech did not use hostile label color")
+	elif label.no_depth_test != true:
+		failures.append("enemy boarder speech label should ignore depth clipping")
+	elif label.render_priority < 20 or label.outline_render_priority < 21:
+		failures.append("enemy boarder speech label render priority is too low")
 
 	boarder.queue_free()
 	enemy_ship.queue_free()
@@ -794,7 +828,7 @@ func _verify_support_rescue_boarding_holds_player_capture_progress(failures: Arr
 	support.target = player
 	support.is_boarding = true
 	support.boarding_target = player
-	support.set_meta("boarding_purpose", "support_rescue_boarding")
+	support.set_meta("boarding_purpose", SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE)
 	EntityRegistry.register_ship(support)
 
 	BaseShipStatusHelper.update_boarding_state(player, 1.25)
@@ -826,7 +860,7 @@ func _verify_support_rescue_boarders_return_after_deck_safe(failures: Array[Stri
 	support.is_boarding = true
 	support.boarding_target = player
 	support._initial_rope_deployed = true
-	support.set_meta("boarding_purpose", "support_rescue_boarding")
+	support.set_meta("boarding_purpose", SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE)
 	EntityRegistry.register_ship(support)
 
 	var support_boarder := MockTransferSoldier.new()
@@ -854,3 +888,49 @@ func _verify_support_rescue_boarders_return_after_deck_safe(failures: Array[Stri
 	support_boarder.queue_free()
 	support.queue_free()
 	player.queue_free()
+
+
+func _verify_support_attack_boarders_return_after_enemy_deck_safe(failures: Array[String]) -> void:
+	var enemy := MockTargetShip.new()
+	add_child(enemy)
+	enemy.team = "enemy"
+	enemy.global_position = Vector3.ZERO
+	enemy.boarding_capture_progress = 2.0
+
+	var support := MockSupportShip.new()
+	add_child(support)
+	support.global_position = Vector3(8.0, 0.0, 0.0)
+	support.is_boarding = true
+	support.boarding_target = enemy
+	support._initial_rope_deployed = true
+	support.set_meta("boarding_purpose", SupportBoardingHelper.SUPPORT_BOARDING_PURPOSE)
+	EntityRegistry.register_ship(support)
+
+	var support_boarder := MockTransferSoldier.new()
+	add_child(support_boarder)
+	support_boarder.team = "player"
+	support_boarder.global_position = enemy.global_position
+	support_boarder.owned_ship = enemy
+	support_boarder.home_ship = support
+	EntityRegistry.register_soldier(support_boarder)
+
+	BaseShipStatusHelper.update_boarding_state(enemy, 0.25)
+
+	if support_boarder.owned_ship != support:
+		failures.append("support attack boarder did not return after enemy deck was safe")
+	if support_boarder.get_boarding_status_value() != "returning":
+		failures.append("support attack boarder was not marked returning while jumping home")
+	if support.is_boarding == true:
+		failures.append("support attack boarding link stayed active after boarders returned")
+	if support.has_meta("boarding_purpose"):
+		failures.append("support attack boarding purpose meta was not cleared after return")
+	if support.has_meta("boarding_transfer_suppressed"):
+		failures.append("support attack transfer suppression meta was not cleared after return")
+	if enemy.boarding_capture_progress > 0.0:
+		failures.append("support attack return should reset enemy capture progress")
+
+	EntityRegistry.unregister_ship(support)
+	EntityRegistry.unregister_soldier(support_boarder)
+	support_boarder.queue_free()
+	support.queue_free()
+	enemy.queue_free()

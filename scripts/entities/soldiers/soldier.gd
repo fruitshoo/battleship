@@ -9,6 +9,8 @@ const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_
 const SoldierShipDutyHelper = preload("res://scripts/entities/soldiers/soldier_ship_duty_helper.gd")
 const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
+const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
+const SoldierShipWorkPriorityHelper = preload("res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd")
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
@@ -23,12 +25,17 @@ const SURVIVOR_SCENE = preload("res://scenes/effects/survivor.tscn")
 
 ## 병사 AI: NavMesh 기반 이동 및 전투
 
+# State는 "지금 몸이 수행하는 행동/포즈"를 나타낸다.
+# boarding_status는 보딩 시스템 안에서의 상황(on_deck/boarding/returning/stranded)을 나타낸다.
+# 둘을 함께 바꿔야 할 때는 begin_boarding_jump_pose(), finish_boarding_jump_pose() 같은 공통 메서드를 거친다.
 enum State {
 	IDLE,
 	WANDER,
 	MOVE,
 	ATTACK,
-	DEAD
+	DEAD,
+	RELOAD,
+	BOARDING_JUMP
 }
 
 # === 기본 속성 ===
@@ -74,6 +81,8 @@ var current_state: State = State.IDLE
 var current_target: Node3D = null
 var current_weapon: Node3D = null
 var attack_timer: float = 0.0
+var cannon_reload_pose_timer: float = 0.0
+var cannon_reload_source: Node3D = null
 var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
@@ -496,6 +505,9 @@ func get_team_tag() -> String:
 func get_current_state_value() -> int:
 	return current_state
 
+func is_state_value_dead(state_value: Variant) -> bool:
+	return state_value != null and int(state_value) == int(State.DEAD)
+
 func get_crit_chance_value() -> float:
 	return crit_chance
 
@@ -601,6 +613,12 @@ func _physics_process(delta: float) -> void:
 		_die()
 		return
 
+	if SoldierActionHelper.is_action_ai_locked(self):
+		velocity = Vector3.ZERO
+		if attack_timer > 0:
+			attack_timer -= delta
+		return
+
 	SoldierSpeechHelper.update(self, delta)
 		
 	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
@@ -689,6 +707,10 @@ func _physics_process(delta: float) -> void:
 			_state_move(delta, run_heavy_logic)
 		State.ATTACK:
 			_state_attack(delta)
+		State.RELOAD:
+			_state_cannon_reload(delta)
+		State.BOARDING_JUMP:
+			_state_boarding_jump()
 		State.DEAD:
 			pass
 	
@@ -709,7 +731,7 @@ func _physics_process(delta: float) -> void:
 		attack_timer -= delta
 
 	# 원거리 사격 및 무기 스위칭 체크 (전투 스케줄)
-	if current_state != State.DEAD and run_combat_logic:
+	if current_state != State.DEAD and current_state != State.RELOAD and current_state != State.BOARDING_JUMP and run_combat_logic:
 		var nearest = find_nearest_enemy()
 		SoldierWeaponHelper.update_combat_weapon_choice(self, nearest)
 
@@ -725,7 +747,7 @@ func _state_idle(delta: float, run_heavy_logic: bool) -> void:
 
 ## WANDER 상태: 배 위를 랜덤하게 돌아다님 (움직이는 배 대응)
 func _state_wander(_delta: float, run_heavy_logic: bool) -> void:
-	SoldierAiHelper.state_wander(self, run_heavy_logic)
+	SoldierAiHelper.state_wander(self, _delta, run_heavy_logic)
 
 
 ## 배회 시작: 새로운 로컬 목표점 설정
@@ -735,12 +757,31 @@ func _start_wander() -> void:
 
 ## MOVE 상태 (적 추적)
 func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
-	SoldierAiHelper.state_move(self)
+	SoldierAiHelper.state_move(self, _delta)
+
+
+## RELOAD 상태: 임시 포대 장전 포즈. 실제 애니메이션은 나중에 붙이고 지금은 대포를 바라보며 정지한다.
+func _state_cannon_reload(delta: float) -> void:
+	cannon_reload_pose_timer = maxf(0.0, cannon_reload_pose_timer - delta)
+	velocity = Vector3.ZERO
+	if is_instance_valid(cannon_reload_source):
+		var look_target: Vector3 = cannon_reload_source.global_position
+		look_target.y = global_position.y
+		SoldierAiHelper.turn_toward_position(self, look_target, SoldierAiHelper.ATTACK_TURN_SPEED, delta)
+	move_and_slide()
+	if cannon_reload_pose_timer <= 0.0 or not is_instance_valid(owned_ship) or owned_ship.get("deck_is_contested") == true:
+		_finish_cannon_reload_pose()
+		_change_state(State.IDLE)
+
+
+## BOARDING_JUMP 상태: 보딩/복귀 점프 중 임시 포즈. 위치 이동은 보딩 tween이 담당한다.
+func _state_boarding_jump() -> void:
+	velocity = Vector3.ZERO
 
 
 ## ATTACK 상태
 func _state_attack(_delta: float) -> void:
-	SoldierAiHelper.state_attack(self)
+	SoldierAiHelper.state_attack(self, _delta)
 
 
 ## 함선 또는 밧줄에 대한 특수 공격 (절단/나포)
@@ -841,6 +882,72 @@ func _play_recovery_pose() -> void:
 	SoldierSpeechHelper.reset(self)
 	SoldierVisualHelper.play_recovery_pose(self)
 
+
+func begin_named_action(action_name: String, locks_ai: bool = false, animation_name: String = "") -> void:
+	SoldierActionHelper.begin_action(self, action_name, locks_ai, animation_name)
+
+
+func finish_named_action(action_name: String = "") -> void:
+	SoldierActionHelper.finish_action(self, action_name)
+	if current_state == State.DEAD:
+		_play_death_pose()
+
+
+func has_named_action(action_name: String = "") -> bool:
+	return SoldierActionHelper.has_action(self, action_name)
+
+
+func get_named_action() -> String:
+	return SoldierActionHelper.get_action_name(self)
+
+
+func configure_carry_anchor(side_sign: float = 1.0, forward_offset: float = 0.08, side_offset: float = 0.08, height_offset: float = 0.46) -> Node3D:
+	return SoldierActionHelper.configure_carry_anchor(self, side_sign, forward_offset, side_offset, height_offset)
+
+
+func get_carry_anchor_global_position() -> Vector3:
+	return SoldierActionHelper.get_carry_anchor_global_position(self)
+
+
+func begin_carry_payload(payload: Node3D, payload_kind: String = "generic", side_sign: float = 1.0, forward_offset: float = 0.08, side_offset: float = 0.08, height_offset: float = 0.46) -> bool:
+	return SoldierActionHelper.begin_carry_payload(self, payload, payload_kind, side_sign, forward_offset, side_offset, height_offset)
+
+
+func begin_typed_carry_payload(payload: Node3D, payload_kind: String = "generic", side_sign: float = 1.0, offset_overrides: Dictionary = {}) -> bool:
+	return SoldierActionHelper.begin_typed_carry_payload(self, payload, payload_kind, side_sign, offset_overrides)
+
+
+func finish_carry_payload(payload: Node3D = null) -> void:
+	SoldierActionHelper.finish_carry_payload(self, payload)
+
+
+func get_carry_payload() -> Node3D:
+	return SoldierActionHelper.get_carry_payload(self)
+
+
+func get_carry_payload_kind() -> String:
+	return SoldierActionHelper.get_carry_payload_kind(self)
+
+
+func begin_corpse_cleanup_action(action_name: String = "") -> void:
+	if action_name.is_empty():
+		action_name = SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH
+	SoldierActionHelper.begin_corpse_cleanup_action(self, action_name)
+
+
+func finish_corpse_cleanup_action() -> void:
+	SoldierActionHelper.finish_corpse_cleanup_action(self)
+	if current_state == State.DEAD:
+		_play_death_pose()
+
+
+func play_corpse_cleanup_carry_animation() -> void:
+	SoldierActionHelper.begin_corpse_cleanup_action(self, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY)
+
+
+func finish_corpse_cleanup_carry_animation() -> void:
+	finish_corpse_cleanup_action()
+
 ## 적군 도선병 약탈 및 방화 처리 (초당 DoT 데미지)
 func _update_boarding_chaos(delta: float) -> void:
 	SoldierLifecycleHelper.update_boarding_chaos(self, delta)
@@ -873,6 +980,68 @@ func move_to_target(target: Node3D) -> void:
 func move_to_position(_target_pos: Vector3) -> void:
 	# NavMesh 대신 단순 상태 전환 및 타이머/거리 체크로직 등 필요시 구현 (현재는 MOVE 상태에서 실시간 추적)
 	_change_state(State.MOVE)
+
+
+func begin_boarding_jump_pose(status: String = BOARDING_STATUS_BOARDING) -> void:
+	_is_jumping = true
+	set_boarding_status(status)
+	current_target = null
+	_finish_cannon_reload_pose()
+	velocity = Vector3.ZERO
+	_change_state(State.BOARDING_JUMP)
+	SoldierVisualHelper.play_boarding_jump_pose(self)
+
+
+func finish_boarding_jump_pose(status: String = BOARDING_STATUS_ON_DECK) -> void:
+	_is_jumping = false
+	set_boarding_status(status)
+	if current_state == State.DEAD:
+		_play_death_pose()
+		return
+	SoldierVisualHelper.play_recovery_pose(self)
+	if current_state == State.BOARDING_JUMP:
+		_change_state(State.IDLE)
+
+
+func is_available_for_cannon_reload_pose() -> bool:
+	if current_state == State.DEAD:
+		return false
+	if SoldierActionHelper.has_action(self) and not SoldierActionHelper.has_action(self, SoldierActionHelper.ACTION_CANNON_RELOAD):
+		return false
+	if _is_jumping:
+		return false
+	if is_captain:
+		return false
+	if is_instance_valid(current_target):
+		return false
+	if current_state == State.ATTACK or current_state == State.MOVE:
+		return false
+	if is_instance_valid(owned_ship) and (owned_ship.get("deck_is_contested") == true or owned_ship.get("deck_is_overrun") == true):
+		return false
+	if not SoldierShipWorkPriorityHelper.can_accept_immediate_work(self, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD):
+		return false
+	return true
+
+
+func play_cannon_reload_pose(source_node: Node3D, duration: float = 0.9) -> void:
+	if not is_available_for_cannon_reload_pose():
+		return
+	if not SoldierShipWorkPriorityHelper.reserve_work_slot(source_node, self, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD, duration + 0.45):
+		return
+	cannon_reload_source = source_node
+	cannon_reload_pose_timer = maxf(cannon_reload_pose_timer, duration)
+	current_target = null
+	velocity = Vector3.ZERO
+	SoldierActionHelper.begin_known_action(self, SoldierActionHelper.ACTION_CANNON_RELOAD)
+	_change_state(State.RELOAD)
+
+
+func _finish_cannon_reload_pose() -> void:
+	if is_instance_valid(cannon_reload_source):
+		SoldierShipWorkPriorityHelper.release_work_slot(cannon_reload_source, self, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD)
+	cannon_reload_source = null
+	cannon_reload_pose_timer = 0.0
+	SoldierActionHelper.finish_action(self, SoldierActionHelper.ACTION_CANNON_RELOAD)
 
 ## 원거리 적 확인 및 사격
 func _check_ranged_combat() -> void:

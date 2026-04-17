@@ -9,11 +9,6 @@
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
-[ext_resource type="PackedScene" uid="uid://bilro8ijftry1" path="res://scenes/effects/fire_effect.tscn" id="12_a8y0u"]
-[ext_resource type="PackedScene" path="res://scenes/effects/wood_splinter.tscn" id="12_splinter"]
-[ext_resource type="PackedScene" uid="uid://cn32xp1401yfh" path="res://scenes/effects/floating_loot.tscn" id="13_jkv2x"]
-[ext_resource type="PackedScene" uid="uid://cm4c0u30p0035" path="res://scenes/effects/water_burst.tscn" id="13_splash"]
-[ext_resource type="PackedScene" path="res://scenes/effects/survivor.tscn" id="14_jbj1t"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
 [ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 [ext_resource type="Script" uid="uid://b3sxf5qk2myeh" path="res://scripts/world/decor/sea_decor_spawner.gd" id="sea_decor_spawner"]
@@ -68,11 +63,12 @@ script = ExtResource("env_preset_manager")
 
 [node name="ShipControlPanel" parent="UI" unique_id=1539809376 instance=ExtResource("3")]
 theme = ExtResource("4_1bvp3")
+controlled_ship = NodePath("")
 
 [node name="OceanPlane" parent="." unique_id=1629146247 instance=ExtResource("10_ocean")]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1808775112]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.0346174, 0.9558134, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.673962, 0.9558134, 0)
 mesh = SubResource("BoxMesh_choun")
 
 [node name="MeshInstance3D2" type="MeshInstance3D" parent="." unique_id=626961768]
@@ -83,17 +79,7 @@ mesh = SubResource("BoxMesh_choun")
 transform = Transform3D(1, 0, 0, 0, 0.9371481, -0.3489319, 0, 0.3489319, 0.9371481, 16.745987, -1.1631579, 6.324033)
 mesh = SubResource("BoxMesh_choun")
 
+[node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
+
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7088671, 0, 15.67263)
-boarding_contact_grace_duration = 0.9
-boarding_hook_throw_delay = 2.5
-boarding_secondary_rope_delay = 1.0
-boarding_max_relative_speed = 0.28
-boarding_initial_rope_count = 0
-boarding_rope_throw_duration = 0.0
-wood_splinter_scene = ExtResource("12_splinter")
-water_splash_scene = ExtResource("13_splash")
-fire_effect_scene = ExtResource("12_a8y0u")
-loot_scene = null
-survivor_scene = ExtResource("14_jbj1t")
-deck_light_player_only = true
+metadata/ally_ship_role = "player_flagship"

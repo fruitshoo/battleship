@@ -3,6 +3,7 @@ class_name ProjectContractSupportHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 
 
 static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
@@ -36,6 +37,7 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		player_ship.set("support_fleet_limit", 1)
 
 	var captured_before: int = EntityRegistry.count_captured_minions()
+	var capture_slots_before: int = ShipAllyRoleHelper.count_capture_slot_minions(EntityRegistry.get_captured_minions())
 	player_ship.call("_spawn_or_repair_ally")
 	await _wait_frames(owner, wait_frames_after_spawn + 2)
 
@@ -56,6 +58,12 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	var support_team: String = str(support_ship.get("team"))
 	if support_team != "player":
 		failures.append("support fleet smoke team mismatch: %s" % support_team)
+	if not player_ship.has_method("get_ally_ship_role") or str(player_ship.call("get_ally_ship_role")) != ShipAllyRoleHelper.ROLE_PLAYER_FLAGSHIP:
+		failures.append("support fleet smoke player ship should be tagged as player_flagship")
+	if not support_ship.has_method("get_ally_ship_role") or str(support_ship.call("get_ally_ship_role")) != ShipAllyRoleHelper.ROLE_SUPPORT_FLEET:
+		failures.append("support fleet smoke support ship should be tagged as support_fleet")
+	if ShipAllyRoleHelper.is_captured_minion(support_ship):
+		failures.append("support fleet smoke support ship should not consume captured-minion role slots")
 	if not support_ship.is_in_group("captured_minion"):
 		failures.append("support fleet smoke missing captured_minion group")
 	if support_ship.get_meta("support_fleet_ship", false) != true:
@@ -64,8 +72,11 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		failures.append("support fleet smoke did not increase captured minion count")
 	if not EntityRegistry.get_captured_minions().has(support_ship):
 		failures.append("support fleet smoke support ship missing from registry bucket")
+	if ShipAllyRoleHelper.count_capture_slot_minions(EntityRegistry.get_captured_minions()) != capture_slots_before:
+		failures.append("support fleet smoke support ship should not consume capture slots")
 
 	_run_support_shared_cannon_cap_smoke(failures, support_ship)
+	_run_support_shared_hull_upgrade_smoke(failures, support_ship)
 
 	var target_ship: Node3D = null
 	if support_ship.has_method("get_target_ship"):
@@ -178,6 +189,46 @@ static func _run_support_shared_cannon_cap_smoke(failures: Array[String], suppor
 		if visible_count != expected_count:
 			failures.append("support fleet smoke shared cannon cap mismatch Lv.%d: %d != %d" % [level, visible_count, expected_count])
 	UpgradeManager.current_levels["cannon"] = original_cannon_level
+	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+
+
+static func _run_support_shared_hull_upgrade_smoke(failures: Array[String], support_ship: Node3D) -> void:
+	if not is_instance_valid(support_ship):
+		return
+	if not is_instance_valid(UpgradeManager):
+		failures.append("support fleet smoke missing UpgradeManager for shared hull upgrade")
+		return
+	if "fleet_hull" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
+		failures.append("support fleet smoke fleet_hull should not be offered as support ship upgrade")
+	if "fleet_hull" in UpgradeManager.ACTIVE_SUPPORT_UPGRADE_IDS:
+		failures.append("support fleet smoke fleet_hull should not be an active support upgrade")
+
+	var original_hull_level: int = int(UpgradeManager.current_levels.get("hull_defense", 0))
+	UpgradeManager.current_levels["hull_defense"] = 0
+	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+	var base_max_hp: float = float(support_ship.get("max_hull_hp")) if support_ship.get("max_hull_hp") != null else 0.0
+	var base_defense: float = float(support_ship.get("hull_defense")) if support_ship.get("hull_defense") != null else 0.0
+
+	if support_ship.get("hull_hp") != null and support_ship.get("max_hull_hp") != null:
+		support_ship.set("hull_hp", maxf(1.0, base_max_hp - 100.0))
+
+	UpgradeManager.current_levels["hull_defense"] = 4
+	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+	var upgraded_max_hp: float = float(support_ship.get("max_hull_hp")) if support_ship.get("max_hull_hp") != null else 0.0
+	var upgraded_defense: float = float(support_ship.get("hull_defense")) if support_ship.get("hull_defense") != null else 0.0
+	if absf(upgraded_max_hp - base_max_hp) > 0.01:
+		failures.append("support fleet smoke shared hull upgrade should not add separate support max HP")
+	if upgraded_defense < base_defense + 3.9:
+		failures.append("support fleet smoke shared hull upgrade did not apply hull_defense levels")
+	if support_ship.get("hull_hp") != null and float(support_ship.get("hull_hp")) <= maxf(1.0, base_max_hp - 100.0):
+		failures.append("support fleet smoke shared hull repair level did not heal support ship")
+
+	UpgradeManager.current_levels["hull_defense"] = 5
+	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+	if support_ship.get("hull_regen_rate") != null and float(support_ship.get("hull_regen_rate")) < 1.4:
+		failures.append("support fleet smoke shared hull upgrade did not apply regen level")
+
+	UpgradeManager.current_levels["hull_defense"] = original_hull_level
 	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
 
 

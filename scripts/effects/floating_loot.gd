@@ -2,6 +2,7 @@ extends Area3D
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 부유물(Floating Loot) 시스템
@@ -14,6 +15,7 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 @export var float_speed: float = 2.0 # 둥실거리는 속도
 @export var float_height: float = 0.3 # 둥실거리는 진폭
 @export var rotation_speed: float = 1.0 # 회전 속도
+@export var collection_contact_margin: float = 0.85
 
 var target_player: Node3D = null
 var current_magnet_speed: float = 0.0
@@ -127,13 +129,14 @@ func _physics_process(delta: float) -> void:
 			# 자석 효과 발동: 가속도가 붙으면서 끌려감
 			var ship_speed_bonus: float = 0.0
 			ship_speed_bonus = maxf(0.0, NodeContractHelper.get_current_speed_value(target_player)) * 0.9
-			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (22.0 / max(dist, 0.8))
+			var pull_target: Vector3 = FieldItemHelper.get_ship_side_anchor(self, target_player, false)
+			var pull_distance: float = global_position.distance_to(pull_target)
+			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (22.0 / max(pull_distance, 0.8))
 			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 28.0 * delta)
-			var direction: Vector3 = (target_player.global_position - global_position).normalized()
-			global_position += direction * current_magnet_speed * delta
+			FieldItemHelper.move_item_toward_ship_side_anchor(self, target_player, current_magnet_speed * delta)
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
-			if dist < 3.5:
+			if FieldItemHelper.is_item_close_to_ship_edge(self, target_player, collection_contact_margin):
 				_collect_by_proximity()
 		else:
 			# 범위를 벗어나면 가속도 초기화 및 제자리 둥실거림
@@ -178,73 +181,42 @@ func _find_target_player() -> void:
 	if not is_inside_tree():
 		target_player = null
 		return
-	var players = EntityRegistry.get_ships_by_team("player")
-	var closest_dist = INF
-	var closest_p = null
-	
-	for p in players:
-		if not is_instance_valid(p) or not p.is_inside_tree():
-			continue
-		if NodeContractHelper.is_sinking_or_dying(p): continue
-		
-		var d = global_position.distance_to(p.global_position)
-		if d < closest_dist:
-			closest_dist = d
-			closest_p = p
-			
-	# 가장 가까운 아군 배를 타겟으로 함 (본선/나포함 구분 없음)
-	if closest_dist <= _get_current_magnet_radius() * 1.5:
-		target_player = closest_p
-	else:
-		target_player = null
+	target_player = FieldItemHelper.find_closest_player_ship(self, _get_current_magnet_radius())
 
 
 func _get_current_magnet_radius() -> float:
-	var meta_bonus := 0.0
-	var meta_manager = get_node_or_null("/root/MetaManager")
-	if is_instance_valid(meta_manager) and meta_manager.has_method("get_collection_radius_bonus"):
-		meta_bonus = float(meta_manager.get_collection_radius_bonus())
-	if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
-		var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
-		return base_magnet_radius + meta_bonus + float(supply_stats.get("radius_bonus", 0.0))
-	return base_magnet_radius + meta_bonus
+	return FieldItemHelper.get_current_magnet_radius(self, base_magnet_radius, _cached_um)
 
 
 func _on_body_entered(body: Node3D) -> void:
 	if is_collected: return
 	var ship = _get_ship_from_node(body)
 	if ship and ship.is_in_group("player"):
-		is_collected = true
-		_collect_loot()
+		_try_collect_or_target(ship)
 
 func _on_area_entered(area: Area3D) -> void:
 	if is_collected: return
 	var ship = _get_ship_from_node(area)
 	if ship and ship.is_in_group("player"):
-		is_collected = true
-		_collect_loot()
+		_try_collect_or_target(ship)
 
 func _collect_by_proximity() -> void:
 	if is_collected: return
-	if is_instance_valid(target_player) and target_player.is_inside_tree():
+	if is_instance_valid(target_player) and target_player.is_inside_tree() and FieldItemHelper.is_item_close_to_ship_edge(self, target_player, collection_contact_margin):
 		is_collected = true
 		_collect_loot()
 
 func _get_ship_from_node(node: Node) -> Node3D:
-	if not node: return null
-	if node.is_in_group("player"): return node
-	
-	var p = node.get_parent()
-	if p and p.is_in_group("player"): return p
-	
-	if node is CollisionShape3D or node is Area3D:
-		var pp = node.get_parent()
-		if pp and pp.is_in_group("player"): return pp
-		
-	if node.owner and node.owner.is_in_group("player"):
-		return node.owner
-		
-	return null
+	return FieldItemHelper.get_ship_from_node(node)
+
+func _try_collect_or_target(ship: Node3D) -> void:
+	if is_collected or not is_instance_valid(ship):
+		return
+	target_player = ship
+	if not FieldItemHelper.is_item_close_to_ship_edge(self, ship, collection_contact_margin):
+		return
+	is_collected = true
+	_collect_loot()
 
 
 func _collect_loot() -> void:

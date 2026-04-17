@@ -1,118 +1,222 @@
 {
+	"weapon_profiles": {
+		"enemy_heavy_cannon": {
+			"kind": "cannon",
+			"scene": "res://scenes/entities/launchers/cannon_enemy_heavy.tscn",
+			"team": "enemy",
+			"projectile_scene": "res://scenes/projectiles/cannonball_enemy_heavy.tscn",
+			"fire_cooldown": 4.6,
+			"detection_range": 23.0,
+			"detection_arc": 50.0
+		},
+		"joseon_light_cannon": {
+			"kind": "cannon",
+			"scene": "res://scenes/entities/launchers/cannon_joseon.tscn",
+			"team": "player",
+			"projectile_scene": "res://scenes/projectiles/cannonball_joseon.tscn",
+			"fire_cooldown": 3.2,
+			"detection_range": 24.0
+		},
+		"boss_singigeon": {
+			"kind": "singigeon",
+			"scene": "res://scenes/entities/launchers/singigeon_launcher.tscn",
+			"team": "enemy",
+			"projectile_scene": "res://scenes/projectiles/singigeon_rocket.tscn",
+			"fire_cooldown": 4.0,
+			"detection_range": 36.0,
+			"projectile_speed": 32.0,
+			"upgrade_level": 3
+		}
+	},
+	"combat_profiles": {
+		"raider_charger": {
+			"combat_role": "charger",
+			"allow_boarding": true,
+			"preferred_range": 3.8,
+			"range_tolerance": 0.8,
+			"retreat_distance": 3.0
+		},
+		"boarding_charger": {
+			"combat_role": "charger",
+			"allow_boarding": true,
+			"preferred_range": 4.5,
+			"range_tolerance": 1.0,
+			"retreat_distance": 3.5
+		},
+		"stand_off_gunner": {
+			"combat_role": "gunner",
+			"allow_boarding": false,
+			"preferred_range": 14.0,
+			"range_tolerance": 2.5,
+			"retreat_distance": 8.5
+		},
+		"mid_boss_gunner": {
+			"combat_role": "gunner",
+			"allow_boarding": false,
+			"preferred_range": 14.0,
+			"range_tolerance": 2.5,
+			"retreat_distance": 7.0,
+			"orbit_distance": 24.0
+		},
+		"final_boss_gunner": {
+			"combat_role": "gunner",
+			"allow_boarding": false,
+			"preferred_range": 16.0,
+			"range_tolerance": 2.5,
+			"retreat_distance": 9.0,
+			"orbit_distance": 28.0
+		}
+	},
+	"ship_archetypes": {
+		"kobayabune_raider": {
+			"hull_scene": "res://scenes/ships/hulls/kobayabune_hull.tscn",
+			"hull_hp": 100,
+			"move_speed": 7.0,
+			"boarders": 3,
+			"has_cannons": false,
+			"soldier_type": "melee",
+			"crew_composition": {
+				"melee": 3,
+				"general": 1
+			},
+			"deck_height": 0.32,
+			"combat_profile": "raider_charger"
+		},
+		"sekibune_boarder": {
+			"hull_scene": "res://scenes/ships/hulls/sekibune_melee_hull.tscn",
+			"hull_hp": 145,
+			"move_speed": 6.0,
+			"boarders": 4,
+			"has_cannons": false,
+			"soldier_type": "melee",
+			"crew_composition": {
+				"melee": 2,
+				"general": 1,
+				"fire_pot": 1
+			},
+			"collision_fit_scale": 0.84,
+			"separation_pad_scale": 0.5,
+			"deck_height": 0.4,
+			"combat_profile": "boarding_charger"
+		},
+		"sekibune_gunner": {
+			"hull_scene": "res://scenes/ships/hulls/sekibune_hull.tscn",
+			"hull_hp": 145,
+			"move_speed": 4.5,
+			"boarders": 3,
+			"has_cannons": true,
+			"soldier_type": "ranged",
+			"crew_composition": {
+				"ranged": 2,
+				"general": 1,
+				"fire_pot": 1
+			},
+			"collision_fit_scale": 0.84,
+			"separation_pad_scale": 0.5,
+			"deck_height": 0.4,
+			"combat_profile": "stand_off_gunner"
+		},
+		"atakebune_mid_boss": {
+			"hull_scene": "res://scenes/ships/hulls/atakebune_hull.tscn",
+			"hull_hp": 680,
+			"move_speed": 3.0,
+			"tier": 1,
+			"soldier_type": "general",
+			"combat_profile": "mid_boss_gunner",
+			"crew_composition": {
+				"general": 2,
+				"melee": 2,
+				"ranged": 1,
+				"fire_pot": 1
+			},
+			"weapon_loadout": [
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonFront", "slot": "CannonFront", "position": [0.0, 0.8, -5.0], "rotation_y": 0.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonLeft", "slot": "CannonLeft", "position": [-2.8, 0.8, 0.0], "rotation_y": 90.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonRight", "slot": "CannonRight", "position": [2.8, 0.8, 0.0], "rotation_y": -90.0}
+			],
+			"deck_height": 0.75
+		},
+		"atakebune_final_boss": {
+			"hull_scene": "res://scenes/ships/hulls/atakebune_hull.tscn",
+			"hull_hp": 5800,
+			"move_speed": 2.5,
+			"tier": 2,
+			"soldier_type": "general",
+			"combat_profile": "final_boss_gunner",
+			"crew_composition": {
+				"general": 1,
+				"melee": 1,
+				"ranged": 1,
+				"fire_pot": 1
+			},
+			"weapon_loadout": [
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonLeftForward", "slot": "CannonLeftExtra", "position": [-2.8, 0.8, -2.0], "rotation_y": 90.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonRightForward", "slot": "CannonRightExtraForward", "position": [2.8, 0.8, -2.0], "rotation_y": -90.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonLeftMid", "slot": "CannonLeft", "position": [-2.8, 0.8, 0.0], "rotation_y": 90.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonRightMid", "slot": "CannonRight", "position": [2.8, 0.8, 0.0], "rotation_y": -90.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonLeftRear", "slot": "CannonLeftExtraRear", "position": [-2.8, 0.8, 2.0], "rotation_y": 90.0},
+				{"profile": "enemy_heavy_cannon", "name": "BossCannonRightRear", "slot": "CannonRightExtra", "position": [2.8, 0.8, 2.0], "rotation_y": -90.0},
+				{"profile": "boss_singigeon", "name": "BossSingigeonFront", "slot": "SingigeonFront", "position": [0.0, 1.0, -5.0], "rotation_y": 0.0}
+			],
+			"deck_height": 0.75
+		},
+		"maengseon_support": {
+			"hull_scene": "res://scenes/ships/hulls/maengseon_hull.tscn",
+			"hull_hp": 200,
+			"move_speed": 4.5,
+			"boarders": 4,
+			"has_cannons": true,
+			"soldier_type": "general",
+			"weapon_loadout": [
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.8, -3.5], "rotation_y": 0.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_1", "slot": "CannonLeft", "position": [-1.0, 0.8, -0.5], "rotation_y": 90.0, "required_level": 2},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_2", "slot": "CannonRight", "position": [1.0, 0.8, -0.5], "rotation_y": -90.0, "required_level": 3}
+			],
+			"deck_height": 0.4
+		},
+		"panokseon_player_default": {
+			"hull_scene": "res://scenes/ships/hulls/panokseon_hull.tscn",
+			"hull_hp": 270,
+			"move_speed": 6.0,
+			"boarders": 4,
+			"weapon_loadout": [
+				{"profile": "joseon_light_cannon", "name": "CannonFront", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "CannonLeft", "slot": "CannonLeft", "position": [-1.3, 0.6, 0.0], "rotation_y": 90.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "CannonRight", "slot": "CannonRight", "position": [1.3, 0.6, 0.0], "rotation_y": -90.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "CannonLeftExtra", "slot": "CannonLeftExtra", "position": [-1.3, 0.6, -2.0], "rotation_y": 90.0, "required_level": 2},
+				{"profile": "joseon_light_cannon", "name": "CannonRightExtra", "slot": "CannonRightExtra", "position": [1.3, 0.6, 2.0], "rotation_y": -90.0, "required_level": 3},
+				{"profile": "joseon_light_cannon", "name": "CannonLeftExtraRear", "slot": "CannonLeftExtraRear", "position": [-1.3, 0.6, 2.0], "rotation_y": 90.0, "required_level": 4},
+				{"profile": "joseon_light_cannon", "name": "CannonRightExtraForward", "slot": "CannonRightExtraForward", "position": [1.3, 0.6, -2.0], "rotation_y": -90.0, "required_level": 5}
+			],
+			"deck_height": 0.5
+		}
+	},
 	"kobayabune_melee": {
 		"name": "Kobayabune Raider",
-		"hull_hp": 100,
-		"move_speed": 7.0,
-		"boarders": 3,
-		"has_cannons": false,
-		"soldier_type": "melee",
-		"crew_composition": {
-			"melee": 3,
-			"general": 1
-		},
-		"deck_height": 0.32,
-		"combat_role": "charger",
-		"allow_boarding": true,
-		"preferred_range": 3.8,
-		"range_tolerance": 0.8,
-		"retreat_distance": 3.0
+		"ship_archetype": "kobayabune_raider"
 	},
 	"sekibune_melee": {
 		"name": "Melee Sekibune",
-		"hull_hp": 145,
-		"move_speed": 6.0,
-		"boarders": 4,
-		"has_cannons": false,
-		"soldier_type": "melee",
-		"crew_composition": {
-			"melee": 2,
-			"general": 1,
-			"fire_pot": 1
-		},
-		"collision_fit_scale": 0.84,
-		"separation_pad_scale": 0.5,
-		"deck_height": 0.4,
-		"combat_role": "charger",
-		"allow_boarding": true,
-		"preferred_range": 4.5,
-		"range_tolerance": 1.0,
-		"retreat_distance": 3.5
+		"ship_archetype": "sekibune_boarder"
 	},
 	"sekibune_cannon": {
 		"name": "Cannon Sekibune",
-		"hull_hp": 145,
-		"move_speed": 4.5,
-		"boarders": 3,
-		"has_cannons": true,
-		"soldier_type": "ranged",
-		"crew_composition": {
-			"ranged": 2,
-			"general": 1,
-			"fire_pot": 1
-		},
-		"collision_fit_scale": 0.84,
-		"separation_pad_scale": 0.5,
-		"deck_height": 0.4,
-		"combat_role": "gunner",
-		"allow_boarding": false,
-		"preferred_range": 14.0,
-		"range_tolerance": 2.5,
-		"retreat_distance": 8.5
+		"ship_archetype": "sekibune_gunner"
 	},
 	"atakebune_mid": {
 		"name": "Mid-Boss Atakebune",
-		"hull_hp": 680,
-		"move_speed": 3.0,
-		"tier": 1,
-		"orbit_distance": 24.0,
-		"soldier_type": "general",
-		"crew_composition": {
-			"general": 2,
-			"melee": 2,
-			"ranged": 1,
-			"fire_pot": 1
-		},
-		"deck_height": 0.75,
-		"combat_role": "gunner",
-		"allow_boarding": false,
-		"preferred_range": 14.0,
-		"range_tolerance": 2.5,
-		"retreat_distance": 7.0
+		"ship_archetype": "atakebune_mid_boss"
 	},
 	"atakebune_final": {
 		"name": "Final Boss Atakebune",
-		"hull_hp": 5800,
-		"move_speed": 2.5,
-		"tier": 2,
-		"orbit_distance": 28.0,
-		"soldier_type": "general",
-		"crew_composition": {
-			"general": 1,
-			"melee": 1,
-			"ranged": 1,
-			"fire_pot": 1
-		},
-		"deck_height": 0.75,
-		"combat_role": "gunner",
-		"allow_boarding": false,
-		"preferred_range": 16.0,
-		"range_tolerance": 2.5,
-		"retreat_distance": 9.0
+		"ship_archetype": "atakebune_final_boss"
 	},
 	"maengseon_ally": {
 		"name": "Maengseon Ally",
-		"hull_hp": 200,
-		"move_speed": 4.5,
-		"boarders": 4,
-		"has_cannons": true,
-		"soldier_type": "general",
-		"deck_height": 0.4
+		"ship_archetype": "maengseon_support"
 	},
 	"panokseon_player": {
 		"name": "Player Panokseon",
-		"hull_hp": 270,
-		"move_speed": 6.0,
-		"boarders": 4,
-		"deck_height": 0.5
+		"ship_archetype": "panokseon_player_default"
 	}
 }

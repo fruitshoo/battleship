@@ -88,6 +88,27 @@ var debug_ship_stamina_value: Label = null
 var debug_environment_value: Label = null
 var debug_collision_value: Label = null
 var debug_distance_value: Label = null
+var debug_authoring_palette_preview_value: Label = null
+var debug_authoring_palette_selected_value: Label = null
+var debug_authoring_palette_assembly_value: Label = null
+var debug_authoring_palette_execute_button: Button = null
+var debug_authoring_palette_queue_value: Label = null
+var debug_authoring_palette_preset_value: Label = null
+var debug_authoring_palette_preset_preview_value: Label = null
+var debug_authoring_palette_preset_select: OptionButton = null
+var debug_authoring_palette_queue_add_button: Button = null
+var debug_authoring_palette_queue_execute_button: Button = null
+var debug_authoring_palette_queue_duplicate_button: Button = null
+var debug_authoring_palette_queue_delete_button: Button = null
+var debug_authoring_palette_queue_prev_button: Button = null
+var debug_authoring_palette_queue_next_button: Button = null
+var debug_authoring_palette_queue_move_up_button: Button = null
+var debug_authoring_palette_queue_move_down_button: Button = null
+var debug_authoring_palette_selected_callback: Callable = Callable()
+var debug_authoring_palette_selected_action: Dictionary = {}
+var debug_authoring_palette_assembly_meta: Dictionary = {}
+var debug_authoring_palette_queue_entries: Array[Dictionary] = []
+var debug_authoring_palette_queue_selected_index: int = -1
 var _sail_debug_ui_syncing: bool = false
 var _ship_debug_ui_syncing: bool = false
 
@@ -158,7 +179,7 @@ const SHIP_HP_BAR_OFFSET_Y: float = 34.0
 const SHIP_UPGRADE_IDS := [
 	"cannon", "cannon_damage", "cannon_reload", "janggun",
 	"hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal",
-	"fleet_hull", "supply", "gold"
+	"supply", "gold"
 ]
 const CREW_UPGRADE_IDS := [
 	"crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow",

@@ -86,7 +86,7 @@ func pool_reset() -> void:
 	var init_dir = launch_direction
 	if init_dir.length_squared() < 0.001:
 		if is_instance_valid(target_node):
-			init_dir = target_node.global_position - global_position
+			init_dir = NodeContractHelper.get_projectile_aim_point(target_node, 0.65) - global_position
 		elif start_pos.distance_squared_to(target_pos) > 0.01:
 			init_dir = target_pos - start_pos
 		else:
@@ -147,7 +147,7 @@ func _physics_process(delta: float) -> void:
 		active_turn_rate = terminal_turn_rate_deg
 		var homing_target = _resolve_homing_target()
 		if is_instance_valid(homing_target):
-			var aim_point = homing_target.global_position + Vector3(0.0, 0.4, 0.0)
+			var aim_point = NodeContractHelper.get_projectile_aim_point(homing_target, 0.65)
 			var to_target = aim_point - global_position
 			if to_target.length_squared() > 0.0001 and to_target.length_squared() <= max_homing_distance * max_homing_distance:
 				desired_dir = _apply_wobble(to_target.normalized(), terminal_wobble_deg, _age)
@@ -169,7 +169,8 @@ func _physics_process(delta: float) -> void:
 			return
 
 	if is_instance_valid(target_node) and _lock_on_left <= 0.0:
-		if global_position.distance_squared_to(target_node.global_position) <= proximity_hit_radius * proximity_hit_radius:
+		var target_aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.65)
+		if global_position.distance_squared_to(target_aim_point) <= proximity_hit_radius * proximity_hit_radius:
 			_on_hit(target_node)
 
 func _apply_wobble(dir: Vector3, wobble_deg: float, age: float) -> Vector3:
@@ -226,7 +227,7 @@ func _resolve_homing_target() -> Node3D:
 			var soldier := candidate as Node3D
 			if not _is_valid_soldier_target(soldier):
 				continue
-			var dist_sq: float = global_position.distance_squared_to(soldier.global_position)
+			var dist_sq: float = global_position.distance_squared_to(NodeContractHelper.get_projectile_aim_point(soldier, 0.5))
 			if dist_sq < best_dist_sq:
 				best_dist_sq = dist_sq
 				best_target = soldier
@@ -241,7 +242,7 @@ func _resolve_homing_target() -> Node3D:
 		if not _is_valid_ship_target(ship):
 			continue
 
-		var dist_sq: float = global_position.distance_squared_to(ship.global_position)
+		var dist_sq: float = global_position.distance_squared_to(NodeContractHelper.get_projectile_aim_point(ship, 0.65))
 		if dist_sq < best_dist_sq:
 			best_dist_sq = dist_sq
 			best_target = ship

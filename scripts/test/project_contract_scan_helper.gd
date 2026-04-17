@@ -53,6 +53,18 @@ static func scan_legacy_godot3_patterns(roots: Array[String], failures: Array[St
 				if line.find(pattern) != -1:
 					failures.append("%s found in %s:%d" % [label, path, line_no])
 				line_no += 1
+		_scan_state_magic_number_patterns(path, source, failures)
+
+
+static func _scan_state_magic_number_patterns(path: String, source: String, failures: Array[String]) -> void:
+	var dead_assignment_token := "3" + "=dead"
+	var dead_comparison_token := "==" + "3"
+	var line_no := 1
+	for line in source.split("\n", false):
+		var compact := line.replace(" ", "").to_lower()
+		if compact.find(dead_assignment_token) != -1 or (compact.find(dead_comparison_token) != -1 and compact.find("dead") != -1):
+			failures.append("dead state magic number found in %s:%d" % [path, line_no])
+		line_no += 1
 
 
 static func _collect_paths(root_path: String, suffix: String, out: Array[String], failures: Array[String]) -> void:

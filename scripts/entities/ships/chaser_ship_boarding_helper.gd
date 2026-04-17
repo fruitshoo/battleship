@@ -1,9 +1,15 @@
 extends RefCounted
 class_name ChaserShipBoardingHelper
 
+const ShipBoardingMotion = preload("res://scripts/entities/ships/ship_boarding_motion.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+
 const BOARDING_MOTION_SETTLE_DURATION := 1.35
 const LATCHED_CORRECTION_BLEND := 0.42
 const LATCHED_PULL_BLEND := 0.62
+const BOARDING_CONTACT_DISTANCE_PAD := 0.85
+const BOARDING_CONTACT_ANCHOR_EDGE_MARGIN := 0.18
 
 static func process_boarding(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
@@ -26,28 +32,28 @@ static func process_boarding(ship, delta: float) -> void:
 		return
 
 	var motion := _build_boarding_motion(ship, ship.boarding_target, target_pos, flat_to_target, dist_to_target)
-	var contact_mode: String = str(ship.get_meta("boarding_contact_mode", ""))
+	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
 	var motion_settle: float = _update_motion_settle(ship, delta)
-	var heading_dir: Vector3 = motion["heading_dir"]
+	var heading_dir: Vector3 = ShipBoardingMotion.get_heading_dir(motion)
 	var target_rot = atan2(-heading_dir.x, -heading_dir.z)
-	var turn_response: float = _get_boarding_turn_response(contact_mode, motion.get("parallel_hold", false) == true, motion_settle)
+	var turn_response: float = _get_boarding_turn_response(contact_mode, ShipBoardingMotion.is_parallel_hold(motion), motion_settle)
 	ship.rotation.y = lerp_angle(ship.rotation.y, target_rot, minf(delta * turn_response, 1.0))
 
-	var desired_boarding_speed: float = float(motion["desired_speed"])
+	var desired_boarding_speed: float = ShipBoardingMotion.get_desired_speed(motion)
 	var speed_change_rate: float = ship.acceleration if desired_boarding_speed > ship.current_speed else ship.deceleration
 	speed_change_rate *= lerpf(0.78, 1.12, motion_settle)
 	ship.current_speed = move_toward(ship.current_speed, desired_boarding_speed, speed_change_rate * delta)
 
-	var correction_velocity: Vector3 = motion["correction_velocity"]
+	var correction_velocity: Vector3 = ShipBoardingMotion.get_correction_velocity(motion)
 	var correction_blend: float = lerpf(0.72, 1.0, motion_settle)
 	if rope_link_active:
 		correction_blend *= LATCHED_CORRECTION_BLEND
 	correction_velocity *= correction_blend
 	var approach_velocity: Vector3 = heading_dir * ship.current_speed + correction_velocity
 	var pull_blend: float = LATCHED_PULL_BLEND if rope_link_active else lerpf(0.25, 0.7, motion_settle)
-	var pull_force = ship._calculate_boarding_pull() * pull_blend
+	var pull_velocity = ship._calculate_boarding_pull_velocity(delta) * pull_blend
 	var prev_pos = ship.global_position
-	var next_pos = prev_pos + (approach_velocity + pull_force * delta) * delta
+	var next_pos = prev_pos + (approach_velocity + pull_velocity) * delta
 	if is_instance_valid(ship.boarding_target):
 		var guard_ratio: float = 0.92
 		next_pos = apply_ship_collision_guard(ship, ship.boarding_target, prev_pos, next_pos, guard_ratio, approach_velocity.length())
@@ -72,29 +78,62 @@ static func _get_effective_boarding_distance(ship, target_ship: Node3D) -> float
 	if not ship.has_method("get_collision_distance_to"):
 		return ship.max_boarding_distance
 	var contact_distance: float = float(ship.call("get_collision_distance_to", target_ship))
-	return maxf(ship.max_boarding_distance, contact_distance * 0.94)
+	return maxf(ship.max_boarding_distance, contact_distance + BOARDING_CONTACT_DISTANCE_PAD)
+
+
+static func store_boarding_contact_anchor(ship, target_ship: Node3D) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(target_ship):
+		return
+	var rel_vector: Vector3 = ship.global_position - target_ship.global_position
+	rel_vector.y = 0.0
+	if rel_vector.length_squared() <= 0.001:
+		return
+	var contact_dist: float = ship.get_collision_distance_to(target_ship) if ship.has_method("get_collision_distance_to") else rel_vector.length()
+	var contact_world: Vector3 = target_ship.global_position + rel_vector.normalized() * minf(rel_vector.length(), maxf(0.01, contact_dist * 0.5))
+	var anchor_local: Vector3 = target_ship.to_local(contact_world)
+	var deck_half: Vector2 = _get_target_deck_half_extents(target_ship)
+	if deck_half.x > 0.01 and deck_half.y > 0.01:
+		var side_limit: float = maxf(0.12, deck_half.x * (1.0 - BOARDING_CONTACT_ANCHOR_EDGE_MARGIN))
+		var length_limit: float = maxf(0.18, deck_half.y * (1.0 - BOARDING_CONTACT_ANCHOR_EDGE_MARGIN))
+		anchor_local.x = clampf(anchor_local.x, -side_limit, side_limit)
+		anchor_local.z = clampf(anchor_local.z, -length_limit, length_limit)
+	if target_ship.get("deck_height") != null:
+		anchor_local.y = float(target_ship.get("deck_height"))
+	ShipBoardingMetaHelper.set_contact_anchor_local(ship, anchor_local)
+
+
+static func _get_target_deck_half_extents(target_ship: Node3D) -> Vector2:
+	if is_instance_valid(target_ship) and target_ship.has_method("get_deck_half_extents"):
+		var deck_half: Variant = target_ship.call("get_deck_half_extents")
+		if typeof(deck_half) == TYPE_VECTOR2:
+			return deck_half as Vector2
+	if is_instance_valid(target_ship) and target_ship.has_method("get_collision_half_extents"):
+		var collision_half: Variant = target_ship.call("get_collision_half_extents")
+		if typeof(collision_half) == TYPE_VECTOR2:
+			return collision_half as Vector2
+	return Vector2(2.5, 4.0)
 
 
 static func _update_motion_settle(ship, delta: float) -> float:
-	var timer: float = float(ship.get_meta("boarding_motion_settle_timer", 0.0)) + delta
-	ship.set_meta("boarding_motion_settle_timer", timer)
+	var timer: float = ShipBoardingMetaHelper.get_motion_settle_timer(ship) + delta
+	ShipBoardingMetaHelper.set_motion_settle_timer(ship, timer)
 	var t: float = clampf(timer / BOARDING_MOTION_SETTLE_DURATION, 0.0, 1.0)
 	return t * t * (3.0 - 2.0 * t)
 
 
 static func _get_boarding_turn_response(contact_mode: String, parallel_hold: bool, motion_settle: float) -> float:
 	var max_response: float = 1.25 if parallel_hold else 0.95
-	if contact_mode == "head_on":
+	if contact_mode == ShipBoardingMetaHelper.CONTACT_HEAD_ON:
 		max_response = 0.82
-	elif contact_mode == "cleanup":
+	elif contact_mode == ShipBoardingMetaHelper.CONTACT_CLEANUP:
 		max_response = 0.72
 	return lerpf(0.45, max_response, motion_settle)
 
 
 static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector3, flat_to_target: Vector3, dist_to_target: float) -> Dictionary:
 	var fallback_dir: Vector3 = flat_to_target.normalized() if dist_to_target > 0.001 else Vector3.FORWARD
-	var contact_mode: String = str(ship.get_meta("boarding_contact_mode", ""))
-	var parallel_hold: bool = contact_mode == "side"
+	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
+	var parallel_hold: bool = contact_mode == ShipBoardingMetaHelper.CONTACT_SIDE
 	if contact_mode.is_empty() and ship.has_method("_is_side_boarding_approach"):
 		parallel_hold = ship.call("_is_side_boarding_approach", target_ship) == true
 	if not parallel_hold:
@@ -110,10 +149,10 @@ static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector
 	var rel_vector: Vector3 = ship.global_position - target_pos
 	rel_vector.y = 0.0
 	var rel_side: float = rel_vector.dot(target_right)
-	var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
+	var side_sign: float = ShipBoardingMetaHelper.get_side_sign(ship)
 	if absf(side_sign) < 0.5:
 		side_sign = 1.0 if rel_side >= 0.0 else -1.0
-		ship.set_meta("boarding_side_sign", side_sign)
+		ShipBoardingMetaHelper.set_side_sign(ship, side_sign)
 
 	var collision_dist: float = ship.get_collision_distance_to(target_ship)
 	var max_hold_dist: float = maxf(4.0, ship.max_boarding_distance - 0.45)
@@ -133,16 +172,11 @@ static func _build_boarding_motion(ship, target_ship: Node3D, target_pos: Vector
 	elif "current_speed" in target_ship:
 		target_speed = float(target_ship.get("current_speed"))
 	var desired_speed: float = clampf(maxf(target_speed * 0.82, 0.6), 0.0, ship.move_speed * 0.6)
-	return {
-		"heading_dir": target_forward,
-		"desired_speed": desired_speed,
-		"correction_velocity": correction_velocity,
-		"parallel_hold": true,
-	}
+	return ShipBoardingMotion.build(target_forward, desired_speed, correction_velocity, true)
 
 
 static func _build_contact_hold_motion(ship, fallback_dir: Vector3, dist_to_target: float) -> Dictionary:
-	var hold_forward: Vector3 = ship.get_meta("boarding_hold_forward", Vector3.ZERO)
+	var hold_forward: Vector3 = ShipBoardingMetaHelper.get_hold_forward(ship)
 	if hold_forward.length_squared() <= 0.001:
 		hold_forward = -ship.global_transform.basis.z
 		hold_forward.y = 0.0
@@ -152,17 +186,23 @@ static func _build_contact_hold_motion(ship, fallback_dir: Vector3, dist_to_targ
 		hold_forward = hold_forward.normalized()
 
 	var correction_velocity := Vector3.ZERO
-	var desired_contact_dist: float = ship.max_boarding_distance - 0.75
-	if dist_to_target > desired_contact_dist and fallback_dir.length_squared() > 0.001:
-		var correction_speed: float = clampf((dist_to_target - desired_contact_dist) * 1.05, 0.0, ship.move_speed * 0.32)
-		correction_velocity = fallback_dir.normalized() * correction_speed
+	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
+	var target_ship: Node3D = ship.get("boarding_target") as Node3D
+	if contact_mode in [ShipBoardingMetaHelper.CONTACT_HEAD_ON, ShipBoardingMetaHelper.CONTACT_CLEANUP] and is_instance_valid(target_ship) and ShipBoardingMetaHelper.has_contact_anchor(ship):
+		var anchor_local: Vector3 = ShipBoardingMetaHelper.get_contact_anchor_local(ship)
+		var anchor_global: Vector3 = target_ship.to_global(anchor_local)
+		var to_anchor: Vector3 = anchor_global - ship.global_position
+		to_anchor.y = 0.0
+		if to_anchor.length_squared() > 0.01:
+			var anchor_correction_speed: float = clampf(to_anchor.length() * 1.45, 0.0, ship.move_speed * 0.42)
+			correction_velocity = to_anchor.normalized() * anchor_correction_speed
+	else:
+		var desired_contact_dist: float = ship.max_boarding_distance - 0.75
+		if dist_to_target > desired_contact_dist and fallback_dir.length_squared() > 0.001:
+			var correction_speed: float = clampf((dist_to_target - desired_contact_dist) * 1.05, 0.0, ship.move_speed * 0.32)
+			correction_velocity = fallback_dir.normalized() * correction_speed
 
-	return {
-		"heading_dir": hold_forward,
-		"desired_speed": 0.0,
-		"correction_velocity": correction_velocity,
-		"parallel_hold": false,
-	}
+	return ShipBoardingMotion.build(hold_forward, 0.0, correction_velocity, false)
 
 
 static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Vector3, excluded_ship: Node3D = null) -> Vector3:
@@ -260,6 +300,7 @@ static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: 
 	var can_board: bool = ship.has_method("can_board_targets") and ship.can_board_targets()
 	var current_target: Node3D = ship.get_target_ship() if ship.has_method("get_target_ship") else null
 	if can_board and current_target == other_ship:
+		store_boarding_contact_anchor(ship, other_ship)
 		var rel_vector: Vector3 = ship.global_position - other_ship.global_position
 		rel_vector.y = 0.0
 		var target_forward: Vector3 = -other_ship.global_transform.basis.z
@@ -268,15 +309,16 @@ static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: 
 			target_forward = target_forward.normalized()
 			var target_right: Vector3 = target_forward.cross(Vector3.UP).normalized()
 			var rel_side: float = rel_vector.dot(target_right)
-			var side_sign: float = float(ship.get_meta("boarding_side_sign", 0.0))
+			var side_sign: float = ShipBoardingMetaHelper.get_side_sign(ship)
 			if absf(side_sign) < 0.5:
 				side_sign = 1.0 if rel_side >= 0.0 else -1.0
-			ship.set_meta("boarding_side_sign", side_sign)
-		ship.set_meta("post_impact_follow_timer", 2.1)
+			ShipBoardingMetaHelper.set_side_sign(ship, side_sign)
+		ShipBoardingMetaHelper.set_post_impact_follow_timer(ship, 2.1)
 		if ship.has_method("_mark_boarding_impact"):
 			ship.call("_mark_boarding_impact", other_ship)
 	var impact_speed = maxf(impact_speed_hint, ship.min_ramming_speed * 0.72)
-	ship.apply_ramming_damage(other_ship, impact_speed)
+	if ship.has_method("apply_ramming_damage"):
+		ship.apply_ramming_damage(other_ship, impact_speed)
 	if other_ship.has_method("apply_ramming_damage"):
 		other_ship.call("apply_ramming_damage", ship, impact_speed)
 
@@ -290,4 +332,4 @@ static func _is_support_fleet_pair(ship, other_ship: Node3D) -> bool:
 		return false
 	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
-	return ship.get_meta("support_fleet_ship", false) == true and other_ship.get_meta("support_fleet_ship", false) == true
+	return ShipAllyRoleHelper.is_support_ship(ship) and ShipAllyRoleHelper.is_support_ship(other_ship)

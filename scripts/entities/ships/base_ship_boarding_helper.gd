@@ -2,6 +2,12 @@ extends RefCounted
 class_name BaseShipBoardingHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+
+const BOARDING_LANDING_INSET := 0.45
+const BOARDING_CONTACT_DISTANCE_PAD := 0.85
+const BOARDING_BREAK_DISTANCE_PAD := 2.2
 
 static func process_boarding_common(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
@@ -68,15 +74,15 @@ static func process_boarding_common(ship, delta: float) -> void:
 		var effective_interval: float = ship.get_effective_boarding_interval() if ship.has_method("get_effective_boarding_interval") else ship.boarding_interval
 		if ship.boarding_timer >= effective_interval:
 			ship.boarding_timer = 0.0
-			if ship.get_meta("boarding_transfer_suppressed", false) != true:
+			if not ShipBoardingMetaHelper.is_transfer_suppressed(ship):
 				transfer_one_soldier(ship)
 
 	ship._update_ropes(delta)
 
 
 static func _uses_limited_rope_visuals(ship) -> bool:
-	var contact_mode: String = str(ship.get_meta("boarding_contact_mode", ""))
-	return contact_mode == "head_on" or contact_mode == "cleanup"
+	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
+	return contact_mode == ShipBoardingMetaHelper.CONTACT_HEAD_ON or contact_mode == ShipBoardingMetaHelper.CONTACT_CLEANUP
 
 
 static func cancel_boarding(ship) -> void:
@@ -91,16 +97,9 @@ static func cancel_boarding(ship) -> void:
 	ship.boarding_secondary_rope_timer = 0.0
 	ship._initial_rope_deployed = false
 	ship._full_rope_deployed = false
-	if ship.has_meta("boarding_contact_mode"):
-		ship.remove_meta("boarding_contact_mode")
-	if ship.has_meta("boarding_hold_forward"):
-		ship.remove_meta("boarding_hold_forward")
-	if ship.has_meta("boarding_motion_settle_timer"):
-		ship.remove_meta("boarding_motion_settle_timer")
-	if ship.has_meta("boarding_purpose"):
-		ship.remove_meta("boarding_purpose")
-	if ship.has_meta("boarding_transfer_suppressed"):
-		ship.remove_meta("boarding_transfer_suppressed")
+	if "boarding_pull_velocity" in ship:
+		ship.boarding_pull_velocity = Vector3.ZERO
+	ShipBoardingMetaHelper.clear_boarding_link_meta(ship)
 	if ship.has_method("_clear_boarding_latch"):
 		ship.call("_clear_boarding_latch")
 
@@ -111,7 +110,7 @@ static func _get_effective_boarding_distance(ship) -> float:
 	if not ship.has_method("get_collision_distance_to"):
 		return ship.max_boarding_distance
 	var contact_distance: float = float(ship.call("get_collision_distance_to", ship.boarding_target))
-	return maxf(ship.max_boarding_distance, contact_distance * 0.94)
+	return maxf(ship.max_boarding_distance, contact_distance + BOARDING_CONTACT_DISTANCE_PAD)
 
 
 static func _get_effective_break_distance(ship, effective_boarding_distance: float) -> float:
@@ -120,7 +119,7 @@ static func _get_effective_break_distance(ship, effective_boarding_distance: flo
 	if not ship.has_method("get_collision_distance_to"):
 		return ship.boarding_break_distance
 	var contact_distance: float = float(ship.call("get_collision_distance_to", ship.boarding_target))
-	return maxf(ship.boarding_break_distance, maxf(effective_boarding_distance + 1.8, contact_distance + 1.2))
+	return maxf(ship.boarding_break_distance, maxf(effective_boarding_distance + 1.8, contact_distance + BOARDING_BREAK_DISTANCE_PAD))
 
 
 static func transfer_one_soldier(ship) -> void:
@@ -136,7 +135,7 @@ static func transfer_one_soldier(ship) -> void:
 	var attackers_on_target_deck = 0
 	if target_soldiers_node:
 		for child in target_soldiers_node.get_children():
-			if child.has_method("is_dead") and child.is_dead():
+			if SoldierStateHelper.is_dead_soldier(child):
 				continue
 			if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 				defenders_alive += 1
@@ -153,7 +152,7 @@ static func transfer_one_soldier(ship) -> void:
 		var enemy_count_on_deck = 0
 		var ally_count_on_deck = 0
 		for child in soldiers:
-			if not (child.has_method("is_dead") and child.is_dead()):
+			if SoldierStateHelper.is_alive_soldier(child):
 				if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 					enemy_count_on_deck += 1
 				else:
@@ -166,20 +165,23 @@ static func transfer_one_soldier(ship) -> void:
 		if team_prop == "enemy" and ally_count_on_deck <= 1:
 			return
 
+		var nearest_boarder_distance_sq: float = INF
 		for child in soldiers:
-			if not (child.has_method("is_dead") and child.is_dead()) and child.has_method("get_team_tag") and child.get_team_tag() == team_prop:
-				s = child
-				break
+			if SoldierStateHelper.is_alive_soldier(child) and child.has_method("get_team_tag") and child.get_team_tag() == team_prop:
+				if not (child is Node3D):
+					continue
+				var distance_sq: float = (child as Node3D).global_position.distance_squared_to(ship.boarding_target.global_position)
+				if distance_sq < nearest_boarder_distance_sq:
+					nearest_boarder_distance_sq = distance_sq
+					s = child
 
 	if s:
 		var start_global = s.global_position
-		if "_is_jumping" in s:
-			s.set("_is_jumping", true)
-		_set_soldier_boarding_status(s, "boarding")
+		_begin_soldier_boarding_jump_pose(s, "boarding")
 		s.reparent(target_soldiers_node, true)
 		s.global_position = start_global
 
-		var jump_offset := _get_random_deck_landing_local(ship.boarding_target)
+		var jump_offset := _get_nearest_deck_landing_local(ship.boarding_target, start_global)
 		var start_local_pos: Vector3 = s.position
 		var horiz_dist: float = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
 		var jump_height: float = maxf(2.0, horiz_dist * 0.32)
@@ -227,17 +229,32 @@ static func transfer_one_soldier(ship) -> void:
 
 
 static func _get_random_deck_landing_local(target_ship: Node3D) -> Vector3:
-	var target_half_ext = Vector2(1.0, 1.5)
-	if target_ship.has_method("get_deck_half_extents"):
-		var ext = target_ship.call("get_deck_half_extents")
-		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
-			target_half_ext = ext
-	var target_deck_h = target_ship.get("deck_height") if "deck_height" in target_ship else 0.5
+	var target_half_ext := _get_target_deck_half_extents(target_ship)
+	var target_deck_h := _get_target_deck_height(target_ship)
 	return Vector3(
 		randf_range(-target_half_ext.x, target_half_ext.x),
 		target_deck_h,
 		randf_range(-target_half_ext.y, target_half_ext.y)
 	)
+
+
+static func _get_nearest_deck_landing_local(target_ship: Node3D, approach_global: Vector3) -> Vector3:
+	var target_half_ext := _get_target_deck_half_extents(target_ship)
+	var target_deck_h := _get_target_deck_height(target_ship)
+	var approach_local: Vector3 = target_ship.to_local(approach_global)
+	var inset_x := minf(BOARDING_LANDING_INSET, maxf(0.0, target_half_ext.x - 0.05))
+	var inset_z := minf(BOARDING_LANDING_INSET, maxf(0.0, target_half_ext.y - 0.05))
+	var outside_x := absf(approach_local.x) > target_half_ext.x
+	var outside_z := absf(approach_local.z) > target_half_ext.y
+
+	var landing_x := clampf(approach_local.x, -target_half_ext.x + inset_x, target_half_ext.x - inset_x)
+	var landing_z := clampf(approach_local.z, -target_half_ext.y + inset_z, target_half_ext.y - inset_z)
+	if outside_x:
+		landing_x = (target_half_ext.x - inset_x) * (1.0 if approach_local.x >= 0.0 else -1.0)
+	if outside_z:
+		landing_z = (target_half_ext.y - inset_z) * (1.0 if approach_local.z >= 0.0 else -1.0)
+
+	return Vector3(landing_x, target_deck_h, landing_z)
 
 
 static func _finish_transfer_landing(soldier_id: int, target_ship_id: int, landing_local: Vector3) -> void:
@@ -247,23 +264,30 @@ static func _finish_transfer_landing(soldier_id: int, target_ship_id: int, landi
 	var target_ship = instance_from_id(target_ship_id)
 	if is_instance_valid(target_ship):
 		soldier.position = _clamp_deck_landing_local(target_ship as Node3D, landing_local)
-	if "_is_jumping" in soldier:
-		soldier.set("_is_jumping", false)
-	_set_soldier_boarding_status(soldier, "on_deck")
+	_finish_soldier_boarding_jump_pose(soldier, "on_deck")
 
 
 static func _clamp_deck_landing_local(target_ship: Node3D, landing_local: Vector3) -> Vector3:
-	var target_half_ext = Vector2(1.0, 1.5)
-	if target_ship.has_method("get_deck_half_extents"):
-		var ext = target_ship.call("get_deck_half_extents")
-		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
-			target_half_ext = ext
-	var target_deck_h = target_ship.get("deck_height") if "deck_height" in target_ship else 0.5
+	var target_half_ext := _get_target_deck_half_extents(target_ship)
+	var target_deck_h := _get_target_deck_height(target_ship)
 	return Vector3(
 		clampf(landing_local.x, -target_half_ext.x, target_half_ext.x),
 		target_deck_h,
 		clampf(landing_local.z, -target_half_ext.y, target_half_ext.y)
 	)
+
+
+static func _get_target_deck_half_extents(target_ship: Node3D) -> Vector2:
+	var target_half_ext = Vector2(1.0, 1.5)
+	if target_ship.has_method("get_deck_half_extents"):
+		var ext = target_ship.call("get_deck_half_extents")
+		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
+			target_half_ext = ext
+	return target_half_ext
+
+
+static func _get_target_deck_height(target_ship: Node3D) -> float:
+	return float(target_ship.get("deck_height")) if target_ship.get("deck_height") != null else 0.5
 
 
 static func _find_nearest_hostile_soldier(boarder: Node3D, target_ship: Node3D, boarder_team: String) -> Node3D:
@@ -283,7 +307,7 @@ static func _find_nearest_hostile_soldier(boarder: Node3D, target_ship: Node3D, 
 			continue
 		if not (other is Node3D):
 			continue
-		if other.has_method("is_dead_soldier") and other.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(other):
 			continue
 		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
 		if other_team == boarder_team:
@@ -303,3 +327,25 @@ static func _set_soldier_boarding_status(soldier, status: String) -> void:
 		soldier.call("set_boarding_status", status)
 	elif soldier.has_method("set_meta"):
 		soldier.set_meta("boarding_status", status)
+
+
+static func _begin_soldier_boarding_jump_pose(soldier, status: String) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if soldier.has_method("begin_boarding_jump_pose"):
+		soldier.call("begin_boarding_jump_pose", status)
+		return
+	if "_is_jumping" in soldier:
+		soldier.set("_is_jumping", true)
+	_set_soldier_boarding_status(soldier, status)
+
+
+static func _finish_soldier_boarding_jump_pose(soldier, status: String) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if soldier.has_method("finish_boarding_jump_pose"):
+		soldier.call("finish_boarding_jump_pose", status)
+		return
+	if "_is_jumping" in soldier:
+		soldier.set("_is_jumping", false)
+	_set_soldier_boarding_status(soldier, status)

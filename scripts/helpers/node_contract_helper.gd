@@ -1,6 +1,8 @@
 extends RefCounted
 class_name NodeContractHelper
 
+const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+
 static func get_team_tag(node: Node, fallback: String = "") -> String:
 	if not is_instance_valid(node):
 		return fallback
@@ -66,6 +68,29 @@ static func get_owned_ship_node(node: Node) -> Node3D:
 	return null
 
 
+static func get_projectile_aim_point(node: Node, vertical_offset: float = 0.5) -> Vector3:
+	if not is_instance_valid(node) or not (node is Node3D):
+		return Vector3.ZERO
+	if node.has_method("get_projectile_aim_point"):
+		return node.call("get_projectile_aim_point", vertical_offset)
+
+	var node_3d := node as Node3D
+	var aim_point := node_3d.global_position
+	if node_3d.is_in_group("soldiers") or node.has_method("is_dead_soldier"):
+		aim_point.y += maxf(0.0, vertical_offset)
+		return aim_point
+
+	if node.get("deck_height") != null or node.get("hull_hp") != null or node.has_method("get_hull_hp_value"):
+		var deck_height_value := 0.4
+		if node.get("deck_height") != null:
+			deck_height_value = float(node.get("deck_height"))
+		aim_point.y += maxf(0.55, deck_height_value + maxf(0.0, vertical_offset))
+		return aim_point
+
+	aim_point.y += maxf(0.0, vertical_offset)
+	return aim_point
+
+
 static func get_boarding_target_ship(node: Node) -> Node3D:
 	if not is_instance_valid(node):
 		return null
@@ -127,10 +152,4 @@ static func get_collision_length_multiplier_value(node: Node) -> float:
 
 
 static func is_player_controlled_ship(node: Node) -> bool:
-	if not is_instance_valid(node):
-		return false
-	if node.has_method("is_player_controlled_ship"):
-		return node.is_player_controlled_ship()
-	if "is_player_controlled" in node:
-		return node.get("is_player_controlled") == true
-	return false
+	return ShipAllyRoleHelper.is_player_flagship(node)

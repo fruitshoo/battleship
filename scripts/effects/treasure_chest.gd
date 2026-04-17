@@ -1,11 +1,12 @@
 extends Node3D
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
 
 ## 보물 상자 (Treasure Chest)
 ## 플레이어가 닿으면 특별한 업그레이드 보상을 제공
 
-@export var collection_range: float = 7.0
+@export var collection_range: float = 0.85
 @export var magnet_range: float = 18.0
 @export var magnet_speed: float = 12.0
 
@@ -34,19 +35,15 @@ func _process(delta: float) -> void:
 	var p := _get_target_player()
 	if not is_instance_valid(p):
 		return
-	var flat_position := Vector3(global_position.x, 0.0, global_position.z)
-	var player_position := Vector3(p.global_position.x, 0.0, p.global_position.z)
-	var dist: float = flat_position.distance_to(player_position)
-	var effective_collection_range: float = _get_effective_collection_range(p)
+	var edge_distance: float = FieldItemHelper.get_ship_edge_distance(self, p)
+	var effective_collection_range: float = collection_range
 	var effective_magnet_range: float = maxf(magnet_range + _get_collection_radius_bonus(), effective_collection_range + 5.0)
 	_update_collection_hint_visual(effective_magnet_range)
-	if dist <= effective_collection_range:
+	if edge_distance <= effective_collection_range:
 		_collect()
-	elif dist <= effective_magnet_range:
-		var pull_speed: float = magnet_speed + (effective_magnet_range - dist) * 0.55
-		var next_flat_position := flat_position.move_toward(player_position, pull_speed * delta)
-		global_position.x = next_flat_position.x
-		global_position.z = next_flat_position.z
+	elif edge_distance <= effective_magnet_range:
+		var pull_speed: float = magnet_speed + (effective_magnet_range - maxf(edge_distance, 0.0)) * 0.55
+		FieldItemHelper.move_item_toward_ship_side_anchor(self, p, pull_speed * delta)
 
 func _collect() -> void:
 	_is_collected = true
@@ -76,17 +73,7 @@ func _get_target_player() -> Node3D:
 
 
 func _get_effective_collection_range(player_ship: Node3D) -> float:
-	var hull_bonus: float = 3.0
-	if is_instance_valid(player_ship):
-		if player_ship.has_method("get_deck_half_extents"):
-			var deck_ext: Variant = player_ship.call("get_deck_half_extents")
-			if deck_ext is Vector2:
-				hull_bonus = maxf(hull_bonus, maxf(deck_ext.x, deck_ext.y * 0.45))
-		elif player_ship.has_method("get_collision_half_extents"):
-			var collision_ext: Variant = player_ship.call("get_collision_half_extents")
-			if collision_ext is Vector2:
-				hull_bonus = maxf(hull_bonus, maxf(collision_ext.x, collision_ext.y * 0.45))
-	return collection_range + hull_bonus + _get_collection_radius_bonus()
+	return collection_range if is_instance_valid(player_ship) else INF
 
 
 func _get_collection_radius_bonus() -> float:

@@ -662,16 +662,36 @@ func _toggle_collision_visualizers() -> void:
 			node.call("_refresh_visibility")
 	print("[DEBUG] 충돌 시각화: %s" % ("ON" if _debug_collision_visuals_enabled else "OFF"))
 
-func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_offset: float) -> void:
+func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_offset: float, authoring_meta: Variant = null) -> void:
 	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_ship"):
 		return
-	enemy_spawner.debug_spawn_ship(ship_type_name, distance, lateral_offset)
+	enemy_spawner.debug_spawn_ship(ship_type_name, distance, lateral_offset, authoring_meta)
 
 
 func _debug_spawn_fleet(fleet_class: String) -> void:
 	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_fleet"):
 		return
 	enemy_spawner.debug_spawn_fleet(fleet_class)
+
+
+func _debug_spawn_recipe(recipe_name: String, authoring_meta: Variant = null) -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_recipe"):
+		return
+	enemy_spawner.debug_spawn_recipe(recipe_name, authoring_meta)
+
+
+func _debug_set_encounter_profile(profile_name: String) -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_set_encounter_profile"):
+		return
+	var applied: bool = bool(enemy_spawner.debug_set_encounter_profile(profile_name))
+	print("[DEBUG] encounter_profile %s: %s" % [profile_name, "OK" if applied else "FAIL"])
+
+
+func _debug_run_scenario_trigger(trigger_id: String) -> void:
+	if not enemy_spawner or not enemy_spawner.has_method("debug_run_scenario_trigger"):
+		return
+	var applied: bool = bool(enemy_spawner.debug_run_scenario_trigger(trigger_id))
+	print("[DEBUG] scenario_trigger %s: %s" % [trigger_id, "OK" if applied else "FAIL"])
 
 
 func _debug_spawn_mid_boss() -> void:

@@ -4,8 +4,12 @@ const RAID_SWITCH_BUFFER: float = 2.0
 const RAID_LARGE_TARGET_EDGE_BUFFER: float = 1.45
 const RAID_LARGE_TARGET_ALONG_BUFFER: float = 1.0
 const RAID_MAX_ACTIVE_THREATS: int = 1
-const AUTO_RAID_BOARDING_PURPOSE := "auto_raid"
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
+const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const AUTO_RAID_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_AUTO_RAID
 
 static func get_desired_player_captain_count(ship) -> int:
 	return clampi(int(ship.captain_count), 0, maxi(0, int(ship.max_crew_count)))
@@ -54,6 +58,7 @@ static func get_soldier_role(ship, soldier: Node) -> String:
 	return str(soldier.get_meta("crew_role", ship.CREW_ROLE_GENERAL))
 
 static func spawn_player_soldier(ship, soldiers_node: Node, role: String, captain: bool = false) -> Node:
+	var spawn_transform := _get_next_player_crew_spawn_transform(ship, soldiers_node)
 	var soldier = ship.SOLDIER_SCENE.instantiate()
 	soldiers_node.add_child(soldier)
 	soldier.set_team("player")
@@ -62,8 +67,7 @@ static func spawn_player_soldier(ship, soldiers_node: Node, role: String, captai
 	else:
 		soldier.set_meta("crew_role", role)
 	set_captain_state(ship, soldier, captain)
-	var offset = Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.5, 2.5))
-	soldier.position = offset
+	soldier.transform = spawn_transform
 	if is_instance_valid(ship._cached_um) and ship._cached_um.has_method("_apply_current_stats_to_soldier"):
 		ship._cached_um._apply_current_stats_to_soldier(soldier)
 	return soldier
@@ -77,10 +81,10 @@ static func get_player_roster_count(ship) -> int:
 			continue
 		elif not child.has_method("is_player_team_soldier") and str(child.get("team")) != "player":
 			continue
-		var is_incapacitated: bool = child.has_method("is_incapacitated_soldier") and child.is_incapacitated_soldier()
+		var is_incapacitated: bool = SoldierStateHelper.is_incapacitated_soldier(child)
 		if is_incapacitated:
 			count += 1
-		elif child.has_method("is_dead_soldier") and not child.is_dead_soldier():
+		elif SoldierStateHelper.is_alive_soldier(child):
 			count += 1
 	return count
 
@@ -88,6 +92,7 @@ static func sync_player_crew_roster(ship) -> void:
 	var soldiers_node = ship.get_node_or_null("Soldiers")
 	if not soldiers_node:
 		return
+	_apply_initial_crew_slot_layout(ship, soldiers_node)
 	var desired = get_desired_player_crew_roles(ship)
 	var desired_captains: int = get_desired_player_captain_count(ship)
 	var alive_captains: Array = []
@@ -99,7 +104,7 @@ static func sync_player_crew_roster(ship) -> void:
 		ship.CREW_ROLE_SINGIGEON: [],
 	}
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
 			continue
@@ -156,9 +161,9 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 			continue
 		elif not child.has_method("is_player_team_soldier") and str(child.get("team")) == "player":
 			continue
-		if child.has_method("is_incapacitated_soldier") and child.is_incapacitated_soldier():
+		if SoldierStateHelper.is_incapacitated_soldier(child):
 			continue
-		elif child.has_method("is_dead_soldier") and not child.is_dead_soldier():
+		elif SoldierStateHelper.is_alive_soldier(child):
 			continue
 		else:
 			child.queue_free()
@@ -174,7 +179,7 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 	}
 	var current_captains: int = 0
 	for child in soldiers:
-		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
 			continue
@@ -220,6 +225,35 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 static func _get_crew_add_log_tag(source: String) -> String:
 	return "Rescue" if source == "survivor" else "Crew"
 
+
+static func _apply_initial_crew_slot_layout(ship, soldiers_node: Node) -> void:
+	if ship.get_meta("crew_slots_layout_applied", false) == true:
+		return
+	var soldiers_node_3d := soldiers_node as Node3D
+	var ship_3d := ship as Node3D
+	if not is_instance_valid(soldiers_node_3d) or not is_instance_valid(ship_3d):
+		return
+	var slot_transforms := ShipAuthoringHelper.get_crew_slot_transforms(ship_3d, soldiers_node_3d)
+	if slot_transforms.is_empty():
+		return
+	ship.set_meta("crew_slots_layout_applied", true)
+	var crew_nodes: Array[Node3D] = []
+	for child in soldiers_node.get_children():
+		var crew_node := child as Node3D
+		if is_instance_valid(crew_node):
+			crew_nodes.append(crew_node)
+	for index in range(mini(crew_nodes.size(), slot_transforms.size())):
+		crew_nodes[index].transform = slot_transforms[index]
+
+
+static func _get_next_player_crew_spawn_transform(ship, soldiers_node: Node) -> Transform3D:
+	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.5, 2.5)))
+	var soldiers_node_3d := soldiers_node as Node3D
+	var ship_3d := ship as Node3D
+	if not is_instance_valid(soldiers_node_3d) or not is_instance_valid(ship_3d):
+		return fallback
+	return ShipAuthoringHelper.get_least_occupied_crew_slot_transform(ship_3d, soldiers_node_3d, fallback)
+
 static func update_fire_pot_logic(ship, delta: float) -> void:
 	if ship.is_sinking or ship.is_dying or ship.hull_hp <= 0.0:
 		return
@@ -246,7 +280,7 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 
 	var tosser = null
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
-		if child.has_method("is_dead_soldier") and child.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		if child.has_method("is_player_team_soldier") and not child.is_player_team_soldier():
 			continue
@@ -267,10 +301,9 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 	ship.fire_pot_cooldown_timer = cd
 
 	var pot = ship.ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
-	var target_pos = target.global_position
+	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
 	target_pos.x += randf_range(-1.2, 1.2)
 	target_pos.z += randf_range(-1.2, 1.2)
-	target_pos.y += 0.5
 
 	var start_pos = tosser.global_position
 	start_pos.y += 1.0
@@ -293,7 +326,7 @@ static func update_auto_boarding_raid(ship, delta: float) -> void:
 		_cancel_auto_raid_boarding_link(ship)
 		ship.auto_raid_target = null
 		return
-	var is_auto_raid_boarding: bool = ship.is_boarding and str(ship.get_meta("boarding_purpose", "")) == AUTO_RAID_BOARDING_PURPOSE
+	var is_auto_raid_boarding: bool = ship.is_boarding and ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE)
 	if ship.is_sinking or ship.is_dying or (ship.is_boarding and not is_auto_raid_boarding):
 		_recall_raid_boarders(ship)
 		_cancel_auto_raid_boarding_link(ship)
@@ -475,26 +508,26 @@ static func _dispatch_raid_boarders(ship, target_ship: Node3D) -> void:
 static func _ensure_auto_raid_boarding_link(ship, target_ship: Node3D) -> void:
 	if not is_instance_valid(ship) or not is_instance_valid(target_ship):
 		return
-	if ship.is_boarding and ship.get_boarding_target_ship() == target_ship and str(ship.get_meta("boarding_purpose", "")) == AUTO_RAID_BOARDING_PURPOSE:
+	if ship.is_boarding and ship.get_boarding_target_ship() == target_ship and ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE):
 		return
 	if ship.is_boarding:
-		if str(ship.get_meta("boarding_purpose", "")) != AUTO_RAID_BOARDING_PURPOSE:
+		if not ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE):
 			return
 		_cancel_auto_raid_boarding_link(ship)
 
 	ship.is_boarding = true
 	ship.boarding_target = target_ship
-	ship.set_meta("boarding_purpose", AUTO_RAID_BOARDING_PURPOSE)
-	ship.set_meta("boarding_transfer_suppressed", true)
+	ShipBoardingMetaHelper.set_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE)
+	ShipBoardingMetaHelper.set_transfer_suppressed(ship, true)
 	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(target_ship):
-		ship.set_meta("boarding_contact_mode", "side")
+		ShipBoardingMetaHelper.set_contact_mode(ship, ShipBoardingMetaHelper.CONTACT_SIDE)
 	else:
-		ship.set_meta("boarding_contact_mode", "cleanup")
+		ShipBoardingMetaHelper.set_contact_mode(ship, ShipBoardingMetaHelper.CONTACT_CLEANUP)
 
 	var hold_forward: Vector3 = -ship.global_transform.basis.z
 	hold_forward.y = 0.0
 	if hold_forward.length_squared() > 0.001:
-		ship.set_meta("boarding_hold_forward", hold_forward.normalized())
+		ShipBoardingMetaHelper.set_hold_forward(ship, hold_forward.normalized())
 	if target_ship.has_method("set_boarding_attacker_ship"):
 		target_ship.set_boarding_attacker_ship(ship)
 	if ship.has_method("_clear_ropes"):
@@ -504,7 +537,7 @@ static func _ensure_auto_raid_boarding_link(ship, target_ship: Node3D) -> void:
 	ship.boarding_contact_timer = 0.0
 	ship.boarding_hook_timer = 0.0
 	ship.boarding_secondary_rope_timer = 0.0
-	ship.set_meta("boarding_motion_settle_timer", 0.0)
+	ShipBoardingMetaHelper.set_motion_settle_timer(ship, 0.0)
 	if "_initial_rope_deployed" in ship:
 		ship.set("_initial_rope_deployed", false)
 	if "_full_rope_deployed" in ship:
@@ -514,21 +547,21 @@ static func _ensure_auto_raid_boarding_link(ship, target_ship: Node3D) -> void:
 static func _cancel_auto_raid_boarding_link(ship) -> void:
 	if not is_instance_valid(ship):
 		return
-	if str(ship.get_meta("boarding_purpose", "")) != AUTO_RAID_BOARDING_PURPOSE:
+	if not ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE):
 		return
 	if ship.has_method("_cancel_boarding"):
 		ship._cancel_boarding()
 		return
 	ship.is_boarding = false
 	ship.boarding_target = null
-	ship.remove_meta("boarding_purpose")
-	ship.remove_meta("boarding_transfer_suppressed")
+	ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_PURPOSE)
+	ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_TRANSFER_SUPPRESSED)
 
 
 static func _has_auto_raid_boarding_rope_ready(ship, target_ship: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(target_ship):
 		return false
-	if str(ship.get_meta("boarding_purpose", "")) != AUTO_RAID_BOARDING_PURPOSE:
+	if not ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE):
 		return false
 	if not ship.is_boarding or ship.get_boarding_target_ship() != target_ship:
 		return false
@@ -556,7 +589,7 @@ static func _recall_raid_boarders(ship, target_ship: Node3D = null) -> void:
 			continue
 		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
@@ -573,7 +606,7 @@ static func _recall_raid_boarders(ship, target_ship: Node3D = null) -> void:
 static func _count_enemy_boarders_on_ship(ship) -> int:
 	var count: int = 0
 	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("is_enemy_team_soldier") and soldier.is_enemy_team_soldier():
 			count += 1
@@ -583,7 +616,7 @@ static func _count_enemy_boarders_on_ship(ship) -> int:
 static func _count_home_defenders(ship) -> int:
 	var count: int = 0
 	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
@@ -601,7 +634,7 @@ static func _count_boarders_from_home(ship) -> int:
 			continue
 		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
@@ -618,7 +651,7 @@ static func _get_home_boarders_on_ship(ship, target_ship: Node3D) -> Array:
 			continue
 		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("get_home_ship_node") and soldier.get_home_ship_node() != ship:
 			continue
@@ -634,7 +667,7 @@ static func _get_available_raid_boarders(ship) -> Array:
 			continue
 		if soldier.has_method("is_player_team_soldier") and not soldier.is_player_team_soldier():
 			continue
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
 			continue
@@ -675,7 +708,7 @@ static func _get_desired_boarder_count(ship, target_ship: Node3D) -> int:
 static func _count_ranged_enemies_on_ship(target_ship: Node3D) -> int:
 	var count: int = 0
 	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
-		if soldier.has_method("is_dead_soldier") and soldier.is_dead_soldier():
+		if SoldierStateHelper.is_dead_soldier(soldier):
 			continue
 		if soldier.has_method("is_enemy_team_soldier") and not soldier.is_enemy_team_soldier():
 			continue

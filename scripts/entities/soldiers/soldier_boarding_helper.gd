@@ -3,6 +3,8 @@ class_name SoldierBoardingHelper
 
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 
+const BOARDING_LANDING_INSET := 0.45
+
 
 static func try_evacuate_to_home(soldier) -> void:
 	if not is_instance_valid(soldier.home_ship) or soldier.home_ship == soldier.owned_ship:
@@ -20,16 +22,11 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 	if not target_soldiers:
 		target_soldiers = target_ship
 
-	soldier._is_jumping = true
 	var transfer_status: String = "returning" if is_instance_valid(soldier.home_ship) and target_ship == soldier.home_ship and soldier.owned_ship != target_ship else "boarding"
-	_set_boarding_status(soldier, transfer_status)
+	_begin_boarding_jump_pose(soldier, transfer_status)
 	var d_h: float = target_ship.get("deck_height") if "deck_height" in target_ship else 0.4
 	var target_half_ext: Vector2 = SoldierShipHelper.get_ship_deck_half_extents(soldier, target_ship)
-	var jump_offset := Vector3(
-		randf_range(-target_half_ext.x, target_half_ext.x),
-		d_h,
-		randf_range(-target_half_ext.y, target_half_ext.y)
-	)
+	var jump_offset := _get_nearest_deck_landing_local(target_ship, soldier.global_position, target_half_ext, d_h)
 
 	var start_glob: Vector3 = soldier.global_position
 	soldier.reparent(target_soldiers)
@@ -55,8 +52,7 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 	y_tween.finished.connect(func():
 		var jumping_soldier = instance_from_id(soldier_id)
 		if is_instance_valid(jumping_soldier):
-			jumping_soldier._is_jumping = false
-			_set_boarding_status(jumping_soldier, "on_deck")
+			_finish_boarding_jump_pose(jumping_soldier, "on_deck")
 	)
 
 	if soldier.team == "enemy" and is_instance_valid(target_ship) and target_ship.get("team") == "player":
@@ -87,6 +83,23 @@ static func teleport_to_ship(soldier, _target_ship: Node3D) -> void:
 	soldier.queue_free()
 
 
+static func _get_nearest_deck_landing_local(target_ship: Node3D, approach_global: Vector3, target_half_ext: Vector2, target_deck_h: float) -> Vector3:
+	var approach_local: Vector3 = target_ship.to_local(approach_global)
+	var inset_x := minf(BOARDING_LANDING_INSET, maxf(0.0, target_half_ext.x - 0.05))
+	var inset_z := minf(BOARDING_LANDING_INSET, maxf(0.0, target_half_ext.y - 0.05))
+	var outside_x := absf(approach_local.x) > target_half_ext.x
+	var outside_z := absf(approach_local.z) > target_half_ext.y
+
+	var landing_x := clampf(approach_local.x, -target_half_ext.x + inset_x, target_half_ext.x - inset_x)
+	var landing_z := clampf(approach_local.z, -target_half_ext.y + inset_z, target_half_ext.y - inset_z)
+	if outside_x:
+		landing_x = (target_half_ext.x - inset_x) * (1.0 if approach_local.x >= 0.0 else -1.0)
+	if outside_z:
+		landing_z = (target_half_ext.y - inset_z) * (1.0 if approach_local.z >= 0.0 else -1.0)
+
+	return Vector3(landing_x, target_deck_h, landing_z)
+
+
 static func has_active_boarding_link_between(ship_a: Node3D, ship_b: Node3D) -> bool:
 	return _ship_has_active_boarding_link_to(ship_a, ship_b) or _ship_has_active_boarding_link_to(ship_b, ship_a)
 
@@ -115,3 +128,25 @@ static func _set_boarding_status(soldier, status: String) -> void:
 		soldier.call("set_boarding_status", status)
 	elif soldier.has_method("set_meta"):
 		soldier.set_meta("boarding_status", status)
+
+
+static func _begin_boarding_jump_pose(soldier, status: String) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if soldier.has_method("begin_boarding_jump_pose"):
+		soldier.call("begin_boarding_jump_pose", status)
+		return
+	if "_is_jumping" in soldier:
+		soldier.set("_is_jumping", true)
+	_set_boarding_status(soldier, status)
+
+
+static func _finish_boarding_jump_pose(soldier, status: String) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if soldier.has_method("finish_boarding_jump_pose"):
+		soldier.call("finish_boarding_jump_pose", status)
+		return
+	if "_is_jumping" in soldier:
+		soldier.set("_is_jumping", false)
+	_set_boarding_status(soldier, status)

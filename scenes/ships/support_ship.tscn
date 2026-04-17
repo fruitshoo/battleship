@@ -1,0 +1,57 @@
+[gd_scene format=3 uid="uid://ctnqkvw72euey"]
+
+[ext_resource type="Script" path="res://scripts/entities/ships/support_ship.gd" id="1_support"]
+[ext_resource type="PackedScene" uid="uid://o87wm0hgwlmn" path="res://scenes/ships/hulls/maengseon_hull.tscn" id="2_hull"]
+[ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="3_soldier"]
+[ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="4_wake_trail"]
+[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="5_cannon"]
+[ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="6_collision_visualizer"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_proximity"]
+size = Vector3(3.4, 2.2, 7.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape_hit"]
+size = Vector3(2.8, 2, 6.4)
+
+[node name="SupportShip" type="Node3D" groups=["player"]]
+script = ExtResource("1_support")
+team = "player"
+move_speed = 4.5
+soldier_scene = ExtResource("3_soldier")
+boarders_count = 4
+initial_crew_count = 5
+cannon_scene = ExtResource("5_cannon")
+hull_scene = ExtResource("2_hull")
+preferred_soldier_type = "general"
+ship_type = "maengseon_ally"
+length_multiplier = 0.82
+width_multiplier = 0.48
+auto_fit_scale = 0.9
+floating_offset = 0.5
+max_hull_hp = 200.0
+max_crew = 7
+
+[node name="ProximityArea" type="Area3D" parent="." groups=["ship_proximity"]]
+collision_layer = 4
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea"]
+shape = SubResource("BoxShape_proximity")
+
+[node name="HitArea" type="Area3D" parent="." groups=["ship_hitbox"]]
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea"]
+shape = SubResource("BoxShape_hit")
+
+[node name="Soldiers" type="Node3D" parent="."]
+
+[node name="WakeTrail" parent="." instance=ExtResource("4_wake_trail")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 3.4)
+
+[node name="CollisionVisualizer" type="Node3D" parent="."]
+script = ExtResource("6_collision_visualizer")
+
+[connection signal="area_entered" from="ProximityArea" to="." method="_on_area_entered"]
+[connection signal="body_entered" from="ProximityArea" to="." method="_on_body_entered"]

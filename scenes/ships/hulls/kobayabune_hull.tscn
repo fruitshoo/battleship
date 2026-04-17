@@ -1,5 +1,9 @@
 [gd_scene format=3 uid="uid://bbrb610a2rv1j"]
 
+[ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="5_to7u2"]
+[ext_resource type="Texture2D" uid="uid://dfds5i3xuhjlk" path="res://assets/vfx/masks/sail_burn_mask_c.png" id="6_cplkf"]
+[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="7_wrrlu"]
+[ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
@@ -10,26 +14,62 @@ size = Vector3(1.8, 0.65, 5.6)
 [sub_resource type="StandardMaterial3D" id="Material_japan_wood"]
 albedo_color = Color(0.45, 0.3, 0.25, 1)
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gt4oh"]
+render_priority = 20
+shader = ExtResource("5_to7u2")
+shader_parameter/wave_speed = 3.0
+shader_parameter/wave_strength = 0.38
+shader_parameter/use_sail_texture = true
+shader_parameter/sail_texture = ExtResource("vertical_sail")
+shader_parameter/burn_mask_texture_c = ExtResource("6_cplkf")
+shader_parameter/use_dark_alpha_cutoff = false
+shader_parameter/dark_alpha_cutoff = 0.12
+shader_parameter/dark_alpha_softness = 0.04
+shader_parameter/sail_uv_scale = Vector2(1, 1)
+shader_parameter/sail_uv_offset = Vector2(0, 0)
+shader_parameter/swap_uv_axes = false
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/sail_damage = 0.0
+shader_parameter/burn_amount = 0.0
+shader_parameter/hole_alpha_strength = 1.0
+shader_parameter/damage_seed = 0.020060180541624874
+shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
+shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
+shader_parameter/burn_edge_emission_strength = 0.28
+shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
+shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
+shader_parameter/bottom_width_scale = 1.0
+metadata/mast_owner_id = 1398680812882042
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_m4m72"]
+top_radius = 0.05
+bottom_radius = 0.05
+height = 1.505
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q6bal"]
+albedo_color = Color(0.35, 0.2, 0.1, 1)
+roughness = 0.85
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_vs3y5"]
+size = Vector2(3, 0.5)
+subdivide_width = 8
+subdivide_depth = 5
+orientation = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_noa1c"]
+render_priority = 0
+shader = ExtResource("7_wrrlu")
+shader_parameter/use_flag_texture = false
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/wave_speed = 5.0
+shader_parameter/wave_strength = 0.25
+shader_parameter/side_drag = 1.0
+
 [node name="KobayabuneHull" type="Node3D" unique_id=640043573]
-
-[node name="Mast" parent="." unique_id=1732171799 instance=ExtResource("mast_scene")]
-sail_texture = ExtResource("vertical_sail")
-sail_uv_scale = Vector2(1, 1)
-
-[node name="MastMesh" parent="Mast" index="0" unique_id=1409497674]
-transform = Transform3D(1, 0, 0, 0, 1.4207367, 0, 0, 0, 1, 0, 4.298, 0)
-
-[node name="SailVisual" parent="Mast" index="1" unique_id=1842287473]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.543, 0)
-
-[node name="SailMesh" parent="Mast/SailVisual" index="0" unique_id=1903760530]
-transform = Transform3D(1.105, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.865, -0.3)
-
-[node name="Flag" parent="Mast/SailVisual" index="1" unique_id=85230560]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.865, 0)
-
-[node name="yardarm" parent="Mast/SailVisual" index="2" unique_id=1460797758]
-transform = Transform3D(0.4, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 0, 3.219, -0.301)
 
 [node name="Hull" type="MeshInstance3D" parent="." unique_id=1548596390]
 mesh = SubResource("BoxMesh_hull")
@@ -37,6 +77,97 @@ surface_material_override/0 = SubResource("Material_japan_wood")
 
 [node name="RudderVisual" parent="." unique_id=1622814849 instance=ExtResource("rudder_scene")]
 transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, -0.15, 2.75)
+
+[node name="Authoring" type="Node3D" parent="." unique_id=1820414183]
+script = ExtResource("authoring_visualizer")
+
+[node name="DeckArea" type="Node3D" parent="Authoring" unique_id=1927403403]
+
+[node name="CannonSlots" type="Node3D" parent="Authoring" unique_id=465532852]
+
+[node name="CannonFront" type="Marker3D" parent="Authoring/CannonSlots" unique_id=475245366]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, -2.55)
+
+[node name="CannonLeft" type="Marker3D" parent="Authoring/CannonSlots" unique_id=1657181576]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -0.75, 0.55, -0.2)
+
+[node name="CannonRight" type="Marker3D" parent="Authoring/CannonSlots" unique_id=88791667]
+transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 0.75, 0.55, -0.2)
+
+[node name="BoardingAnchors" type="Node3D" parent="Authoring" unique_id=1012529382]
+
+[node name="RightForward" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=95905308]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.85, -1.8)
+
+[node name="RightMid" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=316576597]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.05, 0.85, 0)
+
+[node name="RightRear" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1605933498]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.85, 1.8)
+
+[node name="LeftForward" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=419105498]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.85, -1.8)
+
+[node name="LeftMid" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=779834470]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.05, 0.85, 0)
+
+[node name="LeftRear" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=906570605]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.85, 1.8)
+
+[node name="Bow" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=776913888]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -2.85)
+
+[node name="Stern" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1760246541]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 2.85)
+
+[node name="CrewSlots" type="Node3D" parent="Authoring" unique_id=1220269352]
+
+[node name="CrewForwardLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1529333389]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0.45, -1.55)
+
+[node name="CrewForwardRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=2135428550]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.45, -1.55)
+
+[node name="CrewMidLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1997242552]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 0.45, -0.1)
+
+[node name="CrewMidRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=998248320]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.45, -0.1)
+
+[node name="CrewRearLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1901592267]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0.45, 1.35)
+
+[node name="CrewRearRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1649866962]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.45, 1.35)
+
+[node name="Mast" parent="." unique_id=1732171799 instance=ExtResource("mast_scene")]
+sail_texture = ExtResource("vertical_sail")
+sail_uv_scale = Vector2(1, 1)
+
+[node name="MastMesh" parent="Mast" index="0" unique_id=1409497674]
+transform = Transform3D(1, 0, 0, 0, 1.205, 0, 0, 0, 1, 0, 5, 0)
+
+[node name="SailVisual" parent="Mast" index="1" unique_id=1842287473]
+transform = Transform3D(1.1879622, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.3933, 0)
+
+[node name="SailMesh" parent="Mast/SailVisual" index="0" unique_id=1903760530]
+transform = Transform3D(1.2, 0, 0, 0, 0.8, 0, 0, 0, 1, 0, 0.1557436, -0.3)
+material_override = SubResource("ShaderMaterial_gt4oh")
+
+[node name="Flag" parent="Mast/SailVisual" index="1" unique_id=85230560]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.411583, 0)
+
+[node name="Pole" parent="Mast/SailVisual/Flag" index="0" unique_id=555265591]
+mesh = SubResource("CylinderMesh_m4m72")
+surface_material_override/0 = SubResource("StandardMaterial3D_q6bal")
+
+[node name="FlagMesh" parent="Mast/SailVisual/Flag" index="1" unique_id=722299975]
+transform = Transform3D(0.8417776, 0, 3.6795267e-08, 0, 1, 0, -4.371139e-08, 0, 1, 1.2626665, 1.2550001, 0)
+mesh = SubResource("PlaneMesh_vs3y5")
+surface_material_override/0 = SubResource("ShaderMaterial_noa1c")
+
+[node name="yardarm" parent="Mast/SailVisual" index="2" unique_id=1460797758]
+transform = Transform3D(0.41443405, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 0, 3.0346785, -0.301)
 
 [editable path="Mast"]
 [editable path="Mast/SailVisual/Flag"]

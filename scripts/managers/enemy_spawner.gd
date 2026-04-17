@@ -38,6 +38,11 @@ var fleet_templates: Dictionary = {
 	"heavy": [],
 	"mixed": [],
 }
+var spawn_recipes: Dictionary = {}
+var encounter_profiles: Dictionary = {}
+var active_encounter_profile: String = ""
+var scenario_triggers: Array[Dictionary] = []
+var triggered_scenario_ids: Dictionary = {}
 var fleet_progression: Array[Dictionary] = [
 	{"start_time": 0.0, "end_time": 120.0, "light_weight": 0.8, "mixed_weight": 0.2, "heavy_weight": 0.0},
 	{"start_time": 120.0, "end_time": 300.0, "light_weight": 0.45, "mixed_weight": 0.45, "heavy_weight": 0.10},
@@ -104,6 +109,7 @@ func _ready() -> void:
 	reposition_timer = reposition_check_interval
 	elite_spawn_timer = elite_spawn_interval
 	elite_spawn_count = 0
+	triggered_scenario_ids.clear()
 	start_time = Time.get_ticks_msec()
 	_find_player()
 
@@ -111,6 +117,8 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(player):
 		_find_player()
 		return
+
+	_process_scenario_triggers()
 		
 	# 1. 적 생성 주기 관리
 	var enemies = EntityRegistry.get_ships_by_team("enemy")
@@ -252,6 +260,7 @@ func _spawn_enemy_from_template(fleet_template: Array[Dictionary], remaining_slo
 		# Main 씬에 추가
 		get_parent().add_child(enemy)
 		enemy.global_position = spawn_pos
+		EnemySpawnerFleetHelper.apply_authoring_runtime_overrides(enemy, slot_info)
 		_prime_enemy_momentum(enemy)
 		
 		# 레벨 기반 스탯 설정 (이동 속도와 HP는 함선 씬 고유 스탯을 사용하도록 수정)
@@ -347,6 +356,27 @@ func debug_spawn_fleet(fleet_class: String) -> void:
 	_spawn_enemy_from_template(fleet_template, fleet_template.size())
 
 
+func debug_spawn_recipe(recipe_name: String, authoring_meta: Variant = null) -> void:
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		return
+	var fleet_template: Array[Dictionary] = EnemySpawnerFleetHelper.pick_fleet_template_by_recipe(self, recipe_name, 99)
+	fleet_template = EnemySpawnerFleetHelper.apply_authoring_to_template(fleet_template, authoring_meta)
+	if fleet_template.is_empty():
+		push_warning("[EnemySpawner] 디버그 레시피 스폰 실패: %s" % recipe_name)
+		return
+	_spawn_enemy_from_template(fleet_template, fleet_template.size())
+
+
+func debug_set_encounter_profile(profile_name: String) -> bool:
+	return _set_encounter_profile(profile_name)
+
+
+func debug_run_scenario_trigger(trigger_id: String) -> bool:
+	return EnemySpawnerFleetHelper.run_scenario_trigger_by_id(self, trigger_id)
+
+
 func debug_spawn_final_boss() -> Node3D:
 	if not is_instance_valid(player):
 		_find_player()
@@ -393,6 +423,7 @@ func _spawn_elite_escorts(flagship_pos: Vector3) -> void:
 
 		get_parent().add_child(escort)
 		escort.global_position = escort_pos
+		EnemySpawnerFleetHelper.apply_authoring_runtime_overrides(escort, escort_info)
 		escort.look_at(player.global_position, Vector3.UP)
 		_prime_enemy_momentum(escort)
 
@@ -480,12 +511,20 @@ func _pick_weighted_fleet_class(weights: Dictionary) -> String:
 	return EnemySpawnerFleetHelper.pick_weighted_fleet_class(weights)
 
 
+func _process_scenario_triggers() -> void:
+	EnemySpawnerFleetHelper.process_scenario_triggers(self)
+
+
+func _set_encounter_profile(profile_name: String) -> bool:
+	return EnemySpawnerFleetHelper.set_encounter_profile(self, profile_name)
+
+
 func _get_elapsed_spawn_time() -> float:
 	if start_time <= 0:
 		return 0.0
 	return (Time.get_ticks_msec() - start_time) / 1000.0
 
-func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_offset: float = 0.0) -> Node3D:
+func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_offset: float = 0.0, authoring_meta: Variant = null) -> Node3D:
 	if not enemy_scene or not is_instance_valid(player):
 		return null
 
@@ -493,12 +532,14 @@ func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_of
 		"ship_type": ship_type_name,
 		"role": _infer_role_for_ship_type(ship_type_name)
 	}
+	var authoring := EnemySpawnerFleetHelper.normalize_authoring_meta(authoring_meta)
+	if not authoring.is_empty():
+		slot_info[EnemySpawnerFleetHelper.AUTHORING] = authoring
 	var debug_scene: PackedScene = _pick_enemy_scene_for_slot(slot_info)
 	if not is_instance_valid(debug_scene):
 		debug_scene = enemy_scene
 	var enemy = debug_scene.instantiate()
-	if "ship_type" in enemy:
-		enemy.ship_type = ship_type_name
+	_apply_spawn_slot_info(enemy, slot_info)
 
 	var player_forward = -player.global_transform.basis.z
 	var player_right = player_forward.cross(Vector3.UP).normalized()
@@ -507,6 +548,7 @@ func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_of
 
 	get_parent().add_child(enemy)
 	enemy.global_position = spawn_pos
+	EnemySpawnerFleetHelper.apply_authoring_runtime_overrides(enemy, slot_info)
 	enemy.look_at(player.global_position, Vector3.UP)
 	_prime_enemy_momentum(enemy)
 	print("[DEBUG] 적 테스트 소환: %s" % ship_type_name)

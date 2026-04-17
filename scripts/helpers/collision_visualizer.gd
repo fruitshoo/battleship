@@ -4,6 +4,8 @@ extends Node3D
 static var runtime_enabled: bool = false
 static var runtime_mode: int = 0
 
+@export var show_in_editor: bool = false
+
 const MODE_ALL := 0
 const MODE_BASE := 1
 const MODE_SEPARATION := 2
@@ -46,7 +48,7 @@ func _process(_delta: float) -> void:
 		_refresh_visibility()
 
 func _refresh_visibility() -> void:
-	var visible_now := Engine.is_editor_hint() or runtime_enabled
+	var visible_now := (Engine.is_editor_hint() and show_in_editor) or (not Engine.is_editor_hint() and runtime_enabled)
 	visible = visible_now
 	if is_instance_valid(_debug_mesh):
 		_debug_mesh.visible = visible_now and _is_mesh_visible(MODE_BASE)

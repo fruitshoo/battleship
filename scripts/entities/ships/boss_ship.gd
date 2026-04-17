@@ -1,6 +1,8 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
+const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -43,13 +45,7 @@ func _update_editor_hull() -> void:
 	var stats = load_ship_stats(ship_type)
 	if stats.is_empty(): return
 	
-	var type_lower = ship_type.to_lower()
-	var h_path = "res://scenes/ships/hulls/atakebune_hull.tscn"
-	if type_lower.contains("sekibune"): h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
-	elif type_lower.contains("panokseon"): h_path = "res://scenes/ships/hulls/panokseon_hull.tscn"
-	elif type_lower.contains("maengseon"): h_path = "res://scenes/ships/hulls/maengseon_hull.tscn"
-	
-	var new_hull = load(h_path)
+	var new_hull := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
 	if new_hull:
 		var inst = new_hull.instantiate()
 		inst.name = "EditorHull"
@@ -65,15 +61,14 @@ func _ready() -> void:
 				break
 		if not has_hull:
 			_update_editor_hull()
+		_cache_hull_references(self)
+		_refresh_collision_bounds_from_hull()
 		return
 
 	# JSON 데이터 로드 및 적용
 	var stats = load_ship_stats(ship_type)
 	if not stats.is_empty():
-		if stats.has("hull_hp"): max_hull_hp = stats["hull_hp"]
-		if stats.has("move_speed"): move_speed = stats["move_speed"]
-		if stats.has("tier"): tier = stats["tier"]
-		if stats.has("orbit_distance"): orbit_distance = stats["orbit_distance"]
+		ShipBlueprintHelper.apply_boss_stats(self, stats)
 		_load_crew_composition_from_stats(stats)
 		if tier == 1:
 			orbit_inward_bias = 0.42
@@ -81,8 +76,9 @@ func _ready() -> void:
 			orbit_inward_bias = 0.32
 
 	# 선체(Hull) 씬 인스턴스화 및 추가
-	if is_instance_valid(hull_scene):
-		var hull_inst = hull_scene.instantiate()
+	var runtime_hull_scene := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
+	if is_instance_valid(runtime_hull_scene):
+		var hull_inst = runtime_hull_scene.instantiate()
 		add_child(hull_inst)
 	else:
 		_update_editor_hull()
@@ -106,36 +102,45 @@ func _setup_weapons() -> void:
 	var cannons_node = Node3D.new()
 	cannons_node.name = "Cannons"
 	add_child(cannons_node)
-	
-	if tier == 1:
-		# 중간 보스: 전방 1, 좌방 1, 우방 1 (총 3문)
-		_spawn_boss_cannon(cannons_node, Vector3(0, 0.8, -5.0), 0)
-		_spawn_boss_cannon(cannons_node, Vector3(-2.8, 0.8, 0), 90)
-		_spawn_boss_cannon(cannons_node, Vector3(2.8, 0.8, 0), -90)
-	else:
-		# 최종 보스: 기존의 고화력 세팅 (좌우 각 3문 + 전방 신기전)
-		for i in range(3):
-			var z_pos = -2.0 + (i * 2.0)
-			_spawn_boss_cannon(cannons_node, Vector3(-2.8, 0.8, z_pos), 90)
-			_spawn_boss_cannon(cannons_node, Vector3(2.8, 0.8, z_pos), -90)
-			
-		# 전방 신기전 배치
-		var singigeon = singigeon_scene.instantiate()
-		add_child(singigeon)
-		singigeon.position = Vector3(0, 1.0, -5.0)
-		singigeon.team = "enemy"
-		singigeon.detection_range = 36.0
-		if singigeon.has_method("upgrade_to_level"):
-			singigeon.upgrade_to_level(3) # 최고 레벨 신기전
+	var stats := ShipBlueprintHelper.load_stats(ship_type)
+	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, ShipWeaponLoadoutHelper.get_default_boss_loadout(tier))
+	loadout = ShipWeaponLoadoutHelper.apply_authored_weapon_slots(self, cannons_node, loadout)
+	for spec in loadout:
+		match ShipWeaponLoadoutHelper.get_kind(spec):
+			ShipWeaponLoadoutHelper.KIND_CANNON:
+				_spawn_boss_cannon(cannons_node, spec)
+			ShipWeaponLoadoutHelper.KIND_SINGIGEON:
+				_spawn_boss_singigeon(spec)
 
-func _spawn_boss_cannon(container: Node, pos: Vector3, rot_y: float) -> void:
-	var c = cannon_scene.instantiate()
+func _spawn_boss_cannon(container: Node, spec: Dictionary) -> void:
+	var c = ShipWeaponLoadoutHelper.instantiate_weapon(spec, cannon_scene)
+	if not is_instance_valid(c):
+		return
+	c.name = ShipWeaponLoadoutHelper.get_node_name(spec, "BossCannon")
 	container.add_child(c)
-	c.position = pos
-	c.rotation_degrees.y = rot_y
-	c.team = "enemy"
-	c.detection_range = 23.0
-	c.detection_arc = 50.0
+	if c is Node3D:
+		var cannon_node := c as Node3D
+		cannon_node.position = ShipWeaponLoadoutHelper.get_position(spec)
+		if ShipWeaponLoadoutHelper.has_basis(spec):
+			cannon_node.rotation = ShipWeaponLoadoutHelper.get_basis(spec).get_euler()
+		else:
+			cannon_node.rotation_degrees.y = ShipWeaponLoadoutHelper.get_rotation_y(spec)
+	ShipWeaponLoadoutHelper.apply_weapon_config(c, spec, "enemy")
+
+func _spawn_boss_singigeon(spec: Dictionary) -> void:
+	var singigeon = ShipWeaponLoadoutHelper.instantiate_weapon(spec, singigeon_scene)
+	if not is_instance_valid(singigeon):
+		return
+	singigeon.name = ShipWeaponLoadoutHelper.get_node_name(spec, "BossSingigeon")
+	add_child(singigeon)
+	if singigeon is Node3D:
+		var singigeon_node := singigeon as Node3D
+		singigeon_node.position = ShipWeaponLoadoutHelper.get_position(spec)
+		if ShipWeaponLoadoutHelper.has_basis(spec):
+			singigeon_node.rotation = ShipWeaponLoadoutHelper.get_basis(spec).get_euler()
+		else:
+			singigeon_node.rotation_degrees.y = ShipWeaponLoadoutHelper.get_rotation_y(spec)
+	ShipWeaponLoadoutHelper.apply_weapon_config(singigeon, spec, "enemy")
 
 func _setup_soldiers() -> void:
 	if not soldier_scene: return
@@ -171,16 +176,7 @@ func _setup_soldiers() -> void:
 
 
 func _load_crew_composition_from_stats(stats: Dictionary) -> void:
-	crew_composition.clear()
-	var composition_variant: Variant = stats.get("crew_composition", {})
-	if typeof(composition_variant) != TYPE_DICTIONARY:
-		return
-	var composition: Dictionary = composition_variant as Dictionary
-	var ordered_types: Array[String] = ["general", "melee", "ranged", "fire_pot"]
-	for soldier_type_name in ordered_types:
-		var count: int = int(composition.get(soldier_type_name, 0))
-		for _i in range(maxi(count, 0)):
-			crew_composition.append(soldier_type_name)
+	crew_composition = ShipBlueprintHelper.build_crew_composition(stats)
 
 
 func _get_boss_soldier_spawn_points(required_count: int) -> Array[Vector3]:
@@ -333,25 +329,7 @@ func _calculate_separation() -> Vector3:
 	return force
 
 func _find_player() -> void:
-	var players = EntityRegistry.get_ships_by_team("player")
-	var closest_dist = INF
-	var closest_player = null
-	
-	for p in players:
-		if p == self: continue # 자기 자신 제외
-		if not p.get("is_sinking") and not p.get("is_dead"):
-			var dist = global_position.distance_squared_to(p.global_position)
-			var weight = 1.0
-			if p.get("is_player_controlled") == true:
-				weight = 0.8 # 본선 어그로 약간 높음
-				
-			var weighted_dist = dist * weight
-			
-			if weighted_dist < closest_dist:
-				closest_dist = weighted_dist
-				closest_player = p
-				
-	target = closest_player
+	target = ShipTargetingHelper.select_player_target_for(self)
 
 	# 타겟 갱신과 무관하게 HUD 체력바는 즉시 동기화한다.
 	_update_boss_hp_hud()
@@ -522,7 +500,7 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 	
 	var converted_count = 0
 	for child in soldiers_node.get_children():
-		if child.get("team") == "player" and child.get("current_state") != 4: # NOT DEAD
+		if child.get("team") == "player" and _is_alive_soldier_node(child):
 			# 병사 위치 저장 후 생존자 스폰
 			var spawn_pos = child.global_position
 			spawn_pos.y = 0.5 # 수면 높이
@@ -537,6 +515,10 @@ func _evacuate_player_soldiers_as_survivors() -> void:
 	
 	if converted_count > 0:
 		print("[Critical] 보함 침몰! 아군 병사 %d명이 바다로 뛰어들었습니다!" % converted_count)
+
+
+func _is_alive_soldier_node(soldier: Node) -> bool:
+	return BossSoldierStateHelper.is_alive_soldier(soldier)
 
 
 # 누수 추가/제거

@@ -1,5 +1,7 @@
 extends Node3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 ## 팔우노 (Ballista Launcher)
 ## 적 병사를 조준하여 강력한 관통 화살을 발사합니다.
@@ -55,66 +57,48 @@ func _process(delta: float) -> void:
 		return
 	
 	_target_scan_left -= delta
-	if _target_scan_left <= 0.0 or not is_instance_valid(current_target):
+	if _target_scan_left <= 0.0 or not _is_target_valid(current_target):
 		_update_target()
-		_target_scan_left = _get_target_scan_interval(is_instance_valid(current_target))
+		_target_scan_left = _get_target_scan_interval(_is_target_valid(current_target))
 	
-	if is_instance_valid(current_target):
-		# 사거리 체크
-		if global_position.distance_squared_to(current_target.global_position) > detection_range * detection_range:
-			current_target = null
-		else:
-			fire(current_target)
+	if _is_target_valid(current_target):
+		fire(current_target)
+	else:
+		current_target = null
 
 func _get_target_scan_interval(has_valid_target: bool) -> float:
-	var base_interval: float = target_scan_interval
-	if has_valid_target:
-		base_interval *= target_tracking_scan_multiplier
-	return base_interval + randf_range(0.0, 0.05)
+	return LauncherCombatHelper.get_target_scan_interval(target_scan_interval, target_tracking_scan_multiplier, has_valid_target)
 
 func _resolve_owner_ship() -> Node:
-	var node: Node = get_parent()
-	while is_instance_valid(node):
-		if node.is_in_group("ships"):
-			return node
-		if "is_sinking" in node and "is_dying" in node:
-			return node
-		node = node.get_parent()
-	return null
+	return LauncherCombatHelper.resolve_owner_ship(self)
 
 func _is_owner_combat_ready() -> bool:
 	if not is_instance_valid(_owner_ship):
 		_owner_ship = _resolve_owner_ship()
-	if not is_instance_valid(_owner_ship):
-		return true
-	if _owner_ship.has_method("are_weapons_disabled") and _owner_ship.are_weapons_disabled():
-		return false
-	if _owner_ship.has_method("is_combat_disabled") and _owner_ship.is_combat_disabled():
-		return false
-	return _owner_ship.get("deck_is_overrun") != true
+	return LauncherCombatHelper.is_owner_combat_ready(_owner_ship)
 
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
 	var min_dist_sq = detection_range * detection_range
 	
-	var enemy_team = "enemy" if team == "player" else "player"
-	var soldiers = EntityRegistry.get_soldiers_by_team("enemy" if team == "player" else "player")
+	var soldiers = EntityRegistry.get_soldiers_by_team(LauncherCombatHelper.enemy_team_tag(team))
 	
 	for s in soldiers:
-		if not is_instance_valid(s) or (s.has_method("is_dead") and s.is_dead()):
+		if not LauncherCombatHelper.is_enemy_soldier_target(s, team, self, detection_range):
 			continue
-		if s.has_method("get_team_tag") and s.get_team_tag() != enemy_team:
-			continue
-			
-		var dist_sq = global_position.distance_squared_to(s.global_position)
+		var soldier := s as Node3D
+		var dist_sq = global_position.distance_squared_to(soldier.global_position)
 		if dist_sq < min_dist_sq:
 			min_dist_sq = dist_sq
-			nearest_enemy = s
+			nearest_enemy = soldier
 	
 	current_target = nearest_enemy
 
+func _is_target_valid(target: Variant) -> bool:
+	return LauncherCombatHelper.is_enemy_soldier_target(target, team, self, detection_range)
+
 func fire(target: Node3D) -> void:
-	if not _is_owner_combat_ready() or not is_instance_valid(target):
+	if not _is_owner_combat_ready() or not _is_target_valid(target):
 		current_target = null
 		return
 	cooldown_timer = fire_cooldown * _cached_cd_mult
@@ -130,7 +114,8 @@ func fire(target: Node3D) -> void:
 	get_tree().root.add_child.call_deferred(bolt)
 	
 	# 조준 방향 (목표 병사 위치)
-	var dir = (target.global_position - spawn_pos).normalized()
+	var aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.55)
+	var dir = (aim_pos - spawn_pos).normalized()
 	if dir.length_squared() < 0.0001:
 		dir = -global_transform.basis.z
 	bolt.direction = dir

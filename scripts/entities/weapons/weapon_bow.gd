@@ -1,5 +1,6 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 const BASE_DAMAGE: float = 18.0
@@ -29,8 +30,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	spawn_pos.y += 0.8
 	
 	# 기본 타겟 위치
-	var current_target_pos = target.global_position
-	current_target_pos.y += 0.5
+	var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
 	
 	# === 예측 샷 (Predictive Aiming) ===
 	var arrow_speed = 23.0

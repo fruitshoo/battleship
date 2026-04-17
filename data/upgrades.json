@@ -271,6 +271,7 @@
 			"name": "지원함 선체",
 			"category": 5,
 			"description": "지원함 체력과 방어력",
+			"disabled": true,
 			"max_level": 5,
 			"color": "33ffcc",
 			"stats": {
