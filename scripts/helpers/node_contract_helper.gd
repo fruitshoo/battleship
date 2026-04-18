@@ -71,11 +71,11 @@ static func get_owned_ship_node(node: Node) -> Node3D:
 static func get_projectile_aim_point(node: Node, vertical_offset: float = 0.5) -> Vector3:
 	if not is_instance_valid(node) or not (node is Node3D):
 		return Vector3.ZERO
-	if node.has_method("get_projectile_aim_point"):
+	var node_3d := node as Node3D
+	if node_3d.is_inside_tree() and node.has_method("get_projectile_aim_point"):
 		return node.call("get_projectile_aim_point", vertical_offset)
 
-	var node_3d := node as Node3D
-	var aim_point := node_3d.global_position
+	var aim_point := node_3d.global_position if node_3d.is_inside_tree() else node_3d.position
 	if node_3d.is_in_group("soldiers") or node.has_method("is_dead_soldier"):
 		aim_point.y += maxf(0.0, vertical_offset)
 		return aim_point

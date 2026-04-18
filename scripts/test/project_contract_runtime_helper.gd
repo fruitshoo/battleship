@@ -1103,6 +1103,12 @@ static func _run_projectile_aim_height_contract(failures: Array[String]) -> void
 		failures.append("projectile aim point should include high ship deck height")
 	if high_aim.y <= low_aim.y + 2.0:
 		failures.append("projectile aim point should preserve vertical difference between ship classes")
+	var detached_ship := BaseShip.new()
+	detached_ship.position = Vector3(3.0, 1.0, -2.0)
+	detached_ship.deck_height = 0.8
+	var detached_aim: Vector3 = NodeContractHelper.get_projectile_aim_point(detached_ship, 0.55)
+	if absf(detached_aim.y - (detached_ship.position.y + detached_ship.deck_height + 0.55)) > 0.01:
+		failures.append("projectile aim helper should not read global_position from off-tree ships")
 
 	var soldier := Node3D.new()
 	soldier.add_to_group("soldiers")
@@ -1126,9 +1132,17 @@ static func _run_projectile_aim_height_contract(failures: Array[String]) -> void
 		failures.append("singigeon rocket homing should keep using projectile aim point")
 	if not rocket_source.contains("get_projectile_aim_point(homing_target"):
 		failures.append("singigeon rocket homing should aim at raised ship targets")
+	if not rocket_source.contains("if not ship_3d.is_inside_tree():"):
+		failures.append("singigeon rocket should ignore ship targets that left the scene tree")
+	if not rocket_source.contains("if not (node as Node3D).is_inside_tree():"):
+		failures.append("singigeon rocket should ignore soldier targets that left the scene tree")
+	var node_contract_source := FileAccess.get_file_as_string("res://scripts/helpers/node_contract_helper.gd")
+	if not node_contract_source.contains("node_3d.global_position if node_3d.is_inside_tree() else node_3d.position"):
+		failures.append("projectile aim helper should have an off-tree position fallback")
 
 	low_ship.free()
 	high_ship.free()
+	detached_ship.free()
 	soldier.free()
 
 

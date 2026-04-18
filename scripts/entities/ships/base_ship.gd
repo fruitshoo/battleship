@@ -565,7 +565,8 @@ func get_hull_hp_value() -> float:
 	return hull_hp
 
 func get_projectile_aim_point(vertical_offset: float = 0.55) -> Vector3:
-	return global_position + Vector3(0.0, maxf(0.55, deck_height + maxf(0.0, vertical_offset)), 0.0)
+	var base_position := global_position if is_inside_tree() else position
+	return base_position + Vector3(0.0, maxf(0.55, deck_height + maxf(0.0, vertical_offset)), 0.0)
 
 func get_ship_authoring_summary() -> Dictionary:
 	return ShipAuthoringHelper.build_summary(self)

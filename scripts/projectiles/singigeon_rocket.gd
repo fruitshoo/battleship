@@ -85,11 +85,13 @@ func pool_reset() -> void:
 
 	var init_dir = launch_direction
 	if init_dir.length_squared() < 0.001:
-		if is_instance_valid(target_node):
+		if _is_valid_target(target_node):
 			init_dir = NodeContractHelper.get_projectile_aim_point(target_node, 0.65) - global_position
-		elif start_pos.distance_squared_to(target_pos) > 0.01:
-			init_dir = target_pos - start_pos
 		else:
+			target_node = null
+		if init_dir.length_squared() < 0.001 and start_pos.distance_squared_to(target_pos) > 0.01:
+			init_dir = target_pos - start_pos
+		if init_dir.length_squared() < 0.001:
 			init_dir = -global_transform.basis.z
 	if init_dir.length_squared() < 0.001:
 		init_dir = Vector3.FORWARD
@@ -168,7 +170,7 @@ func _physics_process(delta: float) -> void:
 			_on_hit(hit_node)
 			return
 
-	if is_instance_valid(target_node) and _lock_on_left <= 0.0:
+	if _is_valid_target(target_node) and _lock_on_left <= 0.0:
 		var target_aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.65)
 		if global_position.distance_squared_to(target_aim_point) <= proximity_hit_radius * proximity_hit_radius:
 			_on_hit(target_node)
@@ -258,6 +260,8 @@ func _is_valid_ship_target(ship: Node) -> bool:
 	var ship_3d := ship as Node3D
 	if ship_3d.is_queued_for_deletion():
 		return false
+	if not ship_3d.is_inside_tree():
+		return false
 	if shooter and (ship_3d == shooter or ship_3d.get_parent() == shooter):
 		return false
 	if ship_3d.has_method("is_derelict_ship") and ship_3d.is_derelict_ship():
@@ -278,6 +282,8 @@ func _is_valid_soldier_target(node: Node) -> bool:
 	if not (node is CharacterBody3D):
 		return false
 	if node.is_queued_for_deletion():
+		return false
+	if not (node as Node3D).is_inside_tree():
 		return false
 	if NodeContractHelper.get_team_tag(node) != _target_group:
 		return false
