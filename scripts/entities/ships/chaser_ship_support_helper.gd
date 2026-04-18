@@ -169,7 +169,11 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 			pickup.call("configure", xp_amount, soldiers_in_pickup)
 		var angle: float = randf_range(0.0, TAU)
 		var radius: float = randf_range(0.8, 2.4 + float(index) * 0.35)
-		var spawn_pos: Vector3 = ship.global_position + Vector3(cos(angle) * radius, 0.45, sin(angle) * radius)
+		var spawn_pos: Vector3 = Vector3(
+			ship.global_position.x + cos(angle) * radius,
+			0.0,
+			ship.global_position.z + sin(angle) * radius
+		)
 		ship.get_tree().root.add_child.call_deferred(pickup)
 		pickup.set_deferred("global_position", spawn_pos)
 		spawned_count += 1

@@ -75,6 +75,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await _verify_sinking_enemy_soldier_xp_is_deferred_to_pickup(failures)
 	_verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures)
+	_verify_enemy_drifter_uses_survivor_like_field_item_tuning(failures)
 	LevelManagerRegistry.unregister_level_manager(LevelManagerRegistry.get_level_manager(get_tree()))
 	if failures.is_empty():
 		print("[EnemyDrifterXPContract] ok")
@@ -138,3 +139,29 @@ func _verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures: Arr
 	SoldierLifecycleHelper._apply_enemy_kill_rewards(soldier)
 	if lm.current_xp != 0:
 		failures.append("accounted sinking soldier granted duplicate drowned XP")
+
+
+func _verify_enemy_drifter_uses_survivor_like_field_item_tuning(failures: Array[String]) -> void:
+	var pickup := EnemyDrifterScene.instantiate()
+	if pickup == null:
+		failures.append("enemy drifter tuning contract could not instantiate pickup")
+		return
+	add_child(pickup)
+	await get_tree().process_frame
+	if absf(float(pickup.get("waterline_offset")) - -0.05) > 0.001:
+		failures.append("enemy drifter should use survivor-like waterline offset")
+	if absf(float(pickup.get("visual_waterline_offset")) - 0.22) > 0.001:
+		failures.append("enemy drifter should keep its visual near the survivor waterline")
+	if absf(float(pickup.get("base_magnet_radius")) - 8.0) > 0.001:
+		failures.append("enemy drifter should use survivor-like magnet radius")
+	if absf(float(pickup.get("magnet_speed")) - 7.5) > 0.001:
+		failures.append("enemy drifter should use survivor-like magnet speed")
+	if absf(float(pickup.get("collection_contact_margin")) - 0.7) > 0.001:
+		failures.append("enemy drifter should use survivor-like contact margin")
+	var effect_source := FileAccess.get_file_as_string("res://scripts/effects/enemy_drifter_xp.gd")
+	if not effect_source.contains("FieldItemHelper.sample_ocean_surface"):
+		failures.append("enemy drifter should share ocean surface sampling through FieldItemHelper")
+	var survivor_source := FileAccess.get_file_as_string("res://scripts/effects/survivor.gd")
+	if not survivor_source.contains("FieldItemHelper.sample_ocean_surface"):
+		failures.append("survivor should share ocean surface sampling through FieldItemHelper")
+	pickup.queue_free()

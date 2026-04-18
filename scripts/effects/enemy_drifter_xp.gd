@@ -8,13 +8,15 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var xp_amount: int = 3
 @export var soldier_count: int = 1
-@export_range(2.0, 12.0, 0.25) var base_magnet_radius: float = 5.5
-@export_range(2.0, 12.0, 0.25) var max_magnet_radius: float = 7.0
-@export_range(0.5, 12.0, 0.25) var magnet_speed: float = 4.5
-@export_range(0.5, 4.0, 0.05) var collection_contact_margin: float = 0.65
-@export_range(0.3, 4.0, 0.05) var float_speed: float = 1.25
-@export_range(0.05, 0.8, 0.05) var float_height: float = 0.18
+@export_range(2.0, 12.0, 0.25) var base_magnet_radius: float = 8.0
+@export_range(0.5, 12.0, 0.25) var magnet_speed: float = 7.5
+@export_range(0.5, 4.0, 0.05) var collection_contact_margin: float = 0.7
+@export_range(0.3, 4.0, 0.05) var float_speed: float = 1.5
+@export_range(0.05, 0.8, 0.05) var float_height: float = 0.2
 @export_range(0.1, 2.0, 0.05) var rotation_speed: float = 0.45
+@export_range(-0.5, 2.0, 0.05) var waterline_offset: float = -0.05
+@export_range(-0.5, 1.0, 0.05) var visual_waterline_offset: float = 0.22
+@export_range(0.2, 3.0, 0.05) var wave_tilt_strength: float = 0.7
 @export_range(8.0, 180.0, 1.0) var lifetime: float = 70.0
 @export_range(0.05, 0.5, 0.05) var player_search_interval: float = 0.2
 @export_range(0.03, 0.3, 0.01) var wave_sample_interval: float = 0.1
@@ -29,6 +31,7 @@ var _cached_lm: Node = null
 var _cached_um: Node = null
 var _cached_ocean: Node = null
 var _cached_wave_height: float = 0.0
+var _cached_wave_tilt := Vector2.ZERO
 var _wave_sample_timer: float = 0.0
 var _player_search_timer: float = 0.0
 var _visual_rest_scale: Vector3 = Vector3.ONE
@@ -68,8 +71,6 @@ func pool_reset() -> void:
 	_wave_sample_timer = randf_range(0.0, wave_sample_interval)
 	_float_phase = randf_range(0.0, TAU)
 	base_y = global_position.y
-	if base_y < 0.1:
-		base_y = 0.45
 	_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 	_cached_um = get_node_or_null("/root/UpgradeManager")
 	_cached_ocean = get_tree().get_first_node_in_group("ocean") if is_inside_tree() else null
@@ -77,6 +78,7 @@ func pool_reset() -> void:
 	set_deferred("monitorable", true)
 	if visual:
 		_visual_rest_scale = Vector3.ONE * (0.78 + minf(0.45, float(soldier_count - 1) * 0.12))
+		visual.position.y = visual_waterline_offset
 		visual.scale = Vector3.ZERO
 		var tween := create_tween()
 		tween.tween_property(visual, "scale", _visual_rest_scale, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -104,13 +106,14 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(target_player) and target_player.is_inside_tree():
 		var dist: float = global_position.distance_to(target_player.global_position)
 		var radius := _get_current_magnet_radius()
-		var lock_radius := radius * 1.15
+		var lock_radius := radius * 1.35
 		var within_pull_zone := dist <= radius or (current_magnet_speed > 0.1 and dist <= lock_radius)
 		if within_pull_zone:
 			var pull_target := FieldItemHelper.get_ship_side_anchor(self, target_player, false)
 			var pull_distance := global_position.distance_to(pull_target)
-			var desired_speed := magnet_speed + (7.0 / maxf(pull_distance, 1.0))
-			current_magnet_speed = move_toward(current_magnet_speed, desired_speed, 12.0 * delta)
+			var ship_speed_bonus := maxf(0.0, NodeContractHelper.get_current_speed_value(target_player)) * 0.75
+			var desired_speed := magnet_speed + ship_speed_bonus + (16.0 / maxf(pull_distance, 0.8))
+			current_magnet_speed = move_toward(current_magnet_speed, desired_speed, 24.0 * delta)
 			FieldItemHelper.move_item_toward_ship_side_anchor(self, target_player, current_magnet_speed * delta)
 			_apply_floating(delta)
 			if _is_close_enough_to_collect(target_player):
@@ -123,24 +126,38 @@ func _physics_process(delta: float) -> void:
 
 
 func _apply_floating(delta: float) -> void:
-	var target_y := base_y + sin((time_alive * float_speed) + _float_phase) * float_height
+	var bob := sin((time_alive * float_speed) + _float_phase) * float_height
+	var target_y := waterline_offset + bob
 	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
 		if _wave_sample_timer <= 0.0:
-			_cached_wave_height = float(_cached_ocean.call("get_wave_height", global_position))
+			_sample_ocean_surface()
 			_wave_sample_timer = wave_sample_interval
 		target_y += _cached_wave_height
+	else:
+		target_y = base_y + bob
 	position.y = lerp(position.y, target_y, 4.0 * delta)
 	if visual:
 		visual.rotation.y += rotation_speed * delta
-		visual.rotation.z = sin((time_alive * float_speed * 1.4) + _float_phase) * 0.12
+		var target_pitch: float = clampf(_cached_wave_tilt.y * wave_tilt_strength, -0.38, 0.38)
+		var target_roll: float = clampf(-_cached_wave_tilt.x * wave_tilt_strength, -0.38, 0.38)
+		target_pitch += sin((time_alive * float_speed * 1.7) + _float_phase) * 0.08
+		target_roll += sin((time_alive * float_speed * 1.2) + _float_phase * 0.7) * 0.12
+		visual.rotation.x = lerp_angle(visual.rotation.x, target_pitch, 5.0 * delta)
+		visual.rotation.z = lerp_angle(visual.rotation.z, target_roll, 5.0 * delta)
+
+
+func _sample_ocean_surface() -> void:
+	var sample := FieldItemHelper.sample_ocean_surface(self, _cached_ocean)
+	_cached_wave_height = float(sample.get("height", 0.0))
+	_cached_wave_tilt = sample.get("tilt", Vector2.ZERO)
 
 
 func _find_target_player() -> void:
-	target_player = FieldItemHelper.find_closest_player_ship(self, _get_current_magnet_radius(), 1.15)
+	target_player = FieldItemHelper.find_closest_player_ship(self, _get_current_magnet_radius())
 
 
 func _get_current_magnet_radius() -> float:
-	return minf(max_magnet_radius, FieldItemHelper.get_current_magnet_radius(self, base_magnet_radius, _cached_um))
+	return FieldItemHelper.get_current_magnet_radius(self, base_magnet_radius, _cached_um)
 
 
 func _on_body_entered(body: Node3D) -> void:

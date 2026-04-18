@@ -200,16 +200,9 @@ func _sample_ocean_surface() -> void:
 		_cached_wave_height = 0.0
 		_cached_wave_tilt = Vector2.ZERO
 		return
-	var center := global_position
-	var sample_distance := 0.85
-	var center_height: float = float(_cached_ocean.get_wave_height(center))
-	var right_height: float = float(_cached_ocean.get_wave_height(center + Vector3(sample_distance, 0.0, 0.0)))
-	var forward_height: float = float(_cached_ocean.get_wave_height(center + Vector3(0.0, 0.0, sample_distance)))
-	_cached_wave_height = center_height
-	_cached_wave_tilt = Vector2(
-		(right_height - center_height) / sample_distance,
-		(forward_height - center_height) / sample_distance
-	)
+	var sample := FieldItemHelper.sample_ocean_surface(self, _cached_ocean)
+	_cached_wave_height = float(sample.get("height", 0.0))
+	_cached_wave_tilt = sample.get("tilt", Vector2.ZERO)
 
 
 func _ensure_rescue_call_label() -> Label3D:

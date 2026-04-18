@@ -21,6 +21,25 @@ static func get_current_magnet_radius(item: Node, base_radius: float, cached_upg
 	return base_radius + meta_bonus
 
 
+static func sample_ocean_surface(item: Node3D, ocean: Node, sample_distance: float = 0.85) -> Dictionary:
+	if not is_instance_valid(item) or not is_instance_valid(ocean) or not ocean.has_method("get_wave_height"):
+		return {
+			"height": 0.0,
+			"tilt": Vector2.ZERO,
+		}
+	var center := item.global_position if item.is_inside_tree() else item.position
+	var center_height: float = float(ocean.call("get_wave_height", center))
+	var right_height: float = float(ocean.call("get_wave_height", center + Vector3(sample_distance, 0.0, 0.0)))
+	var forward_height: float = float(ocean.call("get_wave_height", center + Vector3(0.0, 0.0, sample_distance)))
+	return {
+		"height": center_height,
+		"tilt": Vector2(
+			(right_height - center_height) / sample_distance,
+			(forward_height - center_height) / sample_distance
+		),
+	}
+
+
 static func find_closest_player_ship(item: Node3D, search_radius: float, search_radius_multiplier: float = 1.5) -> Node3D:
 	if not is_instance_valid(item) or not item.is_inside_tree():
 		return null
