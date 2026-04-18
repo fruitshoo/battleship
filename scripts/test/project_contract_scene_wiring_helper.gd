@@ -249,6 +249,14 @@ static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]
 		failures.append("player corpse cleanup should feed carry offsets through payload definitions")
 	if not player_ship_source.contains("begin_typed_carry_payload"):
 		failures.append("player corpse cleanup should use typed carry payload definitions")
+	if not player_ship_source.contains("_capture_corpse_cleanup_pickup_pose_by_id"):
+		failures.append("player corpse cleanup should capture the corpse pickup pose at pickup time")
+	if player_ship_source.contains("var pickup_start_position: Vector3 = corpse.global_position"):
+		failures.append("player corpse cleanup should not cache pickup start global_position before the actor approaches")
+	if not player_ship_source.contains("_capture_corpse_cleanup_throw_arc_by_id"):
+		failures.append("player corpse cleanup should capture the throw arc at throw time")
+	if player_ship_source.contains("_apply_corpse_cleanup_throw_arc\").bind(corpse_id, throw_origin"):
+		failures.append("player corpse cleanup should not bind a stale throw origin before rail carry completes")
 	var approach_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", pickup_actor_position")
 	var pickup_index := player_ship_source.find("_apply_corpse_cleanup_payload_pickup")
 	var carry_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", rail_actor_position")

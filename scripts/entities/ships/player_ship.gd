@@ -34,6 +34,9 @@ const PLAYER_RUNTIME_FLOATING_OFFSET := 1.0
 const CORPSE_CLEANUP_CARRY_FORWARD_OFFSET := 0.08
 const CORPSE_CLEANUP_CARRY_SIDE_OFFSET := 0.08
 const CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET := 0.46
+const CORPSE_CLEANUP_PICKUP_START_POSITION_META := "corpse_cleanup_pickup_start_position"
+const CORPSE_CLEANUP_PICKUP_START_ROTATION_META := "corpse_cleanup_pickup_start_rotation"
+const CORPSE_CLEANUP_THROW_ARC_META := "corpse_cleanup_throw_arc"
 
 # === 러더(키) 관련 ===
 
@@ -527,12 +530,6 @@ func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
 	var rail_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, rail_stand_point)
 	var pickup_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, pickup_point, throw_target)
 	var rail_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, rail_stand_point, throw_target)
-	var throw_origin: Vector3 = _get_corpse_cleanup_throw_origin_from_actor_position(rail_stand_point, corpse, throw_target)
-	var pickup_start_position: Vector3 = corpse.global_position
-	var start_rotation: Vector3 = corpse.rotation
-	var arc_control: Vector3 = throw_origin.lerp(throw_target, 0.52)
-	arc_control.y = maxf(throw_origin.y, throw_target.y) + randf_range(1.85, 2.45)
-	var spin_rotation: Vector3 = corpse.rotation + Vector3(randf_range(1.7, 2.8), randf_range(-0.9, 0.9), randf_range(-1.8, 1.8))
 	var approach_seconds: float = _get_corpse_cleanup_walk_seconds(cleaner.global_position, pickup_point, cleaner)
 	var pickup_seconds: float = 0.22
 	var carry_seconds: float = _get_corpse_cleanup_walk_seconds(pickup_point, rail_stand_point, cleaner)
@@ -543,11 +540,12 @@ func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
 
 	var tween := create_tween()
 	tween.tween_property(cleaner, "position", pickup_actor_position, approach_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, corpse.global_position))
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_corpse_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY))
+	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_pickup_pose_by_id").bind(corpse_id))
 	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_payload_pickup").bind(corpse_id, cleaner_id, pickup_start_position, start_rotation, pickup_carry_rotation),
+		Callable(self, "_apply_corpse_cleanup_payload_pickup").bind(corpse_id, cleaner_id, pickup_carry_rotation),
 		0.0,
 		1.0,
 		pickup_seconds
@@ -561,17 +559,18 @@ func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
 		1.0,
 		carry_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, throw_target))
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_throw_target_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_THROW))
 	tween.tween_callback(Callable(self, "_finish_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_interval(windup_seconds)
+	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_throw_arc_by_id").bind(corpse_id, cleaner_id))
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_throw_arc").bind(corpse_id, throw_origin, arc_control, throw_target, start_rotation, spin_rotation),
+		Callable(self, "_apply_corpse_cleanup_throw_arc").bind(corpse_id, cleaner_id),
 		0.0,
 		1.0,
 		throw_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.finished.connect(_finish_corpse_cleanup_throw.bind(corpse_id, cleaner_id, throw_target))
+	tween.finished.connect(_finish_corpse_cleanup_throw.bind(corpse_id, cleaner_id))
 
 
 func _get_corpse_cleanup_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector3:
@@ -651,6 +650,20 @@ func _face_corpse_cleanup_actor_by_id(cleaner_id: int, look_position: Vector3) -
 		_face_corpse_cleanup_actor(cleaner as Node3D, look_position)
 
 
+func _face_corpse_cleanup_corpse_by_id(cleaner_id: int, corpse_id: int) -> void:
+	var cleaner := instance_from_id(cleaner_id)
+	var corpse := instance_from_id(corpse_id)
+	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
+		_face_corpse_cleanup_actor(cleaner as Node3D, (corpse as Node3D).global_position)
+
+
+func _face_corpse_cleanup_throw_target_by_id(cleaner_id: int, corpse_id: int) -> void:
+	var cleaner := instance_from_id(cleaner_id)
+	var corpse := instance_from_id(corpse_id)
+	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
+		_face_corpse_cleanup_actor(cleaner as Node3D, _get_corpse_cleanup_throw_target(corpse as Node3D))
+
+
 func _set_corpse_cleanup_action_by_id(cleaner_id: int, action_name: String) -> void:
 	var cleaner := instance_from_id(cleaner_id)
 	if is_instance_valid(cleaner) and cleaner is Node3D:
@@ -662,6 +675,15 @@ func _begin_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) 
 	var corpse := instance_from_id(corpse_id)
 	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
 		_begin_corpse_cleanup_carry_payload(cleaner as Node3D, corpse as Node3D)
+
+
+func _capture_corpse_cleanup_pickup_pose_by_id(corpse_id: int) -> void:
+	var corpse := instance_from_id(corpse_id)
+	if not is_instance_valid(corpse) or not (corpse is Node3D):
+		return
+	var corpse_node := corpse as Node3D
+	corpse_node.set_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META, corpse_node.global_position)
+	corpse_node.set_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META, corpse_node.rotation)
 
 
 func _begin_corpse_cleanup_carry_payload(cleaner: Node3D, corpse: Node3D) -> void:
@@ -721,12 +743,20 @@ func _get_corpse_cleanup_throw_origin_from_actor_position(actor_position: Vector
 	return origin
 
 
-func _apply_corpse_cleanup_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, start_position: Vector3, start_rotation: Vector3, target_rotation: Vector3) -> void:
+func _apply_corpse_cleanup_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, target_rotation: Vector3) -> void:
 	var corpse := instance_from_id(corpse_id)
 	var cleaner := instance_from_id(cleaner_id)
 	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
 		return
-	SoldierActionHelper.apply_carry_payload_pickup(cleaner, corpse, progress, start_position, start_rotation, target_rotation)
+	var corpse_node := corpse as Node3D
+	var start_position: Vector3 = corpse_node.get_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META, corpse_node.global_position)
+	var start_rotation: Vector3 = corpse_node.get_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META, corpse_node.rotation)
+	SoldierActionHelper.apply_carry_payload_pickup(cleaner, corpse_node, progress, start_position, start_rotation, target_rotation)
+	if progress >= 1.0:
+		if corpse_node.has_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META):
+			corpse_node.remove_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META)
+		if corpse_node.has_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META):
+			corpse_node.remove_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META)
 
 
 func _apply_corpse_cleanup_payload_follow(progress: float, corpse_id: int, cleaner_id: int, start_rotation: Vector3, target_rotation: Vector3) -> void:
@@ -737,21 +767,55 @@ func _apply_corpse_cleanup_payload_follow(progress: float, corpse_id: int, clean
 	SoldierActionHelper.apply_carry_payload_follow(cleaner, corpse, progress, start_rotation, target_rotation)
 
 
-func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, start_position: Vector3, arc_control: Vector3, throw_target: Vector3, start_rotation: Vector3, spin_rotation: Vector3) -> void:
+func _capture_corpse_cleanup_throw_arc_by_id(corpse_id: int, cleaner_id: int) -> void:
+	var corpse := instance_from_id(corpse_id)
+	var cleaner := instance_from_id(cleaner_id)
+	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
+		return
+	var corpse_node := corpse as Node3D
+	var cleaner_node := cleaner as Node3D
+	var throw_target: Vector3 = _get_corpse_cleanup_throw_target(corpse_node)
+	var throw_origin: Vector3 = _get_corpse_cleanup_throw_origin(cleaner_node, corpse_node, throw_target)
+	var start_position: Vector3 = corpse_node.global_position
+	var arc_control: Vector3 = throw_origin.lerp(throw_target, 0.52)
+	arc_control.y = maxf(maxf(start_position.y, throw_origin.y), throw_target.y) + randf_range(1.85, 2.45)
+	corpse_node.set_meta(CORPSE_CLEANUP_THROW_ARC_META, {
+		"start_position": start_position,
+		"arc_control": arc_control,
+		"throw_target": throw_target,
+		"start_rotation": corpse_node.rotation,
+		"spin_rotation": corpse_node.rotation + Vector3(randf_range(1.7, 2.8), randf_range(-0.9, 0.9), randf_range(-1.8, 1.8)),
+	})
+
+
+func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, cleaner_id: int) -> void:
 	var corpse := instance_from_id(corpse_id)
 	if not is_instance_valid(corpse) or not (corpse is Node3D):
 		return
+	var corpse_node := corpse as Node3D
+	if not corpse_node.has_meta(CORPSE_CLEANUP_THROW_ARC_META):
+		_capture_corpse_cleanup_throw_arc_by_id(corpse_id, cleaner_id)
+	var arc_data: Dictionary = corpse_node.get_meta(CORPSE_CLEANUP_THROW_ARC_META, {})
+	if arc_data.is_empty():
+		return
+	var start_position: Vector3 = arc_data.get("start_position", corpse_node.global_position)
+	var arc_control: Vector3 = arc_data.get("arc_control", start_position)
+	var throw_target: Vector3 = arc_data.get("throw_target", start_position)
+	var start_rotation: Vector3 = arc_data.get("start_rotation", corpse_node.rotation)
+	var spin_rotation: Vector3 = arc_data.get("spin_rotation", start_rotation)
 	var t: float = clampf(progress, 0.0, 1.0)
 	var eased_t: float = smoothstep(0.0, 1.0, t)
 	var arc_pos: Vector3 = start_position * ((1.0 - t) * (1.0 - t)) \
 		+ arc_control * (2.0 * (1.0 - t) * t) \
 		+ throw_target * (t * t)
-	corpse.global_position = arc_pos
-	corpse.rotation = Vector3(
+	corpse_node.global_position = arc_pos
+	corpse_node.rotation = Vector3(
 		lerp_angle(start_rotation.x, spin_rotation.x, eased_t),
 		lerp_angle(start_rotation.y, spin_rotation.y, eased_t),
 		lerp_angle(start_rotation.z, spin_rotation.z, eased_t)
 	)
+	if progress >= 1.0 and corpse_node.has_meta(CORPSE_CLEANUP_THROW_ARC_META):
+		corpse_node.remove_meta(CORPSE_CLEANUP_THROW_ARC_META)
 
 
 func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
@@ -766,11 +830,12 @@ func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
 	return global_target
 
 
-func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int, splash_pos: Vector3) -> void:
-	_play_corpse_cleanup_splash(splash_pos)
+func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
 	var corpse := instance_from_id(corpse_id)
 	var cleaner := instance_from_id(cleaner_id)
 	if is_instance_valid(corpse):
+		if corpse is Node3D:
+			_play_corpse_cleanup_splash((corpse as Node3D).global_position)
 		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
 		corpse.queue_free()
 	if is_instance_valid(cleaner):
