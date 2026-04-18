@@ -920,11 +920,11 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 		return
 	ui_layer.add_child(control_panel)
 
-	var site := Node3D.new()
-	site.name = "CompassSiteSmoke"
-	site.add_to_group("sea_site")
-	smoke_root.add_child(site)
-	site.global_position = player_ship.global_position + Vector3(0.0, 0.0, -72.0)
+	var near_site := Node3D.new()
+	near_site.name = "CompassNearSiteSmoke"
+	near_site.add_to_group("sea_site")
+	smoke_root.add_child(near_site)
+	near_site.global_position = player_ship.global_position + Vector3(3.0, 0.0, 0.0)
 	await _wait_frames(owner, 5)
 
 	var marker := control_panel.get_node_or_null("WindPanel/WindIndicator/CompassWheel/SiteMarker") as Node2D
@@ -932,8 +932,23 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 		failures.append("hud smoke compass site marker missing")
 	elif not marker.visible:
 		failures.append("hud smoke compass site marker did not become visible")
-	elif marker.position.length() <= 1.0:
-		failures.append("hud smoke compass site marker did not move toward site")
+	elif marker.position.length() > 10.0:
+		failures.append("hud smoke compass near site marker should stay near center: %.2f" % marker.position.length())
+
+	near_site.queue_free()
+	await _wait_frames(owner, 15)
+
+	var site := Node3D.new()
+	site.name = "CompassFarSiteSmoke"
+	site.add_to_group("sea_site")
+	smoke_root.add_child(site)
+	site.global_position = player_ship.global_position + Vector3(0.0, 0.0, -72.0)
+	await _wait_frames(owner, 15)
+
+	if not is_instance_valid(marker):
+		failures.append("hud smoke compass site marker missing after far site spawn")
+	elif not marker.visible:
+		failures.append("hud smoke compass far site marker did not become visible")
 	elif marker.position.length() < 48.0:
 		failures.append("hud smoke compass far site marker was not near the rim: %.2f" % marker.position.length())
 

@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/ui/hud/ship_control_ui.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/hud/wind_compass_art.gd" id="2_wind_art"]
+[ext_resource type="Texture2D" uid="uid://cword2lxgbv6o" path="res://assets/ui/hud/compass/compass_frame_ilseongjeongsiui.png" id="3_frame"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_round"]
 bg_color = Color(0.05, 0.08, 0.15, 0.8)
@@ -76,6 +77,11 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_round")
 
 [node name="Art" type="Node2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=137842191]
 script = ExtResource("2_wind_art")
+
+[node name="CompassFrame" type="Sprite2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=1686080231]
+unique_name_in_owner = true
+scale = Vector2(0.205, 0.205)
+texture = ExtResource("3_frame")
 
 [node name="SiteMarker" type="Node2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=2071370995]
 unique_name_in_owner = true

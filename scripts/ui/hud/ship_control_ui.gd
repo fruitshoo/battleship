@@ -11,6 +11,7 @@ var ship: Node3D = null
 @onready var wind_arrow: Node2D = %Arrow
 @onready var compass_wheel: Node2D = %CompassWheel
 @onready var compass_art: Node2D = %CompassWheel/Art
+@onready var compass_frame: Sprite2D = %CompassWheel/CompassFrame
 @onready var compass_background: Panel = %CompassWheel/Background
 @onready var site_marker: Node2D = %SiteMarker
 @onready var site_marker_glow: Polygon2D = %SiteMarker/Glow
@@ -35,7 +36,6 @@ var _site_marker_alpha: float = 0.0
 var _glow_phase: float = 0.0
 
 const SITE_MARKER_REFRESH_INTERVAL: float = 0.18
-const SITE_MARKER_INNER_RADIUS: float = 24.0
 const SITE_MARKER_OUTER_RADIUS: float = 64.0
 const SITE_MARKER_DISTANCE_AT_EDGE: float = 90.0
 const SITE_MARKER_FADE_SPEED: float = 5.5
@@ -80,10 +80,10 @@ func _apply_theme() -> void:
 		compass_background.add_theme_stylebox_override(
 			"panel",
 			NavalUiTheme.make_panel_style(
-				NavalUiTheme.PANEL_BG_SOFT,
-				NavalUiTheme.BORDER_GOLD_SOFT,
+				Color(0.04, 0.08, 0.12, 0.48),
+				Color(0.32, 0.24, 0.12, 0.0),
 				90,
-				2,
+				0,
 				0.0,
 				0.0,
 				0.0,
@@ -93,12 +93,12 @@ func _apply_theme() -> void:
 	if is_instance_valid(compass_art) and compass_art.has_method("set_palette"):
 		compass_art.call(
 			"set_palette",
-			Color(0.05, 0.08, 0.12, 0.12),
-			NavalUiTheme.BORDER_GOLD,
-			NavalUiTheme.BORDER_GOLD_DIM,
-			Color(0.96, 0.89, 0.71, 0.88),
-			Color(0.72, 0.64, 0.47, 0.26),
-			Color(0.76, 0.31, 0.22, 0.95),
+			Color(0.05, 0.08, 0.12, 0.0),
+			Color(0.82, 0.69, 0.42, 0.10),
+			Color(0.55, 0.47, 0.27, 0.08),
+			Color(0.96, 0.89, 0.71, 0.42),
+			Color(0.72, 0.64, 0.47, 0.08),
+			Color(0.76, 0.31, 0.22, 0.82),
 			Color(0.92, 0.84, 0.66, 0.0)
 		)
 		compass_art.set("draw_swirl", false)
@@ -152,6 +152,8 @@ func _update_wind_indicator(delta: float) -> void:
 	if compass_wheel:
 		_displayed_compass_rotation = lerp_angle(_displayed_compass_rotation, cam_yaw, minf(1.0, delta * 7.5))
 		compass_wheel.rotation = _displayed_compass_rotation
+		if is_instance_valid(compass_frame):
+			compass_frame.rotation = -_displayed_compass_rotation
 
 	var wind_dir: Vector2 = WindManager.get_wind_direction()
 	var wind_angle_rad = atan2(wind_dir.x, -wind_dir.y)
@@ -194,15 +196,13 @@ func _update_site_marker(delta: float) -> void:
 		site_marker.visible = false
 		return
 
-	var angle := atan2(offset.x, -offset.z)
-	var distance_ratio := clampf(distance / SITE_MARKER_DISTANCE_AT_EDGE, 0.0, 1.0)
-	var marker_radius := lerpf(SITE_MARKER_INNER_RADIUS, SITE_MARKER_OUTER_RADIUS, distance_ratio)
-	var target_position := Vector2(sin(angle), -cos(angle)) * marker_radius
+	var distance_ratio := _get_site_marker_distance_ratio(distance)
+	var target_position := _get_site_marker_target_position(offset)
 	if previous_site != _nearest_site or not site_marker.visible or _site_marker_alpha <= 0.01:
 		_displayed_site_marker_position = target_position
 		_site_marker_alpha = 0.0
 	else:
-		var follow_weight := minf(1.0, delta * 9.0)
+		var follow_weight := minf(1.0, delta * lerpf(18.0, 9.0, distance_ratio))
 		_displayed_site_marker_position = _displayed_site_marker_position.lerp(target_position, follow_weight)
 	site_marker.position = _displayed_site_marker_position
 	_site_marker_alpha = move_toward(_site_marker_alpha, 1.0, delta * SITE_MARKER_FADE_SPEED)
@@ -214,6 +214,25 @@ func _update_site_marker(delta: float) -> void:
 		site_marker_glow.modulate = Color(1.0, 1.0, 1.0, clampf(pulse, 0.06, 0.18))
 	if is_instance_valid(site_marker_dot):
 		site_marker_dot.modulate = Color(1.0, 1.0, 1.0, lerpf(0.82, 1.0, 1.0 - distance_ratio))
+
+
+func _get_site_marker_target_position(offset: Vector3) -> Vector2:
+	var flat_offset := offset
+	flat_offset.y = 0.0
+	var distance := flat_offset.length()
+	if distance <= 0.01:
+		return Vector2.ZERO
+	var angle := atan2(flat_offset.x, -flat_offset.z)
+	return Vector2(sin(angle), -cos(angle)) * _get_site_marker_radius(distance)
+
+
+func _get_site_marker_radius(distance: float) -> float:
+	var distance_ratio := _get_site_marker_distance_ratio(distance)
+	return SITE_MARKER_OUTER_RADIUS * smoothstep(0.0, 1.0, distance_ratio)
+
+
+func _get_site_marker_distance_ratio(distance: float) -> float:
+	return clampf(distance / SITE_MARKER_DISTANCE_AT_EDGE, 0.0, 1.0)
 
 
 func _find_nearest_site() -> Node3D:
