@@ -6,39 +6,56 @@ const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
 ## 보물 상자 (Treasure Chest)
 ## 플레이어가 닿으면 특별한 업그레이드 보상을 제공
 
-@export var collection_range: float = 0.85
-@export var magnet_range: float = 18.0
+@export var collection_range: float = 0.65
+@export var magnet_range: float = 6.0
 @export var magnet_speed: float = 12.0
+@export_range(0.3, 4.0, 0.05) var float_speed: float = 1.35
+@export_range(0.02, 0.6, 0.02) var float_height: float = 0.16
+@export_range(0.05, 2.0, 0.05) var rotation_speed: float = 0.35
+@export_range(-0.5, 2.0, 0.05) var waterline_offset: float = -0.12
+@export_range(-0.5, 1.0, 0.05) var visual_waterline_offset: float = 0.18
+@export_range(0.2, 3.0, 0.05) var wave_tilt_strength: float = 0.55
+@export_range(0.03, 0.3, 0.01) var wave_sample_interval: float = 0.1
 
 var _is_collected: bool = false
 var _target_player: Node3D = null
-var _collection_hint_visual: MeshInstance3D = null
+var base_y: float = 0.0
+var time_alive: float = 0.0
+var _cached_ocean: Node = null
+var _cached_wave_height: float = 0.0
+var _cached_wave_tilt := Vector2.ZERO
+var _wave_sample_timer: float = 0.0
+var _float_phase: float = 0.0
+
+@onready var visual: Node3D = $MeshInstance3D if has_node("MeshInstance3D") else self
 
 func _ready() -> void:
 	if _env_flag_enabled("BATTLESHIP_GAUNTLET_DISABLE_RECOVERY"):
 		queue_free()
 		return
 	add_to_group("treasure_chest")
-	_create_collection_hint_visual()
-	# 부유 효과 (Tween)
-	var tween = create_tween().set_loops()
-	tween.tween_property(self , "position:y", 0.5, 1.5).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(self , "position:y", 0.0, 1.5).set_trans(Tween.TRANS_SINE)
-	
-	# 회전 효과
-	var rot_tween = create_tween().set_loops()
-	rot_tween.tween_property(self , "rotation:y", rotation.y + TAU, 4.0)
+	base_y = global_position.y
+	time_alive = 0.0
+	_wave_sample_timer = randf_range(0.0, wave_sample_interval)
+	_float_phase = randf_range(0.0, TAU)
+	_cached_ocean = get_tree().get_first_node_in_group("ocean")
+	if visual:
+		visual.position.y = visual_waterline_offset
+		if visual is GeometryInstance3D:
+			(visual as GeometryInstance3D).extra_cull_margin = 1.0
 
 func _process(delta: float) -> void:
 	if _is_collected: return
+	time_alive += delta
+	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
+	_apply_floating(delta)
 	
 	var p := _get_target_player()
 	if not is_instance_valid(p):
 		return
 	var edge_distance: float = FieldItemHelper.get_ship_edge_distance(self, p)
 	var effective_collection_range: float = collection_range
-	var effective_magnet_range: float = maxf(magnet_range + _get_collection_radius_bonus(), effective_collection_range + 5.0)
-	_update_collection_hint_visual(effective_magnet_range)
+	var effective_magnet_range: float = _get_effective_magnet_range(p)
 	if edge_distance <= effective_collection_range:
 		_collect()
 	elif edge_distance <= effective_magnet_range:
@@ -76,46 +93,36 @@ func _get_effective_collection_range(player_ship: Node3D) -> float:
 	return collection_range if is_instance_valid(player_ship) else INF
 
 
-func _get_collection_radius_bonus() -> float:
-	var bonus: float = 0.0
-	var meta_manager = get_node_or_null("/root/MetaManager")
-	if is_instance_valid(meta_manager) and meta_manager.has_method("get_collection_radius_bonus"):
-		bonus += float(meta_manager.get_collection_radius_bonus())
-	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
-	if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("get_supply_bonus_stats"):
-		var supply_stats: Dictionary = upgrade_manager.get_supply_bonus_stats()
-		bonus += float(supply_stats.get("radius_bonus", 0.0))
-	return bonus
+func _get_effective_magnet_range(player_ship: Node3D) -> float:
+	if not is_instance_valid(player_ship):
+		return 0.0
+	return maxf(magnet_range, collection_range + 2.0)
 
 
-func _create_collection_hint_visual() -> void:
-	_collection_hint_visual = MeshInstance3D.new()
-	_collection_hint_visual.name = "CollectionHint"
-	var disk := CylinderMesh.new()
-	disk.top_radius = 1.0
-	disk.bottom_radius = 1.0
-	disk.height = 0.025
-	_collection_hint_visual.mesh = disk
-	_collection_hint_visual.position = Vector3(0.0, 0.03, 0.0)
-	_collection_hint_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_collection_hint_visual.extra_cull_margin = 24.0
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.84, 0.28, 0.12)
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.62, 0.18, 1.0)
-	mat.emission_energy_multiplier = 0.18
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.no_depth_test = true
-	_collection_hint_visual.material_override = mat
-	add_child(_collection_hint_visual)
-	_update_collection_hint_visual(magnet_range)
+func _apply_floating(delta: float) -> void:
+	var has_ocean_surface := is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height")
+	if has_ocean_surface:
+		if _wave_sample_timer <= 0.0:
+			_sample_ocean_surface()
+			_wave_sample_timer = wave_sample_interval
+	var target_y := FieldItemHelper.get_floating_waterline_target_y(
+		base_y,
+		time_alive,
+		float_speed,
+		float_height,
+		_float_phase,
+		waterline_offset,
+		_cached_wave_height,
+		has_ocean_surface
+	)
+	position.y = lerp(position.y, target_y, 4.0 * delta)
+	FieldItemHelper.apply_floating_visual_motion(visual, delta, time_alive, float_speed, _float_phase, _cached_wave_tilt, wave_tilt_strength, rotation_speed)
 
 
-func _update_collection_hint_visual(radius: float) -> void:
-	if not is_instance_valid(_collection_hint_visual):
-		return
-	var visual_radius: float = clampf(radius, collection_range, 28.0)
-	_collection_hint_visual.scale = Vector3(visual_radius, 1.0, visual_radius)
+func _sample_ocean_surface() -> void:
+	var sample := FieldItemHelper.sample_ocean_surface(self, _cached_ocean)
+	_cached_wave_height = float(sample.get("height", 0.0))
+	_cached_wave_tilt = sample.get("tilt", Vector2.ZERO)
 
 
 func _env_flag_enabled(name: String) -> bool:

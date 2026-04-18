@@ -126,24 +126,23 @@ func _physics_process(delta: float) -> void:
 
 
 func _apply_floating(delta: float) -> void:
-	var bob := sin((time_alive * float_speed) + _float_phase) * float_height
-	var target_y := waterline_offset + bob
-	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
+	var has_ocean_surface := is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height")
+	if has_ocean_surface:
 		if _wave_sample_timer <= 0.0:
 			_sample_ocean_surface()
 			_wave_sample_timer = wave_sample_interval
-		target_y += _cached_wave_height
-	else:
-		target_y = base_y + bob
+	var target_y := FieldItemHelper.get_floating_waterline_target_y(
+		base_y,
+		time_alive,
+		float_speed,
+		float_height,
+		_float_phase,
+		waterline_offset,
+		_cached_wave_height,
+		has_ocean_surface
+	)
 	position.y = lerp(position.y, target_y, 4.0 * delta)
-	if visual:
-		visual.rotation.y += rotation_speed * delta
-		var target_pitch: float = clampf(_cached_wave_tilt.y * wave_tilt_strength, -0.38, 0.38)
-		var target_roll: float = clampf(-_cached_wave_tilt.x * wave_tilt_strength, -0.38, 0.38)
-		target_pitch += sin((time_alive * float_speed * 1.7) + _float_phase) * 0.08
-		target_roll += sin((time_alive * float_speed * 1.2) + _float_phase * 0.7) * 0.12
-		visual.rotation.x = lerp_angle(visual.rotation.x, target_pitch, 5.0 * delta)
-		visual.rotation.z = lerp_angle(visual.rotation.z, target_roll, 5.0 * delta)
+	FieldItemHelper.apply_floating_visual_motion(visual, delta, time_alive, float_speed, _float_phase, _cached_wave_tilt, wave_tilt_strength, rotation_speed)
 
 
 func _sample_ocean_surface() -> void:

@@ -40,6 +40,43 @@ static func sample_ocean_surface(item: Node3D, ocean: Node, sample_distance: flo
 	}
 
 
+static func get_floating_waterline_target_y(
+	base_y: float,
+	time_alive: float,
+	float_speed: float,
+	float_height: float,
+	float_phase: float,
+	waterline_offset: float,
+	sampled_wave_height: float,
+	has_ocean_surface: bool
+) -> float:
+	var bob := sin((time_alive * float_speed) + float_phase) * float_height
+	if has_ocean_surface:
+		return waterline_offset + bob + sampled_wave_height
+	return base_y + bob
+
+
+static func apply_floating_visual_motion(
+	visual: Node3D,
+	delta: float,
+	time_alive: float,
+	float_speed: float,
+	float_phase: float,
+	wave_tilt: Vector2,
+	wave_tilt_strength: float,
+	rotation_speed: float
+) -> void:
+	if not is_instance_valid(visual):
+		return
+	visual.rotation.y += rotation_speed * delta
+	var target_pitch: float = clampf(wave_tilt.y * wave_tilt_strength, -0.38, 0.38)
+	var target_roll: float = clampf(-wave_tilt.x * wave_tilt_strength, -0.38, 0.38)
+	target_pitch += sin((time_alive * float_speed * 1.7) + float_phase) * 0.08
+	target_roll += sin((time_alive * float_speed * 1.2) + float_phase * 0.7) * 0.12
+	visual.rotation.x = lerp_angle(visual.rotation.x, target_pitch, 5.0 * delta)
+	visual.rotation.z = lerp_angle(visual.rotation.z, target_roll, 5.0 * delta)
+
+
 static func find_closest_player_ship(item: Node3D, search_radius: float, search_radius_multiplier: float = 1.5) -> Node3D:
 	if not is_instance_valid(item) or not item.is_inside_tree():
 		return null

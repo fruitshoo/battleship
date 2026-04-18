@@ -61,6 +61,11 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 	if loot is Node3D:
 		(loot as Node3D).global_position = player_ship.global_position + Vector3(1.5, 0.0, 0.0)
 	await _wait_frames(owner, 1)
+	var loot_visual := loot.get_node_or_null("Visual") as Node3D
+	if loot_visual == null:
+		failures.append("recovery loot smoke missing Visual node")
+	elif loot.get("visual_waterline_offset") != null and absf(loot_visual.position.y - float(loot.get("visual_waterline_offset"))) > 0.01:
+		failures.append("recovery loot smoke does not use its shared waterline visual offset")
 
 	var score_before: int = int(level_manager.get("current_score"))
 	var hull_before: float = float(player_ship.get("hull_hp")) if player_ship.get("hull_hp") != null else 0.0
@@ -127,17 +132,33 @@ static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smok
 		failures.append("recovery treasure smoke instantiate failed")
 		return
 	smoke_root.add_child(chest)
-	var expanded_pickup_distance: float = 8.0
+	if chest.get_node_or_null("CollectionHint") != null:
+		failures.append("recovery treasure smoke should not show a pickup range hint")
+	var chest_visual := chest.get_node_or_null("MeshInstance3D") as Node3D
+	if chest_visual == null:
+		failures.append("recovery treasure smoke missing visual mesh")
+	elif chest.get("visual_waterline_offset") != null and absf(chest_visual.position.y - float(chest.get("visual_waterline_offset"))) > 0.01:
+		failures.append("recovery treasure smoke does not use its shared waterline visual offset")
+	if chest.has_method("_get_effective_magnet_range"):
+		var effective_magnet_range: float = float(chest.call("_get_effective_magnet_range", player_ship))
+		if effective_magnet_range > 8.0:
+			failures.append("recovery treasure smoke magnet range too large: %.2f" % effective_magnet_range)
+	var collection_edge_distance: float = 0.35
 	if chest.has_method("_get_effective_collection_range"):
-		expanded_pickup_distance = maxf(5.0, float(chest.call("_get_effective_collection_range", player_ship)) - 0.5)
+		collection_edge_distance = maxf(0.1, float(chest.call("_get_effective_collection_range", player_ship)) * 0.5)
 	if chest is Node3D:
-		(chest as Node3D).global_position = player_ship.global_position + Vector3(expanded_pickup_distance, 0.0, 0.0)
+		var direction := Vector3.RIGHT
+		var ship_radius := 4.0
+		if player_ship.has_method("get_directional_collision_radius"):
+			ship_radius = float(player_ship.call("get_directional_collision_radius", direction))
+		(chest as Node3D).global_position = player_ship.global_position + direction * (ship_radius + collection_edge_distance)
 	await _wait_frames(owner, 3)
 
-	if chest.get("_is_collected") != true:
-		failures.append("recovery treasure smoke did not mark chest collected from expanded range")
-	if not chest.is_queued_for_deletion():
-		failures.append("recovery treasure smoke did not queue chest for deletion")
+	if is_instance_valid(chest):
+		if chest.get("_is_collected") != true:
+			failures.append("recovery treasure smoke did not mark chest collected from reduced range")
+		if not chest.is_queued_for_deletion():
+			failures.append("recovery treasure smoke did not queue chest for deletion")
 
 
 static func _run_drifting_supply_site_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:

@@ -15,6 +15,9 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 @export var float_speed: float = 2.0 # 둥실거리는 속도
 @export var float_height: float = 0.3 # 둥실거리는 진폭
 @export var rotation_speed: float = 1.0 # 회전 속도
+@export_range(-0.5, 2.0, 0.05) var waterline_offset: float = -0.08
+@export_range(-0.5, 1.0, 0.05) var visual_waterline_offset: float = 0.16
+@export_range(0.2, 3.0, 0.05) var wave_tilt_strength: float = 0.7
 @export var collection_contact_margin: float = 0.85
 
 var target_player: Node3D = null
@@ -26,11 +29,13 @@ var _cached_lm: Node = null
 var _cached_um: Node = null
 var _cached_ocean: Node = null
 var _cached_wave_height: float = 0.0
+var _cached_wave_tilt := Vector2.ZERO
 var _wave_sample_timer: float = 0.0
 var _visual_rest_scale: Vector3 = Vector3.ONE
 @export_range(0.03, 0.3) var wave_sample_interval: float = 0.1
 @export_range(0.05, 0.5) var player_search_interval: float = 0.2
 var _player_search_timer: float = 0.0
+var _float_phase: float = 0.0
 
 @onready var visual: Node3D = $Visual if has_node("Visual") else ($MeshInstance3D if has_node("MeshInstance3D") else self)
 
@@ -53,11 +58,10 @@ func pool_reset() -> void:
 	target_player = null
 	current_magnet_speed = 0.0
 	_player_search_timer = randf_range(0.0, player_search_interval)
+	_wave_sample_timer = randf_range(0.0, wave_sample_interval)
+	_float_phase = randf_range(0.0, TAU)
 	
 	base_y = global_position.y
-	if base_y < 0.2: base_y = 0.5
-	
-	# 초기에는 크기를 0으로 시작해서 나타남 (스폰 연출)
 	if visual:
 		_visual_rest_scale = visual.scale
 	if visual and visual is MeshInstance3D:
@@ -73,6 +77,7 @@ func pool_reset() -> void:
 			
 		# 스케일 애니메이션 적용 (투명도 버그 회피)
 	if visual:
+		visual.position.y = visual_waterline_offset
 		visual.scale = Vector3.ZERO
 		var tween = create_tween()
 		tween.tween_property(visual, "scale", _visual_rest_scale, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -134,6 +139,7 @@ func _physics_process(delta: float) -> void:
 			var desired_magnet_speed: float = magnet_speed + ship_speed_bonus + (22.0 / max(pull_distance, 0.8))
 			current_magnet_speed = move_toward(current_magnet_speed, desired_magnet_speed, 28.0 * delta)
 			FieldItemHelper.move_item_toward_ship_side_anchor(self, target_player, current_magnet_speed * delta)
+			_apply_floating(delta)
 			
 			# 근거리 자동 획득 (충돌 미감지 보완)
 			if FieldItemHelper.is_item_close_to_ship_edge(self, target_player, collection_contact_margin):
@@ -161,20 +167,29 @@ func _expire_and_free() -> void:
 func _apply_floating(delta: float) -> void:
 	if not is_inside_tree():
 		return
-	var target_y = base_y + sin(time_alive * float_speed) * float_height
-	
-	if is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height"):
+	var has_ocean_surface := is_instance_valid(_cached_ocean) and _cached_ocean.has_method("get_wave_height")
+	if has_ocean_surface:
 		if _wave_sample_timer <= 0.0:
-			_cached_wave_height = _cached_ocean.get_wave_height(global_position)
+			_sample_ocean_surface()
 			_wave_sample_timer = wave_sample_interval
-		target_y += _cached_wave_height
-		
-	# lerp를 사용하여 부드럽게 파도와 기본 높이를 따라감
+	var target_y := FieldItemHelper.get_floating_waterline_target_y(
+		base_y,
+		time_alive,
+		float_speed,
+		float_height,
+		_float_phase,
+		waterline_offset,
+		_cached_wave_height,
+		has_ocean_surface
+	)
 	position.y = lerp(position.y, target_y, 5.0 * delta)
-	
-	if visual:
-		visual.rotation.y += rotation_speed * delta
-		visual.rotation.z = sin(time_alive * float_speed * 1.5) * 0.1 # 살짝 갸우뚱
+	FieldItemHelper.apply_floating_visual_motion(visual, delta, time_alive, float_speed, _float_phase, _cached_wave_tilt, wave_tilt_strength, rotation_speed)
+
+
+func _sample_ocean_surface() -> void:
+	var sample := FieldItemHelper.sample_ocean_surface(self, _cached_ocean)
+	_cached_wave_height = float(sample.get("height", 0.0))
+	_cached_wave_tilt = sample.get("tilt", Vector2.ZERO)
 
 
 func _find_target_player() -> void:
