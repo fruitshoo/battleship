@@ -5,6 +5,8 @@ const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_regist
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
+const DEFAULT_ENEMY_DRIFTER_XP_SCENE = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
 const DERELICT_OFFSCREEN_DESPAWN_DISTANCE: float = 42.0
@@ -14,6 +16,10 @@ const ENEMY_FIRE_POT_MIN_RANGE: float = 7.0
 const ENEMY_FIRE_POT_MAX_RANGE: float = 18.0
 const ENEMY_FIRE_POT_DAMAGE: float = 11.0
 const ENEMY_FIRE_POT_RADIUS: float = 2.6
+const ENEMY_DRIFTER_XP_ACCOUNTED_META := "enemy_drifter_xp_accounted"
+const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
+const ENEMY_DRIFTER_SOLDIERS_PER_PICKUP := 3
+const ENEMY_DRIFTER_MAX_PICKUPS := 4
 
 static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 	if ship.is_dying or ship.is_sinking or ship.is_derelict:
@@ -83,8 +89,9 @@ static func _is_player_ship(node: Node) -> bool:
 
 static func _get_fire_pot_target_pos(target_ship: Node3D) -> Vector3:
 	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_ship, 0.8)
-	var masts: Array = target_ship.get("masts")
-	if masts != null and not masts.is_empty():
+	var masts_variant: Variant = target_ship.get("masts")
+	if masts_variant is Array:
+		var masts: Array = masts_variant as Array
 		for mast in masts:
 			if is_instance_valid(mast):
 				target_pos = mast.global_position + Vector3(randf_range(-0.4, 0.4), 1.6, randf_range(-0.4, 0.4))
@@ -92,6 +99,92 @@ static func _get_fire_pot_target_pos(target_ship: Node3D) -> Vector3:
 	target_pos.x += randf_range(-0.6, 0.6)
 	target_pos.z += randf_range(-0.6, 0.6)
 	return target_pos
+
+
+static func spawn_enemy_drifter_xp_pickups(ship) -> int:
+	if not is_instance_valid(ship) or not ship.is_inside_tree():
+		return 0
+	if ship.get_meta(ENEMY_DRIFTER_XP_ACCOUNTED_META, false) == true:
+		return 0
+	ship.set_meta(ENEMY_DRIFTER_XP_ACCOUNTED_META, true)
+	if str(ship.get("team")) != "enemy":
+		return 0
+
+	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
+	if not is_instance_valid(soldiers_node):
+		return 0
+
+	var sinking_soldiers: Array[Node3D] = []
+	for child in soldiers_node.get_children():
+		var soldier := child as Node3D
+		if not is_instance_valid(soldier):
+			continue
+		if SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != "enemy":
+			continue
+		var home_ship_variant: Variant = soldier.get("home_ship")
+		if is_instance_valid(home_ship_variant) and home_ship_variant != ship:
+			continue
+		sinking_soldiers.append(soldier)
+
+	var soldier_count: int = sinking_soldiers.size()
+	if soldier_count <= 0:
+		return 0
+
+	var lm: Node = ship.get("cached_lm") if ship.get("cached_lm") != null else LevelManagerRegistry.get_level_manager(ship.get_tree())
+	var xp_per_soldier: int = 3
+	var merit_per_soldier: int = 0
+	if is_instance_valid(lm):
+		xp_per_soldier = max(0, int(lm.get("drowned_soldier_kill_xp_reward")))
+		merit_per_soldier = max(0, int(lm.get("drowned_soldier_kill_merit_reward")))
+		if lm.has_method("add_soldier_kill"):
+			lm.add_soldier_kill(soldier_count, "drowned")
+		if merit_per_soldier > 0 and lm.has_method("add_merit"):
+			lm.add_merit(merit_per_soldier * soldier_count)
+
+	for soldier in sinking_soldiers:
+		soldier.set_meta(ENEMY_SINKING_REWARD_ACCOUNTED_META, true)
+		soldier.set_meta("last_death_cause", "drowned")
+		soldier.set_meta("last_damage_source", "drowned")
+
+	if xp_per_soldier <= 0:
+		return 0
+
+	var pickup_count: int = mini(ENEMY_DRIFTER_MAX_PICKUPS, ceili(float(soldier_count) / float(ENEMY_DRIFTER_SOLDIERS_PER_PICKUP)))
+	var remaining_soldiers: int = soldier_count
+	var spawned_count: int = 0
+	for index in range(pickup_count):
+		var remaining_pickups := pickup_count - index
+		var soldiers_in_pickup: int = ceili(float(remaining_soldiers) / float(remaining_pickups))
+		remaining_soldiers -= soldiers_in_pickup
+		var xp_amount: int = xp_per_soldier * soldiers_in_pickup
+		if xp_amount <= 0:
+			continue
+		var pickup := _instantiate_enemy_drifter_pickup(ship)
+		if not is_instance_valid(pickup):
+			continue
+		if pickup.has_method("configure"):
+			pickup.call("configure", xp_amount, soldiers_in_pickup)
+		var angle: float = randf_range(0.0, TAU)
+		var radius: float = randf_range(0.8, 2.4 + float(index) * 0.35)
+		var spawn_pos: Vector3 = ship.global_position + Vector3(cos(angle) * radius, 0.45, sin(angle) * radius)
+		ship.get_tree().root.add_child.call_deferred(pickup)
+		pickup.set_deferred("global_position", spawn_pos)
+		spawned_count += 1
+	return spawned_count
+
+
+static func _instantiate_enemy_drifter_pickup(ship) -> Node:
+	var scene: PackedScene = null
+	if "enemy_drifter_xp_scene" in ship:
+		var scene_variant: Variant = ship.get("enemy_drifter_xp_scene")
+		if scene_variant is PackedScene:
+			scene = scene_variant as PackedScene
+	if not is_instance_valid(scene):
+		scene = DEFAULT_ENEMY_DRIFTER_XP_SCENE
+	return ScenePool.acquire(ship.get_tree(), scene)
 
 static func become_derelict(ship) -> void:
 	ship.is_derelict = true

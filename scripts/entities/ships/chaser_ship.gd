@@ -13,6 +13,7 @@ const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
 const DEFAULT_FIRE_POT_SCENE_PATH := "res://scenes/projectiles/fire_pot.tscn"
+const DEFAULT_ENEMY_DRIFTER_XP_SCENE_PATH := "res://scenes/effects/enemy_drifter_xp.tscn"
 const DEFER_INITIAL_CREW_SETUP_META := "defer_initial_crew_setup"
 const BOARDING_CONTACT_DEFENSE_RADIUS_MIN := 2.4
 const BOARDING_CONTACT_DEFENSE_RADIUS_MAX := 5.5
@@ -32,6 +33,7 @@ const ENEMY_BOARDING_LATCH_SPEED_BONUS := 0.15
 @export var cannon_scene: PackedScene
 @export var hull_scene: PackedScene
 @export var preferred_soldier_type: String = "general" ## "general", "melee", "ranged"
+@export var enemy_drifter_xp_scene: PackedScene = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 enum CombatRole {CHARGER, GUNNER}
 @export var combat_role: CombatRole = CombatRole.CHARGER
 @export_range(4.0, 30.0) var preferred_combat_range: float = 14.0
@@ -491,6 +493,7 @@ func die() -> void:
 	# ✅ 배 위의 병사들을 원래 배로 복귀시키고, 복귀 불가 시 생존자로 전환
 	_evacuate_soldiers_to_home()
 	_evacuate_player_soldiers_as_survivors()
+	_spawn_enemy_drifter_xp_pickups()
 	
 	# 밧줄 및 도선 공격자 정보 제거
 	if is_instance_valid(boarding_target) and boarding_target.has_method("get_boarding_attacker_ship") and boarding_target.get_boarding_attacker_ship() == self:
@@ -554,6 +557,9 @@ func die() -> void:
 
 func _drop_floating_loot() -> void:
 	ChaserShipSupportHelper.drop_floating_loot(self)
+
+func _spawn_enemy_drifter_xp_pickups() -> void:
+	ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(self)
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:

@@ -15,6 +15,7 @@ const PLAYER_INCAPACITATED_RECOVERY_DELAY: float = 16.0
 const PLAYER_INCAPACITATED_RECOVERY_HEALTH_RATIO: float = 0.35
 const PLAYER_INCAPACITATED_MIN_RECOVERY_DELAY: float = 3.0
 const SUPPORT_RESCUE_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_SUPPORT_RESCUE
+const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -403,6 +404,8 @@ static func _apply_melee_kill_bonus(soldier) -> void:
 
 
 static func _apply_enemy_kill_rewards(soldier) -> void:
+	if soldier.get_meta(ENEMY_SINKING_REWARD_ACCOUNTED_META, false) == true:
+		return
 	var lm = soldier._cached_level_manager
 	if not is_instance_valid(lm):
 		return
