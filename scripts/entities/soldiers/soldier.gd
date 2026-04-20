@@ -15,6 +15,7 @@ const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_vis
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
 const SoldierSpeechHelper = preload("res://scripts/entities/soldiers/soldier_speech_helper.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
 const SWORD_SCENE = preload("res://scenes/entities/weapons/weapon_sword.tscn")
 const SPEARMAN_MELEE_SCENES := [
@@ -40,6 +41,10 @@ enum State {
 
 const REST_RECOVERY_HEALTH_PER_SECOND: float = 3.0
 const REST_RECOVERY_DELAY_AFTER_DAMAGE: float = 3.0
+const NODE_HAND_PIVOT := "HandPivot"
+const NODE_BODY_COLLISION_SHAPE := "CollisionShape3D"
+const NODE_FALLBACK_VISUAL_MESH := "MeshInstance3D"
+const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 
 # === 기본 속성 ===
 @export var max_health: float = 70.0: # 인간화 밸런스 조정 (40 -> 70)
@@ -196,13 +201,7 @@ func _ready() -> void:
 	_cache_base_combat_stats()
 	_setup_soldier_visual()
 	
-	# 부모 노드 구조에 따라 배 참조 찾기
-	# 구조: Ship -> Soldiers -> Soldier
-	var parent = get_parent()
-	if parent and parent.name == "Soldiers":
-		owned_ship = parent.get_parent()
-	elif parent and parent.has_method("get_wind_strength"): # Ship 스크립트 체크
-		owned_ship = parent
+	owned_ship = _resolve_owned_ship_from_parent(get_parent())
 		
 	# 모든 병사에게 home_ship 기록 (원래 소속 배 추적용)
 	home_ship = owned_ship
@@ -210,15 +209,8 @@ func _ready() -> void:
 	
 	_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
 			
-	if not has_node("HandPivot"):
-		var pivot = Node3D.new()
-		pivot.name = "HandPivot"
-		# 캐릭터 오른손 위치
-		pivot.position = Vector3(0.3, 0.7, -0.15)
-		add_child(pivot)
-		
 	# 무기 생성
-	var hand = get_node_or_null("HandPivot")
+	var hand := ensure_hand_pivot()
 	
 	# 근접 무기 로드 (Ranged Only가 아닐 때만)
 	if not is_ranged_only:
@@ -272,6 +264,80 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	EntityRegistry.unregister_soldier(self)
+
+
+func get_visual_root_node() -> Node3D:
+	var visual_root := get_node_or_null(SoldierVisualHelper.VISUAL_ROOT_NAME) as Node3D
+	return visual_root if visual_root != null else self
+
+
+func ensure_visual_root_node() -> Node3D:
+	var visual_root := get_node_or_null(SoldierVisualHelper.VISUAL_ROOT_NAME) as Node3D
+	if visual_root != null:
+		return visual_root
+	visual_root = Node3D.new()
+	visual_root.name = SoldierVisualHelper.VISUAL_ROOT_NAME
+	add_child(visual_root)
+	return visual_root
+
+
+func get_custom_visual_node(visual_root: Node = null) -> Node3D:
+	var root := visual_root if is_instance_valid(visual_root) else get_visual_root_node()
+	if not is_instance_valid(root):
+		return null
+	var custom_visual := root.get_node_or_null(SoldierVisualHelper.CUSTOM_VISUAL_NAME)
+	return custom_visual as Node3D if custom_visual is Node3D else null
+
+
+func get_fallback_visual_mesh(visual_root: Node = null) -> MeshInstance3D:
+	var root := visual_root if is_instance_valid(visual_root) else get_visual_root_node()
+	if is_instance_valid(root) and root != self:
+		var root_mesh := root.get_node_or_null(NODE_FALLBACK_VISUAL_MESH)
+		if root_mesh is MeshInstance3D:
+			return root_mesh as MeshInstance3D
+	var mesh := get_node_or_null(NODE_FALLBACK_VISUAL_MESH)
+	return mesh as MeshInstance3D if mesh is MeshInstance3D else null
+
+
+func get_hand_pivot() -> Node3D:
+	var pivot := get_node_or_null(NODE_HAND_PIVOT)
+	return pivot as Node3D if pivot is Node3D else null
+
+
+func ensure_hand_pivot() -> Node3D:
+	var pivot := get_hand_pivot()
+	if pivot != null:
+		return pivot
+	pivot = Node3D.new()
+	pivot.name = NODE_HAND_PIVOT
+	pivot.position = DEFAULT_HAND_PIVOT_POSITION
+	add_child(pivot)
+	return pivot
+
+
+func get_body_collision_shape() -> CollisionShape3D:
+	var shape := get_node_or_null(NODE_BODY_COLLISION_SHAPE)
+	return shape as CollisionShape3D if shape is CollisionShape3D else null
+
+
+func set_body_collision_disabled(disabled: bool) -> void:
+	var shape := get_body_collision_shape()
+	if shape != null:
+		shape.set_deferred("disabled", disabled)
+
+
+func _resolve_owned_ship_from_parent(parent: Node) -> Node3D:
+	if not is_instance_valid(parent):
+		return null
+
+	var candidate_ship := parent.get_parent()
+	if candidate_ship is Node3D and NodeContractHelper.get_soldiers_container(candidate_ship) == parent:
+		return candidate_ship
+
+	if parent is Node3D and parent.has_method("get_wind_strength"):
+		return parent
+
+	return null
 
 
 func _apply_soldier_rules_data() -> void:
@@ -416,7 +482,7 @@ func apply_crew_role(new_role: String) -> void:
 func equip_weapon(weapon_scene: PackedScene, weapon_id: String = "custom") -> void:
 	if weapon_scene == null:
 		return
-	var hand = get_node_or_null("HandPivot")
+	var hand := ensure_hand_pivot()
 	if hand == null:
 		return
 	if is_instance_valid(weapon_bow):
@@ -433,7 +499,7 @@ func equip_weapon(weapon_scene: PackedScene, weapon_id: String = "custom") -> vo
 func equip_melee_weapon(weapon_scene: PackedScene, weapon_id: String = "melee") -> void:
 	if weapon_scene == null:
 		return
-	var hand = get_node_or_null("HandPivot")
+	var hand := ensure_hand_pivot()
 	if hand == null:
 		return
 	if is_instance_valid(weapon_sword):

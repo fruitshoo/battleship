@@ -97,7 +97,7 @@ static func get_player_roster_count(ship) -> int:
 	return count
 
 static func sync_player_crew_roster(ship) -> void:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return
 	_apply_initial_crew_slot_layout(ship, soldiers_node)
@@ -155,7 +155,7 @@ static func add_respawn_crew(ship) -> bool:
 	return _add_player_crew(ship, false, "respawn")
 
 static func _add_player_crew(ship, allow_over_capacity: bool, source: String) -> bool:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return false
 	var roster_count: int = get_player_roster_count(ship)

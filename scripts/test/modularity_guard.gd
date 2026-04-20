@@ -3,6 +3,64 @@ extends Node
 const REGISTRY_PATH := "res://scripts/test/module_boundaries.json"
 const SCRIPTS_ROOT := "res://scripts"
 const HELPER_SUFFIX := "_helper.gd"
+const SCENE_CONTRACT_ALLOWED_OWNERS := {
+	"res://scripts/entities/ships/base_ship.gd": true,
+	"res://scripts/helpers/node_contract_helper.gd": true,
+}
+const SCENE_CONTRACT_FORBIDDEN_SIGNATURES := [
+	"get_node_or_null(\"Soldiers\")",
+	"get_node(\"Soldiers\")",
+	"has_node(\"Soldiers\")",
+	"$Soldiers",
+	"name == \"Soldiers\"",
+	"name = \"Soldiers\"",
+	"get_node_or_null(\"ProximityArea\")",
+	"get_node(\"ProximityArea\")",
+	"has_node(\"ProximityArea\")",
+	"name == \"ProximityArea\"",
+	"name = \"ProximityArea\"",
+	"get_node_or_null(\"HitArea\")",
+	"get_node(\"HitArea\")",
+	"has_node(\"HitArea\")",
+	"name == \"HitArea\"",
+	"name = \"HitArea\"",
+	"get_node_or_null(\"Cannons\")",
+	"get_node(\"Cannons\")",
+	"has_node(\"Cannons\")",
+	"find_child(\"Cannons\"",
+	"name == \"Cannons\"",
+	"name = \"Cannons\"",
+	"get_node_or_null(\"SpearRail\")",
+	"get_node(\"SpearRail\")",
+	"has_node(\"SpearRail\")",
+	"name == \"SpearRail\"",
+	"name = \"SpearRail\"",
+	"get_node_or_null(\"HullDefenseVisuals\")",
+	"get_node(\"HullDefenseVisuals\")",
+	"has_node(\"HullDefenseVisuals\")",
+	"name == \"HullDefenseVisuals\"",
+	"name = \"HullDefenseVisuals\"",
+	"get_node_or_null(\"SingijeonLauncher\")",
+	"get_node(\"SingijeonLauncher\")",
+	"has_node(\"SingijeonLauncher\")",
+	"name == \"SingijeonLauncher\"",
+	"name = \"SingijeonLauncher\"",
+	"get_node_or_null(\"JanggunLauncher\")",
+	"get_node(\"JanggunLauncher\")",
+	"has_node(\"JanggunLauncher\")",
+	"name == \"JanggunLauncher\"",
+	"name = \"JanggunLauncher\"",
+	"get_node_or_null(\"HandPivot\")",
+	"get_node(\"HandPivot\")",
+	"has_node(\"HandPivot\")",
+	"name == \"HandPivot\"",
+	"name = \"HandPivot\"",
+	"get_node_or_null(\"CollisionShape3D\")",
+	"get_node(\"CollisionShape3D\")",
+	"has_node(\"CollisionShape3D\")",
+	"name == \"CollisionShape3D\"",
+	"name = \"CollisionShape3D\"",
+]
 
 
 func _ready() -> void:
@@ -33,6 +91,7 @@ func _run_guard() -> void:
 	_check_duplicate_static_functions(helper_paths, registry, violations, debt)
 	_check_helper_dependency_boundaries(helper_paths, registered_helpers, registry, violations, watchlist, notices)
 	_check_coordinate_pooling_hazards(script_paths, registry, violations, watchlist, notices)
+	_check_scene_contract_encapsulation(script_paths, violations)
 
 	print("[ModularityGuard] registered_helpers=%d actual_helpers=%d debt=%d watchlist=%d notices=%d violations=%d" % [
 		registered_helpers.size(),
@@ -461,6 +520,18 @@ func _check_coordinate_pooling_hazards(script_paths: Array[String], registry: Di
 			violations.append("Hazard baseline missing recommended_action: %s" % key)
 		if not seen_hazards.has(key):
 			notices.append("Stale coordinate/pooling hazard baseline not observed: %s" % key)
+
+
+func _check_scene_contract_encapsulation(script_paths: Array[String], violations: Array[String]) -> void:
+	for path in script_paths:
+		if path.begins_with("res://scripts/test/"):
+			continue
+		if SCENE_CONTRACT_ALLOWED_OWNERS.has(path):
+			continue
+		var text := FileAccess.get_file_as_string(path)
+		for signature in SCENE_CONTRACT_FORBIDDEN_SIGNATURES:
+			if text.contains(signature):
+				violations.append("Scene contract access outside owner: %s uses %s. Use BaseShip/NodeContractHelper accessors instead." % [path, signature])
 
 
 func _build_allowed_duplicate_map(registry: Dictionary) -> Dictionary:

@@ -4,6 +4,9 @@ class_name LauncherCombatHelper
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
+
+const LIMBO_AI_WEAPON_INTENT_STALE_FRAMES := 4
 
 
 static func enemy_team_tag(team: String) -> String:
@@ -37,6 +40,12 @@ static func is_owner_combat_ready(owner_ship: Node) -> bool:
 		return false
 	if owner_ship.has_method("is_combat_disabled") and owner_ship.is_combat_disabled():
 		return false
+	if owner_ship.get("limbo_ai_pilot_enabled") == true and NodeContractHelper.get_team_tag(owner_ship, "") == "enemy":
+		var weapon_frame := int(owner_ship.get_meta(ShipAILimboKeys.META_WEAPON_FRAME, -1000000))
+		if Engine.get_physics_frames() - weapon_frame <= LIMBO_AI_WEAPON_INTENT_STALE_FRAMES:
+			var weapon_intent := str(owner_ship.get_meta(ShipAILimboKeys.META_WEAPON_INTENT, "")).strip_edges()
+			if weapon_intent == ShipAILimboKeys.WEAPON_HOLD_FIRE:
+				return false
 	return owner_ship.get("deck_is_overrun") != true
 
 
@@ -91,7 +100,7 @@ static func has_friendly_boarding_attacker(target_ship: Node, team: String) -> b
 static func has_alive_soldier_on_team(target_ship: Node, team: String) -> bool:
 	if not is_instance_valid(target_ship):
 		return false
-	var soldiers_node := target_ship.get_node_or_null("Soldiers")
+	var soldiers_node := NodeContractHelper.get_soldiers_container(target_ship)
 	if not is_instance_valid(soldiers_node):
 		return false
 	for child in soldiers_node.get_children():

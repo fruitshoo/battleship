@@ -1,6 +1,7 @@
 extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
@@ -322,13 +323,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_set_level(current_level + 1)
 			KEY_F2: # 대포 디버그
 				_debug_cannons()
-			KEY_F3: # 충돌 외곽선 시각화
+			KEY_F3: # 선박 영역 시각화
 				_toggle_collision_visualizers()
 			KEY_F4: # sekibune melee 테스트 소환
 				_debug_spawn_test_ship("sekibune_melee", 18.0, 0.0)
 			KEY_F5: # sekibune cannon 테스트 소환
 				_debug_spawn_test_ship("sekibune_cannon", 20.0, 10.0)
-			KEY_F6: # 충돌 시각화 모드 순환
+			KEY_F6: # 선박 영역 모드 순환
 				_cycle_collision_visualizer_mode()
 			KEY_F7: # 중간 보스 디버그 소환
 				_debug_spawn_mid_boss()
@@ -624,7 +625,7 @@ func _debug_cannons() -> void:
 		print("[DEBUG] 플레이어 배 없음!")
 		return
 
-	var cannons_node = player_ship.get_node_or_null("Cannons")
+	var cannons_node := NodeContractHelper.get_cannons_container(player_ship)
 	if not cannons_node:
 		print("[DEBUG] Cannons 노드 없음!")
 		return
@@ -633,12 +634,11 @@ func _debug_cannons() -> void:
 	print("[DEBUG] 총 대포 수: %d" % cannons_node.get_child_count())
 	
 	for cannon in cannons_node.get_children():
-		var det_area = cannon.get_node_or_null("DetectionArea")
 		var overlaps = 0
 		var monitoring = false
-		if det_area:
-			monitoring = det_area.monitoring
-			overlaps = det_area.get_overlapping_areas().size() + det_area.get_overlapping_bodies().size()
+		var snapshot: Dictionary = cannon.call("get_debug_cannon_snapshot") if cannon.has_method("get_debug_cannon_snapshot") else {}
+		monitoring = bool(snapshot.get("detection_monitoring", false))
+		overlaps = int(snapshot.get("detection_overlap_count", 0))
 		
 		print("[DEBUG] [%s] pos=%s rot_y=%.1f° monitoring=%s overlaps=%d" % [
 			cannon.name,
@@ -662,11 +662,10 @@ func _toggle_collision_visualizers() -> void:
 func _set_collision_visualizers_enabled(enabled: bool) -> void:
 	_debug_collision_visuals_enabled = enabled
 	CollisionVisualizer.set_runtime_enabled(enabled)
-	DebugDrawBridge.set_collision_debug_enabled(enabled)
 	for node in get_tree().get_nodes_in_group("collision_visualizers"):
 		if node and node.has_method("_refresh_visibility"):
 			node.call("_refresh_visibility")
-	print("[DEBUG] 충돌/탄착 시각화: %s" % ("ON" if enabled else "OFF"))
+	print("[DEBUG] 선박 영역 시각화: %s" % ("ON" if enabled else "OFF"))
 
 func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_offset: float, authoring_meta: Variant = null) -> void:
 	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_ship"):
@@ -720,15 +719,7 @@ func _cycle_collision_visualizer_mode() -> void:
 	for node in get_tree().get_nodes_in_group("collision_visualizers"):
 		if node and node.has_method("_refresh_visibility"):
 			node.call("_refresh_visibility")
-	var mode_name := "ALL"
-	match mode:
-		CollisionVisualizer.MODE_BASE:
-			mode_name = "BASE"
-		CollisionVisualizer.MODE_SEPARATION:
-			mode_name = "SEPARATION"
-		CollisionVisualizer.MODE_GUARD:
-			mode_name = "GUARD"
-	print("[DEBUG] 충돌 시각화 모드: %s" % mode_name)
+	print("[DEBUG] 선박 영역 시각화 모드: %s" % CollisionVisualizer.get_mode_name(mode))
 
 func _debug_spawn_support_ship() -> void:
 	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D

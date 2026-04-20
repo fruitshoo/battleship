@@ -3,6 +3,7 @@ extends "res://scripts/entities/ships/base_ship.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
 const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 const ShipLimboAIPilot = preload("res://scripts/ai/limbo/ship_limbo_ai_pilot.gd")
@@ -94,6 +95,7 @@ func _ready() -> void:
 	hull_hp = max_hull_hp
 	_cache_limbo_base_combat_values()
 	set_team(team)
+	_apply_boss_flag_style()
 	add_to_group("boss")
 	add_to_group("ships")
 	_find_player()
@@ -105,10 +107,18 @@ func _ready() -> void:
 	_update_boss_hp_hud()
 	call_deferred("_update_boss_hp_hud")
 
+func _apply_boss_flag_style() -> void:
+	for mast in masts:
+		if mast.has_method("set_flag_style"):
+			mast.set_flag_style(FlagStyleLibrary.STYLE_BOSS)
+		elif mast.has_method("set_team_color"):
+			mast.set_team_color(team)
+
+
 func _setup_weapons() -> void:
 	# 다수의 대포 배치
 	var cannons_node = Node3D.new()
-	cannons_node.name = "Cannons"
+	cannons_node.name = NODE_CANNONS
 	add_child(cannons_node)
 	var stats := ShipBlueprintHelper.load_stats(ship_type)
 	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, ShipWeaponLoadoutHelper.get_default_boss_loadout(tier))
@@ -153,10 +163,10 @@ func _spawn_boss_singigeon(spec: Dictionary) -> void:
 func _setup_soldiers() -> void:
 	if not soldier_scene: return
 	
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node:
 		soldiers_node = Node3D.new()
-		soldiers_node.name = "Soldiers"
+		soldiers_node.name = NODE_SOLDIERS
 		add_child(soldiers_node)
 		soldiers_node.position = Vector3(0, 1.0, 0)
 	
@@ -477,7 +487,7 @@ func _draw_limbo_ai_debug() -> void:
 	DebugDrawBridge.draw_text(global_position + Vector3.UP * 4.4, label, color, 0.0, 16)
 	if is_instance_valid(target):
 		DebugDrawBridge.draw_line_raised(global_position, target.global_position, 2.35, color, 0.0, 0.026)
-		DebugDrawBridge.draw_circle_xz(target.global_position, get_preferred_engagement_range(), color, 0.35, 0.0, 72, 0.024)
+		DebugDrawBridge.draw_circle_xz(target.global_position, get_preferred_engagement_range(), color, 1.1, 0.0, 72, 0.024)
 		var limbo_nav_hint := _get_limbo_navigation_hint(target)
 		if not limbo_nav_hint.is_empty():
 			var desired_point: Vector3 = limbo_nav_hint.get("desired_point", global_position)
@@ -659,7 +669,7 @@ func _drop_treasure_chest() -> void:
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:
 	if not survivor_scene: return
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node: return
 	
 	var converted_count = 0

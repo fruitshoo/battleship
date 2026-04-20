@@ -30,7 +30,7 @@ static func get_effective_attack_cooldown(soldier, fallback_cooldown: float = 1.
 
 
 static func _play_attack_animation(soldier) -> void:
-	var hand_pivot := soldier.get_node_or_null("HandPivot") as Node3D
+	var hand_pivot := _get_hand_pivot(soldier)
 	var weapon := soldier.current_weapon as Node3D
 	var weapon_visual := _get_weapon_visual_node(weapon)
 	_cache_attack_rest_transforms(hand_pivot, weapon_visual)
@@ -127,9 +127,17 @@ static func _play_ranged_attack_animation(soldier, hand_pivot: Node3D) -> void:
 static func _get_weapon_visual_node(weapon: Node3D) -> Node3D:
 	if not is_instance_valid(weapon):
 		return null
-	if weapon.has_node("Visual"):
-		return weapon.get_node("Visual") as Node3D
+	if weapon.has_method("get_weapon_visual_root"):
+		var visual_root: Variant = weapon.call("get_weapon_visual_root")
+		return visual_root as Node3D if visual_root is Node3D else weapon
 	return weapon
+
+
+static func _get_hand_pivot(soldier) -> Node3D:
+	if soldier.has_method("get_hand_pivot"):
+		var pivot: Variant = soldier.call("get_hand_pivot")
+		return pivot as Node3D if pivot is Node3D else null
+	return null
 
 
 static func _cache_attack_rest_transforms(hand_pivot: Node3D, weapon_visual: Node3D) -> void:

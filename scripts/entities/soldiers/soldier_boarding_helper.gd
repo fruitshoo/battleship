@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierBoardingHelper
 
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 const BOARDING_LANDING_INSET := 0.45
 const BOARDING_WAR_CRY_SFX := "boarding_war_cry"
@@ -28,7 +29,7 @@ static func try_evacuate_to_home(soldier) -> void:
 
 
 static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool = false) -> void:
-	var target_soldiers: Node = target_ship.get_node_or_null("Soldiers")
+	var target_soldiers: Node = NodeContractHelper.get_soldiers_container(target_ship)
 	if not target_soldiers:
 		target_soldiers = target_ship
 

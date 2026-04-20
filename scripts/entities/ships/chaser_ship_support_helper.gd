@@ -5,6 +5,7 @@ const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_regist
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEFAULT_ENEMY_DRIFTER_XP_SCENE = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
@@ -23,6 +24,7 @@ const ENEMY_FIRE_POT_MIN_RANGE: float = 7.0
 const ENEMY_FIRE_POT_MAX_RANGE: float = 18.0
 const ENEMY_FIRE_POT_DAMAGE: float = 11.0
 const ENEMY_FIRE_POT_RADIUS: float = 2.6
+const LIMBO_AI_SPECIAL_ATTACK_INTENT_STALE_FRAMES := 4
 const ENEMY_DRIFTER_XP_ACCOUNTED_META := "enemy_drifter_xp_accounted"
 const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
 const ENEMY_DRIFTER_SOLDIERS_PER_PICKUP := 3
@@ -53,6 +55,15 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 		return
 	if ship.is_boarding:
 		return
+	if ship.get("limbo_ai_pilot_enabled") == true:
+		var special_frame := int(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_FRAME, -1000000))
+		if Engine.get_physics_frames() - special_frame <= LIMBO_AI_SPECIAL_ATTACK_INTENT_STALE_FRAMES:
+			var special_target_id := int(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_TARGET_ID, 0))
+			var special_intent := str(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, "")).strip_edges()
+			if special_target_id != target.get_instance_id():
+				return
+			if not special_intent.is_empty() and special_intent != ShipAILimboKeys.SPECIAL_FIRE_POT_READY:
+				return
 	var dist: float = ship.global_position.distance_to(target.global_position)
 	if dist < ENEMY_FIRE_POT_MIN_RANGE or dist > ENEMY_FIRE_POT_MAX_RANGE:
 		return
@@ -117,7 +128,7 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 	if str(ship.get("team")) != "enemy":
 		return 0
 
-	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
+	var soldiers_node: Node = NodeContractHelper.get_soldiers_container(ship)
 	if not is_instance_valid(soldiers_node):
 		return 0
 
@@ -392,7 +403,7 @@ static func drop_floating_loot(ship) -> void:
 static func evacuate_player_soldiers_as_survivors(ship) -> void:
 	if not ship.survivor_scene:
 		return
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return
 
@@ -414,7 +425,7 @@ static func evacuate_player_soldiers_as_survivors(ship) -> void:
 
 
 static func evacuate_soldiers_to_home(ship) -> void:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return
 
@@ -425,7 +436,7 @@ static func evacuate_soldiers_to_home(ship) -> void:
 
 		var h_ship = child.get("home_ship")
 		if is_instance_valid(h_ship) and h_ship != ship and not (h_ship.has_method("is_sinking_or_dying") and h_ship.is_sinking_or_dying()):
-			var target_soldiers = h_ship.get_node_or_null("Soldiers")
+			var target_soldiers = NodeContractHelper.get_soldiers_container(h_ship)
 			if not target_soldiers:
 				continue
 

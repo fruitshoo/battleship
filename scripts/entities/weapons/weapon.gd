@@ -3,6 +3,8 @@ class_name SoldierWeapon
 
 ## 병사가 사용하는 무기의 베이스 클래스
 
+const NODE_VISUAL := "Visual"
+
 @export var damage: float = 10.0
 @export var attack_range: float = 1.2
 @export var attack_cooldown: float = 1.0
@@ -11,7 +13,19 @@ class_name SoldierWeapon
 func attack(_target: Node3D, _attacker: Node3D) -> void:
 	pass
 
+
+func get_weapon_visual_node() -> Node3D:
+	var visual := get_node_or_null(NODE_VISUAL)
+	return visual as Node3D if visual is Node3D else null
+
+
+func get_weapon_visual_root() -> Node3D:
+	var visual := get_weapon_visual_node()
+	return visual if visual != null else self
+
+
 # 씬에 있는 무기 메쉬의 가시성을 설정하는 헬퍼
 func set_visual_visible(make_visible: bool) -> void:
-	if has_node("Visual"):
-		$Visual.visible = make_visible
+	var visual := get_weapon_visual_node()
+	if visual != null:
+		visual.visible = make_visible

@@ -1,6 +1,7 @@
 extends RefCounted
 
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 static func handle_input(ship, delta: float) -> void:
@@ -73,7 +74,7 @@ static func capture_derelict_ship(ship) -> void:
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
 			ship._cached_hud.show_message("나포 성공! XP +%d / 지휘 +%d" % [xp_reward, merit_reward], 2.4)
 
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if soldiers_node:
 		for child in soldiers_node.get_children():
 			if child.has_method("heal_full") and SoldierStateHelper.is_alive_soldier(child):
@@ -98,7 +99,7 @@ static func capture_derelict_ship(ship) -> void:
 	ship._cancel_boarding()
 
 static func replenish_crew(ship, soldier_scene: PackedScene) -> void:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node or not soldier_scene:
 		return
 	for child in soldiers_node.get_children():

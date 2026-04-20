@@ -21,19 +21,16 @@ const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_stat
 
 
 static func ensure_visual_root(soldier) -> Node3D:
-	var visual_root := soldier.get_node_or_null(VISUAL_ROOT_NAME) as Node3D
-	if visual_root != null:
-		return visual_root
-	visual_root = Node3D.new()
-	visual_root.name = VISUAL_ROOT_NAME
-	soldier.add_child(visual_root)
-	return visual_root
+	if soldier.has_method("ensure_visual_root_node"):
+		var visual_root: Variant = soldier.call("ensure_visual_root_node")
+		return visual_root as Node3D if visual_root is Node3D else null
+	return soldier as Node3D
 
 
 static func setup_visual_scene(soldier, visual_scene: PackedScene) -> void:
 	var visual_root := ensure_visual_root(soldier)
-	var custom_visual := visual_root.get_node_or_null(CUSTOM_VISUAL_NAME) as Node3D
-	var fallback_mesh := visual_root.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	var custom_visual := _get_custom_visual_node(soldier, visual_root)
+	var fallback_mesh := _get_fallback_visual_mesh(soldier, visual_root)
 
 	if visual_scene == null:
 		if custom_visual != null:
@@ -69,9 +66,9 @@ static func setup_visual_scene(soldier, visual_scene: PackedScene) -> void:
 
 
 static func get_visual_root(soldier) -> Node3D:
-	var visual_root := soldier.get_node_or_null(VISUAL_ROOT_NAME) as Node3D
-	if visual_root != null:
-		return visual_root
+	if soldier.has_method("get_visual_root_node"):
+		var visual_root: Variant = soldier.call("get_visual_root_node")
+		return visual_root as Node3D if visual_root is Node3D else soldier as Node3D
 	return soldier as Node3D
 
 
@@ -82,12 +79,10 @@ static func get_body_mesh(soldier) -> MeshInstance3D:
 			return cached_mesh
 
 	var visual_root := get_visual_root(soldier)
-	var custom_visual := visual_root.get_node_or_null(CUSTOM_VISUAL_NAME) as Node3D
+	var custom_visual := _get_custom_visual_node(soldier, visual_root)
 	var mesh := _find_body_mesh_instance(custom_visual) if custom_visual != null else null
 	if mesh == null:
-		mesh = visual_root.get_node_or_null("MeshInstance3D") as MeshInstance3D
-	if mesh == null:
-		mesh = soldier.get_node_or_null("MeshInstance3D") as MeshInstance3D
+		mesh = _get_fallback_visual_mesh(soldier, visual_root)
 	if mesh == null:
 		mesh = _find_first_mesh_instance(visual_root)
 
@@ -104,7 +99,7 @@ static func get_pose_node(soldier) -> Node3D:
 			return cached_node
 
 	var visual_root := get_visual_root(soldier)
-	var pose_node := visual_root.get_node_or_null(CUSTOM_VISUAL_NAME) as Node3D
+	var pose_node := _get_custom_visual_node(soldier, visual_root)
 	if pose_node == null:
 		pose_node = get_body_mesh(soldier) as Node3D
 
@@ -132,6 +127,27 @@ static func _find_named_mesh_instance(node: Node, mesh_name: String) -> MeshInst
 		var found := _find_named_mesh_instance(child, mesh_name)
 		if found != null:
 			return found
+	return null
+
+
+static func _get_custom_visual_node(soldier, visual_root: Node = null) -> Node3D:
+	if soldier.has_method("get_custom_visual_node"):
+		var custom_visual: Variant = soldier.call("get_custom_visual_node", visual_root)
+		return custom_visual as Node3D if custom_visual is Node3D else null
+	return null
+
+
+static func _get_fallback_visual_mesh(soldier, visual_root: Node = null) -> MeshInstance3D:
+	if soldier.has_method("get_fallback_visual_mesh"):
+		var mesh: Variant = soldier.call("get_fallback_visual_mesh", visual_root)
+		return mesh as MeshInstance3D if mesh is MeshInstance3D else null
+	return null
+
+
+static func _get_soldier_hand_pivot(soldier) -> Node3D:
+	if soldier.has_method("get_hand_pivot"):
+		var pivot: Variant = soldier.call("get_hand_pivot")
+		return pivot as Node3D if pivot is Node3D else null
 	return null
 
 
@@ -365,7 +381,7 @@ static func play_death_pose(soldier) -> void:
 	if level_marker != null:
 		level_marker.visible = false
 
-	var hand_pivot := soldier.get_node_or_null("HandPivot") as Node3D
+	var hand_pivot := _get_soldier_hand_pivot(soldier)
 	if hand_pivot != null:
 		hand_pivot.visible = false
 
@@ -432,7 +448,7 @@ static func play_recovery_pose(soldier) -> void:
 	if soldier.get("crew_role") != null:
 		update_role_visual(soldier)
 	update_level_visual(soldier)
-	var hand_pivot := soldier.get_node_or_null("HandPivot") as Node3D
+	var hand_pivot := _get_soldier_hand_pivot(soldier)
 	if hand_pivot != null:
 		hand_pivot.visible = true
 	soldier.visible = true

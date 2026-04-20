@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierLifecycleHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
@@ -151,7 +152,7 @@ static func _find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 	if not is_instance_valid(soldier.owned_ship):
 		return null
 	var candidates: Array = []
-	var soldiers_node: Node = soldier.owned_ship.get_node_or_null("Soldiers")
+	var soldiers_node: Node = NodeContractHelper.get_soldiers_container(soldier.owned_ship)
 	if is_instance_valid(soldiers_node):
 		candidates = soldiers_node.get_children()
 	for registered_soldier in EntityRegistry.get_soldiers_by_ship(soldier.owned_ship):
@@ -206,8 +207,7 @@ static func incapacitate(soldier) -> void:
 	if soldier.is_in_group("soldiers"):
 		soldier.remove_from_group("soldiers")
 
-	if soldier.has_node("CollisionShape3D"):
-		soldier.get_node("CollisionShape3D").set_deferred("disabled", true)
+	_set_body_collision_disabled(soldier, true)
 
 	if soldier.has_method("_play_death_pose"):
 		soldier._play_death_pose()
@@ -270,8 +270,7 @@ static func die(soldier) -> void:
 	if soldier.is_in_group("enemy"):
 		soldier.remove_from_group("enemy")
 
-	if soldier.has_node("CollisionShape3D"):
-		soldier.get_node("CollisionShape3D").set_deferred("disabled", true)
+	_set_body_collision_disabled(soldier, true)
 
 	var owned_ship_team: String = ""
 	if is_instance_valid(soldier.owned_ship):
@@ -354,8 +353,7 @@ static func _recover_incapacitated_now(soldier, health_ratio: float) -> void:
 	soldier.current_state = soldier.State.IDLE
 	if not soldier.is_in_group("soldiers"):
 		soldier.add_to_group("soldiers")
-	if soldier.has_node("CollisionShape3D"):
-		soldier.get_node("CollisionShape3D").set_deferred("disabled", false)
+	_set_body_collision_disabled(soldier, false)
 	if soldier.has_method("_play_recovery_pose"):
 		soldier._play_recovery_pose()
 	if soldier.has_method("add_soldier_xp"):
@@ -379,6 +377,11 @@ static func _has_hostile_on_owned_ship(soldier) -> bool:
 		if other_team != soldier.team:
 			return true
 	return false
+
+
+static func _set_body_collision_disabled(soldier, disabled: bool) -> void:
+	if is_instance_valid(soldier) and soldier.has_method("set_body_collision_disabled"):
+		soldier.call("set_body_collision_disabled", disabled)
 
 
 static func _get_incapacitated_recovery_delay(soldier) -> float:

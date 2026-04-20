@@ -2,6 +2,7 @@
 extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
 const UpgradeManagerChoiceHelper = preload("res://scripts/managers/upgrade_manager_choice_helper.gd")
 const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
@@ -476,14 +477,7 @@ func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.hull_hp, ship.max_hull_hp)
 
-	var old_rail = ship.get_node_or_null("SpearRail")
-	if old_rail:
-		old_rail.queue_free()
-	if ship.has_meta("spear_rail_damage"):
-		ship.remove_meta("spear_rail_damage")
-	var visuals = ship.get_node_or_null("HullDefenseVisuals")
-	if visuals:
-		visuals.queue_free()
+	NodeContractHelper.clear_hull_defense_upgrade_nodes(ship)
 	
 	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
 	if hud and hud.has_method("update_hull_hp"):
@@ -521,11 +515,9 @@ func _apply_supply_bonus(ship: Node3D, level: int) -> void:
 	print("[SupplyBonus] 보급 효율 강화 Lv.%d" % level)
 
 func _apply_cannon(ship: Node3D, level: int) -> void:
-	var cannons_node = _get_player_cannons_node(ship)
-	if not cannons_node:
-		cannons_node = Node3D.new()
-		cannons_node.name = "Cannons"
-		ship.add_child(cannons_node)
+	var cannons_node := NodeContractHelper.ensure_cannons_container(ship)
+	if not is_instance_valid(cannons_node):
+		return
 	_normalize_player_cannons(ship)
 	_sync_player_cannon_layout(ship, level)
 	print("[Cannon] 포문 배치 적용 (Lv.%d)" % level)
@@ -648,20 +640,7 @@ func _get_player_cannons_node(ship: Node3D) -> Node3D:
 	if not is_instance_valid(ship):
 		return null
 
-	var preferred_node: Node3D = null
-	for child in ship.get_children():
-		if not is_instance_valid(child):
-			continue
-		if str(child.name).contains("Hull"):
-			var nested = child.find_child("Cannons", true, false)
-			if nested is Node3D:
-				preferred_node = nested as Node3D
-				break
-
-	if preferred_node == null:
-		var any_cannons = ship.find_child("Cannons", true, false)
-		if any_cannons is Node3D:
-			preferred_node = any_cannons as Node3D
+	var preferred_node := NodeContractHelper.get_cannons_container(ship)
 
 	if preferred_node != null:
 		_cleanup_stray_player_cannons_nodes(ship, preferred_node)
@@ -674,7 +653,7 @@ func _cleanup_stray_player_cannons_nodes(ship: Node3D, keep_node: Node3D) -> voi
 			continue
 		if child == keep_node:
 			continue
-		if str(child.name) != "Cannons":
+		if str(child.name) != NodeContractHelper.SHIP_NODE_CANNONS:
 			continue
 		child.set_process(false)
 		child.set_physics_process(false)
@@ -695,9 +674,7 @@ func _configure_player_cannon(cannon: Node, spec: Dictionary = {}) -> void:
 
 
 func _apply_singigeon(ship: Node3D, level: int) -> void:
-	var launcher = ship.get_node_or_null("SingijeonLauncher")
-	if is_instance_valid(launcher):
-		launcher.queue_free()
+	NodeContractHelper.clear_singigeon_launcher(ship)
 	
 	_refresh_player_crew_capacity(ship)
 		
@@ -708,10 +685,7 @@ func _apply_singigeon(ship: Node3D, level: int) -> void:
 
 func _apply_janggun(ship: Node3D, level: int) -> void:
 	if level == 1:
-		var launcher = janggun_scene.instantiate()
-		launcher.name = "JanggunLauncher"
-		ship.add_child(launcher)
-		launcher.position = Vector3(0, 0.8, 2.0)
+		NodeContractHelper.install_janggun_launcher(ship, janggun_scene, Vector3(0.0, 0.8, 2.0))
 	else:
 		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
 
@@ -992,7 +966,7 @@ func _get_support_fleet_limit_upgrade_bonus() -> int:
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return []
 	var result = []

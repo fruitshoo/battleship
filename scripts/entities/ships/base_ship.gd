@@ -16,6 +16,7 @@ const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 const ShipWeaponLoadoutHelper = preload("res://scripts/entities/ships/ship_weapon_loadout_helper.gd")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
 const BaseShipSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SoldierShipWorkPriorityHelper = preload("res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
@@ -24,6 +25,14 @@ const DEBUG_DAMAGE_LOGS := false
 const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35
 const DAMAGE_ROCK_FORWARD_MULT := 1.6
 const DAMAGE_ROCK_BACK_MULT := 1.1
+const NODE_PROXIMITY_AREA := NodeContractHelper.SHIP_NODE_PROXIMITY_AREA
+const NODE_HIT_AREA := NodeContractHelper.SHIP_NODE_HIT_AREA
+const NODE_SOLDIERS := NodeContractHelper.SHIP_NODE_SOLDIERS
+const NODE_CANNONS := NodeContractHelper.SHIP_NODE_CANNONS
+const NODE_SPEAR_RAIL := NodeContractHelper.SHIP_NODE_SPEAR_RAIL
+const NODE_HULL_DEFENSE_VISUALS := NodeContractHelper.SHIP_NODE_HULL_DEFENSE_VISUALS
+const NODE_SINGIGEON_LAUNCHER := NodeContractHelper.SHIP_NODE_SINGIGEON_LAUNCHER
+const NODE_JANGGUN_LAUNCHER := NodeContractHelper.SHIP_NODE_JANGGUN_LAUNCHER
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -267,57 +276,13 @@ func _sync_profile_from_runtime() -> void:
 	collision_profile.broad_phase_padding = broad_phase_padding
 
 func get_collision_half_extents() -> Vector2:
-	return Vector2(
-		base_collision_radius * width_multiplier,
-		base_collision_radius * length_multiplier
-	)
+	return ShipContactGeometry.get_soft_collision_half_extents(self)
 
 func get_directional_collision_radius(world_dir: Vector3) -> float:
-	var dir = world_dir
-	dir.y = 0.0
-	if dir.length_squared() <= 0.0001:
-		var half = get_collision_half_extents()
-		return maxf(half.x, half.y)
-	dir = dir.normalized()
-	
-	var fwd = -global_transform.basis.z
-	fwd.y = 0.0
-	if fwd.length_squared() <= 0.0001:
-		fwd = Vector3.FORWARD
-	else:
-		fwd = fwd.normalized()
-	
-	var lateral = base_collision_radius * width_multiplier
-	var longitudinal = base_collision_radius * length_multiplier
-	return lateral + (longitudinal - lateral) * absf(fwd.dot(dir))
+	return ShipContactGeometry.get_directional_collision_radius(self, world_dir)
 
 func get_collision_distance_to(other: Node3D) -> float:
-	if not is_instance_valid(other):
-		return 0.0
-		
-	var diff = other.global_position - global_position
-	diff.y = 0.0
-	var dir = diff.normalized() if diff.length_squared() > 0.0001 else Vector3.FORWARD
-	
-	var my_radius = get_directional_collision_radius(dir)
-	var other_radius = 0.0
-	if other.has_method("get_directional_collision_radius"):
-		other_radius = float(other.call("get_directional_collision_radius", -dir))
-	else:
-		var other_base = NodeContractHelper.get_base_collision_radius_value(other)
-		var other_w = NodeContractHelper.get_collision_width_multiplier_value(other)
-		var other_l = NodeContractHelper.get_collision_length_multiplier_value(other)
-		var other_fwd = -other.global_transform.basis.z
-		other_fwd.y = 0.0
-		if other_fwd.length_squared() > 0.0001:
-			other_fwd = other_fwd.normalized()
-		else:
-			other_fwd = -dir
-		var other_lateral = other_base * other_w
-		var other_longitudinal = other_base * other_l
-		other_radius = other_lateral + (other_longitudinal - other_lateral) * absf(other_fwd.dot(-dir))
-	
-	return my_radius + other_radius
+	return ShipContactGeometry.get_collision_distance_between(self, other)
 
 func get_deck_half_extents() -> Vector2:
 	var hull_ext = _hull_half_extents
@@ -362,7 +327,7 @@ func _sync_contact_area_shapes_from_hull() -> void:
 
 	var hit_size := Vector3(
 		maxf(0.8, _hull_half_extents.x * 2.0 + 0.12),
-		_get_contact_area_height("HitArea"),
+		_get_contact_area_height(NODE_HIT_AREA),
 		maxf(1.2, _hull_half_extents.y * 2.0 + 0.12)
 	)
 	var proximity_size := Vector3(
@@ -370,23 +335,23 @@ func _sync_contact_area_shapes_from_hull() -> void:
 		hit_size.y + 0.2,
 		hit_size.z + 0.8
 	)
-	_fit_contact_area_box_shape("HitArea", hit_size)
-	_fit_contact_area_box_shape("ProximityArea", proximity_size)
+	_fit_contact_area_box_shape(NODE_HIT_AREA, hit_size)
+	_fit_contact_area_box_shape(NODE_PROXIMITY_AREA, proximity_size)
 
 func _get_contact_area_height(area_name: String) -> float:
 	var existing_height := 0.0
-	var area := get_node_or_null(area_name)
+	var area := get_contact_area(area_name)
 	if area is Area3D:
-		var shape_node := area.get_node_or_null("CollisionShape3D")
+		var shape_node := ShipContactGeometry.get_contact_area_collision_shape(area)
 		if shape_node is CollisionShape3D and shape_node.shape is BoxShape3D:
 			existing_height = (shape_node.shape as BoxShape3D).size.y
 	return maxf(maxf(existing_height, deck_height + 2.0), 2.0)
 
 func _fit_contact_area_box_shape(area_name: String, size: Vector3) -> void:
-	var area := get_node_or_null(area_name)
+	var area := get_contact_area(area_name)
 	if not (area is Area3D):
 		return
-	var shape_node := area.get_node_or_null("CollisionShape3D")
+	var shape_node := ShipContactGeometry.get_contact_area_collision_shape(area)
 	if not (shape_node is CollisionShape3D):
 		return
 
@@ -403,26 +368,26 @@ func _sync_contact_area_layers(layer_override: int = -1) -> void:
 	if current_layer < 0:
 		var layer_val = get("collision_layer")
 		current_layer = int(layer_val) if layer_val != null else _get_team_collision_layer(get_team_tag())
-	var proximity_area = get_node_or_null("ProximityArea")
+	var proximity_area = get_proximity_area()
 	if proximity_area is Area3D:
 		proximity_area.set_deferred("collision_layer", current_layer)
 		proximity_area.set_deferred("collision_mask", _get_opposing_team_collision_layer(get_team_tag()))
 
-	var hit_area = get_node_or_null("HitArea")
+	var hit_area = get_hit_area()
 	if hit_area is Area3D:
 		hit_area.set_deferred("collision_layer", current_layer)
 		hit_area.set_deferred("collision_mask", 0)
 
 func _set_contact_areas_enabled(enabled: bool) -> void:
-	_set_contact_area_enabled("ProximityArea", enabled)
-	_set_contact_area_enabled("HitArea", enabled)
+	_set_contact_area_enabled(NODE_PROXIMITY_AREA, enabled)
+	_set_contact_area_enabled(NODE_HIT_AREA, enabled)
 
 func _set_contact_area_enabled(area_name: String, enabled: bool) -> void:
-	var area = get_node_or_null(area_name)
+	var area = get_contact_area(area_name)
 	if area is Area3D:
 		area.set_deferred("monitoring", enabled)
 		area.set_deferred("monitorable", enabled)
-		var shape_node = area.get_node_or_null("CollisionShape3D")
+		var shape_node = ShipContactGeometry.get_contact_area_collision_shape(area)
 		if shape_node is CollisionShape3D:
 			shape_node.set_deferred("disabled", not enabled)
 
@@ -570,6 +535,85 @@ func get_projectile_aim_point(vertical_offset: float = 0.55) -> Vector3:
 
 func get_ship_authoring_summary() -> Dictionary:
 	return ShipAuthoringHelper.build_summary(self)
+
+func get_proximity_area() -> Area3D:
+	var area := get_node_or_null(NODE_PROXIMITY_AREA)
+	return area as Area3D if area is Area3D else null
+
+func get_hit_area() -> Area3D:
+	var area := get_node_or_null(NODE_HIT_AREA)
+	return area as Area3D if area is Area3D else null
+
+func get_contact_area(area_name: String) -> Area3D:
+	match area_name:
+		NODE_PROXIMITY_AREA:
+			return get_proximity_area()
+		NODE_HIT_AREA:
+			return get_hit_area()
+		_:
+			var area := get_node_or_null(area_name)
+			return area as Area3D if area is Area3D else null
+
+func get_soldiers_container() -> Node:
+	return get_node_or_null(NODE_SOLDIERS)
+
+func get_cannons_container() -> Node3D:
+	var preferred_node: Node3D = null
+	for child in get_children():
+		if not is_instance_valid(child):
+			continue
+		if str(child.name).contains("Hull"):
+			var nested := child.find_child(NODE_CANNONS, true, false)
+			if nested is Node3D:
+				preferred_node = nested as Node3D
+				break
+
+	if preferred_node == null:
+		var any_cannons := find_child(NODE_CANNONS, true, false)
+		if any_cannons is Node3D:
+			preferred_node = any_cannons as Node3D
+
+	return preferred_node
+
+func ensure_cannons_container() -> Node3D:
+	var cannons_node := get_cannons_container()
+	if is_instance_valid(cannons_node):
+		return cannons_node
+	cannons_node = Node3D.new()
+	cannons_node.name = NODE_CANNONS
+	add_child(cannons_node)
+	return cannons_node
+
+func clear_hull_defense_upgrade_nodes() -> void:
+	_queue_scene_contract_child(NODE_SPEAR_RAIL)
+	_queue_scene_contract_child(NODE_HULL_DEFENSE_VISUALS)
+	if has_meta("spear_rail_damage"):
+		remove_meta("spear_rail_damage")
+
+func clear_singigeon_launcher() -> void:
+	_queue_scene_contract_child(NODE_SINGIGEON_LAUNCHER)
+
+func install_janggun_launcher(launcher_scene: PackedScene, local_position: Vector3 = Vector3(0.0, 0.8, 2.0)) -> Node3D:
+	var existing := get_node_or_null(NODE_JANGGUN_LAUNCHER)
+	if existing is Node3D:
+		return existing as Node3D
+	if launcher_scene == null:
+		return null
+	var launcher := launcher_scene.instantiate()
+	if not (launcher is Node3D):
+		if is_instance_valid(launcher):
+			launcher.queue_free()
+		return null
+	launcher.name = NODE_JANGGUN_LAUNCHER
+	add_child(launcher)
+	var launcher_node := launcher as Node3D
+	launcher_node.position = local_position
+	return launcher_node
+
+func _queue_scene_contract_child(child_name: String) -> void:
+	var child := get_node_or_null(child_name)
+	if is_instance_valid(child):
+		child.queue_free()
 
 func get_base_collision_radius_value() -> float:
 	return base_collision_radius
@@ -811,7 +855,7 @@ func _set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float =
 
 ## 함선 충각(Ramming) 시 갑판 위 병사들에게 광역 데미지 및 넉백 부여
 func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node: return
 	
 	var applied_min: float = INF
@@ -846,7 +890,7 @@ func apply_ramming_aoe(damage: float, impact_pos: Vector3) -> void:
 
 ## 현재 생존 중인 선원(병사) 수 반환
 func get_alive_crew_count() -> int:
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node: return 0
 	
 	var ship_team: String = get_team_tag()
@@ -906,7 +950,7 @@ func has_active_crew_role(role_name: String) -> bool:
 	var normalized_role := role_name.strip_edges().to_lower()
 	if normalized_role.is_empty():
 		return false
-	var soldiers_node := get_node_or_null("Soldiers")
+	var soldiers_node := get_soldiers_container()
 	if not is_instance_valid(soldiers_node):
 		return false
 		for child in soldiers_node.get_children():
@@ -924,7 +968,7 @@ func replace_preview_crew_role(from_role: String, to_role: String = "general") -
 	var normalized_to := to_role.strip_edges().to_lower()
 	if normalized_from.is_empty() or normalized_to.is_empty() or normalized_from == normalized_to:
 		return
-	var soldiers_node := get_node_or_null("Soldiers")
+	var soldiers_node := get_soldiers_container()
 	if not is_instance_valid(soldiers_node):
 		return
 	for child in soldiers_node.get_children():

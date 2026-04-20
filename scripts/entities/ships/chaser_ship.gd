@@ -9,6 +9,7 @@ const ChaserShipSupportHelper = preload("res://scripts/entities/ships/chaser_shi
 const ChaserShipAiHelper = preload("res://scripts/entities/ships/chaser_ship_ai_helper.gd")
 const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
 const ShipLimboAIPilot = preload("res://scripts/ai/limbo/ship_limbo_ai_pilot.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
@@ -385,8 +386,11 @@ func _ready() -> void:
 		_remove_all_cannons()
 	
 	# 초기 팀 표식 설정. 돛 색은 선체/돛대 기본 재질을 유지한다.
+	var enemy_flag_style := FlagStyleLibrary.pick_enemy_style_for_ship_type(ship_type, formation_role_name)
 	for mast in masts:
-		if mast.has_method("set_team_color"):
+		if mast.has_method("set_flag_style"):
+			mast.set_flag_style(enemy_flag_style)
+		elif mast.has_method("set_team_color"):
 			mast.set_team_color("enemy")
 	add_to_group("ships")
 	set_team(team)
@@ -438,7 +442,7 @@ func _load_packed_scene(path: String) -> PackedScene:
 
 func _setup_soldiers() -> void:
 	if not soldier_scene: return
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node: return
 	
 	# ✅ 기존에 씬에 배치된 병사가 있다면 제거 (중복 및 팀 믹스 방지)
@@ -454,7 +458,7 @@ func _setup_soldiers() -> void:
 func _setup_soldiers_staggered() -> void:
 	if not soldier_scene or not is_inside_tree():
 		return
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node:
 		return
 
@@ -482,7 +486,11 @@ func _spawn_one_soldier(s_team: String, soldier_type_override: String = "") -> v
 	s.owned_ship = self
 	s.home_ship = self
 	_configure_spawned_soldier(s, soldier_type_name)
-	$Soldiers.add_child(s)
+	var soldiers_node := get_soldiers_container()
+	if not is_instance_valid(soldiers_node):
+		s.queue_free()
+		return
+	soldiers_node.add_child(s)
 	s.set_team(s_team)
 	_configure_spawned_soldier(s, soldier_type_name)
 		
@@ -579,7 +587,7 @@ func add_survivor(_allow_over_capacity: bool = true) -> bool:
 		return false
 	if not soldier_scene:
 		return false
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node:
 		return false
 	
@@ -601,7 +609,7 @@ func add_survivor(_allow_over_capacity: bool = true) -> bool:
 
 func _get_next_crew_spawn_transform(fallback_x: float, fallback_z: float) -> Transform3D:
 	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-fallback_x, fallback_x), 0.5, randf_range(-fallback_z, fallback_z)))
-	var soldiers_node := get_node_or_null("Soldiers") as Node3D
+	var soldiers_node := get_soldiers_container() as Node3D
 	if not is_instance_valid(soldiers_node):
 		return fallback
 	return ShipAuthoringHelper.get_least_occupied_crew_slot_transform(self, soldiers_node, fallback)
@@ -828,7 +836,10 @@ func _update_children_team_for_capture() -> void:
 	_update_children_team()
 	
 	# 병사 팀 변경
-	for s in $Soldiers.get_children():
+	var soldiers_node := get_soldiers_container()
+	if not is_instance_valid(soldiers_node):
+		return
+	for s in soldiers_node.get_children():
 		if s.has_method("set_team"):
 			s.set_team("player")
 			s.owned_ship = self
@@ -849,7 +860,9 @@ func _apply_minion_visuals() -> void:
 	for mast in masts:
 		if mast.has_method("set_sail_color"):
 			mast.set_sail_color(Color(0.9, 0.9, 1.0, 1.0)) # 밝은 하늘색/흰색
-		if mast.has_method("set_team_color"):
+		if mast.has_method("set_flag_style"):
+			mast.set_flag_style(FlagStyleLibrary.STYLE_PLAYER_SUPPORT)
+		elif mast.has_method("set_team_color"):
 			mast.set_team_color("player")
 			
 	# 연기 효과 중지 (폐선 상태에서 났던 것)
@@ -909,7 +922,7 @@ func _update_wave_sounds(delta: float) -> void:
 func _update_minion_respawn(delta: float) -> void:
 	if deck_is_contested or deck_is_overrun:
 		return
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node: return
 	
 	var alive_count = 0

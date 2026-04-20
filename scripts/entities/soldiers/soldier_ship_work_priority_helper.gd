@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierShipWorkPriorityHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
@@ -429,7 +430,7 @@ static func _collect_gunnery_duty_workers(ship: Node, team: String) -> Array[Nod
 	var workers: Array[Node] = []
 	var candidates: Array = EntityRegistry.get_soldiers_by_ship(ship)
 	if candidates.is_empty():
-		var soldiers_node: Node = ship.get_node_or_null("Soldiers") if is_instance_valid(ship) else null
+		var soldiers_node: Node = NodeContractHelper.get_soldiers_container(ship)
 		if is_instance_valid(soldiers_node):
 			candidates = soldiers_node.get_children()
 	for child in candidates:

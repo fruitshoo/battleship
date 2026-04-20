@@ -30,6 +30,8 @@ Default quick checks:
 
 Recent regression coverage to keep together:
 
+- Scene contract encapsulation keeps ship-internal node names behind `BaseShip` and `NodeContractHelper` accessors.
+  Production code should not call `get_node("Soldiers")`, `get_node_or_null("HitArea")`, `get_node_or_null("ProximityArea")`, `get_node_or_null("Cannons")`, upgrade-mount child names, or soldier body-part child names directly outside those owners; the modularity guard enforces this.
 - Rope pull must require an active rope visual, so a cleared hook graphic cannot keep dragging ships.
 - Support free-combat assist must recall near the player and keep rowing/wind compensation so it does not feel abandoned in free engagement mode.
 - Enemy boarders on the player deck may speak, but ordinary enemy soldiers on their own ship should not spam speech labels.

@@ -2,6 +2,7 @@ extends RefCounted
 class_name BaseShipStatusHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SupportBoardingHelper = preload("res://scripts/entities/ships/support_boarding_helper.gd")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
@@ -48,7 +49,7 @@ static func check_derelict_status(ship) -> void:
 
 	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
 	var all_crew_dead = true
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if soldiers_node:
 		for child in EntityRegistry.get_soldiers_by_ship(ship):
 			var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))

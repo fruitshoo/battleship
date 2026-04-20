@@ -364,7 +364,7 @@ func _update_crew_respawn(delta: float) -> void:
 	if _has_nearby_enemy_pressure_for_respawn():
 		return
 
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if not soldiers_node: return
 
 	if get_alive_crew_count() <= 0:

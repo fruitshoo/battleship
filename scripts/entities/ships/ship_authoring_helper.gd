@@ -12,6 +12,8 @@ const WEAPON_SLOTS := "WeaponSlots"
 const CREW_SLOTS := "CrewSlots"
 const DECK_AREA := "DeckArea"
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
 static func build_summary(ship: Node) -> Dictionary:
@@ -34,10 +36,10 @@ static func build_summary(ship: Node) -> Dictionary:
 	var hull_sources := _collect_hull_sources(ship)
 	summary["hull_sources"] = hull_sources
 	summary["has_hull_source"] = not hull_sources.is_empty()
-	summary["has_soldiers_container"] = ship.get_node_or_null("Soldiers") != null
+	summary["has_soldiers_container"] = NodeContractHelper.get_soldiers_container(ship) != null
 	summary["contact_areas"] = {
-		"HitArea": _build_contact_area_summary(ship, "HitArea"),
-		"ProximityArea": _build_contact_area_summary(ship, "ProximityArea"),
+		NodeContractHelper.SHIP_NODE_HIT_AREA: _build_contact_area_summary(ship, NodeContractHelper.SHIP_NODE_HIT_AREA),
+		NodeContractHelper.SHIP_NODE_PROXIMITY_AREA: _build_contact_area_summary(ship, NodeContractHelper.SHIP_NODE_PROXIMITY_AREA),
 	}
 	summary["authoring_markers"] = {
 		BOARDING_ANCHORS: get_authoring_markers(ship, BOARDING_ANCHORS).size(),
@@ -68,7 +70,7 @@ static func validate_ship_authoring(ship: Node, label: String, failures: Array[S
 		failures.append("%s authoring missing Soldiers container" % label)
 
 	var contact_areas: Dictionary = summary["contact_areas"]
-	for area_name in ["HitArea", "ProximityArea"]:
+	for area_name in NodeContractHelper.SHIP_CONTACT_AREA_NAMES:
 		var area_summary: Dictionary = contact_areas.get(area_name, {})
 		if not bool(area_summary.get("exists", false)):
 			failures.append("%s authoring missing %s" % [label, area_name])
@@ -267,11 +269,15 @@ static func _build_contact_area_summary(ship: Node, area_name: String) -> Dictio
 		"has_box_shape": false,
 		"box_size": Vector3.ZERO,
 	}
-	var area := ship.get_node_or_null(area_name)
+	var area: Area3D = null
+	if area_name == NodeContractHelper.SHIP_NODE_HIT_AREA:
+		area = NodeContractHelper.get_hit_area(ship)
+	elif area_name == NodeContractHelper.SHIP_NODE_PROXIMITY_AREA:
+		area = NodeContractHelper.get_proximity_area(ship)
 	if not (area is Area3D):
 		return result
 	result["exists"] = true
-	var shape_node := area.get_node_or_null("CollisionShape3D")
+	var shape_node := ShipContactGeometry.get_contact_area_collision_shape(area)
 	if not (shape_node is CollisionShape3D):
 		return result
 	result["has_collision_shape"] = true

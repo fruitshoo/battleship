@@ -801,7 +801,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/base_ship_status_helper.gd": {
-      "count": 18,
+      "count": 21,
       "functions": [
         "update_fire_effect",
         "set_fire_emitting",
@@ -1370,7 +1370,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/soldiers/soldier_combat_helper.gd": {
-      "count": 13,
+      "count": 14,
       "functions": [
         "perform_special_attack",
         "perform_attack",
@@ -1380,16 +1380,17 @@
         "_play_thrust_attack_animation",
         "_play_ranged_attack_animation",
         "_get_weapon_visual_node",
+        "_get_hand_pivot",
         "_cache_attack_rest_transforms",
         "_reset_attack_pose",
         "_stop_tracked_tween",
         "check_ranged_combat",
         "find_ranged_target"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Scene contract encapsulation routes soldier hand-pivot lookup through the Soldier owner contract."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
-      "count": 21,
+      "count": 22,
       "functions": [
         "take_damage",
         "get_ship_ranged_cover_reduction",
@@ -1407,13 +1408,14 @@
         "_try_recover_incapacitated",
         "_recover_incapacitated_now",
         "_has_hostile_on_owned_ship",
+        "_set_body_collision_disabled",
         "_get_incapacitated_recovery_delay",
         "_get_incapacitated_recovery_health_ratio",
         "_get_incapacitated_recovery_stat_ship",
         "_apply_melee_kill_bonus",
         "_apply_enemy_kill_rewards"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Scene contract encapsulation routes soldier collision-shape toggling through the Soldier owner contract."
     },
     "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
       "count": 2,
@@ -1539,7 +1541,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/soldiers/soldier_visual_helper.gd": {
-      "count": 23,
+      "count": 26,
       "functions": [
         "ensure_visual_root",
         "setup_visual_scene",
@@ -1548,6 +1550,9 @@
         "get_pose_node",
         "_find_body_mesh_instance",
         "_find_named_mesh_instance",
+        "_get_custom_visual_node",
+        "_get_fallback_visual_mesh",
+        "_get_soldier_hand_pivot",
         "_find_first_mesh_instance",
         "_cache_body_mesh_rest_transform",
         "_cache_pose_node_rest_transform",
@@ -1565,7 +1570,7 @@
         "play_boarding_jump_pose",
         "play_recovery_pose"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Scene contract encapsulation routes soldier visual-part lookups through the Soldier owner contract."
     },
     "res://scripts/entities/soldiers/soldier_weapon_helper.gd": {
       "count": 5,
@@ -1579,7 +1584,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/helpers/node_contract_helper.gd": {
-      "count": 13,
+      "count": 21,
       "functions": [
         "get_team_tag",
         "is_team",
@@ -1590,12 +1595,20 @@
         "get_projectile_aim_point",
         "get_boarding_target_ship",
         "get_target_ship",
+        "get_soldiers_container",
+        "get_cannons_container",
+        "ensure_cannons_container",
+        "clear_hull_defense_upgrade_nodes",
+        "clear_singigeon_launcher",
+        "install_janggun_launcher",
+        "get_proximity_area",
+        "get_hit_area",
         "get_base_collision_radius_value",
         "get_collision_width_multiplier_value",
         "get_collision_length_multiplier_value",
         "is_player_controlled_ship"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Scene contract encapsulation intentionally exposes ship child, weapon-container, and upgrade-mount accessors so production code does not depend on internal node names."
     },
     "res://scripts/managers/enemy_spawner_fleet_helper.gd": {
       "count": 43,
@@ -2512,6 +2525,11 @@
       "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
+    },
     "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/entities/soldiers/soldier_boarding_helper.gd": {
       "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
       "to": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
@@ -2541,6 +2559,11 @@
       "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
       "to": "res://scripts/entities/ships/support_boarding_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
     },
     "res://scripts/entities/ships/base_ship_status_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
       "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
@@ -2652,6 +2675,16 @@
       "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/entities/ships/player_ship_runtime_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_runtime_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
+    },
+    "res://scripts/entities/ships/ship_authoring_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_authoring_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation lets authoring summaries inspect public ship child contracts without direct node-name coupling."
+    },
     "res://scripts/entities/ships/player_ship_crew_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
       "from": "res://scripts/entities/ships/player_ship_crew_helper.gd",
       "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
@@ -2722,6 +2755,11 @@
       "to": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/entities/soldiers/soldier_boarding_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
+    },
     "res://scripts/entities/soldiers/soldier_combat_helper.gd|res://scripts/entities/soldiers/soldier_visual_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_combat_helper.gd",
       "to": "res://scripts/entities/soldiers/soldier_visual_helper.gd",
@@ -2731,6 +2769,11 @@
       "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
       "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
@@ -2747,10 +2790,20 @@
       "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
+    },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/entities/soldiers/soldier_action_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
       "to": "res://scripts/entities/soldiers/soldier_action_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
@@ -2941,6 +2994,11 @@
       "from": "res://scripts/ui/hud/hud_ship_debug_helper.gd",
       "to": "res://scripts/ui/hud/hud_lookup_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/ui/hud/hud_stat_panel_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_stat_panel_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
     },
     "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd|res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
       "from": "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd",

@@ -137,18 +137,10 @@ static func sync_debug_tools_panel_state(hud) -> void:
 			environment_text = "낮" if preset_index == 0 else "밤"
 		hud.debug_environment_value.text = "프리셋: %s" % environment_text
 	if is_instance_valid(hud.debug_collision_value):
-		var collision_text := "OFF"
+		var bounds_text := "OFF"
 		if CollisionVisualizer.runtime_enabled:
-			var mode_name := "ALL"
-			match CollisionVisualizer.runtime_mode:
-				CollisionVisualizer.MODE_BASE:
-					mode_name = "BASE"
-				CollisionVisualizer.MODE_SEPARATION:
-					mode_name = "SEPARATION"
-				CollisionVisualizer.MODE_GUARD:
-					mode_name = "GUARD"
-			collision_text = "ON (%s)" % mode_name
-		hud.debug_collision_value.text = "충돌/탄착: %s" % collision_text
+			bounds_text = "ON (%s)" % CollisionVisualizer.get_mode_name(CollisionVisualizer.runtime_mode)
+		hud.debug_collision_value.text = "선박 영역: %s" % bounds_text
 	if is_instance_valid(hud.debug_distance_value):
 		hud.debug_distance_value.text = "거리 표시: %s" % ("ON" if DistanceDebugVisualizer.runtime_enabled else "OFF")
 	if is_instance_valid(hud.debug_draw_channels_value):
@@ -193,7 +185,7 @@ static func _add_debug_draw_section(hud, panel_box: VBoxContainer) -> void:
 	hud.debug_draw_channels_value = status
 
 	var collision_status := Label.new()
-	collision_status.text = "충돌/탄착: OFF"
+	collision_status.text = "선박 영역: OFF"
 	NavalUiTheme.style_body(collision_status, 11)
 	section["body"].add_child(collision_status)
 	hud.debug_collision_value = collision_status
@@ -207,11 +199,11 @@ static func _add_debug_draw_section(hud, panel_box: VBoxContainer) -> void:
 	var collision_row := HBoxContainer.new()
 	collision_row.add_theme_constant_override("separation", 4)
 	section["body"].add_child(collision_row)
-	collision_row.add_child(create_debug_action_button("충돌/탄착", func() -> void:
+	collision_row.add_child(create_debug_action_button("선박 영역", func() -> void:
 		hud._invoke_level_debug_method("_toggle_collision_visualizers")
 		hud._sync_debug_tools_panel_state()
 	))
-	collision_row.add_child(create_debug_action_button("모드", func() -> void:
+	collision_row.add_child(create_debug_action_button("영역 모드", func() -> void:
 		hud._invoke_level_debug_method("_cycle_collision_visualizer_mode")
 		hud._sync_debug_tools_panel_state()
 	))
@@ -223,33 +215,43 @@ static func _add_debug_draw_section(hud, panel_box: VBoxContainer) -> void:
 	var row_a := HBoxContainer.new()
 	row_a.add_theme_constant_override("separation", 4)
 	section["body"].add_child(row_a)
+	row_a.add_child(create_debug_action_button("충돌", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_COLLISION)
+	))
+	row_a.add_child(create_debug_action_button("탄착", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_PROJECTILE)
+	))
 	row_a.add_child(create_debug_action_button("AI 의도", func() -> void:
 		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_AI_INTENT)
-	))
-	row_a.add_child(create_debug_action_button("스폰", func() -> void:
-		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SPAWN)
-	))
-	row_a.add_child(create_debug_action_button("선원", func() -> void:
-		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_CREW_WORK)
 	))
 
 	var row_b := HBoxContainer.new()
 	row_b.add_theme_constant_override("separation", 4)
 	section["body"].add_child(row_b)
+	row_b.add_child(create_debug_action_button("스폰", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SPAWN)
+	))
+	row_b.add_child(create_debug_action_button("선원", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_CREW_WORK)
+	))
 	row_b.add_child(create_debug_action_button("지원", func() -> void:
 		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SUPPORT)
-	))
-	row_b.add_child(create_debug_action_button("바람", func() -> void:
-		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_WIND)
-	))
-	row_b.add_child(create_debug_action_button("사이트", func() -> void:
-		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SITE)
 	))
 
 	var row_c := HBoxContainer.new()
 	row_c.add_theme_constant_override("separation", 4)
 	section["body"].add_child(row_c)
-	row_c.add_child(create_debug_action_button("드로우 끄기", func() -> void:
+	row_c.add_child(create_debug_action_button("바람", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_WIND)
+	))
+	row_c.add_child(create_debug_action_button("사이트", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SITE)
+	))
+
+	var row_d := HBoxContainer.new()
+	row_d.add_theme_constant_override("separation", 4)
+	section["body"].add_child(row_d)
+	row_d.add_child(create_debug_action_button("드로우 끄기", func() -> void:
 		for channel in DebugDrawBridge.CHANNEL_ORDER:
 			DebugDrawBridge.set_channel_enabled(str(channel), false)
 		hud._invoke_level_debug_method("_set_collision_visualizers_enabled", [false])

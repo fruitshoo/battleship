@@ -2,6 +2,7 @@ extends RefCounted
 class_name BaseShipBoardingHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
@@ -140,7 +141,7 @@ static func _get_ship_team_tag(ship) -> String:
 static func _count_target_defenders(ship, team_prop: String) -> int:
 	if not is_instance_valid(ship.boarding_target):
 		return 0
-	var target_soldiers_node = ship.boarding_target.get_node_or_null("Soldiers")
+	var target_soldiers_node = NodeContractHelper.get_soldiers_container(ship.boarding_target)
 	if not target_soldiers_node:
 		target_soldiers_node = ship.boarding_target
 	var defenders_alive := 0
@@ -155,7 +156,7 @@ static func _count_target_defenders(ship, team_prop: String) -> int:
 static func _count_target_attackers(ship, team_prop: String) -> int:
 	if not is_instance_valid(ship.boarding_target):
 		return 0
-	var target_soldiers_node = ship.boarding_target.get_node_or_null("Soldiers")
+	var target_soldiers_node = NodeContractHelper.get_soldiers_container(ship.boarding_target)
 	if not target_soldiers_node:
 		target_soldiers_node = ship.boarding_target
 	var attackers_alive := 0
@@ -168,7 +169,7 @@ static func _count_target_attackers(ship, team_prop: String) -> int:
 
 
 static func _count_ready_boarders(ship, team_prop: String) -> int:
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return 0
 	var ready_count := 0
@@ -197,7 +198,7 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 	if not is_instance_valid(ship.boarding_target):
 		return false
 
-	var target_soldiers_node = ship.boarding_target.get_node_or_null("Soldiers")
+	var target_soldiers_node = NodeContractHelper.get_soldiers_container(ship.boarding_target)
 	if not target_soldiers_node:
 		target_soldiers_node = ship.boarding_target
 
@@ -217,7 +218,7 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 			return false
 
 	var s = null
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if soldiers_node:
 		var soldiers = soldiers_node.get_children()
 		var enemy_count_on_deck = 0
@@ -389,7 +390,7 @@ static func _find_nearest_hostile_soldier(boarder: Node3D, target_ship: Node3D, 
 	var nearest: Node3D = null
 	var nearest_distance_sq: float = INF
 	var candidates: Array = []
-	var soldiers_node: Node = target_ship.get_node_or_null("Soldiers")
+	var soldiers_node: Node = NodeContractHelper.get_soldiers_container(target_ship)
 	if is_instance_valid(soldiers_node):
 		candidates = soldiers_node.get_children()
 	for registered_soldier in EntityRegistry.get_soldiers_by_ship(target_ship):

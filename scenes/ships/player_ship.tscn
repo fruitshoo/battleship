@@ -23,14 +23,14 @@ metadata/ally_ship_role = "player_flagship"
 collision_layer = 2
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
+[node name="ProximityShape" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
 shape = SubResource("BoxShape3D_0dgdr")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=195625511 groups=["ship_hitbox"]]
 collision_layer = 2
 collision_mask = 0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
+[node name="HitShape" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("BoxShape3D_r4bi8")
 

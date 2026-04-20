@@ -4,6 +4,7 @@ const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 static func process_stat_panel(hud, delta: float) -> void:
@@ -120,7 +121,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var cannon_expected_dps: float = 0.0
 	var primary_cannon: Node = _get_primary_cannon(ship)
 	if is_instance_valid(primary_cannon):
-		var cannons_node = ship.get_node_or_null("Cannons")
+		var cannons_node := NodeContractHelper.get_cannons_container(ship)
 		if is_instance_valid(cannons_node):
 			for child in cannons_node.get_children():
 				if is_instance_valid(child):
@@ -274,7 +275,7 @@ static func _create_icon_label(icon_name: String, font_size: int, color: Color) 
 	return icon_label
 
 static func _get_primary_cannon(ship) -> Node:
-	var cannons_node = ship.get_node_or_null("Cannons")
+	var cannons_node := NodeContractHelper.get_cannons_container(ship)
 	if not is_instance_valid(cannons_node):
 		return null
 	for child in cannons_node.get_children():
@@ -318,7 +319,7 @@ static func _collect_crew_stats(ship) -> Dictionary:
 		"crit_chance": 0.0,
 		"crit_multiplier": 1.0,
 	}
-	var soldiers_node = ship.get_node_or_null("Soldiers")
+	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not is_instance_valid(soldiers_node):
 		return result
 

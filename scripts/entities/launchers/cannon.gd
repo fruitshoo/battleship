@@ -187,6 +187,8 @@ func get_debug_cannon_snapshot() -> Dictionary:
 		"crit_chance": _cached_crit_chance,
 		"crit_multiplier": _cached_crit_multiplier,
 		"expected_dps": expected_shot_damage / current_cooldown if current_cooldown > 0.0 else 0.0,
+		"detection_monitoring": is_processing() and is_physics_processing(),
+		"detection_overlap_count": 1 if is_instance_valid(current_target) else 0,
 		"projectile_stats": projectile_stats,
 	}
 

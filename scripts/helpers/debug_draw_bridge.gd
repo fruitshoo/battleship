@@ -4,6 +4,7 @@ extends RefCounted
 const DEFAULT_SEGMENTS := 72
 const DEFAULT_THICKNESS := 0.035
 const DEBUG_DRAW_3D_EXTENSION_PATH := "res://addons/debug_draw_3d/debug_draw_3d.gdextension"
+const CHANNEL_SHIP_BOUNDS := "ship_bounds"
 const CHANNEL_COLLISION := "collision"
 const CHANNEL_PROJECTILE := "projectile"
 const CHANNEL_SUPPORT := "support"
@@ -13,6 +14,7 @@ const CHANNEL_CREW_WORK := "crew_work"
 const CHANNEL_WIND := "wind"
 const CHANNEL_SITE := "site"
 const CHANNEL_ORDER := [
+	CHANNEL_SHIP_BOUNDS,
 	CHANNEL_COLLISION,
 	CHANNEL_PROJECTILE,
 	CHANNEL_SUPPORT,
@@ -23,6 +25,7 @@ const CHANNEL_ORDER := [
 	CHANNEL_SITE,
 ]
 const CHANNEL_LABELS := {
+	CHANNEL_SHIP_BOUNDS: "선박영역",
 	CHANNEL_COLLISION: "충돌",
 	CHANNEL_PROJECTILE: "탄착",
 	CHANNEL_SUPPORT: "지원",
@@ -37,6 +40,7 @@ static var collision_debug_enabled: bool = false
 static var projectile_debug_enabled: bool = false
 static var support_debug_enabled: bool = false
 static var _channels := {
+	CHANNEL_SHIP_BOUNDS: false,
 	CHANNEL_COLLISION: false,
 	CHANNEL_PROJECTILE: false,
 	CHANNEL_SUPPORT: false,
@@ -52,6 +56,10 @@ static var _load_attempted: bool = false
 static func set_collision_debug_enabled(enabled: bool) -> void:
 	set_channel_enabled(CHANNEL_COLLISION, enabled)
 	set_channel_enabled(CHANNEL_PROJECTILE, enabled)
+
+
+static func set_ship_bounds_debug_enabled(enabled: bool) -> void:
+	set_channel_enabled(CHANNEL_SHIP_BOUNDS, enabled)
 
 
 static func set_projectile_debug_enabled(enabled: bool) -> void:
@@ -148,22 +156,50 @@ static func draw_circle_xz(center: Vector3, radius: float, color: Color, y_offse
 	draw_ellipse_xz(center, Basis.IDENTITY, radius, radius, color, y_offset, duration, segments, thickness)
 
 
+static func draw_box(transform: Transform3D, size: Vector3, color: Color, duration: float = 0.0, thickness: float = DEFAULT_THICKNESS) -> void:
+	if size.x <= 0.01 or size.y <= 0.01 or size.z <= 0.01 or not can_draw():
+		return
+	var half := size * 0.5
+	var corners := [
+		Vector3(-half.x, -half.y, -half.z),
+		Vector3(half.x, -half.y, -half.z),
+		Vector3(half.x, -half.y, half.z),
+		Vector3(-half.x, -half.y, half.z),
+		Vector3(-half.x, half.y, -half.z),
+		Vector3(half.x, half.y, -half.z),
+		Vector3(half.x, half.y, half.z),
+		Vector3(-half.x, half.y, half.z),
+	]
+	for index in range(corners.size()):
+		corners[index] = transform * corners[index]
+	var edges := [
+		Vector2i(0, 1), Vector2i(1, 2), Vector2i(2, 3), Vector2i(3, 0),
+		Vector2i(4, 5), Vector2i(5, 6), Vector2i(6, 7), Vector2i(7, 4),
+		Vector2i(0, 4), Vector2i(1, 5), Vector2i(2, 6), Vector2i(3, 7),
+	]
+	var _scope = _make_scope(thickness, true)
+	for edge in edges:
+		_call_3d("draw_line", [corners[edge.x], corners[edge.y], color, duration])
+
+
 static func draw_ellipse_xz(center: Vector3, basis: Basis, radius_x: float, radius_z: float, color: Color, y_offset: float = 0.0, duration: float = 0.0, segments: int = DEFAULT_SEGMENTS, thickness: float = DEFAULT_THICKNESS) -> void:
 	if radius_x <= 0.01 or radius_z <= 0.01 or not can_draw():
 		return
 	segments = maxi(12, segments)
 	var right := basis.x
 	var forward := basis.z
-	var up := basis.y
+	var up := Vector3.UP
+	right.y = 0.0
+	forward.y = 0.0
 	if right.length_squared() <= 0.0001:
 		right = Vector3.RIGHT
 	if forward.length_squared() <= 0.0001:
 		forward = Vector3.FORWARD
-	if up.length_squared() <= 0.0001:
-		up = Vector3.UP
-	right = right.normalized()
 	forward = forward.normalized()
-	up = up.normalized()
+	right = (right - forward * right.dot(forward))
+	if right.length_squared() <= 0.0001:
+		right = Vector3.UP.cross(forward)
+	right = right.normalized()
 	var origin := center + up * y_offset
 	var path := PackedVector3Array()
 	path.resize(segments + 1)

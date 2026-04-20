@@ -19,7 +19,7 @@ func _ready() -> void:
 	scale = Vector3(1.8, 1.8, 1.8)
 	
 	# 병사들은 원래 크기 유지 (부모 스케일의 역수를 적용하여 상쇄)
-	var soldiers_node = get_node_or_null("Soldiers")
+	var soldiers_node = get_soldiers_container()
 	if soldiers_node:
 		soldiers_node.scale = Vector3.ONE / scale
 	

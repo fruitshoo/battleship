@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierShipHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 
@@ -290,7 +291,7 @@ static func get_clamped_ship_deck_local(soldier, ship: Node3D, local_position: V
 
 
 static func _get_ship_soldier_parent(ship: Node3D) -> Node:
-	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
+	var soldiers_node: Node = NodeContractHelper.get_soldiers_container(ship)
 	if is_instance_valid(soldiers_node):
 		return soldiers_node
 	return ship
