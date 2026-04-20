@@ -224,10 +224,12 @@ func _ready() -> void:
 	_verify_support_ship_rescues_overrun_player_deck(failures)
 	_verify_support_ship_rescues_contested_player_deck(failures)
 	_verify_support_rescue_boarding_relaxes_bad_alignment(failures)
+	_verify_support_rescue_waits_until_boarding_motion_range(failures)
 	_verify_support_hold_formation_ignores_normal_threats(failures)
 	_verify_support_hold_formation_allows_boarding_attacker(failures)
 	_verify_support_free_assist_recalls_near_player(failures)
 	_verify_boarding_transfer_snaps_soldier_to_target_deck(failures)
+	_verify_boarding_transfer_wave_sends_multiple_soldiers(failures)
 	await _verify_boarding_transfer_tracks_moving_target_deck(failures)
 	_verify_soldier_deck_recovery_repairs_parent_and_bounds(failures)
 	_verify_soldier_boarding_status_marks_returning(failures)
@@ -394,7 +396,7 @@ func _verify_support_rescue_boarding_relaxes_bad_alignment(failures: Array[Strin
 	var player := MockTargetShip.new()
 	add_child(player)
 	player.team = "player"
-	player.global_position = Vector3(9.9, 0.0, 0.0)
+	player.global_position = Vector3(8.8, 0.0, 0.0)
 	player.deck_is_overrun = true
 	player.deck_friendly_crew_count = 0
 	player.deck_hostile_boarder_count = 2
@@ -405,6 +407,36 @@ func _verify_support_rescue_boarding_relaxes_bad_alignment(failures: Array[Strin
 		failures.append("support rescue boarding stayed in assist mode when close but not side-aligned")
 	if str(support.get_meta("boarding_contact_mode", "")) != "cleanup":
 		failures.append("support rescue boarding did not fall back to cleanup contact when alignment was poor")
+
+	player.queue_free()
+	support.queue_free()
+
+
+func _verify_support_rescue_waits_until_boarding_motion_range(failures: Array[String]) -> void:
+	var support := MockSupportShip.new()
+	add_child(support)
+	support.global_position = Vector3.ZERO
+	support.collision_distance = 8.0
+	support.side_boarding = false
+	support.cleanup_boarding = false
+
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.team = "player"
+	player.global_position = Vector3(9.8, 0.0, 0.0)
+	player.deck_is_overrun = true
+	player.deck_friendly_crew_count = 0
+	player.deck_hostile_boarder_count = 2
+	support.target = player
+
+	var started_far: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	if started_far == true or support.is_boarding == true:
+		failures.append("support rescue boarding started before boarding motion range and can freeze outside contact")
+
+	player.global_position = Vector3(8.8, 0.0, 0.0)
+	var started_close: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	if started_close != true or support.boarding_target != player:
+		failures.append("support rescue boarding did not start once inside boarding motion range")
 
 	player.queue_free()
 	support.queue_free()
@@ -540,6 +572,53 @@ func _verify_boarding_transfer_snaps_soldier_to_target_deck(failures: Array[Stri
 		failures.append("boarding transfer landing did not snap soldier to target deck height")
 	if absf(soldier.position.x) > target.deck_half_extents.x or absf(soldier.position.z) > target.deck_half_extents.y:
 		failures.append("boarding transfer landing did not clamp soldier inside target deck bounds")
+
+	target.queue_free()
+	source.queue_free()
+
+
+func _verify_boarding_transfer_wave_sends_multiple_soldiers(failures: Array[String]) -> void:
+	var source := MockTransferShip.new()
+	add_child(source)
+	source.team = "player"
+	source.global_position = Vector3.ZERO
+
+	var target := MockTransferShip.new()
+	add_child(target)
+	target.team = "enemy"
+	target.global_position = Vector3(6.0, 0.0, 0.0)
+	source.boarding_target = target
+
+	for i in range(4):
+		var boarder := MockTransferSoldier.new()
+		boarder.team = "player"
+		boarder.owned_ship = source
+		boarder.position = Vector3(float(i) * 0.15, 0.4, 0.0)
+		source.get_node("Soldiers").add_child(boarder)
+
+	for i in range(4):
+		var defender := MockTransferSoldier.new()
+		defender.team = "enemy"
+		defender.owned_ship = target
+		defender.position = Vector3(float(i) * 0.15, 0.4, 0.0)
+		target.get_node("Soldiers").add_child(defender)
+
+	var transferred_count := BaseShipBoardingHelper.transfer_boarding_wave(source)
+	var source_player_count := 0
+	var target_player_count := 0
+	for child in source.get_node("Soldiers").get_children():
+		if child.has_method("get_team_tag") and child.get_team_tag() == "player":
+			source_player_count += 1
+	for child in target.get_node("Soldiers").get_children():
+		if child.has_method("get_team_tag") and child.get_team_tag() == "player":
+			target_player_count += 1
+
+	if transferred_count < 2:
+		failures.append("boarding transfer wave did not send multiple soldiers")
+	if target_player_count != transferred_count:
+		failures.append("boarding transfer wave count did not match soldiers moved to target")
+	if source_player_count != 4 - transferred_count:
+		failures.append("boarding transfer wave did not remove moved soldiers from source deck")
 
 	target.queue_free()
 	source.queue_free()

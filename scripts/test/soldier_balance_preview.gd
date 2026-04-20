@@ -327,8 +327,8 @@ func _configure_soldier_for_role(soldier: Node, role_name: String, is_player: bo
 		soldier.set("decision_timer", 0.0)
 	if "combat_timer" in soldier:
 		soldier.set("combat_timer", 0.0)
-	if "home_ground_timer" in soldier:
-		soldier.set("home_ground_timer", 999.0)
+	if "rest_recovery_delay_timer" in soldier:
+		soldier.set("rest_recovery_delay_timer", 999.0)
 
 
 func _stage_soldier_lines(line_gap: float) -> void:

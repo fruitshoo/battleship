@@ -239,3 +239,8 @@ When adding a new harness:
   Compares lightweight `extends base_ship` isolation scripts against the real `chaser_ship.gd`.
   Also includes `process_loop`, `ai_core`, `process_ai`, `capture_minion`, `boarding_collision`, and `late_combined` buckets for narrowing the leak to specific late-method clusters.
   Useful for checking whether the leak comes from helper preloads, top-level declarations, or a specific method family inside the full chaser script.
+
+- `cannon_crew_reload_contract.tscn`
+  Script: `scripts/test/cannon_crew_reload_contract.gd`
+  Wrapper: `scripts/test/run_cannon_crew_reload_contract.sh`
+  Checks modular cannon reload crew power, active broadside allocation, slot reservation, and the legacy reload multiplier fallback.

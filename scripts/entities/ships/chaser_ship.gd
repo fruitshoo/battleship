@@ -572,32 +572,28 @@ func _evacuate_soldiers_to_home() -> void:
 
 ## 생존자 구조 및 병사 합류 처리 (나포함용)
 func add_survivor(_allow_over_capacity: bool = true) -> bool:
-	if is_dying: return false
-	
+	if is_dying:
+		return false
+	if not soldier_scene:
+		return false
 	var soldiers_node = get_node_or_null("Soldiers")
-	if not soldiers_node: return false
+	if not soldiers_node:
+		return false
 	
-	# 현재 살아있는 병사 수 체크
-	var alive_count = 0
+	# 전투불능 병사는 회복 대기 중인 로스터로 취급한다.
+	var roster_count = 0
 	for child in soldiers_node.get_children():
-		if _is_alive_soldier_node(child):
-			alive_count += 1
-		else:
+		if _counts_as_minion_roster_soldier_node(child):
+			roster_count += 1
+		elif ChaserSoldierStateHelper.is_dead_soldier(child):
 			child.queue_free() # 시체 정리
-			
+
 	# 나포함 전용 정원(max_minion_crew) 체크
-	if alive_count >= max_minion_crew:
-		print("[Rescue] 정원 초과 합류! (현재 인원: %d/%d)" % [alive_count + 1, max_minion_crew])
-		# 정원 초과 시에도 합류는 허용하여 생존자가 배에 부딪혀 튕겨나가는 것을 방지함
+	if roster_count >= max_minion_crew:
+		return BaseShipCrewHelper.train_existing_crew_from_survivor(self)
 		
-	# 병사 생성
-	var s = soldier_scene.instantiate()
-	soldiers_node.add_child(s)
-	s.set_team("player")
-	
-	s.transform = _get_next_crew_spawn_transform(0.8, 1.5)
-	
-	print("[Crew] 나포함이 생존자를 구조했습니다! (현재: %d/%d)" % [alive_count + 1, max_minion_crew])
+	_spawn_one_soldier("player")
+	print("[Crew] 나포함이 생존자를 구조했습니다! (현재: %d/%d)" % [roster_count + 1, max_minion_crew])
 	return true
 
 func _get_next_crew_spawn_transform(fallback_x: float, fallback_z: float) -> Transform3D:
@@ -898,17 +894,24 @@ func _update_wave_sounds(delta: float) -> void:
 	ChaserShipAiHelper.update_wave_sounds(self, delta)
 
 func _update_minion_respawn(delta: float) -> void:
-	if deck_is_contested:
+	if deck_is_contested or deck_is_overrun:
 		return
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node: return
 	
 	var alive_count = 0
+	var roster_count = 0
 	for child in soldiers_node.get_children():
+		if _counts_as_minion_roster_soldier_node(child):
+			roster_count += 1
 		if _is_alive_soldier_node(child):
 			alive_count += 1
-			
-	if alive_count < max_minion_crew:
+
+	if alive_count <= 0:
+		minion_respawn_timer = 0.0
+		return
+
+	if roster_count < max_minion_crew:
 		minion_respawn_timer += delta
 		if minion_respawn_timer >= minion_respawn_interval:
 			minion_respawn_timer = 0.0
@@ -947,6 +950,15 @@ func apply_fleet_weapon_upgrade(level: int) -> void:
 
 func _is_alive_soldier_node(soldier: Node) -> bool:
 	return ChaserSoldierStateHelper.is_alive_soldier(soldier)
+
+
+func _counts_as_minion_roster_soldier_node(soldier: Node) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+	if soldier_team != "player":
+		return false
+	return ChaserSoldierStateHelper.is_alive_soldier(soldier) or ChaserSoldierStateHelper.is_incapacitated_soldier(soldier)
 
 
 ## 함선 수리 (초요기/공적 보너스)

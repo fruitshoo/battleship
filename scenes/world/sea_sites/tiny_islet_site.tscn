@@ -59,6 +59,8 @@ collision_mask = 2
 script = ExtResource("1_script")
 site_label = "작은 섬"
 completed_label = "섬 탐색 완료"
+reward_type = "train_crew"
+crew_xp_amount = 60.0
 
 [node name="Visual" type="Node3D" parent="."]
 transform = Transform3D(1.45, 0, 0, 0, 1.45, 0, 0, 0, 1.45, 0, 0.46, 0)

@@ -212,7 +212,10 @@ func _ensure_rescue_call_label() -> Label3D:
 	_rescue_call_label.position = Vector3(0.0, 2.15, 0.0)
 	_rescue_call_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_rescue_call_label.font_size = 84
-	_rescue_call_label.outline_size = 18
+	_rescue_call_label.outline_size = 6
+	_rescue_call_label.no_depth_test = true
+	_rescue_call_label.render_priority = 20
+	_rescue_call_label.outline_render_priority = 21
 	_rescue_call_label.modulate = Color(1.0, 0.96, 0.58, 0.0)
 	_rescue_call_label.extra_cull_margin = 24.0
 	_rescue_call_label.visible = false
@@ -329,7 +332,7 @@ func _complete_collection(player_ship: Node3D) -> void:
 
 	# 플레이어 배에 병사 추가 시도
 	if player_ship and player_ship.has_method("add_survivor"):
-		if player_ship.add_survivor(true):
+		if player_ship.add_survivor(false):
 			# 생존자 구조 시에도 체력 소폭 회복 로직 추가
 			if "hull_hp" in player_ship and "max_hull_hp" in player_ship and _can_apply_hull_rescue_heal(player_ship):
 				var um = get_node_or_null("/root/UpgradeManager")

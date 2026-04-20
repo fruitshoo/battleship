@@ -4,10 +4,8 @@ const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutline
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const PLAYER_BASE_MOVE_SPEED := 6.0
 const PLAYER_BASE_HULL_HP := 200.0
-const SOLDIER_BASE_HEALTH := 70.0
-const SOLDIER_BASE_ATTACK := 12.0
-const SOLDIER_SWORD_MULT := 1.25
-const SOLDIER_BOW_MULT := 1.0
+const SOLDIER_BASE_HEALTH := 100.0
+const META_CREW_DAMAGE_BONUS_PER_LEVEL := 0.04
 
 signal closed
 
@@ -254,11 +252,9 @@ func _build_effect_text(id: String, level: int) -> String:
 				SOLDIER_BASE_HEALTH * (1.0 + next_level * 0.12),
 			]
 		"crew_attack":
-			return "검 %.1f → %.1f | 활 %.1f → %.1f" % [
-				(SOLDIER_BASE_ATTACK + level * 2.0) * SOLDIER_SWORD_MULT,
-				(SOLDIER_BASE_ATTACK + next_level * 2.0) * SOLDIER_SWORD_MULT,
-				(SOLDIER_BASE_ATTACK + level * 2.0) * SOLDIER_BOW_MULT,
-				(SOLDIER_BASE_ATTACK + next_level * 2.0) * SOLDIER_BOW_MULT,
+			return "무기 피해 +%.0f%% → +%.0f%%" % [
+				level * META_CREW_DAMAGE_BONUS_PER_LEVEL * 100.0,
+				next_level * META_CREW_DAMAGE_BONUS_PER_LEVEL * 100.0,
 			]
 		"crew_defense":
 			return "병사 방어력 +%d → +%d" % [level, next_level]

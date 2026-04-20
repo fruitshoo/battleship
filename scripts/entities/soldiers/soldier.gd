@@ -38,6 +38,9 @@ enum State {
 	BOARDING_JUMP
 }
 
+const REST_RECOVERY_HEALTH_PER_SECOND: float = 3.0
+const REST_RECOVERY_DELAY_AFTER_DAMAGE: float = 3.0
+
 # === 기본 속성 ===
 @export var max_health: float = 70.0: # 인간화 밸런스 조정 (40 -> 70)
 	set(value):
@@ -87,7 +90,7 @@ var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
 var combat_timer: float = 0.0 # 전투/사격 체크 스로틀링용
-var home_ground_timer: float = 0.0 # 홈그라운드 체력 재생 타이머
+var rest_recovery_delay_timer: float = 0.0
 var _is_jumping: bool = false # 점프/도선 중인지 여부
 var boarding_status: String = "on_deck"
 
@@ -139,7 +142,6 @@ const RANGED_DAMAGE_SOURCES := {
 const SOLDIER_MAX_LEVEL := 5
 const SOLDIER_XP_BASE_REQUIREMENT := 2.0
 const SOLDIER_XP_REQUIREMENT_STEP := 2.0
-const SOLDIER_ATTACK_BONUS_PER_LEVEL := 0.75
 const BOARDING_STATUS_ON_DECK := "on_deck"
 const BOARDING_STATUS_BOARDING := "boarding"
 const BOARDING_STATUS_RETURNING := "returning"
@@ -346,27 +348,48 @@ func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
 
 ## 무기 공격력 수치 동기화
 func _update_weapon_stats() -> void:
+	var damage_bonus_pct := _get_total_weapon_damage_bonus_pct()
+
+	_sync_weapon_damage_bonus(weapon_sword, damage_bonus_pct)
+	_sync_weapon_damage_bonus(weapon_bow, damage_bonus_pct)
+
+
+func _sync_weapon_damage_bonus(weapon: Node, damage_bonus_pct: float) -> void:
+	if not is_instance_valid(weapon):
+		return
+	if weapon.has_method("apply_owner_damage_bonus_pct"):
+		weapon.call("apply_owner_damage_bonus_pct", damage_bonus_pct)
+	elif "damage" in weapon:
+		weapon.damage = attack_damage * (1.0 + damage_bonus_pct)
+
+
+func _get_total_weapon_damage_bonus_pct() -> float:
+	if team != "player":
+		return 0.0
 	var meta_manager = get_node_or_null("/root/MetaManager")
-	var attack_flat_bonus: float = 0.0
-	if team == "player" and is_instance_valid(meta_manager):
-		if meta_manager.has_method("get_crew_damage_bonus"):
-			attack_flat_bonus += float(meta_manager.get_crew_damage_bonus())
-	if has_meta("attack_flat_bonus"):
-		attack_flat_bonus += float(get_meta("attack_flat_bonus"))
-	if team == "player" and has_meta("soldier_level_attack_bonus"):
-		attack_flat_bonus += float(get_meta("soldier_level_attack_bonus"))
-	var effective_attack: float = attack_damage + attack_flat_bonus
-		
-	if is_instance_valid(weapon_sword):
-		if weapon_sword.has_method("apply_owner_attack_damage"):
-			weapon_sword.apply_owner_attack_damage(effective_attack)
-		else:
-			weapon_sword.damage = effective_attack
-	if is_instance_valid(weapon_bow):
-		if weapon_bow.has_method("apply_owner_attack_damage"):
-			weapon_bow.apply_owner_attack_damage(effective_attack)
-		else:
-			weapon_bow.damage = effective_attack
+	var damage_bonus_pct: float = 0.0
+	if is_instance_valid(meta_manager) and meta_manager.has_method("get_crew_damage_bonus_pct"):
+		damage_bonus_pct += float(meta_manager.get_crew_damage_bonus_pct())
+	if has_meta("damage_bonus_pct"):
+		damage_bonus_pct += float(get_meta("damage_bonus_pct"))
+	if has_meta("soldier_level_damage_bonus_pct"):
+		damage_bonus_pct += float(get_meta("soldier_level_damage_bonus_pct"))
+	return maxf(0.0, damage_bonus_pct)
+
+
+func _get_soldier_level_damage_bonus_pct() -> float:
+	if team != "player":
+		return 0.0
+	match clampi(soldier_level, 1, SOLDIER_MAX_LEVEL):
+		2:
+			return 0.08
+		3:
+			return 0.16
+		4:
+			return 0.25
+		5:
+			return 0.35
+	return 0.0
 
 
 func _set_active_weapon(type: String) -> void:
@@ -466,7 +489,9 @@ func _apply_soldier_level_stats() -> void:
 	soldier_xp = maxf(soldier_xp, 0.0)
 	set_meta("soldier_level", soldier_level)
 	set_meta("soldier_xp", soldier_xp)
-	set_meta("soldier_level_attack_bonus", _get_soldier_level_attack_bonus())
+	set_meta("soldier_level_damage_bonus_pct", _get_soldier_level_damage_bonus_pct())
+	if has_meta("soldier_level_attack_bonus"):
+		remove_meta("soldier_level_attack_bonus")
 	if is_inside_tree():
 		_update_weapon_stats()
 		_update_level_visual()
@@ -475,11 +500,6 @@ func _get_soldier_xp_required_for_next_level() -> float:
 	if soldier_level >= SOLDIER_MAX_LEVEL:
 		return 0.0
 	return SOLDIER_XP_BASE_REQUIREMENT + float(soldier_level - 1) * SOLDIER_XP_REQUIREMENT_STEP
-
-func _get_soldier_level_attack_bonus() -> float:
-	if team != "player":
-		return 0.0
-	return float(maxi(0, soldier_level - 1)) * SOLDIER_ATTACK_BONUS_PER_LEVEL
 
 func get_soldier_level_value() -> int:
 	return soldier_level
@@ -514,8 +534,14 @@ func get_crit_chance_value() -> float:
 func get_crit_multiplier_value() -> float:
 	return crit_multiplier
 
+func mark_recent_combat_damage() -> void:
+	rest_recovery_delay_timer = REST_RECOVERY_DELAY_AFTER_DAMAGE
+
 func get_damage_multiplier_value() -> float:
 	return float(get_meta("damage_multiplier", 1.0))
+
+func get_weapon_damage_bonus_pct_value() -> float:
+	return _get_total_weapon_damage_bonus_pct()
 
 func get_velocity_value() -> Vector3:
 	return velocity
@@ -671,27 +697,6 @@ func _physics_process(delta: float) -> void:
 		combat_timer = combat_throttle_time + randf_range(0.0, 0.04)
 		run_combat_logic = true
 		
-	# === 아군 홈그라운드(수비) 버프 로직 ===
-	if team == "player" and current_state != State.DEAD:
-		# 자신의 배(본선 또는 나포함)에 타고 있는지 확인
-		var is_on_home_ground = (is_instance_valid(owned_ship) and owned_ship.get("team") == "player")
-		
-		if is_on_home_ground:
-			# 1. 크리티컬 확률 상승 (기본 10% -> 25%)
-			crit_chance = 0.25
-			
-			# 2. 체력 지속 재생 (초당 3)
-			home_ground_timer -= delta
-			if home_ground_timer <= 0:
-				home_ground_timer = 1.0
-				if current_health < max_health:
-					current_health = minf(current_health + 3.0, max_health)
-					# 체력 재생 시각 효과 (초록색 십자가 등, 힐링 파티클이 있다면)
-					# 여기서는 간단히 조용히 회복만 처리하거나, 체력이 낮을 때만 회복했다고 표시
-		else:
-			# 적 배로 공격하러 갔을 때는 기본 크리티컬로 롤백
-			crit_chance = 0.1
-		
 	# === 적군 도선병 방화(Chaos) 로직 ===
 	if team == "enemy" and current_state != State.DEAD:
 		# 플레이어 배에 타고 있는지 확인
@@ -738,6 +743,32 @@ func _physics_process(delta: float) -> void:
 		if current_state != State.ATTACK:
 			_check_ranged_combat()
 			_check_ship_capture_opportunity()
+
+	_update_rest_recovery(delta)
+
+
+func _update_rest_recovery(delta: float) -> void:
+	if team != "player" or current_state == State.DEAD:
+		return
+	if rest_recovery_delay_timer > 0.0:
+		rest_recovery_delay_timer = maxf(0.0, rest_recovery_delay_timer - delta)
+	if not _can_rest_recover():
+		return
+	current_health = minf(current_health + REST_RECOVERY_HEALTH_PER_SECOND * delta, max_health)
+
+
+func _can_rest_recover() -> bool:
+	if current_health >= max_health:
+		return false
+	if rest_recovery_delay_timer > 0.0:
+		return false
+	if _is_jumping:
+		return false
+	if current_state == State.ATTACK or current_state == State.RELOAD or current_state == State.BOARDING_JUMP:
+		return false
+	if is_instance_valid(current_target):
+		return false
+	return true
 
 
 ## IDLE 상태: 잠시 대기하다가 다시 배회
@@ -843,8 +874,14 @@ func _is_in_cross_ship_contact_zone(other_ship: Node3D) -> bool:
 func _find_cross_ship_muster_target() -> Vector3:
 	return SoldierShipHelper.find_cross_ship_muster_target(self)
 
+
 func _find_ship_duty_target() -> Vector3:
 	return SoldierShipDutyHelper.find_ship_duty_target(self)
+
+
+func _get_active_ship_duty_target() -> Vector3:
+	return SoldierShipDutyHelper.get_active_ship_duty_target(self)
+
 
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:

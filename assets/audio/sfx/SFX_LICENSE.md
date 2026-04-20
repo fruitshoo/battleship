@@ -13,6 +13,11 @@
 | sfx_ballistic_death_02.ogg |CC0|https://freesound.org/people/qubodup/sounds/813305/|
 | sfx_bow_01.ogg |Attribution 4.0|https://freesound.org/people/Erdie/sounds/65733/|
 | sfx_bow_02.ogg |Attribution 4.0|https://freesound.org/people/Erdie/sounds/65734/|
+| sfx_boarding_war_cry_1.wav |CC0|https://freesound.org/s/521830/|
+| sfx_boarding_war_cry_2.wav |CC0|https://freesound.org/s/521832/|
+| sfx_boarding_war_cry_3.wav |CC0|https://freesound.org/s/521831/|
+| bgm_boss_taiko_loop_cc0.ogg |CC0|https://freesound.org/people/infinita08/sounds/459561/|
+| sfx_boss_medieval_horn_cc0.ogg |CC0|https://freesound.org/people/klavo1985/sounds/402753/|
 | sfx_cannon_fire.ogg |CC0|https://freesound.org/people/SamsterBirdies/sounds/581599/|
 | sfx_cannon_fire_02.ogg |CC0|https://freesound.org/people/gerainsan/sounds/457044/|
 | sfx_explosion_impact.ogg |Attribution 4.0|https://freesound.org/people/Artninja/sounds/750822/|

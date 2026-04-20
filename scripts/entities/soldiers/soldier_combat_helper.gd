@@ -2,6 +2,9 @@ extends RefCounted
 
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 
+const ATTACK_COOLDOWN_TEMPO_MULT := 1.12
+
+
 static func perform_special_attack(soldier, target: Node3D) -> void:
 	if not is_instance_valid(target):
 		return
@@ -17,6 +20,13 @@ static func perform_attack(soldier) -> void:
 		soldier.current_weapon.attack(soldier.current_target, soldier)
 
 	_play_attack_animation(soldier)
+
+
+static func get_effective_attack_cooldown(soldier, fallback_cooldown: float = 1.0) -> float:
+	var base_cooldown := fallback_cooldown
+	if is_instance_valid(soldier) and is_instance_valid(soldier.current_weapon) and "attack_cooldown" in soldier.current_weapon:
+		base_cooldown = float(soldier.current_weapon.attack_cooldown)
+	return base_cooldown * ATTACK_COOLDOWN_TEMPO_MULT
 
 
 static func _play_attack_animation(soldier) -> void:
@@ -157,7 +167,7 @@ static func check_ranged_combat(soldier) -> void:
 	if not soldier.current_weapon or not "max_range" in soldier.current_weapon:
 		return
 
-	var attack_cooldown = soldier.current_weapon.attack_cooldown if "attack_cooldown" in soldier.current_weapon else 2.0
+	var attack_cooldown := get_effective_attack_cooldown(soldier, 2.0)
 	if soldier.attack_timer > 0:
 		return
 

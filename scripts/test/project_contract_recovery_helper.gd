@@ -1,8 +1,11 @@
 extends RefCounted
 class_name ProjectContractRecoveryHelper
 
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
+const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SeaDecorSpawnerScript = preload("res://scripts/world/decor/sea_decor_spawner.gd")
 const SeaSiteSpawnerScript = preload("res://scripts/world/sea_sites/sea_site_spawner.gd")
 
@@ -119,7 +122,7 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 	if alive_after <= alive_before:
 		failures.append("recovery survivor smoke did not add crew")
 
-	await _run_survivor_full_crew_still_joins_roster(owner, failures, smoke_root, player_ship)
+	await _run_survivor_full_crew_trains_existing_roster(owner, failures, smoke_root, player_ship)
 
 
 static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
@@ -175,17 +178,22 @@ static func _run_drifting_supply_site_smoke(owner: Node, failures: Array[String]
 		(site as Node3D).global_position = player_ship.global_position + Vector3(2.5, 0.0, 0.0)
 	await _wait_frames(owner, 1)
 
+	var hull_before: float = 0.0
+	if player_ship.get("hull_hp") != null and player_ship.get("max_hull_hp") != null:
+		player_ship.set("hull_hp", maxf(1.0, float(player_ship.get("max_hull_hp")) * 0.45))
+		hull_before = float(player_ship.get("hull_hp"))
 	if site.has_method("_collect"):
 		site.call("_collect", player_ship)
 	await _wait_frames(owner, 2)
 
 	if site.get("is_collected") != true:
 		failures.append("recovery drifting supply site did not mark collected")
-	var upgrade_ui: Variant = level_manager.get("_upgrade_ui_instance")
-	if not is_instance_valid(upgrade_ui):
-		failures.append("recovery drifting supply site did not open upgrade choices")
-	else:
-		upgrade_ui.queue_free()
+	if player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) <= hull_before:
+		failures.append("recovery drifting supply site did not repair player hull")
+	var unexpected_upgrade_ui: Variant = level_manager.get("_upgrade_ui_instance")
+	if is_instance_valid(unexpected_upgrade_ui):
+		failures.append("recovery drifting supply site should repair hull instead of opening upgrade choices")
+		unexpected_upgrade_ui.queue_free()
 		level_manager.set("_upgrade_ui_instance", null)
 	owner.get_tree().paused = false
 
@@ -218,6 +226,8 @@ static func _run_static_reward_site_smoke(owner: Node, failures: Array[String], 
 		level_manager.set("_upgrade_ui_instance", null)
 	if site.is_queued_for_deletion():
 		failures.append("recovery static reward site queued for deletion after reward")
+	if site.get("reward_type") != "upgrade_choices":
+		failures.append("recovery static reward reef should remain an upgrade-choice site")
 	site.queue_free()
 	owner.get_tree().paused = false
 
@@ -233,6 +243,7 @@ static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[Str
 			"min_world_width": 3.8,
 			"min_top_y": 2.5,
 			"min_bottom_y": -0.3,
+			"reward_type": "upgrade_choices",
 		},
 		{
 			"path": "res://scenes/world/sea_sites/tiny_islet_site.tscn",
@@ -243,6 +254,7 @@ static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[Str
 			"min_world_width": 7.0,
 			"min_top_y": 1.0,
 			"min_bottom_y": -0.3,
+			"reward_type": "train_crew",
 		},
 		{
 			"path": "res://scenes/world/sea_sites/temporary_outpost_site.tscn",
@@ -253,6 +265,7 @@ static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[Str
 			"min_world_width": 4.5,
 			"min_top_y": 3.0,
 			"min_bottom_y": -0.3,
+			"reward_type": "expand_crew_limit",
 		},
 	]
 
@@ -312,6 +325,8 @@ static func _run_single_static_sea_site_shape_check(owner: Node, failures: Array
 		failures.append("recovery %s missing static_reward_site group" % label)
 	if site.get("is_collected") != null and site.get("is_collected") == true:
 		failures.append("recovery %s should start uncollected" % label)
+	if str(site.get("reward_type")) != str(check.get("reward_type", "")):
+		failures.append("recovery %s reward type mismatch: %s" % [label, str(site.get("reward_type"))])
 
 	site.queue_free()
 	await _wait_frames(owner, 1)
@@ -548,7 +563,7 @@ static func _run_sea_decor_contract(owner: Node, failures: Array[String], smoke_
 	await _wait_frames(owner, 1)
 
 
-static func _run_survivor_full_crew_still_joins_roster(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+static func _run_survivor_full_crew_trains_existing_roster(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
 	var survivor_scene := load("res://scenes/effects/survivor.tscn") as PackedScene
 	if survivor_scene == null:
 		failures.append("recovery survivor full crew scene load failed")
@@ -565,6 +580,7 @@ static func _run_survivor_full_crew_still_joins_roster(owner: Node, failures: Ar
 	var alive_before: int = 0
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var training_before := _get_player_crew_training_total(player_ship)
 	var original_max_crew_count = null
 	if player_ship.get("max_crew_count") != null:
 		original_max_crew_count = player_ship.get("max_crew_count")
@@ -579,11 +595,37 @@ static func _run_survivor_full_crew_still_joins_roster(owner: Node, failures: Ar
 	var alive_after: int = alive_before
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_after = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var training_after := _get_player_crew_training_total(player_ship)
 	if survivor.get("is_collected") != true:
-		failures.append("recovery survivor full crew did not collect despite ignoring roster limit")
-	if alive_after <= alive_before:
-		failures.append("recovery survivor full crew did not add crew beyond roster limit")
+		failures.append("recovery survivor full crew did not collect for overflow training")
+	if alive_after != alive_before:
+		failures.append("recovery survivor full crew changed roster size instead of training existing crew")
+	if training_after <= training_before:
+		failures.append("recovery survivor full crew did not train an existing soldier")
 	await _run_survivor_overcap_does_not_expand_respawn_target(owner, failures, player_ship)
+
+
+static func _get_player_crew_training_total(player_ship: Node3D) -> float:
+	var total := 0.0
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier.has_method("is_player_team_soldier") and soldier.call("is_player_team_soldier") != true:
+			continue
+		if not soldier.has_method("is_player_team_soldier") and str(soldier.get("team")) != "player":
+			continue
+		var level := 1
+		if soldier.has_method("get_soldier_level_value"):
+			level = int(soldier.call("get_soldier_level_value"))
+		else:
+			level = int(soldier.get_meta("soldier_level", 1))
+		var xp := 0.0
+		if soldier.has_method("get_soldier_xp_value"):
+			xp = float(soldier.call("get_soldier_xp_value"))
+		else:
+			xp = float(soldier.get_meta("soldier_xp", 0.0))
+		total += float(level * 1000) + xp
+	return total
 
 
 static func _run_survivor_overcap_does_not_expand_respawn_target(owner: Node, failures: Array[String], player_ship: Node3D) -> void:
@@ -602,6 +644,100 @@ static func _run_survivor_overcap_does_not_expand_respawn_target(owner: Node, fa
 		failures.append("recovery respawn added crew while survivor overcap roster was still above max")
 	if alive_after != alive_before:
 		failures.append("recovery respawn changed crew count while survivor overcap roster was still above max")
+	await _run_incapacitated_captain_blocks_duplicate_respawn(owner, failures, player_ship)
+
+
+static func _run_incapacitated_captain_blocks_duplicate_respawn(owner: Node, failures: Array[String], player_ship: Node3D) -> void:
+	if not player_ship.has_method("add_respawn_crew") or player_ship.get("max_crew_count") == null:
+		return
+	var captain := _find_player_captain(player_ship)
+	if not is_instance_valid(captain):
+		return
+
+	var original_max_crew_count = player_ship.get("max_crew_count")
+	var before_roster_ids := _get_player_roster_instance_ids(player_ship)
+	var before_roster_count: int = before_roster_ids.size()
+	player_ship.set("max_crew_count", before_roster_count + 1)
+
+	SoldierLifecycleHelper.incapacitate(captain)
+	await _wait_frames(owner, 2)
+	var captains_after_incapacitate := _count_player_captains_in_roster(player_ship)
+	var added: bool = bool(player_ship.call("add_respawn_crew"))
+	await _wait_frames(owner, 2)
+	var captains_after_respawn := _count_player_captains_in_roster(player_ship)
+	SoldierLifecycleHelper.heal_full(captain)
+	await _wait_frames(owner, 2)
+	var captains_after_recovery := _count_player_captains_in_roster(player_ship)
+	var spawned_replacement := _find_new_player_roster_soldier(player_ship, before_roster_ids)
+	if is_instance_valid(spawned_replacement):
+		EntityRegistry.unregister_soldier(spawned_replacement)
+		spawned_replacement.queue_free()
+	player_ship.set("max_crew_count", original_max_crew_count)
+	await _wait_frames(owner, 1)
+
+	if captains_after_incapacitate != 1:
+		failures.append("recovery incapacitated captain did not remain reserved in captain roster: %d" % captains_after_incapacitate)
+	if not added:
+		failures.append("recovery respawn did not add regular crew with incapacitated captain reserved")
+	if captains_after_respawn != 1:
+		failures.append("recovery respawn created duplicate captain while original captain was incapacitated: %d" % captains_after_respawn)
+	if captains_after_recovery != 1:
+		failures.append("recovery captain count was not normalized after incapacitated captain recovered: %d" % captains_after_recovery)
+
+
+static func _find_player_captain(player_ship: Node3D) -> Node:
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if not _counts_as_player_roster_member(soldier):
+			continue
+		if _is_captain_node(soldier):
+			return soldier
+	return null
+
+
+static func _count_player_captains_in_roster(player_ship: Node3D) -> int:
+	var count := 0
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if not _counts_as_player_roster_member(soldier):
+			continue
+		if _is_captain_node(soldier):
+			count += 1
+	return count
+
+
+static func _get_player_roster_instance_ids(player_ship: Node3D) -> Dictionary:
+	var ids := {}
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if _counts_as_player_roster_member(soldier):
+			ids[soldier.get_instance_id()] = true
+	return ids
+
+
+static func _find_new_player_roster_soldier(player_ship: Node3D, known_ids: Dictionary) -> Node:
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if not _counts_as_player_roster_member(soldier):
+			continue
+		if not known_ids.has(soldier.get_instance_id()):
+			return soldier
+	return null
+
+
+static func _counts_as_player_roster_member(soldier: Node) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if soldier.has_method("is_player_team_soldier"):
+		if soldier.call("is_player_team_soldier") != true:
+			return false
+	elif str(soldier.get("team")) != "player":
+		return false
+	return SoldierStateHelper.is_alive_soldier(soldier) or SoldierStateHelper.is_incapacitated_soldier(soldier)
+
+
+static func _is_captain_node(soldier: Node) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if soldier.get("is_captain") != null:
+		return soldier.get("is_captain") == true
+	return soldier.get_meta("is_captain", false) == true
 
 
 static func _wait_frames(owner: Node, frames: int) -> void:

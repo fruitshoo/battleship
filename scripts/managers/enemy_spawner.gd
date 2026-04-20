@@ -91,6 +91,7 @@ func _spawn_boss() -> Node3D:
 	boss.look_at(player.global_position, Vector3.UP)
 	_prime_enemy_momentum(boss, true)
 	_push_boss_hp_to_hud(boss)
+	_start_boss_audio(boss)
 	print("[Boss] 최종 보스 소환 완료!")
 	return boss
 
@@ -330,6 +331,7 @@ func _spawn_elite_ship() -> Node3D:
 	elite.look_at(player.global_position, Vector3.UP)
 	_prime_enemy_momentum(elite, true)
 	_push_boss_hp_to_hud(elite)
+	_start_boss_audio(elite)
 	_spawn_elite_escorts(spawn_pos)
 	
 	print("[Event] 중간 보스 편대 출현!")
@@ -393,6 +395,38 @@ func _push_boss_hp_to_hud(boss_ship: Node) -> void:
 		var current_hp: float = float(boss_ship.get("hull_hp"))
 		var maximum_hp: float = float(boss_ship.get("max_hull_hp"))
 		lm.call_deferred("update_boss_hp", current_hp, maximum_hp)
+
+
+func _start_boss_audio(boss_ship: Node3D) -> void:
+	if not is_instance_valid(boss_ship):
+		return
+	var audio_manager := get_node_or_null("/root/AudioManager")
+	if not is_instance_valid(audio_manager):
+		return
+	if audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("boss_horn", boss_ship.global_position)
+	if audio_manager.has_method("set_boss_battle_music"):
+		audio_manager.set_boss_battle_music(true)
+	if boss_ship.has_signal("boss_died"):
+		boss_ship.connect("boss_died", Callable(self, "_on_boss_died").bind(boss_ship.get_instance_id()), CONNECT_ONE_SHOT)
+
+
+func _on_boss_died(_boss_id: int) -> void:
+	call_deferred("_stop_boss_audio_if_no_active_boss")
+
+
+func _stop_boss_audio_if_no_active_boss() -> void:
+	for enemy in EntityRegistry.get_ships_by_team("enemy"):
+		if not is_instance_valid(enemy):
+			continue
+		if not enemy.is_in_group("boss"):
+			continue
+		if enemy.get("is_dying") == true or enemy.get("is_sinking") == true:
+			continue
+		return
+	var audio_manager := get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("set_boss_battle_music"):
+		audio_manager.set_boss_battle_music(false)
 
 
 func _spawn_elite_escorts(flagship_pos: Vector3) -> void:

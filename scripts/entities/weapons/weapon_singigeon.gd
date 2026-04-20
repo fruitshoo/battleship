@@ -12,6 +12,7 @@ var blast_radius: float = 3.5
 var personnel_damage_mult: float = 5.0
 var _cached_spawn_parent: Node = null
 var _upgrade_base_damage: float = 2.5
+var _owner_damage_bonus_pct: float = 0.0
 
 func _ready() -> void:
 	attack_range = max_range
@@ -21,9 +22,9 @@ func _ready() -> void:
 func refresh_upgrade_stats() -> void:
 	_apply_upgrade_stats()
 
-func apply_owner_attack_damage(owner_attack_damage: float) -> void:
-	var owner_bonus: float = maxf(0.0, owner_attack_damage - 12.0)
-	damage = _upgrade_base_damage + owner_bonus
+func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
+	_owner_damage_bonus_pct = maxf(0.0, damage_bonus_pct)
+	_apply_effective_damage()
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not rocket_scene:
@@ -112,7 +113,10 @@ func _apply_upgrade_stats() -> void:
 		blast_radius = float(stats.get("base_blast_radius", 3.5)) + (float(level - 1) * float(stats.get("blast_radius_per_lv", 0.2)))
 		attack_cooldown = maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 		projectile_speed = float(stats.get("projectile_speed", 32.0))
-	damage = _upgrade_base_damage
+	_apply_effective_damage()
+
+func _apply_effective_damage() -> void:
+	damage = _upgrade_base_damage * (1.0 + _owner_damage_bonus_pct)
 
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):

@@ -363,14 +363,18 @@ func _update_crew_respawn(delta: float) -> void:
 		return
 	if _has_nearby_enemy_pressure_for_respawn():
 		return
-	
+
 	var soldiers_node = get_node_or_null("Soldiers")
 	if not soldiers_node: return
-	
+
+	if get_alive_crew_count() <= 0:
+		crew_respawn_timer = 0.0
+		return
+
 	# 전투불능 병사는 정원을 차지하므로 자동 보충으로 대체하지 않는다.
 	var respawn_target_count: int = int(max_crew_count)
 	var roster_count: int = PlayerShipCrewHelper.get_player_roster_count(self)
-			
+
 	if roster_count < respawn_target_count:
 		crew_respawn_timer += delta
 		if crew_respawn_timer >= crew_respawn_interval:

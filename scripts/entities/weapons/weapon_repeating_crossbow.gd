@@ -5,7 +5,6 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const DEFAULT_BASE_DAMAGE: float = 7.0
-const OWNER_ATTACK_BONUS_SCALE: float = 0.25
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -16,7 +15,7 @@ var burst_count: int = 3
 var burst_delay: float = 0.15
 var _cached_spawn_parent: Node = null
 var _upgrade_base_damage: float = DEFAULT_BASE_DAMAGE
-var _owner_attack_bonus: float = 0.0
+var _owner_damage_bonus_pct: float = 0.0
 
 func _ready() -> void:
 	refresh_upgrade_stats()
@@ -47,13 +46,13 @@ func refresh_upgrade_stats() -> void:
 	_apply_effective_damage()
 
 
-func apply_owner_attack_damage(owner_attack_damage: float) -> void:
-	_owner_attack_bonus = maxf(0.0, owner_attack_damage - 12.0)
+func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
+	_owner_damage_bonus_pct = maxf(0.0, damage_bonus_pct)
 	_apply_effective_damage()
 
 
 func _apply_effective_damage() -> void:
-	damage = _upgrade_base_damage + (_owner_attack_bonus * OWNER_ATTACK_BONUS_SCALE)
+	damage = _upgrade_base_damage * (1.0 + _owner_damage_bonus_pct)
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return

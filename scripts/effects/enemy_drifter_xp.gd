@@ -6,6 +6,14 @@ const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
+const DRIFTER_CALL_LABEL_NAME := "DrifterCallLabel"
+const DRIFTER_CALL_LINES: Array[String] = [
+	"살려줘...",
+	"으... 물살이...",
+	"건져줘...",
+	"춥다...",
+]
+
 @export var xp_amount: int = 3
 @export var soldier_count: int = 1
 @export_range(2.0, 12.0, 0.25) var base_magnet_radius: float = 8.0
@@ -20,6 +28,9 @@ const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 @export_range(8.0, 180.0, 1.0) var lifetime: float = 70.0
 @export_range(0.05, 0.5, 0.05) var player_search_interval: float = 0.2
 @export_range(0.03, 0.3, 0.01) var wave_sample_interval: float = 0.1
+@export_range(0.5, 8.0, 0.1) var drifter_call_interval_min: float = 3.0
+@export_range(0.5, 10.0, 0.1) var drifter_call_interval_max: float = 6.5
+@export_range(0.4, 4.0, 0.1) var drifter_call_duration: float = 1.8
 
 var target_player: Node3D = null
 var current_magnet_speed: float = 0.0
@@ -36,6 +47,9 @@ var _wave_sample_timer: float = 0.0
 var _player_search_timer: float = 0.0
 var _visual_rest_scale: Vector3 = Vector3.ONE
 var _float_phase: float = 0.0
+var _drifter_call_timer: float = 0.0
+var _drifter_call_visible_timer: float = 0.0
+var _drifter_call_label: Label3D = null
 
 @onready var visual: Node3D = $Visual if has_node("Visual") else ($MeshInstance3D if has_node("MeshInstance3D") else self)
 
@@ -70,6 +84,9 @@ func pool_reset() -> void:
 	_player_search_timer = randf_range(0.0, player_search_interval)
 	_wave_sample_timer = randf_range(0.0, wave_sample_interval)
 	_float_phase = randf_range(0.0, TAU)
+	_drifter_call_timer = randf_range(0.4, 1.2)
+	_drifter_call_visible_timer = 0.0
+	_hide_drifter_call()
 	base_y = global_position.y
 	_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 	_cached_um = get_node_or_null("/root/UpgradeManager")
@@ -84,6 +101,7 @@ func pool_reset() -> void:
 		tween.tween_property(visual, "scale", _visual_rest_scale, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		if visual is GeometryInstance3D:
 			(visual as GeometryInstance3D).extra_cull_margin = 1.0
+	_ensure_drifter_call_label()
 
 
 func _physics_process(delta: float) -> void:
@@ -92,6 +110,7 @@ func _physics_process(delta: float) -> void:
 	time_alive += delta
 	_wave_sample_timer = maxf(0.0, _wave_sample_timer - delta)
 	_player_search_timer = maxf(0.0, _player_search_timer - delta)
+	_update_drifter_call(delta)
 	if not is_expiring and time_alive > lifetime:
 		_expire_and_free()
 	if is_expiring:
@@ -155,6 +174,62 @@ func _find_target_player() -> void:
 	target_player = FieldItemHelper.find_closest_player_ship(self, _get_current_magnet_radius())
 
 
+func _ensure_drifter_call_label() -> Label3D:
+	if is_instance_valid(_drifter_call_label):
+		return _drifter_call_label
+	_drifter_call_label = get_node_or_null(DRIFTER_CALL_LABEL_NAME) as Label3D
+	if _drifter_call_label != null:
+		return _drifter_call_label
+	_drifter_call_label = Label3D.new()
+	_drifter_call_label.name = DRIFTER_CALL_LABEL_NAME
+	_drifter_call_label.position = Vector3(0.0, 2.05, 0.0)
+	_drifter_call_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_drifter_call_label.font_size = 70
+	_drifter_call_label.outline_size = 6
+	_drifter_call_label.no_depth_test = true
+	_drifter_call_label.render_priority = 20
+	_drifter_call_label.outline_render_priority = 21
+	_drifter_call_label.modulate = Color(1.0, 0.68, 0.56, 0.0)
+	_drifter_call_label.extra_cull_margin = 24.0
+	_drifter_call_label.visible = false
+	add_child(_drifter_call_label)
+	return _drifter_call_label
+
+
+func _update_drifter_call(delta: float) -> void:
+	if is_collected or is_expiring:
+		_hide_drifter_call()
+		return
+	var label := _ensure_drifter_call_label()
+	if label == null:
+		return
+	if _drifter_call_visible_timer > 0.0:
+		_drifter_call_visible_timer = maxf(0.0, _drifter_call_visible_timer - delta)
+		var fade_in: float = clampf((drifter_call_duration - _drifter_call_visible_timer) / 0.22, 0.0, 1.0)
+		var fade_out: float = clampf(_drifter_call_visible_timer / 0.35, 0.0, 1.0)
+		var alpha: float = minf(fade_in, fade_out)
+		label.visible = alpha > 0.03
+		label.modulate = Color(1.0, 0.68, 0.56, alpha)
+		label.position.y = 2.05 + (1.0 - alpha) * 0.14 + sin(time_alive * 3.0) * 0.03
+		return
+
+	_hide_drifter_call()
+	_drifter_call_timer -= delta
+	if _drifter_call_timer > 0.0:
+		return
+	_drifter_call_timer = randf_range(drifter_call_interval_min, drifter_call_interval_max)
+	_drifter_call_visible_timer = drifter_call_duration
+	label.text = DRIFTER_CALL_LINES.pick_random()
+	label.visible = true
+	label.modulate = Color(1.0, 0.68, 0.56, 0.0)
+
+
+func _hide_drifter_call() -> void:
+	if is_instance_valid(_drifter_call_label):
+		_drifter_call_label.visible = false
+		_drifter_call_label.modulate = Color(1.0, 0.68, 0.56, 0.0)
+
+
 func _get_current_magnet_radius() -> float:
 	return FieldItemHelper.get_current_magnet_radius(self, base_magnet_radius, _cached_um)
 
@@ -214,6 +289,7 @@ func _grant_reward(player_ship: Node3D) -> void:
 
 
 func _finish_collection_effect() -> void:
+	_hide_drifter_call()
 	if visual:
 		var tween := create_tween()
 		tween.tween_property(visual, "scale", Vector3.ZERO, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
@@ -226,6 +302,7 @@ func _finish_collection_effect() -> void:
 func _expire_and_free() -> void:
 	is_expiring = true
 	is_collected = true
+	_hide_drifter_call()
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(self, "position:y", position.y - 1.6, 2.5)
 	if visual:

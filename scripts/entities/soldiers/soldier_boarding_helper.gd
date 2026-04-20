@@ -4,6 +4,16 @@ class_name SoldierBoardingHelper
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 
 const BOARDING_LANDING_INSET := 0.45
+const BOARDING_WAR_CRY_SFX := "boarding_war_cry"
+const BOARDING_WAR_CRY_MIN_INTERVAL_MS := 650
+const BOARDING_WAR_CRY_RALLY_INTERVAL_MS := 1250
+const BOARDING_WAR_CRY_STAGGER_SECONDS := 0.16
+const BOARDING_WAR_CRY_VOLUME_DB := 0.0
+const BOARDING_RALLY_CRY_VOLUME_DB := -1.5
+const BOARDING_WAR_CRY_PITCH_MIN := 1.18
+const BOARDING_WAR_CRY_PITCH_MAX := 1.30
+
+static var _last_war_cry_msec_by_team: Dictionary = {}
 
 
 static func try_evacuate_to_home(soldier) -> void:
@@ -24,6 +34,7 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 
 	var transfer_status: String = "returning" if is_instance_valid(soldier.home_ship) and target_ship == soldier.home_ship and soldier.owned_ship != target_ship else "boarding"
 	_begin_boarding_jump_pose(soldier, transfer_status)
+	play_boarding_war_cry(soldier, transfer_status)
 	var d_h: float = target_ship.get("deck_height") if "deck_height" in target_ship else 0.4
 	var target_half_ext: Vector2 = SoldierShipHelper.get_ship_deck_half_extents(soldier, target_ship)
 	var jump_offset := _get_nearest_deck_landing_local(target_ship, soldier.global_position, target_half_ext, d_h)
@@ -150,3 +161,52 @@ static func _finish_boarding_jump_pose(soldier, status: String) -> void:
 	if "_is_jumping" in soldier:
 		soldier.set("_is_jumping", false)
 	_set_boarding_status(soldier, status)
+
+
+static func play_boarding_war_cry(soldier, transfer_status: String, force: bool = false, delay_seconds: float = 0.0, volume_db: float = BOARDING_WAR_CRY_VOLUME_DB) -> void:
+	if transfer_status != "boarding" or not is_instance_valid(soldier):
+		return
+	var team_key := str(soldier.get("team")) if "team" in soldier else "unknown"
+	_play_boarding_war_cry_from_anchor(soldier, "boarding:%s" % team_key, force, delay_seconds, volume_db, BOARDING_WAR_CRY_MIN_INTERVAL_MS)
+
+
+static func play_boarding_rally_cry(anchor: Node, team_key: String) -> void:
+	_play_boarding_war_cry_from_anchor(anchor, "rally:%s" % team_key, false, 0.0, BOARDING_RALLY_CRY_VOLUME_DB, BOARDING_WAR_CRY_RALLY_INTERVAL_MS)
+
+
+static func _play_boarding_war_cry_from_anchor(anchor: Node, cooldown_key: String, force: bool, delay_seconds: float, volume_db: float, cooldown_msec: int) -> void:
+	if not is_instance_valid(anchor):
+		return
+	if delay_seconds > 0.0 and anchor.is_inside_tree():
+		var anchor_id: int = anchor.get_instance_id()
+		anchor.get_tree().create_timer(delay_seconds).timeout.connect(func():
+			var delayed_anchor = instance_from_id(anchor_id)
+			if is_instance_valid(delayed_anchor):
+				SoldierBoardingHelper._play_boarding_war_cry_now(delayed_anchor as Node, cooldown_key, true, volume_db, cooldown_msec)
+		)
+		return
+	_play_boarding_war_cry_now(anchor, cooldown_key, force, volume_db, cooldown_msec)
+
+
+static func _play_boarding_war_cry_now(anchor: Node, cooldown_key: String, force: bool, volume_db: float, cooldown_msec: int) -> void:
+	if not is_instance_valid(anchor):
+		return
+	var now_msec := Time.get_ticks_msec()
+	var last_msec := int(_last_war_cry_msec_by_team.get(cooldown_key, -cooldown_msec))
+	if not force and now_msec - last_msec < cooldown_msec:
+		return
+
+	var audio_manager: Node = anchor.get_node_or_null("/root/AudioManager")
+	if not is_instance_valid(audio_manager) or not audio_manager.has_method("play_sfx"):
+		return
+
+	_last_war_cry_msec_by_team[cooldown_key] = now_msec
+	var play_position := Vector3.ZERO
+	if anchor is Node3D:
+		play_position = (anchor as Node3D).global_position
+	audio_manager.play_sfx(
+		BOARDING_WAR_CRY_SFX,
+		play_position,
+		randf_range(BOARDING_WAR_CRY_PITCH_MIN, BOARDING_WAR_CRY_PITCH_MAX),
+		volume_db
+	)

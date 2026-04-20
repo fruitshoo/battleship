@@ -19,8 +19,10 @@ Status: project-local provenance not found. Each asset below needs source/licens
 | `assets/audio/sfx/click5.ogg` | UNVERIFIED |  |  | Not currently mapped in `AudioManager` |
 | `assets/audio/sfx/sfx_ballistic_death_01.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_ballistic_death_02.ogg` | UNVERIFIED |  |  |  |
+| `assets/audio/music/bgm_boss_taiko_loop_cc0.ogg` | VERIFIED | https://freesound.org/people/infinita08/sounds/459561/ | CC0 | User-supplied source; converted from MP3 to Ogg Vorbis for looping boss combat music |
 | `assets/audio/sfx/sfx_bow_01.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_bow_02.ogg` | UNVERIFIED |  |  |  |
+| `assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg` | VERIFIED | https://freesound.org/people/klavo1985/sounds/402753/ | CC0 | User-supplied source; converted from WAV to Ogg Vorbis for boss arrival cue |
 | `assets/audio/sfx/sfx_cannon_fire.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_cannon_fire_02.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_explosion_impact.ogg` | UNVERIFIED |  |  |  |

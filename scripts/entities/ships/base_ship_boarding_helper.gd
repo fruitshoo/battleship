@@ -3,11 +3,13 @@ class_name BaseShipBoardingHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
+const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const BOARDING_LANDING_INSET := 0.45
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85
 const BOARDING_BREAK_DISTANCE_PAD := 2.2
+const BOARDING_WAVE_MAX_SIZE := 3
 
 static func process_boarding_common(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
@@ -66,6 +68,7 @@ static func process_boarding_common(ship, delta: float) -> void:
 			ship._full_rope_deployed = true
 			if ship.DEBUG_COMBAT_LOGS:
 				print("[Boarding] 추가 밧줄이 연결되었습니다.")
+	_play_boarding_rally_cry(ship)
 
 	if ship.boarding_prep_timer < ship.boarding_prep_duration:
 		ship.boarding_prep_timer += delta
@@ -75,7 +78,7 @@ static func process_boarding_common(ship, delta: float) -> void:
 		if ship.boarding_timer >= effective_interval:
 			ship.boarding_timer = 0.0
 			if not ShipBoardingMetaHelper.is_transfer_suppressed(ship):
-				transfer_one_soldier(ship)
+				transfer_boarding_wave(ship)
 
 	ship._update_ropes(delta)
 
@@ -122,9 +125,77 @@ static func _get_effective_break_distance(ship, effective_boarding_distance: flo
 	return maxf(ship.boarding_break_distance, maxf(effective_boarding_distance + 1.8, contact_distance + BOARDING_BREAK_DISTANCE_PAD))
 
 
-static func transfer_one_soldier(ship) -> void:
+static func _play_boarding_rally_cry(ship) -> void:
+	SoldierBoardingHelper.play_boarding_rally_cry(ship, _get_ship_team_tag(ship))
+
+
+static func _get_ship_team_tag(ship) -> String:
+	if is_instance_valid(ship) and ship.has_method("get_team_tag"):
+		return str(ship.call("get_team_tag"))
+	if is_instance_valid(ship) and ship.get("team") != null:
+		return str(ship.get("team"))
+	return "unknown"
+
+
+static func _count_target_defenders(ship, team_prop: String) -> int:
 	if not is_instance_valid(ship.boarding_target):
-		return
+		return 0
+	var target_soldiers_node = ship.boarding_target.get_node_or_null("Soldiers")
+	if not target_soldiers_node:
+		target_soldiers_node = ship.boarding_target
+	var defenders_alive := 0
+	for child in target_soldiers_node.get_children():
+		if SoldierStateHelper.is_dead_soldier(child):
+			continue
+		if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
+			defenders_alive += 1
+	return defenders_alive
+
+
+static func _count_target_attackers(ship, team_prop: String) -> int:
+	if not is_instance_valid(ship.boarding_target):
+		return 0
+	var target_soldiers_node = ship.boarding_target.get_node_or_null("Soldiers")
+	if not target_soldiers_node:
+		target_soldiers_node = ship.boarding_target
+	var attackers_alive := 0
+	for child in target_soldiers_node.get_children():
+		if SoldierStateHelper.is_dead_soldier(child):
+			continue
+		if child.has_method("get_team_tag") and child.get_team_tag() == team_prop:
+			attackers_alive += 1
+	return attackers_alive
+
+
+static func _count_ready_boarders(ship, team_prop: String) -> int:
+	var soldiers_node = ship.get_node_or_null("Soldiers")
+	if not soldiers_node:
+		return 0
+	var ready_count := 0
+	for child in soldiers_node.get_children():
+		if not SoldierStateHelper.is_alive_soldier(child):
+			continue
+		if not child.has_method("get_team_tag") or child.get_team_tag() != team_prop:
+			continue
+		if child.get("_is_jumping") == true:
+			continue
+		ready_count += 1
+	return ready_count
+
+
+static func transfer_boarding_wave(ship) -> int:
+	var transferred_count := 0
+	var wave_size := _get_boarding_wave_size(ship)
+	for wave_index in range(wave_size):
+		if not transfer_one_soldier(ship, wave_index, wave_size):
+			break
+		transferred_count += 1
+	return transferred_count
+
+
+static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) -> bool:
+	if not is_instance_valid(ship.boarding_target):
+		return false
 
 	var target_soldiers_node = ship.boarding_target.get_node_or_null("Soldiers")
 	if not target_soldiers_node:
@@ -141,9 +212,9 @@ static func transfer_one_soldier(ship) -> void:
 				defenders_alive += 1
 			else:
 				attackers_on_target_deck += 1
-	var max_attackers_during_contest: int = maxi(1, mini(2, defenders_alive))
-	if defenders_alive > 0 and attackers_on_target_deck >= max_attackers_during_contest:
-		return
+		var max_attackers_during_contest: int = maxi(2, mini(4, defenders_alive))
+		if defenders_alive > 0 and attackers_on_target_deck >= max_attackers_during_contest:
+			return false
 
 	var s = null
 	var soldiers_node = ship.get_node_or_null("Soldiers")
@@ -159,11 +230,11 @@ static func transfer_one_soldier(ship) -> void:
 					ally_count_on_deck += 1
 
 		if enemy_count_on_deck > 0 and ally_count_on_deck <= enemy_count_on_deck:
-			return
+			return false
 
 		# 적 함선인 경우 최소한 한 명은 배를 지키기 위해 남겨둠
 		if team_prop == "enemy" and ally_count_on_deck <= 1:
-			return
+			return false
 
 		var nearest_boarder_distance_sq: float = INF
 		for child in soldiers:
@@ -178,6 +249,13 @@ static func transfer_one_soldier(ship) -> void:
 	if s:
 		var start_global = s.global_position
 		_begin_soldier_boarding_jump_pose(s, "boarding")
+		SoldierBoardingHelper.play_boarding_war_cry(
+			s,
+			"boarding",
+			wave_size > 1,
+			float(wave_index) * SoldierBoardingHelper.BOARDING_WAR_CRY_STAGGER_SECONDS,
+			SoldierBoardingHelper.BOARDING_WAR_CRY_VOLUME_DB - 0.5
+		)
 		s.reparent(target_soldiers_node, true)
 		s.global_position = start_global
 
@@ -219,6 +297,7 @@ static func transfer_one_soldier(ship) -> void:
 			s.set("is_stationary", false)
 
 		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team_prop, ship.boarding_target.name])
+		return true
 	else:
 		if ship.has_method("_become_derelict") and not ship.is_in_group("player"):
 			print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
@@ -226,6 +305,20 @@ static func transfer_one_soldier(ship) -> void:
 		else:
 			print("[Status] 도선할 병사가 더 이상 없습니다.")
 			cancel_boarding(ship)
+	return false
+
+
+static func _get_boarding_wave_size(ship) -> int:
+	var team_prop := _get_ship_team_tag(ship)
+	var ready_boarders := _count_ready_boarders(ship, team_prop)
+	if ready_boarders <= 0:
+		return 1
+	var target_defenders := _count_target_defenders(ship, team_prop)
+	var target_attackers := _count_target_attackers(ship, team_prop)
+	var open_contest_slots := ready_boarders
+	if target_defenders > 0:
+		open_contest_slots = maxi(0, maxi(2, mini(4, target_defenders)) - target_attackers)
+	return clampi(mini(ready_boarders, open_contest_slots), 1, BOARDING_WAVE_MAX_SIZE)
 
 
 static func _get_random_deck_landing_local(target_ship: Node3D) -> Vector3:

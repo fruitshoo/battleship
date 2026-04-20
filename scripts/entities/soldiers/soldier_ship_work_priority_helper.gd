@@ -33,6 +33,7 @@ const KEY_SLOT := "slot"
 const KEY_PHASE := "phase"
 const KEY_RUNTIME := "runtime"
 const KEY_PREEMPTS_ROUTINE := "preempts_routine"
+const KEY_LOCAL_TARGET := "local_target"
 
 const PHASE_EMERGENCY := "emergency"
 const PHASE_CLEANUP := "cleanup"
@@ -55,9 +56,21 @@ const TASK_PRIORITY_TABLE := [
 const DUTY_TARGET_REACHED_DISTANCE_SQ := 1.2
 const DEFAULT_SLOT_RESERVATION_SECONDS := 1.1
 const WORK_SLOT_RESERVATIONS_META := "ship_work_slot_reservations"
+const ACTIVE_WORK_TASK_META := "ship_work_active_task"
+const ACTIVE_WORK_SLOT_META := "ship_work_active_slot"
+const ACTIVE_WORK_TARGET_LOCAL_META := "ship_work_active_target_local"
 const RESERVATION_SOLDIER_ID := "soldier_id"
 const RESERVATION_TASK := "task"
 const RESERVATION_EXPIRES_AT_MSEC := "expires_at_msec"
+const CANNON_DUTY_ARRIVE_RADIUS_SQ := 1.0
+const CANNON_DUTY_OCCUPIED_RADIUS_SQ := 0.64
+const DUTY_META_TASK := "ship_duty_task"
+const DUTY_META_SLOT_KEY := "ship_duty_slot_key"
+const DUTY_META_ANIMATION_KEY := "ship_duty_animation_key"
+const DUTY_META_AT_SLOT := "ship_duty_at_slot"
+const DIRECTIVE_CANNON := "cannon"
+const DIRECTIVE_SLOT_INDEX := "slot_index"
+const DIRECTIVE_ANIMATION_KEY := "animation_key"
 
 
 static func find_ship_work_target(soldier) -> Vector3:
@@ -65,14 +78,63 @@ static func find_ship_work_target(soldier) -> Vector3:
 	var ship := _get_owned_ship(soldier)
 	var target: Variant = directive.get(KEY_TARGET, Vector3.INF)
 	if not (target is Vector3):
+		clear_active_ship_work_target(soldier)
 		return Vector3.INF
 	var target_vec: Vector3 = target
 	var task_name := str(directive.get(KEY_TASK, TASK_NONE))
 	var slot_key := str(directive.get(KEY_SLOT, ""))
 	if not reserve_work_slot(ship, soldier, task_name, DEFAULT_SLOT_RESERVATION_SECONDS, slot_key):
+		clear_active_ship_work_target(soldier)
 		return Vector3.INF
+	_store_active_ship_work_target(soldier, directive)
 	target_vec.y = soldier.global_position.y
+	_sync_cannon_reload_duty_state_from_directive(soldier, directive, target_vec)
 	return target_vec
+
+
+static func get_active_ship_work_target(soldier) -> Vector3:
+	if not is_instance_valid(soldier) or not soldier.has_meta(ACTIVE_WORK_TARGET_LOCAL_META):
+		return Vector3.INF
+	var ship := _get_owned_ship(soldier)
+	if not _can_consider_deck_work(soldier, ship, true):
+		clear_active_ship_work_target(soldier)
+		return Vector3.INF
+	var task_name := str(soldier.get_meta(ACTIVE_WORK_TASK_META, TASK_NONE))
+	if not _is_active_work_task_still_valid(soldier, ship, task_name):
+		clear_active_ship_work_target(soldier)
+		return Vector3.INF
+	var local_target_value: Variant = soldier.get_meta(ACTIVE_WORK_TARGET_LOCAL_META, Vector3.INF)
+	if not (local_target_value is Vector3):
+		clear_active_ship_work_target(soldier)
+		return Vector3.INF
+	var local_target: Vector3 = local_target_value
+	var global_target: Vector3 = ship.to_global(local_target)
+	global_target.y = soldier.global_position.y
+	if task_name == TASK_CANNON_RELOAD:
+		var slot_key := str(soldier.get_meta(ACTIVE_WORK_SLOT_META, ""))
+		if not reserve_work_slot(ship, soldier, task_name, DEFAULT_SLOT_RESERVATION_SECONDS, slot_key):
+			clear_active_ship_work_target(soldier)
+			return Vector3.INF
+		_sync_cannon_reload_duty_state_from_active(soldier, ship, local_target, global_target)
+		return global_target
+	if _is_local_target_reached(soldier, ship, local_target):
+		clear_active_ship_work_target(soldier)
+		return Vector3.INF
+	return global_target
+
+
+static func clear_active_ship_work_target(soldier) -> void:
+	if not is_instance_valid(soldier):
+		return
+	var ship := _get_owned_ship(soldier)
+	var task_name := str(soldier.get_meta(ACTIVE_WORK_TASK_META, ""))
+	var slot_key := str(soldier.get_meta(ACTIVE_WORK_SLOT_META, ""))
+	if is_instance_valid(ship) and not task_name.is_empty():
+		release_work_slot(ship, soldier, task_name, slot_key)
+	for meta_name in [ACTIVE_WORK_TASK_META, ACTIVE_WORK_SLOT_META, ACTIVE_WORK_TARGET_LOCAL_META]:
+		if soldier.has_meta(meta_name):
+			soldier.remove_meta(meta_name)
+	_clear_cannon_reload_duty_state(soldier)
 
 
 static func get_ship_work_directive(soldier) -> Dictionary:
@@ -89,7 +151,7 @@ static func get_ship_work_directive(soldier) -> Dictionary:
 	var best := _choose_highest_priority(candidates, ship, soldier)
 	if int(best.get(KEY_PRIORITY, PRIORITY_NONE)) <= PRIORITY_NONE:
 		return _none_directive()
-	if _is_already_at_directive_target(soldier, ship, best):
+	if _is_already_at_directive_target(soldier, ship, best) and str(best.get(KEY_TASK, TASK_NONE)) != TASK_CANNON_RELOAD:
 		return _none_directive()
 	return best
 
@@ -282,6 +344,9 @@ static func _build_gunnery_station_directive(soldier, ship: Node3D, half_ext: Ve
 		return _none_directive()
 	if not _can_work_gunnery(soldier):
 		return _none_directive()
+	var cannon_directive := _build_cannon_reload_slot_directive(soldier, ship)
+	if int(cannon_directive.get(KEY_PRIORITY, PRIORITY_NONE)) > PRIORITY_NONE:
+		return cannon_directive
 	var side_sign: float = _get_enemy_side_sign(soldier, _get_soldier_bias_sign(soldier))
 	var lane_index: int = int(soldier.get_instance_id()) % 5
 	var lane_offset: float = clampf((float(lane_index) - 2.0) * 0.45, -half_ext.y * 0.42, half_ext.y * 0.42)
@@ -306,6 +371,216 @@ static func _build_shiphandling_directive(soldier, ship: Node3D, half_ext: Vecto
 	if current_speed > 1.2:
 		return _build_directive(TASK_SHIPHANDLING_CRUISE, Vector3(bias_sign * half_ext.x * 0.22, 0.0, half_ext.y * 0.35), ship, "under way")
 	return _none_directive()
+
+static func _build_cannon_reload_slot_directive(soldier, ship: Node3D) -> Dictionary:
+	var slots: Array[Dictionary] = _collect_cannon_reload_slots(ship)
+	if slots.is_empty():
+		return _none_directive()
+	var workers: Array[Node] = _collect_gunnery_duty_workers(ship, _get_node_team_tag(soldier))
+	if not workers.has(soldier):
+		return _none_directive()
+	var assignments: Dictionary = _assign_cannon_reload_slots(workers, slots)
+	var slot: Dictionary = assignments.get(soldier.get_instance_id(), {})
+	if slot.is_empty():
+		return _none_directive()
+	var target_global: Vector3 = slot.get("global_position", Vector3.INF)
+	if target_global == Vector3.INF:
+		return _none_directive()
+	var local_target: Vector3 = ship.to_local(target_global)
+	local_target.y = 0.0
+	var directive := _build_directive(TASK_CANNON_RELOAD, local_target, ship, "cannon reload station")
+	directive[KEY_SLOT] = str(slot.get("slot_key", ""))
+	directive[DIRECTIVE_CANNON] = slot.get("cannon", null)
+	directive[DIRECTIVE_SLOT_INDEX] = int(slot.get("slot_index", 0))
+	directive[DIRECTIVE_ANIMATION_KEY] = _get_cannon_reload_slot_animation(slot)
+	return directive
+
+
+static func _collect_cannon_reload_slots(ship: Node) -> Array[Dictionary]:
+	var slots: Array[Dictionary] = []
+	var stack: Array[Node] = [ship]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if not is_instance_valid(node):
+			continue
+		if node != ship and _is_cannon_reload_slot_source(node):
+			var slot_count: int = int(node.call("get_reload_crew_station_count"))
+			for slot_index in range(slot_count):
+				var slot_key := "%s:%03d" % [str(node.get_path()), slot_index]
+				slots.append({
+					"cannon_path": str(node.get_path()),
+					"cannon": node,
+					"slot_index": slot_index,
+					"slot_key": slot_key,
+					"global_position": node.call("get_reload_crew_station_global_position", slot_index),
+				})
+		for child in node.get_children():
+			if child is Node:
+				stack.append(child)
+	slots.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_key := "%s:%03d" % [str(a.get("cannon_path", "")), int(a.get("slot_index", 0))]
+		var b_key := "%s:%03d" % [str(b.get("cannon_path", "")), int(b.get("slot_index", 0))]
+		return a_key < b_key
+	)
+	return slots
+
+
+static func _collect_gunnery_duty_workers(ship: Node, team: String) -> Array[Node]:
+	var workers: Array[Node] = []
+	var candidates: Array = EntityRegistry.get_soldiers_by_ship(ship)
+	if candidates.is_empty():
+		var soldiers_node: Node = ship.get_node_or_null("Soldiers") if is_instance_valid(ship) else null
+		if is_instance_valid(soldiers_node):
+			candidates = soldiers_node.get_children()
+	for child in candidates:
+		if not is_instance_valid(child):
+			continue
+		if _get_node_team_tag(child) != team:
+			continue
+		if _get_owned_ship(child) != ship:
+			continue
+		if not _can_consider_deck_work(child, ship as Node3D, true):
+			continue
+		if not _can_work_gunnery(child):
+			continue
+		workers.append(child)
+	workers.sort_custom(func(a: Node, b: Node) -> bool:
+		return int(a.get_instance_id()) < int(b.get_instance_id())
+	)
+	return workers
+
+
+static func _assign_cannon_reload_slots(workers: Array[Node], slots: Array[Dictionary]) -> Dictionary:
+	var assignments: Dictionary = {}
+	var reserved_slots: Dictionary = {}
+	for worker in workers:
+		var occupied_index: int = _find_occupied_cannon_slot_index(worker, slots)
+		if occupied_index < 0 or reserved_slots.has(occupied_index):
+			continue
+		assignments[worker.get_instance_id()] = slots[occupied_index]
+		reserved_slots[occupied_index] = worker.get_instance_id()
+
+	for worker in workers:
+		if assignments.has(worker.get_instance_id()):
+			continue
+		for slot_index in range(slots.size()):
+			if reserved_slots.has(slot_index):
+				continue
+			assignments[worker.get_instance_id()] = slots[slot_index]
+			reserved_slots[slot_index] = worker.get_instance_id()
+			break
+	return assignments
+
+
+static func _find_occupied_cannon_slot_index(worker: Node, slots: Array[Dictionary]) -> int:
+	if not (worker is Node3D):
+		return -1
+	var worker_node := worker as Node3D
+	var best_index: int = -1
+	var best_dist_sq: float = INF
+	for slot_index in range(slots.size()):
+		var slot: Dictionary = slots[slot_index]
+		var slot_position: Vector3 = slot.get("global_position", Vector3.INF)
+		if slot_position == Vector3.INF:
+			continue
+		var planar_delta := Vector2(worker_node.global_position.x - slot_position.x, worker_node.global_position.z - slot_position.z)
+		var dist_sq: float = planar_delta.length_squared()
+		if dist_sq <= CANNON_DUTY_OCCUPIED_RADIUS_SQ and dist_sq < best_dist_sq:
+			best_dist_sq = dist_sq
+			best_index = slot_index
+	return best_index
+
+
+static func _is_cannon_reload_slot_source(node: Node) -> bool:
+	if not node.has_method("get_reload_crew_station_count"):
+		return false
+	if not node.has_method("get_reload_crew_station_global_position"):
+		return false
+	if node.has_method("get_reload_crew_power") and float(node.call("get_reload_crew_power")) <= 0.0:
+		return false
+	if node.is_inside_tree():
+		if node.has_method("is_visible_in_tree") and not node.is_visible_in_tree():
+			return false
+		if node.has_method("is_processing") and not node.is_processing():
+			return false
+	return true
+
+
+static func _get_cannon_reload_slot_by_key(ship: Node, slot_key: String) -> Dictionary:
+	if slot_key.strip_edges().is_empty():
+		return {}
+	for slot in _collect_cannon_reload_slots(ship):
+		if str(slot.get("slot_key", "")) == slot_key:
+			return slot
+	return {}
+
+
+static func _get_cannon_reload_slot_animation(slot: Dictionary) -> String:
+	var cannon = slot.get("cannon", null)
+	var slot_index: int = int(slot.get("slot_index", 0))
+	if is_instance_valid(cannon) and cannon.has_method("get_reload_crew_station_animation_key"):
+		return str(cannon.call("get_reload_crew_station_animation_key", slot_index))
+	return "cannon_reload_standby"
+
+
+static func _sync_cannon_reload_duty_state_from_directive(soldier, directive: Dictionary, target_global: Vector3) -> void:
+	if str(directive.get(KEY_TASK, TASK_NONE)) != TASK_CANNON_RELOAD:
+		_clear_cannon_reload_duty_state(soldier)
+		return
+	var slot: Dictionary = {
+		"cannon": directive.get(DIRECTIVE_CANNON, null),
+		"slot_index": int(directive.get(DIRECTIVE_SLOT_INDEX, 0)),
+		"slot_key": str(directive.get(KEY_SLOT, "")),
+	}
+	_mark_cannon_reload_slot_state(soldier, slot, target_global, str(directive.get(DIRECTIVE_ANIMATION_KEY, "cannon_reload_standby")))
+
+
+static func _sync_cannon_reload_duty_state_from_active(soldier, ship: Node, _local_target: Vector3, target_global: Vector3) -> void:
+	var slot_key := str(soldier.get_meta(ACTIVE_WORK_SLOT_META, ""))
+	var slot := _get_cannon_reload_slot_by_key(ship, slot_key)
+	if slot.is_empty():
+		_clear_cannon_reload_duty_state(soldier)
+		return
+	_mark_cannon_reload_slot_state(soldier, slot, target_global, _get_cannon_reload_slot_animation(slot))
+
+
+static func _mark_cannon_reload_slot_state(soldier, slot: Dictionary, target_global: Vector3, animation_key: String) -> void:
+	if not is_instance_valid(soldier):
+		return
+	var planar_delta := Vector2(soldier.global_position.x - target_global.x, soldier.global_position.z - target_global.z)
+	var arrived: bool = planar_delta.length_squared() <= CANNON_DUTY_ARRIVE_RADIUS_SQ
+	var cannon = slot.get("cannon", null)
+	var slot_index: int = int(slot.get("slot_index", 0))
+	if is_instance_valid(cannon) and cannon.has_method("notify_reload_crew_station_worker"):
+		cannon.call("notify_reload_crew_station_worker", soldier, slot_index, arrived)
+	var previous_task := str(soldier.get_meta(DUTY_META_TASK, ""))
+	var previous_slot := str(soldier.get_meta(DUTY_META_SLOT_KEY, ""))
+	var previous_animation := str(soldier.get_meta(DUTY_META_ANIMATION_KEY, ""))
+	var previous_arrived := bool(soldier.get_meta(DUTY_META_AT_SLOT, false))
+	var next_slot := str(slot.get("slot_key", ""))
+	soldier.set_meta(DUTY_META_TASK, TASK_CANNON_RELOAD)
+	soldier.set_meta(DUTY_META_SLOT_KEY, next_slot)
+	soldier.set_meta(DUTY_META_ANIMATION_KEY, animation_key)
+	soldier.set_meta(DUTY_META_AT_SLOT, arrived)
+	if previous_task != TASK_CANNON_RELOAD or previous_slot != next_slot or previous_animation != animation_key or previous_arrived != arrived:
+		_refresh_soldier_duty_visual(soldier)
+
+
+static func _clear_cannon_reload_duty_state(soldier) -> void:
+	if not is_instance_valid(soldier):
+		return
+	var had_duty_state: bool = false
+	for key in [DUTY_META_TASK, DUTY_META_SLOT_KEY, DUTY_META_ANIMATION_KEY, DUTY_META_AT_SLOT]:
+		if soldier.has_meta(key):
+			had_duty_state = true
+			soldier.remove_meta(key)
+	if had_duty_state:
+		_refresh_soldier_duty_visual(soldier)
+
+
+static func _refresh_soldier_duty_visual(soldier) -> void:
+	if is_instance_valid(soldier) and soldier.has_method("_update_role_visual"):
+		soldier.call_deferred("_update_role_visual")
 
 
 static func _can_consider_deck_work(soldier, ship: Node3D, allow_current_same_task: bool = false) -> bool:
@@ -446,6 +721,7 @@ static func _build_directive(task_name: String, local_target: Vector3, ship: Nod
 		KEY_TASK: task_name,
 		KEY_PRIORITY: get_task_priority(task_name),
 		KEY_TARGET: global_target,
+		KEY_LOCAL_TARGET: local_target,
 		KEY_REASON: reason,
 		KEY_SLOT: _make_local_slot_key(task_name, local_target),
 	}
@@ -481,10 +757,50 @@ static func _is_already_at_directive_target(soldier, ship: Node3D, directive: Di
 	if not (target is Vector3):
 		return true
 	var target_vec: Vector3 = target
-	var ship_local_pos: Vector3 = ship.to_local(soldier.global_position)
 	var target_local: Vector3 = ship.to_local(target_vec)
+	return _is_local_target_reached(soldier, ship, target_local)
+
+
+static func _is_local_target_reached(soldier, ship: Node3D, target_local: Vector3) -> bool:
+	var ship_local_pos: Vector3 = ship.to_local(soldier.global_position)
 	var local_diff := Vector2(ship_local_pos.x - target_local.x, ship_local_pos.z - target_local.z)
 	return local_diff.length_squared() <= DUTY_TARGET_REACHED_DISTANCE_SQ
+
+
+static func _store_active_ship_work_target(soldier, directive: Dictionary) -> void:
+	if not is_instance_valid(soldier):
+		return
+	var local_target: Variant = directive.get(KEY_LOCAL_TARGET, Vector3.INF)
+	if not (local_target is Vector3):
+		clear_active_ship_work_target(soldier)
+		return
+	soldier.set_meta(ACTIVE_WORK_TASK_META, str(directive.get(KEY_TASK, TASK_NONE)))
+	soldier.set_meta(ACTIVE_WORK_SLOT_META, str(directive.get(KEY_SLOT, "")))
+	soldier.set_meta(ACTIVE_WORK_TARGET_LOCAL_META, local_target)
+
+
+static func _is_active_work_task_still_valid(soldier, ship: Node3D, task_name: String) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	var normalized_task := normalize_task_name(task_name)
+	match normalized_task:
+		TASK_RIGGING_REPAIR:
+			return _has_repairable_rigging_damage(ship)
+		TASK_CANNON_RELOAD:
+			var gunnery_ratio: float = float(ship.get("gunnery_crew_ratio")) if ship.get("gunnery_crew_ratio") != null else 0.0
+			return gunnery_ratio >= 0.45 and _can_work_gunnery(soldier) and not _get_cannon_reload_slot_by_key(ship, str(soldier.get_meta(ACTIVE_WORK_SLOT_META, ""))).is_empty()
+		TASK_GUNNERY_STATION:
+			var gunnery_ratio: float = float(ship.get("gunnery_crew_ratio")) if ship.get("gunnery_crew_ratio") != null else 0.0
+			return gunnery_ratio >= 0.45 and _can_work_gunnery(soldier)
+		TASK_SHIPHANDLING_ROWING:
+			return ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
+		TASK_SHIPHANDLING_RUDDER:
+			var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
+			return absf(rudder_angle) >= 7.5
+		TASK_SHIPHANDLING_CRUISE:
+			var current_speed: float = ship.get_current_speed_value() if ship.has_method("get_current_speed_value") else 0.0
+			return current_speed > 1.2
+	return false
 
 
 static func _get_soldier_bias_sign(soldier) -> float:

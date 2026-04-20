@@ -55,6 +55,60 @@ class MockAllyRoleShip:
 		return team
 
 
+class MockShipWorkShip:
+	extends Node3D
+
+	var team: String = "player"
+	var deck_height: float = 0.4
+	var shiphandling_crew_ratio: float = 1.0
+	var gunnery_crew_ratio: float = 0.0
+	var is_rowing: bool = true
+	var rudder_angle: float = 0.0
+	var current_speed: float = 5.0
+	var deck_is_contested: bool = false
+	var deck_is_overrun: bool = false
+	var deck_hostile_boarder_count: int = 0
+	var rigging_field_repair_enabled: bool = false
+	var is_burning: bool = false
+	var is_sinking: bool = false
+	var is_dying: bool = false
+	var is_derelict: bool = false
+
+	func get_team_tag() -> String:
+		return team
+
+	func get_deck_half_extents() -> Vector2:
+		return Vector2(2.5, 5.0)
+
+	func get_current_speed_value() -> float:
+		return current_speed
+
+
+class MockShipWorkSoldier:
+	extends Node3D
+
+	var team: String = "player"
+	var owned_ship: Node3D = null
+	var current_target: Node3D = null
+	var is_captain: bool = false
+	var crew_role: String = "general"
+
+	func get_team_tag() -> String:
+		return team
+
+	func get_owned_ship_node() -> Node3D:
+		return owned_ship
+
+	func is_dead_soldier() -> bool:
+		return false
+
+	func is_jumping_value() -> bool:
+		return false
+
+	func is_ranged_only_value() -> bool:
+		return false
+
+
 static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String], wait_frames_after_attach: int) -> void:
 	var scene_checks := [
 		{
@@ -150,7 +204,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	_run_scenario_action_authoring_negative_contract(failures)
 	_run_authoring_palette_contract(failures)
 	await _run_soldier_common_action_contract(owner, failures, wait_frames_after_attach)
-	_run_soldier_ship_work_priority_contract(failures)
+	_run_soldier_ship_work_priority_contract(owner, failures)
 	_run_soldier_smooth_turn_contract(owner, failures)
 	await _run_boarding_rope_anchor_height_contract(owner, failures, wait_frames_after_attach)
 	await _run_boarding_landing_contract(owner, failures, wait_frames_after_attach)
@@ -2177,7 +2231,7 @@ static func _run_soldier_common_action_contract(owner: Node, failures: Array[Str
 	await _wait_frames(owner, 1)
 
 
-static func _run_soldier_ship_work_priority_contract(failures: Array[String]) -> void:
+static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Array[String]) -> void:
 	var work_priority_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd")
 	if work_priority_source.is_empty():
 		failures.append("soldier ship work priority contract could not read helper")
@@ -2200,7 +2254,11 @@ static func _run_soldier_ship_work_priority_contract(failures: Array[String]) ->
 		"static func release_work_slot",
 		"static func is_work_slot_reserved_for_other",
 		"WORK_SLOT_RESERVATIONS_META",
+		"ACTIVE_WORK_TARGET_LOCAL_META",
+		"static func get_active_ship_work_target",
+		"static func clear_active_ship_work_target",
 		"KEY_SLOT",
+		"KEY_LOCAL_TARGET",
 	]:
 		if not work_priority_source.contains(str(token)):
 			failures.append("soldier ship work priority helper missing token: %s" % token)
@@ -2236,6 +2294,7 @@ static func _run_soldier_ship_work_priority_contract(failures: Array[String]) ->
 		failures.append("cannon reload worker selection should use ship work priority scoring")
 	if not base_ship_source.contains("SoldierShipWorkPriorityHelper.reserve_work_slot"):
 		failures.append("cannon reload worker selection should reserve the cannon work slot")
+	_validate_ship_work_target_tracks_moving_ship(owner, failures)
 
 
 static func _validate_soldier_ship_work_priority_table(failures: Array[String]) -> void:
@@ -2284,6 +2343,44 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 		failures.append("soldier ship work priority corpse cleanup phase mismatch")
 	if SoldierShipWorkPriorityHelper.get_task_priority("unknown") != SoldierShipWorkPriorityHelper.PRIORITY_NONE:
 		failures.append("soldier ship work priority unknown task should have no priority")
+
+
+static func _validate_ship_work_target_tracks_moving_ship(owner: Node, failures: Array[String]) -> void:
+	var ship := MockShipWorkShip.new()
+	ship.name = "ShipWorkTargetShip"
+	var soldier := MockShipWorkSoldier.new()
+	soldier.name = "ShipWorkTargetSoldier"
+	owner.add_child(ship)
+	owner.add_child(soldier)
+	ship.global_position = Vector3(3.0, 0.0, -4.0)
+	soldier.global_position = ship.to_global(Vector3.ZERO)
+	soldier.owned_ship = ship
+
+	var first_target := SoldierShipWorkPriorityHelper.find_ship_work_target(soldier)
+	if first_target == Vector3.INF:
+		failures.append("ship work target contract could not acquire rowing target")
+		ship.queue_free()
+		soldier.queue_free()
+		return
+	var first_local := ship.to_local(first_target)
+	ship.global_position += Vector3(12.0, 0.0, -3.0)
+	var active_target := SoldierShipWorkPriorityHelper.get_active_ship_work_target(soldier)
+	if active_target == Vector3.INF:
+		failures.append("ship work active target should persist between heavy AI ticks")
+	else:
+		var active_local := ship.to_local(active_target)
+		if active_local.distance_to(first_local) > 0.01:
+			failures.append("ship work active target should track the same ship-local slot while the ship moves")
+		if active_target.distance_to(first_target) < 3.0:
+			failures.append("ship work active target should move with the ship instead of using a stale global point")
+
+	ship.is_rowing = false
+	var stale_target := SoldierShipWorkPriorityHelper.get_active_ship_work_target(soldier)
+	if stale_target != Vector3.INF:
+		failures.append("ship work active rowing target should clear when rowing stops")
+
+	ship.queue_free()
+	soldier.queue_free()
 
 
 static func _run_soldier_smooth_turn_contract(owner: Node, failures: Array[String]) -> void:

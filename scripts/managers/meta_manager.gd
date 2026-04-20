@@ -65,7 +65,7 @@ var UPGRADES = {
 	},
 	"crew_attack": {
 		"name": "무기",
-		"description": "검과 활 피해 +2",
+		"description": "병사 무기 피해 +4%",
 		"base_cost": 750,
 		"cost_multiplier": 1.8,
 		"max_level": 5
@@ -143,8 +143,8 @@ func get_max_crew_bonus() -> int:
 func get_crew_health_multiplier() -> float:
 	return 1.0 + (SaveManager.get_upgrade_level("crew_health") * 0.12)
 
-func get_crew_damage_bonus() -> float:
-	return SaveManager.get_upgrade_level("crew_attack") * 2.0
+func get_crew_damage_bonus_pct() -> float:
+	return SaveManager.get_upgrade_level("crew_attack") * 0.04
 
 func get_crew_defense_bonus() -> float:
 	return SaveManager.get_upgrade_level("crew_defense") * 1.0

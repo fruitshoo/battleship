@@ -54,7 +54,7 @@ const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 const SUPPORT_ASSIST_TARGET_LOCK_DURATION := 3.25
 const SUPPORT_ASSIST_SWITCH_MARGIN := 10.0
 const SUPPORT_BOARDING_CONTACT_PAD := 0.85
-const SUPPORT_RESCUE_BOARDING_START_PAD := 2.35
+const SUPPORT_RESCUE_BOARDING_START_PAD := SUPPORT_BOARDING_CONTACT_PAD
 
 static func process_minion_ai(ship, delta: float) -> void:
 	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
@@ -467,7 +467,7 @@ static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
 	if ship.has_method("get_collision_distance_to"):
 		collision_distance = float(ship.get_collision_distance_to(assist_target))
 	var contact_pad: float = SUPPORT_RESCUE_BOARDING_START_PAD if rescue_boarding else SUPPORT_BOARDING_CONTACT_PAD
-	var contact_boarding_limit: float = maxf(ship.max_boarding_distance + 0.45, collision_distance + contact_pad)
+	var contact_boarding_limit: float = maxf(ship.max_boarding_distance, collision_distance + contact_pad)
 	if center_distance > contact_boarding_limit:
 		return false
 

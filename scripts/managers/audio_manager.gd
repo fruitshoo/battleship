@@ -71,6 +71,11 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_soldier_die_5.ogg",
 		"res://assets/audio/sfx/sfx_soldier_die_6.ogg",
 	],
+	"boarding_war_cry": [
+		"res://assets/audio/sfx/sfx_boarding_war_cry_1.wav",
+		"res://assets/audio/sfx/sfx_boarding_war_cry_2.wav",
+		"res://assets/audio/sfx/sfx_boarding_war_cry_3.wav",
+	],
 	"water_splash_large": [
 		"res://assets/audio/sfx/sfx_water_splash_large_1.ogg",
 		"res://assets/audio/sfx/sfx_water_splash_large_2.ogg",
@@ -83,16 +88,24 @@ var sfx_streams = {
 	],
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
+	"boss_horn": "res://assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg",
 	"support_foghorn": "res://assets/audio/sfx/sfx_support_foghorn_cc0.ogg",
+}
+
+var bgm_streams = {
+	"boss_taiko": "res://assets/audio/music/bgm_boss_taiko_loop_cc0.ogg",
 }
 
 const DEFAULT_3D_SFX_VOLUME_DB := 3.0
 const DEFAULT_3D_SFX_MAX_DISTANCE := 220.0
 const DEFAULT_3D_SFX_UNIT_SIZE := 55.0
 const GILGUNAK_VOLUME_DB := -4.0
+const BOSS_TAIKO_BGM := "boss_taiko"
+const BOSS_TAIKO_VOLUME_DB := -8.0
 const SFX_ALIASES := {
 	"arrow_shoot": "bow_shoot",
 	"critical_hit": "soldier_hit",
+	"trumpet_war": "support_foghorn",
 }
 const SFX_3D_PROFILES := {
 	"wave_splash": {
@@ -120,6 +133,16 @@ const SFX_3D_PROFILES := {
 		"max_distance": 230.0,
 		"unit_size": 65.0,
 	},
+	"boarding_war_cry": {
+		"volume_db": -2.0,
+		"max_distance": 260.0,
+		"unit_size": 85.0,
+	},
+	"boss_horn": {
+		"volume_db": -8.0,
+		"max_distance": 420.0,
+		"unit_size": 120.0,
+	},
 	"support_foghorn": {
 		"volume_db": -2.0,
 		"max_distance": 360.0,
@@ -129,6 +152,7 @@ const SFX_3D_PROFILES := {
 
 # 캐시된 스트림
 var _cached_streams = {}
+var _cached_bgm_streams = {}
 
 # 플레이스홀더 사운드 생성기 (리소스 없을 때 사용)
 var placeholder_stream: AudioStreamGenerator
@@ -365,6 +389,32 @@ func _load_stream_for_playback(stream_name: String):
 	
 	return null
 
+func _load_bgm_stream(stream_name: String) -> AudioStream:
+	if _cached_bgm_streams.has(stream_name):
+		return _cached_bgm_streams[stream_name]
+	if not bgm_streams.has(stream_name):
+		return null
+	var path = bgm_streams[stream_name]
+	if not (path is String) or not ResourceLoader.exists(path):
+		return null
+	var stream := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REUSE) as AudioStream
+	if stream:
+		_set_stream_loop(stream, true)
+		_cached_bgm_streams[stream_name] = stream
+	return stream
+
+func _set_stream_loop(stream: AudioStream, enabled: bool) -> void:
+	if not stream:
+		return
+	for property_info in stream.get_property_list():
+		var property_name: String = str(property_info.get("name", ""))
+		if property_name == "loop":
+			stream.set("loop", enabled)
+			return
+		if property_name == "loop_mode":
+			stream.set("loop_mode", AudioStreamWAV.LOOP_FORWARD if enabled else AudioStreamWAV.LOOP_DISABLED)
+			return
+
 func _resolve_sfx_key(stream_name: String) -> String:
 	return SFX_ALIASES.get(stream_name, stream_name)
 
@@ -438,11 +488,29 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 
 ## 배경음 재생
 func play_bgm(stream_name: String, _fade_duration: float = 1.0) -> void:
-	if current_bgm_name == stream_name: return
+	if current_bgm_name == stream_name and is_instance_valid(bgm_player) and bgm_player.playing:
+		return
+	var stream := _load_bgm_stream(stream_name)
+	if not stream:
+		push_warning("[Audio] BGM 리소스를 찾을 수 없습니다: %s" % stream_name)
+		return
 	current_bgm_name = stream_name
-	
-	# TODO: BGM 리소스가 있으면 여기서 재생 및 페이드인/아웃 구현
-	print("[Audio] Play BGM: %s" % stream_name)
+	bgm_player.stream = stream
+	bgm_player.volume_db = BOSS_TAIKO_VOLUME_DB if stream_name == BOSS_TAIKO_BGM else 0.0
+	bgm_player.play()
+
+func stop_bgm(stream_name: String = "") -> void:
+	if stream_name != "" and current_bgm_name != stream_name:
+		return
+	if is_instance_valid(bgm_player):
+		bgm_player.stop()
+	current_bgm_name = ""
+
+func set_boss_battle_music(active: bool) -> void:
+	if active:
+		play_bgm(BOSS_TAIKO_BGM)
+	elif current_bgm_name == BOSS_TAIKO_BGM:
+		stop_bgm(BOSS_TAIKO_BGM)
 ## === 길군악(노동요) 전용 재생 시스템 ===
 var _gilgunak_player: AudioStreamPlayer = null
 

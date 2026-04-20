@@ -433,14 +433,16 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var defense_lv = int(current_levels.get("crew_defense", 0))
 	var attack_stats: Dictionary = UPGRADES["crew_attack"]["stats"]
 	var defense_stats: Dictionary = UPGRADES["crew_defense"]["stats"]
-	var attack_flat_bonus: float = attack_lv * float(attack_stats.get("attack_add_per_lv", 2.0))
+	var damage_bonus_pct: float = attack_lv * float(attack_stats.get("damage_bonus_pct_per_lv", 0.06))
 	var defense_flat_bonus: float = defense_lv * float(defense_stats.get("defense_add_per_lv", 1.0))
 	var defense_reduction: float = clampf(
 		defense_lv * float(defense_stats.get("damage_reduction_per_lv", 0.0)),
 		0.0,
 		float(defense_stats.get("max_damage_reduction", 0.22))
 	)
-	soldier.set_meta("attack_flat_bonus", attack_flat_bonus)
+	soldier.set_meta("damage_bonus_pct", damage_bonus_pct)
+	if soldier.has_meta("attack_flat_bonus"):
+		soldier.remove_meta("attack_flat_bonus")
 	soldier.set_meta("defense_flat_bonus", defense_flat_bonus)
 	soldier.set_meta("defense_reduction", defense_reduction)
 	if soldier.has_meta("damage_multiplier"):

@@ -1,6 +1,7 @@
 extends RefCounted
 
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 
 const WANDER_TURN_SPEED := 7.0
 const MOVE_TURN_SPEED := 10.0
@@ -17,6 +18,9 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 		return
 
 	if run_heavy_logic:
+		if _try_priority_ship_duty_before_enemy(soldier, 0.78, delta, WANDER_TURN_SPEED):
+			return
+
 		var enemy = soldier.find_nearest_enemy()
 		if enemy:
 			if soldier.is_stationary:
@@ -38,6 +42,8 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 			if duty_target != Vector3.INF:
 				_move_toward_point(soldier, duty_target, 0.75, delta, WANDER_TURN_SPEED)
 				return
+	elif _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
+		return
 
 	if soldier.wander_timer > 0:
 		soldier.wander_timer -= delta
@@ -59,6 +65,9 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		return
 
 	if run_heavy_logic:
+		if _try_priority_ship_duty_before_enemy(soldier, 0.74, delta, WANDER_TURN_SPEED):
+			return
+
 		var enemy = soldier.find_nearest_enemy()
 		if enemy:
 			if soldier.is_stationary:
@@ -83,6 +92,8 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 			if duty_target != Vector3.INF:
 				_move_toward_point(soldier, duty_target, 0.7, delta, WANDER_TURN_SPEED)
 				return
+	elif _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
+		return
 
 	if not is_instance_valid(soldier.owned_ship):
 		soldier._change_state(soldier.State.IDLE)
@@ -105,6 +116,23 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		var target_look = soldier.global_position + direction
 		target_look.y = soldier.global_position.y
 		turn_toward_position(soldier, target_look, WANDER_TURN_SPEED, delta)
+
+
+static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, delta: float, turn_speed: float) -> bool:
+	if not soldier.has_method("_find_ship_duty_target"):
+		return false
+	var owned_ship_value: Variant = soldier.get("owned_ship")
+	if not is_instance_valid(owned_ship_value):
+		return false
+	var owned_ship := owned_ship_value as Node
+	var gunnery_ratio: float = float(owned_ship.get("gunnery_crew_ratio")) if owned_ship.get("gunnery_crew_ratio") != null else 0.0
+	if gunnery_ratio < 0.45:
+		return false
+	var duty_target: Vector3 = soldier._find_ship_duty_target()
+	if duty_target == Vector3.INF:
+		return false
+	_move_toward_point(soldier, duty_target, speed_scale, delta, turn_speed)
+	return true
 
 
 static func start_wander(soldier) -> void:
@@ -242,7 +270,7 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 			soldier._perform_special_attack(soldier.current_target)
 		else:
 			soldier._perform_attack()
-		soldier.attack_timer = soldier.current_weapon.attack_cooldown if soldier.current_weapon and "attack_cooldown" in soldier.current_weapon else 1.0
+		soldier.attack_timer = SoldierCombatHelper.get_effective_attack_cooldown(soldier)
 
 
 static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:
@@ -271,6 +299,16 @@ static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0,
 	if muster_target == Vector3.INF:
 		return false
 	_move_toward_point(soldier, muster_target, speed_scale, delta, turn_speed)
+	return true
+
+
+static func _try_move_to_active_ship_duty_target(soldier, speed_scale: float, delta: float, turn_speed: float) -> bool:
+	if not soldier.has_method("_get_active_ship_duty_target"):
+		return false
+	var duty_target: Vector3 = soldier._get_active_ship_duty_target()
+	if duty_target == Vector3.INF:
+		return false
+	_move_toward_point(soldier, duty_target, speed_scale, delta, turn_speed)
 	return true
 
 

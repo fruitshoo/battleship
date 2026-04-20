@@ -322,6 +322,10 @@
     "res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
       "layer": "entities/ships/player_ship_support_squadron_helper.gd",
       "responsibility": "Owns support fleet squadron slot profile resolution and support archetype application."
+    },
+    "res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
+      "layer": "world/sea_sites/sea_site_reward_helper.gd",
+      "responsibility": "Owns sea-site reward application, including upgrades, hull repair, crew training, crew limit, and crew restoration effects."
     }
   },
   "large_helper_exceptions": {
@@ -430,6 +434,14 @@
         "res://scripts/entities/soldiers/soldier_boarding_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_soldier_level",
+      "paths": [
+        "res://scripts/entities/ships/base_ship_crew_helper.gd",
+        "res://scripts/world/sea_sites/sea_site_reward_helper.gd"
+      ],
+      "reason": "Crew training and sea-site rewards both need a local read-only soldier level adapter while sharing only node contracts."
     },
     {
       "name": "_get_player_cannon_count_for_level",
@@ -1856,7 +1868,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/test/project_contract_recovery_helper.gd": {
-      "count": 29,
+      "count": 28,
       "functions": [
         "run_recovery_effect_contract_smoke",
         "_run_floating_loot_smoke",
@@ -1885,8 +1897,7 @@
         "_find_new_player_roster_soldier",
         "_counts_as_player_roster_member",
         "_is_captain_node",
-        "_wait_frames",
-        "_run_survivor_full_crew_still_joins_roster"
+        "_wait_frames"
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
@@ -2459,6 +2470,24 @@
         "_get_support_squadron_stats"
       ],
       "reason": "Support squadron profile helper owns support slot archetype selection and limit bonuses."
+    },
+    "res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
+      "count": 12,
+      "functions": [
+        "apply_reward",
+        "_open_upgrade_choices",
+        "_repair_hull",
+        "_train_crew",
+        "_expand_crew_limit",
+        "_restore_crew",
+        "_is_player_soldier",
+        "_is_dead_soldier",
+        "_get_soldier_level",
+        "_sync_hull_hud",
+        "_notify",
+        "_get_hud"
+      ],
+      "reason": "Sea-site reward helper owns reward dispatch and player-ship reward side effects."
     }
   },
   "helper_dependency_baselines": {
@@ -3323,6 +3352,11 @@
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_soldier_level|res://scripts/entities/ships/base_ship_crew_helper.gd,res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
+      "reason": "Crew training and sea-site rewards both need a local read-only soldier level adapter while sharing only node contracts.",
+      "priority": "known-local-adapter",
+      "recommended_action": "Consolidate the soldier level adapter if a broader soldier stat contract owner is introduced."
     },
     "duplicate_static_function|_get_player_cannon_count_for_level|res://scripts/test/project_contract_upgrade_helper.gd,res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",

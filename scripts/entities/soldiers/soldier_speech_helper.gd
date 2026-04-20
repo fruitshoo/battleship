@@ -164,7 +164,7 @@ static func _configure_label(soldier, label: Label3D) -> void:
 	var is_captain := bool(soldier.get("is_captain"))
 	label.position = Vector3(0.0, _get_label_base_height(soldier), 0.0)
 	label.font_size = 72 if is_captain else 64
-	label.outline_size = 16 if is_captain else 14
+	label.outline_size = 7 if is_captain else 6
 	label.extra_cull_margin = 16.0
 	label.no_depth_test = true
 	label.render_priority = 20

@@ -158,6 +158,11 @@ func _verify_enemy_drifter_uses_survivor_like_field_item_tuning(failures: Array[
 		failures.append("enemy drifter should use survivor-like magnet speed")
 	if absf(float(pickup.get("collection_contact_margin")) - 0.7) > 0.001:
 		failures.append("enemy drifter should use survivor-like contact margin")
+	var call_label := pickup.get_node_or_null("DrifterCallLabel") as Label3D
+	if call_label == null:
+		failures.append("enemy drifter should create a waterline speech label")
+	elif call_label.outline_size > 8:
+		failures.append("enemy drifter speech outline is too thick")
 	var effect_source := FileAccess.get_file_as_string("res://scripts/effects/enemy_drifter_xp.gd")
 	if not effect_source.contains("FieldItemHelper.sample_ocean_surface"):
 		failures.append("enemy drifter should share ocean surface sampling through FieldItemHelper")

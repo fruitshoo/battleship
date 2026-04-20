@@ -4,7 +4,6 @@ extends "res://scripts/entities/weapons/weapon.gd"
 ## 공격력이 높고 리치도 길지만 쿨다운이 깁니다.
 
 const BASE_DAMAGE: float = 16.0
-const OWNER_ATTACK_BONUS_SCALE: float = 0.75
 
 func _ready() -> void:
 	damage = BASE_DAMAGE
@@ -12,9 +11,9 @@ func _ready() -> void:
 	attack_cooldown = 1.6
 
 
-func apply_owner_attack_damage(owner_attack_damage: float) -> void:
-	var owner_bonus: float = maxf(0.0, owner_attack_damage - 12.0)
-	damage = BASE_DAMAGE + (owner_bonus * OWNER_ATTACK_BONUS_SCALE)
+func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
+	damage = BASE_DAMAGE * (1.0 + maxf(0.0, damage_bonus_pct))
+
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target): return

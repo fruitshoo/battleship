@@ -3,6 +3,7 @@ class_name BaseShipCrewHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const CANNON_RELOAD_CREW_MAX_PER_CANNON := 3.0
 
 static func update_crew_allocation_state(ship, delta: float) -> void:
 	ship._crew_allocation_eval_left -= delta
@@ -18,6 +19,7 @@ static func update_crew_allocation_state(ship, delta: float) -> void:
 		ship.combat_crew_ratio = 0.0
 		ship.shiphandling_crew_ratio = 0.0
 		ship.gunnery_crew_ratio = 0.0
+		assign_cannon_reload_crew_power(ship)
 		return
 
 	var combat_ratio_target: float = 0.2
@@ -40,6 +42,7 @@ static func update_crew_allocation_state(ship, delta: float) -> void:
 	ship.combat_crew_ratio = float(ship.combat_crew_alloc) / float(available_crew)
 	ship.shiphandling_crew_ratio = float(ship.shiphandling_crew_alloc) / float(available_crew)
 	ship.gunnery_crew_ratio = float(ship.gunnery_crew_alloc) / float(available_crew)
+	assign_cannon_reload_crew_power(ship)
 
 
 static func get_shiphandling_multiplier(ship) -> float:
@@ -50,6 +53,124 @@ static func get_shiphandling_multiplier(ship) -> float:
 static func get_gunnery_reload_multiplier(ship) -> float:
 	var t: float = clampf((ship.gunnery_crew_ratio - 0.1) / 0.4, 0.0, 1.0)
 	return lerpf(1.35, 0.72, t)
+
+static func assign_cannon_reload_crew_power(ship) -> void:
+	var cannons: Array[Node] = get_ship_reload_crew_cannons(ship)
+	if cannons.is_empty():
+		return
+	for cannon in cannons:
+		cannon.call("set_reload_crew_power", 0.0)
+
+	var crew_power: float = 0.0
+	if ship.get("gunnery_crew_alloc") != null:
+		crew_power = float(max(0, int(ship.get("gunnery_crew_alloc"))))
+	if crew_power <= 0.0:
+		return
+
+	var active_cannons: Array[Node] = get_active_reload_crew_cannons(ship, cannons)
+	if active_cannons.is_empty():
+		return
+	distribute_cannon_reload_crew_power(active_cannons, crew_power)
+
+
+static func get_ship_reload_crew_cannons(ship) -> Array[Node]:
+	var cannons: Array[Node] = []
+	var stack: Array[Node] = [ship]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if not is_instance_valid(node):
+			continue
+		if node != ship and is_cannon_reload_crew_target(node):
+			cannons.append(node)
+		for child in node.get_children():
+			if child is Node:
+				stack.append(child)
+	return cannons
+
+
+static func get_active_reload_crew_cannons(ship, cannons: Array[Node]) -> Array[Node]:
+	var active: Array[Node] = []
+	var target := get_nearest_enemy_ship_for_allocation(ship)
+	if is_instance_valid(target):
+		for cannon in cannons:
+			if is_reload_crew_cannon_available(cannon) and cannon_can_cover_allocation_target(cannon, target):
+				active.append(cannon)
+	if not active.is_empty():
+		return active
+
+	for cannon in cannons:
+		if is_reload_crew_cannon_available(cannon):
+			active.append(cannon)
+	return active
+
+
+static func distribute_cannon_reload_crew_power(cannons: Array[Node], crew_power: float) -> void:
+	var remaining: float = maxf(0.0, crew_power)
+	if remaining <= 0.0:
+		return
+	var assigned: Dictionary = {}
+	for cannon in cannons:
+		if remaining <= 0.0:
+			break
+		var initial_max_power: float = CANNON_RELOAD_CREW_MAX_PER_CANNON
+		if cannon.has_method("get_max_reload_crew_power"):
+			initial_max_power = float(cannon.call("get_max_reload_crew_power"))
+		var power: float = minf(minf(1.0, maxf(0.0, initial_max_power)), remaining)
+		assigned[cannon] = power
+		remaining -= power
+
+	var cursor: int = 0
+	while remaining > 0.001 and not cannons.is_empty():
+		var cannon: Node = cannons[cursor % cannons.size()]
+		var current_power: float = float(assigned.get(cannon, 0.0))
+		var reload_max_power: float = CANNON_RELOAD_CREW_MAX_PER_CANNON
+		if cannon.has_method("get_max_reload_crew_power"):
+			reload_max_power = float(cannon.call("get_max_reload_crew_power"))
+		var room: float = maxf(0.0, reload_max_power - current_power)
+		if room > 0.001:
+			var extra: float = minf(room, remaining)
+			assigned[cannon] = current_power + extra
+			remaining -= extra
+		cursor += 1
+		if cursor > cannons.size() * 4:
+			break
+
+	for cannon in cannons:
+		cannon.call("set_reload_crew_power", float(assigned.get(cannon, 0.0)))
+
+
+static func is_cannon_reload_crew_target(node: Node) -> bool:
+	return node.has_method("set_reload_crew_power") and node.has_method("get_reload_crew_power")
+
+
+static func is_reload_crew_cannon_available(cannon: Node) -> bool:
+	if not is_instance_valid(cannon) or cannon.is_queued_for_deletion():
+		return false
+	if cannon.is_inside_tree():
+		if cannon.has_method("is_visible_in_tree") and not cannon.is_visible_in_tree():
+			return false
+		if cannon.has_method("is_processing") and not cannon.is_processing():
+			return false
+	return true
+
+
+static func cannon_can_cover_allocation_target(cannon: Node, target: Node) -> bool:
+	if cannon.has_method("can_cover_reload_allocation_target"):
+		return bool(cannon.call("can_cover_reload_allocation_target", target))
+	if not (cannon is Node3D) or not (target is Node3D):
+		return false
+	var cannon_node := cannon as Node3D
+	var target_node := target as Node3D
+	if cannon.has_method("_get_current_range"):
+		var range_value: float = float(cannon.call("_get_current_range"))
+		if range_value > 0.0:
+			var planar_delta: Vector3 = target_node.global_position - cannon_node.global_position
+			planar_delta.y = 0.0
+			if planar_delta.length_squared() > range_value * range_value:
+				return false
+	if cannon.has_method("_is_within_arc"):
+		return bool(cannon.call("_is_within_arc", target_node))
+	return true
 
 
 static func get_combat_effectiveness_multiplier(ship) -> float:
@@ -96,6 +217,95 @@ static func estimate_available_crew_count(ship) -> int:
 	return 0
 
 
+static func train_existing_crew_from_survivor(ship) -> bool:
+	var trainee := _pick_survivor_training_target(ship)
+	if not is_instance_valid(trainee):
+		_show_survivor_training_message(ship, "생존자 구조: 정원 가득")
+		return true
+
+	var before_level := _get_soldier_level(trainee)
+	var xp_amount := _get_soldier_next_level_xp(trainee)
+	if xp_amount <= 0.0:
+		xp_amount = 1.0
+	if trainee.has_method("add_soldier_xp"):
+		trainee.call("add_soldier_xp", xp_amount, "survivor_overflow")
+	var after_level := _get_soldier_level(trainee)
+	var message := "생존자 구조: 병사 훈련"
+	if after_level > before_level:
+		message = "생존자 구조: 병사 Lv.%d" % after_level
+	_show_survivor_training_message(ship, message)
+	var audio_manager = ship.get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("level_up" if after_level > before_level else "soldier_hit", ship.global_position, 1.25)
+	return true
+
+
+static func _pick_survivor_training_target(ship) -> Node:
+	var best: Node = null
+	var best_level := INF
+	var best_xp := INF
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(soldier):
+			continue
+		if not _is_player_training_candidate(soldier):
+			continue
+		if not SoldierStateHelper.is_alive_soldier(soldier):
+			continue
+		if not soldier.has_method("add_soldier_xp"):
+			continue
+		var next_xp := _get_soldier_next_level_xp(soldier)
+		if next_xp <= 0.0:
+			continue
+		var level := _get_soldier_level(soldier)
+		var current_xp := _get_soldier_xp(soldier)
+		if level < best_level or (level == best_level and current_xp < best_xp):
+			best = soldier
+			best_level = level
+			best_xp = current_xp
+	return best
+
+
+static func _is_player_training_candidate(soldier: Node) -> bool:
+	if soldier.has_method("is_player_team_soldier"):
+		return soldier.call("is_player_team_soldier") == true
+	if soldier.has_method("get_team_tag"):
+		return str(soldier.call("get_team_tag")) == "player"
+	return str(soldier.get("team")) == "player"
+
+
+static func _get_soldier_level(soldier: Node) -> int:
+	if not is_instance_valid(soldier):
+		return 0
+	if soldier.has_method("get_soldier_level_value"):
+		return int(soldier.call("get_soldier_level_value"))
+	return int(soldier.get_meta("soldier_level", 1))
+
+
+static func _get_soldier_xp(soldier: Node) -> float:
+	if not is_instance_valid(soldier):
+		return 0.0
+	if soldier.has_method("get_soldier_xp_value"):
+		return float(soldier.call("get_soldier_xp_value"))
+	return float(soldier.get_meta("soldier_xp", 0.0))
+
+
+static func _get_soldier_next_level_xp(soldier: Node) -> float:
+	if not is_instance_valid(soldier):
+		return 0.0
+	if soldier.has_method("get_soldier_next_level_xp_requirement"):
+		return float(soldier.call("get_soldier_next_level_xp_requirement"))
+	return 0.0
+
+
+static func _show_survivor_training_message(ship, message: String) -> void:
+	print("[Rescue] %s" % message)
+	var hud = null
+	if "_cached_hud" in ship:
+		hud = ship._cached_hud
+	if is_instance_valid(hud) and hud.has_method("show_message"):
+		hud.show_message(message, 2.0)
+
+
 static func is_in_gunnery_posture(ship) -> bool:
 	var cannon_range: float = get_ship_cannon_range_for_allocation(ship)
 	if cannon_range <= 0.01:
@@ -122,23 +332,34 @@ static func get_ship_cannon_range_for_allocation(ship) -> float:
 
 
 static func get_nearest_enemy_ship_distance_for_allocation(ship) -> float:
+	var nearest_ship := get_nearest_enemy_ship_for_allocation(ship)
+	if not is_instance_valid(nearest_ship):
+		return -1.0
+	var planar_delta: Vector3 = nearest_ship.global_position - ship.global_position
+	planar_delta.y = 0.0
+	return planar_delta.length()
+
+
+static func get_nearest_enemy_ship_for_allocation(ship) -> Node3D:
 	var own_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
 	var nearest_distance_sq: float = INF
+	var nearest_ship: Node3D = null
 	var opposing_team: String = "enemy" if own_team == "player" else "player"
 	var all_ships: Array = EntityRegistry.get_ships_by_team(opposing_team)
 	for other in all_ships:
-		if not is_instance_valid(other) or other == ship:
+		if not is_instance_valid(other) or other == ship or not (other is Node3D):
 			continue
 		if other.has_method("is_combat_disabled") and other.is_combat_disabled():
+			continue
+		if other.get("is_dying") == true or other.get("is_sinking") == true:
 			continue
 		var planar_delta: Vector3 = other.global_position - ship.global_position
 		planar_delta.y = 0.0
 		var dist_sq: float = planar_delta.length_squared()
 		if dist_sq < nearest_distance_sq:
 			nearest_distance_sq = dist_sq
-	if nearest_distance_sq == INF:
-		return -1.0
-	return sqrt(nearest_distance_sq)
+			nearest_ship = other as Node3D
+	return nearest_ship
 
 
 static func build_debug_crew_snapshot(ship) -> Dictionary:

@@ -14,9 +14,8 @@ const PLAYER_STAMINA_DRAIN_RATE := 10.0
 const PLAYER_STAMINA_RECOVERY_RATE := 6.5
 const SUPPLY_BASE_HEAL := 5.0
 const SUPPLY_BASE_STAMINA_RECOVERY := 0.0
-const SOLDIER_BASE_ATTACK := 12.0
-const SOLDIER_SWORD_MULT := 1.25
-const SOLDIER_BOW_MULT := 1.0
+const SOLDIER_SWORD_BASE_DAMAGE := 13.0
+const SOLDIER_BOW_BASE_DAMAGE := 18.0
 const SUPPORT_FLEET_BASE_RESPAWN_INTERVAL := 30.0
 const SUPPORT_FLEET_BASE_LIMIT := 1
 
@@ -166,10 +165,10 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var spearmen = int(UpgradeManager.get_specialist_unit_count("crew_numbers", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
 			return "창병 %d명 | 근접 방어/난간전 특화" % spearmen
 		"crew_attack":
-			var attack_bonus := float(stats.get("attack_add_per_lv", 2.0)) * level
-			var sword_damage := (SOLDIER_BASE_ATTACK + attack_bonus) * SOLDIER_SWORD_MULT
-			var bow_damage := (SOLDIER_BASE_ATTACK + attack_bonus) * SOLDIER_BOW_MULT
-			return "검 %.1f | 활 %.1f" % [sword_damage, bow_damage]
+			var damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
+			var sword_damage := SOLDIER_SWORD_BASE_DAMAGE * (1.0 + damage_bonus_pct)
+			var bow_damage := SOLDIER_BOW_BASE_DAMAGE * (1.0 + damage_bonus_pct)
+			return "무기 피해 +%.0f%% | 검 %.1f | 활 %.1f" % [damage_bonus_pct * 100.0, sword_damage, bow_damage]
 		"crew_defense":
 			var defense_bonus := float(stats.get("defense_add_per_lv", 1.0)) * level
 			var damage_reduction := clampf(

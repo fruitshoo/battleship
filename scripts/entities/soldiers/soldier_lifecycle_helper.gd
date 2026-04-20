@@ -34,6 +34,8 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 	var final_damage: float = maxf(mitigated_damage * (1.0 - total_reduction), 1.0)
 	soldier.current_health -= final_damage
 	soldier.set_meta("last_damage_source", damage_source)
+	if soldier.has_method("mark_recent_combat_damage"):
+		soldier.mark_recent_combat_damage()
 	soldier.set_meta("last_death_cause", "combat")
 
 	if not damage_source.is_empty() and soldier.team == "enemy":
@@ -342,6 +344,10 @@ static func _recover_incapacitated_now(soldier, health_ratio: float) -> void:
 	if soldier.has_method("add_soldier_xp"):
 		soldier.add_soldier_xp(1.0, "recovery")
 	soldier.set_physics_process(true)
+	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_method("_sync_player_crew_roster"):
+		soldier.owned_ship.call_deferred("_sync_player_crew_roster")
+	elif is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("_sync_player_crew_roster"):
+		soldier.home_ship.call_deferred("_sync_player_crew_roster")
 	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("check_derelict_status"):
 		soldier.home_ship.call_deferred("check_derelict_status")
 

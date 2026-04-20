@@ -7,6 +7,7 @@ const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
+const CANNON_RELOAD_TEMPO_MULT := 1.10
 
 ## 함포 (Cannon)
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
@@ -14,6 +15,15 @@ const DEBUG_CANNON_FIRE_LOGS := false
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var fire_cooldown: float = 2.8
+@export var crew_operated_reload_enabled: bool = true
+@export_range(0.0, 3.0, 0.05) var max_reload_crew_power: float = 3.0
+@export_range(0.05, 1.0, 0.05) var uncrewed_reload_speed_mult: float = 0.35
+@export_range(1.0, 2.5, 0.05) var two_crew_reload_speed_mult: float = 1.35
+@export_range(1.0, 3.0, 0.05) var three_crew_reload_speed_mult: float = 1.65
+@export_range(0.2, 2.0, 0.05) var reload_crew_station_back_offset: float = 1.05
+@export_range(0.2, 1.5, 0.05) var reload_crew_station_side_offset: float = 0.55
+@export_range(0.0, 1.0, 0.05) var reload_crew_station_forward_step: float = 0.25
+@export var reload_crew_animation_key: String = "cannon_reload_standby"
 @export var detection_range: float = 22.0
 @export var detection_arc: float = 25.0 # 탐지 각도 (±25도)
 @export_range(0.0, 0.35, 0.01) var reload_extra_jitter_pct: float = 0.12
@@ -40,6 +50,7 @@ var _target_scan_left: float = 0.0
 var fleet_damage_mult: float = 1.0
 var fleet_cooldown_mult: float = 1.0
 var _owner_ship: Node = null
+var _reload_crew_power: float = 0.0
 
 # 함수(수명 주기별) 성능을 위한 업그레이드 수치 캐싱
 var _cached_range_mult: float = 1.0
@@ -171,11 +182,93 @@ func get_debug_cannon_snapshot() -> Dictionary:
 		"damage": cannon_damage,
 		"damage_mult": _cached_dmg_mult,
 		"fleet_damage_mult": fleet_damage_mult,
+		"reload_crew_power": _reload_crew_power,
+		"reload_crew_speed_mult": get_reload_crew_speed_multiplier(),
 		"crit_chance": _cached_crit_chance,
 		"crit_multiplier": _cached_crit_multiplier,
 		"expected_dps": expected_shot_damage / current_cooldown if current_cooldown > 0.0 else 0.0,
 		"projectile_stats": projectile_stats,
 	}
+
+func set_reload_crew_power(value: float) -> void:
+	_reload_crew_power = clampf(value, 0.0, max_reload_crew_power)
+
+
+func get_reload_crew_power() -> float:
+	return _reload_crew_power
+
+
+func get_max_reload_crew_power() -> float:
+	return max_reload_crew_power
+
+
+func get_reload_crew_station_count() -> int:
+	return clampi(int(ceil(_reload_crew_power)), 0, int(max_reload_crew_power))
+
+
+func get_reload_crew_station_global_position(slot_index: int) -> Vector3:
+	return to_global(_get_reload_crew_station_local_position(slot_index))
+
+
+func get_reload_crew_station_animation_key(_slot_index: int) -> String:
+	return reload_crew_animation_key
+
+
+func notify_reload_crew_station_worker(_soldier: Node, _slot_index: int, _arrived: bool) -> void:
+	pass
+
+
+func get_reload_crew_speed_multiplier() -> float:
+	if not crew_operated_reload_enabled:
+		return 1.0
+	var crew_power: float = clampf(_reload_crew_power, 0.0, max_reload_crew_power)
+	if crew_power <= 1.0:
+		return lerpf(uncrewed_reload_speed_mult, 1.0, crew_power)
+	if crew_power <= 2.0:
+		return lerpf(1.0, two_crew_reload_speed_mult, crew_power - 1.0)
+	var extra_span: float = maxf(0.01, max_reload_crew_power - 2.0)
+	var extra_t: float = clampf((crew_power - 2.0) / extra_span, 0.0, 1.0)
+	return lerpf(two_crew_reload_speed_mult, three_crew_reload_speed_mult, extra_t)
+
+
+func can_cover_reload_allocation_target(target: Node) -> bool:
+	if not (target is Node3D):
+		return false
+	var target_node := target as Node3D
+	var range_value: float = _get_current_range()
+	if range_value > 0.0:
+		var planar_delta: Vector3 = target_node.global_position - global_position
+		planar_delta.y = 0.0
+		if planar_delta.length_squared() > range_value * range_value:
+			return false
+	return _is_within_arc(target_node)
+
+
+func _get_reload_crew_station_local_position(slot_index: int) -> Vector3:
+	match slot_index:
+		0:
+			return Vector3(0.0, 0.0, reload_crew_station_back_offset)
+		1:
+			return Vector3(-reload_crew_station_side_offset, 0.0, reload_crew_station_back_offset - reload_crew_station_forward_step)
+		2:
+			return Vector3(reload_crew_station_side_offset, 0.0, reload_crew_station_back_offset - reload_crew_station_forward_step)
+		_:
+			var side_sign: float = -1.0 if slot_index % 2 == 0 else 1.0
+			var row: float = float(slot_index / 2)
+			return Vector3(
+				side_sign * reload_crew_station_side_offset,
+				0.0,
+				reload_crew_station_back_offset + row * reload_crew_station_forward_step
+			)
+
+
+func _get_reload_crew_cooldown_mult() -> float:
+	if not crew_operated_reload_enabled:
+		if is_instance_valid(_owner_ship) and _owner_ship.has_method("get_gunnery_reload_multiplier"):
+			return float(_owner_ship.call("get_gunnery_reload_multiplier"))
+		return 1.0
+	return 1.0 / maxf(0.05, get_reload_crew_speed_multiplier())
+
 
 
 func _get_projectile_stats_snapshot() -> Dictionary:
@@ -291,10 +384,9 @@ func _is_ship_occupied_by_enemy(target_ship: Node3D) -> bool:
 func _get_current_cooldown() -> float:
 	# 캐시된 업그레이드 배율 * 함대 배율
 	var cooldown_mult: float = _cached_cd_mult * fleet_cooldown_mult
-	if is_instance_valid(_owner_ship) and _owner_ship.has_method("get_gunnery_reload_multiplier"):
-		cooldown_mult *= float(_owner_ship.call("get_gunnery_reload_multiplier"))
+	cooldown_mult *= _get_reload_crew_cooldown_mult()
 	cooldown_mult *= _get_boarding_reload_cooldown_mult()
-	return fire_cooldown * cooldown_mult
+	return fire_cooldown * cooldown_mult * CANNON_RELOAD_TEMPO_MULT
 
 func _get_boarding_reload_cooldown_mult() -> float:
 	if not is_instance_valid(_owner_ship):

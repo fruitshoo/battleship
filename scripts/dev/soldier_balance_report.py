@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SOLDIER_RULES_PATH = ROOT / "data" / "soldier_rules.json"
 UPGRADES_PATH = ROOT / "data" / "upgrades.json"
+ATTACK_COOLDOWN_TEMPO_MULT = 1.12
 
 
 def load_json(path: Path) -> dict:
@@ -49,6 +50,7 @@ def main() -> int:
     parser.add_argument("--meta-crew-defense", type=int, default=0, help="Assumed permanent crew_defense level.")
     parser.add_argument("--run-crew-attack", type=int, default=0, help="Assumed run crew_attack level.")
     parser.add_argument("--run-crew-defense", type=int, default=0, help="Assumed run crew_defense level.")
+    parser.add_argument("--soldier-level", type=int, default=1, help="Assumed player soldier personal level.")
     parser.add_argument("--repeating-crossbow-level", type=int, default=1, help="Assumed repeating_crossbow specialist upgrade level.")
     args = parser.parse_args()
 
@@ -57,7 +59,7 @@ def main() -> int:
     upgrades = upgrades_root["upgrades"]
 
     base = soldier_rules["base"]
-    crew_attack_add = float(upgrades["crew_attack"]["stats"].get("attack_add_per_lv", 2.0))
+    run_damage_bonus_per_level = float(upgrades["crew_attack"]["stats"].get("damage_bonus_pct_per_lv", 0.06))
     crew_defense_add = float(upgrades["crew_defense"]["stats"].get("defense_add_per_lv", 1.0))
 
     base_health = float(base["max_health"])
@@ -66,26 +68,34 @@ def main() -> int:
     crit_chance = float(base["crit_chance"])
     crit_multiplier = float(base["crit_multiplier"])
 
+    soldier_level_bonus_by_level = {
+        1: 0.0,
+        2: 0.08,
+        3: 0.16,
+        4: 0.25,
+        5: 0.35,
+    }
+    soldier_level = max(1, min(5, args.soldier_level))
     meta_health_mult = 1.0 + (args.meta_crew_health * 0.12)
-    meta_attack_bonus = args.meta_crew_attack * 2.0
+    meta_damage_bonus = args.meta_crew_attack * 0.04
+    soldier_level_damage_bonus = soldier_level_bonus_by_level[soldier_level]
     meta_defense_bonus = args.meta_crew_defense * 1.0
-    run_attack_bonus = args.run_crew_attack * crew_attack_add
+    run_damage_bonus = args.run_crew_attack * run_damage_bonus_per_level
     run_defense_bonus = args.run_crew_defense * crew_defense_add
+    total_damage_bonus = max(0.0, meta_damage_bonus + run_damage_bonus + soldier_level_damage_bonus)
 
     effective_health = base_health * meta_health_mult
-    effective_attack = base_attack + meta_attack_bonus + run_attack_bonus
     effective_defense = base_defense + meta_defense_bonus + run_defense_bonus
-    owner_attack_bonus = max(0.0, effective_attack - base_attack)
 
     melee_expected_crit = expected_crit_multiplier(crit_chance, crit_multiplier)
     harpoon_expected_crit = expected_crit_multiplier(crit_chance + 0.15, 2.5)
 
-    # Mirror the current code-facing formulas, not the design intent.
-    sword_damage = 13.0 + (owner_attack_bonus * 0.8)
-    spear_damage = 13.5 + (owner_attack_bonus * 0.75)
-    trident_damage = 16.0 + (owner_attack_bonus * 0.75)
-    harpoon_damage = 12.0 + (owner_attack_bonus * 0.65)
-    bow_damage = 18.0 + (owner_attack_bonus * 0.55)
+    # Mirror the current code-facing formula: weapon base damage * one summed bonus.
+    sword_damage = 13.0 * (1.0 + total_damage_bonus)
+    spear_damage = 13.5 * (1.0 + total_damage_bonus)
+    trident_damage = 16.0 * (1.0 + total_damage_bonus)
+    harpoon_damage = 12.0 * (1.0 + total_damage_bonus)
+    bow_damage = 18.0 * (1.0 + total_damage_bonus)
 
     repeating_crossbow_level = max(1, args.repeating_crossbow_level)
     repeating_stats = upgrades["repeating_crossbow"]["stats"]
@@ -99,9 +109,11 @@ def main() -> int:
     repeater_cooldown = float(repeating_stats.get("base_cooldown", 2.2)) - max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("cooldown_reduce_per_lv", 0.05))
     repeater_burst_delay = float(repeating_stats.get("burst_delay", 0.15))
     repeater_cooldown = max(repeater_cooldown, repeater_burst_count * repeater_burst_delay + 0.5)
-    repeater_damage = repeater_upgrade_damage + (owner_attack_bonus * 0.25)
+    repeater_cooldown *= ATTACK_COOLDOWN_TEMPO_MULT
+    repeater_damage = repeater_upgrade_damage * (1.0 + total_damage_bonus)
     singigeon_base_damage = float(upgrades["singigeon"]["stats"].get("base_damage", 2.2))
     singigeon_personnel_mult = float(upgrades["singigeon"]["stats"].get("personnel_damage_mult", 6.0))
+    singigeon_personnel_damage = singigeon_base_damage * singigeon_personnel_mult * (1.0 + total_damage_bonus)
 
     target_defense = effective_defense
     ranged_cover = 0.20
@@ -110,35 +122,35 @@ def main() -> int:
         {
             "weapon": "sword",
             "raw_hit": sword_damage,
-            "cooldown": 1.0,
+            "cooldown": 1.0 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": sword_damage * melee_expected_crit,
-            "notes": "General melee baseline with moderate owner-attack scaling.",
+            "notes": "General melee baseline using weapon base damage plus the summed damage bonus.",
         },
         {
             "weapon": "spear",
             "raw_hit": spear_damage,
-            "cooldown": 1.2,
+            "cooldown": 1.2 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": spear_damage * melee_expected_crit,
             "notes": "Longer reach with a modest anti-general bump while staying below heavy melee variants.",
         },
         {
             "weapon": "trident",
             "raw_hit": trident_damage,
-            "cooldown": 1.6,
+            "cooldown": 1.6 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": trident_damage * melee_expected_crit,
             "notes": "Heavy melee variant with slower cadence and stronger base hit.",
         },
         {
             "weapon": "harpoon",
             "raw_hit": harpoon_damage,
-            "cooldown": 1.1,
+            "cooldown": 1.1 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": harpoon_damage * harpoon_expected_crit,
             "notes": "Gets higher crit expectation than other melee variants.",
         },
         {
             "weapon": "bow",
             "raw_hit": bow_damage,
-            "cooldown": 2.0,
+            "cooldown": 2.0 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": bow_damage,
             "notes": "No crit in current projectile path; ranged cover applies on target side.",
         },
@@ -147,13 +159,13 @@ def main() -> int:
             "raw_hit": repeater_damage,
             "cooldown": repeater_cooldown,
             "expected_hit": repeater_damage * repeater_burst_count,
-            "notes": f"Current per-bolt base hit is {repeater_upgrade_damage:.1f} at level {repeating_crossbow_level}, with {repeater_burst_count} bolts per burst and modest owner scaling.",
+            "notes": f"Current per-bolt base hit is {repeater_upgrade_damage:.1f} at level {repeating_crossbow_level}, with {repeater_burst_count} bolts per burst before the summed damage bonus.",
         },
         {
             "weapon": "singigeon",
-            "raw_hit": singigeon_base_damage * singigeon_personnel_mult,
-            "cooldown": 5.0,
-            "expected_hit": singigeon_base_damage * singigeon_personnel_mult,
+            "raw_hit": singigeon_personnel_damage,
+            "cooldown": 5.0 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "expected_hit": singigeon_personnel_damage,
             "notes": "Personnel splash specialist; value shown is direct personnel hit before splash falloff.",
         },
     ]
@@ -161,12 +173,13 @@ def main() -> int:
     print("Soldier Balance Report")
     print(f"- base health: {base_health:.1f}")
     print(f"- effective health: {effective_health:.1f}")
-    print(f"- effective attack stat: {effective_attack:.1f}")
+    print(f"- weapon damage bonus: {total_damage_bonus * 100.0:.1f}%")
     print(f"- effective defense stat: {effective_defense:.1f}")
     print(
         "- assumptions: "
         f"meta_health={args.meta_crew_health}, meta_attack={args.meta_crew_attack}, meta_defense={args.meta_crew_defense}, "
         f"run_attack={args.run_crew_attack}, run_defense={args.run_crew_defense}, "
+        f"soldier_level={soldier_level}, "
         f"repeating_crossbow_level={repeating_crossbow_level}"
     )
     print()
@@ -191,8 +204,7 @@ def main() -> int:
     for row in rows:
         print(f"- {row['weapon']}: {row['notes']}")
     print("- cover column is only meaningful for ranged damage sources, but is printed consistently for quick comparison.")
-    print("- melee and bow families now preserve role-specific base damage and apply separate owner-attack scaling instead of flattening to the same value.")
-    print("- repeating_crossbow and singigeon still mix role-specific stats with owner stat sync, so progression shape should be watched closely.")
+    print("- weapon families preserve role-specific base damage and apply one summed damage bonus from soldier level, meta upgrades, and run upgrades.")
     return 0
 
 

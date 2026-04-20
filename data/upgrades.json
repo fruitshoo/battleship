@@ -147,11 +147,11 @@
 		"crew_attack": {
 			"name": "무기",
 			"category": 1,
-			"description": "병사의 검과 활 피해 강화",
+			"description": "병사 무기 피해 강화",
 			"max_level": 5,
 			"color": "e3bf3a",
 			"stats": {
-				"attack_add_per_lv": 2.0
+				"damage_bonus_pct_per_lv": 0.06
 			}
 		},
 		"crew_defense": {

@@ -127,7 +127,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.08)) * 100.0))
 			return "적 장악 %d%% 지연 | 갑판 혼란 피해 -%d%%" % [capture_delay_pct, boarding_fire_reduce_pct]
 		"crew_attack":
-			return "무기 피해 +%.0f" % [next_level * float(s.get("attack_add_per_lv", 2.0))]
+			return "무기 피해 +%.0f%%" % [next_level * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0]
 		"crew_defense":
 			var defense_bonus: float = next_level * float(s.get("defense_add_per_lv", 1.0))
 			var damage_reduction: float = clampf(

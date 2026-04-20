@@ -82,4 +82,3 @@ mesh = SubResource("BoxMesh_choun")
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
-metadata/ally_ship_role = "player_flagship"

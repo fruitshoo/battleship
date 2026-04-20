@@ -239,8 +239,8 @@ func _verify_player_soldier_level_progression(failures: Array[String]) -> void:
 	soldier.add_soldier_xp(1.0, "contract")
 	if soldier.get_soldier_level_value() != 2:
 		failures.append("player soldier did not reach level 2 at xp requirement")
-	if not is_equal_approx(float(soldier.get_meta("soldier_level_attack_bonus", 0.0)), 0.75):
-		failures.append("player soldier level 2 attack bonus was not applied")
+	if not is_equal_approx(float(soldier.get_meta("soldier_level_damage_bonus_pct", 0.0)), 0.08):
+		failures.append("player soldier level 2 damage bonus was not applied")
 
 	soldier.add_soldier_xp(100.0, "contract")
 	if soldier.get_soldier_level_value() != 5:

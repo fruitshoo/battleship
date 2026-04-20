@@ -11,6 +11,13 @@ const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
 const DERELICT_OFFSCREEN_DESPAWN_DISTANCE: float = 42.0
 const DERELICT_HARD_DESPAWN_DISTANCE: float = 150.0
+const DERELICT_SETTLE_Y_OFFSET: float = -0.28
+const DERELICT_MIN_ROLL_DEGREES: float = 2.5
+const DERELICT_MAX_ROLL_DEGREES: float = 6.5
+const DERELICT_MAX_PITCH_DEGREES: float = 2.0
+const DERELICT_SAIL_COLOR := Color(0.52, 0.50, 0.45, 1.0)
+const DERELICT_SAIL_DAMAGE_MIN: float = 0.16
+const DERELICT_SAIL_DAMAGE_MAX: float = 0.30
 const ENEMY_FIRE_POT_BASE_COOLDOWN: float = 7.5
 const ENEMY_FIRE_POT_MIN_RANGE: float = 7.0
 const ENEMY_FIRE_POT_MAX_RANGE: float = 18.0
@@ -218,10 +225,9 @@ static func become_derelict(ship) -> void:
 	ship._sync_profile_from_runtime()
 	ship._set_wake_state(false)
 
-	var tilt_tween = ship.create_tween()
-	tilt_tween.tween_property(ship, "rotation_degrees:z", 15.0, 1.5).set_ease(Tween.EASE_OUT)
-	tilt_tween.set_parallel(true)
-	tilt_tween.tween_property(ship, "position:y", ship.base_y - 1.0, 2.0)
+	_weather_derelict_sails(ship)
+	_play_derelict_transition_visuals(ship)
+	_set_derelict_settle_pose(ship)
 
 	var ship_id: int = ship.get_instance_id()
 	ship.get_tree().create_timer(DERELICT_NONBLOCKING_DELAY).timeout.connect(func():
@@ -229,6 +235,80 @@ static func become_derelict(ship) -> void:
 		if is_instance_valid(derelict_ship) and derelict_ship.is_derelict and not derelict_ship.is_sinking:
 			derelict_ship.set_meta("derelict_nonblocking", true)
 	)
+
+
+static func _weather_derelict_sails(ship) -> void:
+	var masts_variant: Variant = ship.get("masts") if "masts" in ship else []
+	if not (masts_variant is Array):
+		return
+	for mast in masts_variant:
+		if not is_instance_valid(mast):
+			continue
+		if mast.has_method("add_sail_damage"):
+			mast.add_sail_damage(randf_range(DERELICT_SAIL_DAMAGE_MIN, DERELICT_SAIL_DAMAGE_MAX))
+		elif mast.has_method("set_sail_damage"):
+			mast.set_sail_damage(randf_range(DERELICT_SAIL_DAMAGE_MIN, DERELICT_SAIL_DAMAGE_MAX))
+		if mast.has_method("set_sail_color"):
+			mast.set_sail_color(DERELICT_SAIL_COLOR)
+
+
+static func _play_derelict_transition_visuals(ship) -> void:
+	if not is_instance_valid(ship) or not ship.is_inside_tree():
+		return
+
+	_spawn_derelict_smoke(ship, Vector3(-0.7, 0.9, -1.6), 0.95)
+	_spawn_derelict_smoke(ship, Vector3(0.8, 0.85, 0.3), 0.85)
+	_spawn_derelict_smoke(ship, Vector3(0.1, 1.0, 1.7), 0.75)
+	_spawn_derelict_water_burst(ship, Vector3(-1.1, 0.0, -2.1), 0.82)
+	_spawn_derelict_water_burst(ship, Vector3(1.0, 0.0, 1.8), 0.72)
+
+
+static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float) -> void:
+	var scene: PackedScene = ship.get("impact_puff_scene") if "impact_puff_scene" in ship else null
+	if not is_instance_valid(scene):
+		return
+	var smoke = ScenePool.acquire(ship.get_tree(), scene)
+	if not is_instance_valid(smoke):
+		return
+	ship.get_tree().root.add_child(smoke)
+	smoke.global_position = ship.to_global(local_offset)
+	if smoke.has_method("configure_as_muzzle"):
+		smoke.configure_as_muzzle()
+	if smoke.has_method("set_intensity"):
+		smoke.set_intensity(intensity)
+	if smoke.has_method("pool_activate"):
+		smoke.pool_activate()
+
+
+static func _spawn_derelict_water_burst(ship, local_offset: Vector3, intensity: float) -> void:
+	var scene: PackedScene = ship.get("water_splash_scene") if "water_splash_scene" in ship else null
+	if not is_instance_valid(scene):
+		return
+	var splash = ScenePool.acquire(ship.get_tree(), scene)
+	if not is_instance_valid(splash):
+		return
+	ship.get_tree().root.add_child(splash)
+	var splash_pos: Vector3 = ship.to_global(local_offset)
+	splash_pos.y = ship.base_y + 0.05
+	splash.global_position = splash_pos
+	if splash.has_method("configure_as_small"):
+		splash.configure_as_small()
+	if splash.has_method("set_intensity"):
+		splash.set_intensity(intensity)
+	if splash.has_method("pool_activate"):
+		splash.pool_activate()
+
+
+static func _set_derelict_settle_pose(ship) -> void:
+	var roll_degrees: float = randf_range(-DERELICT_MAX_ROLL_DEGREES, DERELICT_MAX_ROLL_DEGREES)
+	if absf(roll_degrees) < DERELICT_MIN_ROLL_DEGREES:
+		roll_degrees = DERELICT_MIN_ROLL_DEGREES * (1.0 if randf() >= 0.5 else -1.0)
+	var pitch_degrees: float = randf_range(-DERELICT_MAX_PITCH_DEGREES, DERELICT_MAX_PITCH_DEGREES)
+	var settle_tween = ship.create_tween()
+	settle_tween.set_parallel(true)
+	settle_tween.tween_property(ship, "rotation_degrees:z", roll_degrees, 1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	settle_tween.tween_property(ship, "rotation_degrees:x", pitch_degrees, 1.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	settle_tween.tween_property(ship, "position:y", ship.base_y + DERELICT_SETTLE_Y_OFFSET, 1.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 static func sink_derelict(ship) -> void:

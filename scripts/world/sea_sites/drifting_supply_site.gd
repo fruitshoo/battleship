@@ -1,11 +1,17 @@
 extends Area3D
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
+const SeaSiteRewardHelper = preload("res://scripts/world/sea_sites/sea_site_reward_helper.gd")
 
 @export var collection_range: float = 9.0
 @export var hint_range: float = 34.0
 @export var choice_count: int = 4
+@export_enum("upgrade_choices", "repair_hull", "train_crew", "expand_crew_limit", "restore_crew") var reward_type: String = "repair_hull"
+@export_range(0.05, 1.0, 0.05) var hull_repair_ratio: float = 0.28
+@export var hull_repair_minimum: float = 35.0
+@export var crew_xp_amount: float = 45.0
+@export_range(1, 4, 1) var crew_limit_bonus: int = 1
+@export_range(1, 4, 1) var crew_restore_count: int = 1
 @export var waterline_offset: float = 0.28
 @export var float_speed: float = 1.35
 @export var float_height: float = 0.24
@@ -111,7 +117,7 @@ func _try_collect_from_node(node: Node) -> void:
 func _collect(_player_ship: Node3D) -> void:
 	if is_collected:
 		return
-	if not _open_bonus_choices():
+	if not _apply_site_reward(_player_ship):
 		return
 	is_collected = true
 	if is_instance_valid(AudioManager):
@@ -126,15 +132,18 @@ func _collect(_player_ship: Node3D) -> void:
 		queue_free()
 
 
-func _open_bonus_choices() -> bool:
-	var lm := LevelManagerRegistry.get_level_manager(get_tree())
-	if not is_instance_valid(lm) or not lm.has_method("_show_upgrade_ui"):
-		return false
-	var active_ui: Variant = lm.get("_upgrade_ui_instance")
-	if is_instance_valid(active_ui):
-		return false
-	lm.call_deferred("_show_upgrade_ui", choice_count)
-	return true
+func _apply_site_reward(player_ship: Node3D) -> bool:
+	return SeaSiteRewardHelper.apply_reward(
+		self,
+		player_ship,
+		reward_type,
+		choice_count,
+		hull_repair_ratio,
+		hull_repair_minimum,
+		crew_xp_amount,
+		crew_limit_bonus,
+		crew_restore_count
+	)
 
 
 func _get_target_player() -> Node3D:
