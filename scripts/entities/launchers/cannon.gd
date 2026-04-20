@@ -3,6 +3,7 @@ extends Node3D
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
@@ -372,6 +373,16 @@ func _execute_fire() -> void:
 	if fire_direction.is_zero_approx():
 		fire_direction = - global_transform.basis.z
 	fire_direction = _apply_cannon_inaccuracy(fire_direction, target_node, dist)
+	if DebugDrawBridge.projectile_debug_enabled:
+		DebugDrawBridge.draw_targeting_solution(
+			muzzle.global_position,
+			target_aim_pos,
+			predicted_pos,
+			fire_direction,
+			_get_current_range(),
+			"%s -> %s" % [name, target_node.name],
+			1.1
+		)
 
 	var final_damage = 1.0
 	var ball = ScenePool.acquire(get_tree(), cannonball_scene)

@@ -8,6 +8,7 @@ const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_m
 const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
@@ -273,6 +274,7 @@ static func process_physics(ship, delta: float) -> void:
 	var move_vector = desired_point - ship.global_position
 	move_vector.y = 0.0
 	var move_dir = move_vector.normalized() if move_vector.length_squared() > 0.001 else Vector3.ZERO
+	var base_move_dir: Vector3 = move_dir
 	if ship.separation_force.length_squared() > 0.001:
 		if move_dir == Vector3.ZERO:
 			move_dir = ship.separation_force.normalized()
@@ -344,6 +346,24 @@ static func process_physics(ship, delta: float) -> void:
 			if approach_dot > 0.3:
 				collision_repulsion *= 0.35
 	velocity += collision_repulsion * delta
+	_draw_ai_intent_debug(
+		ship,
+		current_target,
+		nav,
+		target_pos,
+		desired_point,
+		heading_point,
+		base_move_dir,
+		move_dir,
+		heading_vector,
+		velocity,
+		collision_repulsion,
+		dist_to_target,
+		desired_speed_mult,
+		desired_rudder,
+		permit_sprint,
+		boarding_attempt_distance
+	)
 
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + velocity * delta
@@ -361,6 +381,108 @@ static func process_physics(ship, delta: float) -> void:
 	if not ship.is_dying:
 		ship.rotation.z += ship.tilt_offset
 	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+
+
+static func _draw_ai_intent_debug(
+	ship,
+	current_target: Node3D,
+	nav: Dictionary,
+	target_pos: Vector3,
+	desired_point: Vector3,
+	heading_point: Vector3,
+	base_move_dir: Vector3,
+	move_dir: Vector3,
+	heading_vector: Vector3,
+	velocity: Vector3,
+	collision_repulsion: Vector3,
+	dist_to_target: float,
+	desired_speed_mult: float,
+	desired_rudder: float,
+	permit_sprint: bool,
+	boarding_attempt_distance: float
+) -> void:
+	if not DebugDrawBridge.is_channel_enabled(DebugDrawBridge.CHANNEL_AI_INTENT) or not DebugDrawBridge.can_draw():
+		return
+	if not (ship is Node3D) or not is_instance_valid(current_target):
+		return
+
+	var ship_3d := ship as Node3D
+	var origin: Vector3 = ship_3d.global_position
+	var mode := ShipMovementIntent.get_mode(nav, "pursuit")
+	if mode.is_empty():
+		mode = "pursuit"
+	var color := _get_ai_intent_color(mode)
+	var target_color := Color(1.0, 0.22, 0.12, 0.9)
+	var desired_color := Color(0.28, 0.92, 1.0, 0.92)
+	var heading_color := Color(1.0, 0.82, 0.24, 0.9)
+	var velocity_color := Color(0.42, 1.0, 0.36, 0.86)
+	var separation_color := Color(1.0, 0.36, 0.78, 0.86)
+	var duration := 0.0
+
+	DebugDrawBridge.draw_marker(target_pos, target_color, "", duration, 0.18, 1.0)
+	DebugDrawBridge.draw_marker(desired_point, desired_color, "", duration, 0.22, 1.0)
+	DebugDrawBridge.draw_marker(heading_point, heading_color, "", duration, 0.18, 1.45)
+	DebugDrawBridge.draw_line_raised(origin, desired_point, 1.15, desired_color, duration, 0.035)
+
+	if base_move_dir.length_squared() > 0.001:
+		var base_end: Vector3 = origin + base_move_dir.normalized() * clampf(origin.distance_to(desired_point), 2.5, 8.0)
+		DebugDrawBridge.draw_arrow(origin + Vector3.UP * 1.55, base_end + Vector3.UP * 1.55, color, duration, 0.45, 0.035)
+	if move_dir.length_squared() > 0.001 and move_dir.distance_squared_to(base_move_dir) > 0.02:
+		var adjusted_end: Vector3 = origin + move_dir.normalized() * 5.5
+		DebugDrawBridge.draw_arrow(origin + Vector3.UP * 1.85, adjusted_end + Vector3.UP * 1.85, velocity_color, duration, 0.42, 0.032)
+	if heading_vector.length_squared() > 0.001:
+		var heading_end: Vector3 = origin + heading_vector.normalized() * 5.0
+		DebugDrawBridge.draw_arrow(origin + Vector3.UP * 2.15, heading_end + Vector3.UP * 2.15, heading_color, duration, 0.4, 0.03)
+	var separation_force: Vector3 = ship.separation_force
+	if separation_force.length_squared() > 0.001:
+		var separation_end: Vector3 = origin + separation_force.normalized() * clampf(separation_force.length() * 5.0, 1.5, 5.5)
+		DebugDrawBridge.draw_arrow(origin + Vector3.UP * 2.45, separation_end + Vector3.UP * 2.45, separation_color, duration, 0.36, 0.03)
+	if collision_repulsion.length_squared() > 0.001:
+		var repulsion_end: Vector3 = origin + collision_repulsion.normalized() * clampf(collision_repulsion.length(), 1.2, 4.5)
+		DebugDrawBridge.draw_arrow(origin + Vector3.UP * 2.75, repulsion_end + Vector3.UP * 2.75, Color(1.0, 0.18, 0.12, 0.86), duration, 0.34, 0.03)
+	if velocity.length_squared() > 0.001:
+		var velocity_end: Vector3 = origin + velocity.normalized() * clampf(velocity.length(), 1.5, 6.0)
+		DebugDrawBridge.draw_line(origin + Vector3.UP * 0.72, velocity_end + Vector3.UP * 0.72, velocity_color, duration, 0.026)
+
+	if _can_board(ship) and boarding_attempt_distance > 0.1 and dist_to_target <= boarding_attempt_distance + 5.0:
+		var boarding_color := Color(0.25, 1.0, 0.64, 0.7) if dist_to_target <= boarding_attempt_distance else Color(1.0, 0.58, 0.16, 0.62)
+		DebugDrawBridge.draw_circle_xz(current_target.global_position, boarding_attempt_distance, boarding_color, 0.62, duration, 72, 0.026)
+
+	var approach_mode := ShipBoardingMetaHelper.get_approach_mode(ship, "-")
+	var slot_id := ShipBoardingMetaHelper.get_slot_id(ship, "")
+	var approach_text := " | %s" % approach_mode if approach_mode != "-" else ""
+	var slot_text := " | slot %s" % slot_id if not slot_id.is_empty() else ""
+	DebugDrawBridge.draw_text(
+		origin + Vector3.UP * 3.15,
+		"%s | %s | %.1fm | spd x%.2f | rud %.0f%s%s" % [
+			ship_3d.name,
+			mode,
+			dist_to_target,
+			desired_speed_mult,
+			desired_rudder,
+			" | sprint" if permit_sprint else "",
+			approach_text + slot_text
+		],
+		color,
+		duration,
+		17
+	)
+
+
+static func _get_ai_intent_color(mode: String) -> Color:
+	match mode:
+		"gunner_standoff":
+			return Color(1.0, 0.62, 0.2, 0.94)
+		"side":
+			return Color(0.28, 0.92, 1.0, 0.94)
+		"contact_settle":
+			return Color(0.46, 1.0, 0.64, 0.94)
+		"rear":
+			return Color(0.55, 0.72, 1.0, 0.94)
+		"yield_overrun":
+			return Color(1.0, 0.42, 0.9, 0.94)
+		_:
+			return Color(0.86, 1.0, 0.36, 0.94)
 
 
 static func update_logic_throttled(ship) -> void:

@@ -88,6 +88,7 @@ var debug_ship_stamina_value: Label = null
 var debug_environment_value: Label = null
 var debug_collision_value: Label = null
 var debug_distance_value: Label = null
+var debug_draw_channels_value: Label = null
 var debug_authoring_palette_preview_value: Label = null
 var debug_authoring_palette_selected_value: Label = null
 var debug_authoring_palette_assembly_value: Label = null

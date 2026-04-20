@@ -1,6 +1,10 @@
 @tool
 extends Node3D
 
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
+const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+
 static var runtime_enabled: bool = false
 var tracked_ship: Node3D = null
 
@@ -13,39 +17,31 @@ const RING_COLORS: Array[Color] = [
 	Color(1.0, 0.36, 0.24, 0.2),
 ]
 
-var _rings: Array[MeshInstance3D] = []
-var _cannon_range_ring: MeshInstance3D = null
-var _cannon_range_refresh_left: float = 0.0
 var _pulse_time: float = 0.0
+var _cached_cannon_range: float = 0.0
+var _cannon_range_refresh_left: float = 0.0
 
 func _ready() -> void:
 	add_to_group("distance_debug_visualizers")
 	top_level = true
-	_ensure_rings()
-	_ensure_cannon_range_ring()
 	_sync_world_transform()
 	_refresh_visibility()
 	set_process(true)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_sync_world_transform()
-	_update_cannon_range_ring(_delta)
-	_update_pulse_animation(_delta)
+	_update_cannon_range(delta)
+	_update_pulse_animation(delta)
 	_refresh_visibility()
+	if _is_draw_active():
+		_draw_distance_debug()
 
 
 func _update_pulse_animation(delta: float) -> void:
 	if not runtime_enabled and not Engine.is_editor_hint():
 		return
 	_pulse_time += delta * 2.0
-	var pulse_val = (sin(_pulse_time) + 1.0) * 0.5 # 0.0 ~ 1.0
-	
-	for i in range(_rings.size()):
-		var ring = _rings[i]
-		if is_instance_valid(ring) and ring.mesh and ring.mesh.surface_get_material(0):
-			var mat = ring.mesh.surface_get_material(0) as StandardMaterial3D
-			mat.emission_energy_multiplier = (0.3 + pulse_val * 0.4) * (0.55 if i < 2 else 0.7)
 
 
 static func set_runtime_enabled(enabled: bool) -> void:
@@ -55,53 +51,6 @@ static func set_runtime_enabled(enabled: bool) -> void:
 func _refresh_visibility() -> void:
 	var visible_now: bool = Engine.is_editor_hint() or runtime_enabled
 	visible = visible_now
-	for ring in _rings:
-		if is_instance_valid(ring):
-			ring.visible = visible_now
-	if is_instance_valid(_cannon_range_ring):
-		_cannon_range_ring.visible = visible_now and _cannon_range_ring.scale.x > 0.01
-
-
-func _ensure_rings() -> void:
-	if not _rings.is_empty():
-		return
-	for index in range(RING_RADII.size()):
-		var mesh_instance := MeshInstance3D.new()
-		mesh_instance.mesh = _create_ring_mesh(RING_COLORS[index], 0.55 if index < 2 else 0.7)
-		mesh_instance.scale = Vector3(RING_RADII[index] * 2.0, 1.0, RING_RADII[index] * 2.0)
-		mesh_instance.position = Vector3(0.0, 0.92 + float(index) * 0.1, 0.0)
-		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(mesh_instance)
-		_rings.append(mesh_instance)
-
-
-func _ensure_cannon_range_ring() -> void:
-	if is_instance_valid(_cannon_range_ring):
-		return
-	_cannon_range_ring = MeshInstance3D.new()
-	_cannon_range_ring.mesh = _create_ring_mesh(Color(1.0, 0.93, 0.54, 0.13), 0.5)
-	_cannon_range_ring.scale = Vector3.ZERO
-	_cannon_range_ring.position = Vector3(0.0, 0.86, 0.0)
-	_cannon_range_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_cannon_range_ring)
-
-func _create_ring_mesh(fill_color: Color, emission_energy: float) -> CylinderMesh:
-	var cyl := CylinderMesh.new()
-	cyl.height = 0.04
-	cyl.top_radius = 0.5
-	cyl.bottom_radius = 0.5
-	var mat := StandardMaterial3D.new()
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = fill_color
-	mat.emission_enabled = true
-	mat.emission = Color(fill_color.r, fill_color.g, fill_color.b, 1.0)
-	mat.emission_energy_multiplier = emission_energy * 0.6
-	mat.no_depth_test = true # 항상 함선 위에 보이도록 설정
-	mat.render_priority = 10 # 렌더링 순위 상향
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	cyl.surface_set_material(0, mat)
-	return cyl
 
 
 func _sync_world_transform() -> void:
@@ -114,9 +63,7 @@ func _sync_world_transform() -> void:
 	global_transform = Transform3D(Basis.IDENTITY, Vector3(anchor_pos.x, anchor_pos.y, anchor_pos.z))
 
 
-func _update_cannon_range_ring(delta: float) -> void:
-	if not is_instance_valid(_cannon_range_ring):
-		return
+func _update_cannon_range(delta: float) -> void:
 	_cannon_range_refresh_left = maxf(0.0, _cannon_range_refresh_left - delta)
 	if _cannon_range_refresh_left > 0.0:
 		return
@@ -125,13 +72,73 @@ func _update_cannon_range_ring(delta: float) -> void:
 	if not is_instance_valid(owner_ship):
 		owner_ship = tracked_ship
 	if not is_instance_valid(owner_ship):
-		_cannon_range_ring.scale = Vector3.ZERO
+		_cached_cannon_range = 0.0
 		return
-	var cannon_range: float = _get_owner_cannon_range(owner_ship)
-	if cannon_range <= 0.01:
-		_cannon_range_ring.scale = Vector3.ZERO
+	_cached_cannon_range = _get_owner_cannon_range(owner_ship)
+
+
+func _draw_distance_debug() -> void:
+	var target_ship := _resolve_target_ship()
+	if not is_instance_valid(target_ship):
 		return
-	_cannon_range_ring.scale = Vector3(cannon_range * 2.0, 1.0, cannon_range * 2.0)
+	var anchor := target_ship.global_position
+	var pulse_val := (sin(_pulse_time) + 1.0) * 0.5
+	for index in range(RING_RADII.size()):
+		var color := RING_COLORS[index]
+		color.a = lerpf(0.42, 0.8, pulse_val) if index < 2 else lerpf(0.5, 0.9, pulse_val)
+		DebugDrawBridge.draw_circle_xz(anchor, RING_RADII[index], color, 0.92 + float(index) * 0.1, 0.0, 64, 0.026)
+	if _cached_cannon_range > 0.01:
+		DebugDrawBridge.draw_circle_xz(anchor, _cached_cannon_range, Color(1.0, 0.93, 0.54, 0.9), 0.86, 0.0, 96, 0.038)
+	_draw_nearest_target_line(target_ship, _cached_cannon_range)
+
+
+func _draw_nearest_target_line(owner_ship: Node3D, cannon_range: float) -> void:
+	var nearest := _find_nearest_enemy_ship(owner_ship)
+	if not is_instance_valid(nearest):
+		return
+	var planar_distance := Vector2(
+		nearest.global_position.x - owner_ship.global_position.x,
+		nearest.global_position.z - owner_ship.global_position.z
+	).length()
+	var color := Color(0.42, 1.0, 0.42, 0.9) if cannon_range > 0.01 and planar_distance <= cannon_range else Color(0.72, 0.72, 0.72, 0.72)
+	if planar_distance <= 2.0:
+		color = Color(1.0, 0.25, 0.15, 0.95)
+	DebugDrawBridge.draw_line_raised(owner_ship.global_position, nearest.global_position, 1.35, color, 0.0, 0.035)
+	DebugDrawBridge.draw_marker(nearest.global_position, color, "%.1fm" % planar_distance, 0.0, 0.22, 1.65)
+
+
+func _resolve_target_ship() -> Node3D:
+	var target_ship: Node3D = tracked_ship
+	if not is_instance_valid(target_ship):
+		target_ship = get_parent_node_3d()
+	return target_ship
+
+
+func _is_draw_active() -> bool:
+	return (Engine.is_editor_hint() or runtime_enabled) and DebugDrawBridge.can_draw()
+
+
+func _find_nearest_enemy_ship(owner_ship: Node3D) -> Node3D:
+	var owner_team := NodeContractHelper.get_team_tag(owner_ship)
+	var candidates: Array = EntityRegistry.get_ships()
+	var nearest_ship: Node3D = null
+	var nearest_distance_sq := INF
+	for ship in candidates:
+		if not (ship is Node3D):
+			continue
+		var ship_3d := ship as Node3D
+		if ship_3d == owner_ship or not is_instance_valid(ship_3d):
+			continue
+		if NodeContractHelper.get_team_tag(ship_3d) == owner_team:
+			continue
+		if NodeContractHelper.is_sinking_or_dying(ship_3d):
+			continue
+		var delta := Vector2(ship_3d.global_position.x - owner_ship.global_position.x, ship_3d.global_position.z - owner_ship.global_position.z)
+		var dist_sq := delta.length_squared()
+		if dist_sq < nearest_distance_sq:
+			nearest_distance_sq = dist_sq
+			nearest_ship = ship_3d
+	return nearest_ship
 
 
 func _get_owner_cannon_range(owner_ship: Node) -> float:

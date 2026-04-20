@@ -3,6 +3,7 @@ class_name BaseShipCollisionHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
@@ -116,6 +117,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
 				if backward_component < 0.0:
 					repulsion_force -= my_fwd * backward_component
+			_draw_ship_collision_debug(ship, other, dir, my_radius, other_radius, dist, coll_dist, compression, repulsion_force, is_player_support_pair, high_speed_head_on)
 			force += repulsion_force
 
 			if ship.current_speed > 0.5 and not is_player_support_pair:
@@ -140,6 +142,54 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				ship.apply_ramming_damage(other, approach_speed)
 
 	return force
+
+
+static func _draw_ship_collision_debug(
+	ship,
+	other_ship: Node3D,
+	dir: Vector3,
+	my_radius: float,
+	other_radius: float,
+	dist: float,
+	coll_dist: float,
+	compression: float,
+	repulsion_force: Vector3,
+	is_player_support_pair: bool,
+	high_speed_head_on: bool
+) -> void:
+	if not DebugDrawBridge.collision_debug_enabled or not DebugDrawBridge.can_draw():
+		return
+	if not (ship is Node3D) or not is_instance_valid(other_ship):
+		return
+	var ship_3d := ship as Node3D
+	var my_contact := ship_3d.global_position + dir * my_radius
+	var other_contact := other_ship.global_position - dir * other_radius
+	var contact_pos := (my_contact + other_contact) * 0.5
+	contact_pos.y = maxf(ship_3d.global_position.y, other_ship.global_position.y) + 0.25
+	var color := Color(1.0, 0.2, 0.08, 0.98)
+	if is_player_support_pair:
+		color = Color(0.35, 0.95, 1.0, 0.95)
+	elif high_speed_head_on:
+		color = Color(1.0, 0.08, 0.02, 1.0)
+	DebugDrawBridge.draw_line_raised(ship_3d.global_position, other_ship.global_position, 1.1, color, 0.08, 0.042)
+	DebugDrawBridge.draw_marker(
+		contact_pos,
+		color,
+		"contact %.2fm" % compression,
+		0.12,
+		0.26,
+		0.95
+	)
+	if repulsion_force.length_squared() > 0.001:
+		var force_len := clampf(repulsion_force.length() * 0.025, 0.55, 4.0)
+		DebugDrawBridge.draw_arrow(
+			contact_pos + Vector3.UP * 1.25,
+			contact_pos + Vector3.UP * 1.25 + repulsion_force.normalized() * force_len,
+			color,
+			0.12,
+			0.45,
+			0.04
+		)
 
 
 static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll_dist: float) -> bool:

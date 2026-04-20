@@ -2,6 +2,7 @@ extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
@@ -187,6 +188,7 @@ func _on_timeout() -> void:
 	if has_hit or _is_releasing: return
 	
 	# 수명 만료 = 바다에 떨어짐 → 물 폭발 이펙트 생성
+	_draw_projectile_marker("splash", Color(0.25, 0.6, 1.0, 0.95))
 	_spawn_water_explosion()
 	
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -212,6 +214,7 @@ func _physics_process(delta: float) -> void:
 		look_at(global_position + direction, up_vec)
 		
 	var move_vec = direction * speed * delta
+	var ray_start := global_position
 	var next_pos = global_position + move_vec
 	
 	# CCD (Continuous Collision Detection)
@@ -221,6 +224,11 @@ func _physics_process(delta: float) -> void:
 	query.collide_with_bodies = true
 	
 	var result = space_state.intersect_ray(query)
+	if DebugDrawBridge.projectile_debug_enabled:
+		if result:
+			DebugDrawBridge.draw_hit_ray(ray_start, next_pos, result.position, true, _debug_hit_label(result.collider), 1.4)
+		else:
+			DebugDrawBridge.draw_line(ray_start, next_pos, Color(1.0, 0.82, 0.25, 0.45), 0.08, 0.026)
 	if result:
 		global_position = result.position
 		_check_hit(result.collider)
@@ -230,6 +238,7 @@ func _physics_process(delta: float) -> void:
 	
 	# 수면(y=0.0) 타격 감지 기능 추가
 	if global_position.y <= 0.0:
+		_draw_projectile_marker("water", Color(0.25, 0.6, 1.0, 0.95))
 		_spawn_water_explosion()
 		var audio_manager = get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -273,6 +282,7 @@ func _check_hit(target: Node) -> void:
 				source_id += ":%s" % shooter_label
 			ship.take_damage(final_damage, global_position, source_id)
 		
+		_draw_projectile_marker("HIT %s" % ship.name, Color(1.0, 0.22, 0.1, 0.98))
 		_spawn_effects(is_crit)
 		_release_self()
 	else:
@@ -283,6 +293,7 @@ func _check_hit(target: Node) -> void:
 			
 		if not is_sinking:
 			# 함선 외의 물체에 부딪혔을 때 → 물 폭발 이펙트 생성
+			_draw_projectile_marker("impact", Color(0.25, 0.6, 1.0, 0.95))
 			_spawn_water_explosion()
 			var audio_manager = get_node_or_null("/root/AudioManager")
 			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -290,6 +301,18 @@ func _check_hit(target: Node) -> void:
 		
 		# 어떤 경우든 부딪히면 삭제
 		_release_self()
+
+
+func _draw_projectile_marker(label: String, color: Color) -> void:
+	if not DebugDrawBridge.projectile_debug_enabled:
+		return
+	DebugDrawBridge.draw_marker(global_position, color, label, 1.6, 0.32, 0.45)
+
+
+func _debug_hit_label(target: Variant) -> String:
+	if target is Node:
+		return (target as Node).name
+	return "hit"
 
 
 func _build_damage_source_id(is_crit: bool) -> String:

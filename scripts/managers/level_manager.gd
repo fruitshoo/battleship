@@ -2,6 +2,7 @@ extends Node
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
 const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
 const LevelManagerUpgradeFlowHelper = preload("res://scripts/managers/level_manager_upgrade_flow_helper.gd")
@@ -655,12 +656,17 @@ func _debug_cannons() -> void:
 	print("[DEBUG] ========================================")
 
 func _toggle_collision_visualizers() -> void:
-	_debug_collision_visuals_enabled = not _debug_collision_visuals_enabled
-	CollisionVisualizer.set_runtime_enabled(_debug_collision_visuals_enabled)
+	_set_collision_visualizers_enabled(not _debug_collision_visuals_enabled)
+
+
+func _set_collision_visualizers_enabled(enabled: bool) -> void:
+	_debug_collision_visuals_enabled = enabled
+	CollisionVisualizer.set_runtime_enabled(enabled)
+	DebugDrawBridge.set_collision_debug_enabled(enabled)
 	for node in get_tree().get_nodes_in_group("collision_visualizers"):
 		if node and node.has_method("_refresh_visibility"):
 			node.call("_refresh_visibility")
-	print("[DEBUG] 충돌 시각화: %s" % ("ON" if _debug_collision_visuals_enabled else "OFF"))
+	print("[DEBUG] 충돌/탄착 시각화: %s" % ("ON" if enabled else "OFF"))
 
 func _debug_spawn_test_ship(ship_type_name: String, distance: float, lateral_offset: float, authoring_meta: Variant = null) -> void:
 	if not enemy_spawner or not enemy_spawner.has_method("debug_spawn_ship"):
@@ -767,6 +773,7 @@ func _debug_dump_support_fleet_state() -> void:
 		var lead_speed: float = float(support_ship.get_meta("support_debug_lead_speed", 0.0))
 		var target_speed: float = float(support_ship.get_meta("support_debug_target_speed", 0.0))
 		var join_state: bool = support_ship.get_meta("support_joining", false) == true
+		_draw_support_fleet_debug(support_ship, lead_name, slot_dist, rel_depth, join_state)
 		print("[DEBUG] %s pos=%s speed=%.2f lead=%s slot_dist=%.2f rel_depth=%.2f lead_speed=%.2f target_speed=%.2f joining=%s" % [
 			support_ship.name,
 			support_ship.global_position,
@@ -779,6 +786,36 @@ func _debug_dump_support_fleet_state() -> void:
 			join_state
 		])
 	print("[DEBUG] ===============================")
+
+
+func _draw_support_fleet_debug(support_ship: Node, lead_name: String, slot_dist: float, rel_depth: float, join_state: bool) -> void:
+	if not (support_ship is Node3D) or not DebugDrawBridge.can_draw():
+		return
+	var ship_3d := support_ship as Node3D
+	var target_pos_variant: Variant = support_ship.get_meta("support_debug_target_pos", Vector3.INF)
+	if not (target_pos_variant is Vector3):
+		return
+	var target_pos := target_pos_variant as Vector3
+	if target_pos == Vector3.INF:
+		return
+	var color := Color(0.35, 0.95, 1.0, 0.95) if not join_state else Color(1.0, 0.86, 0.28, 0.95)
+	DebugDrawBridge.draw_marker(target_pos, color, "%s slot" % ship_3d.name, 4.0, 0.32, 1.05)
+	DebugDrawBridge.draw_line_raised(ship_3d.global_position, target_pos, 1.15, color, 4.0, 0.04)
+	DebugDrawBridge.draw_arrow(
+		ship_3d.global_position + Vector3.UP * 1.55,
+		target_pos + Vector3.UP * 1.55,
+		color,
+		4.0,
+		0.55,
+		0.04
+	)
+	DebugDrawBridge.draw_text(
+		ship_3d.global_position + Vector3.UP * 2.2,
+		"%s -> %s | %.1fm | depth %.1f" % [ship_3d.name, lead_name, slot_dist, rel_depth],
+		color,
+		4.0,
+		18
+	)
 
 
 func _get_debug_player_ship() -> Node3D:

@@ -2,6 +2,7 @@ extends Area3D
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
@@ -252,7 +253,7 @@ func _resolve_homing_target() -> Node3D:
 	target_node = best_target
 	return best_target
 
-func _is_valid_ship_target(ship: Node) -> bool:
+func _is_valid_ship_target(ship: Variant) -> bool:
 	if not is_instance_valid(ship):
 		return false
 	if not (ship is Node3D):
@@ -276,7 +277,7 @@ func _is_valid_ship_target(ship: Node) -> bool:
 		return true
 	return HitTargetResolver.resolve_team_tag(ship_3d) == _target_group
 
-func _is_valid_soldier_target(node: Node) -> bool:
+func _is_valid_soldier_target(node: Variant) -> bool:
 	if not is_instance_valid(node):
 		return false
 	if not (node is CharacterBody3D):
@@ -291,7 +292,9 @@ func _is_valid_soldier_target(node: Node) -> bool:
 		return false
 	return true
 
-func _is_valid_target(node: Node) -> bool:
+func _is_valid_target(node: Variant) -> bool:
+	if not is_instance_valid(node):
+		return false
 	return _is_valid_ship_target(node) or _is_valid_soldier_target(node)
 
 func _raycast_hit(from_pos: Vector3, to_pos: Vector3) -> Node:
@@ -304,21 +307,29 @@ func _raycast_hit(from_pos: Vector3, to_pos: Vector3) -> Node:
 	query.collide_with_bodies = true
 	query.exclude = [self]
 	var result = world.direct_space_state.intersect_ray(query)
+	if DebugDrawBridge.projectile_debug_enabled:
+		if result.is_empty():
+			DebugDrawBridge.draw_line(from_pos, to_pos, Color(0.35, 1.0, 0.65, 0.32), 0.08, 0.022)
+		else:
+			var hit_pos: Vector3 = result.get("position", to_pos)
+			DebugDrawBridge.draw_hit_ray(from_pos, to_pos, hit_pos, true, _debug_hit_label(result.get("collider")), 1.2)
 	if result.is_empty():
 		return null
 	return result.get("collider")
 
-func _on_hit(target: Node) -> void:
+func _on_hit(target: Variant) -> void:
 	if has_exploded: return
+	if not is_instance_valid(target):
+		return
 
-	var active_target_soldier: Node = target_node
+	var active_target_soldier: Variant = target_node
 	if prefer_personnel_targets and _is_valid_soldier_target(active_target_soldier):
 		var struck_ship: Node = HitTargetResolver.resolve_ship_from_node(target)
 		var target_ship_variant: Variant = NodeContractHelper.get_owned_ship_node(active_target_soldier)
 		if struck_ship != null and target_ship_variant is Node and struck_ship == target_ship_variant and not _is_valid_soldier_target(target):
 			return
 
-	var hit_obj: Node = target
+	var hit_obj: Variant = target
 	if not _is_valid_target(hit_obj):
 		hit_obj = HitTargetResolver.resolve_ship_from_node(target)
 	if not is_instance_valid(hit_obj) or not _is_valid_target(hit_obj):
@@ -326,10 +337,11 @@ func _on_hit(target: Node) -> void:
 
 	# 직격 + 주변 스플래시 피해
 	var primary_target: Node3D = hit_obj as Node3D
+	_draw_rocket_impact_debug(primary_target)
 	_explode(primary_target)
 	ScenePool.release(self)
 
-func _apply_damage(target_node: Node, scale: float = 1.0) -> void:
+func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 	if not is_instance_valid(target_node): return
 	
 	# 데미지 보정 (블랙 파우더 업그레이드 등)
@@ -359,6 +371,7 @@ func _explode(primary_target: Node3D = null) -> void:
 	if has_exploded:
 		return
 	has_exploded = true
+	_draw_rocket_blast_debug(primary_target)
 
 	if is_instance_valid(primary_target):
 		_apply_damage(primary_target, 1.0)
@@ -378,6 +391,33 @@ func _explode(primary_target: Node3D = null) -> void:
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))
+
+
+func _draw_rocket_impact_debug(primary_target: Node3D) -> void:
+	if not DebugDrawBridge.projectile_debug_enabled:
+		return
+	var label := "rocket"
+	if is_instance_valid(primary_target):
+		label = "rocket %s" % primary_target.name
+	DebugDrawBridge.draw_marker(global_position, Color(1.0, 0.22, 0.08, 0.98), label, 1.6, 0.32, 0.45)
+
+
+func _draw_rocket_blast_debug(primary_target: Node3D = null) -> void:
+	if not DebugDrawBridge.projectile_debug_enabled:
+		return
+	var color := Color(1.0, 0.45, 0.12, 0.9)
+	DebugDrawBridge.draw_circle_xz(global_position, blast_radius, color, 0.35, 1.6, 56, 0.035)
+	var label := "blast %.1fm" % blast_radius
+	if is_instance_valid(primary_target):
+		label += " %s" % primary_target.name
+	DebugDrawBridge.draw_text(global_position + Vector3.UP * 1.25, label, color, 1.6, 18)
+
+
+func _debug_hit_label(target: Variant) -> String:
+	if target is Node:
+		return (target as Node).name
+	return "hit"
+
 
 func _find_splash_targets() -> Array[Node3D]:
 	var out: Array[Node3D] = []

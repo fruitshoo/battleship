@@ -6,6 +6,7 @@ const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MastDamagePresets = preload("res://scripts/props/mast_damage_presets.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"
 const SHIP_STATS_DATA_PATH := "res://data/ship_stats.json"
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
@@ -72,7 +73,7 @@ static func setup_debug_panel(hud) -> void:
 	panel_box.add_child(hint)
 
 	_add_environment_section(hud, panel_box)
-	_add_collision_section(hud, panel_box)
+	_add_debug_draw_section(hud, panel_box)
 	_add_spawn_section(hud, panel_box)
 	_add_authoring_palette_section(hud, panel_box)
 	_add_misc_section(hud, panel_box)
@@ -147,9 +148,15 @@ static func sync_debug_tools_panel_state(hud) -> void:
 				CollisionVisualizer.MODE_GUARD:
 					mode_name = "GUARD"
 			collision_text = "ON (%s)" % mode_name
-		hud.debug_collision_value.text = "충돌 시각화: %s" % collision_text
+		hud.debug_collision_value.text = "충돌/탄착: %s" % collision_text
 	if is_instance_valid(hud.debug_distance_value):
 		hud.debug_distance_value.text = "거리 표시: %s" % ("ON" if DistanceDebugVisualizer.runtime_enabled else "OFF")
+	if is_instance_valid(hud.debug_draw_channels_value):
+		var draw_status := "사용 가능" if DebugDrawBridge.can_draw() else "비활성"
+		hud.debug_draw_channels_value.text = "DebugDraw3D: %s\n%s" % [
+			draw_status,
+			DebugDrawBridge.get_channel_status_text()
+		]
 	hud._sync_ship_debug_panel_from_player()
 
 
@@ -174,12 +181,19 @@ static func _add_environment_section(hud, panel_box: VBoxContainer) -> void:
 	))
 
 
-static func _add_collision_section(hud, panel_box: VBoxContainer) -> void:
-	var section: Dictionary = create_debug_section("충돌", false)
+static func _add_debug_draw_section(hud, panel_box: VBoxContainer) -> void:
+	var section: Dictionary = create_debug_section("드로우 채널", false)
 	panel_box.add_child(section["root"])
 
+	var status := Label.new()
+	status.text = "DebugDraw3D: -"
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_body(status, 11)
+	section["body"].add_child(status)
+	hud.debug_draw_channels_value = status
+
 	var collision_status := Label.new()
-	collision_status.text = "충돌 시각화: OFF"
+	collision_status.text = "충돌/탄착: OFF"
 	NavalUiTheme.style_body(collision_status, 11)
 	section["body"].add_child(collision_status)
 	hud.debug_collision_value = collision_status
@@ -191,24 +205,66 @@ static func _add_collision_section(hud, panel_box: VBoxContainer) -> void:
 	hud.debug_distance_value = distance_status
 
 	var collision_row := HBoxContainer.new()
-	collision_row.add_theme_constant_override("separation", 6)
+	collision_row.add_theme_constant_override("separation", 4)
 	section["body"].add_child(collision_row)
-	collision_row.add_child(create_debug_action_button("표시 토글", func() -> void:
+	collision_row.add_child(create_debug_action_button("충돌/탄착", func() -> void:
 		hud._invoke_level_debug_method("_toggle_collision_visualizers")
 		hud._sync_debug_tools_panel_state()
 	))
-	collision_row.add_child(create_debug_action_button("모드 순환", func() -> void:
+	collision_row.add_child(create_debug_action_button("모드", func() -> void:
 		hud._invoke_level_debug_method("_cycle_collision_visualizer_mode")
 		hud._sync_debug_tools_panel_state()
 	))
-
-	var distance_row := HBoxContainer.new()
-	distance_row.add_theme_constant_override("separation", 6)
-	section["body"].add_child(distance_row)
-	distance_row.add_child(create_debug_action_button("거리 토글", func() -> void:
+	collision_row.add_child(create_debug_action_button("거리", func() -> void:
 		hud._toggle_distance_debug()
 		hud._sync_debug_tools_panel_state()
 	))
+
+	var row_a := HBoxContainer.new()
+	row_a.add_theme_constant_override("separation", 4)
+	section["body"].add_child(row_a)
+	row_a.add_child(create_debug_action_button("AI 의도", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_AI_INTENT)
+	))
+	row_a.add_child(create_debug_action_button("스폰", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SPAWN)
+	))
+	row_a.add_child(create_debug_action_button("선원", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_CREW_WORK)
+	))
+
+	var row_b := HBoxContainer.new()
+	row_b.add_theme_constant_override("separation", 4)
+	section["body"].add_child(row_b)
+	row_b.add_child(create_debug_action_button("지원", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SUPPORT)
+	))
+	row_b.add_child(create_debug_action_button("바람", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_WIND)
+	))
+	row_b.add_child(create_debug_action_button("사이트", func() -> void:
+		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SITE)
+	))
+
+	var row_c := HBoxContainer.new()
+	row_c.add_theme_constant_override("separation", 4)
+	section["body"].add_child(row_c)
+	row_c.add_child(create_debug_action_button("드로우 끄기", func() -> void:
+		for channel in DebugDrawBridge.CHANNEL_ORDER:
+			DebugDrawBridge.set_channel_enabled(str(channel), false)
+		hud._invoke_level_debug_method("_set_collision_visualizers_enabled", [false])
+		DistanceDebugVisualizer.set_runtime_enabled(false)
+		hud._sync_debug_tools_panel_state()
+	))
+
+
+static func _toggle_debug_draw_channel(hud, channel: String) -> void:
+	var enabled := DebugDrawBridge.toggle_channel(channel)
+	hud.show_gust_warning_message("%s 드로우 %s" % [
+		DebugDrawBridge.get_channel_label(channel),
+		"ON" if enabled else "OFF"
+	], 0.8)
+	hud._sync_debug_tools_panel_state()
 
 
 static func _add_spawn_section(hud, panel_box: VBoxContainer) -> void:
