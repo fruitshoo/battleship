@@ -1,7 +1,6 @@
 extends MarginContainer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SLOT_SIZE := Vector2(40, 40)
 
 var item_container: HBoxContainer = null

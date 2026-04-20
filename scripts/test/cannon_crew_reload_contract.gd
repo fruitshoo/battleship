@@ -1,8 +1,5 @@
 extends Node
 
-const BaseShipCrewHelper = preload("res://scripts/entities/ships/base_ship_crew_helper.gd")
-const SoldierShipDutyHelper = preload("res://scripts/entities/soldiers/soldier_ship_duty_helper.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const CANNON_SCENE := preload("res://scenes/entities/launchers/cannon.tscn")
 
 

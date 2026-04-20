@@ -1,8 +1,6 @@
 class_name EnemySpawnerFleetHelper
 extends RefCounted
 
-const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint_helper.gd")
-const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
 
 const SPAWN_RECIPES := "spawn_recipes"
 const ENCOUNTER_PROFILES := "encounter_profiles"

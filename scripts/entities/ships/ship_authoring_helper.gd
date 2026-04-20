@@ -11,9 +11,6 @@ const CANNON_SLOTS := "CannonSlots"
 const WEAPON_SLOTS := "WeaponSlots"
 const CREW_SLOTS := "CrewSlots"
 const DECK_AREA := "DeckArea"
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
 static func build_summary(ship: Node) -> Dictionary:

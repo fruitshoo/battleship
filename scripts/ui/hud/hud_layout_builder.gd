@@ -3,7 +3,6 @@ extends RefCounted
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const HudItemBar = preload("res://scripts/ui/hud/hud_item_bar.gd")
 const HudUpgradeTrack = preload("res://scripts/ui/hud/hud_upgrade_track.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 
 # Entry point

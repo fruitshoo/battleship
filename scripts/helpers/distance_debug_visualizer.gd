@@ -1,9 +1,6 @@
 @tool
 extends Node3D
 
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 static var runtime_enabled: bool = false
 var tracked_ship: Node3D = null

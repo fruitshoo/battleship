@@ -1,5 +1,4 @@
 extends MeshInstance3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 ## 플레이어를 따라다니는 수면 평면
 ## 작은 메시 하나로 무한 바다처럼 보이게 하는 표준 기법 (포그로 경계 숨김)

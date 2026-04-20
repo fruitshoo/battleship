@@ -13,7 +13,7 @@ static func load_items_from_resources(manager) -> bool:
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
 			var resource_path := "%s/%s" % [manager.ITEM_DATA_DIR, file_name]
 			var item_res: Resource = load(resource_path)
-			if item_res != null and item_res.get_script() == manager.ItemDataResource:
+			if item_res != null and item_res.get_script() == ItemDataResource:
 				var item_id := str(item_res.get("item_id"))
 				if item_id.is_empty():
 					file_name = dir.get_next()

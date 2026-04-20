@@ -2,7 +2,6 @@ extends Node
 
 const AttackerScript = preload("res://scripts/test/chaser_isolation_boarding_collision.gd")
 const ChaserShipScript = preload("res://scripts/entities/ships/chaser_ship.gd")
-const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
 
 
 class MockTarget:

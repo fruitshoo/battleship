@@ -1,7 +1,5 @@
 extends Node3D
 
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const ShipControlPanelScene = preload("res://scenes/ui/ship_control_panel.tscn")
 
 const SITE_PREVIEWS := [

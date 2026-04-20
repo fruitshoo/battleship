@@ -1,7 +1,5 @@
 extends Control
 
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
-const RunResultStore = preload("res://scripts/ui/results/run_result_store.gd")
 
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"

@@ -1,10 +1,6 @@
 extends Area3D
 class_name EnemyDrifterXP
 
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 const DRIFTER_CALL_LABEL_NAME := "DrifterCallLabel"
 const DRIFTER_CALL_LINES: Array[String] = [

@@ -1,7 +1,6 @@
 extends VBoxContainer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 var slot_container: HFlowContainer = null
 var slots: Array[PanelContainer] = []

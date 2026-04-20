@@ -1,6 +1,4 @@
 extends Control
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 ## 배 조작 UI: 현재는 나침반/바람 표시만 담당
 

@@ -3,9 +3,6 @@ extends RefCounted
 const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 static func process_stat_panel(hud, delta: float) -> void:
 	if not hud.show_stat_panel:

@@ -1,6 +1,5 @@
 extends Node3D
 
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const POOLED_TEST_NODE := preload("res://scenes/test/pooled_test_node.tscn")
 
 

@@ -1,7 +1,5 @@
 extends Area3D
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SeaSiteRewardHelper = preload("res://scripts/world/sea_sites/sea_site_reward_helper.gd")
 
 @export var collection_range: float = 9.0
 @export var hint_range: float = 34.0

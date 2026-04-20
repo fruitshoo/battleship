@@ -21,9 +21,9 @@ static func process_hud(hud, delta: float) -> void:
 			hud._item_refresh_retry_left = 0.5
 			hud._refresh_owned_item_icons()
 	if is_instance_valid(hud.sail_debug_panel) and hud.sail_debug_panel.visible:
-		hud._sail_debug_sync_left = maxf(0.0, hud._sail_debug_sync_left - delta)
-		if hud._sail_debug_sync_left <= 0.0:
-			hud._sail_debug_sync_left = 0.2
+		hud.sail_debug_sync_left = maxf(0.0, hud.sail_debug_sync_left - delta)
+		if hud.sail_debug_sync_left <= 0.0:
+			hud.sail_debug_sync_left = 0.2
 			hud._sync_sail_debug_panel_from_player()
 			hud._sync_debug_tools_panel_state()
 	if hud.show_ship_health_bars:

@@ -1,11 +1,6 @@
 extends RefCounted
 class_name BaseShipBoardingHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const BOARDING_LANDING_INSET := 0.45
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85

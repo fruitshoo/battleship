@@ -1,8 +1,6 @@
 extends RefCounted
 class_name SoldierBoardingHelper
 
-const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 const BOARDING_LANDING_INSET := 0.45
 const BOARDING_WAR_CRY_SFX := "boarding_war_cry"
@@ -86,7 +84,7 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 static func teleport_to_ship(soldier, _target_ship: Node3D) -> void:
 	_set_boarding_status(soldier, "stranded")
 	if soldier.team == "player" and soldier.SURVIVOR_SCENE:
-		var survivor = soldier.ScenePool.acquire(soldier.get_tree(), soldier.SURVIVOR_SCENE)
+		var survivor = ScenePool.acquire(soldier.get_tree(), soldier.SURVIVOR_SCENE)
 		soldier.get_tree().root.add_child.call_deferred(survivor)
 		var spawn_pos: Vector3 = soldier.global_position
 		spawn_pos.y = 0.5

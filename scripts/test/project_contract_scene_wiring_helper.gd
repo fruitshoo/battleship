@@ -1,14 +1,7 @@
 extends RefCounted
 class_name ProjectContractSceneWiringHelper
 
-const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
-const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint_helper.gd")
-const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
-const ShipWeaponLoadoutHelper = preload("res://scripts/entities/ships/ship_weapon_loadout_helper.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
-const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
-const SoldierShipWorkPriorityHelper = preload("res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd")
 
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"

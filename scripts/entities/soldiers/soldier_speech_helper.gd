@@ -7,7 +7,6 @@ const SPEECH_TIMER_META := "speech_timer"
 const SPEECH_VISIBLE_TIMER_META := "speech_visible_timer"
 const SPEECH_DURATION_META := "speech_duration"
 const SPEECH_LAST_CONTEXT_META := "speech_last_context"
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const CAPTAIN_GENERAL_LINES: Array[String] = [
 	"대열을 지켜라!",

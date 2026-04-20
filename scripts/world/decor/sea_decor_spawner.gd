@@ -1,6 +1,5 @@
 extends Node
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 const DEFAULT_DECOR_SCENES: Array[PackedScene] = [
 	preload("res://scenes/world/decor/sea_rock_cluster.tscn"),

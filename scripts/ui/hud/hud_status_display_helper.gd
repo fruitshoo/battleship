@@ -15,11 +15,11 @@ static func update_hull_hp(hud, current: float, maximum: float) -> void:
 		var fill_style := hud.hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
 		if fill_style:
 			if ratio > 0.6:
-				fill_style.bg_color = hud.NavalUiTheme.STATUS_GOOD
+				fill_style.bg_color = NavalUiTheme.STATUS_GOOD
 			elif ratio > 0.3:
-				fill_style.bg_color = hud.NavalUiTheme.STATUS_WARN
+				fill_style.bg_color = NavalUiTheme.STATUS_WARN
 			else:
-				fill_style.bg_color = hud.NavalUiTheme.STATUS_DANGER
+				fill_style.bg_color = NavalUiTheme.STATUS_DANGER
 
 
 static func update_stamina(hud, current: float, maximum: float) -> void:
@@ -30,9 +30,9 @@ static func update_stamina(hud, current: float, maximum: float) -> void:
 		var fill_style := hud.stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
 		if fill_style:
 			if current < 1.0:
-				fill_style.bg_color = hud.NavalUiTheme.STATUS_DANGER
+				fill_style.bg_color = NavalUiTheme.STATUS_DANGER
 			else:
-				fill_style.bg_color = hud.NavalUiTheme.STATUS_WARN
+				fill_style.bg_color = NavalUiTheme.STATUS_WARN
 
 
 static func update_xp(hud, current: int, maximum: int) -> void:
@@ -51,18 +51,18 @@ static func update_merit(hud, current: int, maximum: int, level: int = 1) -> voi
 		if hud.merit_label:
 			if current >= maximum:
 				hud.merit_label.text = "[ 병영 LEVEL UP! ]"
-				hud.merit_label.add_theme_color_override("font_color", hud.NavalUiTheme.TEXT_GOLD)
+				hud.merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
 
 				var style := hud.merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
 				if style:
 					style.bg_color = Color(1.0, 0.94, 0.58, 1.0)
 			else:
 				hud.merit_label.text = "지휘 Lv.%d (%d / %d)" % [level, current, maximum]
-				hud.merit_label.add_theme_color_override("font_color", hud.NavalUiTheme.TEXT_MAIN)
+				hud.merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 
 				var style_normal := hud.merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
 				if style_normal:
-					style_normal.bg_color = hud.NavalUiTheme.STATUS_WARN
+					style_normal.bg_color = NavalUiTheme.STATUS_WARN
 
 
 static func update_ammo_mode_display(hud) -> void:

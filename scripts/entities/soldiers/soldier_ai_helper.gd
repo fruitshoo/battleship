@@ -1,6 +1,5 @@
 extends RefCounted
 
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 
 const WANDER_TURN_SPEED := 7.0

@@ -1,7 +1,6 @@
 extends RefCounted
 class_name ShipContactGeometry
 
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 const DEFAULT_BASE_COLLISION_RADIUS := 4.5
 const DEFAULT_WIDTH_MULTIPLIER := 1.0

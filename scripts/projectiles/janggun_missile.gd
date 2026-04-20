@@ -1,9 +1,4 @@
 extends Area3D
-const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
-const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 
 ## 장군전 미사일 (Janggun Missile)

@@ -1,13 +1,5 @@
 extends Node
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const LevelManagerStartupHelper = preload("res://scripts/managers/level_manager_startup_helper.gd")
-const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
-const LevelManagerUpgradeFlowHelper = preload("res://scripts/managers/level_manager_upgrade_flow_helper.gd")
-const RunResultStore = preload("res://scripts/ui/results/run_result_store.gd")
 const DEBUG_LEVEL_LOGS := false
 const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
 const REWARD_RULES_DATA_PATH := "res://data/reward_rules.json"

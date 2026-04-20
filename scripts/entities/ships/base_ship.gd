@@ -1,25 +1,8 @@
 @tool
 extends Node3D
 class_name BaseShip
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
-const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
-const BaseShipCollisionHelper = preload("res://scripts/entities/ships/base_ship_collision_helper.gd")
-const BaseShipBoardingHelper = preload("res://scripts/entities/ships/base_ship_boarding_helper.gd")
-const BaseShipCrewHelper = preload("res://scripts/entities/ships/base_ship_crew_helper.gd")
-const BaseShipRudderHelper = preload("res://scripts/entities/ships/base_ship_rudder_helper.gd")
-const BaseShipStatusHelper = preload("res://scripts/entities/ships/base_ship_status_helper.gd")
-const BaseShipVisualHelper = preload("res://scripts/entities/ships/base_ship_visual_helper.gd")
-const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
-const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint_helper.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const ShipWeaponLoadoutHelper = preload("res://scripts/entities/ships/ship_weapon_loadout_helper.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
-const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
 const BaseShipSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const SoldierShipWorkPriorityHelper = preload("res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
 const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35

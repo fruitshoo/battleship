@@ -1,9 +1,6 @@
 extends RefCounted
 class_name SoldierShipHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 
 static func find_nearest_enemy(soldier) -> Node3D:

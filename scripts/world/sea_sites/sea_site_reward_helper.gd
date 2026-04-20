@@ -1,8 +1,6 @@
 extends RefCounted
 class_name SeaSiteRewardHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 
 const REWARD_UPGRADE_CHOICES := "upgrade_choices"
 const REWARD_REPAIR_HULL := "repair_hull"

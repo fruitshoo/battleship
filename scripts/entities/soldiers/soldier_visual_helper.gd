@@ -17,7 +17,6 @@ const POSE_NODE_REST_POSITION_META := "pose_node_rest_position"
 const POSE_NODE_REST_ROTATION_META := "pose_node_rest_rotation"
 const POSE_NODE_REST_SCALE_META := "pose_node_rest_scale"
 const ACTIVE_VISUAL_SCENE_ID_META := "active_visual_scene_id"
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 
 static func ensure_visual_root(soldier) -> Node3D:

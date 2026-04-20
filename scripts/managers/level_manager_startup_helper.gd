@@ -1,7 +1,6 @@
 class_name LevelManagerStartupHelper
 extends RefCounted
 
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const STARTUP_BLOCKING_PREWARM_MIN_SECONDS: float = 1.6
 const STARTUP_POOL_PREWARM_DEFAULT: int = 4
 const STARTUP_POOL_PREWARM_MAX: int = 12

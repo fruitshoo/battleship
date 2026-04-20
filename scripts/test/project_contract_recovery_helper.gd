@@ -1,11 +1,6 @@
 extends RefCounted
 class_name ProjectContractRecoveryHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SeaDecorSpawnerScript = preload("res://scripts/world/decor/sea_decor_spawner.gd")
 const SeaSiteSpawnerScript = preload("res://scripts/world/sea_sites/sea_site_spawner.gd")
 

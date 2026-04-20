@@ -1,8 +1,4 @@
 extends Area3D
-const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 팔우노 화살 (Ballista Bolt)
 ## 고속으로 비행하며 다수의 대상을 관통하고 강력한 넉백을 줍니다.

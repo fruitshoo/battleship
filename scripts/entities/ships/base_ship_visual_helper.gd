@@ -1,8 +1,6 @@
 extends RefCounted
 class_name BaseShipVisualHelper
 
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 static func cache_common_references(ship) -> void:
 	if ship == null:

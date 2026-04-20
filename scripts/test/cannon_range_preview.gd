@@ -1,9 +1,7 @@
 extends Node3D
 
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
-const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var auto_enable_distance_debug: bool = true

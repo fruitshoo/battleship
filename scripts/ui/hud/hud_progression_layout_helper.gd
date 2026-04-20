@@ -9,16 +9,16 @@ static func apply_overlay_theme(hud) -> void:
 		hud.gust_warning.offset_right = 260.0
 		hud.gust_warning.offset_bottom = 134.0
 		hud.gust_warning.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		hud.NavalUiTheme.style_accent(hud.gust_warning, 22)
-		hud.gust_warning.add_theme_color_override("font_outline_color", hud.NavalUiTheme.OUTLINE_DARK)
+		NavalUiTheme.style_accent(hud.gust_warning, 22)
+		hud.gust_warning.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 		hud.gust_warning.add_theme_constant_override("outline_size", 4)
 	if is_instance_valid(hud.game_over_label):
 		hud.game_over_label.add_theme_color_override("font_color", Color(0.84, 0.34, 0.28, 1.0))
-		hud.game_over_label.add_theme_color_override("font_outline_color", hud.NavalUiTheme.OUTLINE_DARK)
+		hud.game_over_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 		hud.game_over_label.add_theme_constant_override("outline_size", 4)
 	if is_instance_valid(hud.victory_label):
-		hud.victory_label.add_theme_color_override("font_color", hud.NavalUiTheme.TEXT_GOLD)
-		hud.victory_label.add_theme_color_override("font_outline_color", hud.NavalUiTheme.OUTLINE_DARK)
+		hud.victory_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
+		hud.victory_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 		hud.victory_label.add_theme_constant_override("outline_size", 4)
 
 
@@ -43,7 +43,7 @@ static func setup_top_xp_bar(hud) -> void:
 	hud.xp_bar.show_percentage = false
 	hud.xp_bar.z_index = 10
 
-	hud.NavalUiTheme.apply_progress_bar(hud.xp_bar, Color(0.06, 0.08, 0.11, 0.82), Color(0.58, 0.77, 0.92, 0.94), 0)
+	NavalUiTheme.apply_progress_bar(hud.xp_bar, Color(0.06, 0.08, 0.11, 0.82), Color(0.58, 0.77, 0.92, 0.94), 0)
 
 	hud.merit_bar = ProgressBar.new()
 	hud.merit_bar.name = "TopMeritBar"
@@ -55,13 +55,13 @@ static func setup_top_xp_bar(hud) -> void:
 	hud.merit_bar.show_percentage = false
 	hud.merit_bar.z_index = 10
 
-	hud.NavalUiTheme.apply_progress_bar(hud.merit_bar, Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0)
+	NavalUiTheme.apply_progress_bar(hud.merit_bar, Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0)
 
 	hud.merit_label = Label.new()
 	hud.merit_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.merit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hud.merit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hud.NavalUiTheme.style_overlay_value(hud.merit_label, 10)
+	NavalUiTheme.style_overlay_value(hud.merit_label, 10)
 	hud.merit_label.add_theme_constant_override("outline_size", 3)
 	hud.merit_label.text = "지휘 포인트 (병영 강화 대기)"
 	hud.merit_bar.add_child(hud.merit_label)
@@ -79,5 +79,5 @@ static func attach_level_label_to_xp_bar(hud) -> void:
 	hud.level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hud.level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hud.level_label.add_theme_font_size_override("font_size", 14)
-	hud.level_label.add_theme_color_override("font_outline_color", hud.NavalUiTheme.OUTLINE_DARK)
+	hud.level_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	hud.level_label.add_theme_constant_override("outline_size", 4)

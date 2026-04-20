@@ -1,8 +1,4 @@
 extends Area3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
 const RESCUE_CALL_LINES: Array[String] = [
 	"구해줘!",

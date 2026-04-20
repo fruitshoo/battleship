@@ -1,10 +1,6 @@
 extends Node3D
 
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 enum BattleMode {
 	STRESS,

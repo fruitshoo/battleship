@@ -1,9 +1,7 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI

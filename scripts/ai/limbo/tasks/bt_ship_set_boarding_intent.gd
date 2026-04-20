@@ -2,7 +2,6 @@
 extends BTAction
 class_name BTShipSetBoardingIntent
 
-const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 @export var boarding_intent_var: StringName = ShipAILimboKeys.VAR_BOARDING_INTENT

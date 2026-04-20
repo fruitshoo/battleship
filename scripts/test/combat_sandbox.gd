@@ -1,7 +1,6 @@
 extends Node3D
 
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var auto_enable_distance_debug: bool = false

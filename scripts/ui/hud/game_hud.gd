@@ -2,22 +2,16 @@ extends CanvasLayer
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const HudGameOverOverlay = preload("res://scripts/ui/hud/hud_game_over_overlay.gd")
 const HudLayoutBuilder = preload("res://scripts/ui/hud/hud_layout_builder.gd")
-const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud/hud_update_helper.gd")
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
 const HudUpgradeTooltipHelper = preload("res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd")
 const HudStatPanelHelper = preload("res://scripts/ui/hud/hud_stat_panel_helper.gd")
-const HudDebugPanelHelper = preload("res://scripts/ui/hud/hud_debug_panel_helper.gd")
-const HudDistanceDebugHelper = preload("res://scripts/ui/hud/hud_distance_debug_helper.gd")
-const HudSailDebugHelper = preload("res://scripts/ui/hud/hud_sail_debug_helper.gd")
-const HudShipDebugHelper = preload("res://scripts/ui/hud/hud_ship_debug_helper.gd")
 const HudEndStateHelper = preload("res://scripts/ui/hud/hud_end_state_helper.gd")
 const HudStatusDisplayHelper = preload("res://scripts/ui/hud/hud_status_display_helper.gd")
 const HudItemDisplayHelper = preload("res://scripts/ui/hud/hud_item_display_helper.gd")
 const HudProgressionLayoutHelper = preload("res://scripts/ui/hud/hud_progression_layout_helper.gd")
 const HudRuntimeHelper = preload("res://scripts/ui/hud/hud_runtime_helper.gd")
 const HudShipHealthOverlayHelper = preload("res://scripts/ui/hud/hud_ship_health_overlay_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
 const CANNON_CLOSE_RANGE_MIN_MULTIPLIER: float = 0.55
@@ -133,7 +127,7 @@ var _speed_visual_value: float = 0.0
 var _last_difficulty_text: String = ""
 var _last_combat_stats_text: String = ""
 var _item_refresh_retry_left: float = 0.0
-var _sail_debug_sync_left: float = 0.0
+var sail_debug_sync_left: float = 0.0
 var _distance_debug_refresh_left: float = 0.0
 
 # Item and stat UI

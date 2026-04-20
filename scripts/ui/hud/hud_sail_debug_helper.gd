@@ -1,7 +1,6 @@
 extends RefCounted
 class_name HudSailDebugHelper
 
-const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
 
 
 static func update_sail_debug_toggle_button_text(hud) -> void:

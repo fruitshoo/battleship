@@ -1,7 +1,5 @@
 extends Node
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
 
 const PILOT_TREE_PATH := "res://resources/ai/limbo/ship_ai_pilot_skeleton.tres"
 const CONTRACT_META_STALE_FRAMES := 8

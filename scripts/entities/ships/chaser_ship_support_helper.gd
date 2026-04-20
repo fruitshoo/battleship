@@ -1,11 +1,6 @@
 extends RefCounted
 class_name ChaserShipSupportHelper
 
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEFAULT_ENEMY_DRIFTER_XP_SCENE = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
 const DERELICT_MIN_VISIBLE_LIFETIME: float = 4.0
@@ -72,7 +67,7 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 
 	var start_pos: Vector3 = tosser.global_position + Vector3(0.0, 1.0, 0.0)
 	var target_pos: Vector3 = _get_fire_pot_target_pos(target)
-	var pot = ship.ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
+	var pot = ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
 	pot.damage = ENEMY_FIRE_POT_DAMAGE
 	pot.explosion_radius = ENEMY_FIRE_POT_RADIUS
 	pot.team = ship.team
@@ -382,7 +377,7 @@ static func drop_floating_loot(ship) -> void:
 	if randf() > float(ship.floating_loot_drop_chance):
 		return
 
-	var loot = ship.ScenePool.acquire(ship.get_tree(), ship.loot_scene)
+	var loot = ScenePool.acquire(ship.get_tree(), ship.loot_scene)
 	var offset_x = randf_range(-1.2, 1.2)
 	var offset_z = randf_range(-1.2, 1.2)
 	var spawn_pos = Vector3(ship.global_position.x + offset_x, 0.5, ship.global_position.z + offset_z)
@@ -391,7 +386,7 @@ static func drop_floating_loot(ship) -> void:
 	loot.set_deferred("global_position", spawn_pos)
 
 	if ship.survivor_scene and randf() < 0.3:
-		var survivor = ship.ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
+		var survivor = ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
 		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
 		var survivor_pos = ship.global_position + s_offset
 		ship.get_tree().root.add_child.call_deferred(survivor)
@@ -412,7 +407,7 @@ static func evacuate_player_soldiers_as_survivors(ship) -> void:
 			var spawn_pos = child.global_position
 			spawn_pos.y = 0.5
 
-			var survivor = ship.ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
+			var survivor = ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
 			ship.get_tree().root.add_child.call_deferred(survivor)
 			survivor.set_deferred("global_position", spawn_pos)
 

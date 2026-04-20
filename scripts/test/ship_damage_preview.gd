@@ -1,6 +1,5 @@
 extends Node3D
 
-const MastDamagePresets = preload("res://scripts/props/mast_damage_presets.gd")
 const PRESETS := MastDamagePresets.ALL
 
 

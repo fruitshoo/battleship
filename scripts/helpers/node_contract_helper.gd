@@ -1,7 +1,6 @@
 extends RefCounted
 class_name NodeContractHelper
 
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 const SHIP_NODE_SOLDIERS := "Soldiers"
 const SHIP_NODE_PROXIMITY_AREA := "ProximityArea"
 const SHIP_NODE_HIT_AREA := "HitArea"

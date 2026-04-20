@@ -1,13 +1,7 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
 class_name ChaserShip
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const DEBUG_CHASER_LOGS := false
-const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
-const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship_minion_helper.gd")
-const ChaserShipSupportHelper = preload("res://scripts/entities/ships/chaser_ship_support_helper.gd")
-const ChaserShipAiHelper = preload("res://scripts/entities/ships/chaser_ship_ai_helper.gd")
-const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"

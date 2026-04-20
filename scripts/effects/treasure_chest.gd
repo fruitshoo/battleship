@@ -1,7 +1,4 @@
 extends Node3D
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
 
 ## 보물 상자 (Treasure Chest)
 ## 플레이어가 닿으면 특별한 업그레이드 보상을 제공

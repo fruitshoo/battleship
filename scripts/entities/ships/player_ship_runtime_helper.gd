@@ -1,8 +1,6 @@
 extends RefCounted
 
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 static func handle_input(ship, delta: float) -> void:
 	var sail_turn_speed: float = float(ship.sail_turn_speed)

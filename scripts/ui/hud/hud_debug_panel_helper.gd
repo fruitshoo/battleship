@@ -1,12 +1,8 @@
 extends RefCounted
 class_name HudDebugPanelHelper
 
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
-const MastDamagePresets = preload("res://scripts/props/mast_damage_presets.gd")
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"
 const SHIP_STATS_DATA_PATH := "res://data/ship_stats.json"
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"

@@ -1,7 +1,4 @@
 extends Node
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
 const DEBUG_SPAWNER_LOGS := false
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 

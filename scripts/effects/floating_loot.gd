@@ -1,9 +1,4 @@
 extends Area3D
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const FieldItemHelper = preload("res://scripts/effects/field_item_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 부유물(Floating Loot) 시스템
 ## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨

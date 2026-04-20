@@ -6,11 +6,7 @@ const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn
 const CANNONBALL_SCENE := preload("res://scenes/projectiles/cannonball.tscn")
 const ARROW_SCENE := preload("res://scenes/projectiles/arrow.tscn")
 const FIRE_POT_SCENE := preload("res://scenes/projectiles/fire_pot.tscn")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const PreviewStateSnapshotHelper = preload("res://scripts/test/preview_state_snapshot_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 enum Scenario {
 	IDLE,

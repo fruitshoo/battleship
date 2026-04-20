@@ -1,12 +1,6 @@
 extends RefCounted
 class_name ProjectContractHudHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
-const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
-const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
 const AUTHORING_SCENARIO_TRIGGER_USER_PATH := "user://authoring_palette_scenario_trigger.json"
 const AUTHORING_SCENARIO_PRESETS_USER_PATH := "user://authoring_palette_scenario_presets.json"
 const AUTHORING_DATA_PATCH_USER_PATH := "user://authoring_palette_data_patch.json"

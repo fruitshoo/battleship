@@ -4,12 +4,6 @@ const RAID_SWITCH_BUFFER: float = 2.0
 const RAID_LARGE_TARGET_EDGE_BUFFER: float = 1.45
 const RAID_LARGE_TARGET_ALONG_BUFFER: float = 1.0
 const RAID_MAX_ACTIVE_THREATS: int = 1
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const BaseShipCrewHelper = preload("res://scripts/entities/ships/base_ship_crew_helper.gd")
-const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const AUTO_RAID_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_AUTO_RAID
 
 static func get_desired_player_captain_count(ship) -> int:
@@ -308,7 +302,7 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 		cd = 3.0
 	ship.fire_pot_cooldown_timer = cd
 
-	var pot = ship.ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
+	var pot = ScenePool.acquire(ship.get_tree(), ship.fire_pot_scene)
 	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
 	target_pos.x += randf_range(-1.2, 1.2)
 	target_pos.z += randf_range(-1.2, 1.2)

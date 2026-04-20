@@ -1,18 +1,6 @@
 extends RefCounted
 class_name ProjectContractRuntimeHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const EnemySpawnerFleetHelper = preload("res://scripts/managers/enemy_spawner_fleet_helper.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
-const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint_helper.gd")
-const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
-const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
-const RunResultStore = preload("res://scripts/ui/results/run_result_store.gd")
-const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
-const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship_minion_helper.gd")
 
 const FIRE_EFFECT_SCENE_PATH := "res://scenes/effects/fire_effect.tscn"
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"

@@ -6,9 +6,6 @@ const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
 const BOSS_SCENE := preload("res://scenes/ships/boss_ship.tscn")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const PlayerShipCrewHelper = preload("res://scripts/entities/ships/player_ship_crew_helper.gd")
 
 @export var auto_open_debug_panel: bool = true

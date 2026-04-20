@@ -1,6 +1,5 @@
 extends Node3D
 
-const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
 
 
 class MockSoldier:

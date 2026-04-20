@@ -3,8 +3,6 @@ extends RefCounted
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const SUPPORT_FLEET_ICON = preload("res://assets/ui/support_fleet/support_fleet_bow_icon.png")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
 const CAPTURE_HINT_CREW_RATIO: float = 0.34
 const CAPTURE_HINT_CREW_MAX: int = 2

@@ -1,15 +1,6 @@
 @tool
 extends Node
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ItemDataResource = preload("res://scripts/resource_types/item_data.gd")
-const UpgradeManagerChoiceHelper = preload("res://scripts/managers/upgrade_manager_choice_helper.gd")
-const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 const UpgradeManagerItemHelper = preload("res://scripts/managers/upgrade_manager_item_helper.gd")
-const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
-const ShipWeaponLoadoutHelper = preload("res://scripts/entities/ships/ship_weapon_loadout_helper.gd")
-const PlayerShipSupportSquadronHelper = preload("res://scripts/entities/ships/player_ship_support_squadron_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
 ## 업그레이드 데이터 및 적용 로직 관리

@@ -1,7 +1,4 @@
 extends "res://scripts/entities/weapons/weapon.gd"
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 const BASE_DAMAGE: float = 18.0
 

@@ -1,14 +1,6 @@
 extends RefCounted
 class_name ChaserShipAiHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
-const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
-const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
-const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1

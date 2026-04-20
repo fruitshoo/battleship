@@ -1,7 +1,6 @@
 extends RefCounted
 class_name HudLookupHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 
 static func try_resolve_player_ship(hud) -> void:

@@ -1,8 +1,6 @@
 extends RefCounted
 class_name FieldItemHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
 static func get_current_magnet_radius(item: Node, base_radius: float, cached_upgrade_manager: Node = null) -> float:

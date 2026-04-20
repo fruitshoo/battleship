@@ -1,5 +1,4 @@
 extends Camera3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 ## 3rd Person Camera Controller
 ## 타겟(배)을 부드럽게 따라다니며 줌/회전 기능 제공

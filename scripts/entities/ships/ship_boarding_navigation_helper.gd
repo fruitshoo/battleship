@@ -1,8 +1,6 @@
 extends RefCounted
 class_name ShipBoardingNavigationHelper
 
-const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 
 
 static func get_ship_deck_half_extents(ship) -> Vector2:

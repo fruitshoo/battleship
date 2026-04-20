@@ -1,14 +1,5 @@
 extends Node
 
-const ProjectContractBootstrapHelper = preload("res://scripts/test/project_contract_bootstrap_helper.gd")
-const ProjectContractHudHelper = preload("res://scripts/test/project_contract_hud_helper.gd")
-const ProjectContractRecoveryHelper = preload("res://scripts/test/project_contract_recovery_helper.gd")
-const ProjectContractRuntimeHelper = preload("res://scripts/test/project_contract_runtime_helper.gd")
-const ProjectContractScanHelper = preload("res://scripts/test/project_contract_scan_helper.gd")
-const ProjectContractSaveHelper = preload("res://scripts/test/project_contract_save_helper.gd")
-const ProjectContractSceneWiringHelper = preload("res://scripts/test/project_contract_scene_wiring_helper.gd")
-const ProjectContractSupportHelper = preload("res://scripts/test/project_contract_support_helper.gd")
-const ProjectContractUpgradeHelper = preload("res://scripts/test/project_contract_upgrade_helper.gd")
 
 @export var script_roots: Array[String] = ["res://scripts"]
 @export var scene_roots: Array[String] = ["res://scenes"]

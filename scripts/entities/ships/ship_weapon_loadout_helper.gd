@@ -1,8 +1,6 @@
 extends RefCounted
 class_name ShipWeaponLoadoutHelper
 
-const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
-const ShipBlueprintHelper = preload("res://scripts/entities/ships/ship_blueprint_helper.gd")
 
 const KIND := "kind"
 const KIND_CANNON := "cannon"

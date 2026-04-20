@@ -1,15 +1,6 @@
 extends Node
 
-const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
-const ChaserShipMinionHelper = preload("res://scripts/entities/ships/chaser_ship_minion_helper.gd")
-const BaseShipBoardingHelper = preload("res://scripts/entities/ships/base_ship_boarding_helper.gd")
-const BaseShipStatusHelper = preload("res://scripts/entities/ships/base_ship_status_helper.gd")
-const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
-const SoldierBoardingHelper = preload("res://scripts/entities/soldiers/soldier_boarding_helper.gd")
-const SoldierSpeechHelper = preload("res://scripts/entities/soldiers/soldier_speech_helper.gd")
-const SupportBoardingHelper = preload("res://scripts/entities/ships/support_boarding_helper.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const CannonScript = preload("res://scripts/entities/launchers/cannon.gd")
 const SingigeonLauncherScript = preload("res://scripts/entities/launchers/singigeon_launcher.gd")
 const BallistaLauncherScript = preload("res://scripts/entities/launchers/ballista_launcher.gd")

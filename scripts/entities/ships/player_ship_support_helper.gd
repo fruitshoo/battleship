@@ -1,9 +1,6 @@
 extends RefCounted
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SUPPORT_SHIP_SCENE = preload("res://scenes/ships/support_ship.tscn")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
-const PlayerShipSupportSquadronHelper = preload("res://scripts/entities/ships/player_ship_support_squadron_helper.gd")
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_FLEET_NEXT_ORDER_META := "support_fleet_next_order"
 const SUPPORT_FLEET_PROFILE_META := "support_fleet_profile"

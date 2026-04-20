@@ -1,7 +1,5 @@
 extends Node3D
 
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true

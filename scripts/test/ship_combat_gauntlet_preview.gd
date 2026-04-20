@@ -5,9 +5,6 @@ const ENEMY_BASE_SCENE := preload("res://scenes/ships/enemy_ship.tscn")
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true

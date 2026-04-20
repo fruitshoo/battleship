@@ -1,7 +1,6 @@
 class_name VfxBudget
 extends RefCounted
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DISTANCE_BIAS_MULT: float = 1.2
 
 static var _last_frame: int = -1

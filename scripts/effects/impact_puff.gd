@@ -1,7 +1,5 @@
 extends GPUParticles3D
 
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
-const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 @export_enum("muzzle", "hit") var preset: String = "muzzle"
 

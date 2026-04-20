@@ -1,7 +1,6 @@
 extends RefCounted
 class_name ProjectContractBootstrapHelper
 
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 
 
 static func run_bootstrap_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int) -> void:

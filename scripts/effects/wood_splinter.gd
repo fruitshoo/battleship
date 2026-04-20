@@ -1,6 +1,4 @@
 extends Node3D
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
-const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 const DEFAULT_BUDGET_KEY := "wood_splinter"
 const DEFAULT_BUDGET_MAX_PER_FRAME := 3

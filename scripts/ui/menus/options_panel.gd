@@ -1,6 +1,5 @@
 extends CanvasLayer
 
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 signal closed
 

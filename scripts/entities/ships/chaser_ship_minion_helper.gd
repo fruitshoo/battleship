@@ -1,10 +1,6 @@
 extends RefCounted
 class_name ChaserShipMinionHelper
 
-const SupportBoardingHelper = preload("res://scripts/entities/ships/support_boarding_helper.gd")
-const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 
 const SUPPORT_FORMATION_SPACING := 10.0
 const SUPPORT_JOIN_SPACING := 14.0

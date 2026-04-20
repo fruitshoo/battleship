@@ -1,10 +1,6 @@
 extends RefCounted
 class_name BaseShipCollisionHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
 const BOSS_DERELICT_CONTACT_REPAIR_BONUS: float = 18.0
@@ -383,8 +379,8 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 		)
 
 	# 임팩트 퍼프 (연기/먼지)
-	if ship.impact_puff_scene and ship.VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_smoke", impact_pos, 4, 85.0):
-		var smoke = ship.ScenePool.acquire(ship.get_tree(), ship.impact_puff_scene)
+	if ship.impact_puff_scene and VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_smoke", impact_pos, 4, 85.0):
+		var smoke = ScenePool.acquire(ship.get_tree(), ship.impact_puff_scene)
 		ship.get_tree().root.add_child(smoke)
 		smoke.position = impact_pos + Vector3(0.0, 0.6, 0.0)
 		if smoke.has_method("configure_as_muzzle"):

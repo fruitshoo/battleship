@@ -1,7 +1,4 @@
 extends Node3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 ## 팔우노 (Ballista Launcher)
 ## 적 병사를 조준하여 강력한 관통 화살을 발사합니다.

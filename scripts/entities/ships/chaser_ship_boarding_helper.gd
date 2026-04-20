@@ -1,9 +1,6 @@
 extends RefCounted
 class_name ChaserShipBoardingHelper
 
-const ShipBoardingMotion = preload("res://scripts/entities/ships/ship_boarding_motion.gd")
-const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 
 const BOARDING_MOTION_SETTLE_DURATION := 1.35
 const LATCHED_CORRECTION_BLEND := 0.42

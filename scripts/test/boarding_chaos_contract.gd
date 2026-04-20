@@ -1,7 +1,5 @@
 extends Node
 
-const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 
 
 class MockShip:

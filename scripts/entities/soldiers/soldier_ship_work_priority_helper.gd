@@ -1,10 +1,7 @@
 extends RefCounted
 class_name SoldierShipWorkPriorityHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 
 const TASK_NONE := "none"
 const TASK_DECK_DEFENSE := "deck_defense"

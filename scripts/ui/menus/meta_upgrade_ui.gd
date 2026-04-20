@@ -1,7 +1,6 @@
 extends CanvasLayer
 
 const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const PLAYER_BASE_MOVE_SPEED := 6.0
 const PLAYER_BASE_HULL_HP := 200.0
 const SOLDIER_BASE_HEALTH := 100.0

@@ -2,8 +2,6 @@ extends Node3D
 
 const PLAYER_SHIP_SCENE := preload("res://scenes/ships/player_ship.tscn")
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true

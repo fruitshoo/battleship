@@ -2,7 +2,6 @@ extends CanvasLayer
 
 const MAIN_MENU_PATH := "res://scenes/ui/main_menu.tscn"
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 @onready var panel_container: PanelContainer = $Center/Panel
 @onready var title_label: Label = $Center/Panel/Margin/VBox/Title

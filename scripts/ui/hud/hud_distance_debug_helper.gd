@@ -1,10 +1,7 @@
 class_name HudDistanceDebugHelper
 extends RefCounted
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
-const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
 static func toggle_distance_debug(hud) -> void:

@@ -1,6 +1,5 @@
 extends RefCounted
 
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
 
 static func die(ship) -> void:

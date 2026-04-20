@@ -1,9 +1,6 @@
 extends RefCounted
 class_name ProjectContractSupportHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 
 
 static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:

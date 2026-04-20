@@ -1,6 +1,5 @@
 extends PanelContainer
 
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 const MIN_WIDTH: float = 320.0
 const OFFSET := Vector2(18.0, 16.0)

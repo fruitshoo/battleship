@@ -1,7 +1,6 @@
 extends RefCounted
 class_name HudShipDebugHelper
 
-const HudLookupHelper = preload("res://scripts/ui/hud/hud_lookup_helper.gd")
 
 static func sync_ship_debug_panel_from_player(hud) -> void:
 	if not is_instance_valid(hud.debug_ship_status_value):

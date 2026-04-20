@@ -2,8 +2,6 @@ extends Node3D
 
 const SUPPORT_SHIP_SCENE := preload("res://scenes/ships/support_ship.tscn")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
-const PlayerShipSupportSquadronHelper = preload("res://scripts/entities/ships/player_ship_support_squadron_helper.gd")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
 
 const PREVIEW_META := "support_fleet_profile_preview_spawn"
 const FLEET_UPGRADES := {

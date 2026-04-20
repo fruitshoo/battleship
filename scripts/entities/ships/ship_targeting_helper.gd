@@ -1,8 +1,6 @@
 extends RefCounted
 class_name ShipTargetingHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 
 const PLAYER_FLAGSHIP_TARGET_WEIGHT := 0.8
 const PLAYER_SUPPORT_TARGET_WEIGHT := 1.08

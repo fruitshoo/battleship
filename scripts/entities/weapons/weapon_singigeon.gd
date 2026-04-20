@@ -1,7 +1,4 @@
 extends "res://scripts/entities/weapons/weapon.gd"
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
 @export var launch_cooldown: float = 5.0

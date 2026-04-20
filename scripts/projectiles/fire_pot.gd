@@ -1,9 +1,4 @@
 extends Area3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 
 ## 화통 (Fire Pot)
 ## 포물선으로 날아가 착탄 시 폭발하며 범위 데미지(화염)를 줍니다.

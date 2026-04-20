@@ -1,10 +1,5 @@
 @tool
 extends Node3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
 const CANNON_RELOAD_TEMPO_MULT := 1.10

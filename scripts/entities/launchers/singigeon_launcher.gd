@@ -1,7 +1,4 @@
 extends Node3D
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LauncherCombatHelper = preload("res://scripts/entities/launchers/launcher_combat_helper.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const DEBUG_COMBAT_LOGS := false
 
 ## 신기전 발사기 (Singigeon Launcher)

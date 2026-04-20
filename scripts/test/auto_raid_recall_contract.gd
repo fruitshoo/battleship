@@ -1,6 +1,5 @@
 extends Node
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const PlayerShipCrewHelper = preload("res://scripts/entities/ships/player_ship_crew_helper.gd")
 
 

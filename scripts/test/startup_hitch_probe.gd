@@ -1,9 +1,6 @@
 extends Node3D
 
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
-const PreviewHarnessHelper = preload("res://scripts/test/preview_harness_helper.gd")
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 
 @export var auto_open_debug_panel: bool = false
 @export var stop_regular_spawns: bool = true

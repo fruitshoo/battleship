@@ -2,7 +2,6 @@ extends Control
 
 const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
 @export var background_texture: Texture2D
 @export_range(0.0, 1.0, 0.01) var background_dim: float = 0.18

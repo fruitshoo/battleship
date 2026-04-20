@@ -1,6 +1,5 @@
 extends PanelContainer
 
-const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 signal return_requested
 

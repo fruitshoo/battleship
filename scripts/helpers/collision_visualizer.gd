@@ -1,9 +1,6 @@
 @tool
 extends Node3D
 
-const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
-const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 static var runtime_enabled: bool = false
 static var runtime_mode: int = 0

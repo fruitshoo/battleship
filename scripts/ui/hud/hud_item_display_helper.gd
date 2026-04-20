@@ -13,7 +13,7 @@ static func add_item_icon(hud, icon_data) -> void:
 			item_description = str(icon_data.get("description", ""))
 		var tooltip_text := "[%s]\n%s" % [item_name, item_description]
 		slot.set_meta("tooltip_text", tooltip_text.strip_edges())
-		slot.set_meta("tooltip_color", hud.NavalUiTheme.TEXT_GOLD)
+		slot.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
 		if slot.get_meta("hover_bound", false) != true:
 			hud._bind_upgrade_slot_hover(slot)
 			slot.set_meta("hover_bound", true)

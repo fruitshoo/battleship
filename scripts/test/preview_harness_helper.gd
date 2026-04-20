@@ -1,7 +1,6 @@
 extends RefCounted
 class_name PreviewHarnessHelper
 
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 
 
 static func setup_common(root: Node, auto_open_debug_panel: bool, stop_regular_spawns: bool) -> void:

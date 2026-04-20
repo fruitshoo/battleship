@@ -11,8 +11,6 @@ var team: String = "player"
 
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
-const SoldierRulesData = preload("res://scripts/helpers/soldier_rules_data.gd")
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
 const PLAYER_DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
 const PLAYER_DEFAULT_WATER_SPLASH_SCENE = preload("res://scenes/effects/water_burst.tscn")

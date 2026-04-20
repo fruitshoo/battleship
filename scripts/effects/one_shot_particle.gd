@@ -1,5 +1,4 @@
 extends GPUParticles3D
-const VfxBudget = preload("res://scripts/helpers/vfx_budget.gd")
 
 ## 원샷 파티클 — 재생 즉시 emit을 시작하고, 수명이 다하면 자동으로 노드를 제거합니다.
 ## muzzle_smoke, hit_effect, slash_effect, rocket_explosion 등 일회성 GPUParticles3D에 공용으로 사용합니다.

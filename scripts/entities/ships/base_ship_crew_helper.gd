@@ -1,8 +1,6 @@
 extends RefCounted
 class_name BaseShipCrewHelper
 
-const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
-const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const CANNON_RELOAD_CREW_MAX_PER_CANNON := 3.0
 
 static func update_crew_allocation_state(ship, delta: float) -> void:

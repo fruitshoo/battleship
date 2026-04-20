@@ -1,8 +1,5 @@
 extends Node
 
-const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const ChaserShipSupportHelper = preload("res://scripts/entities/ships/chaser_ship_support_helper.gd")
-const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
 const EnemyDrifterScene = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 
 

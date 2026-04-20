@@ -1,6 +1,5 @@
 extends Node
 
-const SoldierLifecycleHelper = preload("res://scripts/entities/soldiers/soldier_lifecycle_helper.gd")
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
