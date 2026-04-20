@@ -1,12 +1,9 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
-const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
 const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
-const ShipLimboAIPilot = preload("res://scripts/ai/limbo/ship_limbo_ai_pilot.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -475,10 +472,16 @@ func _draw_limbo_ai_debug() -> void:
 	var pressure := clampf(float(get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
 	var target_distance := float(get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, 0.0))
 	var nav_mode := str(get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges()
+	var weapon_intent := str(get_meta(ShipAILimboKeys.META_WEAPON_INTENT, "")).strip_edges()
+	var special_intent := str(get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, "")).strip_edges()
+	var boarding_intent := str(get_meta(ShipAILimboKeys.META_BOARDING_INTENT, "")).strip_edges()
 	var color := _get_limbo_stance_color(stance)
-	var label := "LimboAI %s\nrange:%s phase:%s p:%.2f dist:%.1f\nnav:%s" % [
+	var label := "LimboAI %s\nrange:%s weapon:%s special:%s board:%s\nphase:%s p:%.2f dist:%.1f nav:%s" % [
 		stance if not stance.is_empty() else "-",
 		range_intent if not range_intent.is_empty() else "-",
+		weapon_intent if not weapon_intent.is_empty() else "-",
+		special_intent if not special_intent.is_empty() else "-",
+		boarding_intent if not boarding_intent.is_empty() else "-",
 		phase,
 		pressure,
 		target_distance,

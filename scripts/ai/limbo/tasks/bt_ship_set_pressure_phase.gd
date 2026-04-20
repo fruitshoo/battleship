@@ -2,7 +2,6 @@
 extends BTAction
 class_name BTShipSetPressurePhase
 
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 @export var phase_var: StringName = ShipAILimboKeys.VAR_PRESSURE_PHASE
 @export var pressure_var: StringName = ShipAILimboKeys.VAR_PRESSURE

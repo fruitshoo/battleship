@@ -3,16 +3,16 @@ class_name ChaserShipAiHelper
 
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
-const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
 const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
 const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const ShipContactGeometry = preload("res://scripts/entities/ships/ship_contact_geometry.gd")
 const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
+const LIMBO_AI_BOARDING_INTENT_STALE_FRAMES := 4
 
 static func _is_true(value: Variant) -> bool:
 	return value == true
@@ -247,28 +247,36 @@ static func process_physics(ship, delta: float) -> void:
 	var permit_sprint: bool = ShipMovementIntent.get_permit_sprint(nav)
 	var dir_to_target: Vector3 = ShipMovementIntent.get_dir_to_target(nav, Vector3.ZERO)
 
-	var boarding_attempt_distance: float = ship.boarding_break_distance
-	if ship.has_method("get_collision_distance_to"):
-		boarding_attempt_distance = maxf(boarding_attempt_distance, float(ship.call("get_collision_distance_to", current_target)) + 2.2)
+	var boarding_attempt_distance: float = ShipContactGeometry.get_boarding_attempt_distance(ship, current_target)
 	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= boarding_attempt_distance:
-		var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
-		var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
-		var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
-		var can_latched_board: bool = ship.has_method("_can_start_boarding_latched") and ship.call("_can_start_boarding_latched", current_target, dist_to_target, can_side_board, can_force_head_on, can_force_cleanup, delta)
-		var direct_board_pad: float = 0.35
-		if ship.has_method("get_team_tag") and ship.call("get_team_tag") == "enemy":
-			direct_board_pad += 0.15
-		var direct_board_distance: float = ship.max_boarding_distance + direct_board_pad
-		if ship.has_method("get_collision_distance_to"):
-			direct_board_distance = maxf(direct_board_distance, float(ship.call("get_collision_distance_to", current_target)) + 0.85)
-		var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= direct_board_distance
-		var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
-		if (can_latched_board or can_direct_board) and impact_confirmed:
-			if ship.has_method("_board_ship"):
-				ship.call("_board_ship", current_target)
-				if ship.is_boarding:
-					ship._process_boarding(delta)
-					return
+		var can_use_limbo_boarding_intent := true
+		if ship.get("limbo_ai_pilot_enabled") == true:
+			var boarding_frame := int(ship.get_meta(ShipAILimboKeys.META_BOARDING_FRAME, -1000000))
+			if Engine.get_physics_frames() - boarding_frame <= LIMBO_AI_BOARDING_INTENT_STALE_FRAMES:
+				var boarding_target_id := int(ship.get_meta(ShipAILimboKeys.META_BOARDING_TARGET_ID, 0))
+				var boarding_intent := str(ship.get_meta(ShipAILimboKeys.META_BOARDING_INTENT, "")).strip_edges()
+				can_use_limbo_boarding_intent = boarding_target_id == current_target.get_instance_id() and boarding_intent == ShipAILimboKeys.BOARDING_READY
+		if can_use_limbo_boarding_intent:
+			var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
+			var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
+			var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
+			var can_latched_board: bool = ship.has_method("_can_start_boarding_latched") and ship.call("_can_start_boarding_latched", current_target, dist_to_target, can_side_board, can_force_head_on, can_force_cleanup, delta)
+			var direct_board_pad: float = 0.35
+			if ship.has_method("get_team_tag") and ship.call("get_team_tag") == "enemy":
+				direct_board_pad += 0.15
+			var direct_board_distance: float = ship.max_boarding_distance + direct_board_pad
+			if ship.has_method("get_collision_distance_to"):
+				direct_board_distance = maxf(direct_board_distance, float(ship.call("get_collision_distance_to", current_target)) + 0.85)
+			var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= direct_board_distance
+			var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
+			if (can_latched_board or can_direct_board) and impact_confirmed:
+				if ship.has_method("_board_ship"):
+					ship.call("_board_ship", current_target)
+					if ship.is_boarding:
+						ship._process_boarding(delta)
+						return
+		elif ship.has_method("_decay_boarding_latch"):
+			ship.call("_decay_boarding_latch", current_target, delta)
 	elif ship.has_method("_decay_boarding_latch"):
 		ship.call("_decay_boarding_latch", current_target, delta)
 
@@ -447,7 +455,7 @@ static func _draw_ai_intent_debug(
 
 	if _can_board(ship) and boarding_attempt_distance > 0.1 and dist_to_target <= boarding_attempt_distance + 5.0:
 		var boarding_color := Color(0.25, 1.0, 0.64, 0.7) if dist_to_target <= boarding_attempt_distance else Color(1.0, 0.58, 0.16, 0.62)
-		DebugDrawBridge.draw_circle_xz(current_target.global_position, boarding_attempt_distance, boarding_color, 0.62, duration, 72, 0.026)
+		DebugDrawBridge.draw_circle_xz(current_target.global_position, boarding_attempt_distance, boarding_color, 1.25, duration, 72, 0.026)
 
 	var approach_mode := ShipBoardingMetaHelper.get_approach_mode(ship, "-")
 	var slot_id := ShipBoardingMetaHelper.get_slot_id(ship, "")
@@ -480,13 +488,19 @@ static func _get_limbo_debug_text(ship) -> String:
 	var stance := str(ship.get_meta(ShipAILimboKeys.META_STANCE, ""))
 	var range_intent := str(ship.get_meta(ShipAILimboKeys.META_INTENT, ""))
 	var phase := str(ship.get_meta(ShipAILimboKeys.META_PRESSURE_PHASE, ""))
-	if stance.is_empty() and range_intent.is_empty() and phase.is_empty():
+	var weapon_intent := str(ship.get_meta(ShipAILimboKeys.META_WEAPON_INTENT, ""))
+	var special_intent := str(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, ""))
+	var boarding_intent := str(ship.get_meta(ShipAILimboKeys.META_BOARDING_INTENT, ""))
+	if stance.is_empty() and range_intent.is_empty() and phase.is_empty() and weapon_intent.is_empty() and special_intent.is_empty() and boarding_intent.is_empty():
 		return ""
 	var pressure := clampf(float(ship.get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
 	var distance := float(ship.get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, 0.0))
-	return "\nLimboAI %s | range:%s | phase:%s | p:%.2f | %.1fm" % [
+	return "\nLimboAI %s | range:%s | weapon:%s | special:%s | board:%s | phase:%s | p:%.2f | %.1fm" % [
 		stance if not stance.is_empty() else "-",
 		range_intent if not range_intent.is_empty() else "-",
+		weapon_intent if not weapon_intent.is_empty() else "-",
+		special_intent if not special_intent.is_empty() else "-",
+		boarding_intent if not boarding_intent.is_empty() else "-",
 		phase if not phase.is_empty() else "-",
 		pressure,
 		distance,

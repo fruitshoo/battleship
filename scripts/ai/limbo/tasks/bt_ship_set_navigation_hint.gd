@@ -2,7 +2,6 @@
 extends BTAction
 class_name BTShipSetNavigationHint
 
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 @export var intent_var: StringName = ShipAILimboKeys.VAR_INTENT

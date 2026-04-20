@@ -2,7 +2,6 @@
 extends BTCondition
 class_name BTShipTargetInRange
 
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 @export var min_range: float = 0.0

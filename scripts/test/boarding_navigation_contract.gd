@@ -3,7 +3,6 @@ extends Node
 const ChaserShipNavigationHelper = preload("res://scripts/entities/ships/chaser_ship_navigation_helper.gd")
 const ChaserShipBoardingHelper = preload("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
 const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_intent.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 
 class MockShip:

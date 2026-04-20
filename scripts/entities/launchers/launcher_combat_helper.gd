@@ -4,7 +4,6 @@ class_name LauncherCombatHelper
 const HitTargetResolver = preload("res://scripts/helpers/hit_target_resolver.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 const LIMBO_AI_WEAPON_INTENT_STALE_FRAMES := 4
 

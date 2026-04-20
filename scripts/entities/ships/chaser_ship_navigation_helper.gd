@@ -6,7 +6,6 @@ const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_i
 const ShipBoardingNavigationHelper = preload("res://scripts/entities/ships/ship_boarding_navigation_helper.gd")
 const ShipBoardingSlot = preload("res://scripts/entities/ships/ship_boarding_slot.gd")
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 const META_AUTHORING_MOVEMENT_MODE := "enemy_authoring_movement_mode"
 const META_AUTHORING_MOVEMENT_SPEED_MIN := "enemy_authoring_movement_speed_min"

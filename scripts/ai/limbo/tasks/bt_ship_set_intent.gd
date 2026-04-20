@@ -2,7 +2,6 @@
 extends BTAction
 class_name BTShipSetIntent
 
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 @export var intent: StringName = &"engage"
 @export var intent_var: StringName = ShipAILimboKeys.VAR_INTENT

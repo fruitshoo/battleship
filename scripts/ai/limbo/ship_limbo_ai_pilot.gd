@@ -1,7 +1,6 @@
 extends RefCounted
 class_name ShipLimboAIPilot
 
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 const DEFAULT_TREE_PATH := "res://resources/ai/limbo/ship_ai_pilot_skeleton.tres"
 const PLAYER_NODE_NAME := "LimboAIPilotPlayer"

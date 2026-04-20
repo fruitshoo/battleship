@@ -2,8 +2,6 @@
 extends BTAction
 class_name BTShipSelectPlayerTarget
 
-const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 

@@ -5,7 +5,6 @@ const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_regist
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 const ScenePool = preload("res://scripts/helpers/scene_pool.gd")
 const DEFAULT_ENEMY_DRIFTER_XP_SCENE = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
