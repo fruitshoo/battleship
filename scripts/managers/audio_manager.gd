@@ -486,6 +486,17 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 		
 		current_2d_index = (current_2d_index + 1) % sfx_2d_pool.size()
 
+func play_sfx_random_pitch(
+	stream_name: String,
+	position = null,
+	min_pitch: float = 0.9,
+	max_pitch: float = 1.1,
+	volume_db: float = 0.0
+) -> void:
+	var low_pitch := minf(min_pitch, max_pitch)
+	var high_pitch := maxf(min_pitch, max_pitch)
+	play_sfx(stream_name, position, randf_range(low_pitch, high_pitch), volume_db)
+
 ## 배경음 재생
 func play_bgm(stream_name: String, _fade_duration: float = 1.0) -> void:
 	if current_bgm_name == stream_name and is_instance_valid(bgm_player) and bgm_player.playing:

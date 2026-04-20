@@ -16,6 +16,9 @@ const PLAYER_INCAPACITATED_RECOVERY_HEALTH_RATIO: float = 0.35
 const PLAYER_INCAPACITATED_MIN_RECOVERY_DELAY: float = 3.0
 const SUPPORT_RESCUE_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_SUPPORT_RESCUE
 const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
+const SOLDIER_DEATH_PITCH_MIN: float = 1.08
+const SOLDIER_DEATH_PITCH_MAX: float = 1.18
+const SOLDIER_DEATH_VOLUME_DB: float = -1.0
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -236,7 +239,21 @@ static func die(soldier) -> void:
 	var tree: SceneTree = soldier.get_tree()
 	var audio_manager = soldier.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("soldier_die", death_position)
+		if audio_manager.has_method("play_sfx_random_pitch"):
+			audio_manager.play_sfx_random_pitch(
+				"soldier_die",
+				death_position,
+				SOLDIER_DEATH_PITCH_MIN,
+				SOLDIER_DEATH_PITCH_MAX,
+				SOLDIER_DEATH_VOLUME_DB
+			)
+		else:
+			audio_manager.play_sfx(
+				"soldier_die",
+				death_position,
+				randf_range(SOLDIER_DEATH_PITCH_MIN, SOLDIER_DEATH_PITCH_MAX),
+				SOLDIER_DEATH_VOLUME_DB
+			)
 		if is_instance_valid(tree):
 			tree.create_timer(randf_range(0.3, 0.6)).timeout.connect(func():
 				var main_loop := Engine.get_main_loop() as SceneTree
