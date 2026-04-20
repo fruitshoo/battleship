@@ -3,6 +3,9 @@ extends "res://scripts/entities/ships/base_ship.gd"
 const LevelManagerRegistry = preload("res://scripts/helpers/level_manager_registry.gd")
 const ShipTargetingHelper = preload("res://scripts/entities/ships/ship_targeting_helper.gd")
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
+const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
+const ShipLimboAIPilot = preload("res://scripts/ai/limbo/ship_limbo_ai_pilot.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -18,6 +21,8 @@ signal boss_died
 @export var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
 @export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/atakebune_hull.tscn")
 @export var chest_scene: PackedScene = preload("res://scenes/effects/treasure_chest.tscn")
+@export var limbo_ai_pilot_enabled: bool = true
+@export_file("*.tres") var limbo_ai_pilot_tree_path: String = ShipLimboAIPilot.DEFAULT_TREE_PATH
 
 var target: Node3D = null
 var orbit_angle: float = 0.0
@@ -29,6 +34,8 @@ var _victory_reported: bool = false
 var _victory_report_retry_count: int = 0
 var _defeat_flourish_started: bool = false
 var crew_composition: Array[String] = []
+var _base_move_speed: float = 0.0
+var _base_orbit_inward_bias: float = 0.0
 
 @export var ship_type: String = "atakebune_mid":
 	set(value):
@@ -85,6 +92,7 @@ func _ready() -> void:
 		
 	super._ready()
 	hull_hp = max_hull_hp
+	_cache_limbo_base_combat_values()
 	set_team(team)
 	add_to_group("boss")
 	add_to_group("ships")
@@ -225,6 +233,7 @@ func _physics_process(delta: float) -> void:
 	_update_hull_regeneration(delta)
 	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
+	_update_limbo_ai_pilot(delta)
 	
 	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true or target.get("is_dead") == true:
 		target = null
@@ -244,14 +253,30 @@ func _physics_process(delta: float) -> void:
 	
 	# 거리가 너무 멀면 접근, 적절하면 선회, 너무 가까우면 뒤로
 	var move_dir = Vector3.ZERO
-	if dist > orbit_distance + 5.0:
+	var range_intent := _get_limbo_range_intent()
+	var stance := _get_limbo_stance()
+	var orbit_dir := Vector3(-to_player.z, 0, to_player.x)
+	if range_intent == ShipAILimboKeys.INTENT_CLOSE_DISTANCE:
+		move_dir = _get_limbo_close_move_dir(to_player, orbit_dir, stance)
+	elif range_intent == ShipAILimboKeys.INTENT_HOLD:
+		move_dir = - to_player
+	elif range_intent == ShipAILimboKeys.INTENT_ENGAGE:
+		# 플레이어 주변을 시계 방향으로 선회
+		move_dir = (orbit_dir + to_player * _get_limbo_orbit_inward_bias(stance)).normalized()
+	elif dist > orbit_distance + 5.0:
 		move_dir = to_player
 	elif dist < orbit_distance - 5.0:
 		move_dir = - to_player
 	else:
-		# 플레이어 주변을 시계 방향으로 선회
-		var side_dir = Vector3(-to_player.z, 0, to_player.x)
-		move_dir = (side_dir + to_player * orbit_inward_bias).normalized()
+		move_dir = (orbit_dir + to_player * orbit_inward_bias).normalized()
+
+	var limbo_nav_hint := _get_limbo_navigation_hint(target)
+	var limbo_speed_mult := 1.0
+	if not limbo_nav_hint.is_empty():
+		var hinted_move_dir: Vector3 = limbo_nav_hint.get("move_dir", Vector3.ZERO)
+		if hinted_move_dir.length_squared() > 0.001:
+			move_dir = hinted_move_dir.normalized()
+			limbo_speed_mult = clampf(float(limbo_nav_hint.get("speed_mult", 1.0)), 0.1, 1.35)
 		
 	# === 이동 및 회전 (Separation 및 Hard Collision 포함) ===
 	# 1. Separation (부드러운 충돌 방지)
@@ -290,7 +315,7 @@ func _physics_process(delta: float) -> void:
 		wind_mult = lerp(1.0, base_wind_influence, wind_str)
 		
 	# velocity 계산 및 적용
-	var final_velocity = move_dir * move_speed * leak_speed_mult * wind_mult
+	var final_velocity = move_dir * move_speed * leak_speed_mult * wind_mult * limbo_speed_mult
 	global_position += (final_velocity + hard_rep) * delta
 	
 	_update_leaking_damage(delta)
@@ -333,6 +358,145 @@ func _find_player() -> void:
 
 	# 타겟 갱신과 무관하게 HUD 체력바는 즉시 동기화한다.
 	_update_boss_hp_hud()
+
+
+func get_preferred_engagement_range() -> float:
+	return orbit_distance
+
+
+func get_engagement_range_tolerance() -> float:
+	return 5.0
+
+
+func _cache_limbo_base_combat_values() -> void:
+	_base_move_speed = move_speed
+	_base_orbit_inward_bias = orbit_inward_bias
+
+
+func _update_limbo_ai_pilot(delta: float) -> void:
+	if not limbo_ai_pilot_enabled:
+		return
+	ShipLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path)
+	_apply_limbo_pilot_modifiers()
+	_draw_limbo_ai_debug()
+
+
+func _get_limbo_range_intent() -> String:
+	if not limbo_ai_pilot_enabled:
+		return ""
+	return str(get_meta(ShipAILimboKeys.META_INTENT, ""))
+
+
+func _get_limbo_stance() -> String:
+	if not limbo_ai_pilot_enabled:
+		return ""
+	return str(get_meta(ShipAILimboKeys.META_STANCE, ""))
+
+
+func _apply_limbo_pilot_modifiers() -> void:
+	if _base_move_speed <= 0.0:
+		_cache_limbo_base_combat_values()
+	var pressure := clampf(float(get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
+	var stance := _get_limbo_stance()
+	var stance_speed_mult := 1.0
+	if stance == ShipAILimboKeys.STANCE_DESPERATE_PUSH:
+		stance_speed_mult = 1.06
+	elif stance == ShipAILimboKeys.STANCE_WITHDRAW:
+		stance_speed_mult = 0.96
+	move_speed = _base_move_speed * lerp(1.0, 1.12, pressure) * stance_speed_mult
+	orbit_inward_bias = clampf(_base_orbit_inward_bias + pressure * 0.12, 0.0, 1.0)
+
+
+func _get_limbo_orbit_inward_bias(stance: String) -> float:
+	return clampf(orbit_inward_bias + _get_limbo_stance_inward_bonus(stance), 0.0, 1.0)
+
+
+func _get_limbo_stance_inward_bonus(stance: String) -> float:
+	match stance:
+		ShipAILimboKeys.STANCE_BOMBARD:
+			return -0.06
+		ShipAILimboKeys.STANCE_ORBIT_PRESSURE:
+			return 0.04
+		ShipAILimboKeys.STANCE_DESPERATE_PUSH:
+			return 0.16
+	return 0.0
+
+
+func _get_limbo_close_move_dir(to_player: Vector3, orbit_dir: Vector3, stance: String) -> Vector3:
+	if stance == ShipAILimboKeys.STANCE_DESPERATE_PUSH:
+		return (to_player + orbit_dir * 0.22).normalized()
+	return to_player
+
+
+func _get_limbo_navigation_hint(target_node: Node3D) -> Dictionary:
+	if not limbo_ai_pilot_enabled or not is_instance_valid(target_node):
+		return {}
+	var nav_target_id := int(get_meta(ShipAILimboKeys.META_NAV_TARGET_ID, 0))
+	if nav_target_id != target_node.get_instance_id():
+		return {}
+	var nav_frame := int(get_meta(ShipAILimboKeys.META_NAV_FRAME, -1000000))
+	if Engine.get_physics_frames() - nav_frame > 4:
+		return {}
+	var nav_mode := str(get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges()
+	if nav_mode.is_empty() or nav_mode == "limbo_bombard":
+		return {}
+	var desired_value: Variant = get_meta(ShipAILimboKeys.META_NAV_DESIRED_POINT, null)
+	if not (desired_value is Vector3):
+		return {}
+	var desired_point: Vector3 = desired_value
+	var move_vector: Vector3 = desired_point - global_position
+	move_vector.y = 0.0
+	if move_vector.length_squared() <= 0.001:
+		return {}
+	return {
+		"move_dir": move_vector.normalized(),
+		"speed_mult": float(get_meta(ShipAILimboKeys.META_NAV_SPEED_MULT, 1.0)),
+		"mode": nav_mode,
+		"desired_point": desired_point,
+	}
+
+
+func _draw_limbo_ai_debug() -> void:
+	if not DebugDrawBridge.is_channel_enabled(DebugDrawBridge.CHANNEL_AI_INTENT) or not DebugDrawBridge.can_draw():
+		return
+	var stance := _get_limbo_stance()
+	var range_intent := _get_limbo_range_intent()
+	var phase := str(get_meta(ShipAILimboKeys.META_PRESSURE_PHASE, ShipAILimboKeys.PHASE_STABLE))
+	var pressure := clampf(float(get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
+	var target_distance := float(get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, 0.0))
+	var nav_mode := str(get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges()
+	var color := _get_limbo_stance_color(stance)
+	var label := "LimboAI %s\nrange:%s phase:%s p:%.2f dist:%.1f\nnav:%s" % [
+		stance if not stance.is_empty() else "-",
+		range_intent if not range_intent.is_empty() else "-",
+		phase,
+		pressure,
+		target_distance,
+		nav_mode if not nav_mode.is_empty() else "-",
+	]
+	DebugDrawBridge.draw_text(global_position + Vector3.UP * 4.4, label, color, 0.0, 16)
+	if is_instance_valid(target):
+		DebugDrawBridge.draw_line_raised(global_position, target.global_position, 2.35, color, 0.0, 0.026)
+		DebugDrawBridge.draw_circle_xz(target.global_position, get_preferred_engagement_range(), color, 0.35, 0.0, 72, 0.024)
+		var limbo_nav_hint := _get_limbo_navigation_hint(target)
+		if not limbo_nav_hint.is_empty():
+			var desired_point: Vector3 = limbo_nav_hint.get("desired_point", global_position)
+			DebugDrawBridge.draw_marker(desired_point, color, "", 0.0, 0.28, 1.5)
+			DebugDrawBridge.draw_line_raised(global_position, desired_point, 1.4, color, 0.0, 0.032)
+
+
+func _get_limbo_stance_color(stance: String) -> Color:
+	match stance:
+		ShipAILimboKeys.STANCE_CLOSE_DISTANCE:
+			return Color(0.35, 0.95, 1.0, 0.88)
+		ShipAILimboKeys.STANCE_ORBIT_PRESSURE:
+			return Color(1.0, 0.75, 0.22, 0.9)
+		ShipAILimboKeys.STANCE_WITHDRAW:
+			return Color(0.5, 0.74, 1.0, 0.88)
+		ShipAILimboKeys.STANCE_DESPERATE_PUSH:
+			return Color(1.0, 0.18, 0.12, 0.94)
+		_:
+			return Color(0.86, 1.0, 0.36, 0.88)
 
 func _update_boss_hp_hud() -> void:
 	if not is_instance_valid(cached_lm):

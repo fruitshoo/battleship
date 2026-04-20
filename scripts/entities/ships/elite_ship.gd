@@ -6,6 +6,7 @@ extends "res://scripts/entities/ships/chaser_ship.gd"
 @export var chest_scene: PackedScene = preload("res://scenes/effects/treasure_chest.tscn")
 
 func _ready() -> void:
+	limbo_ai_pilot_enabled = true
 	super._ready()
 	add_to_group("elite")
 	

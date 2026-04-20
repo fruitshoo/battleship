@@ -840,7 +840,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
-      "count": 22,
+      "count": 23,
       "functions": [
         "_is_true",
         "_is_gunner",
@@ -858,6 +858,7 @@
         "calculate_separation",
         "process_physics",
         "_draw_ai_intent_debug",
+        "_get_limbo_debug_text",
         "_get_ai_intent_color",
         "update_logic_throttled",
         "_get_logic_update_interval",
@@ -865,7 +866,7 @@
         "find_player",
         "update_wave_sounds"
       ],
-      "reason": "AI DebugDraw instrumentation is intentionally owned by the AI helper because it visualizes the movement intent produced and consumed in process_physics."
+      "reason": "AI DebugDraw instrumentation is intentionally owned by the AI helper because it visualizes the movement intent produced and consumed in process_physics, including LimboAI bridge metadata."
     },
     "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
       "count": 14,

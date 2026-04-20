@@ -9,6 +9,7 @@ const ChaserShipSupportHelper = preload("res://scripts/entities/ships/chaser_shi
 const ChaserShipAiHelper = preload("res://scripts/entities/ships/chaser_ship_ai_helper.gd")
 const ShipCombatModeHelper = preload("res://scripts/entities/ships/ship_combat_mode_helper.gd")
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const ShipLimboAIPilot = preload("res://scripts/ai/limbo/ship_limbo_ai_pilot.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
@@ -48,6 +49,8 @@ enum CombatRole {CHARGER, GUNNER}
 		formation_role_name = value
 		if not Engine.is_editor_hint() and is_node_ready():
 			_apply_formation_role_profile()
+@export var limbo_ai_pilot_enabled: bool = false
+@export_file("*.tres") var limbo_ai_pilot_tree_path: String = ShipLimboAIPilot.DEFAULT_TREE_PATH
 @export var ship_type: String = "sekibune_melee":
 	set(value):
 		ship_type = value
@@ -645,6 +648,7 @@ func _update_enemy_fire_pot_logic(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_limbo_ai_pilot(delta)
 	ChaserShipAiHelper.process_physics(self, delta)
 
 func _update_logic_throttled() -> void:
@@ -678,6 +682,14 @@ func _apply_ship_collision_guard(other_ship: Node3D, prev_pos: Vector3, proposed
 
 func _find_player() -> void:
 	ChaserShipAiHelper.find_player(self)
+
+
+func _update_limbo_ai_pilot(delta: float) -> void:
+	if not limbo_ai_pilot_enabled:
+		return
+	if get_team_tag() != "enemy":
+		return
+	ShipLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path)
 
 ## 나포(Capture) 처리
 func capture_ship() -> void:
@@ -725,6 +737,7 @@ func capture_ship() -> void:
 	# (is_boarding, boarding_target, _clear_ropes 등은 _cancel_boarding()에서 이미 처리됨)
 	
 	# 플레이어의 현재 업그레이드된 최대 속도를 상속받아 평준화 (기본치 3.2 대신)
+	limbo_ai_pilot_enabled = false
 	var players = EntityRegistry.get_ships_by_team("player")
 	if players.size() > 0 and players[0].get("is_player_controlled"):
 		move_speed = players[0].get("max_speed")

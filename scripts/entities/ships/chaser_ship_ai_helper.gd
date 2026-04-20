@@ -9,6 +9,7 @@ const ShipMovementIntent = preload("res://scripts/entities/ships/ship_movement_i
 const ShipBoardingMetaHelper = preload("res://scripts/entities/ships/ship_boarding_meta_helper.gd")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
 const DebugDrawBridge = preload("res://scripts/helpers/debug_draw_bridge.gd")
+const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
@@ -452,21 +453,44 @@ static func _draw_ai_intent_debug(
 	var slot_id := ShipBoardingMetaHelper.get_slot_id(ship, "")
 	var approach_text := " | %s" % approach_mode if approach_mode != "-" else ""
 	var slot_text := " | slot %s" % slot_id if not slot_id.is_empty() else ""
+	var limbo_text := _get_limbo_debug_text(ship)
 	DebugDrawBridge.draw_text(
 		origin + Vector3.UP * 3.15,
-		"%s | %s | %.1fm | spd x%.2f | rud %.0f%s%s" % [
+		"%s | %s | %.1fm | spd x%.2f | rud %.0f%s%s%s" % [
 			ship_3d.name,
 			mode,
 			dist_to_target,
 			desired_speed_mult,
 			desired_rudder,
 			" | sprint" if permit_sprint else "",
-			approach_text + slot_text
+			approach_text + slot_text,
+			limbo_text
 		],
 		color,
 		duration,
 		17
 	)
+
+
+static func _get_limbo_debug_text(ship) -> String:
+	if not is_instance_valid(ship):
+		return ""
+	if ship.get("limbo_ai_pilot_enabled") != true:
+		return ""
+	var stance := str(ship.get_meta(ShipAILimboKeys.META_STANCE, ""))
+	var range_intent := str(ship.get_meta(ShipAILimboKeys.META_INTENT, ""))
+	var phase := str(ship.get_meta(ShipAILimboKeys.META_PRESSURE_PHASE, ""))
+	if stance.is_empty() and range_intent.is_empty() and phase.is_empty():
+		return ""
+	var pressure := clampf(float(ship.get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
+	var distance := float(ship.get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, 0.0))
+	return "\nLimboAI %s | range:%s | phase:%s | p:%.2f | %.1fm" % [
+		stance if not stance.is_empty() else "-",
+		range_intent if not range_intent.is_empty() else "-",
+		phase if not phase.is_empty() else "-",
+		pressure,
+		distance,
+	]
 
 
 static func _get_ai_intent_color(mode: String) -> Color:

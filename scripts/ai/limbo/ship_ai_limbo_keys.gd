@@ -1,0 +1,42 @@
+extends RefCounted
+class_name ShipAILimboKeys
+
+const VAR_TARGET := &"ship_target"
+const VAR_INTENT := &"ship_intent"
+const VAR_TARGET_DISTANCE := &"ship_target_distance"
+const VAR_PRESSURE_PHASE := &"ship_pressure_phase"
+const VAR_PRESSURE := &"ship_pressure"
+const VAR_STANCE := &"ship_stance"
+const VAR_NAV_DESIRED_POINT := &"ship_nav_desired_point"
+const VAR_NAV_HEADING_POINT := &"ship_nav_heading_point"
+const VAR_NAV_SPEED_MULT := &"ship_nav_speed_mult"
+const VAR_NAV_PERMIT_SPRINT := &"ship_nav_permit_sprint"
+const VAR_NAV_MODE := &"ship_nav_mode"
+
+const META_INTENT := "limbo_ai_intent"
+const META_TARGET_ID := "limbo_ai_target_id"
+const META_TARGET_DISTANCE := "limbo_ai_target_distance"
+const META_PRESSURE_PHASE := "limbo_ai_pressure_phase"
+const META_PRESSURE := "limbo_ai_pressure"
+const META_STANCE := "limbo_ai_stance"
+const META_NAV_TARGET_ID := "limbo_ai_nav_target_id"
+const META_NAV_FRAME := "limbo_ai_nav_frame"
+const META_NAV_DESIRED_POINT := "limbo_ai_nav_desired_point"
+const META_NAV_HEADING_POINT := "limbo_ai_nav_heading_point"
+const META_NAV_SPEED_MULT := "limbo_ai_nav_speed_mult"
+const META_NAV_PERMIT_SPRINT := "limbo_ai_nav_permit_sprint"
+const META_NAV_MODE := "limbo_ai_nav_mode"
+
+const INTENT_ENGAGE := "engage"
+const INTENT_CLOSE_DISTANCE := "close_distance"
+const INTENT_HOLD := "hold"
+
+const PHASE_STABLE := "stable"
+const PHASE_DAMAGED := "damaged"
+const PHASE_DESPERATE := "desperate"
+
+const STANCE_BOMBARD := "bombard"
+const STANCE_CLOSE_DISTANCE := "close_distance"
+const STANCE_ORBIT_PRESSURE := "orbit_pressure"
+const STANCE_WITHDRAW := "withdraw"
+const STANCE_DESPERATE_PUSH := "desperate_push"

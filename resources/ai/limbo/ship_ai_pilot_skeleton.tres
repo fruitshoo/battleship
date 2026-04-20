@@ -1,0 +1,30 @@
+[gd_resource type="BehaviorTree" load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_ship_select_player_target.gd" id="1_select"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_ship_set_range_intent.gd" id="2_range_intent"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_ship_set_pressure_phase.gd" id="3_pressure"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_ship_set_stance.gd" id="4_stance"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_ship_set_navigation_hint.gd" id="5_nav_hint"]
+
+[sub_resource type="BTAction" id="BTAction_select"]
+script = ExtResource("1_select")
+
+[sub_resource type="BTAction" id="BTAction_range_intent"]
+script = ExtResource("2_range_intent")
+
+[sub_resource type="BTAction" id="BTAction_pressure"]
+script = ExtResource("3_pressure")
+
+[sub_resource type="BTAction" id="BTAction_stance"]
+script = ExtResource("4_stance")
+
+[sub_resource type="BTAction" id="BTAction_nav_hint"]
+script = ExtResource("5_nav_hint")
+
+[sub_resource type="BTSequence" id="BTSequence_root"]
+custom_name = "Ship AI Pilot: acquire target, choose stance, and publish navigation hint"
+children = [SubResource("BTAction_select"), SubResource("BTAction_range_intent"), SubResource("BTAction_pressure"), SubResource("BTAction_stance"), SubResource("BTAction_nav_hint")]
+
+[resource]
+description = "Pilot LimboAI behavior tree for boss and special enemy ships. It selects a player target, classifies distance, marks hull-pressure phase, chooses a stance, and publishes a validated navigation hint. Existing ship helpers still own steering, aiming, attacks, and collision guards."
+root_task = SubResource("BTSequence_root")

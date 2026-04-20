@@ -2,6 +2,11 @@ extends "res://scripts/entities/ships/chaser_ship.gd"
 class_name EnemyGunnerShip
 
 
+func _ready() -> void:
+	limbo_ai_pilot_enabled = true
+	super._ready()
+
+
 func is_gunner_role() -> bool:
 	return true
 
