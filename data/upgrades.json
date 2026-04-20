@@ -259,12 +259,13 @@
 		"fleet_signal": {
 			"name": "지원함",
 			"category": 4,
-			"description": "지원함 호출 또는 수리, Lv2 한계 +1",
+			"description": "지원함 호출 또는 수리, Lv2 판옥선 편대와 한계 +1",
 			"max_level": 2,
 			"color": "ffb347",
 			"stats": {
 				"limit_add_level": 2,
-				"limit_add": 1
+				"limit_add": 1,
+				"panokseon_level": 2
 			}
 		},
 		"fleet_hull": {

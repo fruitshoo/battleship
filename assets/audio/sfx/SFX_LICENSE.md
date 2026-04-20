@@ -40,6 +40,7 @@
 | sfx_soldier_die_5.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_soldier_die_6.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_steam_hiss.ogg |CC0|https://freesound.org/people/wubitog/sounds/234782/|
+| sfx_support_foghorn_cc0.ogg |CC0|https://freesound.org/people/danjocross/sounds/507471/|
 | sfx_sword_swing_1.ogg |Attribution 4.0|https://freesound.org/people/Artninja/sounds/700220/|
 | sfx_sword_swing_2.ogg |Attribution 4.0|https://freesound.org/people/Artninja/sounds/700220/|
 | sfx_sword_swing_3.ogg |Attribution 4.0|https://freesound.org/people/Artninja/sounds/700220/|

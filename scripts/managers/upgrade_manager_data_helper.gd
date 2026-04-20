@@ -209,7 +209,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "관통 화살 데미지 %.0f, 최대 %d명 관통 및 넉백" % [ballista_damage, pierce]
 		"fleet_signal":
 			if next_level >= int(s.get("limit_add_level", 2)):
-				return "지원함 한계 +%d | 즉시 추가 소집" % int(s.get("limit_add", 1))
+				return "판옥선 포격 편대 해금 | 지원함 한계 +%d | 즉시 추가 소집" % int(s.get("limit_add", 1))
 			return "희귀 카드: 지원함을 호출합니다.\n(이미 지원함이 있으면 수리 및 재정비)"
 		"fleet_crew":
 			var reduce_per_level: float = float(s.get("respawn_reduce_per_lv", 4.0))

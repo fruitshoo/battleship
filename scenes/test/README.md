@@ -80,6 +80,9 @@ When adding a new harness:
 - `boarding_impact_contract.tscn`, `boarding_navigation_contract.tscn`, `boarding_chaos_contract.tscn`, `support_boarding_contract.tscn`, `auto_raid_recall_contract.tscn`, `soldier_incapacitation_contract.tscn`, `ship_damage_contract.tscn`
   Focused combat contract scenes for impact gating, approach geometry, cleanup/chaos handling, support boarding, raid recall, incapacitation behavior, and rigging field repair.
   Wrapper: `scripts/test/run_boarding_contracts.sh`
+- `support_fleet_profile_preview.tscn`
+  Support-fleet squadron slot assertions for Maengseon screens and Panokseon artillery leads.
+  Script: `scripts/test/support_fleet_profile_preview.gd`
 - `firepot_preview.tscn`
   Fire pot attack gating scenarios such as no target, no tosser, and out of range.
   Script: `scripts/test/firepot_preview.gd`

@@ -8,6 +8,7 @@ const UpgradeManagerDataHelper = preload("res://scripts/managers/upgrade_manager
 const UpgradeManagerItemHelper = preload("res://scripts/managers/upgrade_manager_item_helper.gd")
 const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
 const ShipWeaponLoadoutHelper = preload("res://scripts/entities/ships/ship_weapon_loadout_helper.gd")
+const PlayerShipSupportSquadronHelper = preload("res://scripts/entities/ships/player_ship_support_squadron_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
 ## 업그레이드 데이터 및 적용 로직 관리
@@ -970,7 +971,8 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 			ship.set_meta("base_support_fleet_limit", base_limit)
 		var item_bonus: int = 1 if ship.get_meta("item_choyogi_applied", false) == true else 0
 		var upgrade_bonus: int = _get_support_fleet_limit_upgrade_bonus()
-		ship.support_fleet_limit = base_limit + item_bonus + upgrade_bonus
+		var squadron_bonus: int = PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, UPGRADES)
+		ship.support_fleet_limit = base_limit + item_bonus + upgrade_bonus + squadron_bonus
 
 
 func _get_support_fleet_limit_upgrade_bonus() -> int:

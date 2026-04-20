@@ -21,6 +21,24 @@
   ],
   "runtime_harnesses": [
     {
+      "id": "support_fleet_profile_preview",
+      "scene": "res://scenes/test/support_fleet_profile_preview.tscn",
+      "script": "res://scripts/test/support_fleet_profile_preview.gd",
+      "focus": "Support-fleet squadron profile resolution.",
+      "scenarios": [
+        {
+          "id": "default_maengseon_screen",
+          "label": "Maengseon screen",
+          "coverage": "Base support slots resolve to Maengseon screen and rescue roles."
+        },
+        {
+          "id": "panokseon_artillery_unlock",
+          "label": "Panokseon artillery",
+          "coverage": "Fleet signal progression unlocks a Panokseon artillery lead in the second support slot."
+        }
+      ]
+    },
+    {
       "id": "scene_pool_contract",
       "scene": "res://scenes/test/scene_pool_contract.tscn",
       "script": "res://scripts/test/scene_pool_contract.gd",

@@ -318,6 +318,10 @@
     "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
       "layer": "ui/hud/hud_upgrade_tooltip_helper.gd",
       "responsibility": "Owns the current hud upgrade tooltip helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
+      "layer": "entities/ships/player_ship_support_squadron_helper.gd",
+      "responsibility": "Owns support fleet squadron slot profile resolution and support archetype application."
     }
   },
   "large_helper_exceptions": {
@@ -651,6 +655,11 @@
       "id": "pooled_node_parent_ownership",
       "owner": "res://scripts/helpers/scene_pool.gd",
       "invariant": "Released pooled nodes must leave gameplay parents and live under the pool root before reuse."
+    },
+    {
+      "id": "support_squadron_profiles",
+      "owner": "res://scripts/entities/ships/player_ship_support_squadron_helper.gd",
+      "invariant": "Support-fleet slot profiles decide support ship archetypes; the spawn helper only applies resolved profiles."
     }
   ],
   "scenario_matrix_path": "res://scenes/test/runtime_scenario_matrix.json",
@@ -2434,6 +2443,22 @@
         "update_support_ui"
       ],
       "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
+      "count": 10,
+      "functions": [
+        "resolve_support_fleet_profile_for_levels",
+        "get_support_slot_plan_for_levels",
+        "is_panokseon_squadron_unlocked",
+        "get_panokseon_unlock_upgrade_id",
+        "get_panokseon_unlock_level",
+        "get_support_limit_bonus_for_levels",
+        "apply_support_fleet_profile",
+        "_build_profile_for_slot",
+        "_build_fallback_slot",
+        "_get_support_squadron_stats"
+      ],
+      "reason": "Support squadron profile helper owns support slot archetype selection and limit bonuses."
     }
   },
   "helper_dependency_baselines": {
@@ -2891,6 +2916,11 @@
       "from": "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd",
       "to": "res://scripts/ui/hud/hud_upgrade_info_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_support_helper.gd|res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/player_ship_support_squadron_helper.gd",
+      "reason": "Support spawn helper delegates support slot profile resolution to the squadron helper."
     }
   },
   "hazard_baselines": {

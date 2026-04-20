@@ -3,8 +3,13 @@ extends RefCounted
 const EntityRegistry = preload("res://scripts/helpers/entity_registry.gd")
 const SUPPORT_SHIP_SCENE = preload("res://scenes/ships/support_ship.tscn")
 const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const PlayerShipSupportSquadronHelper = preload("res://scripts/entities/ships/player_ship_support_squadron_helper.gd")
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_FLEET_NEXT_ORDER_META := "support_fleet_next_order"
+const SUPPORT_FLEET_PROFILE_META := "support_fleet_profile"
+const SUPPORT_FLEET_ROLE_META := "support_fleet_role"
+const SUPPORT_FLEET_SQUADRON_META := "support_squadron_id"
+const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
 
 static func spawn_or_repair_ally(ship) -> void:
 	if not ShipAllyRoleHelper.is_player_flagship(ship):
@@ -14,16 +19,14 @@ static func spawn_or_repair_ally(ship) -> void:
 	if ship._cached_hud and ship._cached_hud.has_method("show_message"):
 		ship._cached_hud.show_message("지원 함대가 합류했습니다!", 3.0)
 
-	if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
-		ship._cached_audio_manager.play_sfx("trumpet_war", ship.global_position)
-
 	if not support_ships.is_empty():
 		var repair_fraction: float = _get_support_repair_fraction(ship)
 		for support_ship in support_ships:
 			if support_ship.has_method("repair_ship"):
 				support_ship.repair_ship(repair_fraction)
-			if is_instance_valid(UpgradeManager):
-				UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+			var upgrade_manager = _get_upgrade_manager(ship)
+			if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
+				upgrade_manager.apply_fleet_upgrades_to_ship(support_ship)
 		print("[Merit] 기존 지원 함대를 수리 및 강화했습니다.")
 		if support_ships.size() >= ship.support_fleet_limit:
 			return
@@ -31,7 +34,10 @@ static func spawn_or_repair_ally(ship) -> void:
 	if not SUPPORT_SHIP_SCENE:
 		return
 
+	var support_slot: int = support_ships.size()
+	var support_profile: Dictionary = resolve_support_fleet_profile(ship, support_slot)
 	var ally = SUPPORT_SHIP_SCENE.instantiate()
+	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, support_profile)
 
 	if ally.has_method("set_team"):
 		ally.set_team("player")
@@ -41,6 +47,10 @@ static func spawn_or_repair_ally(ship) -> void:
 	ally.set_meta("support_joining", true)
 	ShipAllyRoleHelper.mark_support_ship(ally)
 	ally.set_meta("defer_initial_crew_setup", true)
+	ally.set_meta(SUPPORT_FLEET_PROFILE_META, str(support_profile.get("id", "")))
+	ally.set_meta(SUPPORT_FLEET_ROLE_META, str(support_profile.get("role", "")))
+	ally.set_meta(SUPPORT_FLEET_SQUADRON_META, str(support_profile.get("squadron_id", "")))
+	ally.set_meta(SUPPORT_FLEET_SLOT_ROLE_META, str(support_profile.get("slot_role", "")))
 	ally.set_meta(SUPPORT_FLEET_ORDER_META, next_support_order)
 
 	ship.get_parent().add_child(ally)
@@ -50,6 +60,9 @@ static func spawn_or_repair_ally(ship) -> void:
 	ally.global_position = spawn_pos
 	ally.look_at(ship.global_position + forward * 50.0, Vector3.UP)
 	ship.set_meta(SUPPORT_FLEET_NEXT_ORDER_META, next_support_order + 1)
+
+	if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
+		ship._cached_audio_manager.play_sfx("support_foghorn", ally.global_position)
 
 	if ally.has_method("set_team"):
 		ally.set_team("player")
@@ -65,7 +78,31 @@ static func spawn_or_repair_ally(ship) -> void:
 	if "_last_ai_speed" in ally:
 		ally._last_ai_speed = ally.current_speed
 
-	print("[Summon] 정규군 함선을 소환했습니다!")
+	print("[Summon] 정규군 함선을 소환했습니다! profile=%s squadron=%s slot=%s" % [
+		str(support_profile.get("id", "unknown")),
+		str(support_profile.get("squadron_id", "unknown")),
+		str(support_profile.get("slot_role", "unknown")),
+	])
+
+static func resolve_support_fleet_profile(ship, support_slot: int = 0) -> Dictionary:
+	var current_levels: Dictionary = {}
+	var upgrades: Dictionary = {}
+	var upgrade_manager = _get_upgrade_manager(ship)
+	if is_instance_valid(upgrade_manager):
+		if "current_levels" in upgrade_manager and upgrade_manager.current_levels is Dictionary:
+			current_levels = upgrade_manager.current_levels
+		if "UPGRADES" in upgrade_manager and upgrade_manager.UPGRADES is Dictionary:
+			upgrades = upgrade_manager.UPGRADES
+	return PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels(current_levels, upgrades, support_slot)
+
+static func _get_upgrade_manager(ship):
+	if is_instance_valid(ship) and "_cached_um" in ship and is_instance_valid(ship._cached_um):
+		return ship._cached_um
+	if is_instance_valid(ship) and ship is Node:
+		var tree := (ship as Node).get_tree()
+		if tree != null and is_instance_valid(tree.root):
+			return tree.root.get_node_or_null("UpgradeManager")
+	return null
 
 static func _get_support_repair_fraction(_ship) -> float:
 	return 0.2

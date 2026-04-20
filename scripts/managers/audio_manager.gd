@@ -83,6 +83,7 @@ var sfx_streams = {
 	],
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
+	"support_foghorn": "res://assets/audio/sfx/sfx_support_foghorn_cc0.ogg",
 }
 
 const DEFAULT_3D_SFX_VOLUME_DB := 3.0
@@ -118,6 +119,11 @@ const SFX_3D_PROFILES := {
 		"volume_db": 1.0,
 		"max_distance": 230.0,
 		"unit_size": 65.0,
+	},
+	"support_foghorn": {
+		"volume_db": -2.0,
+		"max_distance": 360.0,
+		"unit_size": 110.0,
 	},
 }
 

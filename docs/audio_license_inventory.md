@@ -48,6 +48,7 @@ Status: project-local provenance not found. Each asset below needs source/licens
 | `assets/audio/sfx/sfx_soldier_die_5.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_soldier_die_6.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_steam_hiss.ogg` | UNVERIFIED |  |  |  |
+| `assets/audio/sfx/sfx_support_foghorn_cc0.ogg` | VERIFIED | https://freesound.org/people/danjocross/sounds/507471/ | CC0 | User-supplied source; converted from AIFF to Ogg Vorbis and trimmed first 1.05 seconds of quiet lead-in |
 | `assets/audio/sfx/sfx_sword_swing_1.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_sword_swing_2.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_sword_swing_3.ogg` | UNVERIFIED |  |  |  |
