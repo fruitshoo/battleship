@@ -1,0 +1,3428 @@
+{
+  "version": 1,
+  "max_helper_lines": 360,
+  "max_known_warning_lines": 12,
+  "helpers": {
+    "res://scripts/effects/field_item_helper.gd": {
+      "layer": "effects/field_item_helper.gd",
+      "responsibility": "Owns the current field item helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/launchers/launcher_combat_helper.gd": {
+      "layer": "entities/launchers/launcher_combat_helper.gd",
+      "responsibility": "Owns the current launcher combat helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd": {
+      "layer": "entities/ships/base_ship_boarding_helper.gd",
+      "responsibility": "Owns the current base ship boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_collision_helper.gd": {
+      "layer": "entities/ships/base_ship_collision_helper.gd",
+      "responsibility": "Owns the current base ship collision helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_crew_helper.gd": {
+      "layer": "entities/ships/base_ship_crew_helper.gd",
+      "responsibility": "Owns the current base ship crew helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_rudder_helper.gd": {
+      "layer": "entities/ships/base_ship_rudder_helper.gd",
+      "responsibility": "Owns the current base ship rudder helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd": {
+      "layer": "entities/ships/base_ship_status_helper.gd",
+      "responsibility": "Owns the current base ship status helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_visual_helper.gd": {
+      "layer": "entities/ships/base_ship_visual_helper.gd",
+      "responsibility": "Owns the current base ship visual helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
+      "layer": "entities/ships/chaser_ship_ai_helper.gd",
+      "responsibility": "Owns the current chaser ship ai helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+      "layer": "entities/ships/chaser_ship_boarding_helper.gd",
+      "responsibility": "Owns the current chaser ship boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
+      "layer": "entities/ships/chaser_ship_minion_helper.gd",
+      "responsibility": "Owns the current chaser ship minion helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "layer": "entities/ships/chaser_ship_navigation_helper.gd",
+      "responsibility": "Owns the current chaser ship navigation helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/chaser_ship_support_helper.gd": {
+      "layer": "entities/ships/chaser_ship_support_helper.gd",
+      "responsibility": "Owns the current chaser ship support helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_aux_helper.gd": {
+      "layer": "entities/ships/player_ship_aux_helper.gd",
+      "responsibility": "Owns the current player ship aux helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd": {
+      "layer": "entities/ships/player_ship_crew_helper.gd",
+      "responsibility": "Owns the current player ship crew helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "layer": "entities/ships/player_ship_movement_helper.gd",
+      "responsibility": "Owns the current player ship movement helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
+      "layer": "entities/ships/player_ship_runtime_helper.gd",
+      "responsibility": "Owns the current player ship runtime helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_sink_helper.gd": {
+      "layer": "entities/ships/player_ship_sink_helper.gd",
+      "responsibility": "Owns the current player ship sink helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_support_helper.gd": {
+      "layer": "entities/ships/player_ship_support_helper.gd",
+      "responsibility": "Owns the current player ship support helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "layer": "entities/ships/ship_ally_role_helper.gd",
+      "responsibility": "Owns the current ship ally role helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_authoring_helper.gd": {
+      "layer": "entities/ships/ship_authoring_helper.gd",
+      "responsibility": "Owns the current ship authoring helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "layer": "entities/ships/ship_blueprint_helper.gd",
+      "responsibility": "Owns the current ship blueprint helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "layer": "entities/ships/ship_boarding_meta_helper.gd",
+      "responsibility": "Owns the current ship boarding meta helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_boarding_navigation_helper.gd": {
+      "layer": "entities/ships/ship_boarding_navigation_helper.gd",
+      "responsibility": "Owns the current ship boarding navigation helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "layer": "entities/ships/ship_combat_mode_helper.gd",
+      "responsibility": "Owns the current ship combat mode helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_targeting_helper.gd": {
+      "layer": "entities/ships/ship_targeting_helper.gd",
+      "responsibility": "Owns the current ship targeting helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/ship_weapon_loadout_helper.gd": {
+      "layer": "entities/ships/ship_weapon_loadout_helper.gd",
+      "responsibility": "Owns the current ship weapon loadout helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/support_boarding_helper.gd": {
+      "layer": "entities/ships/support_boarding_helper.gd",
+      "responsibility": "Owns the current support boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "layer": "entities/soldiers/soldier_action_helper.gd",
+      "responsibility": "Owns the current soldier action helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd": {
+      "layer": "entities/soldiers/soldier_ai_helper.gd",
+      "responsibility": "Owns the current soldier ai helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_boarding_helper.gd": {
+      "layer": "entities/soldiers/soldier_boarding_helper.gd",
+      "responsibility": "Owns the current soldier boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_combat_helper.gd": {
+      "layer": "entities/soldiers/soldier_combat_helper.gd",
+      "responsibility": "Owns the current soldier combat helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
+      "layer": "entities/soldiers/soldier_lifecycle_helper.gd",
+      "responsibility": "Owns the current soldier lifecycle helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
+      "layer": "entities/soldiers/soldier_ship_duty_helper.gd",
+      "responsibility": "Owns the current soldier ship duty helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
+      "layer": "entities/soldiers/soldier_ship_helper.gd",
+      "responsibility": "Owns the current soldier ship helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
+      "layer": "entities/soldiers/soldier_ship_work_priority_helper.gd",
+      "responsibility": "Owns the current soldier ship work priority helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_speech_helper.gd": {
+      "layer": "entities/soldiers/soldier_speech_helper.gd",
+      "responsibility": "Owns the current soldier speech helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "layer": "entities/soldiers/soldier_state_helper.gd",
+      "responsibility": "Owns the current soldier state helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_visual_helper.gd": {
+      "layer": "entities/soldiers/soldier_visual_helper.gd",
+      "responsibility": "Owns the current soldier visual helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_weapon_helper.gd": {
+      "layer": "entities/soldiers/soldier_weapon_helper.gd",
+      "responsibility": "Owns the current soldier weapon helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/helpers/node_contract_helper.gd": {
+      "layer": "helpers/node_contract_helper.gd",
+      "responsibility": "Owns the current node contract helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/enemy_spawner_fleet_helper.gd": {
+      "layer": "managers/enemy_spawner_fleet_helper.gd",
+      "responsibility": "Owns the current enemy spawner fleet helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/level_manager_progression_helper.gd": {
+      "layer": "managers/level_manager_progression_helper.gd",
+      "responsibility": "Owns the current level manager progression helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/level_manager_startup_helper.gd": {
+      "layer": "managers/level_manager_startup_helper.gd",
+      "responsibility": "Owns the current level manager startup helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/level_manager_upgrade_flow_helper.gd": {
+      "layer": "managers/level_manager_upgrade_flow_helper.gd",
+      "responsibility": "Owns the current level manager upgrade flow helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/upgrade_manager_choice_helper.gd": {
+      "layer": "managers/upgrade_manager_choice_helper.gd",
+      "responsibility": "Owns the current upgrade manager choice helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/upgrade_manager_data_helper.gd": {
+      "layer": "managers/upgrade_manager_data_helper.gd",
+      "responsibility": "Owns the current upgrade manager data helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/managers/upgrade_manager_item_helper.gd": {
+      "layer": "managers/upgrade_manager_item_helper.gd",
+      "responsibility": "Owns the current upgrade manager item helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/props/mast_geometry_helper.gd": {
+      "layer": "props/mast_geometry_helper.gd",
+      "responsibility": "Owns the current mast geometry helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/props/mast_material_helper.gd": {
+      "layer": "props/mast_material_helper.gd",
+      "responsibility": "Owns the current mast material helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/props/mast_smoke_helper.gd": {
+      "layer": "props/mast_smoke_helper.gd",
+      "responsibility": "Owns the current mast smoke helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/props/mast_visual_helper.gd": {
+      "layer": "props/mast_visual_helper.gd",
+      "responsibility": "Owns the current mast visual helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/props/mast_wind_helper.gd": {
+      "layer": "props/mast_wind_helper.gd",
+      "responsibility": "Owns the current mast wind helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/preview_harness_helper.gd": {
+      "layer": "test/preview_harness_helper.gd",
+      "responsibility": "Owns the current preview harness helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/preview_state_snapshot_helper.gd": {
+      "layer": "test/preview_state_snapshot_helper.gd",
+      "responsibility": "Owns the current preview state snapshot helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_bootstrap_helper.gd": {
+      "layer": "test/project_contract_bootstrap_helper.gd",
+      "responsibility": "Owns the current project contract bootstrap helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd": {
+      "layer": "test/project_contract_hud_helper.gd",
+      "responsibility": "Owns the current project contract hud helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd": {
+      "layer": "test/project_contract_recovery_helper.gd",
+      "responsibility": "Owns the current project contract recovery helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd": {
+      "layer": "test/project_contract_runtime_helper.gd",
+      "responsibility": "Owns the current project contract runtime helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_save_helper.gd": {
+      "layer": "test/project_contract_save_helper.gd",
+      "responsibility": "Owns the current project contract save helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_scan_helper.gd": {
+      "layer": "test/project_contract_scan_helper.gd",
+      "responsibility": "Owns the current project contract scan helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd": {
+      "layer": "test/project_contract_scene_wiring_helper.gd",
+      "responsibility": "Owns the current project contract scene wiring helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_support_helper.gd": {
+      "layer": "test/project_contract_support_helper.gd",
+      "responsibility": "Owns the current project contract support helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/test/project_contract_upgrade_helper.gd": {
+      "layer": "test/project_contract_upgrade_helper.gd",
+      "responsibility": "Owns the current project contract upgrade helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_debug_panel_helper.gd": {
+      "layer": "ui/hud/hud_debug_panel_helper.gd",
+      "responsibility": "Owns the current hud debug panel helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_distance_debug_helper.gd": {
+      "layer": "ui/hud/hud_distance_debug_helper.gd",
+      "responsibility": "Owns the current hud distance debug helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_end_state_helper.gd": {
+      "layer": "ui/hud/hud_end_state_helper.gd",
+      "responsibility": "Owns the current hud end state helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_item_display_helper.gd": {
+      "layer": "ui/hud/hud_item_display_helper.gd",
+      "responsibility": "Owns the current hud item display helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_lookup_helper.gd": {
+      "layer": "ui/hud/hud_lookup_helper.gd",
+      "responsibility": "Owns the current hud lookup helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_progression_layout_helper.gd": {
+      "layer": "ui/hud/hud_progression_layout_helper.gd",
+      "responsibility": "Owns the current hud progression layout helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_runtime_helper.gd": {
+      "layer": "ui/hud/hud_runtime_helper.gd",
+      "responsibility": "Owns the current hud runtime helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_sail_debug_helper.gd": {
+      "layer": "ui/hud/hud_sail_debug_helper.gd",
+      "responsibility": "Owns the current hud sail debug helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_ship_debug_helper.gd": {
+      "layer": "ui/hud/hud_ship_debug_helper.gd",
+      "responsibility": "Owns the current hud ship debug helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_ship_health_overlay_helper.gd": {
+      "layer": "ui/hud/hud_ship_health_overlay_helper.gd",
+      "responsibility": "Owns the current hud ship health overlay helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_stat_panel_helper.gd": {
+      "layer": "ui/hud/hud_stat_panel_helper.gd",
+      "responsibility": "Owns the current hud stat panel helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_status_display_helper.gd": {
+      "layer": "ui/hud/hud_status_display_helper.gd",
+      "responsibility": "Owns the current hud status display helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_update_helper.gd": {
+      "layer": "ui/hud/hud_update_helper.gd",
+      "responsibility": "Owns the current hud update helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
+      "layer": "ui/hud/hud_upgrade_info_helper.gd",
+      "responsibility": "Owns the current hud upgrade info helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
+      "layer": "ui/hud/hud_upgrade_tooltip_helper.gd",
+      "responsibility": "Owns the current hud upgrade tooltip helper responsibilities; update this baseline when moving behavior across module boundaries."
+    }
+  },
+  "large_helper_exceptions": {
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/base_ship_collision_helper.gd": "Collision DebugDraw instrumentation extends the existing collision owner; split only with a dedicated collision debug extraction.",
+    "res://scripts/entities/ships/base_ship_crew_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/chaser_ship_support_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/player_ship_crew_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/ship_authoring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/soldiers/soldier_action_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/soldiers/soldier_visual_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/managers/enemy_spawner_fleet_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/test/project_contract_hud_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/test/project_contract_recovery_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/test/project_contract_runtime_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/test/project_contract_scene_wiring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/ui/hud/hud_debug_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/ui/hud/hud_stat_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/ui/hud/hud_update_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change."
+  },
+  "thin_helper_exceptions": {
+    "res://scripts/entities/ships/player_ship_aux_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+    "res://scripts/ui/hud/hud_lookup_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+    "res://scripts/ui/hud/hud_runtime_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists."
+  },
+  "class_name_exceptions": {
+    "res://scripts/entities/ships/player_ship_aux_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/ships/player_ship_crew_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/ships/player_ship_movement_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/ships/player_ship_runtime_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/ships/player_ship_sink_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/ships/player_ship_support_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/soldiers/soldier_action_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/soldiers/soldier_combat_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/soldiers/soldier_visual_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/entities/soldiers/soldier_weapon_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/managers/upgrade_manager_item_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/props/mast_geometry_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/props/mast_material_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/props/mast_smoke_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/props/mast_visual_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/props/mast_wind_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_end_state_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_item_display_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_progression_layout_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_runtime_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_ship_health_overlay_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_stat_panel_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_status_display_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_update_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_upgrade_info_helper.gd": "Existing helper without class_name at modularity guard adoption time.",
+    "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": "Existing helper without class_name at modularity guard adoption time."
+  },
+  "allowed_duplicate_static_functions": [
+    {
+      "name": "_can_board",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_counts_as_player_roster_member",
+      "paths": [
+        "res://scripts/entities/ships/player_ship_crew_helper.gd",
+        "res://scripts/test/project_contract_recovery_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_env_flag_enabled",
+      "paths": [
+        "res://scripts/managers/level_manager_progression_helper.gd",
+        "res://scripts/managers/level_manager_startup_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_effective_boarding_distance",
+      "paths": [
+        "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_boarding_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_float",
+      "paths": [
+        "res://scripts/entities/ships/ship_weapon_loadout_helper.gd",
+        "res://scripts/ui/hud/hud_stat_panel_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_nearest_deck_landing_local",
+      "paths": [
+        "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+        "res://scripts/entities/soldiers/soldier_boarding_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_player_cannon_count_for_level",
+      "paths": [
+        "res://scripts/test/project_contract_upgrade_helper.gd",
+        "res://scripts/ui/hud/hud_upgrade_info_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_support_cannon_count_for_level",
+      "paths": [
+        "res://scripts/test/project_contract_upgrade_helper.gd",
+        "res://scripts/ui/hud/hud_upgrade_info_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_target_deck_half_extents",
+      "paths": [
+        "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_boarding_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_get_team_tag",
+      "paths": [
+        "res://scripts/entities/ships/ship_ally_role_helper.gd",
+        "res://scripts/entities/ships/ship_targeting_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_has_repairable_rigging_damage",
+      "paths": [
+        "res://scripts/entities/ships/base_ship_status_helper.gd",
+        "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_is_dead_soldier_node",
+      "paths": [
+        "res://scripts/entities/ships/base_ship_crew_helper.gd",
+        "res://scripts/entities/ships/ship_authoring_helper.gd",
+        "res://scripts/ui/hud/hud_stat_panel_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_is_gunner",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_is_sinking_or_dying",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_is_true",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_is_world_position_offscreen",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+        "res://scripts/entities/ships/player_ship_support_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_load_json_dictionary",
+      "paths": [
+        "res://scripts/test/project_contract_scene_wiring_helper.gd",
+        "res://scripts/ui/hud/hud_debug_panel_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_target_ship",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_validate_authoring_action_meta",
+      "paths": [
+        "res://scripts/test/project_contract_hud_helper.gd",
+        "res://scripts/ui/hud/hud_debug_panel_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "_wait_frames",
+      "paths": [
+        "res://scripts/test/project_contract_bootstrap_helper.gd",
+        "res://scripts/test/project_contract_hud_helper.gd",
+        "res://scripts/test/project_contract_recovery_helper.gd",
+        "res://scripts/test/project_contract_runtime_helper.gd",
+        "res://scripts/test/project_contract_scene_wiring_helper.gd",
+        "res://scripts/test/project_contract_support_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "apply_deform_bounds",
+      "paths": [
+        "res://scripts/props/mast_material_helper.gd",
+        "res://scripts/props/mast_visual_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "apply_sail_material_settings",
+      "paths": [
+        "res://scripts/props/mast_material_helper.gd",
+        "res://scripts/props/mast_visual_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "calculate_separation",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/player_ship_movement_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "die",
+      "paths": [
+        "res://scripts/entities/ships/player_ship_sink_helper.gd",
+        "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "ensure_sail_material",
+      "paths": [
+        "res://scripts/props/mast_material_helper.gd",
+        "res://scripts/props/mast_visual_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "ensure_sail_smoke",
+      "paths": [
+        "res://scripts/props/mast_smoke_helper.gd",
+        "res://scripts/props/mast_visual_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "get_boarding_purpose",
+      "paths": [
+        "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+        "res://scripts/entities/ships/support_boarding_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "get_ship_deck_half_extents",
+      "paths": [
+        "res://scripts/entities/ships/ship_boarding_navigation_helper.gd",
+        "res://scripts/entities/soldiers/soldier_ship_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "is_player_controlled_ship",
+      "paths": [
+        "res://scripts/entities/ships/ship_targeting_helper.gd",
+        "res://scripts/helpers/node_contract_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "normalize_role_name",
+      "paths": [
+        "res://scripts/entities/ships/ship_ally_role_helper.gd",
+        "res://scripts/entities/ships/ship_combat_mode_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "update_sail_smoke",
+      "paths": [
+        "res://scripts/props/mast_smoke_helper.gd",
+        "res://scripts/props/mast_visual_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    },
+    {
+      "name": "update_ship_health_bars",
+      "paths": [
+        "res://scripts/ui/hud/hud_ship_health_overlay_helper.gd",
+        "res://scripts/ui/hud/hud_update_helper.gd"
+      ],
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
+    }
+  ],
+  "watched_responsibilities": [
+    {
+      "id": "world_space_soldier_motion",
+      "owner": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "invariant": "Soldier flight or throw motion must be animated in global/world space until final reparent."
+    },
+    {
+      "id": "pooled_node_parent_ownership",
+      "owner": "res://scripts/helpers/scene_pool.gd",
+      "invariant": "Released pooled nodes must leave gameplay parents and live under the pool root before reuse."
+    }
+  ],
+  "scenario_matrix_path": "res://scenes/test/runtime_scenario_matrix.json",
+  "helper_static_function_baselines": {
+    "res://scripts/effects/field_item_helper.gd": {
+      "count": 11,
+      "functions": [
+        "get_current_magnet_radius",
+        "sample_ocean_surface",
+        "get_floating_waterline_target_y",
+        "apply_floating_visual_motion",
+        "find_closest_player_ship",
+        "get_ship_from_node",
+        "get_ship_edge_distance",
+        "get_ship_edge_distance_from_position",
+        "get_ship_side_anchor",
+        "move_item_toward_ship_side_anchor",
+        "is_item_close_to_ship_edge"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/launchers/launcher_combat_helper.gd": {
+      "count": 12,
+      "functions": [
+        "enemy_team_tag",
+        "is_enemy_node",
+        "resolve_owner_ship",
+        "is_owner_combat_ready",
+        "get_target_scan_interval",
+        "get_valid_target_node",
+        "is_combat_targetable",
+        "get_enemy_combat_target",
+        "is_target_in_range",
+        "has_friendly_boarding_attacker",
+        "has_alive_soldier_on_team",
+        "is_enemy_soldier_target"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd": {
+      "count": 23,
+      "functions": [
+        "process_boarding_common",
+        "_uses_limited_rope_visuals",
+        "cancel_boarding",
+        "_get_effective_boarding_distance",
+        "_get_effective_break_distance",
+        "_play_boarding_rally_cry",
+        "_get_ship_team_tag",
+        "_count_target_defenders",
+        "_count_target_attackers",
+        "_count_ready_boarders",
+        "transfer_boarding_wave",
+        "transfer_one_soldier",
+        "_get_boarding_wave_size",
+        "_get_random_deck_landing_local",
+        "_get_nearest_deck_landing_local",
+        "_finish_transfer_landing",
+        "_clamp_deck_landing_local",
+        "_get_target_deck_half_extents",
+        "_get_target_deck_height",
+        "_find_nearest_hostile_soldier",
+        "_set_soldier_boarding_status",
+        "_begin_soldier_boarding_jump_pose",
+        "_finish_soldier_boarding_jump_pose"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/base_ship_collision_helper.gd": {
+      "count": 9,
+      "functions": [
+        "calculate_collision_repulsion",
+        "_draw_ship_collision_debug",
+        "_try_salvage_derelict_contact",
+        "_is_derelict_ship",
+        "_repair_player_from_derelict_contact",
+        "_is_boss_salvage_target",
+        "_is_player_support_pair",
+        "apply_ramming_damage",
+        "spawn_ship_collision_effects"
+      ],
+      "reason": "Collision DebugDraw instrumentation is intentionally owned by the collision helper so contact, compression, and repulsion vectors stay near the physics calculation."
+    },
+    "res://scripts/entities/ships/base_ship_crew_helper.gd": {
+      "count": 27,
+      "functions": [
+        "update_crew_allocation_state",
+        "get_shiphandling_multiplier",
+        "get_gunnery_reload_multiplier",
+        "assign_cannon_reload_crew_power",
+        "get_ship_reload_crew_cannons",
+        "get_active_reload_crew_cannons",
+        "distribute_cannon_reload_crew_power",
+        "is_cannon_reload_crew_target",
+        "is_reload_crew_cannon_available",
+        "cannon_can_cover_allocation_target",
+        "get_combat_effectiveness_multiplier",
+        "get_effective_boarding_interval",
+        "get_effective_boarding_capture_duration",
+        "estimate_available_crew_count",
+        "train_existing_crew_from_survivor",
+        "_pick_survivor_training_target",
+        "_is_player_training_candidate",
+        "_get_soldier_level",
+        "_get_soldier_xp",
+        "_get_soldier_next_level_xp",
+        "_show_survivor_training_message",
+        "is_in_gunnery_posture",
+        "get_ship_cannon_range_for_allocation",
+        "get_nearest_enemy_ship_distance_for_allocation",
+        "get_nearest_enemy_ship_for_allocation",
+        "build_debug_crew_snapshot",
+        "_is_dead_soldier_node"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/base_ship_rudder_helper.gd": {
+      "count": 6,
+      "functions": [
+        "apply_rudder_damage",
+        "get_rudder_health_ratio",
+        "get_rudder_turn_multiplier",
+        "get_rudder_response_multiplier",
+        "apply_rudder_damage_from_hit",
+        "get_stern_hit_factor"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd": {
+      "count": 18,
+      "functions": [
+        "update_fire_effect",
+        "set_fire_emitting",
+        "check_derelict_status",
+        "update_boarding_state",
+        "_find_attacker_ship_from_boarders",
+        "_resolve_boarding_capture_tick",
+        "take_fire_damage",
+        "update_burning_status",
+        "update_hull_regeneration",
+        "mark_rigging_damage_for_repair",
+        "update_rigging_recovery",
+        "_has_repairable_rigging_damage",
+        "_repair_rudder_to_field_target",
+        "_repair_sails_to_field_target",
+        "_show_rigging_repair_active_feedback_if_needed",
+        "_show_rigging_repair_complete_feedback_if_needed",
+        "_show_rigging_repair_feedback",
+        "_should_show_rigging_repair_feedback"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/base_ship_visual_helper.gd": {
+      "count": 9,
+      "functions": [
+        "cache_common_references",
+        "on_environment_preset_applied",
+        "is_clear_day_preset_active",
+        "resolve_deck_light_parent",
+        "refresh_deck_light",
+        "apply_bobbing_effect",
+        "update_sail_visual",
+        "update_rudder_visual",
+        "set_wake_state"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
+      "count": 22,
+      "functions": [
+        "_is_true",
+        "_is_gunner",
+        "_can_board",
+        "_target_ship",
+        "_is_sinking_or_dying",
+        "_is_player_controlled",
+        "_calculate_sail_drive_multiplier",
+        "get_ships_cached",
+        "configure_logic_throttle",
+        "get_logic_update_interval_for_ship",
+        "get_separation_update_interval_for_ship",
+        "get_load_multiplier",
+        "get_separation_update_interval_runtime",
+        "calculate_separation",
+        "process_physics",
+        "_draw_ai_intent_debug",
+        "_get_ai_intent_color",
+        "update_logic_throttled",
+        "_get_logic_update_interval",
+        "_get_separation_update_interval",
+        "find_player",
+        "update_wave_sounds"
+      ],
+      "reason": "AI DebugDraw instrumentation is intentionally owned by the AI helper because it visualizes the movement intent produced and consumed in process_physics."
+    },
+    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+      "count": 14,
+      "functions": [
+        "process_boarding",
+        "_has_active_boarding_rope_link",
+        "_get_effective_boarding_distance",
+        "store_boarding_contact_anchor",
+        "_get_target_deck_half_extents",
+        "_update_motion_settle",
+        "_get_boarding_turn_response",
+        "_build_boarding_motion",
+        "_build_contact_hold_motion",
+        "apply_neighbor_ship_guards",
+        "apply_ship_collision_guard",
+        "emit_guarded_collision",
+        "soften_collision_speed",
+        "_is_support_fleet_pair"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
+      "count": 30,
+      "functions": [
+        "process_minion_ai",
+        "_is_ship_disabled",
+        "_record_support_anchor",
+        "_has_support_anchor",
+        "_process_support_idle_patrol",
+        "_process_support_assist_ai",
+        "_get_support_assist_rowing_speed_multiplier",
+        "_get_support_assist_rowing_wind_floor",
+        "_try_start_support_boarding",
+        "_can_support_board_target",
+        "_start_support_boarding_link",
+        "_build_support_assist_navigation",
+        "_calculate_support_assist_separation",
+        "_get_minion_roster",
+        "_get_minion_offset",
+        "_get_support_fleet_offset",
+        "_get_support_join_offset",
+        "_get_support_chain_goal",
+        "_get_support_assist_target",
+        "_is_player_deck_emergency",
+        "_is_support_rescue_target",
+        "_is_support_formation_hold_enabled",
+        "_set_support_assist_target_lock",
+        "_clear_support_assist_target_lock",
+        "_get_support_follow_distance",
+        "_get_support_lead_ship",
+        "_get_ship_forward_flat",
+        "_get_ship_speed",
+        "_record_support_trail_point",
+        "_get_support_trail_goal"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "count": 27,
+      "functions": [
+        "_is_true",
+        "_team_tag",
+        "_is_sinking_or_dying",
+        "_is_boarding_ship",
+        "_boarding_target_ship",
+        "_target_ship",
+        "_can_board_node",
+        "_current_speed",
+        "_is_gunner",
+        "_can_board",
+        "_preferred_range",
+        "_range_tolerance",
+        "_retreat_range",
+        "_authoring_movement_mode",
+        "_navigation_mode",
+        "_apply_authoring_movement_params",
+        "_build_authoring_movement_intent",
+        "_build_boarding_slots",
+        "_score_boarding_slot",
+        "_classify_boarding_approach",
+        "_classify_boarding_approach_smoothed",
+        "_is_bow_sector_approach",
+        "_choose_boarding_slot",
+        "_is_target_deck_contested",
+        "_is_target_deck_overrun",
+        "_has_closer_allied_attacker",
+        "build_navigation"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/chaser_ship_support_helper.gd": {
+      "count": 18,
+      "functions": [
+        "update_enemy_fire_pot_logic",
+        "_find_fire_pot_tosser",
+        "_is_player_ship",
+        "_get_fire_pot_target_pos",
+        "spawn_enemy_drifter_xp_pickups",
+        "_instantiate_enemy_drifter_pickup",
+        "become_derelict",
+        "_weather_derelict_sails",
+        "_play_derelict_transition_visuals",
+        "_spawn_derelict_smoke",
+        "_spawn_derelict_water_burst",
+        "_set_derelict_settle_pose",
+        "sink_derelict",
+        "check_offscreen_despawn",
+        "_is_world_position_offscreen",
+        "drop_floating_loot",
+        "evacuate_player_soldiers_as_survivors",
+        "evacuate_soldiers_to_home"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_aux_helper.gd": {
+      "count": 2,
+      "functions": [
+        "add_stuck_object",
+        "remove_stuck_object"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd": {
+      "count": 42,
+      "functions": [
+        "get_desired_player_captain_count",
+        "is_captain",
+        "set_captain_state",
+        "get_desired_player_crew_roles",
+        "get_soldier_role",
+        "_counts_as_player_roster_member",
+        "_captain_retention_rank",
+        "spawn_player_soldier",
+        "get_player_roster_count",
+        "sync_player_crew_roster",
+        "add_survivor",
+        "add_respawn_crew",
+        "_add_player_crew",
+        "_get_crew_add_log_tag",
+        "_apply_initial_crew_slot_layout",
+        "_get_next_player_crew_spawn_transform",
+        "update_fire_pot_logic",
+        "update_auto_boarding_raid",
+        "_find_raid_target",
+        "get_auto_raid_debug_snapshot",
+        "_can_initiate_raid",
+        "_can_continue_raid",
+        "_dispatch_raid_boarders",
+        "_ensure_auto_raid_boarding_link",
+        "_cancel_auto_raid_boarding_link",
+        "_has_auto_raid_boarding_rope_ready",
+        "_recall_raid_boarders_with_link",
+        "_recall_raid_boarders",
+        "_count_enemy_boarders_on_ship",
+        "_count_home_defenders",
+        "_count_boarders_from_home",
+        "_get_home_boarders_on_ship",
+        "_get_available_raid_boarders",
+        "_get_boarder_priority",
+        "_get_desired_boarder_count",
+        "_count_ranged_enemies_on_ship",
+        "_get_raid_pressure_value",
+        "_is_valid_raid_target_ship",
+        "_is_ship_close_for_raid",
+        "_has_raid_deck_edge_contact",
+        "_is_large_raid_target",
+        "_is_boss_raid_target"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "count": 8,
+      "functions": [
+        "auto_adjust_sail",
+        "calculate_separation",
+        "get_boarding_drag_multiplier",
+        "update_movement",
+        "update_steering",
+        "calculate_sail_speed",
+        "update_oar_visual",
+        "update_rowing_stamina"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
+      "count": 5,
+      "functions": [
+        "handle_input",
+        "toggle_fleet_formation",
+        "update_rowing_audio",
+        "capture_derelict_ship",
+        "replenish_crew"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_sink_helper.gd": {
+      "count": 5,
+      "functions": [
+        "die",
+        "disable_combat_modules_on_sink",
+        "disable_combat_subtree",
+        "fade_out_meshes",
+        "find_hud"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/player_ship_support_helper.gd": {
+      "count": 8,
+      "functions": [
+        "spawn_or_repair_ally",
+        "resolve_support_fleet_profile",
+        "_get_upgrade_manager",
+        "_get_support_repair_fraction",
+        "get_support_fleet_ships",
+        "get_offscreen_ally_spawn_position",
+        "update_support_fleet_respawn",
+        "_is_world_position_offscreen"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "count": 20,
+      "functions": [
+        "set_ally_role",
+        "mark_player_flagship",
+        "mark_support_ship",
+        "mark_captured_minion",
+        "clear_ally_role",
+        "get_ally_role",
+        "is_player_flagship",
+        "is_support_ship",
+        "is_captured_minion",
+        "is_player_owned_ship",
+        "ship_consumes_capture_slot",
+        "role_consumes_capture_slot",
+        "get_role_definition",
+        "get_role_rows",
+        "count_captured_minions",
+        "count_capture_slot_minions",
+        "normalize_role_name",
+        "_has_legacy_support_flag",
+        "_is_player_controlled_property",
+        "_get_team_tag"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_authoring_helper.gd": {
+      "count": 22,
+      "functions": [
+        "build_summary",
+        "validate_ship_authoring",
+        "get_authoring_markers",
+        "get_boarding_anchor_local",
+        "get_nearest_boarding_anchor_global",
+        "get_cannon_slot_transforms",
+        "get_named_cannon_slot_transforms",
+        "get_weapon_slot_transforms",
+        "get_named_weapon_slot_transforms",
+        "get_crew_slot_transforms",
+        "get_named_crew_slot_transforms",
+        "get_least_occupied_crew_slot_transform",
+        "_build_contact_area_summary",
+        "_validate_marker_container",
+        "_collect_hull_sources",
+        "_collect_hull_child_sources",
+        "_get_authoring_container",
+        "_find_child_named",
+        "_collect_marker_descendants",
+        "_collect_node3d_leaf_descendants",
+        "_anchor_matches_side",
+        "_is_dead_soldier_node"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "count": 13,
+      "functions": [
+        "load_stats",
+        "load_all_stats",
+        "get_ship_archetypes",
+        "resolve_ship_archetype",
+        "get_ship_archetype_name",
+        "get_combat_profiles",
+        "resolve_combat_profile",
+        "get_combat_profile_name",
+        "get_hull_scene_path",
+        "load_hull_scene",
+        "build_crew_composition",
+        "apply_chaser_stats",
+        "apply_boss_stats"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "count": 35,
+      "functions": [
+        "get_contact_mode",
+        "set_contact_mode",
+        "get_approach_mode",
+        "set_approach_mode",
+        "get_boarding_purpose",
+        "set_boarding_purpose",
+        "is_boarding_purpose",
+        "get_support_boarding_purpose",
+        "get_side_sign",
+        "set_side_sign",
+        "get_slot_id",
+        "set_slot_id",
+        "get_hold_forward",
+        "set_hold_forward",
+        "get_contact_anchor_local",
+        "set_contact_anchor_local",
+        "has_contact_anchor",
+        "get_motion_settle_timer",
+        "set_motion_settle_timer",
+        "get_latch_mode",
+        "set_latch",
+        "get_latch_target_id",
+        "get_latch_timer",
+        "set_latch_timer",
+        "is_transfer_suppressed",
+        "set_transfer_suppressed",
+        "get_post_impact_follow_timer",
+        "set_post_impact_follow_timer",
+        "set_support_debug_mode",
+        "get_string",
+        "set_meta_value",
+        "remove_meta_key",
+        "clear_navigation_meta",
+        "clear_boarding_link_meta",
+        "clear_latch_meta"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_boarding_navigation_helper.gd": {
+      "count": 4,
+      "functions": [
+        "get_ship_deck_half_extents",
+        "build_side_follow",
+        "build_contact_settle",
+        "build_rear_recovery"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "count": 8,
+      "functions": [
+        "is_gunner",
+        "is_charger",
+        "can_board",
+        "preferred_range",
+        "range_tolerance",
+        "retreat_distance",
+        "normalize_role_name",
+        "sync_exported_profile_from_accessors"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_targeting_helper.gd": {
+      "count": 7,
+      "functions": [
+        "select_player_target_for",
+        "is_ship_targetable",
+        "is_player_controlled_ship",
+        "is_support_fleet_ship",
+        "_select_controlled_player",
+        "_select_weighted_player_target",
+        "_get_team_tag"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/ship_weapon_loadout_helper.gd": {
+      "count": 35,
+      "functions": [
+        "get_weapon_loadout",
+        "get_weapon_loadout_for_type",
+        "get_weapon_profiles",
+        "resolve_weapon_profile",
+        "load_scene",
+        "instantiate_weapon",
+        "apply_weapon_config",
+        "get_default_support_cannon_loadout",
+        "get_default_player_cannon_loadout",
+        "get_default_boss_loadout",
+        "build_cannon_spec",
+        "build_singigeon_spec",
+        "apply_authored_weapon_slots",
+        "apply_authored_cannon_slots",
+        "get_kind",
+        "get_node_name",
+        "get_profile_name",
+        "get_slot_name",
+        "get_team",
+        "get_scene_path",
+        "get_projectile_scene_path",
+        "get_position",
+        "has_basis",
+        "get_basis",
+        "get_rotation_y",
+        "get_required_level",
+        "get_detection_range",
+        "get_detection_arc",
+        "get_upgrade_level",
+        "_normalize_spec",
+        "_coerce_vector3",
+        "_get_vector",
+        "_get_float",
+        "_apply_float_property",
+        "_apply_packed_scene_property"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/support_boarding_helper.gd": {
+      "count": 11,
+      "functions": [
+        "get_boarding_purpose",
+        "is_support_rescue_boarding_active",
+        "finish_support_rescue_boarding_if_safe",
+        "finish_support_attack_boarding_if_safe",
+        "_get_support_rescue_boarding_ships",
+        "_get_support_attack_boarding_ships",
+        "_count_support_rescue_boarders_on_player_ship",
+        "_count_support_attack_boarders_on_target",
+        "_is_support_rescue_boarder_on_player_ship",
+        "_is_support_attack_boarder_on_target",
+        "_cancel_support_boarding"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "count": 31,
+      "functions": [
+        "begin_action",
+        "begin_known_action",
+        "finish_action",
+        "begin_corpse_cleanup_action",
+        "finish_corpse_cleanup_action",
+        "has_action",
+        "is_action_ai_locked",
+        "get_action_name",
+        "get_action_animation_name",
+        "is_corpse_cleanup_action",
+        "get_action_definition",
+        "get_action_rows",
+        "get_action_family",
+        "get_default_animation_name",
+        "is_known_action",
+        "get_or_create_carry_anchor",
+        "configure_carry_anchor",
+        "get_carry_anchor_global_position",
+        "get_carry_payload_definition",
+        "get_carry_payload_offsets",
+        "begin_typed_carry_payload",
+        "begin_carry_payload",
+        "finish_carry_payload",
+        "get_carry_payload",
+        "get_carry_payload_kind",
+        "apply_carry_payload_pickup",
+        "apply_carry_payload_follow",
+        "normalize_action_name",
+        "normalize_payload_kind",
+        "_lerp_rotation",
+        "_clear_meta"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd": {
+      "count": 11,
+      "functions": [
+        "state_idle",
+        "state_wander",
+        "_try_priority_ship_duty_before_enemy",
+        "start_wander",
+        "state_move",
+        "state_attack",
+        "_move_toward_point",
+        "_try_muster_to_cross_ship_contact",
+        "_try_move_to_active_ship_duty_target",
+        "turn_toward_position",
+        "_retarget_owned_ship_hostile"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_boarding_helper.gd": {
+      "count": 13,
+      "functions": [
+        "try_evacuate_to_home",
+        "jump_to_ship",
+        "teleport_to_ship",
+        "_get_nearest_deck_landing_local",
+        "has_active_boarding_link_between",
+        "_ship_has_active_boarding_link_to",
+        "_set_boarding_status",
+        "_begin_boarding_jump_pose",
+        "_finish_boarding_jump_pose",
+        "play_boarding_war_cry",
+        "play_boarding_rally_cry",
+        "_play_boarding_war_cry_from_anchor",
+        "_play_boarding_war_cry_now"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_combat_helper.gd": {
+      "count": 13,
+      "functions": [
+        "perform_special_attack",
+        "perform_attack",
+        "get_effective_attack_cooldown",
+        "_play_attack_animation",
+        "_play_swing_attack_animation",
+        "_play_thrust_attack_animation",
+        "_play_ranged_attack_animation",
+        "_get_weapon_visual_node",
+        "_cache_attack_rest_transforms",
+        "_reset_attack_pose",
+        "_stop_tracked_tween",
+        "check_ranged_combat",
+        "find_ranged_target"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
+      "count": 21,
+      "functions": [
+        "take_damage",
+        "get_ship_ranged_cover_reduction",
+        "update_boarding_chaos",
+        "_is_fighting_defender_on_owned_ship",
+        "_is_support_rescue_boarding_active",
+        "_find_nearest_hostile_on_owned_ship",
+        "heal_full",
+        "incapacitate",
+        "die",
+        "_snap_dead_body_to_deck",
+        "_should_incapacitate_instead_of_die",
+        "_schedule_incapacitated_recovery",
+        "_try_recover_incapacitated_by_id",
+        "_try_recover_incapacitated",
+        "_recover_incapacitated_now",
+        "_has_hostile_on_owned_ship",
+        "_get_incapacitated_recovery_delay",
+        "_get_incapacitated_recovery_health_ratio",
+        "_get_incapacitated_recovery_stat_ship",
+        "_apply_melee_kill_bonus",
+        "_apply_enemy_kill_rewards"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
+      "count": 2,
+      "functions": [
+        "find_ship_duty_target",
+        "get_active_ship_duty_target"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
+      "count": 13,
+      "functions": [
+        "find_nearest_enemy",
+        "find_nearest_hostile_on_owned_ship",
+        "is_ship_pair_in_melee_range",
+        "get_cross_ship_engage_ship_distance",
+        "get_cross_ship_engage_max_distance",
+        "get_cross_ship_contact_point_local",
+        "get_cross_ship_contact_point_global",
+        "is_in_cross_ship_contact_zone",
+        "find_cross_ship_muster_target",
+        "keep_within_owned_ship_bounds",
+        "get_clamped_ship_deck_local",
+        "_get_ship_soldier_parent",
+        "get_ship_deck_half_extents"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
+      "count": 56,
+      "functions": [
+        "find_ship_work_target",
+        "get_active_ship_work_target",
+        "clear_active_ship_work_target",
+        "get_ship_work_directive",
+        "can_accept_immediate_work",
+        "score_worker_for_task",
+        "reserve_work_slot",
+        "release_work_slot",
+        "is_work_slot_reserved_for_other",
+        "get_task_priority",
+        "get_task_definition",
+        "get_task_priority_rows",
+        "get_task_phase",
+        "get_role_affinity_for_task",
+        "normalize_task_name",
+        "_build_rigging_repair_directive",
+        "_build_gunnery_station_directive",
+        "_build_shiphandling_directive",
+        "_build_cannon_reload_slot_directive",
+        "_collect_cannon_reload_slots",
+        "_collect_gunnery_duty_workers",
+        "_assign_cannon_reload_slots",
+        "_find_occupied_cannon_slot_index",
+        "_is_cannon_reload_slot_source",
+        "_get_cannon_reload_slot_by_key",
+        "_get_cannon_reload_slot_animation",
+        "_sync_cannon_reload_duty_state_from_directive",
+        "_sync_cannon_reload_duty_state_from_active",
+        "_mark_cannon_reload_slot_state",
+        "_clear_cannon_reload_duty_state",
+        "_refresh_soldier_duty_visual",
+        "_can_consider_deck_work",
+        "_has_conflicting_named_action",
+        "_ship_has_deck_emergency",
+        "_has_repairable_rigging_damage",
+        "_get_most_damaged_mast_local",
+        "_can_work_gunnery",
+        "_get_soldier_role",
+        "_is_ranged_only",
+        "_get_enemy_side_sign",
+        "_build_directive",
+        "_none_directive",
+        "_append_candidate",
+        "_choose_highest_priority",
+        "_is_already_at_directive_target",
+        "_is_local_target_reached",
+        "_store_active_ship_work_target",
+        "_is_active_work_task_still_valid",
+        "_get_soldier_bias_sign",
+        "_make_local_slot_key",
+        "_get_reservation_slot_key",
+        "_get_pruned_reservations",
+        "_set_reservations",
+        "_is_active_reservation",
+        "_get_owned_ship",
+        "_get_node_team_tag"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_speech_helper.gd": {
+      "count": 15,
+      "functions": [
+        "reset",
+        "update",
+        "hide",
+        "_can_speak",
+        "_ensure_label",
+        "_get_label",
+        "_configure_label",
+        "_get_label_base_height",
+        "_get_label_color",
+        "_get_context",
+        "_get_lines_for_context",
+        "_get_next_interval",
+        "_is_current_weapon_melee",
+        "_is_danger_context",
+        "_is_enemy_boarder_on_player_ship"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "count": 7,
+      "functions": [
+        "is_alive_soldier",
+        "is_dead_soldier",
+        "is_incapacitated_soldier",
+        "can_act",
+        "can_be_targeted",
+        "is_state_value_dead",
+        "_get_state_value"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_visual_helper.gd": {
+      "count": 23,
+      "functions": [
+        "ensure_visual_root",
+        "setup_visual_scene",
+        "get_visual_root",
+        "get_body_mesh",
+        "get_pose_node",
+        "_find_body_mesh_instance",
+        "_find_named_mesh_instance",
+        "_find_first_mesh_instance",
+        "_cache_body_mesh_rest_transform",
+        "_cache_pose_node_rest_transform",
+        "_clear_body_mesh_cache",
+        "ensure_role_marker",
+        "remove_captain_marker",
+        "ensure_level_marker",
+        "update_role_visual",
+        "update_level_visual",
+        "update_team_color",
+        "get_or_create_team_material",
+        "get_team_color",
+        "flash_hit",
+        "play_death_pose",
+        "play_boarding_jump_pose",
+        "play_recovery_pose"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_weapon_helper.gd": {
+      "count": 5,
+      "functions": [
+        "get_ranged_weapon_id",
+        "get_melee_weapon_id",
+        "apply_role_loadout",
+        "update_combat_weapon_choice",
+        "_can_cross_ship_melee_reach_target"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/helpers/node_contract_helper.gd": {
+      "count": 13,
+      "functions": [
+        "get_team_tag",
+        "is_team",
+        "is_sinking_or_dying",
+        "get_current_state_value",
+        "get_current_speed_value",
+        "get_owned_ship_node",
+        "get_projectile_aim_point",
+        "get_boarding_target_ship",
+        "get_target_ship",
+        "get_base_collision_radius_value",
+        "get_collision_width_multiplier_value",
+        "get_collision_length_multiplier_value",
+        "is_player_controlled_ship"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/enemy_spawner_fleet_helper.gd": {
+      "count": 43,
+      "functions": [
+        "apply_enemy_spawn_rules_root",
+        "build_default_spawn_slot_info",
+        "apply_spawn_slot_info",
+        "apply_authoring_runtime_overrides",
+        "apply_authoring_to_template",
+        "normalize_authoring_meta",
+        "_merge_authoring_meta",
+        "_apply_authoring_metadata",
+        "_apply_authoring_combat_profile",
+        "infer_role_for_ship_type",
+        "pick_enemy_scene",
+        "pick_fleet_template",
+        "pick_fleet_template_by_class",
+        "pick_fleet_template_by_recipe",
+        "get_spawn_slot_info",
+        "parse_spawn_recipes",
+        "parse_scenario_triggers",
+        "parse_encounter_profiles",
+        "get_formation_encounter_profile",
+        "resolve_fleet_progression",
+        "parse_fleet_templates",
+        "_resolve_spawn_template",
+        "_normalize_spawn_recipe",
+        "get_formation_offset",
+        "get_line_abreast_offset",
+        "get_column_offset",
+        "get_wedge_offset",
+        "get_escort_offset",
+        "get_echelon_offset",
+        "parse_fleet_progression",
+        "parse_fleet_weights",
+        "set_encounter_profile",
+        "process_scenario_triggers",
+        "run_scenario_trigger_by_id",
+        "pick_fleet_class_for_time",
+        "pick_weighted_fleet_class",
+        "_normalize_scenario_condition",
+        "_normalize_scenario_actions",
+        "_scenario_condition_met",
+        "_apply_scenario_trigger",
+        "_apply_scenario_action",
+        "_is_scenario_trigger_already_fired",
+        "_mark_scenario_trigger_fired"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/level_manager_progression_helper.gd": {
+      "count": 16,
+      "functions": [
+        "add_score",
+        "add_ship_sunk",
+        "add_ship_derelict",
+        "add_soldier_kill",
+        "add_command_xp_from_soldier_kill",
+        "add_player_weapon_damage",
+        "get_total_weapon_damage",
+        "get_weapon_damage_rows",
+        "_normalize_damage_source_id",
+        "add_xp",
+        "add_merit",
+        "calculate_next_level_xp",
+        "get_merit_requirement",
+        "set_level",
+        "update_difficulty",
+        "_env_flag_enabled"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/level_manager_startup_helper.gd": {
+      "count": 13,
+      "functions": [
+        "initialize",
+        "run_startup_bootstrap_async",
+        "run_startup_prewarm_async",
+        "prewarm_shaders",
+        "_apply_startup_default_equipment",
+        "_wait_for_minimum_startup_overlay",
+        "_mark_prewarm_recursive",
+        "_prepare_prewarmer_visual_instance",
+        "_prime_visual_resources",
+        "_prewarm_scene_pool_instances",
+        "_prepare_pool_warm_instance",
+        "_get_scene_pool_prewarm_count",
+        "_env_flag_enabled"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/level_manager_upgrade_flow_helper.gd": {
+      "count": 7,
+      "functions": [
+        "show_fleet_upgrade_ui",
+        "on_fleet_upgrade_chosen",
+        "finalize_merit_levelup",
+        "on_fleet_reroll_requested",
+        "show_upgrade_ui",
+        "on_reroll_requested",
+        "on_upgrade_chosen"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/upgrade_manager_choice_helper.gd": {
+      "count": 9,
+      "functions": [
+        "is_upgrade_available",
+        "collect_choices_from_ids",
+        "build_priority_then_random_choices",
+        "maybe_add_rare_fleet_upgrade",
+        "fill_with_fallbacks",
+        "sort_choices_by_preferred_order",
+        "build_ship_upgrade_choices",
+        "build_command_upgrade_choices",
+        "build_random_choices"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/upgrade_manager_data_helper.gd": {
+      "count": 5,
+      "functions": [
+        "level_matches",
+        "get_specialist_unit_count",
+        "get_supply_bonus_stats",
+        "get_player_crew_roster",
+        "get_next_description"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/managers/upgrade_manager_item_helper.gd": {
+      "count": 5,
+      "functions": [
+        "load_items_from_resources",
+        "equip_owned_items",
+        "refresh_hud_item_icons",
+        "add_item",
+        "get_item_icon_payload"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/props/mast_geometry_helper.gd": {
+      "count": 9,
+      "functions": [
+        "capture_base_state",
+        "apply_mast_geometry",
+        "apply_sail_geometry",
+        "get_current_mast_top_y",
+        "get_sail_meshes",
+        "find_first_mesh_instance",
+        "compute_mesh_tree_aabb",
+        "collect_mesh_instances",
+        "aabb_corners"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/props/mast_material_helper.gd": {
+      "count": 4,
+      "functions": [
+        "apply_sail_material_settings",
+        "ensure_sail_material",
+        "apply_deform_bounds",
+        "apply_sail_shader_parameters"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/props/mast_smoke_helper.gd": {
+      "count": 5,
+      "functions": [
+        "ensure_sail_smoke",
+        "update_sail_smoke",
+        "get_smoke_particles",
+        "configure_smoke_particles",
+        "stop_sail_smoke"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/props/mast_visual_helper.gd": {
+      "count": 5,
+      "functions": [
+        "apply_sail_material_settings",
+        "ensure_sail_smoke",
+        "update_sail_smoke",
+        "ensure_sail_material",
+        "apply_deform_bounds"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/props/mast_wind_helper.gd": {
+      "count": 3,
+      "functions": [
+        "update_sail_wind_visual",
+        "apply_wind_strength_to_sails",
+        "apply_sail_flutter_to_sails"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/preview_harness_helper.gd": {
+      "count": 11,
+      "functions": [
+        "setup_common",
+        "_open_debug_panel",
+        "_disable_regular_spawns",
+        "clear_preview_enemies",
+        "assign_preview_target",
+        "apply_preview_deck_state",
+        "reset_preview_fire_pot_cooldown",
+        "set_preview_fire_pot_enabled",
+        "has_preview_crew_role",
+        "set_preview_deck_light_enabled",
+        "add_billboard_label"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/preview_state_snapshot_helper.gd": {
+      "count": 9,
+      "functions": [
+        "format_yes_no",
+        "planar_distance",
+        "build_firepot_text",
+        "build_boarding_navigation_text",
+        "build_enemy_role_text",
+        "build_boarding_preview_text",
+        "build_cannon_player_text",
+        "build_cannon_enemy_text",
+        "build_projectile_compare_text"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_bootstrap_helper.gd": {
+      "count": 3,
+      "functions": [
+        "run_bootstrap_contract_smoke",
+        "_validate_prewarm_effect_state",
+        "_wait_frames"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd": {
+      "count": 28,
+      "functions": [
+        "run_hud_contract_smoke",
+        "_run_hud_state_baselines",
+        "_run_hud_boarding_state_check",
+        "_run_hud_support_respawn_slot_check",
+        "_run_hud_capture_state_check",
+        "_run_hud_debug_state_check",
+        "_run_hud_authoring_palette_harness",
+        "_validate_authoring_palette_scenario_trigger_export",
+        "_validate_authoring_palette_scenario_preset_store",
+        "_validate_authoring_palette_scenario_preset_deleted",
+        "_validate_authoring_palette_data_patch_export",
+        "_validate_authoring_action_meta",
+        "_validate_authoring_runtime_enemy",
+        "_find_new_authoring_runtime_enemy",
+        "_collect_enemy_node_ids",
+        "_collect_enemy_nodes",
+        "_make_conflicting_authoring_data_patch",
+        "_run_compass_site_marker_check",
+        "_validate_hud_baseline_state",
+        "_validate_hud_message_api",
+        "_validate_hud_message_does_not_overlap_timer",
+        "_find_button_by_text",
+        "_option_button_has_metadata",
+        "_select_option_by_metadata",
+        "_count_enemy_nodes",
+        "_load_user_json_dictionary",
+        "_write_user_json_dictionary",
+        "_wait_frames"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd": {
+      "count": 29,
+      "functions": [
+        "run_recovery_effect_contract_smoke",
+        "_run_floating_loot_smoke",
+        "_run_survivor_smoke",
+        "_run_treasure_chest_smoke",
+        "_run_drifting_supply_site_smoke",
+        "_run_static_reward_site_smoke",
+        "_run_static_sea_site_shape_contract",
+        "_run_single_static_sea_site_shape_check",
+        "_compute_mesh_tree_aabb",
+        "_collect_mesh_instances",
+        "_has_collision_shape",
+        "_has_shader_material",
+        "_get_first_instance_shader_float",
+        "_shader_source_contains_any",
+        "_aabb_corners",
+        "_run_sea_site_spawner_contract",
+        "_run_sea_decor_contract",
+        "_run_survivor_full_crew_trains_existing_roster",
+        "_get_player_crew_training_total",
+        "_run_survivor_overcap_does_not_expand_respawn_target",
+        "_run_incapacitated_captain_blocks_duplicate_respawn",
+        "_find_player_captain",
+        "_count_player_captains_in_roster",
+        "_get_player_roster_instance_ids",
+        "_find_new_player_roster_soldier",
+        "_counts_as_player_roster_member",
+        "_is_captain_node",
+        "_wait_frames",
+        "_run_survivor_full_crew_still_joins_roster"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd": {
+      "count": 59,
+      "functions": [
+        "run_runtime_smoke",
+        "_run_ship_targeting_contract",
+        "_run_authoring_spawn_runtime_contract",
+        "_build_authoring_runtime_matrix_cases",
+        "_validate_authoring_block_runtime_harness_coverage",
+        "_validate_authoring_set_encounter_profile_action_block",
+        "_validate_authoring_run_scenario_trigger_action_block",
+        "_validate_authoring_intent_family_coverage",
+        "_run_authoring_support_intent_family_contract",
+        "_validate_support_assist_authoring_intent",
+        "_find_authoring_runtime_case",
+        "_load_authoring_palette",
+        "_collect_palette_entries",
+        "_collect_palette_entries_by_id",
+        "_first_palette_entry_id",
+        "_pick_authoring_combat_profile_for_movement",
+        "_authoring_movement_intent_family",
+        "_find_palette_entry_with_tag",
+        "_pick_authoring_ship_type_for_movement",
+        "_find_ship_entry_with_tags",
+        "_palette_tags",
+        "_tags_have_any",
+        "_tags_have_all",
+        "_run_authoring_direct_spawn_matrix",
+        "_run_authoring_scenario_spawn_ship_matrix",
+        "_run_authoring_debug_recipe_matrix",
+        "_run_authoring_scenario_recipe_matrix",
+        "_build_authoring_spawn_case",
+        "_build_authoring_meta_from_case",
+        "_build_authoring_meta",
+        "_validate_authoring_spawned_ship_case",
+        "_find_authoring_spawned_ships",
+        "_find_new_authoring_spawned_ship",
+        "_collect_new_spawned_ships",
+        "_collect_spawned_ship_ids",
+        "_validate_authoring_spawned_ship",
+        "_run_single_smoke_pass",
+        "_run_ship_variant_smoke_pass",
+        "_run_derelict_contact_smoke_pass",
+        "_run_launcher_smoke_pass",
+        "_run_projectile_smoke_pass",
+        "_configure_projectile_smoke",
+        "_run_projectile_aim_height_contract",
+        "_run_fire_pot_residual_smoke_contract",
+        "_create_fire_pot_contract_ship_hitbox",
+        "_run_fire_effect_pool_reset_contract",
+        "_count_active_fire_effects_near",
+        "_count_active_fire_effects_near_node",
+        "_release_active_fire_effects_near",
+        "_release_active_fire_effects_near_node",
+        "_is_fire_effect_active",
+        "_has_emitting_particles",
+        "_validate_registry_smoke",
+        "_validate_spawned_boss",
+        "_validate_final_boss_victory_on_death",
+        "_validate_final_boss_defeat_message",
+        "_validate_spawned_ship",
+        "_wait_frames",
+        "_wait_physics_frames"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_save_helper.gd": {
+      "count": 9,
+      "functions": [
+        "run_save_contract_smoke",
+        "_capture_save_manager_state",
+        "_capture_settings_snapshot",
+        "_apply_save_manager_state",
+        "_restore_save_manager_state",
+        "_validate_save_manager_state",
+        "_validate_save_config",
+        "_capture_file_bytes",
+        "_restore_file_bytes"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_scan_helper.gd": {
+      "count": 4,
+      "functions": [
+        "scan_resource_roots",
+        "scan_legacy_godot3_patterns",
+        "_scan_state_magic_number_patterns",
+        "_collect_paths"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd": {
+      "count": 87,
+      "functions": [
+        "run_scene_wiring_contract_smoke",
+        "_run_player_ship_runtime_safety_contract",
+        "_run_player_corpse_cleanup_sequence_contract",
+        "_validate_soldier_action_definition_catalog",
+        "_run_player_cannon_slot_authoring_contract",
+        "_find_cannon_slot_marker",
+        "_run_player_boarding_anchor_authoring_contract",
+        "_run_player_crew_slot_authoring_contract",
+        "_run_support_ship_spawn_template_contract",
+        "_run_ship_ally_role_contract",
+        "_run_hull_authoring_marker_contract",
+        "_run_ship_blueprint_weapon_loadout_contract",
+        "_load_ship_stats_dictionary",
+        "_run_enemy_spawn_rules_contract",
+        "_run_authoring_palette_contract",
+        "_run_scenario_action_authoring_negative_contract",
+        "_expect_failure_contains",
+        "_load_json_dictionary",
+        "_validate_palette_reference_entries",
+        "_validate_palette_entry_shape",
+        "_validate_palette_coverage",
+        "_validate_authoring_palette_block_schema",
+        "_collect_palette_catalog_entries_by_id",
+        "_validate_palette_catalog_entries",
+        "_validate_palette_ship_type_entries",
+        "_validate_palette_movement_intent_entries",
+        "_palette_entry_has_any_tag",
+        "_validate_palette_spawn_recipe_entries",
+        "_validate_palette_fleet_class_entries",
+        "_collect_ship_type_references",
+        "_collect_scenario_trigger_references",
+        "_build_spawn_recipe_fleet_class_index",
+        "_recipe_fleet_class_index_has",
+        "_validate_spawn_recipe_definitions",
+        "_validate_encounter_profile_definitions",
+        "_validate_formation_encounter_profile",
+        "_validate_scenario_trigger_definitions",
+        "_validate_scenario_action",
+        "_validate_scenario_action_authoring_meta",
+        "_validate_fleet_progression",
+        "_validate_fleet_template_recipe_references",
+        "_validate_parsed_fleet_templates",
+        "_validate_mid_boss_escort_rules",
+        "_validate_spawn_slots",
+        "_validate_spawn_slot",
+        "_validate_spawn_formation_type",
+        "_is_known_ship_type",
+        "_is_ship_blueprint_meta_key",
+        "_load_ship_archetypes",
+        "_validate_ship_archetypes",
+        "_validate_ship_archetype_reference",
+        "_load_combat_profiles",
+        "_validate_combat_profiles",
+        "_validate_combat_profile_reference",
+        "_validate_combat_runtime_fields",
+        "_load_weapon_profiles",
+        "_validate_weapon_profiles",
+        "_validate_weapon_loadout_entries",
+        "_validate_weapon_kind",
+        "_validate_weapon_runtime_fields",
+        "_load_hull_weapon_slot_names",
+        "_expect_min_authoring_count",
+        "_expect_authoring_marker_names",
+        "_expect_authoring_visualizer",
+        "_expect_no_persisted_authoring_visuals",
+        "_expect_runtime_authoring_visuals_absent",
+        "_expect_authoring_marker_layout",
+        "_expect_deck_marker_bounds",
+        "_expect_boarding_anchor_layout",
+        "_get_scene_hull_half_extents",
+        "_collect_scene_mesh_bounds",
+        "_get_aabb_corners",
+        "_run_soldier_common_action_contract",
+        "_run_soldier_ship_work_priority_contract",
+        "_validate_soldier_ship_work_priority_table",
+        "_validate_ship_work_target_tracks_moving_ship",
+        "_run_soldier_smooth_turn_contract",
+        "_run_boarding_rope_anchor_height_contract",
+        "_run_boarding_landing_contract",
+        "_run_weapon_damage_grouping_contract",
+        "_run_result_scene_wiring_pass",
+        "_run_main_player_effect_scene_wiring_pass",
+        "_run_main_player_ship_text_contract",
+        "_validate_packed_scene_path",
+        "_run_single_scene_wiring_pass",
+        "_has_hull_child",
+        "_wait_frames"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_support_helper.gd": {
+      "count": 6,
+      "functions": [
+        "run_support_fleet_contract_smoke",
+        "_run_support_signal_level_two_limit_smoke",
+        "_run_support_shared_cannon_cap_smoke",
+        "_run_support_shared_hull_upgrade_smoke",
+        "_count_visible_fleet_cannons",
+        "_wait_frames"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/test/project_contract_upgrade_helper.gd": {
+      "count": 5,
+      "functions": [
+        "run_upgrade_contract_smoke",
+        "_validate_cannon_upgrade_split",
+        "_validate_support_hull_upgrade_retired",
+        "_get_player_cannon_count_for_level",
+        "_get_support_cannon_count_for_level"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_debug_panel_helper.gd": {
+      "count": 122,
+      "functions": [
+        "setup_debug_panel",
+        "get_level_manager_for_debug",
+        "get_environment_preset_manager_for_debug",
+        "invoke_level_debug_method",
+        "apply_environment_preset",
+        "sync_debug_tools_panel_state",
+        "_add_environment_section",
+        "_add_debug_draw_section",
+        "_toggle_debug_draw_channel",
+        "_add_spawn_section",
+        "_add_authoring_palette_section",
+        "load_authoring_palette",
+        "load_authoring_palette_source_data",
+        "_describe_palette_block_schema",
+        "_load_json_dictionary",
+        "_add_palette_ship_type_buttons",
+        "_add_palette_recipe_buttons",
+        "_add_palette_combat_profile_buttons",
+        "_add_palette_movement_intent_buttons",
+        "_add_palette_profile_buttons",
+        "_add_palette_trigger_buttons",
+        "_add_palette_group",
+        "_add_palette_reference_group",
+        "_make_level_debug_callback",
+        "_make_palette_action_callback",
+        "_create_palette_select_button",
+        "_create_palette_reference_button",
+        "_select_palette_action",
+        "_select_palette_reference",
+        "_merge_palette_assembly_reference",
+        "_clear_palette_assembly",
+        "_sync_palette_assembly_ui",
+        "_clear_palette_selection",
+        "_add_selected_palette_action_to_queue",
+        "_execute_palette_queue",
+        "_execute_palette_entries",
+        "_clear_palette_queue",
+        "_select_palette_queue_entry",
+        "_move_selected_palette_queue_entry",
+        "_duplicate_selected_palette_queue_entry",
+        "_delete_selected_palette_queue_entry",
+        "_save_palette_queue",
+        "_save_palette_queue_as_scenario_trigger",
+        "_save_palette_queue_as_scenario_preset",
+        "_load_active_scenario_preset_to_queue",
+        "_execute_selected_scenario_preset",
+        "_promote_selected_scenario_preset_to_data_patch",
+        "_check_authoring_data_patch",
+        "_merge_authoring_data_patch",
+        "_validate_authoring_data_patch",
+        "_validate_authoring_data_patch_action",
+        "_validate_authoring_action_meta",
+        "_collect_palette_movement_intent_ids",
+        "_collect_authoring_trigger_ids",
+        "_format_authoring_data_patch_check_result",
+        "_format_authoring_data_patch_merge_blocked",
+        "_format_authoring_check_details",
+        "_get_authoring_data_patch_triggers",
+        "_merge_authoring_palette_trigger_entries",
+        "_write_json_dictionary",
+        "_delete_selected_scenario_preset",
+        "_load_palette_queue",
+        "_set_palette_preview_status",
+        "_sync_palette_queue_ui",
+        "_normalize_palette_queue_selection",
+        "_sync_palette_preset_ui",
+        "_sync_palette_preset_select",
+        "_set_palette_preset_preview",
+        "_format_scenario_preset_preview",
+        "_format_palette_action_summary",
+        "_format_palette_action_display_text",
+        "_format_palette_queue_text",
+        "_build_palette_queue_actions",
+        "_build_palette_queue_entries_from_actions",
+        "_build_scenario_trigger_from_palette_queue",
+        "_build_scenario_trigger_from_queue_actions",
+        "_build_scenario_actions_from_palette_queue",
+        "_build_scenario_actions_from_queue_actions",
+        "_palette_queue_action_to_scenario_action",
+        "_queue_actions_from_scenario_actions",
+        "_get_queue_actions_from_scenario_preset",
+        "_select_scenario_preset",
+        "_get_selected_or_active_scenario_preset",
+        "_get_selected_preset_id",
+        "_get_preset_select_id",
+        "_find_scenario_preset",
+        "_scenario_preset_array_has_id",
+        "_first_scenario_preset_id",
+        "_get_active_scenario_preset",
+        "_make_palette_queue_preset_id_from_actions",
+        "_make_palette_queue_preset_label_from_actions",
+        "_palette_action_identity",
+        "_slugify_palette_identifier",
+        "_normalize_palette_queue_action",
+        "_finalize_normalized_palette_action",
+        "_make_palette_reference_authoring_meta",
+        "_apply_palette_assembly_to_action",
+        "_palette_action_accepts_assembly_meta",
+        "_normalize_palette_action_authoring_meta",
+        "_get_palette_movement_speed_range",
+        "_format_palette_authoring_suffix",
+        "_palette_action_label",
+        "_wire_palette_preview",
+        "_describe_palette_ship_type",
+        "_describe_palette_recipe",
+        "_describe_palette_combat_profile",
+        "_describe_palette_movement_intent",
+        "_describe_palette_profile",
+        "_describe_palette_trigger",
+        "_find_scenario_trigger",
+        "_format_count_dictionary",
+        "_dictionary_from",
+        "_array_from",
+        "_palette_button_text",
+        "_palette_entry_has_tag",
+        "_add_misc_section",
+        "_add_ship_section",
+        "_add_sail_section",
+        "create_debug_section",
+        "_update_debug_section_button_text",
+        "create_debug_action_button",
+        "create_slider_row"
+      ],
+      "reason": "DebugDraw channel controls are intentionally owned by the debug panel helper with the rest of the runtime debug UI wiring."
+    },
+    "res://scripts/ui/hud/hud_distance_debug_helper.gd": {
+      "count": 9,
+      "functions": [
+        "toggle_distance_debug",
+        "ensure_distance_debug_visualizer",
+        "update_distance_debug_display",
+        "find_nearest_enemy_ship_for_distance_debug",
+        "get_planar_distance",
+        "get_ship_pair_melee_distance_debug",
+        "get_player_cannon_range_for_debug",
+        "get_cannon_efficiency_for_debug",
+        "get_ship_deck_half_extents_for_debug"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_end_state_helper.gd": {
+      "count": 5,
+      "functions": [
+        "show_game_over",
+        "show_victory",
+        "show_victory_with_damage",
+        "setup_game_over_overlay",
+        "return_to_main_menu"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_item_display_helper.gd": {
+      "count": 3,
+      "functions": [
+        "add_item_icon",
+        "clear_item_icons",
+        "refresh_owned_item_icons"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_lookup_helper.gd": {
+      "count": 2,
+      "functions": [
+        "try_resolve_player_ship",
+        "ensure_player_ship"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_progression_layout_helper.gd": {
+      "count": 4,
+      "functions": [
+        "apply_overlay_theme",
+        "ensure_hud_label",
+        "setup_top_xp_bar",
+        "attach_level_label_to_xp_bar"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_runtime_helper.gd": {
+      "count": 2,
+      "functions": [
+        "process_hud",
+        "sync_game_time"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_sail_debug_helper.gd": {
+      "count": 7,
+      "functions": [
+        "update_sail_debug_toggle_button_text",
+        "get_player_masts_for_debug",
+        "apply_sail_debug_values",
+        "sync_sail_debug_panel_from_player",
+        "on_sail_debug_damage_changed",
+        "on_sail_debug_burn_changed",
+        "on_sail_debug_hole_changed"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_ship_debug_helper.gd": {
+      "count": 14,
+      "functions": [
+        "sync_ship_debug_panel_from_player",
+        "on_debug_ship_hull_changed",
+        "on_debug_ship_stamina_changed",
+        "refill_player_crew_for_debug",
+        "spawn_support_ship_for_debug",
+        "stop_player_ship_for_debug",
+        "toggle_player_ship_fire_for_debug",
+        "toggle_player_rowing_for_debug",
+        "auto_adjust_player_sail_for_debug",
+        "adjust_player_crew_capacity_for_debug",
+        "adjust_player_captain_count_for_debug",
+        "adjust_player_support_limit_for_debug",
+        "adjust_player_ship_float_for_debug",
+        "_ensure_player_ship"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_ship_health_overlay_helper.gd": {
+      "count": 3,
+      "functions": [
+        "setup_ship_hp_overlay",
+        "update_ship_health_bars",
+        "toggle_ship_health_bars"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_stat_panel_helper.gd": {
+      "count": 16,
+      "functions": [
+        "process_stat_panel",
+        "toggle_stat_panel",
+        "update_stat_panel",
+        "build_stat_sections",
+        "_build_signature",
+        "_rebuild_stat_content",
+        "_create_section",
+        "_create_stat_row",
+        "_create_icon_label",
+        "_get_primary_cannon",
+        "_get_cannon_projectile_stats",
+        "_collect_crew_stats",
+        "_is_dead_soldier_node",
+        "_get_item_names",
+        "_get_float",
+        "_get_int"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_status_display_helper.gd": {
+      "count": 6,
+      "functions": [
+        "update_hull_hp",
+        "update_stamina",
+        "update_xp",
+        "update_merit",
+        "update_ammo_mode_display",
+        "show_gust_warning_message"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_update_helper.gd": {
+      "count": 34,
+      "functions": [
+        "update_level",
+        "update_score",
+        "update_combat_stats",
+        "update_difficulty_ui",
+        "update_crew_status",
+        "update_timer",
+        "_apply_speed_bar_state",
+        "update_speed_display",
+        "update_force_panel",
+        "_update_crew_force_status",
+        "_update_support_force_status",
+        "update_crew_count",
+        "_is_support_respawn_active",
+        "_get_support_respawn_timer_text",
+        "_ensure_support_slot_count",
+        "_create_support_slot",
+        "_update_support_slot",
+        "update_hull_display",
+        "update_stamina_display",
+        "update_boarding_display",
+        "update_capture_opportunity_display",
+        "_get_capture_opportunity_text",
+        "update_boss_hp",
+        "update_ship_health_bars",
+        "_hide_all_ship_health_bars",
+        "_is_ship_hp_bar_target_valid",
+        "_update_single_ship_health_bar",
+        "_get_boarding_capture_short_text",
+        "_get_boarding_capture_ratio",
+        "_get_boarding_capture_remaining",
+        "_get_boarding_capture_duration",
+        "_cleanup_stale_ship_hp_bars",
+        "_ensure_ship_hp_bar",
+        "_get_short_ship_name"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
+      "count": 16,
+      "functions": [
+        "is_ship_upgrade",
+        "is_crew_upgrade",
+        "get_upgrade_track_name",
+        "build_upgrade_tooltip_text",
+        "build_upgrade_spec_text",
+        "get_upgrade_icon",
+        "get_upgrade_icon_texture_path",
+        "get_upgrade_color",
+        "_percent_delta_from_ratio",
+        "_get_player_cannon_count_for_level",
+        "_get_support_cannon_count_for_level",
+        "_level_matches",
+        "_calculate_sailing_stats",
+        "_calculate_rowing_stats",
+        "_calculate_hull_defense_stats",
+        "_calculate_supply_bonus_stats"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
+      "count": 15,
+      "functions": [
+        "setup_upgrade_tooltip",
+        "bind_upgrade_slot_hover",
+        "on_upgrade_slot_mouse_entered",
+        "on_upgrade_slot_mouse_exited",
+        "update_upgrade_tooltip_state",
+        "show_slot_tooltip",
+        "slot_has_tooltip",
+        "get_slot_tooltip_payload",
+        "hide_upgrade_tooltip",
+        "update_upgrade_tooltip_position",
+        "update_upgrade_track_slot",
+        "update_ship_upgrade_ui",
+        "update_crew_upgrade_ui",
+        "update_weapon_ui",
+        "update_support_ui"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    }
+  },
+  "helper_dependency_baselines": {
+    "res://scripts/effects/field_item_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/effects/field_item_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/launchers/launcher_combat_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/launchers/launcher_combat_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/launchers/launcher_combat_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/launchers/launcher_combat_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/entities/soldiers/soldier_boarding_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_collision_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_collision_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_collision_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_collision_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_crew_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_crew_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd|res://scripts/entities/ships/support_boarding_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
+      "to": "res://scripts/entities/ships/support_boarding_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/base_ship_visual_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_visual_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd|res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+      "to": "res://scripts/entities/ships/chaser_ship_navigation_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd|res://scripts/entities/ships/ship_targeting_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+      "to": "res://scripts/entities/ships/ship_targeting_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+      "to": "res://scripts/entities/ships/ship_combat_mode_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_ai_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/support_boarding_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+      "to": "res://scripts/entities/ships/support_boarding_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_navigation_helper.gd",
+      "to": "res://scripts/entities/ships/ship_combat_mode_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd|res://scripts/entities/ships/ship_boarding_navigation_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_navigation_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_navigation_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_navigation_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_support_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/chaser_ship_support_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_crew_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd|res://scripts/entities/ships/base_ship_crew_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_crew_helper.gd",
+      "to": "res://scripts/entities/ships/base_ship_crew_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd|res://scripts/entities/ships/ship_authoring_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_crew_helper.gd",
+      "to": "res://scripts/entities/ships/ship_authoring_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_crew_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_crew_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_crew_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_runtime_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_runtime_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_support_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/ship_authoring_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_authoring_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/ship_boarding_navigation_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_boarding_navigation_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/ship_targeting_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_targeting_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/ship_weapon_loadout_helper.gd|res://scripts/entities/ships/ship_authoring_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_weapon_loadout_helper.gd",
+      "to": "res://scripts/entities/ships/ship_authoring_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/ship_weapon_loadout_helper.gd|res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_weapon_loadout_helper.gd",
+      "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/support_boarding_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/ships/support_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/support_boarding_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/support_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/support_boarding_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/ships/support_boarding_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ai_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd|res://scripts/entities/soldiers/soldier_combat_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ai_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_combat_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_boarding_helper.gd|res://scripts/entities/soldiers/soldier_ship_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_combat_helper.gd|res://scripts/entities/soldiers/soldier_visual_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_combat_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_visual_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
+      "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd|res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_action_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_speech_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_speech_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_visual_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_visual_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/helpers/node_contract_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/helpers/node_contract_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/managers/enemy_spawner_fleet_helper.gd|res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "from": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
+      "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/managers/enemy_spawner_fleet_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "from": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
+      "to": "res://scripts/entities/ships/ship_combat_mode_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/props/mast_visual_helper.gd|res://scripts/props/mast_material_helper.gd": {
+      "from": "res://scripts/props/mast_visual_helper.gd",
+      "to": "res://scripts/props/mast_material_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/props/mast_visual_helper.gd|res://scripts/props/mast_smoke_helper.gd": {
+      "from": "res://scripts/props/mast_visual_helper.gd",
+      "to": "res://scripts/props/mast_smoke_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_bootstrap_helper.gd|res://scripts/test/preview_harness_helper.gd": {
+      "from": "res://scripts/test/project_contract_bootstrap_helper.gd",
+      "to": "res://scripts/test/preview_harness_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd|res://scripts/managers/enemy_spawner_fleet_helper.gd": {
+      "from": "res://scripts/test/project_contract_hud_helper.gd",
+      "to": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd|res://scripts/test/preview_harness_helper.gd": {
+      "from": "res://scripts/test/project_contract_hud_helper.gd",
+      "to": "res://scripts/test/preview_harness_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "from": "res://scripts/test/project_contract_hud_helper.gd",
+      "to": "res://scripts/entities/ships/ship_combat_mode_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd|res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "from": "res://scripts/test/project_contract_hud_helper.gd",
+      "to": "res://scripts/entities/ships/chaser_ship_navigation_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd|res://scripts/test/preview_harness_helper.gd": {
+      "from": "res://scripts/test/project_contract_recovery_helper.gd",
+      "to": "res://scripts/test/preview_harness_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd|res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
+      "from": "res://scripts/test/project_contract_recovery_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+      "from": "res://scripts/test/project_contract_recovery_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/managers/enemy_spawner_fleet_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/test/preview_harness_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/test/preview_harness_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ship_combat_mode_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/ship_targeting_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ship_targeting_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/chaser_ship_navigation_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/ship_authoring_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/ships/ship_authoring_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/ships/ship_combat_mode_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/ship_weapon_loadout_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/ships/ship_weapon_loadout_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/managers/enemy_spawner_fleet_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_action_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_support_helper.gd|res://scripts/test/preview_harness_helper.gd": {
+      "from": "res://scripts/test/project_contract_support_helper.gd",
+      "to": "res://scripts/test/preview_harness_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/test/project_contract_support_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/test/project_contract_support_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/ui/hud/hud_distance_debug_helper.gd|res://scripts/ui/hud/hud_lookup_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_distance_debug_helper.gd",
+      "to": "res://scripts/ui/hud/hud_lookup_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/ui/hud/hud_distance_debug_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_distance_debug_helper.gd",
+      "to": "res://scripts/helpers/node_contract_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/ui/hud/hud_sail_debug_helper.gd|res://scripts/ui/hud/hud_lookup_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_sail_debug_helper.gd",
+      "to": "res://scripts/ui/hud/hud_lookup_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/ui/hud/hud_ship_debug_helper.gd|res://scripts/ui/hud/hud_lookup_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_ship_debug_helper.gd",
+      "to": "res://scripts/ui/hud/hud_lookup_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd|res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd",
+      "to": "res://scripts/ui/hud/hud_upgrade_info_helper.gd",
+      "reason": "Generated baseline for current helper-to-helper preload boundary."
+    }
+  },
+  "hazard_baselines": {
+    "pool_reset_reads_global_y|res://scripts/effects/enemy_drifter_xp.gd|base_y = global_position.y": {
+      "kind": "pool_reset_reads_global_y",
+      "path": "res://scripts/effects/enemy_drifter_xp.gd",
+      "signature": "base_y = global_position.y",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "pool_reset_reads_global_y|res://scripts/effects/floating_loot.gd|base_y = global_position.y": {
+      "kind": "pool_reset_reads_global_y",
+      "path": "res://scripts/effects/floating_loot.gd",
+      "signature": "base_y = global_position.y",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "pool_reset_reads_global_y|res://scripts/effects/survivor.gd|base_y = global_position.y": {
+      "kind": "pool_reset_reads_global_y",
+      "path": "res://scripts/effects/survivor.gd",
+      "signature": "base_y = global_position.y",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "direct_reparent_outside_soldier_boarding|res://scripts/entities/ships/base_ship_boarding_helper.gd|s.reparent(target_soldiers_node, true)": {
+      "kind": "direct_reparent_outside_soldier_boarding",
+      "path": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "signature": "s.reparent(target_soldiers_node, true)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "local_position_axis_tween|res://scripts/entities/ships/base_ship_boarding_helper.gd|tween.tween_property(s, \"position:x\", jump_offset.x, travel_time).set_trans(Tween.TRANS_LINEAR)": {
+      "kind": "local_position_axis_tween",
+      "path": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "signature": "tween.tween_property(s, \"position:x\", jump_offset.x, travel_time).set_trans(Tween.TRANS_LINEAR)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "local_position_axis_tween|res://scripts/entities/ships/base_ship_boarding_helper.gd|tween.tween_property(s, \"position:z\", jump_offset.z, travel_time).set_trans(Tween.TRANS_LINEAR)": {
+      "kind": "local_position_axis_tween",
+      "path": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "signature": "tween.tween_property(s, \"position:z\", jump_offset.z, travel_time).set_trans(Tween.TRANS_LINEAR)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/boss_ship.gd|survivor.set_deferred(\"global_position\", global_position + offset)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/boss_ship.gd",
+      "signature": "survivor.set_deferred(\"global_position\", global_position + offset)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/boss_ship.gd|survivor.set_deferred(\"global_position\", spawn_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/boss_ship.gd",
+      "signature": "survivor.set_deferred(\"global_position\", spawn_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|pot.set_deferred(\"global_position\", start_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "signature": "pot.set_deferred(\"global_position\", start_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|pickup.set_deferred(\"global_position\", spawn_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "signature": "pickup.set_deferred(\"global_position\", spawn_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|loot.set_deferred(\"global_position\", spawn_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "signature": "loot.set_deferred(\"global_position\", spawn_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|survivor.set_deferred(\"global_position\", survivor_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "signature": "survivor.set_deferred(\"global_position\", survivor_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|survivor.set_deferred(\"global_position\", spawn_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "signature": "survivor.set_deferred(\"global_position\", spawn_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/player_ship_crew_helper.gd|pot.set_deferred(\"global_position\", start_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/ships/player_ship_crew_helper.gd",
+      "signature": "pot.set_deferred(\"global_position\", start_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "local_position_axis_tween|res://scripts/entities/soldiers/soldier_boarding_helper.gd|tween.tween_property(soldier, \"position:x\", jump_offset.x, travel_time)": {
+      "kind": "local_position_axis_tween",
+      "path": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "signature": "tween.tween_property(soldier, \"position:x\", jump_offset.x, travel_time)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "local_position_axis_tween|res://scripts/entities/soldiers/soldier_boarding_helper.gd|tween.tween_property(soldier, \"position:z\", jump_offset.z, travel_time)": {
+      "kind": "local_position_axis_tween",
+      "path": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "signature": "tween.tween_property(soldier, \"position:z\", jump_offset.z, travel_time)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "deferred_global_position_after_deferred_add|res://scripts/entities/soldiers/soldier_boarding_helper.gd|survivor.set_deferred(\"global_position\", spawn_pos)": {
+      "kind": "deferred_global_position_after_deferred_add",
+      "path": "res://scripts/entities/soldiers/soldier_boarding_helper.gd",
+      "signature": "survivor.set_deferred(\"global_position\", spawn_pos)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    },
+    "direct_reparent_outside_soldier_boarding|res://scripts/entities/soldiers/soldier_ship_helper.gd|soldier.reparent(target_parent, true)": {
+      "kind": "direct_reparent_outside_soldier_boarding",
+      "path": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
+      "signature": "soldier.reparent(target_parent, true)",
+      "recommended_action": "Generated baseline; prefer world-space motion, explicit parent ownership, or pool-safe activation when touching this line."
+    }
+  },
+  "exception_debt": {
+    "large_helper|res://scripts/entities/ships/base_ship_boarding_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/base_ship_collision_helper.gd": {
+      "reason": "Collision DebugDraw instrumentation extends the existing collision owner; split only with a dedicated collision debug extraction.",
+      "priority": "baseline",
+      "recommended_action": "Move debug drawing into a dedicated collision debug owner when collision helpers are refactored."
+    },
+    "large_helper|res://scripts/entities/ships/base_ship_crew_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/chaser_ship_support_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/player_ship_crew_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/ship_authoring_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/soldiers/soldier_visual_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/managers/enemy_spawner_fleet_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/test/project_contract_hud_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/test/project_contract_recovery_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/test/project_contract_runtime_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/test/project_contract_scene_wiring_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/ui/hud/hud_debug_panel_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/ui/hud/hud_stat_panel_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/ui/hud/hud_update_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "thin_helper|res://scripts/entities/ships/player_ship_aux_helper.gd": {
+      "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "thin_helper|res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
+      "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "thin_helper|res://scripts/ui/hud/hud_lookup_helper.gd": {
+      "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "thin_helper|res://scripts/ui/hud/hud_runtime_helper.gd": {
+      "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/ships/player_ship_aux_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/ships/player_ship_crew_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/ships/player_ship_runtime_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/ships/player_ship_sink_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/ships/player_ship_support_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/soldiers/soldier_ai_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/soldiers/soldier_combat_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/soldiers/soldier_visual_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/entities/soldiers/soldier_weapon_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/managers/upgrade_manager_item_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/props/mast_geometry_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/props/mast_material_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/props/mast_smoke_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/props/mast_visual_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/props/mast_wind_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_end_state_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_item_display_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_progression_layout_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_runtime_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_ship_health_overlay_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_stat_panel_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_status_display_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_update_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "class_name|res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
+      "reason": "Existing helper without class_name at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "duplicate_static_function|_can_board|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_counts_as_player_roster_member|res://scripts/entities/ships/player_ship_crew_helper.gd,res://scripts/test/project_contract_recovery_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_env_flag_enabled|res://scripts/managers/level_manager_progression_helper.gd,res://scripts/managers/level_manager_startup_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_effective_boarding_distance|res://scripts/entities/ships/base_ship_boarding_helper.gd,res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_float|res://scripts/entities/ships/ship_weapon_loadout_helper.gd,res://scripts/ui/hud/hud_stat_panel_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_nearest_deck_landing_local|res://scripts/entities/ships/base_ship_boarding_helper.gd,res://scripts/entities/soldiers/soldier_boarding_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_player_cannon_count_for_level|res://scripts/test/project_contract_upgrade_helper.gd,res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_support_cannon_count_for_level|res://scripts/test/project_contract_upgrade_helper.gd,res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_target_deck_half_extents|res://scripts/entities/ships/base_ship_boarding_helper.gd,res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_get_team_tag|res://scripts/entities/ships/ship_ally_role_helper.gd,res://scripts/entities/ships/ship_targeting_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_has_repairable_rigging_damage|res://scripts/entities/ships/base_ship_status_helper.gd,res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_is_dead_soldier_node|res://scripts/entities/ships/base_ship_crew_helper.gd,res://scripts/entities/ships/ship_authoring_helper.gd,res://scripts/ui/hud/hud_stat_panel_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_is_gunner|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_is_sinking_or_dying|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_is_true|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_is_world_position_offscreen|res://scripts/entities/ships/chaser_ship_support_helper.gd,res://scripts/entities/ships/player_ship_support_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_load_json_dictionary|res://scripts/test/project_contract_scene_wiring_helper.gd,res://scripts/ui/hud/hud_debug_panel_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_target_ship|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_validate_authoring_action_meta|res://scripts/test/project_contract_hud_helper.gd,res://scripts/ui/hud/hud_debug_panel_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|_wait_frames|res://scripts/test/project_contract_bootstrap_helper.gd,res://scripts/test/project_contract_hud_helper.gd,res://scripts/test/project_contract_recovery_helper.gd,res://scripts/test/project_contract_runtime_helper.gd,res://scripts/test/project_contract_scene_wiring_helper.gd,res://scripts/test/project_contract_support_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|apply_deform_bounds|res://scripts/props/mast_material_helper.gd,res://scripts/props/mast_visual_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|apply_sail_material_settings|res://scripts/props/mast_material_helper.gd,res://scripts/props/mast_visual_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|calculate_separation|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|die|res://scripts/entities/ships/player_ship_sink_helper.gd,res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|ensure_sail_material|res://scripts/props/mast_material_helper.gd,res://scripts/props/mast_visual_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|ensure_sail_smoke|res://scripts/props/mast_smoke_helper.gd,res://scripts/props/mast_visual_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|get_boarding_purpose|res://scripts/entities/ships/ship_boarding_meta_helper.gd,res://scripts/entities/ships/support_boarding_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|get_ship_deck_half_extents|res://scripts/entities/ships/ship_boarding_navigation_helper.gd,res://scripts/entities/soldiers/soldier_ship_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|is_player_controlled_ship|res://scripts/entities/ships/ship_targeting_helper.gd,res://scripts/helpers/node_contract_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|normalize_role_name|res://scripts/entities/ships/ship_ally_role_helper.gd,res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|update_sail_smoke|res://scripts/props/mast_smoke_helper.gd,res://scripts/props/mast_visual_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "duplicate_static_function|update_ship_health_bars|res://scripts/ui/hud/hud_ship_health_overlay_helper.gd,res://scripts/ui/hud/hud_update_helper.gd": {
+      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
+      "priority": "baseline",
+      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    }
+  }
+}

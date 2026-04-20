@@ -21,6 +21,8 @@ Default quick checks:
   Broad smoke for scripts, scenes, save/load, HUD, support fleet, bootstrap, recovery effects, upgrades, scene wiring, and runtime spawning.
 - `scripts/test/run_boarding_contracts.sh`
   Focused combat regression suite for boarding impact, navigation, chaos, support rescue, auto-raid recall, ship damage, and soldier incapacitation/weapon-state behavior.
+- `scripts/test/run_modularity_guard_suite.sh`
+  Architecture guard suite for helper ownership, runtime scenario registry paths, pooling ownership, and world-space soldier motion.
 - `scripts/test/run_ship_combat_balance_preview.sh`
   Short encounter feel check for ship combat balance.
 - `scripts/test/run_midgame_performance_compare.sh`
@@ -145,6 +147,11 @@ When adding a new harness:
   Project-wide load sweep plus a legacy-pattern scan, save/load, HUD, support-fleet, bootstrap audio/effect, recovery-effect, and scene-wiring roundtrip smokes, and a small runtime smoke check for registry, boss, ship, launcher, and projectile contracts.
   Script: `scripts/test/project_contract_sweep.gd`
   Wrapper: `scripts/test/run_project_contract_sweep.sh`
+- `modularity_guard.tscn`
+  Static architecture guard for helper registry coverage, runtime scenario matrix validity, helper public-surface drift, dependency boundaries, and coordinate/pooling hazards.
+  Script: `scripts/test/modularity_guard.gd`
+  Registry: `scripts/test/module_boundaries.json`
+  Wrapper: `scripts/test/run_modularity_guard_suite.sh`
 
 ## Helper Scripts
 
@@ -179,6 +186,8 @@ When adding a new harness:
   Runs each contract through the generic scene load probe and fails on common script/runtime log errors.
 - `scripts/test/harness_log_gate.sh`
   Shared shell helper for common Godot script/runtime log error gates used by headless test wrappers.
+- `scripts/test/run_modularity_guard_suite.sh`
+  Shell wrapper that runs the modularity guard plus scene pool and soldier world-motion contracts.
 - `scripts/test/run_soldier_balance_preview.sh`
   Headless wrapper for the soldier balance harness.
   Auto-quits after the summary report and fails on common runtime log errors or missing summary output.

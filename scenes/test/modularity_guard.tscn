@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/test/modularity_guard.gd" id="1_modularity_guard"]
+
+[node name="ModularityGuard" type="Node"]
+script = ExtResource("1_modularity_guard")

@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "kind": "runtime_scenario_matrix",
+  "description": "Machine-readable index of selected runtime and architecture harness coverage.",
+  "shared_references": [
+    {
+      "id": "preview_base",
+      "scene": "res://scenes/test/preview_base.tscn",
+      "purpose": "Shared gameplay shell for preview scenes."
+    },
+    {
+      "id": "preview_harness_helper",
+      "script": "res://scripts/test/preview_harness_helper.gd",
+      "purpose": "Shared preview bootstrapping and label helpers."
+    },
+    {
+      "id": "module_boundaries",
+      "registry": "res://scripts/test/module_boundaries.json",
+      "purpose": "Architecture guard registry for helper ownership and boundary baselines."
+    }
+  ],
+  "runtime_harnesses": [
+    {
+      "id": "scene_pool_contract",
+      "scene": "res://scenes/test/scene_pool_contract.tscn",
+      "script": "res://scripts/test/scene_pool_contract.gd",
+      "focus": "ScenePool release and reacquire ownership.",
+      "scenarios": [
+        {
+          "id": "pooled_node_reparent",
+          "label": "Pool reparent",
+          "coverage": "Released pooled nodes move under the pool root and reacquire detached and visible."
+        }
+      ]
+    },
+    {
+      "id": "soldier_world_motion_contract",
+      "scene": "res://scenes/test/soldier_world_motion_contract.tscn",
+      "script": "res://scripts/test/soldier_world_motion_contract.gd",
+      "focus": "Soldier cross-deck jump ownership and landing.",
+      "scenarios": [
+        {
+          "id": "jump_preserves_world_motion",
+          "label": "Jump landing",
+          "coverage": "Soldier jump preserves its start position, moves under the target deck, follows target motion, and clears jumping state on landing."
+        }
+      ]
+    }
+  ],
+  "architecture_harnesses": [
+    {
+      "id": "modularity_guard",
+      "scene": "res://scenes/test/modularity_guard.tscn",
+      "script": "res://scripts/test/modularity_guard.gd",
+      "registry": "res://scripts/test/module_boundaries.json",
+      "focus": "Helper ownership and boundary drift.",
+      "scenarios": [
+        {
+          "id": "helper_boundary_registry",
+          "label": "Helper registry",
+          "coverage": "Every helper has a registered owner, public-surface baseline, dependency baseline, and known exception metadata."
+        }
+      ]
+    }
+  ],
+  "static_authoring_scenes": []
+}
