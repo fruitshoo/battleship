@@ -37,6 +37,8 @@ static func die(ship) -> void:
 	var audio_manager = ship.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("water_splash_large", ship.global_position, randf_range(0.8, 1.0), 3.0)
+	if ship.has_method("play_sink_bubbles"):
+		ship.play_sink_bubbles(0.35, -1.5)
 
 	sink_tween.set_parallel(false)
 	var ship_id: int = ship.get_instance_id()

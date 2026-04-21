@@ -138,7 +138,45 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_stop_run_audio_state()
+	_clear_root_runtime_pool_residue()
 	LevelManagerRegistry.unregister_level_manager(self)
+
+
+func _stop_run_audio_state() -> void:
+	var audio_manager := get_node_or_null("/root/AudioManager")
+	if not is_instance_valid(audio_manager):
+		return
+	if audio_manager.has_method("set_boss_battle_music"):
+		audio_manager.set_boss_battle_music(false)
+	elif audio_manager.has_method("stop_bgm"):
+		audio_manager.stop_bgm()
+
+
+func _clear_root_runtime_pool_residue() -> void:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var root := tree.root
+	var current_scene := tree.current_scene
+	for child in root.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child == current_scene:
+			continue
+		if child.name == ScenePool.ROOT_NAME:
+			continue
+		if child.has_meta(ScenePool.KEY_META):
+			child.queue_free()
+
+	var pool_root := root.get_node_or_null(ScenePool.ROOT_NAME)
+	if not is_instance_valid(pool_root):
+		return
+	for pooled_child in pool_root.get_children():
+		if is_instance_valid(pooled_child):
+			pooled_child.queue_free()
+	if pool_root.has_meta(ScenePool.STORE_META):
+		pool_root.set_meta(ScenePool.STORE_META, {})
 
 
 func _load_level_progression_data() -> void:

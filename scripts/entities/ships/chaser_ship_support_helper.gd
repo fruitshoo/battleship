@@ -329,6 +329,8 @@ static func sink_derelict(ship) -> void:
 	sink_tween.tween_property(ship, "global_position:y", ship.base_y - 15.0, 5.0).set_ease(Tween.EASE_IN)
 	sink_tween.parallel().tween_property(ship, "rotation_degrees:x", randf_range(-20.0, 20.0), 5.0)
 	sink_tween.parallel().tween_property(ship, "rotation_degrees:z", randf_range(20.0, 40.0) * (1 if randf() > 0.5 else -1), 5.0)
+	if ship.has_method("play_sink_bubbles"):
+		ship.play_sink_bubbles(0.25, -1.5)
 
 	await sink_tween.finished
 	ship.queue_free()

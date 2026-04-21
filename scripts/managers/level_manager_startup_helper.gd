@@ -113,6 +113,7 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		preload("res://scenes/entities/launchers/cannon_enemy_heavy.tscn"),
 	]
 	var instantiate_only_scenes_to_warm = [
+		preload("res://scenes/ships/enemy_base_ship.tscn"),
 		preload("res://scenes/ships/enemy_ship.tscn"),
 		preload("res://scenes/ships/enemy_melee_ship.tscn"),
 		preload("res://scenes/ships/enemy_gunner_ship.tscn"),

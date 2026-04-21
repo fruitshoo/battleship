@@ -128,7 +128,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		
 		var audio_manager = attacker.get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager):
-			audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(1.0, 1.15)) # 조금 높은 피치
+			audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(0.9, 1.04))
 			
 		# 다음 발사 대기
 		if i < burst_count - 1:

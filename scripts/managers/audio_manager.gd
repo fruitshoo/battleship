@@ -73,7 +73,6 @@ var sfx_streams = {
 	],
 	"boarding_war_cry": [
 		"res://assets/audio/sfx/sfx_boarding_war_cry_1.wav",
-		"res://assets/audio/sfx/sfx_boarding_war_cry_2.wav",
 		"res://assets/audio/sfx/sfx_boarding_war_cry_3.wav",
 	],
 	"water_splash_large": [
@@ -86,6 +85,7 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_water_splash_small_2.ogg",
 		"res://assets/audio/sfx/sfx_water_splash_small_3.ogg",
 	],
+	"ship_sink_bubbles": "res://assets/audio/sfx/sfx_ship_sink_bubbles_cc0.ogg",
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
 	"boss_horn": "res://assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg",
@@ -101,52 +101,98 @@ const DEFAULT_3D_SFX_MAX_DISTANCE := 220.0
 const DEFAULT_3D_SFX_UNIT_SIZE := 55.0
 const GILGUNAK_VOLUME_DB := -4.0
 const BOSS_TAIKO_BGM := "boss_taiko"
-const BOSS_TAIKO_VOLUME_DB := -8.0
+const BOSS_TAIKO_VOLUME_DB := 1.5
 const SFX_ALIASES := {
 	"arrow_shoot": "bow_shoot",
 	"critical_hit": "soldier_hit",
 	"trumpet_war": "support_foghorn",
 }
-const SFX_3D_PROFILES := {
-	"wave_splash": {
-		"volume_db": 2.0,
-		"max_distance": 260.0,
-		"unit_size": 75.0,
-	},
-	"oars_rowing": {
-		"volume_db": 2.0,
-		"max_distance": 240.0,
-		"unit_size": 70.0,
-	},
-	"bow_shoot": {
+const SFX_PROFILE_DEFAULT_3D := "default_3d"
+const SFX_PROFILE_WEAPON_CLOSE := "weapon_close"
+const SFX_PROFILE_LIGHT_PROJECTILE := "light_projectile"
+const SFX_PROFILE_CANNON_BLAST := "cannon_blast"
+const SFX_PROFILE_SHIP_AMBIENT := "ship_ambient"
+const SFX_PROFILE_CHARACTER_VOICE := "character_voice"
+const SFX_PROFILE_BOARDING_VOICE := "boarding_voice"
+const SFX_PROFILE_BATTLE_ALERT := "battle_alert"
+# 새 효과음은 보통 SFX_PROFILE_BY_KEY에 용도만 고르고, 값 튜닝이 꼭 필요할 때만 SFX_PROFILE_OVERRIDES를 쓴다.
+const SFX_PROFILE_PRESETS := {
+	SFX_PROFILE_DEFAULT_3D: {},
+	SFX_PROFILE_WEAPON_CLOSE: {
 		"volume_db": -1.0,
 		"max_distance": 220.0,
 		"unit_size": 60.0,
 	},
+	SFX_PROFILE_LIGHT_PROJECTILE: {
+		"volume_db": -5.0,
+		"max_distance": 150.0,
+		"unit_size": 38.0,
+		"pitch_jitter": 0.035,
+		"rate_limit_msec": 55,
+	},
+	SFX_PROFILE_CANNON_BLAST: {
+		"volume_db": 1.5,
+		"max_distance": 340.0,
+		"unit_size": 95.0,
+		"pitch_jitter": 0.08,
+	},
+	SFX_PROFILE_SHIP_AMBIENT: {
+		"volume_db": 2.0,
+		"max_distance": 260.0,
+		"unit_size": 75.0,
+	},
+	SFX_PROFILE_CHARACTER_VOICE: {
+		"volume_db": 0.5,
+		"max_distance": 250.0,
+		"unit_size": 80.0,
+		"pitch_jitter": 0.025,
+	},
+	SFX_PROFILE_BOARDING_VOICE: {
+		"volume_db": 1.5,
+		"max_distance": 320.0,
+		"unit_size": 110.0,
+		"pitch_jitter": 0.025,
+	},
+	SFX_PROFILE_BATTLE_ALERT: {
+		"volume_db": 1.5,
+		"non_spatial": true,
+	},
+}
+const SFX_PROFILE_BY_KEY := {
+	"cannon_fire": SFX_PROFILE_CANNON_BLAST,
+	"wave_splash": SFX_PROFILE_SHIP_AMBIENT,
+	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
+	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
+	"bow_shoot": SFX_PROFILE_LIGHT_PROJECTILE,
+	"sword_swing": SFX_PROFILE_WEAPON_CLOSE,
+	"soldier_hit": SFX_PROFILE_WEAPON_CLOSE,
+	"soldier_die": SFX_PROFILE_CHARACTER_VOICE,
+	"boarding_war_cry": SFX_PROFILE_BOARDING_VOICE,
+	"boss_horn": SFX_PROFILE_BATTLE_ALERT,
+	"support_foghorn": SFX_PROFILE_BATTLE_ALERT,
+}
+const SFX_PROFILE_OVERRIDES := {
+	"oars_rowing": {
+		"max_distance": 240.0,
+		"unit_size": 70.0,
+	},
 	"sword_swing": {
 		"volume_db": 0.5,
-		"max_distance": 220.0,
-		"unit_size": 60.0,
 	},
 	"soldier_hit": {
 		"volume_db": 1.0,
 		"max_distance": 230.0,
 		"unit_size": 65.0,
 	},
-	"boarding_war_cry": {
-		"volume_db": -2.0,
-		"max_distance": 260.0,
-		"unit_size": 85.0,
-	},
-	"boss_horn": {
-		"volume_db": -8.0,
-		"max_distance": 420.0,
-		"unit_size": 120.0,
+	"ship_sink_bubbles": {
+		"volume_db": -2.5,
+		"max_distance": 210.0,
+		"unit_size": 70.0,
+		"pitch_jitter": 0.04,
+		"rate_limit_msec": 300,
 	},
 	"support_foghorn": {
-		"volume_db": -2.0,
-		"max_distance": 360.0,
-		"unit_size": 110.0,
+		"volume_db": 2.0,
 	},
 }
 
@@ -163,8 +209,11 @@ var _use_placeholder: bool = false
 var sfx_pool_size: int = 16
 var sfx_pool: Array[AudioStreamPlayer3D] = []
 var sfx_2d_pool: Array[AudioStreamPlayer] = []
+var sfx_non_spatial_pool: Array[AudioStreamPlayer] = []
 var current_sfx_index: int = 0
 var current_2d_index: int = 0
+var current_non_spatial_index: int = 0
+var _last_sfx_play_msec_by_key: Dictionary = {}
 
 # BGM 플레이어
 var bgm_player: AudioStreamPlayer
@@ -187,7 +236,8 @@ var _essential_warm_keys: Array[String] = [
 	"musket_fire",
 	"wave_splash",
 	"water_splash_large",
-	"water_splash_small"
+	"water_splash_small",
+	"ship_sink_bubbles"
 ]
 var _web_essential_warm_keys: Array[String] = [
 	"ui_click"
@@ -221,6 +271,14 @@ func _ready() -> void:
 		p.bus = "UI" # UI 전용 버스 사용
 		add_child(p)
 		sfx_2d_pool.append(p)
+
+	# 2.5. 위치보다 가독성이 중요한 전투 알림음 전용 풀
+	for i in range(4):
+		var p = AudioStreamPlayer.new()
+		p.name = "SFX_Player_NonSpatial_%d" % i
+		p.bus = "SFX"
+		add_child(p)
+		sfx_non_spatial_pool.append(p)
 		
 	# 3. BGM 플레이어 생성
 	bgm_player = AudioStreamPlayer.new()
@@ -418,13 +476,37 @@ func _set_stream_loop(stream: AudioStream, enabled: bool) -> void:
 func _resolve_sfx_key(stream_name: String) -> String:
 	return SFX_ALIASES.get(stream_name, stream_name)
 
-func _get_3d_sfx_profile(stream_name: String) -> Dictionary:
-	if SFX_3D_PROFILES.has(stream_name):
-		return SFX_3D_PROFILES[stream_name]
+func _get_sfx_profile(stream_name: String) -> Dictionary:
 	var resolved_name := _resolve_sfx_key(stream_name)
-	if SFX_3D_PROFILES.has(resolved_name):
-		return SFX_3D_PROFILES[resolved_name]
-	return {}
+	var profile_name := str(SFX_PROFILE_BY_KEY.get(resolved_name, SFX_PROFILE_DEFAULT_3D))
+	if SFX_PROFILE_BY_KEY.has(stream_name):
+		profile_name = str(SFX_PROFILE_BY_KEY[stream_name])
+
+	var profile := {}
+	if SFX_PROFILE_PRESETS.has(profile_name):
+		_merge_sfx_profile(profile, SFX_PROFILE_PRESETS[profile_name])
+	if SFX_PROFILE_OVERRIDES.has(resolved_name):
+		_merge_sfx_profile(profile, SFX_PROFILE_OVERRIDES[resolved_name])
+	if stream_name != resolved_name and SFX_PROFILE_OVERRIDES.has(stream_name):
+		_merge_sfx_profile(profile, SFX_PROFILE_OVERRIDES[stream_name])
+	return profile
+
+
+func _merge_sfx_profile(target: Dictionary, source: Dictionary) -> void:
+	for key in source.keys():
+		target[key] = source[key]
+
+
+func _should_skip_sfx_for_rate_limit(resolved_name: String, profile: Dictionary) -> bool:
+	var min_interval_msec := int(profile.get("rate_limit_msec", 0))
+	if min_interval_msec <= 0:
+		return false
+	var now_msec := Time.get_ticks_msec()
+	var last_msec := int(_last_sfx_play_msec_by_key.get(resolved_name, -1000000))
+	if now_msec - last_msec < min_interval_msec:
+		return true
+	_last_sfx_play_msec_by_key[resolved_name] = now_msec
+	return false
 
 
 ## 오디오 버스 상태 진단 로직
@@ -453,6 +535,10 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 	if not is_prewarm_finished and mute_sfx_until_prewarm_finished:
 		# 시작 예열 중에는 온디맨드 로드도 막아 첫 전투 프레임 끊김을 피한다.
 		return
+	var resolved_name := _resolve_sfx_key(stream_name)
+	var profile := _get_sfx_profile(stream_name)
+	if _should_skip_sfx_for_rate_limit(resolved_name, profile):
+		return
 	# 1. 리소스 확인 및 동적 로드
 	var stream = _load_stream_for_playback(stream_name)
 	
@@ -462,13 +548,14 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 			_play_placeholder_beep()
 		return
 
-	if position != null:
+	var non_spatial := bool(profile.get("non_spatial", false))
+	if position != null and not non_spatial:
 		# 3D 재생 (3D Player Pool 사용)
-		var profile := _get_3d_sfx_profile(stream_name)
 		var player = sfx_pool[current_sfx_index]
 		player.stream = stream
 		player.global_position = position
-		player.pitch_scale = pitch_scale + randf_range(-0.1, 0.1) # 약간의 피치 변동으로 자연스럽게
+		var pitch_jitter := float(profile.get("pitch_jitter", 0.1))
+		player.pitch_scale = pitch_scale + randf_range(-pitch_jitter, pitch_jitter)
 		player.volume_db = volume_db + DEFAULT_3D_SFX_VOLUME_DB + float(profile.get("volume_db", 0.0))
 		player.max_distance = float(profile.get("max_distance", DEFAULT_3D_SFX_MAX_DISTANCE))
 		player.unit_size = float(profile.get("unit_size", DEFAULT_3D_SFX_UNIT_SIZE))
@@ -477,14 +564,19 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 		# 인덱스 순환
 		current_sfx_index = (current_sfx_index + 1) % sfx_pool.size()
 	else:
-		# 2D 재생 (UI 등)
-		var player = sfx_2d_pool[current_2d_index]
+		# 2D 재생 (UI 또는 전투 알림음)
+		var player: AudioStreamPlayer
+		if non_spatial and not sfx_non_spatial_pool.is_empty():
+			player = sfx_non_spatial_pool[current_non_spatial_index]
+			current_non_spatial_index = (current_non_spatial_index + 1) % sfx_non_spatial_pool.size()
+		else:
+			player = sfx_2d_pool[current_2d_index]
+			current_2d_index = (current_2d_index + 1) % sfx_2d_pool.size()
 		player.stream = stream
 		player.pitch_scale = pitch_scale
-		player.volume_db = volume_db
+		player.bus = "SFX" if non_spatial else "UI"
+		player.volume_db = volume_db + float(profile.get("volume_db", 0.0))
 		player.play()
-		
-		current_2d_index = (current_2d_index + 1) % sfx_2d_pool.size()
 
 func play_sfx_random_pitch(
 	stream_name: String,

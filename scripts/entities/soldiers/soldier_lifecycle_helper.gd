@@ -13,9 +13,11 @@ const PLAYER_INCAPACITATED_RECOVERY_HEALTH_RATIO: float = 0.35
 const PLAYER_INCAPACITATED_MIN_RECOVERY_DELAY: float = 3.0
 const SUPPORT_RESCUE_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_SUPPORT_RESCUE
 const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
-const SOLDIER_DEATH_PITCH_MIN: float = 1.08
-const SOLDIER_DEATH_PITCH_MAX: float = 1.18
+const SOLDIER_DEATH_PITCH_MIN: float = 1.14
+const SOLDIER_DEATH_PITCH_MAX: float = 1.26
 const SOLDIER_DEATH_VOLUME_DB: float = -1.0
+const SOLDIER_SINKING_DEATH_VOLUME_DB: float = -10.0
+const SOLDIER_SINKING_SPLASH_VOLUME_DB: float = -6.0
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -232,6 +234,9 @@ static func die(soldier) -> void:
 
 	_snap_dead_body_to_deck(soldier)
 	var death_position: Vector3 = soldier.global_position
+	var is_sinking_death := _is_sinking_death_context(soldier)
+	var death_volume_db := SOLDIER_SINKING_DEATH_VOLUME_DB if is_sinking_death else SOLDIER_DEATH_VOLUME_DB
+	var splash_volume_db := SOLDIER_SINKING_SPLASH_VOLUME_DB if is_sinking_death else 0.0
 	var tree: SceneTree = soldier.get_tree()
 	var audio_manager = soldier.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -241,14 +246,14 @@ static func die(soldier) -> void:
 				death_position,
 				SOLDIER_DEATH_PITCH_MIN,
 				SOLDIER_DEATH_PITCH_MAX,
-				SOLDIER_DEATH_VOLUME_DB
+				death_volume_db
 			)
 		else:
 			audio_manager.play_sfx(
 				"soldier_die",
 				death_position,
 				randf_range(SOLDIER_DEATH_PITCH_MIN, SOLDIER_DEATH_PITCH_MAX),
-				SOLDIER_DEATH_VOLUME_DB
+				death_volume_db
 			)
 		if is_instance_valid(tree):
 			tree.create_timer(randf_range(0.3, 0.6)).timeout.connect(func():
@@ -257,7 +262,7 @@ static func die(soldier) -> void:
 					return
 				var delay_am = main_loop.root.get_node_or_null("AudioManager")
 				if is_instance_valid(delay_am) and delay_am.has_method("play_sfx"):
-					delay_am.play_sfx("water_splash_small", death_position, randf_range(0.8, 1.2))
+					delay_am.play_sfx("water_splash_small", death_position, randf_range(0.8, 1.2), splash_volume_db)
 			)
 
 	soldier.set_physics_process(false)
@@ -285,6 +290,22 @@ static func _snap_dead_body_to_deck(soldier) -> void:
 		return
 	if soldier.has_method("_keep_within_owned_ship_bounds"):
 		soldier._keep_within_owned_ship_bounds()
+
+
+static func _is_sinking_death_context(soldier) -> bool:
+	if soldier.get_meta(ENEMY_SINKING_REWARD_ACCOUNTED_META, false) == true:
+		return true
+	if _is_ship_sinking_or_dying(soldier.owned_ship):
+		return true
+	return _is_ship_sinking_or_dying(soldier.home_ship)
+
+
+static func _is_ship_sinking_or_dying(ship) -> bool:
+	if ship == null or not is_instance_valid(ship):
+		return false
+	if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
+		return true
+	return ship.get("is_sinking") == true or ship.get("is_dying") == true
 
 
 static func _should_incapacitate_instead_of_die(soldier) -> bool:

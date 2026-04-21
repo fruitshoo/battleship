@@ -94,7 +94,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	# 활 쏘는 소리
 	var audio_manager = attacker.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager):
-		audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(0.9, 1.1))
+		audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(0.84, 1.0))
 
 func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 	var current = node

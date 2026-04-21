@@ -38,6 +38,7 @@
 | sfx_rocket_launch_01.ogg |CC0|https://freesound.org/people/LukaCafuka/sounds/750685/|
 | sfx_rocket_launch_02.ogg |CC0|https://freesound.org/people/LukaCafuka/sounds/750684/|
 | sfx_rocket_launch_03.ogg |CC0|https://freesound.org/people/ReadeOnly/sounds/186933/|
+| sfx_ship_sink_bubbles_cc0.ogg |CC0|https://freesound.org/people/pillwave/sounds/423959/|
 | sfx_soldier_die_1.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_soldier_die_2.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_soldier_die_3.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
