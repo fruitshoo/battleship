@@ -8,13 +8,40 @@ const BOSS_DERELICT_CONTACT_SCORE_REWARD: int = 120
 const BOSS_DERELICT_CONTACT_XP_REWARD: int = 35
 const BOSS_DERELICT_CONTACT_MERIT_REWARD: int = 18
 const BOSS_DERELICT_CONTACT_SURVIVOR_RESCUES: int = 2
+const COLLISION_REPULSION_CACHE_FRAME_META := "collision_repulsion_cache_frame"
+const COLLISION_REPULSION_CACHE_FORCE_META := "collision_repulsion_cache_force"
+const COLLISION_REPULSION_CACHE_SHIP_COUNT_META := "collision_repulsion_cache_ship_count"
+const COLLISION_REPULSION_CACHE_MIN_SHIP_COUNT := 8
+const COLLISION_REPULSION_CACHE_FRAME_WINDOW := 2
 
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
-	var force = Vector3.ZERO
 	var neighbors = EntityRegistry.get_ships()
+	var current_frame: int = Engine.get_physics_frames()
+	var ship_count: int = neighbors.size()
+	var skip_cache: bool = false
+	if ship_count < COLLISION_REPULSION_CACHE_MIN_SHIP_COUNT:
+		skip_cache = true
+	elif ship.has_method("is_player_controlled_ship") and ship.call("is_player_controlled_ship") == true:
+		skip_cache = true
+	elif ship.get("is_boarding") == true:
+		skip_cache = true
+	elif ship.has_method("get_boarding_target_ship"):
+		var boarding_target: Variant = ship.call("get_boarding_target_ship")
+		if is_instance_valid(boarding_target):
+			skip_cache = true
+	if not skip_cache and ship.has_meta(COLLISION_REPULSION_CACHE_FRAME_META):
+		var cached_frame: int = int(ship.get_meta(COLLISION_REPULSION_CACHE_FRAME_META, -1000))
+		var cached_ship_count: int = int(ship.get_meta(COLLISION_REPULSION_CACHE_SHIP_COUNT_META, 0))
+		if current_frame - cached_frame < COLLISION_REPULSION_CACHE_FRAME_WINDOW \
+			and abs(cached_ship_count - ship_count) <= 1 \
+			and ship.has_meta(COLLISION_REPULSION_CACHE_FORCE_META):
+			var cached_force: Variant = ship.get_meta(COLLISION_REPULSION_CACHE_FORCE_META, Vector3.ZERO)
+			return cached_force if cached_force is Vector3 else Vector3.ZERO
+
+	var force = Vector3.ZERO
 
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
@@ -137,6 +164,9 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			if approach_speed >= ship.min_ramming_speed and not is_player_support_pair:
 				ship.apply_ramming_damage(other, approach_speed)
 
+	ship.set_meta(COLLISION_REPULSION_CACHE_FRAME_META, current_frame)
+	ship.set_meta(COLLISION_REPULSION_CACHE_SHIP_COUNT_META, ship_count)
+	ship.set_meta(COLLISION_REPULSION_CACHE_FORCE_META, force)
 	return force
 
 

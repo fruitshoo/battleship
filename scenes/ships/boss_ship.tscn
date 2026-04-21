@@ -1,32 +1,37 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://colm46xlwrqry"]
 
-[ext_resource type="Script" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
-[ext_resource type="Script" path="res://scripts/entities/ships/boss_ship.gd" id="1"]
+[ext_resource type="Script" uid="uid://cs6tj62g3wuin" path="res://scripts/entities/ships/boss_ship.gd" id="1"]
+[ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
 
-[sub_resource type="BoxShape3D" id="BoxShape_proximity"]
-size = Vector3(6.6, 2.7, 13.3)
+[sub_resource type="BoxShape3D" id="BoxShape3D_2242h"]
+size = Vector3(5.22, 2.95, 11.92)
 
-[sub_resource type="BoxShape3D" id="BoxShape_hit"]
-size = Vector3(6, 2.5, 12.5)
-[node name="BossShip" type="Node3D"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1olwy"]
+size = Vector3(4.62, 2.75, 11.12)
+
+[node name="BossShip" type="Node3D" unique_id=1300417418]
 script = ExtResource("1")
+max_speed = 3.0
+base_collision_radius = 5.52
+width_multiplier = 0.41123188202357597
+max_hull_hp = 680.0
 
-[node name="ProximityArea" type="Area3D" parent="." groups=["ship_proximity"]]
+[node name="ProximityArea" type="Area3D" parent="." unique_id=261607379 groups=["ship_proximity"]]
 collision_layer = 4
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea"]
-shape = SubResource("BoxShape_proximity")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=498059689]
+shape = SubResource("BoxShape3D_2242h")
 
-[node name="HitArea" type="Area3D" parent="." groups=["ship_hitbox"]]
+[node name="HitArea" type="Area3D" parent="." unique_id=622514920 groups=["ship_hitbox"]]
 collision_layer = 4
 collision_mask = 0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea"]
-shape = SubResource("BoxShape_hit")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=163643442]
+shape = SubResource("BoxShape3D_1olwy")
 
+[node name="Soldiers" type="Node3D" parent="." unique_id=57025064]
 
-[node name="Soldiers" type="Node3D" parent="."]
-
-[node name="CollisionVisualizer" type="Node3D" parent="."]
+[node name="CollisionVisualizer" type="Node3D" parent="." unique_id=737223088]
+visible = false
 script = ExtResource("sys_vis_script")

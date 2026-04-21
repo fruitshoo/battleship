@@ -180,6 +180,12 @@ static func apply_boss_stats(ship, stats: Dictionary) -> void:
 		ship.max_hull_hp = float(stats["hull_hp"])
 	if stats.has("move_speed"):
 		ship.move_speed = float(stats["move_speed"])
+	if stats.has("preferred_range") and ship.get("preferred_combat_range") != null:
+		ship.preferred_combat_range = float(stats["preferred_range"])
+	if stats.has("range_tolerance") and ship.get("combat_range_tolerance") != null:
+		ship.combat_range_tolerance = float(stats["range_tolerance"])
+	if stats.has("retreat_distance") and ship.get("retreat_distance") != null:
+		ship.retreat_distance = float(stats["retreat_distance"])
 	if stats.has("tier"):
 		ship.tier = int(stats["tier"])
 	if stats.has("orbit_distance"):
