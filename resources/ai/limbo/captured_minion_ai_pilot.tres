@@ -1,0 +1,24 @@
+[gd_resource type="BehaviorTree" format=3]
+
+[ext_resource type="Script" uid="uid://48jeqwf0vy8s" path="res://scripts/ai/limbo/tasks/bt_ship_select_player_target.gd" id="1_select"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_captured_minion_set_mode.gd" id="2_captured_mode"]
+
+[sub_resource type="BlackboardPlan" id="BlackboardPlan_captured"]
+
+[sub_resource type="BTAction" id="BTAction_select"]
+script = ExtResource("1_select")
+
+[sub_resource type="BTAction" id="BTAction_captured_mode"]
+script = ExtResource("2_captured_mode")
+threat_range = 34.0
+threat_leash_distance = 68.0
+regroup_distance = 44.0
+
+[sub_resource type="BTSequence" id="BTSequence_root"]
+custom_name = "Captured Minion AI Pilot: follow, regroup, or guard nearby threats"
+children = [SubResource("BTAction_select"), SubResource("BTAction_captured_mode")]
+
+[resource]
+description = "Captured-minion LimboAI behavior tree. It selects the player flagship and publishes a follow, regroup, or guard-threat mode while the existing minion helper still owns steering, formation, and collision execution."
+blackboard_plan = SubResource("BlackboardPlan_captured")
+root_task = SubResource("BTSequence_root")

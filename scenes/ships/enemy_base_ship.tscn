@@ -1,0 +1,70 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/ships/chaser_ship.gd" id="1_chaser"]
+[ext_resource type="PackedScene" uid="uid://bbrb610a2rv1j" path="res://scenes/ships/hulls/kobayabune_hull.tscn" id="2_73pna"]
+[ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
+[ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
+[ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_73pna"]
+size = Vector3(3.12, 2.6000001, 7.92)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pukie"]
+size = Vector3(2.52, 2.4, 7.12)
+
+[node name="EnemyBaseShip" type="Node3D" unique_id=2138341481 groups=["enemy"]]
+script = ExtResource("1_chaser")
+move_speed = 4.2
+boarders_count = 5
+initial_crew_count = 5
+hull_scene = ExtResource("2_73pna")
+preferred_combat_range = 4.5
+combat_range_tolerance = 1.0
+retreat_distance = 3.5
+limbo_ai_pilot_enabled = true
+max_crew = 7
+max_speed = 6.0
+base_collision_radius = 2.9568
+width_multiplier = 0.3465909319982925
+auto_fit_scale = 0.84
+floating_offset = 0.5
+max_hull_hp = 145.0
+metadata/boarding_feedback_contested = false
+metadata/boarding_feedback_overrun = false
+
+[node name="ProximityArea" type="Area3D" parent="." unique_id=694699390 groups=["ship_proximity"]]
+collision_layer = 4
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=1935515166]
+shape = SubResource("BoxShape3D_73pna")
+
+[node name="HitArea" type="Area3D" parent="." unique_id=1043851433 groups=["ship_hitbox"]]
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=240060993]
+shape = SubResource("BoxShape3D_pukie")
+
+[node name="Soldiers" type="Node3D" parent="." unique_id=470013572]
+
+[node name="Archer1" parent="Soldiers" unique_id=438727161 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+team = "enemy"
+
+[node name="Archer2" parent="Soldiers" unique_id=1097590409 instance=ExtResource("2_soldier")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+team = "enemy"
+
+[node name="Archer3" parent="Soldiers" unique_id=2073146356 instance=ExtResource("2_soldier")]
+team = "enemy"
+
+[node name="WakeTrail" parent="." unique_id=1464356147 instance=ExtResource("3_wake_trail")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
+
+[node name="CollisionVisualizer" type="Node3D" parent="." unique_id=1919619224]
+visible = false
+script = ExtResource("sys_vis_script")
+
+[connection signal="area_entered" from="ProximityArea" to="." method="_on_area_entered"]
+[connection signal="body_entered" from="ProximityArea" to="." method="_on_body_entered"]

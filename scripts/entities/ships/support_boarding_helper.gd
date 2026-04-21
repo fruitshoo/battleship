@@ -41,6 +41,7 @@ static func finish_support_attack_boarding_if_safe(target_ship: Node, target_tea
 	var attack_ships := _get_support_attack_boarding_ships(target_ship)
 	if attack_ships.is_empty():
 		return false
+	var hold_attack_boarders := _should_hold_support_attack_boarders_on_target(target_ship)
 
 	var support_boarders: Array[Node] = []
 	for soldier in EntityRegistry.get_soldiers_by_ship(target_ship):
@@ -50,15 +51,25 @@ static func finish_support_attack_boarding_if_safe(target_ship: Node, target_tea
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team == target_team:
+			if hold_attack_boarders:
+				_set_support_attack_transfer_suppressed(attack_ships, false)
 			return false
 		if _is_support_attack_boarder_on_target(soldier, target_ship, attack_ships):
 			support_boarders.append(soldier)
 		else:
+			if hold_attack_boarders:
+				_set_support_attack_transfer_suppressed(attack_ships, false)
 			return false
 
+	if hold_attack_boarders:
+		# Boss breach boarding should keep the committed support boarders on deck so
+		# they can continue capture pressure, but stop feeding fresh crew into an
+		# already-secured deck every interval.
+		_set_support_attack_transfer_suppressed(attack_ships, true)
+		return false
+
 	target_ship.boarding_capture_progress = 0.0
-	for support_ship in attack_ships:
-		ShipBoardingMetaHelper.set_transfer_suppressed(support_ship, true)
+	_set_support_attack_transfer_suppressed(attack_ships, true)
 
 	for soldier in support_boarders:
 		if soldier.has_method("is_jumping_value") and soldier.is_jumping_value():
@@ -125,6 +136,26 @@ static func _count_support_attack_boarders_on_target(target_ship: Node, attack_s
 		if _is_support_attack_boarder_on_target(soldier, target_ship, attack_ships):
 			count += 1
 	return count
+
+
+static func _should_hold_support_attack_boarders_on_target(target_ship: Node) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if target_ship.get("is_sinking") == true or target_ship.get("is_dying") == true:
+		return false
+	if target_ship.has_method("is_derelict_ship") and target_ship.call("is_derelict_ship") == true:
+		return false
+	if target_ship.get("is_derelict") == true:
+		return false
+	if target_ship.is_in_group("boss"):
+		return true
+	var ship_type_value: Variant = target_ship.get("ship_type") if target_ship.get("ship_type") != null else null
+	return str(ship_type_value).to_lower().contains("atakebune")
+
+
+static func _set_support_attack_transfer_suppressed(attack_ships: Array[Node], suppressed: bool) -> void:
+	for support_ship in attack_ships:
+		ShipBoardingMetaHelper.set_transfer_suppressed(support_ship, suppressed)
 
 
 static func _is_support_rescue_boarder_on_player_ship(soldier: Node, player_ship: Node) -> bool:

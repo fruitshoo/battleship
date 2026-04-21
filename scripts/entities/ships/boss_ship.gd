@@ -1,7 +1,6 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -11,6 +10,15 @@ signal boss_died
 @export var team: String = "enemy"
 @export var move_speed: float = 3.0
 @export var orbit_distance: float = 35.0 # 플레이어 주변을 도는 거리
+@export_range(4.0, 40.0, 0.5) var preferred_combat_range: float = 16.0
+@export_range(0.5, 10.0, 0.5) var combat_range_tolerance: float = 2.5
+@export_range(2.0, 20.0, 0.5) var retreat_distance: float = 9.0
+@export_range(0.4, 2.5, 0.05) var ai_rudder_gain: float = 1.05
+@export_range(12.0, 120.0, 1.0) var ai_rudder_response_speed: float = 34.0
+@export_range(6.0, 60.0, 1.0) var ai_max_turn_rate: float = 16.0
+@export_range(0.2, 1.4, 0.05) var ai_turn_authority: float = 0.92
+@export_range(4.0, 24.0, 0.25) var ai_close_turn_soft_radius: float = 10.0
+@export_range(0.2, 1.0, 0.05) var ai_close_turn_scale: float = 0.72
 @export_range(0.0, 1.0, 0.01) var orbit_inward_bias: float = 0.34 # 선회 중에도 플레이어 쪽으로 얼마나 파고들지
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/launchers/cannon_enemy_heavy.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/launchers/singigeon_launcher.tscn")
@@ -85,6 +93,7 @@ func _ready() -> void:
 		add_child(hull_inst)
 	else:
 		_update_editor_hull()
+	limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 		
 	super._ready()
 	hull_hp = max_hull_hp
@@ -239,6 +248,7 @@ func _physics_process(delta: float) -> void:
 	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
 	_update_limbo_ai_pilot(delta)
+	_auto_adjust_sail(delta)
 	
 	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true or target.get("is_dead") == true:
 		target = null
@@ -255,73 +265,94 @@ func _physics_process(delta: float) -> void:
 		return
 	to_player = to_player.normalized()
 	var dist = global_position.distance_to(target.global_position)
+	var preferred_range := get_preferred_engagement_range()
+	var range_tolerance := get_engagement_range_tolerance()
+	var retreat_range := get_retreat_engagement_distance()
 	
 	# 거리가 너무 멀면 접근, 적절하면 선회, 너무 가까우면 뒤로
-	var move_dir = Vector3.ZERO
+	var desired_move_dir = Vector3.ZERO
 	var range_intent := _get_limbo_range_intent()
 	var stance := _get_limbo_stance()
 	var orbit_dir := Vector3(-to_player.z, 0, to_player.x)
 	if range_intent == ShipAILimboKeys.INTENT_CLOSE_DISTANCE:
-		move_dir = _get_limbo_close_move_dir(to_player, orbit_dir, stance)
+		desired_move_dir = _get_limbo_close_move_dir(to_player, orbit_dir, stance)
 	elif range_intent == ShipAILimboKeys.INTENT_HOLD:
-		move_dir = - to_player
+		desired_move_dir = _build_withdraw_move_dir(to_player, orbit_dir)
 	elif range_intent == ShipAILimboKeys.INTENT_ENGAGE:
 		# 플레이어 주변을 시계 방향으로 선회
-		move_dir = (orbit_dir + to_player * _get_limbo_orbit_inward_bias(stance)).normalized()
-	elif dist > orbit_distance + 5.0:
-		move_dir = to_player
-	elif dist < orbit_distance - 5.0:
-		move_dir = - to_player
+		desired_move_dir = (orbit_dir + to_player * _get_limbo_orbit_inward_bias(stance)).normalized()
+	elif dist > preferred_range + range_tolerance:
+		desired_move_dir = to_player
+	elif dist < retreat_range:
+		desired_move_dir = _build_withdraw_move_dir(to_player, orbit_dir)
 	else:
-		move_dir = (orbit_dir + to_player * orbit_inward_bias).normalized()
+		desired_move_dir = (orbit_dir + to_player * orbit_inward_bias).normalized()
 
-	var limbo_nav_hint := _get_limbo_navigation_hint(target)
-	var limbo_speed_mult := 1.0
+	var limbo_nav_hint: Dictionary = _get_limbo_navigation_hint(target)
+	var limbo_speed_mult: float = 1.0
+	var desired_heading_point: Vector3 = global_position + desired_move_dir
 	if not limbo_nav_hint.is_empty():
 		var hinted_move_dir: Vector3 = limbo_nav_hint.get("move_dir", Vector3.ZERO)
 		if hinted_move_dir.length_squared() > 0.001:
-			move_dir = hinted_move_dir.normalized()
+			desired_move_dir = hinted_move_dir.normalized()
 			limbo_speed_mult = clampf(float(limbo_nav_hint.get("speed_mult", 1.0)), 0.1, 1.35)
-		
-	# === 이동 및 회전 (Separation 및 Hard Collision 포함) ===
-	# 1. Separation (부드러운 충돌 방지)
-	var sep = _calculate_separation()
-	
-	# 2. Collision Repulsion (강체 충돌 및 충각 데미지)
-	var hard_rep = _calculate_collision_repulsion()
-	
+		var hinted_heading_point: Vector3 = limbo_nav_hint.get("heading_point", global_position + desired_move_dir)
+		desired_heading_point = hinted_heading_point
+
+	# === 이동 및 회전 (Rudder-driven) ===
+	var sep: Vector3 = _calculate_separation()
+	var hard_rep: Vector3 = _calculate_collision_repulsion()
+	var steering_dir: Vector3 = desired_move_dir
 	if (sep + hard_rep).length_squared() > 0.001:
-		# 보스는 질량이 크므로 다른 배들에 비해 밀려나는 정도를 적게 함 (0.5배 -> 0.3배)
-		move_dir = (move_dir.normalized() + (sep + hard_rep) * 0.3).normalized()
-	
-	# 이동 및 회전
-	var target_look = global_position + move_dir
-	if not global_position.is_equal_approx(target_look):
-		target_look.y = global_position.y
-		var look_target = lerp(global_position + -basis.z, target_look, delta * 2.0)
-		look_target.y = global_position.y
-		look_at(look_target, Vector3.UP)
-		
-	# 이동 (누수율에 비례하여 속도 감소)
-	var leak_speed_mult = clamp(1.0 - (leaking_rate * 0.03), 0.4, 1.0)
-	
-	# === 바람 영향(Wind Force) 적용 ===
-	var wind_mult = 1.0
-	var wind_manager = get_node_or_null("/root/WindManager")
-	if is_instance_valid(wind_manager) and wind_manager.has_method("get_wind_direction"):
-		var wind_dir: Vector2 = wind_manager.get_wind_direction()
-		var wind_str: float = wind_manager.get_wind_strength()
-		
-		var ship_forward = Vector2(move_dir.x, move_dir.z).normalized()
-		var dot_prod = wind_dir.dot(ship_forward)
-		
-		# 보스는 덩치가 커서 바람의 영향을 조금 덜 받도록 완화 (0.6 ~ 1.3)
-		var base_wind_influence = remap(dot_prod, -1.0, 1.0, 0.6, 1.3)
-		wind_mult = lerp(1.0, base_wind_influence, wind_str)
-		
-	# velocity 계산 및 적용
-	var final_velocity = move_dir * move_speed * leak_speed_mult * wind_mult * limbo_speed_mult
-	global_position += (final_velocity + hard_rep) * delta
+		# 보스는 질량이 커서 밀림을 덜 받되, 조타 목표에는 살짝 반영한다.
+		steering_dir = (steering_dir.normalized() + (sep + hard_rep) * 0.24).normalized()
+		desired_heading_point = global_position + steering_dir
+
+	var heading_vector := desired_heading_point - global_position
+	heading_vector.y = 0.0
+	if heading_vector.length_squared() <= 0.001:
+		heading_vector = steering_dir if steering_dir.length_squared() > 0.001 else desired_move_dir
+	if heading_vector.length_squared() <= 0.001:
+		heading_vector = to_player
+	var target_rotation_y := atan2(-heading_vector.x, -heading_vector.z)
+	var angle_diff := wrapf(target_rotation_y - rotation.y, -PI, PI)
+	var desired_rudder: float = clampf(-rad_to_deg(angle_diff) * ai_rudder_gain, -40.0, 40.0)
+	var close_turn_blend: float = 0.0
+	if ai_close_turn_soft_radius > 0.01:
+		close_turn_blend = clampf(1.0 - (dist / ai_close_turn_soft_radius), 0.0, 1.0)
+	var close_turn_factor: float = lerpf(1.0, ai_close_turn_scale, close_turn_blend)
+	desired_rudder *= close_turn_factor
+	var rudder_speed_adjusted: float = ai_rudder_response_speed * get_rudder_response_multiplier()
+	rudder_angle = move_toward(rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
+
+	var leak_speed_mult: float = clampf(1.0 - (leaking_rate * 0.03), 0.4, 1.0)
+	var desired_speed: float = move_speed * leak_speed_mult * limbo_speed_mult * get_shiphandling_multiplier()
+	if desired_speed > current_speed:
+		current_speed = move_toward(current_speed, desired_speed, acceleration * delta)
+	else:
+		current_speed = move_toward(current_speed, desired_speed, deceleration * delta)
+
+	if current_speed > 0.1:
+		var turn_speed_reference: float = maxf(move_speed * 1.15, 3.2)
+		var speed_ratio: float = clampf(current_speed / turn_speed_reference, 0.0, 1.0)
+		var actual_turn: float = (rudder_angle / 45.0) * turn_rate * get_rudder_turn_multiplier() * speed_ratio * turn_mult * ai_turn_authority * close_turn_factor * delta
+		var max_turn_this_frame: float = ai_max_turn_rate * delta
+		actual_turn = clampf(actual_turn, -max_turn_this_frame, max_turn_this_frame)
+		rotation.y -= deg_to_rad(actual_turn)
+
+	var forward_vec: Vector3 = Vector3(-sin(rotation.y), 0.0, -cos(rotation.y))
+	var wind_mult: float = _calculate_boss_wind_multiplier(forward_vec)
+	var velocity: Vector3 = forward_vec * current_speed * wind_mult
+	velocity += sep
+	velocity += hard_rep * delta
+	global_position += velocity * delta
+	_update_rudder_visual()
+	_set_wake_state(
+		current_speed > 0.4 or sep.length() > 0.12,
+		clampf(current_speed / maxf(move_speed, 0.01), 0.0, 1.0),
+		clampf(rudder_angle / 45.0, -1.0, 1.0),
+		clampf(sep.length() / 2.0, 0.0, 1.0)
+	)
 	
 	_update_leaking_damage(delta)
 		
@@ -366,11 +397,27 @@ func _find_player() -> void:
 
 
 func get_preferred_engagement_range() -> float:
-	return orbit_distance
+	return preferred_combat_range
 
 
 func get_engagement_range_tolerance() -> float:
-	return 5.0
+	return combat_range_tolerance
+
+
+func get_retreat_engagement_distance() -> float:
+	return retreat_distance
+
+
+func is_gunner_role() -> bool:
+	return true
+
+
+func can_board_targets() -> bool:
+	return false
+
+
+func get_limbo_ai_default_tree_path() -> String:
+	return ShipLimboAIPilot.BOSS_TREE_PATH
 
 
 func _cache_limbo_base_combat_values() -> void:
@@ -433,6 +480,34 @@ func _get_limbo_close_move_dir(to_player: Vector3, orbit_dir: Vector3, stance: S
 	return to_player
 
 
+func _build_withdraw_move_dir(to_player: Vector3, orbit_dir: Vector3) -> Vector3:
+	return (-to_player * 0.72 + orbit_dir * 0.28).normalized()
+
+
+func _calculate_boss_wind_multiplier(forward_vec: Vector3) -> float:
+	var wind_manager = get_node_or_null("/root/WindManager")
+	if not is_instance_valid(wind_manager) or not wind_manager.has_method("get_wind_direction"):
+		return 1.0
+	var wind_dir: Vector2 = wind_manager.get_wind_direction()
+	var wind_str: float = wind_manager.get_wind_strength()
+	var ship_forward := Vector2(forward_vec.x, forward_vec.z).normalized()
+	var dot_prod := wind_dir.dot(ship_forward)
+	var base_wind_influence := remap(dot_prod, -1.0, 1.0, 0.65, 1.24)
+	return lerp(1.0, base_wind_influence, wind_str)
+
+
+func _auto_adjust_sail(delta: float) -> void:
+	var wind_manager = get_node_or_null("/root/WindManager")
+	if not is_instance_valid(wind_manager) or not wind_manager.has_method("get_wind_direction"):
+		return
+	var wind_dir: Vector2 = wind_manager.get_wind_direction()
+	var wind_angle: float = rad_to_deg(atan2(wind_dir.x, -wind_dir.y))
+	var ship_angle_ccw: float = rad_to_deg(rotation.y)
+	var rel_wind_angle: float = wrapf(wind_angle + ship_angle_ccw, -180.0, 180.0)
+	var target_sail_angle: float = clamp(rel_wind_angle / 2.0, -90.0, 90.0)
+	sail_angle = move_toward(sail_angle, target_sail_angle, 42.0 * delta)
+
+
 func _get_limbo_navigation_hint(target_node: Node3D) -> Dictionary:
 	if not limbo_ai_pilot_enabled or not is_instance_valid(target_node):
 		return {}
@@ -458,6 +533,7 @@ func _get_limbo_navigation_hint(target_node: Node3D) -> Dictionary:
 		"speed_mult": float(get_meta(ShipAILimboKeys.META_NAV_SPEED_MULT, 1.0)),
 		"mode": nav_mode,
 		"desired_point": desired_point,
+		"heading_point": get_meta(ShipAILimboKeys.META_NAV_HEADING_POINT, desired_point),
 	}
 
 
@@ -536,6 +612,7 @@ func die() -> void:
 	
 	boss_died.emit()
 	print("[Boss] 보스 격침!")
+	play_sink_bubbles(0.45, -1.5)
 	if is_instance_valid(cached_lm):
 		if cached_lm.has_method("add_ship_sunk"):
 			cached_lm.add_ship_sunk(1)

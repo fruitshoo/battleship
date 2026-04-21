@@ -802,6 +802,25 @@ static func _run_single_smoke_pass(owner: Node, failures: Array[String], packed:
 			spawned_boss = spawner.call(spawn_method) as Node3D
 			await _wait_frames(owner, wait_frames_after_spawn)
 		_validate_spawned_boss(failures, spawned_boss, label)
+		if is_instance_valid(spawned_boss):
+			spawned_boss.set("current_speed", 0.0)
+			spawned_boss.set("rudder_angle", 0.0)
+			spawned_boss.rotation.y += PI * 0.5
+			var boss_motion_start: Vector3 = spawned_boss.global_position
+			await _wait_frames(owner, 12)
+			if not is_instance_valid(spawned_boss):
+				failures.append("%s rudder motion contract boss disappeared during steering check" % label)
+			else:
+				var boss_current_speed: float = float(spawned_boss.get("current_speed"))
+				if boss_current_speed <= 0.08:
+					failures.append("%s rudder motion contract never built forward speed: %.3f" % [label, boss_current_speed])
+				var boss_rudder_angle: float = absf(float(spawned_boss.get("rudder_angle")))
+				if boss_rudder_angle <= 0.2:
+					failures.append("%s rudder motion contract never engaged rudder: %.3f" % [label, boss_rudder_angle])
+				var boss_displacement: Vector3 = spawned_boss.global_position - boss_motion_start
+				boss_displacement.y = 0.0
+				if boss_displacement.length() <= 0.015:
+					failures.append("%s rudder motion contract barely moved: %.3f" % [label, boss_displacement.length()])
 
 	_validate_registry_smoke(failures, player_ship, label)
 	if label == "final boss":
@@ -1354,6 +1373,23 @@ static func _validate_spawned_boss(failures: Array[String], spawned_boss: Node3D
 	var max_hull_hp: float = float(spawned_boss.get("max_hull_hp"))
 	if int(spawned_boss.get("tier")) == 1 and max_hull_hp > 720.0:
 		failures.append("%s mid boss hull contract failed: %.1f > 720.0" % [label, max_hull_hp])
+	var preferred_range: float = float(spawned_boss.get("preferred_combat_range"))
+	var range_tolerance: float = float(spawned_boss.get("combat_range_tolerance"))
+	var retreat_distance: float = float(spawned_boss.get("retreat_distance"))
+	if int(spawned_boss.get("tier")) == 1:
+		if absf(preferred_range - 14.0) > 0.05:
+			failures.append("%s mid boss preferred range contract failed: %.2f != 14.0" % [label, preferred_range])
+		if absf(range_tolerance - 2.5) > 0.05:
+			failures.append("%s mid boss range tolerance contract failed: %.2f != 2.5" % [label, range_tolerance])
+		if absf(retreat_distance - 7.0) > 0.05:
+			failures.append("%s mid boss retreat distance contract failed: %.2f != 7.0" % [label, retreat_distance])
+	else:
+		if absf(preferred_range - 16.0) > 0.05:
+			failures.append("%s final boss preferred range contract failed: %.2f != 16.0" % [label, preferred_range])
+		if absf(range_tolerance - 2.5) > 0.05:
+			failures.append("%s final boss range tolerance contract failed: %.2f != 2.5" % [label, range_tolerance])
+		if absf(retreat_distance - 9.0) > 0.05:
+			failures.append("%s final boss retreat distance contract failed: %.2f != 9.0" % [label, retreat_distance])
 
 
 static func _validate_final_boss_victory_on_death(owner: Node, failures: Array[String], spawned_boss: Node3D, level_manager: Node, label: String) -> void:
@@ -1410,6 +1446,40 @@ static func _validate_spawned_ship(failures: Array[String], spawned_ship: Node3D
 	var registered_enemy := EntityRegistry.get_ships_by_team("enemy").has(spawned_ship)
 	if not registered_enemy:
 		failures.append("%s instance was not registered in enemy team bucket" % label)
+	_validate_spawned_ship_collision_fit(failures, spawned_ship, label)
+
+
+static func _validate_spawned_ship_collision_fit(failures: Array[String], spawned_ship: Node3D, label: String) -> void:
+	if not is_instance_valid(spawned_ship):
+		return
+	if not spawned_ship.has_method("get_collision_half_extents"):
+		return
+	var soft_extents_value: Variant = spawned_ship.call("get_collision_half_extents")
+	if not (soft_extents_value is Vector2):
+		return
+	var soft_extents := soft_extents_value as Vector2
+	if soft_extents.x <= 0.01 or soft_extents.y <= 0.01:
+		failures.append("%s collision fit produced invalid soft extents: %s" % [label, soft_extents])
+		return
+	var hit_area := NodeContractHelper.get_hit_area(spawned_ship)
+	if not is_instance_valid(hit_area):
+		return
+	var hit_shape_node := ShipContactGeometry.get_contact_area_collision_shape(hit_area)
+	if not (hit_shape_node is CollisionShape3D):
+		return
+	var hit_shape := (hit_shape_node as CollisionShape3D).shape
+	if not (hit_shape is BoxShape3D):
+		return
+	var hit_box := hit_shape as BoxShape3D
+	var hit_half_extents := Vector2(hit_box.size.x * 0.5, hit_box.size.z * 0.5)
+	if hit_half_extents.x <= 0.01 or hit_half_extents.y <= 0.01:
+		return
+	var width_ratio: float = soft_extents.x / hit_half_extents.x
+	var length_ratio: float = soft_extents.y / hit_half_extents.y
+	if width_ratio < 0.9:
+		failures.append("%s collision fit width too small for hull/contact box: %.3f" % [label, width_ratio])
+	if length_ratio < 0.9:
+		failures.append("%s collision fit length too small for hull/contact box: %.3f" % [label, length_ratio])
 
 
 static func _wait_frames(owner: Node, count: int) -> void:

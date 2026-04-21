@@ -1,56 +1,64 @@
 [gd_scene format=3 uid="uid://ctnqkvw72euey"]
 
-[ext_resource type="Script" path="res://scripts/entities/ships/support_ship.gd" id="1_support"]
+[ext_resource type="Script" uid="uid://bsdykwc0agmyy" path="res://scripts/entities/ships/support_ship.gd" id="1_support"]
 [ext_resource type="PackedScene" uid="uid://o87wm0hgwlmn" path="res://scenes/ships/hulls/maengseon_hull.tscn" id="2_hull"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="3_soldier"]
 [ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="4_wake_trail"]
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="5_cannon"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="6_collision_visualizer"]
 
-[sub_resource type="BoxShape3D" id="BoxShape_proximity"]
-size = Vector3(3.4, 2.2, 7.2)
+[sub_resource type="BoxShape3D" id="BoxShape3D_46xrd"]
+size = Vector3(2.7199998, 2.6000001, 6.42)
 
-[sub_resource type="BoxShape3D" id="BoxShape_hit"]
-size = Vector3(2.8, 2, 6.4)
+[sub_resource type="BoxShape3D" id="BoxShape3D_6oovs"]
+size = Vector3(2.12, 2.4, 5.62)
 
-[node name="SupportShip" type="Node3D" groups=["player"]]
+[node name="SupportShip" type="Node3D" unique_id=603951927 groups=["player"]]
 script = ExtResource("1_support")
 team = "player"
 move_speed = 4.5
 soldier_scene = ExtResource("3_soldier")
-boarders_count = 4
 initial_crew_count = 5
 cannon_scene = ExtResource("5_cannon")
 hull_scene = ExtResource("2_hull")
-preferred_soldier_type = "general"
+preferred_combat_range = 4.5
+combat_range_tolerance = 1.0
+retreat_distance = 3.5
+limbo_ai_pilot_enabled = true
+limbo_ai_pilot_tree_path = "res://resources/ai/limbo/support_ship_ai_pilot.tres"
 ship_type = "maengseon_ally"
-length_multiplier = 0.82
-width_multiplier = 0.48
+max_crew = 7
+max_speed = 4.5
+base_collision_radius = 2.493
+width_multiplier = 0.3682310355380437
 auto_fit_scale = 0.9
 floating_offset = 0.5
-max_hull_hp = 200.0
-max_crew = 7
+metadata/ally_ship_role = "support_fleet"
+metadata/support_fleet_ship = true
+metadata/boarding_feedback_contested = false
+metadata/boarding_feedback_overrun = false
 
-[node name="ProximityArea" type="Area3D" parent="." groups=["ship_proximity"]]
+[node name="ProximityArea" type="Area3D" parent="." unique_id=1929580253 groups=["ship_proximity"]]
 collision_layer = 4
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea"]
-shape = SubResource("BoxShape_proximity")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=1607305721]
+shape = SubResource("BoxShape3D_46xrd")
 
-[node name="HitArea" type="Area3D" parent="." groups=["ship_hitbox"]]
+[node name="HitArea" type="Area3D" parent="." unique_id=433385544 groups=["ship_hitbox"]]
 collision_layer = 4
 collision_mask = 0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea"]
-shape = SubResource("BoxShape_hit")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=465804758]
+shape = SubResource("BoxShape3D_6oovs")
 
-[node name="Soldiers" type="Node3D" parent="."]
+[node name="Soldiers" type="Node3D" parent="." unique_id=764909694]
 
-[node name="WakeTrail" parent="." instance=ExtResource("4_wake_trail")]
+[node name="WakeTrail" parent="." unique_id=1359669164 instance=ExtResource("4_wake_trail")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 3.4)
 
-[node name="CollisionVisualizer" type="Node3D" parent="."]
+[node name="CollisionVisualizer" type="Node3D" parent="." unique_id=1064114260]
+visible = false
 script = ExtResource("6_collision_visualizer")
 
 [connection signal="area_entered" from="ProximityArea" to="." method="_on_area_entered"]

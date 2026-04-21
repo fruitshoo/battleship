@@ -1,7 +1,7 @@
 extends Node3D
 
 const PLAYER_SHIP_SCENE := preload("res://scenes/ships/player_ship.tscn")
-const ENEMY_BASE_SCENE := preload("res://scenes/ships/enemy_ship.tscn")
+const ENEMY_RUNTIME_SCENE := preload("res://scenes/ships/enemy_ship.tscn")
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
@@ -76,7 +76,7 @@ func _build_scenarios() -> Array[Dictionary]:
 		},
 		{
 			"name": "Mixed Pressure",
-			"enemy_scene": ENEMY_BASE_SCENE,
+			"enemy_scene": ENEMY_RUNTIME_SCENE,
 			"distance": 12.5,
 			"enemy_lateral_offset": 0.0,
 		},
@@ -207,7 +207,7 @@ func _spawn_fresh_ships(scenario: Dictionary) -> void:
 		_current_player_ship.global_position = Vector3(-1.7, 0.0, 15.7)
 		_current_player_ship.rotation = Vector3.ZERO
 
-	var enemy_scene: PackedScene = scenario.get("enemy_scene", ENEMY_BASE_SCENE)
+	var enemy_scene: PackedScene = scenario.get("enemy_scene", ENEMY_RUNTIME_SCENE)
 	_current_enemy_ship = enemy_scene.instantiate() as Node3D
 	if is_instance_valid(_current_enemy_ship):
 		_current_enemy_ship.name = "CombatPreviewEnemy"

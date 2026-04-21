@@ -2542,6 +2542,41 @@ static func _add_ship_section(hud, panel_box: VBoxContainer) -> void:
 	section["body"].add_child(enemy_fleet_status)
 	hud.debug_enemy_fleet_value = enemy_fleet_status
 
+	var ship_ai_status := Label.new()
+	ship_ai_status.text = "플레이어 AI: -"
+	ship_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(ship_ai_status, 10)
+	section["body"].add_child(ship_ai_status)
+	hud.debug_ship_ai_value = ship_ai_status
+
+	var enemy_ai_status := Label.new()
+	enemy_ai_status.text = "적선 AI: -"
+	enemy_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(enemy_ai_status, 10)
+	section["body"].add_child(enemy_ai_status)
+	hud.debug_enemy_ai_value = enemy_ai_status
+
+	var ally_ai_status := Label.new()
+	ally_ai_status.text = "아군 AI: -"
+	ally_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(ally_ai_status, 10)
+	section["body"].add_child(ally_ai_status)
+	hud.debug_ally_ai_value = ally_ai_status
+
+	var player_soldier_ai_status := Label.new()
+	player_soldier_ai_status.text = "아군 병사 AI: -"
+	player_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(player_soldier_ai_status, 10)
+	section["body"].add_child(player_soldier_ai_status)
+	hud.debug_player_soldier_ai_value = player_soldier_ai_status
+
+	var enemy_soldier_ai_status := Label.new()
+	enemy_soldier_ai_status.text = "적 병사 AI: -"
+	enemy_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(enemy_soldier_ai_status, 10)
+	section["body"].add_child(enemy_soldier_ai_status)
+	hud.debug_enemy_soldier_ai_value = enemy_soldier_ai_status
+
 	var hull_row: Dictionary = create_slider_row("Hull")
 	section["body"].add_child(hull_row["root"])
 	hud.debug_ship_hull_slider = hull_row["slider"]

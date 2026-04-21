@@ -47,6 +47,17 @@ static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_s
 		await _wait_frames(owner, 1)
 		return
 
+	var nearby_enemy_ship: Node3D = null
+	if spawner.has_method("debug_spawn_ship"):
+		nearby_enemy_ship = spawner.call("debug_spawn_ship", "kobayabune_melee", 7.0, 0.0) as Node3D
+		await _wait_frames(owner, wait_frames_after_spawn)
+	if not is_instance_valid(nearby_enemy_ship):
+		failures.append("hud smoke nearby enemy spawn failed")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	target_ship.name = "HudDebugBoardingTarget"
 	target_ship.global_position = player_ship.global_position + Vector3(0.0, 0.0, 9.0)
 	if target_ship.has_method("set_team"):
 		target_ship.call("set_team", "enemy")
@@ -57,12 +68,31 @@ static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_s
 		target_ship.set("is_sinking", false)
 	if target_ship.get("is_dying") != null:
 		target_ship.set("is_dying", false)
+	nearby_enemy_ship.name = "HudDebugCloserEnemy"
+	nearby_enemy_ship.global_position = player_ship.global_position + Vector3(0.0, 0.0, 4.0)
+	if nearby_enemy_ship.has_method("set_team"):
+		nearby_enemy_ship.call("set_team", "enemy")
+	elif nearby_enemy_ship.get("team") != null:
+		nearby_enemy_ship.set("team", "enemy")
+	nearby_enemy_ship.set("is_derelict", false)
+	if nearby_enemy_ship.get("is_sinking") != null:
+		nearby_enemy_ship.set("is_sinking", false)
+	if nearby_enemy_ship.get("is_dying") != null:
+		nearby_enemy_ship.set("is_dying", false)
 
 	_run_hud_state_baselines(hud, player_ship, failures)
 	_run_hud_support_respawn_slot_check(hud, player_ship, failures)
 	_run_hud_boarding_state_check(hud, player_ship, target_ship, failures)
 	_run_hud_capture_state_check(hud, player_ship, failures)
-	_run_hud_debug_state_check(hud, player_ship, failures)
+	var support_ship: Node3D = null
+	if player_ship.has_method("_spawn_or_repair_ally") and player_ship.has_method("_get_support_fleet_ships"):
+		if "support_fleet_limit" in player_ship:
+			player_ship.set("support_fleet_limit", maxi(1, int(player_ship.get("support_fleet_limit"))))
+		player_ship.call("_spawn_or_repair_ally")
+		await _wait_frames(owner, wait_frames_after_spawn + 2)
+		var support_ships: Array = player_ship.call("_get_support_fleet_ships")
+		support_ship = support_ships[0] as Node3D if not support_ships.is_empty() else null
+	_run_hud_debug_state_check(hud, player_ship, target_ship, nearby_enemy_ship, support_ship, failures)
 	await _run_hud_authoring_palette_harness(owner, hud, smoke_root, failures, wait_frames_after_spawn)
 	await _run_compass_site_marker_check(owner, failures, smoke_root, player_ship)
 
@@ -195,7 +225,7 @@ static func _run_hud_capture_state_check(hud: Node, player_ship: Node3D, failure
 		failures.append("hud smoke distance label mismatch")
 
 
-static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, failures: Array[String]) -> void:
+static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_ship: Node3D, nearby_enemy_ship: Node3D, support_ship: Node3D, failures: Array[String]) -> void:
 	if not is_instance_valid(hud) or not is_instance_valid(player_ship):
 		return
 	player_ship.set("is_sinking", true)
@@ -205,8 +235,163 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, failures:
 		failures.append("hud smoke ship debug status text mismatch")
 	if is_instance_valid(hud.debug_ship_config_value) and not hud.debug_ship_config_value.text.contains("설정"):
 		failures.append("hud smoke ship debug config text mismatch")
+	if not is_instance_valid(hud.debug_ship_ai_value):
+		failures.append("hud smoke ship debug AI label missing")
+	elif not hud.debug_ship_ai_value.text.contains("플레이어 AI"):
+		failures.append("hud smoke ship debug AI text mismatch")
+	if not is_instance_valid(hud.debug_enemy_ai_value):
+		failures.append("hud smoke enemy debug AI label missing")
+	elif not hud.debug_enemy_ai_value.text.contains("적선 AI"):
+		failures.append("hud smoke enemy debug AI text mismatch")
+	if not is_instance_valid(hud.debug_ally_ai_value):
+		failures.append("hud smoke ally debug AI label missing")
+	elif not hud.debug_ally_ai_value.text.contains("아군 AI"):
+		failures.append("hud smoke ally debug AI text mismatch")
+	if not is_instance_valid(hud.debug_player_soldier_ai_value):
+		failures.append("hud smoke player soldier debug AI label missing")
+	elif not hud.debug_player_soldier_ai_value.text.contains("아군 병사 AI"):
+		failures.append("hud smoke player soldier debug AI text mismatch")
+	if not is_instance_valid(hud.debug_enemy_soldier_ai_value):
+		failures.append("hud smoke enemy soldier debug AI label missing")
+	elif not hud.debug_enemy_soldier_ai_value.text.contains("적 병사 AI"):
+		failures.append("hud smoke enemy soldier debug AI text mismatch")
+	var player_soldier: Node3D = null
+	if is_instance_valid(player_ship):
+		for candidate_variant in EntityRegistry.get_soldiers_by_ship(player_ship):
+			var candidate := candidate_variant as Node3D
+			if not is_instance_valid(candidate):
+				continue
+			if NodeContractHelper.get_team_tag(candidate) != "player":
+				continue
+			if SoldierStateHelper.is_dead_soldier(candidate):
+				continue
+			player_soldier = candidate
+			break
+	var enemy_soldier: Node3D = null
+	if is_instance_valid(target_ship):
+		for candidate_variant in EntityRegistry.get_soldiers_by_ship(target_ship):
+			var candidate := candidate_variant as Node3D
+			if not is_instance_valid(candidate):
+				continue
+			if NodeContractHelper.get_team_tag(candidate) != "enemy":
+				continue
+			if SoldierStateHelper.is_dead_soldier(candidate):
+				continue
+			enemy_soldier = candidate
+			break
+	if is_instance_valid(player_soldier):
+		player_soldier.name = "HudDebugPlayerSoldier"
+		player_soldier.global_position = player_ship.global_position + Vector3.ZERO
+		player_soldier.set("limbo_ai_pilot_enabled", true)
+		player_soldier.set_meta("soldier_limbo_ai_mode", "ship_duty")
+		player_soldier.set_meta("soldier_limbo_ai_reason", "ship_duty")
+		player_soldier.set_meta("soldier_limbo_ai_frame", Engine.get_physics_frames())
+	if is_instance_valid(enemy_soldier):
+		enemy_soldier.name = "HudDebugEnemySoldier"
+		enemy_soldier.global_position = target_ship.global_position + Vector3.ZERO
+		enemy_soldier.set("limbo_ai_pilot_enabled", true)
+		enemy_soldier.set_meta("soldier_limbo_ai_mode", "attack_target")
+		enemy_soldier.set_meta("soldier_limbo_ai_reason", "target_visible")
+		enemy_soldier.set_meta("soldier_limbo_ai_target_distance", 3.5)
+		enemy_soldier.set_meta("soldier_limbo_ai_frame", Engine.get_physics_frames())
+		player_ship.set("boarding_target", target_ship)
+	if hud.has_method("_sync_ship_debug_panel_from_player"):
+		hud.call("_sync_ship_debug_panel_from_player")
+	if is_instance_valid(player_soldier) and is_instance_valid(hud.debug_player_soldier_ai_value):
+		if not hud.debug_player_soldier_ai_value.text.contains(player_soldier.name):
+			failures.append("hud smoke player soldier AI did not surface player soldier")
+		elif not hud.debug_player_soldier_ai_value.text.contains("mode ship_duty"):
+			failures.append("hud smoke player soldier AI did not surface duty mode")
+		elif not hud.debug_player_soldier_ai_value.text.contains("focus home deck"):
+			failures.append("hud smoke player soldier AI did not label flagship deck focus")
+	if is_instance_valid(enemy_soldier) and is_instance_valid(hud.debug_enemy_soldier_ai_value):
+		if not hud.debug_enemy_soldier_ai_value.text.contains(enemy_soldier.name):
+			failures.append("hud smoke enemy soldier AI did not surface enemy soldier")
+		elif not hud.debug_enemy_soldier_ai_value.text.contains("focus crew on -> %s" % target_ship.name):
+			failures.append("hud smoke enemy soldier AI did not label target ship focus")
+		elif not hud.debug_enemy_soldier_ai_value.text.contains("mode attack_target"):
+			failures.append("hud smoke enemy soldier AI did not surface attack mode")
+	if is_instance_valid(target_ship) and is_instance_valid(nearby_enemy_ship):
+		player_ship.set("boarding_target", target_ship)
+		if "auto_raid_target" in player_ship:
+			player_ship.set("auto_raid_target", null)
+		if hud.has_method("_sync_ship_debug_panel_from_player"):
+			hud.call("_sync_ship_debug_panel_from_player")
+		if is_instance_valid(hud.debug_enemy_ai_value):
+			if not hud.debug_enemy_ai_value.text.contains(target_ship.name):
+				failures.append("hud smoke enemy AI did not prioritize boarding target")
+			elif hud.debug_enemy_ai_value.text.contains(nearby_enemy_ship.name):
+				failures.append("hud smoke enemy AI kept nearest enemy instead of boarding target")
+			elif not hud.debug_enemy_ai_value.text.contains("focus boarding run -> %s" % target_ship.name):
+				failures.append("hud smoke enemy AI did not label boarding focus")
+		player_ship.set("boarding_target", null)
+		if "auto_raid_target" in player_ship:
+			player_ship.set("auto_raid_target", target_ship)
+		if hud.has_method("_sync_ship_debug_panel_from_player"):
+			hud.call("_sync_ship_debug_panel_from_player")
+		if is_instance_valid(hud.debug_enemy_ai_value):
+			if not hud.debug_enemy_ai_value.text.contains(target_ship.name):
+				failures.append("hud smoke enemy AI did not use auto raid target fallback")
+			elif not hud.debug_enemy_ai_value.text.contains("focus raid target -> %s" % target_ship.name):
+				failures.append("hud smoke enemy AI did not label auto raid focus")
+		if "auto_raid_target" in player_ship:
+			player_ship.set("auto_raid_target", null)
+	if is_instance_valid(player_soldier) and is_instance_valid(target_ship):
+		player_soldier.owned_ship = target_ship
+		player_soldier.home_ship = player_ship
+		if player_soldier.has_method("set_boarding_status"):
+			player_soldier.call("set_boarding_status", "boarding")
+		else:
+			player_soldier.set("boarding_status", "boarding")
+		player_soldier.global_position = target_ship.global_position + Vector3(0.0, 0.0, 0.8)
+		player_soldier.set("limbo_ai_pilot_enabled", true)
+		player_soldier.set_meta("soldier_limbo_ai_mode", "muster_cross_ship")
+		player_soldier.set_meta("soldier_limbo_ai_reason", "boarding_muster")
+		player_soldier.set_meta("soldier_limbo_ai_frame", Engine.get_physics_frames())
+		player_ship.set("boarding_target", target_ship)
+		if hud.has_method("_sync_ship_debug_panel_from_player"):
+			hud.call("_sync_ship_debug_panel_from_player")
+		if is_instance_valid(hud.debug_player_soldier_ai_value):
+			if not hud.debug_player_soldier_ai_value.text.contains("focus away team -> %s" % target_ship.name):
+				failures.append("hud smoke player soldier AI did not prioritize away team focus")
+			elif not hud.debug_player_soldier_ai_value.text.contains("boarding away team"):
+				failures.append("hud smoke player soldier AI did not humanize away team boarding status")
+			elif not hud.debug_player_soldier_ai_value.text.contains("why boarding lane"):
+				failures.append("hud smoke player soldier AI did not humanize boarding muster reason")
+		if player_soldier.has_method("set_boarding_status"):
+			player_soldier.call("set_boarding_status", "returning")
+		else:
+			player_soldier.set("boarding_status", "returning")
+		if hud.has_method("_sync_ship_debug_panel_from_player"):
+			hud.call("_sync_ship_debug_panel_from_player")
+		if is_instance_valid(hud.debug_player_soldier_ai_value) and not hud.debug_player_soldier_ai_value.text.contains("boarding returning home"):
+			failures.append("hud smoke player soldier AI did not humanize returning boarding status")
+		if player_soldier.has_method("set_boarding_status"):
+			player_soldier.call("set_boarding_status", "stranded")
+		else:
+			player_soldier.set("boarding_status", "stranded")
+		if hud.has_method("_sync_ship_debug_panel_from_player"):
+			hud.call("_sync_ship_debug_panel_from_player")
+		if is_instance_valid(hud.debug_player_soldier_ai_value) and not hud.debug_player_soldier_ai_value.text.contains("boarding cut off"):
+			failures.append("hud smoke player soldier AI did not humanize stranded boarding status")
+	if is_instance_valid(support_ship):
+		if "limbo_ai_pilot_enabled" in support_ship:
+			support_ship.set("limbo_ai_pilot_enabled", true)
+		support_ship.set_meta(ShipAILimboKeys.META_SUPPORT_MODE, ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP)
+		support_ship.set_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, player_ship.get_instance_id())
+		support_ship.set_meta(ShipAILimboKeys.META_SUPPORT_REASON, "debug_rescue")
+		if hud.has_method("_sync_ship_debug_panel_from_player"):
+			hud.call("_sync_ship_debug_panel_from_player")
+		if is_instance_valid(hud.debug_ally_ai_value):
+			if not hud.debug_ally_ai_value.text.contains(support_ship.name):
+				failures.append("hud smoke ally AI did not surface support ship")
+			elif not hud.debug_ally_ai_value.text.contains("focus rescue run -> %s" % player_ship.name):
+				failures.append("hud smoke ally AI did not label rescue focus")
+			elif hud.debug_ally_ai_value.text.contains("debug_rescue"):
+				failures.append("hud smoke ally AI leaked internal rescue reason")
 	player_ship.set("is_sinking", false)
 	player_ship.set("is_dying", false)
+	player_ship.set("boarding_target", null)
 	if hud.has_method("_update_ship_health_bars"):
 		hud.call("_update_ship_health_bars", false)
 	if is_instance_valid(hud.hp_text_label) and hud.hp_text_label.text != "HP 143 / 200":

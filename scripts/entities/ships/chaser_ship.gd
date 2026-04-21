@@ -3,7 +3,6 @@ extends "res://scripts/entities/ships/base_ship.gd"
 class_name ChaserShip
 const DEBUG_CHASER_LOGS := false
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
-const FlagStyleLibrary = preload("res://scripts/props/flag_style_library.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
@@ -79,7 +78,7 @@ var _enemy_crew_spawn_index: int = 0
 
 
 # === 함대 진형 (Formation) 관련 ===
-enum Formation {COLUMN, WING}
+enum Formation {COLUMN, WING, WEDGE}
 static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정 (기본: 장사진)
 static var support_hold_formation: bool = false # 지원함 자유 교전/진형 유지 토글
 
@@ -165,6 +164,18 @@ func _has_recent_boarding_impact(target_ship: Node3D) -> bool:
 
 func can_use_fire_pot_attack() -> bool:
 	return false
+
+
+func get_limbo_ai_default_tree_path() -> String:
+	var team_tag := get_team_tag()
+	if team_tag == "player":
+		if ShipAllyRoleHelper.is_support_ship(self):
+			return ShipLimboAIPilot.SUPPORT_TREE_PATH
+		if ShipAllyRoleHelper.is_captured_minion(self):
+			return ShipLimboAIPilot.CAPTURED_MINION_TREE_PATH
+	elif team_tag == "enemy":
+		return ShipLimboAIPilot.ENEMY_GUNNER_TREE_PATH if is_gunner_role() else ShipLimboAIPilot.ENEMY_BOARDER_TREE_PATH
+	return ShipLimboAIPilot.DEFAULT_TREE_PATH
 
 
 func set_preview_target(target_ship: Node3D) -> void:
@@ -368,6 +379,7 @@ func _ready() -> void:
 		add_child(hull_inst)
 	else:
 		_update_editor_hull()
+	limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 		
 	super._ready()
 	if max_hull_hp <= 0: max_hull_hp = 60.0 # Default fallback
@@ -548,6 +560,7 @@ func die() -> void:
 	# 아래로 깊게 가라앉음 + 페이드 아웃
 	var sink_duration = 6.0
 	sink_tween.tween_property(self , "global_position:y", global_position.y - 15.0, sink_duration).set_ease(Tween.EASE_IN)
+	play_sink_bubbles(0.25, -1.25)
 	
 	# (메쉬 투명도 조절 대신 셰이더 수심 효과로 대체)
 	
@@ -688,7 +701,11 @@ func _find_player() -> void:
 func _update_limbo_ai_pilot(delta: float) -> void:
 	if not limbo_ai_pilot_enabled:
 		return
-	if get_team_tag() != "enemy":
+	var team_tag := get_team_tag()
+	if team_tag != "enemy" and not (
+		team_tag == "player"
+		and (ShipAllyRoleHelper.is_support_ship(self) or ShipAllyRoleHelper.is_captured_minion(self))
+	):
 		return
 	ShipLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path)
 
@@ -738,7 +755,15 @@ func capture_ship() -> void:
 	# (is_boarding, boarding_target, _clear_ropes 등은 _cancel_boarding()에서 이미 처리됨)
 	
 	# 플레이어의 현재 업그레이드된 최대 속도를 상속받아 평준화 (기본치 3.2 대신)
-	limbo_ai_pilot_enabled = false
+	limbo_ai_pilot_enabled = true
+	var current_limbo_tree_path := limbo_ai_pilot_tree_path.strip_edges()
+	if (
+		current_limbo_tree_path.is_empty()
+		or current_limbo_tree_path == ShipLimboAIPilot.DEFAULT_TREE_PATH
+		or current_limbo_tree_path == ShipLimboAIPilot.ENEMY_BOARDER_TREE_PATH
+		or current_limbo_tree_path == ShipLimboAIPilot.ENEMY_GUNNER_TREE_PATH
+	):
+		limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, ShipLimboAIPilot.DEFAULT_TREE_PATH)
 	var players = EntityRegistry.get_ships_by_team("player")
 	if players.size() > 0 and players[0].get("is_player_controlled"):
 		move_speed = players[0].get("max_speed")

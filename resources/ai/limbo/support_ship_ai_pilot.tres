@@ -1,0 +1,25 @@
+[gd_resource type="BehaviorTree" format=3 uid="uid://bsuabsmyffsf2"]
+
+[ext_resource type="Script" uid="uid://48jeqwf0vy8s" path="res://scripts/ai/limbo/tasks/bt_ship_select_player_target.gd" id="1_select"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_support_ship_set_mode.gd" id="2_support_mode"]
+
+[sub_resource type="BlackboardPlan" id="BlackboardPlan_support"]
+
+[sub_resource type="BTAction" id="BTAction_select"]
+script = ExtResource("1_select")
+
+[sub_resource type="BTAction" id="BTAction_support_mode"]
+script = ExtResource("2_support_mode")
+threat_range = 38.0
+emergency_threat_range = 96.0
+boss_breach_range = 62.0
+regroup_distance = 148.0
+
+[sub_resource type="BTSequence" id="BTSequence_root"]
+custom_name = "Support Ship AI Pilot: choose rescue, screen, regroup, or follow"
+children = [SubResource("BTAction_select"), SubResource("BTAction_support_mode")]
+
+[resource]
+description = "Support-fleet LimboAI behavior tree. It selects the player flagship and publishes a support mode hint for rescue, boss breaching, screening, regrouping, or formation following. Existing support fleet helpers still own movement, boarding, collision guards, and formation execution."
+blackboard_plan = SubResource("BlackboardPlan_support")
+root_task = SubResource("BTSequence_root")

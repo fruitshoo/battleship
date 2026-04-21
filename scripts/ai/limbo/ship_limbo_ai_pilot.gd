@@ -3,6 +3,12 @@ class_name ShipLimboAIPilot
 
 
 const DEFAULT_TREE_PATH := "res://resources/ai/limbo/ship_ai_pilot_skeleton.tres"
+const ENEMY_GUNNER_TREE_PATH := "res://resources/ai/limbo/enemy_gunner_ai_pilot.tres"
+const ENEMY_BOARDER_TREE_PATH := "res://resources/ai/limbo/enemy_boarder_ai_pilot.tres"
+const ENEMY_FIREPOT_TREE_PATH := "res://resources/ai/limbo/enemy_firepot_ai_pilot.tres"
+const BOSS_TREE_PATH := "res://resources/ai/limbo/boss_ship_ai_pilot.tres"
+const SUPPORT_TREE_PATH := "res://resources/ai/limbo/support_ship_ai_pilot.tres"
+const CAPTURED_MINION_TREE_PATH := "res://resources/ai/limbo/captured_minion_ai_pilot.tres"
 const PLAYER_NODE_NAME := "LimboAIPilotPlayer"
 const META_LAST_STATUS := "limbo_ai_last_status"
 const META_LAST_ERROR := "limbo_ai_last_error"
@@ -13,7 +19,8 @@ const UPDATE_MODE_MANUAL := 2
 static func tick(ship: Node, delta: float, behavior_tree_path: String = DEFAULT_TREE_PATH) -> bool:
 	if not is_instance_valid(ship):
 		return false
-	var player := _ensure_player(ship, behavior_tree_path)
+	var resolved_tree_path := resolve_tree_path(ship, behavior_tree_path)
+	var player := _ensure_player(ship, resolved_tree_path)
 	if not is_instance_valid(player):
 		return false
 	if not player.has_method("update"):
@@ -26,6 +33,30 @@ static func tick(ship: Node, delta: float, behavior_tree_path: String = DEFAULT_
 	ship.set_meta(META_LAST_STATUS, status)
 	_apply_pilot_target(ship)
 	return true
+
+
+static func resolve_tree_path(ship: Node, behavior_tree_path: String = DEFAULT_TREE_PATH) -> String:
+	var requested_path := behavior_tree_path.strip_edges()
+	if requested_path.is_empty():
+		requested_path = DEFAULT_TREE_PATH
+	if requested_path != DEFAULT_TREE_PATH:
+		return requested_path
+	if not is_instance_valid(ship):
+		return requested_path
+
+	var ship_default_tree_path := _get_ship_default_tree_path(ship)
+	if not ship_default_tree_path.is_empty() and ship_default_tree_path != DEFAULT_TREE_PATH:
+		return ship_default_tree_path
+
+	var team_tag := _get_team_tag(ship)
+	if team_tag == "player":
+		if ShipAllyRoleHelper.is_support_ship(ship):
+			return SUPPORT_TREE_PATH
+		if ShipAllyRoleHelper.is_captured_minion(ship):
+			return CAPTURED_MINION_TREE_PATH
+	elif team_tag == "enemy" and ship.has_method("is_gunner_role"):
+		return ENEMY_GUNNER_TREE_PATH if ship.call("is_gunner_role") == true else ENEMY_BOARDER_TREE_PATH
+	return requested_path
 
 
 static func is_available() -> bool:
@@ -87,3 +118,17 @@ static func _apply_pilot_target(ship: Node) -> void:
 		return
 	if "target" in ship:
 		ship.set("target", pilot_target)
+
+
+static func _get_team_tag(ship: Node) -> String:
+	if ship.has_method("get_team_tag"):
+		return str(ship.call("get_team_tag"))
+	if "team" in ship:
+		return str(ship.get("team"))
+	return ""
+
+
+static func _get_ship_default_tree_path(ship: Node) -> String:
+	if not is_instance_valid(ship) or not ship.has_method("get_limbo_ai_default_tree_path"):
+		return ""
+	return str(ship.call("get_limbo_ai_default_tree_path")).strip_edges()

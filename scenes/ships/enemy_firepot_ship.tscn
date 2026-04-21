@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dbgt8puv1j3pw"]
 
-[ext_resource type="PackedScene" uid="uid://dhgl16b2bfb5i" path="res://scenes/ships/enemy_ship.tscn" id="1_enemy_base"]
+[ext_resource type="PackedScene" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
 [ext_resource type="Script" path="res://scripts/entities/ships/enemy_firepot_ship.gd" id="2_enemy_firepot_script"]
 
 [node name="EnemyFirepotShip" unique_id=260554998 instance=ExtResource("1_enemy_base")]

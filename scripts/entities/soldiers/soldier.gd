@@ -4,6 +4,8 @@ const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_help
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
+const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
+const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
 const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
 const SWORD_SCENE = preload("res://scenes/entities/weapons/weapon_sword.tscn")
 const SPEARMAN_MELEE_SCENES := [
@@ -51,6 +53,8 @@ const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 @export var defense: float = 0.0 # 방어력 (피해 감소)
 
 @export var move_speed: float = 3.0
+@export var limbo_ai_pilot_enabled: bool = true
+@export_file("*.tres") var limbo_ai_pilot_tree_path: String = SoldierLimboAIPilot.DEFAULT_TREE_PATH
 @export var team: String = "player": # "player" or "enemy"
 	set(value):
 		team = value
@@ -248,6 +252,7 @@ func _ready() -> void:
 			_cached_upgrade_manager.upgrade_applied.connect(_on_upgrade_applied)
 
 	EntityRegistry.register_soldier(self)
+	limbo_ai_pilot_tree_path = SoldierLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 
 
 func _exit_tree() -> void:
@@ -614,6 +619,55 @@ func get_home_ship_node() -> Node3D:
 	return home_ship if is_instance_valid(home_ship) else null
 
 
+func get_debug_soldier_state_snapshot() -> Dictionary:
+	var limbo_requested_tree_path: String = limbo_ai_pilot_tree_path.strip_edges()
+	var limbo_enabled_value: bool = limbo_ai_pilot_enabled
+	var limbo_resolved_tree_path: String = ""
+	if limbo_enabled_value or not limbo_requested_tree_path.is_empty():
+		var limbo_resolve_seed: String = limbo_requested_tree_path if not limbo_requested_tree_path.is_empty() else SoldierLimboAIPilot.DEFAULT_TREE_PATH
+		limbo_resolved_tree_path = SoldierLimboAIPilot.resolve_tree_path(self, limbo_resolve_seed)
+	var limbo_active_tree_path: String = str(get_meta(SoldierLimboAIPilot.META_TREE_PATH, limbo_resolved_tree_path)).strip_edges()
+	var limbo_snapshot := {
+		"enabled": limbo_enabled_value,
+		"requested_tree_path": limbo_requested_tree_path,
+		"resolved_tree_path": limbo_resolved_tree_path,
+		"tree_path": limbo_active_tree_path,
+		"status": str(get_meta(SoldierLimboAIPilot.META_LAST_STATUS, "")),
+		"error": str(get_meta(SoldierLimboAIPilot.META_LAST_ERROR, "")).strip_edges(),
+		"mode": str(get_meta(SoldierAILimboKeys.META_MODE, "")).strip_edges(),
+		"reason": str(get_meta(SoldierAILimboKeys.META_REASON, "")).strip_edges(),
+		"target_distance": float(get_meta(SoldierAILimboKeys.META_TARGET_DISTANCE, -1.0)),
+	}
+	return {
+		"name": name,
+		"team": team,
+		"role": crew_role,
+		"state": _get_debug_state_name(),
+		"boarding_status": boarding_status,
+		"target_name": current_target.name if is_instance_valid(current_target) else "",
+		"limbo": limbo_snapshot,
+	}
+
+
+func _get_debug_state_name() -> String:
+	match current_state:
+		State.IDLE:
+			return "idle"
+		State.WANDER:
+			return "wander"
+		State.MOVE:
+			return "move"
+		State.ATTACK:
+			return "attack"
+		State.DEAD:
+			return "dead"
+		State.RELOAD:
+			return "reload"
+		State.BOARDING_JUMP:
+			return "boarding_jump"
+	return "unknown"
+
+
 func is_dead_soldier() -> bool:
 	return current_state == State.DEAD
 
@@ -700,6 +754,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	SoldierSpeechHelper.update(self, delta)
+	_update_limbo_ai_pilot(delta)
 		
 	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
 	if not _is_jumping and current_state != State.DEAD:
@@ -883,6 +938,10 @@ func _perform_attack() -> void:
 
 ## 가장 가까운 적 찾기 (탐지 범위 및 동일 함선 우선순위 적용)
 func find_nearest_enemy() -> Node3D:
+	var limbo_target: Node3D = _get_recent_limbo_target()
+	if is_instance_valid(limbo_target):
+		_cached_nearest_enemy = limbo_target
+		return limbo_target
 	if is_instance_valid(owned_ship):
 		var owned_team: String = owned_ship.get_team_tag() if owned_ship.has_method("get_team_tag") else str(owned_ship.get("team"))
 		if owned_team == team:
@@ -926,14 +985,23 @@ func _is_in_cross_ship_contact_zone(other_ship: Node3D) -> bool:
 
 
 func _find_cross_ship_muster_target() -> Vector3:
+	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP)
+	if limbo_point != Vector3.INF:
+		return limbo_point
 	return SoldierShipHelper.find_cross_ship_muster_target(self)
 
 
 func _find_ship_duty_target() -> Vector3:
+	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
+	if limbo_point != Vector3.INF:
+		return limbo_point
 	return SoldierShipDutyHelper.find_ship_duty_target(self)
 
 
 func _get_active_ship_duty_target() -> Vector3:
+	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
+	if limbo_point != Vector3.INF:
+		return limbo_point
 	return SoldierShipDutyHelper.get_active_ship_duty_target(self)
 
 
@@ -1138,6 +1206,40 @@ func _finish_cannon_reload_pose() -> void:
 func _check_ranged_combat() -> void:
 	SoldierCombatHelper.check_ranged_combat(self)
 
+func _is_support_or_captured_ship_crew() -> bool:
+	if not is_instance_valid(owned_ship):
+		return false
+	return ShipAllyRoleHelper.is_support_ship(owned_ship) or ShipAllyRoleHelper.is_captured_minion(owned_ship)
+
+func _is_passive_ally_ship_crew() -> bool:
+	if not _is_support_or_captured_ship_crew():
+		return false
+	if _is_jumping:
+		return false
+	if current_state == State.ATTACK or current_state == State.MOVE or current_state == State.RELOAD or current_state == State.BOARDING_JUMP:
+		return false
+	if is_instance_valid(current_target):
+		return false
+	if boarding_status != BOARDING_STATUS_ON_DECK:
+		return false
+	if not is_instance_valid(owned_ship):
+		return false
+	if owned_ship.get("deck_is_contested") == true or owned_ship.get("deck_is_overrun") == true:
+		return false
+	if owned_ship.get("is_boarding") == true:
+		return false
+	var boarding_target: Variant = owned_ship.get("boarding_target")
+	if is_instance_valid(boarding_target):
+		return false
+	return true
+
+func _allow_cross_ship_enemy_scan() -> bool:
+	if not is_instance_valid(owned_ship):
+		return true
+	if ShipAllyRoleHelper.is_player_flagship(owned_ship):
+		return true
+	return not _is_passive_ally_ship_crew()
+
 func _is_lod_combat_priority() -> bool:
 	if _is_jumping:
 		return true
@@ -1150,11 +1252,17 @@ func _is_lod_combat_priority() -> bool:
 	if is_instance_valid(owned_ship):
 		if owned_ship.get("deck_is_contested") == true or owned_ship.get("deck_is_overrun") == true:
 			return true
-		if str(owned_ship.get("team")) == "player":
+		if ShipAllyRoleHelper.is_player_flagship(owned_ship):
 			return true
 	return false
 
 func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, combat_priority: bool) -> float:
+	if _is_passive_ally_ship_crew():
+		if dist_to_player > 40.0:
+			return 1.1
+		if dist_to_player > 24.0:
+			return 0.8
+		return 0.55
 	var throttle_time: float = 0.2 if ship_hp_ratio > 0.2 else 0.1
 	if combat_priority:
 		if dist_to_player > 65.0:
@@ -1174,6 +1282,12 @@ func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, co
 	return throttle_time
 
 func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> float:
+	if _is_passive_ally_ship_crew():
+		if dist_to_player > 40.0:
+			return 0.8
+		if dist_to_player > 24.0:
+			return 0.55
+		return 0.35
 	if combat_priority:
 		if dist_to_player > 65.0:
 			return 0.28
@@ -1197,12 +1311,129 @@ func _get_nearest_enemy_cache_interval() -> float:
 	return _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
 
 func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
+	var limbo_target: Node3D = _get_recent_limbo_target()
+	if is_instance_valid(limbo_target):
+		_cached_nearest_enemy = limbo_target
+		_nearest_enemy_cache_interval_runtime = _get_nearest_enemy_cache_interval()
+		_nearest_enemy_cache_timer = _nearest_enemy_cache_interval_runtime
+		return _cached_nearest_enemy
 	if not force and _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
 		return _cached_nearest_enemy
 	_cached_nearest_enemy = SoldierShipHelper.find_nearest_enemy(self)
 	_nearest_enemy_cache_interval_runtime = _get_nearest_enemy_cache_interval()
 	_nearest_enemy_cache_timer = _nearest_enemy_cache_interval_runtime
 	return _cached_nearest_enemy
+
+
+func get_limbo_ai_default_tree_path() -> String:
+	var role_name: String = crew_role.strip_edges().to_lower()
+	if is_ranged_only or role_name == "repeating_crossbow" or role_name == "singigeon":
+		return SoldierLimboAIPilot.RANGED_TREE_PATH
+	if _should_use_boarding_limbo_tree():
+		return SoldierLimboAIPilot.BOARDING_TREE_PATH
+	return SoldierLimboAIPilot.BOARDER_TREE_PATH
+
+
+func _should_use_boarding_limbo_tree() -> bool:
+	if boarding_status == BOARDING_STATUS_BOARDING or boarding_status == BOARDING_STATUS_RETURNING:
+		return true
+	var owned_ship_node := owned_ship
+	if is_instance_valid(owned_ship_node):
+		var boarding_target: Node3D = owned_ship_node.get_boarding_target_ship() if owned_ship_node.has_method("get_boarding_target_ship") else owned_ship_node.get("boarding_target")
+		if is_instance_valid(boarding_target) and owned_ship_node.get("is_boarding") == true:
+			return true
+	if is_instance_valid(home_ship) and is_instance_valid(owned_ship_node) and home_ship != owned_ship_node:
+		if _has_active_boarding_link_between_ships(home_ship, owned_ship_node):
+			return true
+	return false
+
+
+func _has_active_boarding_link_between_ships(ship_a: Node3D, ship_b: Node3D) -> bool:
+	return _ship_has_active_boarding_link_to(ship_a, ship_b) or _ship_has_active_boarding_link_to(ship_b, ship_a)
+
+
+func _ship_has_active_boarding_link_to(from_ship: Node3D, to_ship: Node3D) -> bool:
+	if not is_instance_valid(from_ship) or not is_instance_valid(to_ship):
+		return false
+	if from_ship.has_method("has_boarding_rope_link_to"):
+		return from_ship.has_boarding_rope_link_to(to_ship) == true
+	var target_ship: Node3D = from_ship.get_boarding_target_ship() if from_ship.has_method("get_boarding_target_ship") else from_ship.get("boarding_target")
+	if target_ship != to_ship:
+		return false
+	return from_ship.get("_initial_rope_deployed") == true
+
+
+func _update_limbo_ai_pilot(delta: float) -> void:
+	if not limbo_ai_pilot_enabled:
+		return
+	if current_state == State.DEAD or current_state == State.BOARDING_JUMP:
+		return
+	if not SoldierLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path):
+		return
+	_apply_limbo_ai_bridge()
+
+
+func _apply_limbo_ai_bridge() -> void:
+	var pilot_target: Node3D = _get_recent_limbo_target()
+	var mode: String = _get_recent_limbo_mode()
+	if mode.is_empty():
+		return
+	if is_instance_valid(pilot_target):
+		current_target = pilot_target
+	elif mode == SoldierAILimboKeys.MODE_SHIP_DUTY or mode == SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP or mode == SoldierAILimboKeys.MODE_WANDER:
+		current_target = null
+	if current_state == State.DEAD or current_state == State.RELOAD or current_state == State.BOARDING_JUMP:
+		return
+	if SoldierActionHelper.is_action_ai_locked(self):
+		return
+	match mode:
+		SoldierAILimboKeys.MODE_ATTACK_TARGET:
+			if is_instance_valid(pilot_target) and current_state != State.ATTACK:
+				_change_state(State.ATTACK)
+		SoldierAILimboKeys.MODE_MOVE_TO_TARGET:
+			if is_stationary:
+				if current_state != State.IDLE:
+					_change_state(State.IDLE)
+			elif is_instance_valid(pilot_target) and current_state != State.MOVE:
+				_change_state(State.MOVE)
+		SoldierAILimboKeys.MODE_SHIP_DUTY, SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP, SoldierAILimboKeys.MODE_WANDER:
+			if current_state == State.MOVE or current_state == State.ATTACK:
+				_change_state(State.IDLE)
+
+
+func _get_recent_limbo_target() -> Node3D:
+	if not limbo_ai_pilot_enabled:
+		return null
+	var frame: int = int(get_meta(SoldierAILimboKeys.META_FRAME, -1000000))
+	if Engine.get_physics_frames() - frame > SoldierAILimboKeys.META_STALE_FRAMES:
+		return null
+	var target_id: int = int(get_meta(SoldierAILimboKeys.META_TARGET_ID, 0))
+	if target_id == 0:
+		return null
+	return instance_from_id(target_id) as Node3D
+
+
+func _get_recent_limbo_mode() -> String:
+	if not limbo_ai_pilot_enabled:
+		return ""
+	var frame: int = int(get_meta(SoldierAILimboKeys.META_FRAME, -1000000))
+	if Engine.get_physics_frames() - frame > SoldierAILimboKeys.META_STALE_FRAMES:
+		return ""
+	return str(get_meta(SoldierAILimboKeys.META_MODE, "")).strip_edges()
+
+
+func _get_recent_limbo_point_for_mode(expected_mode: String) -> Vector3:
+	if not limbo_ai_pilot_enabled:
+		return Vector3.INF
+	var frame: int = int(get_meta(SoldierAILimboKeys.META_FRAME, -1000000))
+	if Engine.get_physics_frames() - frame > SoldierAILimboKeys.META_STALE_FRAMES:
+		return Vector3.INF
+	if str(get_meta(SoldierAILimboKeys.META_MODE, "")).strip_edges() != expected_mode:
+		return Vector3.INF
+	var point_value: Variant = get_meta(SoldierAILimboKeys.META_POINT, null)
+	if point_value is Vector3:
+		return point_value as Vector3
+	return Vector3.INF
 
 func _is_far_lod_sleep_candidate() -> bool:
 	if _lod_is_combat_priority:
@@ -1211,6 +1442,8 @@ func _is_far_lod_sleep_candidate() -> bool:
 		return false
 	if current_state != State.IDLE and current_state != State.WANDER:
 		return false
+	if _is_passive_ally_ship_crew():
+		return _lod_dist_to_player > 24.0
 	return _lod_dist_to_player > 60.0
 
 func _find_ranged_target() -> Node3D:

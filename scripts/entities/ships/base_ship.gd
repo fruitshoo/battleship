@@ -16,6 +16,11 @@ const NODE_SPEAR_RAIL := NodeContractHelper.SHIP_NODE_SPEAR_RAIL
 const NODE_HULL_DEFENSE_VISUALS := NodeContractHelper.SHIP_NODE_HULL_DEFENSE_VISUALS
 const NODE_SINGIGEON_LAUNCHER := NodeContractHelper.SHIP_NODE_SINGIGEON_LAUNCHER
 const NODE_JANGGUN_LAUNCHER := NodeContractHelper.SHIP_NODE_JANGGUN_LAUNCHER
+const SHIP_SINK_BUBBLES_SFX := "ship_sink_bubbles"
+const SHIP_SINK_BUBBLES_DEFAULT_DELAY := 0.35
+const SHIP_SINK_BUBBLES_VOLUME_DB := -1.5
+const SHIP_SINK_BUBBLES_PITCH_MIN := 0.94
+const SHIP_SINK_BUBBLES_PITCH_MAX := 1.06
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -632,6 +637,43 @@ func get_ship_type_value() -> String:
 func is_sinking_or_dying() -> bool:
 	return is_sinking or is_dying
 
+func play_sink_bubbles(delay_seconds: float = SHIP_SINK_BUBBLES_DEFAULT_DELAY, volume_db: float = SHIP_SINK_BUBBLES_VOLUME_DB) -> void:
+	if delay_seconds <= 0.0:
+		_play_sink_bubbles_now(volume_db)
+		return
+	var tree := get_tree()
+	if not is_instance_valid(tree):
+		return
+	var ship_id := get_instance_id()
+	tree.create_timer(delay_seconds).timeout.connect(func() -> void:
+		var ship := instance_from_id(ship_id)
+		if not is_instance_valid(ship):
+			return
+		if ship.has_method("_play_sink_bubbles_now"):
+			ship.call("_play_sink_bubbles_now", volume_db)
+	)
+
+func _play_sink_bubbles_now(volume_db: float = SHIP_SINK_BUBBLES_VOLUME_DB) -> void:
+	if not is_instance_valid(_cached_audio_manager):
+		_cached_audio_manager = get_node_or_null("/root/AudioManager")
+	if not is_instance_valid(_cached_audio_manager) or not _cached_audio_manager.has_method("play_sfx"):
+		return
+	if _cached_audio_manager.has_method("play_sfx_random_pitch"):
+		_cached_audio_manager.play_sfx_random_pitch(
+			SHIP_SINK_BUBBLES_SFX,
+			global_position,
+			SHIP_SINK_BUBBLES_PITCH_MIN,
+			SHIP_SINK_BUBBLES_PITCH_MAX,
+			volume_db
+		)
+	else:
+		_cached_audio_manager.play_sfx(
+			SHIP_SINK_BUBBLES_SFX,
+			global_position,
+			randf_range(SHIP_SINK_BUBBLES_PITCH_MIN, SHIP_SINK_BUBBLES_PITCH_MAX),
+			volume_db
+		)
+
 func is_derelict_ship() -> bool:
 	return is_derelict
 
@@ -683,6 +725,9 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 	var captain_count_value: int = 0
 	var is_rowing_value: bool = false
 	var crew_respawn_interval_value: float = 0.0
+	var limbo_requested_tree_path: String = ""
+	var limbo_enabled_value: bool = false
+	var limbo_resolved_tree_path: String = ""
 
 	if "rowing_stamina" in self:
 		var rowing_stamina_variant: Variant = get("rowing_stamina")
@@ -710,6 +755,37 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		var crew_respawn_interval_variant: Variant = get("crew_respawn_interval")
 		if crew_respawn_interval_variant != null:
 			crew_respawn_interval_value = float(crew_respawn_interval_variant)
+	if "limbo_ai_pilot_tree_path" in self:
+		var limbo_tree_path_variant: Variant = get("limbo_ai_pilot_tree_path")
+		if limbo_tree_path_variant != null:
+			limbo_requested_tree_path = str(limbo_tree_path_variant).strip_edges()
+	if "limbo_ai_pilot_enabled" in self:
+		limbo_enabled_value = get("limbo_ai_pilot_enabled") == true
+	if limbo_enabled_value or not limbo_requested_tree_path.is_empty():
+		var limbo_resolve_seed := limbo_requested_tree_path if not limbo_requested_tree_path.is_empty() else ShipLimboAIPilot.DEFAULT_TREE_PATH
+		limbo_resolved_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_resolve_seed)
+	var limbo_active_tree_path := str(get_meta(ShipLimboAIPilot.META_TREE_PATH, limbo_resolved_tree_path)).strip_edges()
+	var limbo_snapshot := {
+		"enabled": limbo_enabled_value,
+		"requested_tree_path": limbo_requested_tree_path,
+		"resolved_tree_path": limbo_resolved_tree_path,
+		"tree_path": limbo_active_tree_path,
+		"status": str(get_meta(ShipLimboAIPilot.META_LAST_STATUS, "")),
+		"error": str(get_meta(ShipLimboAIPilot.META_LAST_ERROR, "")).strip_edges(),
+		"range_intent": str(get_meta(ShipAILimboKeys.META_INTENT, "")).strip_edges(),
+		"target_distance": float(get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, -1.0)),
+		"pressure_phase": str(get_meta(ShipAILimboKeys.META_PRESSURE_PHASE, "")).strip_edges(),
+		"pressure": clampf(float(get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0),
+		"stance": str(get_meta(ShipAILimboKeys.META_STANCE, "")).strip_edges(),
+		"nav_mode": str(get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges(),
+		"weapon_intent": str(get_meta(ShipAILimboKeys.META_WEAPON_INTENT, "")).strip_edges(),
+		"special_intent": str(get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, "")).strip_edges(),
+		"boarding_intent": str(get_meta(ShipAILimboKeys.META_BOARDING_INTENT, "")).strip_edges(),
+		"support_mode": str(get_meta(ShipAILimboKeys.META_SUPPORT_MODE, "")).strip_edges(),
+		"support_reason": str(get_meta(ShipAILimboKeys.META_SUPPORT_REASON, "")).strip_edges(),
+		"ally_mode": str(get_meta(ShipAILimboKeys.META_ALLY_MODE, "")).strip_edges(),
+		"ally_reason": str(get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges(),
+	}
 
 	return {
 		"hull_hp": hull_hp,
@@ -734,6 +810,7 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		"combat_crew_ratio": combat_crew_ratio,
 		"shiphandling_crew_ratio": shiphandling_crew_ratio,
 		"gunnery_crew_ratio": gunnery_crew_ratio,
+		"limbo": limbo_snapshot,
 	}
 
 

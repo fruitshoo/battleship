@@ -108,6 +108,10 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		await _wait_frames(owner, wait_frames_after_spawn + 4)
 		if support_ship.get_meta("support_debug_mode", "") != "assist":
 			failures.append("support fleet smoke support ship did not enter assist engagement mode")
+		await _run_support_rescue_emergency_smoke(owner, failures, player_ship, support_ship, spawner, wait_frames_after_spawn)
+		await _run_support_boss_breach_smoke(owner, failures, player_ship, support_ship, spawner, wait_frames_after_spawn)
+		await _run_support_boss_breach_smoke(owner, failures, player_ship, support_ship, spawner, wait_frames_after_spawn, true)
+		await _run_captured_minion_guard_smoke(owner, failures, player_ship, spawner, wait_frames_after_spawn)
 
 	var support_before_idle_pos: Vector3 = support_ship.global_position
 	support_ship.set("target", null)
@@ -136,6 +140,195 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	await _run_support_signal_level_two_limit_smoke(owner, failures, player_ship, wait_frames_after_spawn)
 
 	smoke_root.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_support_rescue_emergency_smoke(owner: Node, failures: Array[String], player_ship: Node3D, support_ship: Node3D, spawner: Node, wait_frames_after_spawn: int) -> void:
+	if not is_instance_valid(owner) or not is_instance_valid(player_ship) or not is_instance_valid(support_ship) or not is_instance_valid(spawner):
+		return
+	var rescue_threat := spawner.call("debug_spawn_ship", "kobayabune_melee", 10.0, 0.0) as Node3D
+	await _wait_frames(owner, wait_frames_after_spawn)
+	if not is_instance_valid(rescue_threat):
+		failures.append("support fleet smoke rescue threat spawn failed")
+		return
+	var player_forward: Vector3 = -player_ship.global_transform.basis.z
+	player_forward.y = 0.0
+	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.001 else Vector3.FORWARD
+	player_ship.set("deck_is_contested", true)
+	player_ship.set("deck_is_overrun", true)
+	player_ship.set("deck_hostile_boarder_count", 3)
+	rescue_threat.global_position = player_ship.global_position + player_forward * 9.0
+	if "boarding_target" in rescue_threat:
+		rescue_threat.set("boarding_target", player_ship)
+	if "current_speed" in rescue_threat:
+		rescue_threat.set("current_speed", 0.0)
+	if "_last_ai_speed" in rescue_threat:
+		rescue_threat.set("_last_ai_speed", 0.0)
+	if support_ship.has_method("_cancel_boarding"):
+		support_ship.call("_cancel_boarding")
+	var rescue_contact_distance: float = float(support_ship.call("get_collision_distance_to", player_ship)) if support_ship.has_method("get_collision_distance_to") else 8.0
+	support_ship.set("target", player_ship)
+	support_ship.set_meta("support_joining", false)
+	support_ship.global_position = player_ship.global_position - player_forward * maxf(10.4, rescue_contact_distance + 1.9)
+	support_ship.global_position.y = 0.0
+	var rescue_start_position: Vector3 = support_ship.global_position
+	var rescue_start_distance: float = support_ship.global_position.distance_to(player_ship.global_position)
+	await _wait_frames(owner, wait_frames_after_spawn + 8)
+	var rescue_mode := str(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_MODE, "")).strip_edges()
+	if rescue_mode != ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP:
+		failures.append("support fleet smoke support ship did not enter rescue mode during flagship deck emergency")
+	var rescue_target_id := int(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0))
+	if rescue_target_id != player_ship.get_instance_id():
+		failures.append("support fleet smoke support ship rescue target mismatch")
+	var rescue_reason := str(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_REASON, "")).strip_edges()
+	if not rescue_reason.begins_with("flagship_deck_emergency"):
+		failures.append("support fleet smoke support ship rescue reason mismatch: %s" % rescue_reason)
+	var rescue_boarding: bool = support_ship.get("is_boarding") == true and support_ship.get("boarding_target") == player_ship
+	if not rescue_boarding and str(support_ship.get_meta("support_debug_mode", "")) != "boarding":
+		failures.append("support fleet smoke support ship did not commit to rescue boarding")
+	var rescue_end_distance: float = support_ship.global_position.distance_to(player_ship.global_position)
+	var rescue_travel_distance: float = support_ship.global_position.distance_to(rescue_start_position)
+	if not rescue_boarding:
+		if rescue_travel_distance < 0.35:
+			failures.append("support fleet smoke support ship did not move into rescue approach")
+		elif rescue_end_distance >= rescue_start_distance - 0.2:
+			failures.append("support fleet smoke support ship did not close rescue distance")
+	player_ship.set("deck_is_contested", false)
+	player_ship.set("deck_is_overrun", false)
+	player_ship.set("deck_hostile_boarder_count", 0)
+	if support_ship.has_method("_cancel_boarding"):
+		support_ship.call("_cancel_boarding")
+	EntityRegistry.unregister_ship(rescue_threat)
+	rescue_threat.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_support_boss_breach_smoke(owner: Node, failures: Array[String], player_ship: Node3D, support_ship: Node3D, spawner: Node, wait_frames_after_spawn: int, use_manual_boarding_intent: bool = false) -> void:
+	if not is_instance_valid(owner) or not is_instance_valid(player_ship) or not is_instance_valid(support_ship) or not is_instance_valid(spawner):
+		return
+	if not spawner.has_method("debug_spawn_final_boss"):
+		failures.append("support fleet smoke boss breach missing debug_spawn_final_boss")
+		return
+	var boss_ship := spawner.call("debug_spawn_final_boss") as Node3D
+	await _wait_frames(owner, wait_frames_after_spawn + 3)
+	if not is_instance_valid(boss_ship):
+		failures.append("support fleet smoke boss breach spawn failed")
+		return
+	var player_forward: Vector3 = -player_ship.global_transform.basis.z
+	player_forward.y = 0.0
+	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.001 else Vector3.FORWARD
+	var support_contact_distance: float = float(support_ship.call("get_collision_distance_to", boss_ship)) if support_ship.has_method("get_collision_distance_to") else 8.0
+	if use_manual_boarding_intent:
+		player_ship.set("manual_boarding_target", boss_ship)
+		player_ship.set("boarding_target", null)
+	else:
+		player_ship.set("boarding_target", boss_ship)
+		player_ship.set("manual_boarding_target", null)
+	support_ship.set("target", player_ship)
+	support_ship.set_meta("support_joining", false)
+	boss_ship.global_position = player_ship.global_position + player_forward * 15.0
+	boss_ship.global_position.y = 0.0
+	support_ship.global_position = player_ship.global_position - player_forward * maxf(11.0, support_contact_distance + 2.0)
+	support_ship.global_position.y = 0.0
+	if "current_speed" in boss_ship:
+		boss_ship.set("current_speed", 0.0)
+	if "_last_ai_speed" in boss_ship:
+		boss_ship.set("_last_ai_speed", 0.0)
+	var breach_start_position: Vector3 = support_ship.global_position
+	var breach_start_distance: float = support_ship.global_position.distance_to(boss_ship.global_position)
+	await _wait_frames(owner, wait_frames_after_spawn + 10)
+	var breach_mode := str(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_MODE, "")).strip_edges()
+	if breach_mode != ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS:
+		failures.append("support fleet smoke support ship did not enter boss breach mode")
+	var breach_target_id := int(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0))
+	if breach_target_id != boss_ship.get_instance_id():
+		failures.append("support fleet smoke support ship boss breach target mismatch")
+	var breach_reason := str(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_REASON, "")).strip_edges()
+	var expected_reason := "flagship_manual_boarding" if use_manual_boarding_intent else "flagship_boss_boarding"
+	if breach_reason != expected_reason:
+		failures.append("support fleet smoke support ship boss breach reason mismatch: %s" % breach_reason)
+	var breach_boarding: bool = support_ship.get("is_boarding") == true and support_ship.get("boarding_target") == boss_ship
+	var breach_end_distance: float = support_ship.global_position.distance_to(boss_ship.global_position)
+	var breach_travel_distance: float = support_ship.global_position.distance_to(breach_start_position)
+	if not breach_boarding:
+		if breach_travel_distance < 0.35:
+			failures.append("support fleet smoke support ship did not move into boss breach approach")
+		elif breach_end_distance >= breach_start_distance - 0.2:
+			failures.append("support fleet smoke support ship did not close boss breach distance")
+	player_ship.set("boarding_target", null)
+	player_ship.set("manual_boarding_target", null)
+	if support_ship.has_method("_cancel_boarding"):
+		support_ship.call("_cancel_boarding")
+	EntityRegistry.unregister_ship(boss_ship)
+	boss_ship.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_captured_minion_guard_smoke(owner: Node, failures: Array[String], player_ship: Node3D, spawner: Node, wait_frames_after_spawn: int) -> void:
+	if not is_instance_valid(owner) or not is_instance_valid(player_ship) or not is_instance_valid(spawner):
+		return
+	var captured_ship := spawner.call("debug_spawn_ship", "kobayabune_melee", 20.0, -12.0) as Node3D
+	await _wait_frames(owner, wait_frames_after_spawn)
+	if not is_instance_valid(captured_ship):
+		failures.append("support fleet smoke captured minion spawn failed")
+		return
+	if not captured_ship.has_method("capture_ship"):
+		failures.append("support fleet smoke captured minion missing capture_ship")
+		EntityRegistry.unregister_ship(captured_ship)
+		captured_ship.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	captured_ship.call("capture_ship")
+	await _wait_frames(owner, wait_frames_after_spawn + 2)
+	var guard_threat := spawner.call("debug_spawn_ship", "kobayabune_melee", 12.0, 0.0) as Node3D
+	await _wait_frames(owner, wait_frames_after_spawn)
+	if not is_instance_valid(guard_threat):
+		failures.append("support fleet smoke guard threat spawn failed")
+		EntityRegistry.unregister_captured_minion(captured_ship)
+		EntityRegistry.unregister_ship(captured_ship)
+		captured_ship.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	var player_forward: Vector3 = -player_ship.global_transform.basis.z
+	player_forward.y = 0.0
+	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.001 else Vector3.FORWARD
+	captured_ship.global_position = player_ship.global_position - player_forward * 12.0
+	captured_ship.global_position.y = 0.0
+	var captured_start_position: Vector3 = captured_ship.global_position
+	var captured_start_forward_offset: float = (captured_start_position - player_ship.global_position).dot(player_forward)
+	captured_ship.set("target", player_ship)
+	guard_threat.global_position = player_ship.global_position + player_forward * 10.0
+	var guard_start_distance: float = captured_ship.global_position.distance_to(guard_threat.global_position)
+	if "boarding_target" in guard_threat:
+		guard_threat.set("boarding_target", player_ship)
+	if "current_speed" in guard_threat:
+		guard_threat.set("current_speed", 0.0)
+	if "_last_ai_speed" in guard_threat:
+		guard_threat.set("_last_ai_speed", 0.0)
+	await _wait_frames(owner, wait_frames_after_spawn + 6)
+	if captured_ship.get("limbo_ai_pilot_enabled") != true:
+		failures.append("support fleet smoke captured minion did not enable LimboAI after capture")
+	var ally_mode := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, "")).strip_edges()
+	if ally_mode != ShipAILimboKeys.ALLY_MODE_GUARD_THREAT:
+		failures.append("support fleet smoke captured minion did not enter guard threat mode")
+	var ally_target_id := int(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
+	if ally_target_id != guard_threat.get_instance_id():
+		failures.append("support fleet smoke captured minion guard target mismatch")
+	var ally_reason := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges()
+	if ally_reason != "flagship_boarder":
+		failures.append("support fleet smoke captured minion guard reason mismatch: %s" % ally_reason)
+	var captured_end_forward_offset: float = (captured_ship.global_position - player_ship.global_position).dot(player_forward)
+	var captured_travel_distance: float = captured_ship.global_position.distance_to(captured_start_position)
+	var guard_end_distance: float = captured_ship.global_position.distance_to(guard_threat.global_position)
+	if captured_travel_distance < 0.35:
+		failures.append("support fleet smoke captured minion did not move to intercept threat")
+	elif captured_end_forward_offset <= captured_start_forward_offset + 0.45 and guard_end_distance >= guard_start_distance - 0.2:
+		failures.append("support fleet smoke captured minion did not advance toward flagship boarder")
+	EntityRegistry.unregister_ship(guard_threat)
+	guard_threat.queue_free()
+	EntityRegistry.unregister_captured_minion(captured_ship)
+	EntityRegistry.unregister_ship(captured_ship)
+	captured_ship.queue_free()
 	await _wait_frames(owner, 1)
 
 

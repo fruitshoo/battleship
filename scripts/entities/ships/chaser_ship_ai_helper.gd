@@ -216,6 +216,9 @@ static func process_physics(ship, delta: float) -> void:
 
 	if ship.get_team_tag() == "player":
 		if ship.is_boarding:
+			if ChaserShipMinionHelper.try_interrupt_boarding_for_flagship_rescue(ship):
+				ship._process_minion_ai(delta)
+				return
 			ship._process_boarding(delta)
 			return
 		ship._process_minion_ai(delta)

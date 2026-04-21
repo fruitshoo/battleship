@@ -1,7 +1,7 @@
 extends Node3D
 
 const PLAYER_SHIP_SCENE := preload("res://scenes/ships/player_ship.tscn")
-const ENEMY_BASE_SCENE := preload("res://scenes/ships/enemy_ship.tscn")
+const ENEMY_RUNTIME_SCENE := preload("res://scenes/ships/enemy_ship.tscn")
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
 const ENEMY_GUNNER_SCENE := preload("res://scenes/ships/enemy_gunner_ship.tscn")
 const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn")
@@ -66,7 +66,7 @@ func _build_encounters() -> Array[Dictionary]:
 		{"name": "Opening Gunner", "enemy_scene": ENEMY_GUNNER_SCENE, "distance": 15.5, "enemy_lateral_offset": 0.0},
 		{"name": "First Melee", "enemy_scene": ENEMY_MELEE_SCENE, "distance": 8.5, "enemy_lateral_offset": 2.8},
 		{"name": "Firepot Chase", "enemy_scene": ENEMY_FIREPOT_SCENE, "distance": 10.5, "enemy_lateral_offset": -3.0},
-		{"name": "Mixed Pressure", "enemy_scene": ENEMY_BASE_SCENE, "distance": 12.5, "enemy_lateral_offset": 0.0},
+		{"name": "Mixed Pressure", "enemy_scene": ENEMY_RUNTIME_SCENE, "distance": 12.5, "enemy_lateral_offset": 0.0},
 		{"name": "Late Gunner", "enemy_scene": ENEMY_GUNNER_SCENE, "distance": 16.0, "enemy_lateral_offset": 1.6},
 		{"name": "Final Melee", "enemy_scene": ENEMY_MELEE_SCENE, "distance": 8.0, "enemy_lateral_offset": -2.4},
 	]
@@ -169,7 +169,7 @@ func _clear_runtime_noise() -> void:
 
 
 func _spawn_enemy_ship(encounter: Dictionary) -> void:
-	var enemy_scene: PackedScene = encounter.get("enemy_scene", ENEMY_BASE_SCENE)
+	var enemy_scene: PackedScene = encounter.get("enemy_scene", ENEMY_RUNTIME_SCENE)
 	_current_enemy_ship = enemy_scene.instantiate() as Node3D
 	if not is_instance_valid(_current_enemy_ship):
 		return

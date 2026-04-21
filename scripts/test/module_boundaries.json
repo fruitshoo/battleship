@@ -291,6 +291,10 @@
       "layer": "ui/hud/hud_sail_debug_helper.gd",
       "responsibility": "Owns the current hud sail debug helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
+    "res://scripts/ui/hud/hud_soldier_debug_helper.gd": {
+      "layer": "ui/hud/hud_soldier_debug_helper.gd",
+      "responsibility": "Owns soldier-focused HUD debug formatting and focus selection so ship HUD debug keeps its ship-level ownership boundary."
+    },
     "res://scripts/ui/hud/hud_ship_debug_helper.gd": {
       "layer": "ui/hud/hud_ship_debug_helper.gd",
       "responsibility": "Owns the current hud ship debug helper responsibilities; update this baseline when moving behavior across module boundaries."
@@ -347,6 +351,7 @@
     "res://scripts/test/project_contract_recovery_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/test/project_contract_runtime_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/test/project_contract_scene_wiring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/test/project_contract_support_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/ui/hud/hud_debug_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/ui/hud/hud_stat_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/ui/hud/hud_update_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change."
@@ -889,7 +894,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
-      "count": 30,
+      "count": 43,
       "functions": [
         "process_minion_ai",
         "_is_ship_disabled",
@@ -900,6 +905,7 @@
         "_get_support_assist_rowing_speed_multiplier",
         "_get_support_assist_rowing_wind_floor",
         "_try_start_support_boarding",
+        "try_interrupt_boarding_for_flagship_rescue",
         "_can_support_board_target",
         "_start_support_boarding_link",
         "_build_support_assist_navigation",
@@ -909,10 +915,19 @@
         "_get_support_fleet_offset",
         "_get_support_join_offset",
         "_get_support_chain_goal",
+        "_get_support_formation_offset",
         "_get_support_assist_target",
         "_is_player_deck_emergency",
         "_is_support_rescue_target",
+        "_is_support_boss_breach_target",
+        "_is_boss_ship",
         "_is_support_formation_hold_enabled",
+        "_get_recent_support_limbo_payload",
+        "_get_recent_ally_limbo_payload",
+        "_draw_support_limbo_debug",
+        "_draw_ally_limbo_debug",
+        "_get_support_limbo_color",
+        "_get_ally_limbo_color",
         "_set_support_assist_target_lock",
         "_clear_support_assist_target_lock",
         "_get_support_follow_distance",
@@ -920,9 +935,12 @@
         "_get_ship_forward_flat",
         "_get_ship_speed",
         "_record_support_trail_point",
-        "_get_support_trail_goal"
+        "_get_support_trail_goal",
+        "_process_captured_guard_ai",
+        "_build_captured_guard_navigation",
+        "_calculate_captured_guard_separation"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Support-fleet and captured-minion LimboAI bridges intentionally extend the minion helper with recent payload reads while the helper remains the execution owner for allied movement, escorting, and boarding. Boss-breach support routing also lives here because it is still an allied escort execution concern, not a separate owner."
     },
     "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
       "count": 27,
@@ -990,7 +1008,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_crew_helper.gd": {
-      "count": 42,
+      "count": 47,
       "functions": [
         "get_desired_player_captain_count",
         "is_captain",
@@ -1010,6 +1028,11 @@
         "_get_next_player_crew_spawn_transform",
         "update_fire_pot_logic",
         "update_auto_boarding_raid",
+        "toggle_manual_boarding_intent",
+        "clear_manual_boarding_intent",
+        "_show_ship_hud_message",
+        "_find_manual_boarding_target",
+        "_can_keep_manual_boarding_target",
         "_find_raid_target",
         "get_auto_raid_debug_snapshot",
         "_can_initiate_raid",
@@ -1035,7 +1058,7 @@
         "_is_large_raid_target",
         "_is_boss_raid_target"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Player boarding continues to use the auto-raid helper as the single execution owner. Manual boarding intent is intentionally added here so flagship-authored boarding requests reuse the same rope, recall, and boarder-dispatch path instead of creating a second boarding system, including HUD-safe messaging for test doubles."
     },
     "res://scripts/entities/ships/player_ship_movement_helper.gd": {
       "count": 8,
@@ -1052,10 +1075,12 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
-      "count": 5,
+      "count": 7,
       "functions": [
         "handle_input",
         "toggle_fleet_formation",
+        "cycle_fleet_formation",
+        "_get_fleet_formation_label",
         "update_rowing_audio",
         "capture_derelict_ship",
         "replenish_crew"
@@ -1280,7 +1305,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/support_boarding_helper.gd": {
-      "count": 11,
+      "count": 13,
       "functions": [
         "get_boarding_purpose",
         "is_support_rescue_boarding_active",
@@ -1290,11 +1315,13 @@
         "_get_support_attack_boarding_ships",
         "_count_support_rescue_boarders_on_player_ship",
         "_count_support_attack_boarders_on_target",
+        "_should_hold_support_attack_boarders_on_target",
+        "_set_support_attack_transfer_suppressed",
         "_is_support_rescue_boarder_on_player_ship",
         "_is_support_attack_boarder_on_target",
         "_cancel_support_boarding"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Support boarding keeps boss-breach boarders committed on deck while suppressing fresh transfers after the deck is secured."
     },
     "res://scripts/entities/soldiers/soldier_action_helper.gd": {
       "count": 31,
@@ -1390,7 +1417,7 @@
       "reason": "Scene contract encapsulation routes soldier hand-pivot lookup through the Soldier owner contract."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
-      "count": 22,
+      "count": 24,
       "functions": [
         "take_damage",
         "get_ship_ranged_cover_reduction",
@@ -1401,6 +1428,8 @@
         "heal_full",
         "incapacitate",
         "die",
+        "_is_sinking_death_context",
+        "_is_ship_sinking_or_dying",
         "_snap_dead_body_to_deck",
         "_should_incapacitate_instead_of_die",
         "_schedule_incapacitated_recovery",
@@ -1415,7 +1444,7 @@
         "_apply_melee_kill_bonus",
         "_apply_enemy_kill_rewards"
       ],
-      "reason": "Scene contract encapsulation routes soldier collision-shape toggling through the Soldier owner contract."
+      "reason": "Soldier death audio tuning keeps sinking-context volume decisions inside the lifecycle owner that already owns death, reward, and corpse-state transitions."
     },
     "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
       "count": 2,
@@ -1839,13 +1868,15 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/test/project_contract_bootstrap_helper.gd": {
-      "count": 3,
+      "count": 5,
       "functions": [
         "run_bootstrap_contract_smoke",
         "_validate_prewarm_effect_state",
+        "_validate_battle_alert_audio_pool",
+        "_validate_bow_audio_rate_limit",
         "_wait_frames"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Bootstrap contract owns startup smoke checks, including non-spatial battle-alert routing and bow SFX rate-limit validation."
     },
     "res://scripts/test/project_contract_hud_helper.gd": {
       "count": 28,
@@ -1916,7 +1947,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/test/project_contract_runtime_helper.gd": {
-      "count": 59,
+      "count": 60,
       "functions": [
         "run_runtime_smoke",
         "_run_ship_targeting_contract",
@@ -1975,6 +2006,7 @@
         "_validate_final_boss_victory_on_death",
         "_validate_final_boss_defeat_message",
         "_validate_spawned_ship",
+        "_validate_spawned_ship_collision_fit",
         "_wait_frames",
         "_wait_physics_frames"
       ],
@@ -2099,9 +2131,12 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/test/project_contract_support_helper.gd": {
-      "count": 6,
+      "count": 9,
       "functions": [
         "run_support_fleet_contract_smoke",
+        "_run_support_rescue_emergency_smoke",
+        "_run_support_boss_breach_smoke",
+        "_run_captured_minion_guard_smoke",
         "_run_support_signal_level_two_limit_smoke",
         "_run_support_shared_cannon_cap_smoke",
         "_run_support_shared_hull_upgrade_smoke",
@@ -2323,8 +2358,19 @@
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
+    "res://scripts/ui/hud/hud_soldier_debug_helper.gd": {
+      "count": 5,
+      "functions": [
+        "format_soldier_limbo_panel_text",
+        "find_focus_player_soldier",
+        "find_focus_enemy_soldier",
+        "_find_nearest_alive_soldier_on_ship",
+        "_find_nearest_alive_enemy_soldier_global"
+      ],
+      "reason": "Soldier HUD debug owns Limbo panel formatting plus focused allied/enemy soldier selection for the ship debug panel."
+    },
     "res://scripts/ui/hud/hud_ship_debug_helper.gd": {
-      "count": 14,
+      "count": 18,
       "functions": [
         "sync_ship_debug_panel_from_player",
         "on_debug_ship_hull_changed",
@@ -2339,7 +2385,11 @@
         "adjust_player_captain_count_for_debug",
         "adjust_player_support_limit_for_debug",
         "adjust_player_ship_float_for_debug",
-        "_ensure_player_ship"
+        "_ensure_player_ship",
+        "_find_priority_enemy_ai_ship",
+        "_is_valid_enemy_ai_focus_ship",
+        "_format_limbo_panel_text",
+        "_find_nearest_player_limbo_ship"
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
@@ -2995,6 +3045,11 @@
       "to": "res://scripts/ui/hud/hud_lookup_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/ui/hud/hud_ship_debug_helper.gd|res://scripts/ui/hud/hud_soldier_debug_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_ship_debug_helper.gd",
+      "to": "res://scripts/ui/hud/hud_soldier_debug_helper.gd",
+      "reason": "Ship HUD debug delegates soldier-focused Limbo formatting and focus selection to the dedicated soldier HUD debug helper."
+    },
     "res://scripts/ui/hud/hud_stat_panel_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
       "from": "res://scripts/ui/hud/hud_stat_panel_helper.gd",
       "to": "res://scripts/helpers/node_contract_helper.gd",
@@ -3208,6 +3263,11 @@
       "recommended_action": "Revisit when the owning module is actively refactored."
     },
     "large_helper|res://scripts/test/project_contract_scene_wiring_helper.gd": {
+      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+      "priority": "baseline",
+      "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/test/project_contract_support_helper.gd": {
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."

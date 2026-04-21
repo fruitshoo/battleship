@@ -19,6 +19,10 @@ func can_use_fire_pot_attack() -> bool:
 	return true
 
 
+func get_limbo_ai_default_tree_path() -> String:
+	return ShipLimboAIPilot.ENEMY_FIREPOT_TREE_PATH
+
+
 func get_preferred_engagement_range() -> float:
 	return 4.8
 

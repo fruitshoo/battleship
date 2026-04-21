@@ -1,0 +1,25 @@
+[gd_resource type="BehaviorTree" format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_soldier_select_target.gd" id="1_select"]
+[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_soldier_set_mode.gd" id="2_mode"]
+
+[sub_resource type="BlackboardPlan" id="BlackboardPlan_soldier_boarding"]
+
+[sub_resource type="BTAction" id="BTAction_select"]
+script = ExtResource("1_select")
+
+[sub_resource type="BTAction" id="BTAction_mode"]
+script = ExtResource("2_mode")
+ship_duty_priority_threshold = 0.95
+allow_cross_ship_muster = true
+allow_ship_duty = false
+prefer_active_boarding_muster = true
+
+[sub_resource type="BTSequence" id="BTSequence_root"]
+custom_name = "Soldier AI Pilot: boarding profile"
+children = [SubResource("BTAction_select"), SubResource("BTAction_mode")]
+
+[resource]
+description = "Soldier LimboAI boarding profile. Active boarders ignore deck duty and rally toward the current boarding contact point before falling back to generic cross-ship muster."
+blackboard_plan = SubResource("BlackboardPlan_soldier_boarding")
+root_task = SubResource("BTSequence_root")
