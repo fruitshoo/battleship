@@ -123,8 +123,10 @@ var crew_respawn_timer: float = 0.0
 @export_range(1, 8, 1) var auto_raid_min_defenders: int = 3
 @export_range(8.0, 28.0, 0.5) var auto_raid_threat_range: float = 18.0
 @export_range(0.0, 1.0, 0.01) var auto_raid_min_hull_ratio: float = 0.45
+@export_range(12.0, 60.0, 0.5) var manual_boarding_lock_range: float = 34.0
 var auto_raid_eval_timer: float = 0.0
 var auto_raid_target: Node3D = null
+var manual_boarding_target: Node3D = null
 
 # === 방어 무기 (화통) 로직 변수 ===
 var fire_pot_cooldown_timer: float = 0.0
@@ -324,8 +326,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_sinking or is_dying or not is_player_controlled: return
 	
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F:
+		if event.is_action_pressed("toggle_fleet_formation"):
 			_toggle_fleet_formation()
+			return
+		if event.is_action_pressed("cycle_fleet_formation"):
+			_cycle_fleet_formation()
 			return
 		# 치트키: F2 누르면 바로 지휘(병영) 레벨업
 		if OS.is_debug_build() and event.keycode == KEY_F2:
@@ -863,6 +868,12 @@ func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
 func _update_auto_boarding_raid(delta: float) -> void:
 	PlayerShipCrewHelper.update_auto_boarding_raid(self, delta)
 
+func _toggle_manual_boarding_intent() -> void:
+	PlayerShipCrewHelper.toggle_manual_boarding_intent(self)
+
+func _clear_manual_boarding_intent() -> void:
+	PlayerShipCrewHelper.clear_manual_boarding_intent(self)
+
 func _update_support_fleet_respawn(delta: float) -> void:
 	PlayerShipSupportHelper.update_support_fleet_respawn(self, delta)
 
@@ -884,6 +895,9 @@ func _handle_input(delta: float) -> void:
 
 func _toggle_fleet_formation() -> void:
 	PlayerShipRuntimeHelper.toggle_fleet_formation(self)
+
+func _cycle_fleet_formation() -> void:
+	PlayerShipRuntimeHelper.cycle_fleet_formation(self)
 
 
 ## 러더 조향 입력 처리

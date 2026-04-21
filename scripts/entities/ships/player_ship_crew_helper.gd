@@ -323,7 +323,11 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 
 
 static func update_auto_boarding_raid(ship, delta: float) -> void:
-	if ship.auto_raid_enabled != true:
+	var manual_target: Node3D = ship.manual_boarding_target if "manual_boarding_target" in ship else null
+	if is_instance_valid(manual_target) and not _can_keep_manual_boarding_target(ship, manual_target):
+		clear_manual_boarding_intent(ship)
+		manual_target = null
+	if ship.auto_raid_enabled != true and not is_instance_valid(manual_target):
 		_recall_raid_boarders(ship)
 		_cancel_auto_raid_boarding_link(ship)
 		ship.auto_raid_target = null
@@ -333,12 +337,15 @@ static func update_auto_boarding_raid(ship, delta: float) -> void:
 		_recall_raid_boarders(ship)
 		_cancel_auto_raid_boarding_link(ship)
 		ship.auto_raid_target = null
+		if "manual_boarding_target" in ship:
+			ship.manual_boarding_target = null
 		return
 
 	ship.auto_raid_eval_timer = maxf(0.0, float(ship.auto_raid_eval_timer) - delta)
 
 	var current_target: Node3D = ship.auto_raid_target
-	if is_instance_valid(current_target) and not _can_continue_raid(ship, current_target):
+	var current_is_manual: bool = is_instance_valid(manual_target) and current_target == manual_target
+	if is_instance_valid(current_target) and not (_can_keep_manual_boarding_target(ship, current_target) if current_is_manual else _can_continue_raid(ship, current_target)):
 		if _recall_raid_boarders_with_link(ship, current_target):
 			ship.auto_raid_target = current_target
 			return
@@ -346,7 +353,7 @@ static func update_auto_boarding_raid(ship, delta: float) -> void:
 
 	if ship.auto_raid_eval_timer <= 0.0:
 		ship.auto_raid_eval_timer = float(ship.auto_raid_eval_interval)
-		var next_target: Node3D = _find_raid_target(ship)
+		var next_target: Node3D = manual_target if is_instance_valid(manual_target) else (_find_raid_target(ship) if ship.auto_raid_enabled == true else null)
 		if current_target != next_target and _count_boarders_from_home(ship) > 0:
 			if _recall_raid_boarders_with_link(ship, current_target):
 				ship.auto_raid_target = current_target
@@ -359,11 +366,98 @@ static func update_auto_boarding_raid(ship, delta: float) -> void:
 	ship.auto_raid_target = current_target
 
 	if is_instance_valid(current_target):
+		current_is_manual = is_instance_valid(manual_target) and current_target == manual_target
+		var can_hold_manual_contact: bool = current_is_manual \
+			and _is_valid_raid_target_ship(ship, current_target) \
+			and _is_ship_close_for_raid(ship, current_target)
+		var can_dispatch_manual: bool = can_hold_manual_contact and _can_initiate_raid(ship)
+		if current_is_manual and not can_hold_manual_contact:
+			if ship.is_boarding and ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE) and ship.get_boarding_target_ship() == current_target:
+				if _recall_raid_boarders_with_link(ship, current_target):
+					return
+				_cancel_auto_raid_boarding_link(ship)
+			return
 		_ensure_auto_raid_boarding_link(ship, current_target)
-		_dispatch_raid_boarders(ship, current_target)
+		if current_is_manual and not can_dispatch_manual:
+			_recall_raid_boarders(ship, current_target)
+			return
+		_dispatch_raid_boarders(ship, current_target, current_is_manual)
 	else:
 		_cancel_auto_raid_boarding_link(ship)
 		_recall_raid_boarders(ship)
+
+
+static func toggle_manual_boarding_intent(ship) -> void:
+	if not is_instance_valid(ship):
+		return
+	var current_target: Node3D = ship.manual_boarding_target if "manual_boarding_target" in ship else null
+	if is_instance_valid(current_target):
+		clear_manual_boarding_intent(ship)
+		_show_ship_hud_message(ship, "도선 해제", 1.4)
+		return
+	var next_target := _find_manual_boarding_target(ship)
+	if not is_instance_valid(next_target):
+		_show_ship_hud_message(ship, "도선 목표 없음", 1.4)
+		return
+	ship.manual_boarding_target = next_target
+	ship.auto_raid_target = next_target
+	ship.auto_raid_eval_timer = 0.0
+	_show_ship_hud_message(ship, "도선 시도: %s" % next_target.name, 1.6)
+
+
+static func clear_manual_boarding_intent(ship) -> void:
+	if not is_instance_valid(ship):
+		return
+	var previous_target: Node3D = ship.manual_boarding_target if "manual_boarding_target" in ship else null
+	ship.manual_boarding_target = null
+	if ship.auto_raid_target == previous_target and not (ship.is_boarding and ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE) and ship.get_boarding_target_ship() == previous_target):
+		ship.auto_raid_target = null
+	ship.auto_raid_eval_timer = 0.0
+
+
+static func _show_ship_hud_message(ship, message: String, duration: float) -> void:
+	if not is_instance_valid(ship):
+		return
+	var hud = ship._cached_hud if "_cached_hud" in ship else null
+	if is_instance_valid(hud) and hud.has_method("show_message"):
+		hud.show_message(message, duration)
+
+
+static func _find_manual_boarding_target(ship) -> Node3D:
+	if not is_instance_valid(ship):
+		return null
+	var best_target: Node3D = null
+	var best_score := INF
+	var lock_range: float = float(ship.manual_boarding_lock_range) if "manual_boarding_lock_range" in ship else maxf(float(ship.auto_raid_threat_range) * 1.8, 34.0)
+	for enemy in EntityRegistry.get_ships_by_team("enemy"):
+		var enemy_3d := enemy as Node3D
+		if not _is_valid_raid_target_ship(ship, enemy_3d):
+			continue
+		var dist: float = ship.global_position.distance_to(enemy_3d.global_position)
+		if dist > lock_range and not _is_ship_close_for_raid(ship, enemy_3d):
+			continue
+		var score := dist
+		if ship.auto_raid_target == enemy_3d:
+			score -= 5.0
+		if enemy_3d.has_method("get_boarding_target_ship") and enemy_3d.get_boarding_target_ship() == ship:
+			score -= 7.0
+		if _is_ship_close_for_raid(ship, enemy_3d):
+			score -= 3.0
+		if _is_boss_raid_target(enemy_3d):
+			score -= 11.0
+		if score < best_score:
+			best_score = score
+			best_target = enemy_3d
+	return best_target
+
+
+static func _can_keep_manual_boarding_target(ship, target_ship: Node3D) -> bool:
+	if not _is_valid_raid_target_ship(ship, target_ship):
+		return false
+	if _is_ship_close_for_raid(ship, target_ship):
+		return true
+	var lock_range: float = float(ship.manual_boarding_lock_range) if "manual_boarding_lock_range" in ship else maxf(float(ship.auto_raid_threat_range) * 1.8, 34.0)
+	return ship.global_position.distance_to(target_ship.global_position) <= lock_range
 
 
 static func _find_raid_target(ship) -> Node3D:
@@ -478,8 +572,8 @@ static func _can_continue_raid(ship, target_ship: Node3D) -> bool:
 	return true
 
 
-static func _dispatch_raid_boarders(ship, target_ship: Node3D) -> void:
-	var desired_boarders: int = _get_desired_boarder_count(ship, target_ship)
+static func _dispatch_raid_boarders(ship, target_ship: Node3D, force_manual: bool = false) -> void:
+	var desired_boarders: int = _get_desired_boarder_count(ship, target_ship, force_manual)
 	if desired_boarders <= 0:
 		_recall_raid_boarders(ship)
 		return
@@ -534,11 +628,16 @@ static func _ensure_auto_raid_boarding_link(ship, target_ship: Node3D) -> void:
 		target_ship.set_boarding_attacker_ship(ship)
 	if ship.has_method("_clear_ropes"):
 		ship._clear_ropes()
-	ship.boarding_timer = 0.0
-	ship.boarding_prep_timer = 0.0
-	ship.boarding_contact_timer = 0.0
-	ship.boarding_hook_timer = 0.0
-	ship.boarding_secondary_rope_timer = 0.0
+	if "boarding_timer" in ship:
+		ship.boarding_timer = 0.0
+	if "boarding_prep_timer" in ship:
+		ship.boarding_prep_timer = 0.0
+	if "boarding_contact_timer" in ship:
+		ship.boarding_contact_timer = 0.0
+	if "boarding_hook_timer" in ship:
+		ship.boarding_hook_timer = 0.0
+	if "boarding_secondary_rope_timer" in ship:
+		ship.boarding_secondary_rope_timer = 0.0
 	ShipBoardingMetaHelper.set_motion_settle_timer(ship, 0.0)
 	if "_initial_rope_deployed" in ship:
 		ship.set("_initial_rope_deployed", false)
@@ -690,7 +789,7 @@ static func _get_boarder_priority(soldier: Node) -> int:
 	return 1
 
 
-static func _get_desired_boarder_count(ship, target_ship: Node3D) -> int:
+static func _get_desired_boarder_count(ship, target_ship: Node3D, force_manual: bool = false) -> int:
 	var home_defenders: int = _count_home_defenders(ship)
 	var reserve: int = int(ship.auto_raid_min_defenders)
 	var spare: int = max(0, home_defenders - reserve)
@@ -698,6 +797,8 @@ static func _get_desired_boarder_count(ship, target_ship: Node3D) -> int:
 		return 0
 
 	var raid_pressure: int = _get_raid_pressure_value(target_ship)
+	if force_manual and raid_pressure <= 0:
+		raid_pressure = 2 if _is_boss_raid_target(target_ship) and spare >= 2 else 1
 	var desired_cap: int = int(ship.auto_raid_max_boarders)
 	if _is_boss_raid_target(target_ship):
 		desired_cap += 1

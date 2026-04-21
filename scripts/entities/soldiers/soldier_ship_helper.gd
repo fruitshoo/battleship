@@ -50,6 +50,13 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			nearest_distance_global = dist_sq_xz
 			nearest_global = other
 
+	if soldier.has_method("_allow_cross_ship_enemy_scan") and soldier._allow_cross_ship_enemy_scan() == false:
+		if is_player_boarder and nearest_ranged_on_ship:
+			return nearest_ranged_on_ship
+		if soldier.is_melee_only:
+			return nearest_on_ship if nearest_on_ship else nearest_global
+		return nearest_on_ship if nearest_on_ship else nearest_global
+
 	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
 	var opposing_ships: Array = EntityRegistry.get_ships_by_team(opposing_team)
 	for other_ship in opposing_ships:

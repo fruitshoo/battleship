@@ -82,3 +82,4 @@ mesh = SubResource("BoxMesh_choun")
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
+manual_boarding_lock_range = 34.0

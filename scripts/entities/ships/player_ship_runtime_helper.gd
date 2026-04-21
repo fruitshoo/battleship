@@ -23,16 +23,33 @@ static func handle_input(ship, delta: float) -> void:
 	else:
 		if ship.is_rowing:
 			ship.set_rowing(false)
+	if Input.is_action_just_pressed("manual_boarding") and ship.has_method("_toggle_manual_boarding_intent"):
+		ship.call("_toggle_manual_boarding_intent")
 
 static func toggle_fleet_formation(ship) -> void:
 	ship.CHASER_SHIP_SCRIPT.support_hold_formation = not bool(ship.CHASER_SHIP_SCRIPT.support_hold_formation)
 	if ship.CHASER_SHIP_SCRIPT.support_hold_formation:
-		ship.CHASER_SHIP_SCRIPT.fleet_formation = ship.CHASER_SHIP_SCRIPT.Formation.COLUMN
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-			ship._cached_hud.show_message("지원함: 진형 유지", 2.0)
+			ship._cached_hud.show_message("지원함: 진형 유지 (%s)" % _get_fleet_formation_label(ship), 2.0)
 	else:
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
 			ship._cached_hud.show_message("지원함: 자유 교전", 2.0)
+
+static func cycle_fleet_formation(ship) -> void:
+	var next_formation: int = (int(ship.CHASER_SHIP_SCRIPT.fleet_formation) + 1) % 3
+	ship.CHASER_SHIP_SCRIPT.fleet_formation = next_formation
+	if ship._cached_hud and ship._cached_hud.has_method("show_message"):
+		var suffix := "" if ship.CHASER_SHIP_SCRIPT.support_hold_formation else " (자유 교전 중)"
+		ship._cached_hud.show_message("지원함 진형: %s%s" % [_get_fleet_formation_label(ship), suffix], 2.0)
+
+static func _get_fleet_formation_label(ship) -> String:
+	match int(ship.CHASER_SHIP_SCRIPT.fleet_formation):
+		ship.CHASER_SHIP_SCRIPT.Formation.WING:
+			return "양익"
+		ship.CHASER_SHIP_SCRIPT.Formation.WEDGE:
+			return "쇄기"
+		_:
+			return "장사진"
 
 static func update_rowing_audio(ship, delta: float) -> void:
 	if ship.is_rowing:
