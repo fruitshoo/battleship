@@ -35,6 +35,7 @@ anim_speed_min = 0.29999998
 anim_speed_max = 0.39999998
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_puff"]
+render_priority = 12
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true

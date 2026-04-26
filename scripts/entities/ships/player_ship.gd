@@ -859,16 +859,19 @@ func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
 	if water_splash_scene:
 		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
 		if is_instance_valid(splash):
-			if splash.has_method("configure_as_splash"):
+			get_tree().root.add_child(splash)
+			if splash is Node3D:
+				(splash as Node3D).global_position = Vector3(splash_pos.x, 0.05, splash_pos.z)
+			if splash.has_method("configure_as_corpse_cleanup"):
+				splash.configure_as_corpse_cleanup()
+			elif splash.has_method("configure_as_splash"):
 				splash.configure_as_splash()
 			elif splash.has_method("configure_as_small"):
 				splash.configure_as_small()
 			if splash.has_method("set_intensity"):
 				splash.set_intensity(0.75)
-			splash.position = Vector3(splash_pos.x, 0.05, splash_pos.z)
-			get_tree().root.add_child(splash)
 			if splash.has_method("pool_activate"):
-				splash.pool_activate()
+				splash.call_deferred("pool_activate")
 	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
 		_cached_audio_manager.play_sfx("water_splash_small", splash_pos, randf_range(0.85, 1.15), 2.0)
 

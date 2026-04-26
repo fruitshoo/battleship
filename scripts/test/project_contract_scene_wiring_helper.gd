@@ -198,6 +198,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	_run_main_player_effect_scene_wiring_pass(failures)
 	await _run_player_ship_runtime_safety_contract(owner, failures, wait_frames_after_attach)
 	_run_player_corpse_cleanup_sequence_contract(failures)
+	_run_transparent_vfx_render_priority_contract(failures)
 	await _run_player_cannon_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_boarding_anchor_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_crew_slot_authoring_contract(owner, failures, wait_frames_after_attach)
@@ -432,6 +433,43 @@ static func _validate_soldier_action_definition_catalog(failures: Array[String])
 		failures.append("soldier action definition cannon reload should not lock AI")
 	if SoldierActionHelper.get_default_animation_name(SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY) != SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY:
 		failures.append("soldier action definition corpse carry animation name mismatch")
+
+
+static func _run_transparent_vfx_render_priority_contract(failures: Array[String]) -> void:
+	_expect_scene_loads("res://scenes/test/transparent_vfx_render_harness.tscn", "transparent VFX render harness should load", failures)
+	_expect_file_contains("res://resources/materials/water.tres", "render_priority = 0", "water material should stay at transparent render priority 0", failures)
+	_expect_file_contains("res://scenes/effects/ship_wake_trail.tscn", "render_priority = 1", "wake trail should render just above ocean water", failures)
+	_expect_file_contains("res://scenes/effects/water_blast.tscn", "render_priority = 4", "water blast floor foam should render above ocean/wake", failures)
+	_expect_file_contains("res://scenes/effects/water_blast.tscn", "render_priority = 5", "water blast mist should render above ocean/wake", failures)
+	_expect_file_contains("res://scenes/effects/water_blast.tscn", "render_priority = 6", "water blast spray should render above ocean/wake", failures)
+	_expect_file_contains("res://scenes/effects/impact_puff.tscn", "render_priority = 12", "impact puff should render above water effects", failures)
+	_expect_file_contains("res://scenes/effects/fire_effect.tscn", "render_priority = 17", "fire smoke should render above water without overpainting sails", failures)
+	_expect_file_contains("res://scenes/effects/fire_effect.tscn", "render_priority = 18", "fire flames should render above water without overpainting sails", failures)
+	_expect_file_contains("res://scenes/effects/fire_effect.tscn", "render_priority = 19", "fire sparks should render above water without overpainting sails", failures)
+	_expect_file_contains("res://scenes/effects/fire_pot_explosion.tscn", "render_priority = 18", "fire pot explosion should render above water", failures)
+	_expect_file_contains("res://scenes/effects/cannon_muzzle_smoke.tscn", "render_priority = 32", "muzzle smoke should keep its high foreground priority", failures)
+	_expect_file_contains("res://scenes/effects/cannon_muzzle_smoke.tscn", "render_priority = 34", "muzzle flash should keep its high foreground priority", failures)
+
+
+static func _expect_file_contains(path: String, needle: String, message: String, failures: Array[String]) -> void:
+	var source := FileAccess.get_file_as_string(path)
+	if source.is_empty():
+		failures.append("render priority contract could not read %s" % path)
+		return
+	if not source.contains(needle):
+		failures.append(message)
+
+
+static func _expect_scene_loads(path: String, message: String, failures: Array[String]) -> void:
+	var packed := load(path) as PackedScene
+	if packed == null:
+		failures.append(message)
+		return
+	var instance := packed.instantiate()
+	if not is_instance_valid(instance):
+		failures.append("%s: instantiate failed" % message)
+		return
+	instance.free()
 
 
 static func _run_player_cannon_slot_authoring_contract(owner: Node, failures: Array[String], wait_frames_after_attach: int) -> void:

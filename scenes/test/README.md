@@ -41,7 +41,7 @@ Recent regression coverage to keep together:
 
 Current harness gaps:
 
-- Sail, rope, and rock occlusion/transparency issues still need visual preview or screenshot-style checks; headless contract tests can only check state, not whether the player actually sees the mesh.
+- Rope and rock occlusion/transparency issues still need visual preview or screenshot-style checks; headless contract tests can only check state, not whether the player actually sees the mesh.
 - Formation and support combat feel still needs preview/balance harness runs because small AI constant changes can be technically valid but feel too passive or too slippery.
 - Sea decor pop-in/pop-out should be checked with a visibility/distance preview if it regresses again, since the current recovery contract mostly verifies spawn shape and collision semantics.
 - Audio mix changes should be checked in-game or with a dedicated audio bus/sample report; the current sweep only catches wiring/runtime errors, not loudness feel.
@@ -67,6 +67,9 @@ When adding a new harness:
   Damage preset preview for sail wear, burn, and wreck states.
 - `hybrid_sail_preview.tscn`
   Additional sail material and shape experimentation scene.
+- `transparent_vfx_render_harness.tscn`
+  Visual check for transparent VFX render priority over ocean, deck, and sail-overlap backgrounds.
+  Script: `scripts/test/transparent_vfx_render_harness.gd`
 
 ## Enemy And Boarding
 

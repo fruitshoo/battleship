@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="7_script"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3k83x"]
+render_priority = 18
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true

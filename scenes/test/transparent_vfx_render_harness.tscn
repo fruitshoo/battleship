@@ -1,0 +1,112 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Environment" uid="uid://d3wyl5ks17fd8" path="res://resources/environment/world_environment.tres" id="1_env"]
+[ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="2_ocean"]
+[ext_resource type="Script" path="res://scripts/test/transparent_vfx_render_harness.gd" id="3_script"]
+
+[sub_resource type="StandardMaterial3D" id="Material_deck"]
+albedo_color = Color(0.58, 0.45, 0.39, 1)
+roughness = 0.82
+
+[sub_resource type="StandardMaterial3D" id="Material_hull"]
+albedo_color = Color(0.34, 0.25, 0.2, 1)
+roughness = 0.86
+
+[sub_resource type="StandardMaterial3D" id="Material_sail_alpha"]
+render_priority = 20
+transparency = 1
+cull_mode = 2
+albedo_color = Color(0.82, 0.78, 0.66, 0.58)
+roughness = 0.78
+
+[sub_resource type="StandardMaterial3D" id="Material_marker_water"]
+albedo_color = Color(0.18, 0.38, 0.48, 1)
+roughness = 0.7
+
+[sub_resource type="BoxMesh" id="DeckMesh"]
+size = Vector3(4.0, 0.22, 3.0)
+
+[sub_resource type="BoxMesh" id="LowBlockMesh"]
+size = Vector3(1.1, 0.28, 0.72)
+
+[sub_resource type="BoxMesh" id="WaterMarkerMesh"]
+size = Vector3(2.6, 0.04, 2.2)
+
+[sub_resource type="QuadMesh" id="SailPanelMesh"]
+size = Vector2(3.2, 3.2)
+
+[sub_resource type="BoxMesh" id="MuzzleBlockMesh"]
+size = Vector3(0.36, 0.36, 1.1)
+
+[node name="TransparentVfxRenderHarness" type="Node3D"]
+script = ExtResource("3_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.809017, -0.293893, 0.509037, 0, 0.866025, 0.5, -0.587785, -0.404508, 0.700629, 0, 18, 0)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.642788, 0.766044, 0, -0.766044, 0.642788, 0, 8.2, 11.5)
+current = true
+environment = ExtResource("1_env")
+
+[node name="OceanPlane" parent="." instance=ExtResource("2_ocean")]
+
+[node name="ReferenceGeometry" type="Node3D" parent="."]
+
+[node name="WaterOnlyPlate" type="MeshInstance3D" parent="ReferenceGeometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.035, 0)
+mesh = SubResource("WaterMarkerMesh")
+surface_material_override/0 = SubResource("Material_marker_water")
+
+[node name="DeckPlate" type="MeshInstance3D" parent="ReferenceGeometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+mesh = SubResource("DeckMesh")
+surface_material_override/0 = SubResource("Material_deck")
+
+[node name="LowHullBlock" type="MeshInstance3D" parent="ReferenceGeometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 0.38, 0.58)
+mesh = SubResource("LowBlockMesh")
+surface_material_override/0 = SubResource("Material_hull")
+
+[node name="TransparentSailPanel" type="MeshInstance3D" parent="ReferenceGeometry"]
+transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.1736482, 0, -0.1736482, 0.9848077, 0, 2.05, -0.15)
+mesh = SubResource("SailPanelMesh")
+surface_material_override/0 = SubResource("Material_sail_alpha")
+
+[node name="MuzzleBlock" type="MeshInstance3D" parent="ReferenceGeometry"]
+transform = Transform3D(0.8660254, 0, -0.5, 0, 1, 0, 0.5, 0, 0.8660254, 2.75, 0.42, 0.25)
+mesh = SubResource("MuzzleBlockMesh")
+surface_material_override/0 = SubResource("Material_hull")
+
+[node name="Slots" type="Node3D" parent="."]
+
+[node name="FireOverWater" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.18, 0)
+
+[node name="WaterBurst" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.08, 1.15)
+
+[node name="FireOverDeck" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0.38, -0.15)
+
+[node name="DeckWaterBurst" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.38, 1.0)
+
+[node name="FireBehindSail" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.65, 0.72, -0.3)
+
+[node name="ImpactPuff" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.95, 0.45, 0.62)
+
+[node name="FirePotExplosion" type="Marker3D" parent="Slots"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.0, 0.18, 0)
+
+[node name="MuzzleSmoke" type="Marker3D" parent="Slots"]
+transform = Transform3D(0.8660254, 0, -0.5, 0, 1, 0, 0.5, 0, 0.8660254, 2.75, 0.68, 0.25)
+
+[node name="WakeTrail" type="Marker3D" parent="Slots"]
+transform = Transform3D(1.35, 0, 0, 0, 1.35, 0, 0, 0, 1.35, -2.2, 0.08, -2.45)

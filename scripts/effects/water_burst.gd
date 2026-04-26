@@ -1,7 +1,7 @@
 extends Node3D
 
 
-@export_enum("splash", "small", "sink") var preset: String = "splash"
+@export_enum("splash", "small", "sink", "corpse_cleanup") var preset: String = "splash"
 @export var lock_to_waterline: bool = true
 @export_range(-1.0, 1.0, 0.01) var waterline_y: float = 0.05
 
@@ -51,6 +51,7 @@ var _mist_alpha: float = 0.28
 var _droplets_enabled: bool = true
 var _blast_particles: Array[GPUParticles3D] = []
 var _blast_scale: float = 1.0
+var _waterline_lift: float = 0.0
 var _foam_material: StandardMaterial3D
 var _column_material: StandardMaterial3D
 var _mist_material: StandardMaterial3D
@@ -88,6 +89,12 @@ func configure_as_small() -> void:
 
 func configure_as_sink() -> void:
 	preset = "sink"
+	if is_node_ready():
+		_apply_preset()
+
+
+func configure_as_corpse_cleanup() -> void:
+	preset = "corpse_cleanup"
 	if is_node_ready():
 		_apply_preset()
 
@@ -159,6 +166,8 @@ func _apply_preset() -> void:
 			_apply_small_preset()
 		"sink":
 			_apply_sink_preset()
+		"corpse_cleanup":
+			_apply_corpse_cleanup_preset()
 		_:
 			_apply_splash_preset()
 
@@ -169,6 +178,7 @@ func _apply_splash_preset() -> void:
 	_budget_key_value = "water_explosion"
 	_budget_limit_value = 4
 	_budget_distance_value = 70.0
+	_waterline_lift = 0.0
 	_duration = 0.72 + (0.08 * intensity)
 	_blast_scale = size_scale
 
@@ -212,6 +222,7 @@ func _apply_small_preset() -> void:
 	_budget_key_value = "water_explosion_small"
 	_budget_limit_value = 2
 	_budget_distance_value = 60.0
+	_waterline_lift = 0.0
 	_duration = 0.46
 	_blast_scale = size_scale * 0.58
 
@@ -233,12 +244,21 @@ func _apply_small_preset() -> void:
 	_configure_droplets(6, 0.44, 1.9 * intensity, 4.2 * intensity, 0.025, 0.065 * size_scale)
 
 
+func _apply_corpse_cleanup_preset() -> void:
+	_apply_splash_preset()
+	_budget_key_value = "corpse_cleanup_splash"
+	_budget_limit_value = 8
+	_budget_distance_value = -1.0
+	_waterline_lift = 0.12
+
+
 func _apply_sink_preset() -> void:
 	var intensity := _intensity_scale
 	var size_scale := lerpf(1.05, 1.75, inverse_lerp(0.7, 2.0, intensity))
 	_budget_key_value = "ship_sinking_bubbles"
 	_budget_limit_value = 2
 	_budget_distance_value = 85.0
+	_waterline_lift = 0.0
 	_duration = 1.35 + (0.2 * intensity)
 	_blast_scale = size_scale * 1.18
 
@@ -515,7 +535,7 @@ func _align_to_waterline() -> void:
 	if not lock_to_waterline:
 		return
 	var pos := global_position
-	pos.y = waterline_y
+	pos.y = waterline_y + _waterline_lift
 	global_position = pos
 
 
