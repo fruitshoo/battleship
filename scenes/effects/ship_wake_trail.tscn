@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://c58kji4wu37n3"]
+[gd_scene format=3 uid="uid://dhmvxxlj2uy8p"]
 
 [ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_wake_texture"]
 [ext_resource type="Script" path="res://scripts/effects/ship_wake_particles.gd" id="2_wake_script"]
@@ -25,7 +25,7 @@ curve = SubResource("Curve_alpha")
 
 [sub_resource type="Curve" id="Curve_emission"]
 _limits = [-0.2, 1.0, 0.0, 1.0]
-_data = [Vector2(0, 0.16810113), 0.0, 0.0, 0, 0, Vector2(1, -0.2), -0.66567487, 0.0, 0, 0]
+_data = [Vector2(0, 0.25051552), 0.0, 0.0, 0, 0, Vector2(1, -0.2), -0.66567487, 0.0, 0, 0]
 point_count = 2
 
 [sub_resource type="CurveTexture" id="CurveTexture_emission"]
@@ -52,14 +52,14 @@ radial_accel_max = -2.2351742e-06
 scale_min = 8.0
 scale_max = 11.0
 scale_curve = SubResource("CurveTexture_scale")
+color = Color(0.74815804, 0.74815804, 0.74815804, 1)
 alpha_curve = SubResource("CurveTexture_alpha")
 emission_curve = SubResource("CurveTexture_emission")
 
 [sub_resource type="QuadMesh" id="QuadMesh_wake"]
 orientation = 1
 
-[node name="WakeTrail" type="GPUParticles3D"]
-emitting = false
+[node name="WakeTrail" type="GPUParticles3D" unique_id=1501401394]
 material_override = SubResource("StandardMaterial3D_wake")
 cast_shadow = 0
 amount = 20

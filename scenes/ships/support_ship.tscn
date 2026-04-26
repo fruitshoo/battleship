@@ -55,7 +55,7 @@ shape = SubResource("BoxShape3D_5qbug")
 [node name="Soldiers" type="Node3D" parent="." unique_id=764909694]
 
 [node name="WakeTrail" parent="." instance=ExtResource("wake_trail_scene")]
-transform = Transform3D(0.68, 0, 0, 0, 0.68, 0, 0, 0, 0.68, 0, -0.9, -0.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.9, -0.75)
 
 [node name="CollisionVisualizer" type="Node3D" parent="." unique_id=1064114260]
 visible = false

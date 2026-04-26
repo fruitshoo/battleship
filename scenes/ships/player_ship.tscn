@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
 [ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
-[ext_resource type="PackedScene" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
+[ext_resource type="PackedScene" uid="uid://dhmvxxlj2uy8p" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0dgdr"]
 size = Vector3(4.9047456, 3.2, 10.164231)

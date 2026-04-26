@@ -22,6 +22,7 @@ static func ensure_sail_smoke(mast: Node3D, smoke_scene: PackedScene) -> Node3D:
 	else:
 		mast.add_child(smoke_root)
 	mast._sail_smoke_instance = smoke_root
+	_configure_smoke_only_effect(smoke_root)
 	var smoke_particles: GPUParticles3D = get_smoke_particles(smoke_root)
 	configure_smoke_particles(smoke_particles)
 	return mast._sail_smoke_instance
@@ -53,6 +54,17 @@ static func configure_smoke_particles(smoke_particles: GPUParticles3D) -> void:
 	smoke_particles.lifetime = 1.8
 	smoke_particles.randomness = 0.45
 	smoke_particles.fixed_fps = 16
+
+
+static func _configure_smoke_only_effect(smoke_root: Node) -> void:
+	for child in smoke_root.get_children():
+		if child is GPUParticles3D:
+			var particles := child as GPUParticles3D
+			particles.emitting = child.name == "SmokeParticles"
+		elif child is AudioStreamPlayer3D:
+			var player := child as AudioStreamPlayer3D
+			player.stop()
+		_configure_smoke_only_effect(child)
 
 
 static func stop_sail_smoke(mast: Node3D) -> void:

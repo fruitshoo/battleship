@@ -162,7 +162,7 @@
 		},
 		"maengseon_support": {
 			"hull_scene": "res://scenes/ships/hulls/maengseon_hull.tscn",
-			"hull_hp": 200,
+			"hull_hp": 160,
 			"move_speed": 4.5,
 			"boarders": 4,
 			"has_cannons": true,
@@ -176,7 +176,7 @@
 		},
 		"panokseon_support": {
 			"hull_scene": "res://scenes/ships/hulls/panokseon_hull.tscn",
-			"hull_hp": 320,
+			"hull_hp": 240,
 			"move_speed": 3.8,
 			"boarders": 4,
 			"has_cannons": true,
