@@ -1,6 +1,19 @@
 extends CanvasLayer
 
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
+const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
+const CARD_WIDTH := 212
+const CARD_HEIGHT := 352
+const CARD_ART_SIZE := 156
+const CARD_PLACEHOLDER_ICON_SIZE := 46
+const CARD_CORNER_RADIUS := 18
+const CARD_CONTENT_PADDING := 16
+const CARD_ENTRY_SCALE := 0.94
+const CARD_FOCUS_SCALE := 1.042
+const CARD_ENTRY_DELAY := 0.055
+const CARD_ENTRY_DURATION := 0.22
+const REROLL_ENTRY_DELAY := 0.08
+const CARD_SHEEN_DURATION := 0.46
 
 ## 업그레이드 선택 UI
 ## 레벨업 시 3개의 카드를 표시, 플레이어가 하나를 선택
@@ -9,16 +22,37 @@ signal upgrade_chosen(upgrade_id: String)
 signal reroll_requested()
 
 @onready var background: ColorRect = $Background
+@onready var root_vbox: VBoxContainer = $VBox
 @onready var title_label: Label = $VBox/TitleLabel
+@onready var title_spacer: Control = $VBox/Spacer
 @onready var cards_container: HBoxContainer = $VBox/CardsContainer
+@onready var footer_spacer: Control = $VBox/FooterSpacer
 @onready var footer_row: HBoxContainer = $VBox/FooterRow
 
 var card_buttons: Array = []
 var card_ids: Array[String] = []
 var reroll_button: Button = null
+var _current_reroll_count: int = 0
 
 var _focused_index: int = 0
 var _input_lock_timer: float = 0.0
+var _card_width_px: float = CARD_WIDTH
+var _card_height_px: float = CARD_HEIGHT
+var _card_art_size_px: float = CARD_ART_SIZE
+var _card_art_corner_radius_px: float = 12.0
+var _card_placeholder_icon_size_px: int = CARD_PLACEHOLDER_ICON_SIZE
+var _card_corner_radius_px: int = CARD_CORNER_RADIUS
+var _card_content_padding_px: float = CARD_CONTENT_PADDING
+var _cards_separation_px: int = 28
+var _title_font_size_px: int = 30
+var _track_badge_font_size_px: int = 11
+var _level_font_size_px: int = 14
+var _name_font_size_px: int = 25
+var _effect_heading_font_size_px: int = 11
+var _effect_body_font_size_px: int = 13
+var _reroll_width_px: float = 200
+var _reroll_height_px: float = 46
+var _reroll_focused: bool = false
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
@@ -38,14 +72,65 @@ func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 작동
 	visible = false
+	_apply_background_fx()
 	_apply_theme()
+	_apply_layout_density()
+	if get_viewport() != null:
+		get_viewport().size_changed.connect(_apply_layout_density)
 
 func _apply_theme() -> void:
 	if is_instance_valid(background):
-		background.color = Color(0.02, 0.03, 0.05, 0.72)
+		background.color = Color.WHITE
 	if is_instance_valid(title_label):
-		NavalUiTheme.style_heading(title_label, 24)
+		title_label.text = "보강 선택"
+		NavalUiTheme.style_heading(title_label, _title_font_size_px)
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if is_instance_valid(cards_container):
+		cards_container.add_theme_constant_override("separation", _cards_separation_px)
+
+
+func _apply_layout_density() -> void:
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var viewport_size := viewport.get_visible_rect().size
+	var width_fit: float = clampf((viewport_size.x - 900.0) / 420.0, 0.0, 1.0)
+	var height_fit: float = clampf((viewport_size.y - 700.0) / 220.0, 0.0, 1.0)
+	var density: float = min(width_fit, height_fit)
+	_cards_separation_px = roundi(lerpf(14.0, 28.0, density))
+	var max_card_width := (maxf(620.0, viewport_size.x - 92.0) - float(_cards_separation_px) * 2.0) / 3.0
+	_card_width_px = clampf(max_card_width, 172.0, CARD_WIDTH)
+	_card_height_px = roundf(_card_width_px * 1.66)
+	_card_art_size_px = roundf(minf(_card_width_px - 28.0, _card_width_px * 0.74))
+	_card_art_corner_radius_px = roundf(lerpf(10.0, 12.0, density))
+	_card_placeholder_icon_size_px = roundi(lerpf(36.0, CARD_PLACEHOLDER_ICON_SIZE, density))
+	_card_corner_radius_px = roundi(lerpf(14.0, CARD_CORNER_RADIUS, density))
+	_card_content_padding_px = roundf(lerpf(12.0, CARD_CONTENT_PADDING, density))
+	_title_font_size_px = roundi(lerpf(24.0, 30.0, density))
+	_track_badge_font_size_px = roundi(lerpf(10.0, 11.0, density))
+	_level_font_size_px = roundi(lerpf(12.0, 14.0, density))
+	_name_font_size_px = roundi(lerpf(21.0, 25.0, density))
+	_effect_heading_font_size_px = roundi(lerpf(10.0, 11.0, density))
+	_effect_body_font_size_px = roundi(lerpf(12.0, 13.0, density))
+	_reroll_width_px = roundf(clampf(viewport_size.x * 0.22, 176.0, 200.0))
+	_reroll_height_px = roundf(lerpf(42.0, 46.0, density))
+	var content_width := roundf(_card_width_px * 3.0 + float(_cards_separation_px) * 2.0 + _card_content_padding_px * 2.0)
+	if is_instance_valid(root_vbox):
+		root_vbox.offset_left = -content_width * 0.5
+		root_vbox.offset_right = content_width * 0.5
+		root_vbox.offset_top = -roundf(lerpf(176.0, 200.0, density))
+		root_vbox.offset_bottom = roundf(lerpf(194.0, 220.0, density))
+	if is_instance_valid(title_label):
+		NavalUiTheme.style_heading(title_label, _title_font_size_px)
+	if is_instance_valid(title_spacer):
+		title_spacer.custom_minimum_size.y = roundf(lerpf(14.0, 20.0, density))
+	if is_instance_valid(cards_container):
+		cards_container.add_theme_constant_override("separation", _cards_separation_px)
+	if is_instance_valid(footer_spacer):
+		footer_spacer.custom_minimum_size.y = roundf(lerpf(20.0, 28.0, density))
+	if is_instance_valid(reroll_button):
+		reroll_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
+		reroll_button.add_theme_font_size_override("font_size", roundi(lerpf(15.0, 16.0, density)))
 
 func _process(delta: float) -> void:
 	if _input_lock_timer > 0:
@@ -54,62 +139,74 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or card_ids.is_empty() or _input_lock_timer > 0:
 		return
-		
-	# 키보드 에코(반복 입력) 무시 및 이미 눌러진 키 무시
+
 	if event is InputEventKey and event.is_echo():
 		return
-		
-	# A, D, Left, Right 화살표로 포커스 이동
-	if event.is_action_pressed("ui_left") or (event is InputEventKey and event.keycode == KEY_A and event.pressed):
-		_focused_index = maxi(0, _focused_index - 1)
-		_update_focus()
-		if get_viewport(): get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_right") or (event is InputEventKey and event.keycode == KEY_D and event.pressed):
-		var max_index = card_ids.size() - 1
-		if reroll_button and not reroll_button.disabled:
-			max_index += 1 # 리롤 버튼 포함
-		_focused_index = mini(max_index, _focused_index + 1)
-		_update_focus()
-		if get_viewport(): get_viewport().set_input_as_handled()
-		
-	# Space나 Enter로 선택
-	elif event.is_action_pressed("ui_accept") or (event is InputEventKey and event.keycode == KEY_SPACE and event.pressed and not event.is_echo()):
-		if _focused_index < card_ids.size():
-			_on_choice_pressed(card_ids[_focused_index])
-		elif _focused_index == card_ids.size() and reroll_button and not reroll_button.disabled:
-			_on_reroll_pressed()
-		if get_viewport(): get_viewport().set_input_as_handled()
 
-func _update_focus() -> void:
-	# 사운드 재생 (이동음)
-	if is_instance_valid(AudioManager):
+	if _is_prev_event(event):
+		if not _reroll_focused:
+			_focused_index = maxi(0, _focused_index - 1)
+		_update_focus()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	elif _is_next_event(event):
+		if not _reroll_focused:
+			_focused_index = mini(card_ids.size() - 1, _focused_index + 1)
+		_update_focus()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	elif _is_down_event(event):
+		if not _reroll_focused and reroll_button and not reroll_button.disabled:
+			_reroll_focused = true
+			_update_focus()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	elif _is_up_event(event):
+		if _reroll_focused:
+			_reroll_focused = false
+			_update_focus()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	elif _is_confirm_event(event):
+		if _reroll_focused and reroll_button and not reroll_button.disabled:
+			_on_reroll_pressed()
+		elif _focused_index >= 0 and _focused_index < card_ids.size():
+			_on_choice_pressed(card_ids[_focused_index])
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+
+func _update_focus(immediate: bool = false) -> void:
+	if not immediate and is_instance_valid(AudioManager):
 		AudioManager.play_sfx("ui_click", null, 1.2, -6.0) # 피치를 높이고 볼륨을 더 줄임
 		
 	for i in range(card_buttons.size()):
 		var card = card_buttons[i]
-		var style = card.get_theme_stylebox("panel") as StyleBoxFlat
 		var upgrade_id = card_ids[i]
 		var color = UpgradeManager.UPGRADES[upgrade_id].get("color", Color.WHITE)
-		
-		# 선택된 카드와 아닌 카드의 비주얼 업데이트 (기존 hover 함수 재활용)
-		if i == _focused_index:
-			_on_card_hover(card, style, color)
-		else:
-			_on_card_unhover(card, style, color)
+		var is_focused := i == _focused_index
+		_apply_card_focus_visuals(card, color, is_focused, immediate)
 			
-	# 리롤 버튼 포커스 처리
 	if reroll_button:
-		var style = reroll_button.get_theme_stylebox("normal") as StyleBoxFlat
-		if _focused_index == card_ids.size():
-			# 리롤 버튼 호버 효과 (임시)
+		if _reroll_focused and not reroll_button.disabled:
 			reroll_button.add_theme_stylebox_override("normal", reroll_button.get_theme_stylebox("hover"))
-			reroll_button.scale = Vector2(1.05, 1.05)
+			if immediate:
+				reroll_button.scale = Vector2(1.03, 1.03)
+			else:
+				var focus_tween := create_tween()
+				focus_tween.tween_property(reroll_button, "scale", Vector2(1.03, 1.03), 0.12)
 		else:
-			reroll_button.add_theme_stylebox_override("normal", style)
-			reroll_button.scale = Vector2(1.0, 1.0)
+			reroll_button.add_theme_stylebox_override("normal", NavalUiTheme.make_panel_style(Color(0.10, 0.15, 0.20, 0.72), NavalUiTheme.BORDER_GOLD_DIM, 8, 1, 12.0, 7.0, 12.0, 7.0))
+			if immediate:
+				reroll_button.scale = Vector2.ONE
+			else:
+				var blur_tween := create_tween()
+				blur_tween.tween_property(reroll_button, "scale", Vector2.ONE, 0.12)
 
 func show_upgrades(choices: Array, rerolls: int = 0) -> void:
+	_apply_layout_density()
 	card_ids = []
+	_current_reroll_count = rerolls
+	_reroll_focused = false
 	
 	# 기존 카드 제거
 	for child in cards_container.get_children():
@@ -129,7 +226,8 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	_update_reroll_button(rerolls)
 	
 	_focused_index = 0
-	_update_focus()
+	_update_focus(true)
+	_prepare_entry_animation()
 	
 	# 레벨업 시 방향키를 누르고 있었을 경우를 대비해 0.4초간 입력 잠금
 	_input_lock_timer = 0.4
@@ -142,6 +240,7 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(background, "modulate:a", 1.0, 0.3)
 	tween.tween_property($VBox, "modulate:a", 1.0, 0.3)
+	_animate_cards_in()
 
 
 func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
@@ -150,94 +249,93 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	var next_lv = current_lv + 1
 	var color = data.get("color", Color.WHITE)
 	
-	# 카드 컨테이너
 	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(200, 280)
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(_card_width_px, _card_height_px)
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	
-	# 스타일
 	var style = StyleBoxFlat.new()
-	style.bg_color = NavalUiTheme.PANEL_BG
-	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.35)
+	style.bg_color = Color(0.055, 0.085, 0.125, 0.96)
+	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.38)
 	style.border_width_top = 2
 	style.border_width_bottom = 2
 	style.border_width_left = 2
 	style.border_width_right = 2
-	style.corner_radius_top_left = 14
-	style.corner_radius_top_right = 14
-	style.corner_radius_bottom_left = 14
-	style.corner_radius_bottom_right = 14
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	style.content_margin_top = 16
-	style.content_margin_bottom = 16
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
-	style.shadow_size = 6
+	style.corner_radius_top_left = _card_corner_radius_px
+	style.corner_radius_top_right = _card_corner_radius_px
+	style.corner_radius_bottom_left = _card_corner_radius_px
+	style.corner_radius_bottom_right = _card_corner_radius_px
+	style.content_margin_left = _card_content_padding_px
+	style.content_margin_right = _card_content_padding_px
+	style.content_margin_top = _card_content_padding_px
+	style.content_margin_bottom = _card_content_padding_px
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
+	style.shadow_size = 10
 	card.add_theme_stylebox_override("panel", style)
 	
-	# 내부 VBox
 	var vbox = VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 12)
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 10)
 	card.add_child(vbox)
+
+	var art_center := CenterContainer.new()
+	art_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var art_frame = _create_card_art_frame(upgrade_id, data, color)
+	art_center.add_child(art_frame)
+	vbox.add_child(art_center)
+
+	var meta_row := HBoxContainer.new()
+	meta_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	meta_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta_row.add_child(_create_track_badge(_get_upgrade_track_label(upgrade_id, int(data["category"])), color))
+	var meta_spacer := Control.new()
+	meta_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta_row.add_child(meta_spacer)
 	
-	# 카테고리 라벨
-	var cat_label = Label.new()
-	cat_label.text = "[%s]" % _get_upgrade_track_label(upgrade_id, int(data["category"]))
-	cat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var cat_color = color.lerp(NavalUiTheme.TEXT_GOLD, 0.55)
-	NavalUiTheme.style_muted(cat_label, 12)
-	cat_label.add_theme_color_override("font_color", cat_color)
-	vbox.add_child(cat_label)
-	
-	# 이름 라벨
-	var name_label = Label.new()
-	name_label.text = data["name"]
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 22)
-	name_label.add_theme_color_override("font_color", color)
-	name_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-	name_label.add_theme_constant_override("outline_size", 3)
-	vbox.add_child(name_label)
-	
-	# 레벨 라벨
 	var level_label = Label.new()
 	level_label.text = "Lv.%d → Lv.%d" % [current_lv, next_lv] if current_lv > 0 else "NEW!"
-	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_gold(level_label, 14)
-	vbox.add_child(level_label)
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	NavalUiTheme.style_gold(level_label, _level_font_size_px)
+	meta_row.add_child(level_label)
+	vbox.add_child(meta_row)
 	
-	# 구분선
-	var sep = HSeparator.new()
-	sep.add_theme_constant_override("separation", 4)
-	vbox.add_child(sep)
+	var name_label = Label.new()
+	name_label.text = data["name"]
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.add_theme_font_override("font", NavalUiTheme.FONT_SEMIBOLD)
+	name_label.add_theme_font_size_override("font_size", _name_font_size_px)
+	name_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN.lerp(color, 0.18))
+	name_label.add_theme_color_override("font_shadow_color", NavalUiTheme.OUTLINE_DARK)
+	name_label.add_theme_constant_override("shadow_offset_x", 1)
+	name_label.add_theme_constant_override("shadow_offset_y", 2)
+	name_label.add_theme_constant_override("shadow_outline_size", 2)
+	vbox.add_child(name_label)
 	
-	# 설명
-	var desc_label = Label.new()
-	var next_spec: String = HudUpgradeInfoHelper.build_upgrade_spec_text(upgrade_id, next_lv, data.get("stats", {}))
-	if next_spec.is_empty():
-		desc_label.text = UpgradeManager.get_next_description(upgrade_id)
-	else:
-		desc_label.text = "다음 효과: " + next_spec
-	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	NavalUiTheme.style_body(desc_label, 15)
-	vbox.add_child(desc_label)
-	
-	# 여백
+	var rule := ColorRect.new()
+	rule.custom_minimum_size = Vector2(0.0, 1.0)
+	rule.color = color.lerp(NavalUiTheme.BORDER_GOLD_SOFT, 0.25)
+	vbox.add_child(rule)
+
+	var effect_heading := Label.new()
+	effect_heading.text = "다음 단계"
+	effect_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	NavalUiTheme.style_overlay_caption(effect_heading, _effect_heading_font_size_px, color.lerp(NavalUiTheme.TEXT_ACCENT, 0.35), 1)
+	vbox.add_child(effect_heading)
+
+	vbox.add_child(_create_effect_list(upgrade_id, next_lv, data, color))
+
 	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 10)
+	spacer.custom_minimum_size = Vector2(0.0, 10.0)
 	vbox.add_child(spacer)
+
+	card.set_meta("art_frame", art_frame)
+	card.set_meta("track_badge", meta_row.get_child(0))
 	
-	# 선택 버튼
-	var button = Button.new()
-	button.text = "선택"
-	button.custom_minimum_size = Vector2(0, 40)
-	NavalUiTheme.apply_hud_button(button, 18)
-	button.pressed.connect(_on_choice_pressed.bind(upgrade_id))
-	vbox.add_child(button)
-	
-	# 호버 효과용 마우스 이벤트 (마우스 작동도 유지)
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			_on_choice_pressed(upgrade_id)
+	)
 	card.mouse_entered.connect(func():
 		var idx = card_ids.find(upgrade_id)
 		if idx != -1:
@@ -246,6 +344,90 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	)
 	
 	return card
+
+
+func _create_card_art_frame(upgrade_id: String, data: Dictionary, color: Color) -> PanelContainer:
+	var art_frame := PanelContainer.new()
+	art_frame.custom_minimum_size = Vector2(_card_art_size_px, _card_art_size_px)
+	art_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	art_frame.clip_contents = true
+	art_frame.add_theme_stylebox_override(
+		"panel",
+		NavalUiTheme.make_emblem_frame_style(color)
+	)
+
+	var art_path := str(data.get("card_art_path", "")).strip_edges()
+	if not art_path.is_empty() and ResourceLoader.exists(art_path):
+		var texture := ResourceLoader.load(art_path, "", ResourceLoader.CACHE_MODE_REUSE) as Texture2D
+		if texture != null:
+			var art := TextureRect.new()
+			art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			art.texture = texture
+			art.expand_mode = 1
+			art.stretch_mode = 6
+			art.material = _make_rounded_card_art_material(
+				Vector2(_card_art_size_px, _card_art_size_px),
+				_card_art_corner_radius_px
+			)
+			art_frame.add_child(art)
+			_attach_art_sheen(art_frame)
+			return art_frame
+
+	var placeholder := CenterContainer.new()
+	placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	art_frame.add_child(placeholder)
+
+	var placeholder_inner := PanelContainer.new()
+	placeholder_inner.custom_minimum_size = Vector2(_card_art_size_px - 18.0, _card_art_size_px - 18.0)
+	placeholder_inner.add_theme_stylebox_override("panel", NavalUiTheme.make_emblem_plate_style(color))
+	placeholder.add_child(placeholder_inner)
+
+	var icon_wrap := CenterContainer.new()
+	icon_wrap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	placeholder_inner.add_child(icon_wrap)
+
+	var icon := Label.new()
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	NavalUiTheme.apply_emblem(icon, upgrade_id, _card_placeholder_icon_size_px, color.lerp(NavalUiTheme.TEXT_ACCENT, 0.48))
+	icon_wrap.add_child(icon)
+	_attach_art_sheen(art_frame)
+
+	return art_frame
+
+
+func _make_rounded_card_art_material(rect_size: Vector2, corner_radius: float) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+render_mode unshaded, blend_mix;
+
+uniform vec2 rect_size = vec2(156.0, 156.0);
+uniform float corner_radius_px = 12.0;
+uniform float softness_px = 1.25;
+
+float rounded_rect_alpha(vec2 uv) {
+	vec2 size = max(rect_size, vec2(1.0));
+	float radius = min(corner_radius_px, min(size.x, size.y) * 0.5);
+	vec2 half_size = size * 0.5;
+	vec2 point = uv * size;
+	vec2 delta = abs(point - half_size) - (half_size - vec2(radius));
+	float distance = length(max(delta, vec2(0.0))) + min(max(delta.x, delta.y), 0.0) - radius;
+	return 1.0 - smoothstep(0.0, softness_px, distance);
+}
+
+void fragment() {
+	vec4 tex = texture(TEXTURE, UV);
+	float inherited_alpha = COLOR.a;
+	COLOR = vec4(tex.rgb, tex.a * inherited_alpha * rounded_rect_alpha(UV));
+}
+"""
+	material.shader = shader
+	material.set_shader_parameter("rect_size", rect_size)
+	material.set_shader_parameter("corner_radius_px", corner_radius)
+	return material
 
 
 func _on_choice_pressed(upgrade_id: String) -> void:
@@ -269,16 +451,17 @@ func _on_choice_pressed(upgrade_id: String) -> void:
 
 
 func _on_card_hover(card: PanelContainer, style: StyleBoxFlat, color: Color) -> void:
-	style.bg_color = NavalUiTheme.PANEL_BG_SOFT
-	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.55).lightened(0.1)
-	# 스케일 효과
+	style.bg_color = Color(0.09, 0.14, 0.20, 0.98)
+	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.62).lightened(0.08)
+	style.shadow_size = 14
 	var tween = create_tween()
-	tween.tween_property(card, "scale", Vector2(1.05, 1.05), 0.1)
+	tween.tween_property(card, "scale", Vector2(1.035, 1.035), 0.1)
 
 
 func _on_card_unhover(card: PanelContainer, style: StyleBoxFlat, color: Color) -> void:
-	style.bg_color = NavalUiTheme.PANEL_BG
+	style.bg_color = Color(0.055, 0.085, 0.125, 0.96)
 	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.35)
+	style.shadow_size = 10
 	var tween = create_tween()
 	tween.tween_property(card, "scale", Vector2(1.0, 1.0), 0.1)
 
@@ -286,23 +469,25 @@ func _on_card_unhover(card: PanelContainer, style: StyleBoxFlat, color: Color) -
 func _update_reroll_button(count: int) -> void:
 	if not reroll_button:
 		reroll_button = Button.new()
-		reroll_button.custom_minimum_size = Vector2(180, 50)
+		reroll_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
 		reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		NavalUiTheme.apply_hud_button(reroll_button, 16)
+		NavalUiTheme.apply_hud_button(reroll_button, roundi(lerpf(15.0, 16.0, clampf((get_viewport().get_visible_rect().size.y - 700.0) / 220.0, 0.0, 1.0))))
 		
 		reroll_button.pressed.connect(_on_reroll_pressed)
 		
 		# 마우스 호버 지원
 		reroll_button.mouse_entered.connect(func():
-			_focused_index = card_ids.size()
+			_reroll_focused = true
 			_update_focus()
 		)
 		
 		footer_row.add_child(reroll_button)
 	
-	reroll_button.text = "Reroll (%d)" % count
+	reroll_button.text = "다시 고르기 %d회" % count if count > 0 else "다시 고르기"
 	reroll_button.disabled = count <= 0
 	reroll_button.visible = true
+	if reroll_button.disabled:
+		_reroll_focused = false
 
 
 func _on_reroll_pressed() -> void:
@@ -311,3 +496,267 @@ func _on_reroll_pressed() -> void:
 		AudioManager.play_sfx("ui_click", null, 1.1, -4.0)
 	
 	reroll_requested.emit()
+
+
+func _create_track_badge(track_label: String, color: Color) -> PanelContainer:
+	var badge := PanelContainer.new()
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	badge.add_theme_stylebox_override(
+		"panel",
+		NavalUiTheme.make_panel_style(
+			Color(color.r, color.g, color.b, 0.10),
+			color.lerp(NavalUiTheme.BORDER_GOLD_SOFT, 0.12),
+			9,
+			1,
+			10.0,
+			4.0,
+			10.0,
+			4.0
+		)
+	)
+	var label := Label.new()
+	label.text = track_label
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NavalUiTheme.style_overlay_caption(label, _track_badge_font_size_px, color.lerp(NavalUiTheme.TEXT_ACCENT, 0.28), 1)
+	badge.add_child(label)
+	return badge
+
+
+func _create_effect_list(upgrade_id: String, next_level: int, data: Dictionary, color: Color) -> VBoxContainer:
+	var effect_box := VBoxContainer.new()
+	effect_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	effect_box.add_theme_constant_override("separation", 4)
+	var lines: Array[String] = _build_card_effect_lines(upgrade_id, next_level, data.get("stats", {}))
+	if lines.is_empty():
+		var fallback_text := str(UpgradeManager.get_next_description(upgrade_id)).strip_edges()
+		if not fallback_text.is_empty():
+			lines.append(fallback_text)
+	for line_text in lines:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		row.add_theme_constant_override("separation", 6)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var bullet := Label.new()
+		bullet.text = "•"
+		NavalUiTheme.style_accent(bullet, _effect_body_font_size_px)
+		bullet.add_theme_color_override("font_color", color.lerp(NavalUiTheme.TEXT_ACCENT, 0.25))
+		row.add_child(bullet)
+		var line_label := Label.new()
+		line_label.text = line_text
+		line_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		line_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		NavalUiTheme.style_body(line_label, _effect_body_font_size_px)
+		row.add_child(line_label)
+		effect_box.add_child(row)
+	return effect_box
+
+
+func _build_card_effect_lines(upgrade_id: String, next_level: int, stats: Dictionary) -> Array[String]:
+	var spec_text := HudUpgradeInfoHelper.build_upgrade_spec_text(upgrade_id, next_level, stats)
+	if spec_text.is_empty():
+		return []
+	var normalized := spec_text.replace("\n", " | ")
+	var raw_parts := normalized.split("|")
+	var lines: Array[String] = []
+	for raw_part in raw_parts:
+		var line := str(raw_part).strip_edges()
+		if line.is_empty():
+			continue
+		lines.append(line)
+	return lines
+
+
+func _apply_background_fx() -> void:
+	if not is_instance_valid(background):
+		return
+	background.material = UiOverlayFx.make_vignette_material(
+		Color(0.02, 0.03, 0.05, 0.86),
+		Vector2(0.5, 0.46),
+		0.72,
+		0.34,
+		0.16,
+		0.26,
+		Vector3(0.035, 0.04, 0.03)
+	)
+
+
+func _attach_art_sheen(art_frame: PanelContainer) -> void:
+	if not is_instance_valid(art_frame) or art_frame.has_meta("art_sheen"):
+		return
+	var sheen := ColorRect.new()
+	sheen.name = "ArtSheen"
+	sheen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sheen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sheen.color = Color.WHITE
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+render_mode unshaded, blend_add;
+
+uniform float sweep = -0.45;
+uniform float width = 0.16;
+uniform float intensity = 0.0;
+uniform vec2 rect_size = vec2(156.0, 156.0);
+uniform float corner_radius_px = 12.0;
+uniform float softness_px = 1.25;
+
+float rounded_rect_alpha(vec2 uv) {
+	vec2 size = max(rect_size, vec2(1.0));
+	float radius = min(corner_radius_px, min(size.x, size.y) * 0.5);
+	vec2 half_size = size * 0.5;
+	vec2 point = uv * size;
+	vec2 delta = abs(point - half_size) - (half_size - vec2(radius));
+	float distance = length(max(delta, vec2(0.0))) + min(max(delta.x, delta.y), 0.0) - radius;
+	return 1.0 - smoothstep(0.0, softness_px, distance);
+}
+
+void fragment() {
+	float diagonal = UV.x + UV.y * 0.72;
+	float band = smoothstep(sweep - width, sweep, diagonal) * (1.0 - smoothstep(sweep, sweep + width, diagonal));
+	float alpha = band * intensity * rounded_rect_alpha(UV);
+	vec3 tint = vec3(1.0, 0.96, 0.84) * alpha;
+	COLOR = vec4(tint, alpha);
+}
+"""
+	material.shader = shader
+	material.set_shader_parameter("sweep", -0.45)
+	material.set_shader_parameter("width", 0.16)
+	material.set_shader_parameter("intensity", 0.0)
+	material.set_shader_parameter("rect_size", Vector2(_card_art_size_px, _card_art_size_px))
+	material.set_shader_parameter("corner_radius_px", _card_art_corner_radius_px)
+	sheen.material = material
+	art_frame.add_child(sheen)
+	art_frame.set_meta("art_sheen", sheen)
+
+
+func _play_card_focus_sheen(card: PanelContainer) -> void:
+	if not is_instance_valid(card):
+		return
+	var art_frame := card.get_meta("art_frame", null) as PanelContainer
+	if not is_instance_valid(art_frame):
+		return
+	var sheen := art_frame.get_meta("art_sheen", null) as ColorRect
+	if not is_instance_valid(sheen):
+		return
+	var sheen_material := sheen.material as ShaderMaterial
+	if sheen_material == null:
+		return
+	sheen_material.set_shader_parameter("sweep", -0.35)
+	sheen_material.set_shader_parameter("intensity", 0.0)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("sweep", v), -0.35, 1.4, CARD_SHEEN_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("intensity", v), 0.0, 0.22, 0.14)
+	tween.chain()
+	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("intensity", v), 0.22, 0.0, 0.18)
+
+
+func _prepare_entry_animation() -> void:
+	for card in card_buttons:
+		if not is_instance_valid(card):
+			continue
+		card.pivot_offset = card.custom_minimum_size * 0.5
+		card.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		card.scale = Vector2(CARD_ENTRY_SCALE, CARD_ENTRY_SCALE)
+	if reroll_button:
+		reroll_button.pivot_offset = reroll_button.custom_minimum_size * 0.5
+		reroll_button.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		reroll_button.scale = Vector2(0.96, 0.96)
+
+
+func _animate_cards_in() -> void:
+	for i in range(card_buttons.size()):
+		var card = card_buttons[i]
+		if not is_instance_valid(card):
+			continue
+		var target_scale := Vector2(CARD_FOCUS_SCALE, CARD_FOCUS_SCALE) if i == _focused_index else Vector2.ONE
+		var tween := create_tween()
+		tween.tween_interval(CARD_ENTRY_DELAY * float(i))
+		tween.set_parallel(true)
+		tween.tween_property(card, "modulate:a", 1.0, CARD_ENTRY_DURATION)
+		tween.tween_property(card, "scale", target_scale, CARD_ENTRY_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if reroll_button:
+		var reroll_tween := create_tween()
+		reroll_tween.tween_interval(CARD_ENTRY_DELAY * float(card_buttons.size()) + REROLL_ENTRY_DELAY)
+		reroll_tween.set_parallel(true)
+		reroll_tween.tween_property(reroll_button, "modulate:a", 1.0, 0.18)
+		reroll_tween.tween_property(reroll_button, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if _focused_index >= 0 and _focused_index < card_buttons.size():
+		var sheen_tween := create_tween()
+		sheen_tween.tween_interval(CARD_ENTRY_DELAY * float(_focused_index) + 0.12)
+		sheen_tween.tween_callback(func(): _play_card_focus_sheen(card_buttons[_focused_index]))
+
+
+func _apply_card_focus_visuals(card: PanelContainer, color: Color, focused: bool, immediate: bool) -> void:
+	var style := card.get_theme_stylebox("panel") as StyleBoxFlat
+	if style != null:
+		if focused:
+			style.bg_color = Color(0.09, 0.14, 0.20, 0.98)
+			style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.62).lightened(0.08)
+			style.shadow_size = 16
+			style.shadow_color = Color(color.r, color.g, color.b, 0.18)
+		else:
+			style.bg_color = Color(0.055, 0.085, 0.125, 0.96)
+			style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.35)
+			style.shadow_size = 10
+			style.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
+
+	var target_scale := Vector2(CARD_FOCUS_SCALE, CARD_FOCUS_SCALE) if focused else Vector2.ONE
+	if immediate:
+		card.scale = target_scale
+	else:
+		var tween := create_tween()
+		tween.tween_property(card, "scale", target_scale, 0.12)
+
+	var art_frame := card.get_meta("art_frame", null) as PanelContainer
+	if is_instance_valid(art_frame):
+		art_frame.self_modulate = Color.WHITE
+		var art_style := art_frame.get_theme_stylebox("panel") as StyleBoxFlat
+		if art_style != null:
+			art_style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.52 if focused else 0.34)
+			art_style.shadow_size = 10 if focused else 0
+			art_style.shadow_color = Color(color.r, color.g, color.b, 0.14)
+		var sheen := art_frame.get_meta("art_sheen", null) as ColorRect
+		if is_instance_valid(sheen):
+			var sheen_material := sheen.material as ShaderMaterial
+			if sheen_material != null and not focused:
+				sheen_material.set_shader_parameter("intensity", 0.0)
+
+	var track_badge := card.get_meta("track_badge", null) as PanelContainer
+	if is_instance_valid(track_badge):
+		var badge_style := track_badge.get_theme_stylebox("panel") as StyleBoxFlat
+		if badge_style != null:
+			badge_style.bg_color = Color(color.r, color.g, color.b, 0.16 if focused else 0.10)
+			badge_style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD_SOFT, 0.20 if focused else 0.12)
+	if focused and not immediate:
+		_play_card_focus_sheen(card)
+
+
+func _is_prev_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_left") or _is_physical_key_pressed(event, KEY_A)
+
+
+func _is_next_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_right") or _is_physical_key_pressed(event, KEY_D)
+
+
+func _is_up_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_up") or _is_physical_key_pressed(event, KEY_W)
+
+
+func _is_down_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_down") or _is_physical_key_pressed(event, KEY_S)
+
+
+func _is_confirm_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
+
+
+func _is_physical_key_pressed(event: InputEvent, keycode: Key) -> bool:
+	return event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == keycode
+
+
+func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
+	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode

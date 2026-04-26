@@ -1,18 +1,17 @@
 extends VBoxContainer
 
-const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-
 var slot_container: HFlowContainer = null
 var slots: Array[PanelContainer] = []
 var _slot_panel_bg: Color = Color(0, 0, 0, 0.4)
 var _slot_border_color: Color = Color(0.3, 0.3, 0.3, 0.8)
 
 func setup_track(title_text: String, title_color: Color, slot_panel_bg: Color, slot_border_color: Color, slot_count: int = 0) -> void:
-	var title = Label.new()
-	title.text = title_text
-	NavalUiTheme.style_heading(title, 12)
-	title.add_theme_color_override("font_color", title_color)
-	add_child(title)
+	if not title_text.strip_edges().is_empty():
+		var title = Label.new()
+		title.text = title_text
+		NavalUiTheme.style_heading(title, 12)
+		title.add_theme_color_override("font_color", title_color)
+		add_child(title)
 
 	_slot_panel_bg = slot_panel_bg
 	_slot_border_color = slot_border_color
@@ -39,8 +38,7 @@ func update_slot(slot_idx: int, upgrade_id: String, level: int, icon_text: Strin
 		icon_texture_rect.texture = icon_texture
 		icon_texture_rect.visible = icon_texture != null
 	if icon_label:
-		icon_label.text = icon_text
-		icon_label.add_theme_color_override("font_color", icon_color)
+		NavalUiTheme.apply_emblem(icon_label, icon_text, 16, icon_color)
 		icon_label.visible = icon_texture == null
 	if lv_label:
 		lv_label.text = str(level)
@@ -89,10 +87,8 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	var icon_label = Label.new()
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	icon_label.add_theme_font_size_override("font_size", 20)
-	if MATERIAL_SYMBOLS_FONT:
-		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
 	icon_label.name = "Icon"
+	NavalUiTheme.apply_emblem(icon_label, "build", 16, NavalUiTheme.TEXT_ACCENT)
 	slot_bg.add_child(icon_label)
 
 	var level_label_overlay = Label.new()

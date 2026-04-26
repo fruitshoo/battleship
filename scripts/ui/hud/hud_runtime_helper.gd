@@ -38,6 +38,7 @@ static func process_hud(hud, delta: float) -> void:
 		hud._update_stamina_display()
 		hud._update_boarding_display()
 		hud._update_capture_opportunity_display()
+		hud._update_boss_hp_display()
 		hud._update_ammo_mode_display()
 		hud._update_distance_debug_display()
 		hud._update_ship_health_bars(false)

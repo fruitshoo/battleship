@@ -1,4 +1,5 @@
 extends Area3D
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
 const RESCUE_CALL_LINES: Array[String] = [
 	"구해줘!",
@@ -206,14 +207,7 @@ func _ensure_rescue_call_label() -> Label3D:
 	_rescue_call_label = Label3D.new()
 	_rescue_call_label.name = RESCUE_CALL_LABEL_NAME
 	_rescue_call_label.position = Vector3(0.0, 2.15, 0.0)
-	_rescue_call_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_rescue_call_label.font_size = 84
-	_rescue_call_label.outline_size = 6
-	_rescue_call_label.no_depth_test = true
-	_rescue_call_label.render_priority = 20
-	_rescue_call_label.outline_render_priority = 21
-	_rescue_call_label.modulate = Color(1.0, 0.96, 0.58, 0.0)
-	_rescue_call_label.extra_cull_margin = 24.0
+	NavalUiTheme.style_world_callout(_rescue_call_label, 84, Color(1.0, 0.96, 0.58, 0.0))
 	_rescue_call_label.visible = false
 	add_child(_rescue_call_label)
 	return _rescue_call_label

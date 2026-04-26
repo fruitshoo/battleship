@@ -1,5 +1,6 @@
 extends Area3D
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 @export var collection_range: float = 9.0
 @export var hint_range: float = 34.0
@@ -188,10 +189,7 @@ func _ensure_hint_label() -> Label3D:
 	_hint_label.name = "HintLabel"
 	_hint_label.text = "표류 보급품"
 	_hint_label.position = Vector3(0.0, 1.55, 0.0)
-	_hint_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_hint_label.font_size = 24
-	_hint_label.outline_size = 6
-	_hint_label.modulate = Color(1.0, 0.92, 0.45, 0.0)
+	NavalUiTheme.style_world_hint(_hint_label, 24, Color(1.0, 0.92, 0.45, 0.0))
 	_hint_label.visible = false
 	add_child(_hint_label)
 	return _hint_label

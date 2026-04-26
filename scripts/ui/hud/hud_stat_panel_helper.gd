@@ -2,7 +2,6 @@ extends RefCounted
 
 const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
-const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 
 static func process_stat_panel(hud, delta: float) -> void:
 	if not hud.show_stat_panel:
@@ -138,7 +137,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"rows": [
 			{"icon": "apps", "label": "포문 수", "value": str(cannon_count)},
 			{"icon": "adjust", "label": "기본 / 최종 데미지", "value": "%.1f / %.1f" % [cannon_base_damage, cannon_damage]},
-			{"icon": "network_node", "label": "데미지 배율", "value": "화약 x%.2f" % cannon_damage_mult},
+			{"icon": "network_node", "label": "데미지 배율", "value": "철환 x%.2f" % cannon_damage_mult},
 			{"icon": "radar", "label": "사거리", "value": "%.1fm" % cannon_range},
 			{"icon": "timer", "label": "재장전", "value": "%.2fs" % cannon_cooldown},
 			{"icon": "grade", "label": "치명타", "value": "%.1f%% x%.1f" % [cannon_crit_chance * 100.0, cannon_crit_multiplier]},
@@ -264,11 +263,7 @@ static func _create_icon_label(icon_name: String, font_size: int, color: Color) 
 	icon_label.custom_minimum_size = Vector2(18, 18)
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	icon_label.add_theme_font_size_override("font_size", font_size)
-	icon_label.add_theme_color_override("font_color", color)
-	if MATERIAL_SYMBOLS_FONT:
-		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
-	icon_label.text = icon_name
+	NavalUiTheme.apply_emblem(icon_label, icon_name, font_size, color)
 	return icon_label
 
 static func _get_primary_cannon(ship) -> Node:

@@ -1,6 +1,7 @@
 extends Area3D
 class_name EnemyDrifterXP
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 const DRIFTER_CALL_LABEL_NAME := "DrifterCallLabel"
 const DRIFTER_CALL_LINES: Array[String] = [
@@ -179,14 +180,7 @@ func _ensure_drifter_call_label() -> Label3D:
 	_drifter_call_label = Label3D.new()
 	_drifter_call_label.name = DRIFTER_CALL_LABEL_NAME
 	_drifter_call_label.position = Vector3(0.0, 2.05, 0.0)
-	_drifter_call_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_drifter_call_label.font_size = 70
-	_drifter_call_label.outline_size = 6
-	_drifter_call_label.no_depth_test = true
-	_drifter_call_label.render_priority = 20
-	_drifter_call_label.outline_render_priority = 21
-	_drifter_call_label.modulate = Color(1.0, 0.68, 0.56, 0.0)
-	_drifter_call_label.extra_cull_margin = 24.0
+	NavalUiTheme.style_world_callout(_drifter_call_label, 70, Color(1.0, 0.68, 0.56, 0.0))
 	_drifter_call_label.visible = false
 	add_child(_drifter_call_label)
 	return _drifter_call_label

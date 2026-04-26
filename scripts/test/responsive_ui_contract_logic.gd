@@ -1,0 +1,127 @@
+extends RefCounted
+
+const MAIN_MENU_SCENE := preload("res://scenes/main_menu.tscn")
+const PAUSE_MENU_SCENE := preload("res://scenes/ui/pause_menu.tscn")
+const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
+const UPGRADE_UI_SCENE := preload("res://scenes/ui/upgrade_ui.tscn")
+const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
+const SHIP_CONTROL_PANEL_SCENE := preload("res://scenes/ui/ship_control_panel.tscn")
+
+const VIEWPORT_SIZES := [
+	Vector2i(960, 540),
+	Vector2i(1280, 720),
+	Vector2i(1600, 900),
+	Vector2i(1920, 1080),
+	Vector2i(2560, 1080),
+]
+
+
+static func run_contract(owner: Node, failures: Array[String]) -> void:
+	var window := owner.get_window()
+	var original_size := window.size if window != null else Vector2i.ZERO
+	for target_size in VIEWPORT_SIZES:
+		await _resize_window(owner, target_size)
+		var effective_size := _get_effective_viewport_size(owner)
+		await _run_main_menu_check(owner, failures, effective_size)
+		await _run_pause_menu_check(owner, failures, effective_size)
+		await _run_options_panel_check(owner, failures, effective_size)
+		await _run_upgrade_ui_check(owner, failures, effective_size)
+		await _run_meta_upgrade_check(owner, failures, effective_size)
+		await _run_ship_control_check(owner, failures, effective_size)
+	if window != null and original_size != Vector2i.ZERO:
+		await _resize_window(owner, original_size)
+
+
+static func _run_main_menu_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var menu := MAIN_MENU_SCENE.instantiate()
+	owner.add_child(menu)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(menu.get_node_or_null("TitleBlock") as Control, viewport_size, failures, "main menu title block")
+	_expect_control_within_viewport(menu.get_node_or_null("ButtonBlock") as Control, viewport_size, failures, "main menu button block")
+	menu.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_pause_menu_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var pause_menu := PAUSE_MENU_SCENE.instantiate()
+	owner.add_child(pause_menu)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(pause_menu.get_node_or_null("Center/Panel") as Control, viewport_size, failures, "pause panel")
+	pause_menu.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_options_panel_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var options_panel := OPTIONS_PANEL_SCENE.instantiate()
+	owner.add_child(options_panel)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(options_panel.get_node_or_null("Panel") as Control, viewport_size, failures, "options panel")
+	options_panel.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_upgrade_ui_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var upgrade_ui = UPGRADE_UI_SCENE.instantiate()
+	owner.add_child(upgrade_ui)
+	await _wait_frames(owner, 2)
+	upgrade_ui.show_upgrades(["cannon", "cannon_damage", "janggun"], 1)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(upgrade_ui.get_node_or_null("VBox") as Control, viewport_size, failures, "upgrade root")
+	var cards_container := upgrade_ui.get_node_or_null("VBox/CardsContainer") as HBoxContainer
+	if is_instance_valid(cards_container):
+		for child in cards_container.get_children():
+			_expect_control_within_viewport(child as Control, viewport_size, failures, "upgrade card")
+	upgrade_ui.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_meta_upgrade_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var meta_upgrade_ui = META_UPGRADE_UI_SCENE.instantiate()
+	owner.add_child(meta_upgrade_ui)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(meta_upgrade_ui.get_node_or_null("Backdrop/Panel") as Control, viewport_size, failures, "meta upgrade panel")
+	meta_upgrade_ui.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_ship_control_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var ship_control := SHIP_CONTROL_PANEL_SCENE.instantiate()
+	owner.add_child(ship_control)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(ship_control.get_node_or_null("WindPanel") as Control, viewport_size, failures, "ship control panel", 6.0)
+	ship_control.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _resize_window(owner: Node, target_size: Vector2i) -> void:
+	var window := owner.get_window()
+	if window != null:
+		window.size = target_size
+	await _wait_frames(owner, 3)
+
+
+static func _get_effective_viewport_size(owner: Node) -> Vector2:
+	var viewport := owner.get_viewport()
+	if viewport != null:
+		return viewport.get_visible_rect().size
+	var window := owner.get_window()
+	if window != null:
+		return window.size
+	return Vector2.ZERO
+
+
+static func _expect_control_within_viewport(control: Control, viewport_size: Vector2, failures: Array[String], label: String, padding: float = 2.0) -> void:
+	if not is_instance_valid(control):
+		failures.append("%s missing during responsive contract" % label)
+		return
+	var rect := control.get_global_rect()
+	if rect.position.x < -padding \
+		or rect.position.y < -padding \
+		or rect.end.x > float(viewport_size.x) + padding \
+		or rect.end.y > float(viewport_size.y) + padding:
+		failures.append("%s exceeds viewport %s with rect %s" % [label, viewport_size, rect])
+
+
+static func _wait_frames(owner: Node, count: int) -> void:
+	for _index in range(maxi(count, 1)):
+		await owner.get_tree().process_frame

@@ -1,5 +1,9 @@
 extends Node
 
+const ProjectContractTypographyHelper = preload("res://scripts/test/project_contract_typography_helper.gd")
+const ResponsiveUiContractLogic = preload("res://scripts/test/responsive_ui_contract_logic.gd")
+const ScreenEdgeFxContractLogic = preload("res://scripts/test/screen_edge_fx_contract_logic.gd")
+
 
 @export var script_roots: Array[String] = ["res://scripts"]
 @export var scene_roots: Array[String] = ["res://scenes"]
@@ -34,6 +38,9 @@ extends Node
 @export var smoke_run_recovery_effect_contract: bool = true
 @export var smoke_run_scene_wiring_contract: bool = true
 @export var smoke_run_upgrade_contract: bool = true
+@export var smoke_run_typography_contract: bool = true
+@export var smoke_run_responsive_ui_contract: bool = true
+@export var smoke_run_screen_edge_fx_contract: bool = true
 
 var _failures: Array[String] = []
 var _loaded_scripts: int = 0
@@ -63,6 +70,12 @@ func _run_contract_checks() -> void:
 		await _run_recovery_effect_contract_smoke()
 	if smoke_run_scene_wiring_contract:
 		await _run_scene_wiring_contract_smoke()
+	if smoke_run_typography_contract:
+		await _run_typography_contract_smoke()
+	if smoke_run_responsive_ui_contract:
+		await _run_responsive_ui_contract_smoke()
+	if smoke_run_screen_edge_fx_contract:
+		await _run_screen_edge_fx_contract_smoke()
 	_report_and_quit()
 
 
@@ -105,6 +118,23 @@ func _run_scene_wiring_contract_smoke() -> void:
 		_failures,
 		smoke_wait_frames_after_attach
 	)
+
+
+func _run_typography_contract_smoke() -> void:
+	await ProjectContractTypographyHelper.run_typography_contract_smoke(
+		self,
+		_failures,
+		smoke_scene_path,
+		smoke_wait_frames_after_attach
+	)
+
+
+func _run_screen_edge_fx_contract_smoke() -> void:
+	await ScreenEdgeFxContractLogic.run_contract(self, _failures)
+
+
+func _run_responsive_ui_contract_smoke() -> void:
+	await ResponsiveUiContractLogic.run_contract(self, _failures)
 
 
 func _run_support_fleet_contract_smoke() -> void:

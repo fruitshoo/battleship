@@ -1,5 +1,7 @@
 extends RefCounted
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+
 const ROLE_MARKER_NAME := "RoleMarker"
 const CAPTAIN_MARKER_NAME := "CaptainMarker"
 const LEVEL_MARKER_NAME := "LevelMarker"
@@ -225,10 +227,7 @@ static func ensure_level_marker(soldier) -> Label3D:
 	marker = Label3D.new()
 	marker.name = LEVEL_MARKER_NAME
 	marker.position = Vector3(0.0, 1.78, 0.0)
-	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	marker.font_size = 24
-	marker.outline_size = 5
-	marker.modulate = Color(1.0, 0.9, 0.32, 1.0)
+	NavalUiTheme.style_world_marker(marker, 24, Color(1.0, 0.9, 0.32, 1.0))
 	soldier.add_child(marker)
 	return marker
 

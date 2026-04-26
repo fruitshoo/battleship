@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS := {
 	"sfx_volume": 0.85,
 	"ui_volume": 0.85,
 	"fullscreen": false,
+	"screen_edge_fx_enabled": true,
+	"screen_edge_fx_strength": 0.75,
 }
 
 var gold: int = 0

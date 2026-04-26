@@ -1,11 +1,20 @@
 extends RefCounted
 
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
-const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
-const SUPPORT_FLEET_ICON = preload("res://assets/ui/support_fleet/support_fleet_bow_icon.png")
+const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
 const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
 const CAPTURE_HINT_CREW_RATIO: float = 0.34
 const CAPTURE_HINT_CREW_MAX: int = 2
+const SUPPORT_SLOT_SIZE_DEFAULT := 42.0
+const SUPPORT_SLOT_SIZE_COMPACT := 38.0
+const SUPPORT_SLOT_SIZE_DENSE := 34.0
+const SUPPORT_SLOT_PANOKSEON_ACCENT := Color(0.86, 0.58, 0.34, 0.96)
+const SUPPORT_SLOT_MAENGSEON_ACCENT := Color(0.82, 0.69, 0.42, 0.92)
+const SUPPORT_SLOT_EMPTY_BG := Color(0.05, 0.07, 0.10, 0.72)
+const BOSS_HP_FALLBACK_ID := -1
+const BOSS_HP_FILL := Color(0.77, 0.22, 0.20, 0.95)
+const BOSS_HP_BG := Color(0.07, 0.08, 0.10, 0.92)
+const SHIP_HP_UI_SAFE_PADDING := 10.0
 
 # Top-line HUD text
 static func update_level(hud, val: int) -> void:
@@ -15,28 +24,24 @@ static func update_level(hud, val: int) -> void:
 static func update_score(hud, val: int) -> void:
 	if hud.score_label:
 		var total_gold = SaveManager.gold if is_instance_valid(SaveManager) else val
-		hud.score_label.text = "[Gold] %d (Total %d)" % [val, total_gold]
+		hud.score_label.text = "금 %d · 총 %d" % [val, total_gold]
 
 static func update_combat_stats(hud, ship_sunk: int, ships_derelicted: int, soldiers_killed: int, _soldiers_slain: int, _soldiers_drowned: int) -> void:
-	var text = "[전과] 격침 %d | 나포 %d | 병사 %d" % [ship_sunk, ships_derelicted, soldiers_killed]
+	var destroyed_ships: int = ship_sunk + ships_derelicted
+	var text = "배 %d | 병 %d" % [destroyed_ships, soldiers_killed]
 	if hud._last_combat_stats_text == text:
 		return
 	hud._last_combat_stats_text = text
-	if hud.combat_stats_label:
-		hud.combat_stats_label.text = "[전과]"
 	if hud.combat_sunk_value_label:
-		hud.combat_sunk_value_label.text = str(ship_sunk)
-	if hud.combat_derelict_value_label:
-		hud.combat_derelict_value_label.text = str(ships_derelicted)
+		hud.combat_sunk_value_label.text = str(destroyed_ships)
 	if hud.combat_soldier_value_label:
 		hud.combat_soldier_value_label.text = str(soldiers_killed)
 
 static func update_difficulty_ui(hud, val: int) -> void:
 	if hud.difficulty_label:
-		var new_text = "[Diff] %d" % val
-		if hud._last_difficulty_text != new_text:
-			hud._last_difficulty_text = new_text
-			hud.difficulty_label.text = new_text
+		hud._last_difficulty_text = ""
+		hud.difficulty_label.text = ""
+		hud.difficulty_label.visible = false
 
 static func update_crew_status(hud, count: int, max_count: int = 4) -> void:
 	if hud.crew_label:
@@ -130,16 +135,18 @@ static func _update_support_force_status(hud) -> void:
 	if respawn_active:
 		slot_count = maxi(slot_count, support_limit)
 	_ensure_support_slot_count(hud, slot_count)
+	_apply_support_slot_density(hud, slot_count)
 
 	for i in range(hud.support_fleet_hud_slots.size()):
 		var slot: PanelContainer = hud.support_fleet_hud_slots[i]
 		if not is_instance_valid(slot):
 			continue
 		var ship = support_ships[i] if i < support_ships.size() else null
+		var slot_profile: Dictionary = PlayerShipSupportHelper.resolve_support_fleet_profile(hud.player_ship, i)
 		var timer_text := ""
 		if not is_instance_valid(ship):
 			timer_text = _get_support_respawn_timer_text(hud.player_ship) if i == support_ships.size() else "대기"
-		_update_support_slot(slot, ship, timer_text)
+		_update_support_slot(slot, ship, slot_profile, timer_text)
 
 static func update_crew_count(hud) -> void:
 	if Engine.get_process_frames() % 30 != 0:
@@ -179,19 +186,8 @@ static func _ensure_support_slot_count(hud, slot_count: int) -> void:
 
 static func _create_support_slot() -> PanelContainer:
 	var slot := PanelContainer.new()
-	slot.custom_minimum_size = Vector2(76, 76)
-	var slot_style := StyleBoxFlat.new()
-	slot_style.bg_color = Color(0.05, 0.07, 0.10, 0.90)
-	slot_style.border_color = Color(0.84, 0.68, 0.35, 0.90)
-	slot_style.border_width_left = 2
-	slot_style.border_width_top = 2
-	slot_style.border_width_right = 2
-	slot_style.border_width_bottom = 2
-	slot_style.corner_radius_top_left = 38
-	slot_style.corner_radius_top_right = 38
-	slot_style.corner_radius_bottom_right = 38
-	slot_style.corner_radius_bottom_left = 38
-	slot.add_theme_stylebox_override("panel", slot_style)
+	slot.custom_minimum_size = Vector2(SUPPORT_SLOT_SIZE_DEFAULT, SUPPORT_SLOT_SIZE_DEFAULT)
+	slot.add_theme_stylebox_override("panel", NavalUiTheme.make_support_slot_style())
 
 	var root := Control.new()
 	root.name = "Root"
@@ -208,48 +204,56 @@ static func _create_support_slot() -> PanelContainer:
 	damage_fill.anchor_bottom = 1.0
 	damage_fill.offset_left = 0.0
 	damage_fill.offset_right = 0.0
-	damage_fill.offset_top = 0.0
+	damage_fill.offset_top = -5.0
 	damage_fill.offset_bottom = 0.0
-	var damage_style := StyleBoxFlat.new()
-	damage_style.bg_color = Color(0.92, 0.24, 0.24, 0.76)
-	damage_style.corner_radius_top_left = 38
-	damage_style.corner_radius_top_right = 38
-	damage_style.corner_radius_bottom_right = 38
-	damage_style.corner_radius_bottom_left = 38
-	damage_fill.add_theme_stylebox_override("panel", damage_style)
+	damage_fill.add_theme_stylebox_override("panel", NavalUiTheme.make_support_slot_damage_style())
 	root.add_child(damage_fill)
 
 	var dead_overlay := Panel.new()
 	dead_overlay.name = "DeadOverlay"
 	dead_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dead_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var dead_style := StyleBoxFlat.new()
-	dead_style.bg_color = Color(0.08, 0.08, 0.08, 0.72)
-	dead_style.corner_radius_top_left = 38
-	dead_style.corner_radius_top_right = 38
-	dead_style.corner_radius_bottom_right = 38
-	dead_style.corner_radius_bottom_left = 38
-	dead_overlay.add_theme_stylebox_override("panel", dead_style)
+	dead_overlay.add_theme_stylebox_override("panel", NavalUiTheme.make_support_slot_dead_style())
 	dead_overlay.visible = false
 	root.add_child(dead_overlay)
 
-	var icon := TextureRect.new()
+	var emblem_plate := PanelContainer.new()
+	emblem_plate.name = "EmblemPlate"
+	emblem_plate.anchor_left = 0.0
+	emblem_plate.anchor_top = 0.0
+	emblem_plate.anchor_right = 1.0
+	emblem_plate.anchor_bottom = 1.0
+	emblem_plate.offset_left = 4.0
+	emblem_plate.offset_top = 4.0
+	emblem_plate.offset_right = -4.0
+	emblem_plate.offset_bottom = -4.0
+	emblem_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	emblem_plate.add_theme_stylebox_override("panel", NavalUiTheme.make_emblem_plate_style(SUPPORT_SLOT_MAENGSEON_ACCENT, true))
+	root.add_child(emblem_plate)
+
+	var icon := Label.new()
 	icon.name = "Icon"
-	icon.anchor_left = 0.0
-	icon.anchor_top = 0.0
-	icon.anchor_right = 1.0
-	icon.anchor_bottom = 1.0
-	icon.offset_left = 4.0
-	icon.offset_top = 4.0
-	icon.offset_right = -4.0
-	icon.offset_bottom = -4.0
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.custom_minimum_size = Vector2(68, 68)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.texture = SUPPORT_FLEET_ICON
-	icon.modulate = NavalUiTheme.TEXT_MAIN
-	root.add_child(icon)
+	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	NavalUiTheme.apply_emblem(icon, "fleet_signal", 15, NavalUiTheme.TEXT_ACCENT)
+	emblem_plate.add_child(icon)
+
+	var badge := Label.new()
+	badge.name = "TypeBadge"
+	badge.anchor_left = 1.0
+	badge.anchor_top = 0.0
+	badge.anchor_right = 1.0
+	badge.anchor_bottom = 0.0
+	badge.offset_left = -16.0
+	badge.offset_top = 2.0
+	badge.offset_right = -4.0
+	badge.offset_bottom = 14.0
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	NavalUiTheme.style_overlay_caption(badge, 8, NavalUiTheme.TEXT_GOLD, 2)
+	badge.visible = false
+	root.add_child(badge)
 
 	var timer := Label.new()
 	timer.name = "Timer"
@@ -263,36 +267,111 @@ static func _create_support_slot() -> PanelContainer:
 
 	return slot
 
-static func _update_support_slot(slot: PanelContainer, ship, timer_text: String = "") -> void:
+static func _apply_support_slot_density(hud, slot_count: int) -> void:
+	var slot_size: float = SUPPORT_SLOT_SIZE_DEFAULT
+	if slot_count >= 5:
+		slot_size = SUPPORT_SLOT_SIZE_DENSE
+	elif slot_count >= 4:
+		slot_size = SUPPORT_SLOT_SIZE_COMPACT
+	if is_instance_valid(hud.support_row):
+		hud.support_row.add_theme_constant_override("separation", 4)
+	if is_instance_valid(hud.support_slot_container):
+		hud.support_slot_container.add_theme_constant_override("separation", 4 if slot_count >= 5 else 5)
+	for slot in hud.support_fleet_hud_slots:
+		if not is_instance_valid(slot):
+			continue
+		slot.custom_minimum_size = Vector2(slot_size, slot_size)
+		var emblem_plate := slot.get_node_or_null("Root/EmblemPlate") as PanelContainer
+		if is_instance_valid(emblem_plate):
+			emblem_plate.offset_left = 4.0
+			emblem_plate.offset_top = 4.0
+			emblem_plate.offset_right = -4.0
+			emblem_plate.offset_bottom = -4.0
+		var badge := slot.get_node_or_null("Root/TypeBadge") as Label
+		if is_instance_valid(badge):
+			badge.offset_left = -roundf(slot_size * 0.34)
+			badge.offset_top = 2.0
+			badge.offset_right = -4.0
+			badge.offset_bottom = roundf(slot_size * 0.28)
+
+static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dictionary = {}, timer_text: String = "") -> void:
 	var slot_style: StyleBoxFlat = slot.get_theme_stylebox("panel") as StyleBoxFlat
 	var damage_fill: Panel = slot.get_node("Root/DamageFill") as Panel
 	var dead_overlay: Panel = slot.get_node("Root/DeadOverlay") as Panel
-	var icon: TextureRect = slot.get_node("Root/Icon") as TextureRect
+	var emblem_plate: PanelContainer = slot.get_node("Root/EmblemPlate") as PanelContainer
+	var emblem_style: StyleBoxFlat = emblem_plate.get_theme_stylebox("panel") as StyleBoxFlat if is_instance_valid(emblem_plate) else null
+	var icon: Label = slot.get_node("Root/EmblemPlate/Icon") as Label
+	var badge: Label = slot.get_node("Root/TypeBadge") as Label
 	var timer: Label = slot.get_node("Root/Timer") as Label
 	if not is_instance_valid(icon) or not is_instance_valid(dead_overlay) or not is_instance_valid(damage_fill) or not is_instance_valid(timer):
 		return
+	var visual := _get_support_slot_visual(ship, slot_profile)
+	var accent: Color = visual.get("accent", SUPPORT_SLOT_MAENGSEON_ACCENT)
+	var bg_color: Color = visual.get("bg", NavalUiTheme.PANEL_BG_DARK)
+	var badge_text: String = str(visual.get("badge", ""))
+	var badge_color: Color = visual.get("badge_color", accent)
+	var emblem_token: String = str(visual.get("emblem", "fleet_signal"))
+	var emblem_color: Color = visual.get("emblem_color", NavalUiTheme.TEXT_ACCENT)
+	var slot_size_px: float = slot.custom_minimum_size.x if slot.custom_minimum_size.x > 0.0 else SUPPORT_SLOT_SIZE_DEFAULT
+	var emblem_font_size := 15
+	if slot_size_px <= SUPPORT_SLOT_SIZE_DENSE + 0.5:
+		emblem_font_size = 13
+	elif slot_size_px <= SUPPORT_SLOT_SIZE_COMPACT + 0.5:
+		emblem_font_size = 14
+	if is_instance_valid(badge):
+		badge.visible = not badge_text.is_empty()
+		badge.text = badge_text
+		NavalUiTheme.style_overlay_caption(badge, 8, badge_color, 2)
+	NavalUiTheme.apply_emblem(icon, emblem_token, emblem_font_size, emblem_color)
+	if is_instance_valid(emblem_style):
+		emblem_style.bg_color = Color(accent.r, accent.g, accent.b, 0.08)
+		emblem_style.border_color = accent.lerp(NavalUiTheme.BORDER_GOLD_SOFT, 0.18)
 	if is_instance_valid(ship) and ship.get("hull_hp") != null and ship.get("max_hull_hp") != null:
-		damage_fill.visible = false
+		var hull_hp: float = maxf(0.0, float(ship.get("hull_hp")))
+		var max_hull_hp: float = maxf(float(ship.get("max_hull_hp")), 1.0)
+		var hull_ratio: float = clampf(hull_hp / max_hull_hp, 0.0, 1.0)
+		damage_fill.visible = true
+		damage_fill.anchor_right = hull_ratio
+		var damage_style := damage_fill.get_theme_stylebox("panel") as StyleBoxFlat
+		if is_instance_valid(damage_style):
+			damage_style.bg_color = NavalUiTheme.STATUS_DANGER.lerp(NavalUiTheme.STATUS_GOOD, hull_ratio)
 		dead_overlay.visible = false
 		icon.visible = true
-		icon.texture = SUPPORT_FLEET_ICON
-		icon.modulate = NavalUiTheme.TEXT_MAIN
 		timer.visible = false
 		timer.text = ""
 		if slot_style:
-			slot_style.bg_color = NavalUiTheme.PANEL_BG_DARK
-			slot_style.border_color = NavalUiTheme.BORDER_GOLD_DIM
+			slot_style.bg_color = bg_color
+			slot_style.border_color = accent
 	else:
 		damage_fill.visible = false
+		damage_fill.anchor_right = 1.0
 		dead_overlay.visible = true
 		icon.visible = true
-		icon.texture = SUPPORT_FLEET_ICON
-		icon.modulate = Color(0.62, 0.66, 0.72, 0.82)
+		NavalUiTheme.apply_emblem(icon, emblem_token, emblem_font_size, Color(0.62, 0.66, 0.72, 0.82))
 		timer.visible = not timer_text.is_empty()
 		timer.text = timer_text
 		if slot_style:
-			slot_style.bg_color = Color(0.06, 0.07, 0.09, 0.9)
-			slot_style.border_color = NavalUiTheme.STATUS_DEAD
+			slot_style.bg_color = SUPPORT_SLOT_EMPTY_BG
+			slot_style.border_color = accent.lerp(NavalUiTheme.STATUS_DEAD, 0.45)
+		if is_instance_valid(emblem_style):
+			emblem_style.bg_color = Color(0.08, 0.08, 0.09, 0.42)
+			emblem_style.border_color = accent.lerp(NavalUiTheme.STATUS_DEAD, 0.35)
+
+static func _get_support_slot_visual(ship, slot_profile: Dictionary = {}) -> Dictionary:
+	var ship_type_name := ""
+	if is_instance_valid(ship) and ship.get("ship_type") != null:
+		ship_type_name = str(ship.get("ship_type")).strip_edges().to_lower()
+	if ship_type_name.is_empty():
+		ship_type_name = str(slot_profile.get("ship_type", "maengseon_ally")).strip_edges().to_lower()
+	var is_panokseon := ship_type_name.contains("panokseon")
+	return {
+		"accent": SUPPORT_SLOT_PANOKSEON_ACCENT if is_panokseon else SUPPORT_SLOT_MAENGSEON_ACCENT,
+		"bg": Color(0.09, 0.07, 0.06, 0.92) if is_panokseon else NavalUiTheme.PANEL_BG_DARK,
+		"emblem": "fort" if is_panokseon else "fleet_signal",
+		"emblem_color": NavalUiTheme.TEXT_ACCENT if is_panokseon else NavalUiTheme.TEXT_MAIN,
+		"badge": "포" if is_panokseon else "",
+		"badge_color": NavalUiTheme.TEXT_ACCENT if is_panokseon else NavalUiTheme.TEXT_GOLD,
+	}
 
 static func update_hull_display(hud) -> void:
 	if is_instance_valid(hud.player_ship) and hud.player_ship.get("hull_hp") != null:
@@ -434,13 +513,202 @@ static func _get_capture_opportunity_text(player_ship) -> String:
 	return ""
 
 static func update_boss_hp(hud, current: float, maximum: float) -> void:
-	if hud.boss_hp_bar_new:
-		hud.boss_hp_bar_new.max_value = maximum
-		hud.boss_hp_bar_new.visible = current > 0
-		var tween = hud.create_tween()
-		tween.tween_property(hud.boss_hp_bar_new, "value", current, 0.2)
-		if hud.boss_hp_text_label:
-			hud.boss_hp_text_label.text = "BOSS: %.0f/%.0f" % [current, maximum]
+	refresh_boss_hp_display(hud, current, maximum)
+
+static func refresh_boss_hp_display(hud, fallback_current: float = -1.0, fallback_maximum: float = -1.0) -> void:
+	if hud == null or not is_instance_valid(hud.boss_hp_container):
+		return
+	var boss_rows: Array[Dictionary] = _collect_active_boss_hp_rows()
+	if boss_rows.is_empty() and fallback_current > 0.0 and fallback_maximum > 0.0:
+		boss_rows.append({
+			"id": BOSS_HP_FALLBACK_ID,
+			"label": "보스",
+			"current": fallback_current,
+			"maximum": fallback_maximum,
+			"tier": 0,
+		})
+	_sort_boss_hp_rows(boss_rows)
+
+	var active_ids: Dictionary = {}
+	var label_counts: Dictionary = {}
+	for row in boss_rows:
+		var base_label := str(row.get("label", "보스"))
+		label_counts[base_label] = int(label_counts.get(base_label, 0)) + 1
+
+	var label_seen: Dictionary = {}
+	var show_labels: bool = boss_rows.size() > 0
+	for index in range(boss_rows.size()):
+		var row: Dictionary = boss_rows[index]
+		var boss_id: int = int(row.get("id", BOSS_HP_FALLBACK_ID))
+		active_ids[boss_id] = true
+		var base_label := str(row.get("label", "보스"))
+		label_seen[base_label] = int(label_seen.get(base_label, 0)) + 1
+		var display_label := base_label
+		if int(label_counts.get(base_label, 0)) > 1:
+			display_label = "%s %d" % [base_label, int(label_seen[base_label])]
+		var entry: Dictionary = _ensure_boss_hp_entry(hud, boss_id)
+		_update_boss_hp_entry(entry, display_label, float(row.get("current", 0.0)), float(row.get("maximum", 1.0)), show_labels)
+		var root := entry.get("root", null) as VBoxContainer
+		if is_instance_valid(root):
+			hud.boss_hp_container.move_child(root, index)
+
+	_cleanup_stale_boss_hp_entries(hud, active_ids)
+	var active_count: int = boss_rows.size()
+	hud.boss_hp_container.visible = active_count > 0
+	if hud.boss_hp_visible_count != active_count:
+		hud.boss_hp_visible_count = active_count
+		if hud.has_method("_apply_layout_density"):
+			hud._apply_layout_density()
+	_update_legacy_boss_hp_refs(hud)
+
+static func _collect_active_boss_hp_rows() -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	var ships: Array = EntityRegistry.get_ships_by_team("enemy")
+	for ship in ships:
+		if not _is_boss_hp_target_valid(ship):
+			continue
+		var maximum: float = maxf(float(ship.get("max_hull_hp")), 1.0)
+		var current: float = clampf(float(ship.get("hull_hp")), 0.0, maximum)
+		rows.append({
+			"id": ship.get_instance_id(),
+			"label": _get_boss_hp_label(ship),
+			"current": current,
+			"maximum": maximum,
+			"tier": int(ship.get("tier")) if ship.get("tier") != null else 0,
+		})
+	return rows
+
+static func _is_boss_hp_target_valid(ship) -> bool:
+	if not is_instance_valid(ship) or not ship.is_inside_tree():
+		return false
+	if not ship.is_in_group("boss"):
+		return false
+	if ship.get("hull_hp") == null or ship.get("max_hull_hp") == null:
+		return false
+	if ship.get("is_sinking") == true or ship.get("is_dying") == true:
+		return false
+	var maximum: float = float(ship.get("max_hull_hp"))
+	if maximum <= 0.0:
+		return false
+	return float(ship.get("hull_hp")) > 0.0
+
+static func _get_boss_hp_label(ship) -> String:
+	if not is_instance_valid(ship):
+		return "보스"
+	var tier_value: int = int(ship.get("tier")) if ship.get("tier") != null else 0
+	if tier_value >= 2:
+		return "대장선"
+	var ship_type_name := str(ship.get("ship_type")).strip_edges().to_lower() if ship.get("ship_type") != null else ""
+	if ship_type_name.contains("final"):
+		return "대장선"
+	if ship_type_name.contains("mid") or ship_type_name.contains("atakebune"):
+		return "대형 적선"
+	return "보스"
+
+static func _sort_boss_hp_rows(rows: Array[Dictionary]) -> void:
+	for i in range(rows.size()):
+		var best_index := i
+		for j in range(i + 1, rows.size()):
+			if _boss_hp_row_precedes(rows[j], rows[best_index]):
+				best_index = j
+		if best_index != i:
+			var temp := rows[i]
+			rows[i] = rows[best_index]
+			rows[best_index] = temp
+
+static func _boss_hp_row_precedes(a: Dictionary, b: Dictionary) -> bool:
+	var a_tier := int(a.get("tier", 0))
+	var b_tier := int(b.get("tier", 0))
+	if a_tier != b_tier:
+		return a_tier > b_tier
+	return int(a.get("id", 0)) < int(b.get("id", 0))
+
+static func _ensure_boss_hp_entry(hud, boss_id: int) -> Dictionary:
+	if hud.boss_hp_entries.has(boss_id):
+		var existing: Dictionary = hud.boss_hp_entries[boss_id]
+		if is_instance_valid(existing.get("root", null)) and is_instance_valid(existing.get("bar", null)):
+			return existing
+
+	var root := VBoxContainer.new()
+	root.name = "BossHPRow_%s" % str(boss_id)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.custom_minimum_size = Vector2(560.0, 38.0)
+	root.add_theme_constant_override("separation", 2)
+	hud.boss_hp_container.add_child(root)
+
+	var label := Label.new()
+	label.name = "BossName"
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.custom_minimum_size = Vector2(560.0, 16.0)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.visible = false
+	NavalUiTheme.style_caption(label, 10, NavalUiTheme.TEXT_MUTED)
+	label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
+	label.add_theme_constant_override("outline_size", 2)
+	root.add_child(label)
+
+	var bar := ProgressBar.new()
+	bar.name = "BossHP_%s" % str(boss_id)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.custom_minimum_size = Vector2(560.0, 20.0)
+	bar.min_value = 0.0
+	bar.max_value = 1.0
+	bar.value = 1.0
+	bar.show_percentage = false
+	NavalUiTheme.apply_progress_bar(bar, BOSS_HP_BG, BOSS_HP_FILL, 3)
+	root.add_child(bar)
+
+	var entry := {
+		"root": root,
+		"bar": bar,
+		"label": label,
+	}
+	hud.boss_hp_entries[boss_id] = entry
+	return entry
+
+static func _update_boss_hp_entry(entry: Dictionary, label_text: String, current: float, maximum: float, show_label: bool) -> void:
+	var bar := entry.get("bar", null) as ProgressBar
+	if not is_instance_valid(bar):
+		return
+	bar.max_value = maxf(maximum, 1.0)
+	bar.visible = current > 0.0
+	if bar.get_meta("boss_hp_initialized", false) != true:
+		bar.value = current
+		bar.set_meta("boss_hp_initialized", true)
+	else:
+		bar.value = lerpf(float(bar.value), current, 0.45)
+
+	var label := entry.get("label", null) as Label
+	if is_instance_valid(label):
+		label.text = label_text
+		label.visible = show_label
+	var root := entry.get("root", null) as VBoxContainer
+	if is_instance_valid(root):
+		root.add_theme_constant_override("separation", 2 if show_label else 0)
+
+static func _cleanup_stale_boss_hp_entries(hud, active_ids: Dictionary) -> void:
+	for boss_id in hud.boss_hp_entries.keys():
+		if active_ids.has(boss_id):
+			continue
+		var entry: Dictionary = hud.boss_hp_entries[boss_id]
+		var root := entry.get("root", null) as VBoxContainer
+		if is_instance_valid(root):
+			root.queue_free()
+		hud.boss_hp_entries.erase(boss_id)
+
+static func _update_legacy_boss_hp_refs(hud) -> void:
+	hud.boss_hp_bar_new = null
+	hud.boss_hp_text_label = null
+	for entry in hud.boss_hp_entries.values():
+		if not (entry is Dictionary):
+			continue
+		var bar := (entry as Dictionary).get("bar", null) as ProgressBar
+		if not is_instance_valid(bar):
+			continue
+		hud.boss_hp_bar_new = bar
+		hud.boss_hp_text_label = (entry as Dictionary).get("label", null) as Label
+		return
 
 # Ship HP overlay
 static func update_ship_health_bars(hud, positions_only: bool = false) -> void:
@@ -456,6 +724,8 @@ static func update_ship_health_bars(hud, positions_only: bool = false) -> void:
 	var active_ids: Dictionary = {}
 	var ships: Array = EntityRegistry.get_ships()
 	for ship in ships:
+		if ship == hud.player_ship:
+			continue
 		if not _is_ship_hp_bar_target_valid(ship):
 			continue
 		var ship_id: int = ship.get_instance_id()
@@ -473,6 +743,8 @@ static func _is_ship_hp_bar_target_valid(ship) -> bool:
 	if not is_instance_valid(ship) or not ship.is_inside_tree():
 		return false
 	if ship.get("hull_hp") == null or ship.get("max_hull_hp") == null:
+		return false
+	if ship.is_in_group("boss"):
 		return false
 	if ship.get("is_sinking") == true or ship.get("is_dying") == true:
 		return false
@@ -502,6 +774,9 @@ static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_re
 	var bar_root: Control = _ensure_ship_hp_bar(hud, ship_id, team_tag)
 	bar_root.visible = true
 	bar_root.position = screen_pos + Vector2(-hud.SHIP_HP_BAR_WIDTH * 0.5, hud.SHIP_HP_BAR_OFFSET_Y)
+	if _ship_hp_bar_overlaps_reserved_hud(hud, Rect2(bar_root.position, bar_root.size)):
+		bar_root.visible = false
+		return true
 	var hp_bar: ProgressBar = bar_root.get_node("Bar") as ProgressBar
 	var boarding_label: Label = bar_root.get_node("Boarding") as Label
 	var state_label: Label = bar_root.get_node("State") as Label
@@ -621,7 +896,7 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	bar_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_root.custom_minimum_size = Vector2(hud.SHIP_HP_BAR_WIDTH, hud.SHIP_HP_BAR_HEIGHT + 30.0)
 	bar_root.size = bar_root.custom_minimum_size
-	bar_root.z_index = 20
+	bar_root.z_index = 0
 	hud.ship_hp_overlay.add_child(bar_root)
 
 	var state_label := Label.new()
@@ -632,9 +907,7 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	state_label.size = state_label.custom_minimum_size
 	state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	state_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	state_label.add_theme_font_size_override("font_size", 10)
-	state_label.add_theme_constant_override("outline_size", 2)
-	state_label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.05, 0.9))
+	NavalUiTheme.style_overlay_caption(state_label, 10, NavalUiTheme.TEXT_MAIN, 2)
 	state_label.visible = false
 	bar_root.add_child(state_label)
 
@@ -646,9 +919,7 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	boarding_label.size = boarding_label.custom_minimum_size
 	boarding_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	boarding_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	boarding_label.add_theme_font_size_override("font_size", 10)
-	boarding_label.add_theme_constant_override("outline_size", 2)
-	boarding_label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.05, 0.9))
+	NavalUiTheme.style_overlay_caption(boarding_label, 10, NavalUiTheme.TEXT_MAIN, 2)
 	boarding_label.visible = false
 	bar_root.add_child(boarding_label)
 
@@ -662,20 +933,28 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	hp_bar.position = Vector2(0.0, 28.0)
 	bar_root.add_child(hp_bar)
 
-	var bg_style: StyleBoxFlat = StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.03, 0.04, 0.06, 0.72)
-	bg_style.set_border_width_all(1)
-	bg_style.border_color = NavalUiTheme.STATUS_ACTIVE_BLUE if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
-	bg_style.set_corner_radius_all(3)
-	hp_bar.add_theme_stylebox_override("background", bg_style)
-
-	var fill_style: StyleBoxFlat = StyleBoxFlat.new()
-	fill_style.bg_color = NavalUiTheme.STATUS_GOOD
-	fill_style.set_corner_radius_all(2)
-	hp_bar.add_theme_stylebox_override("fill", fill_style)
+	var accent := NavalUiTheme.STATUS_ACTIVE_BLUE if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
+	hp_bar.add_theme_stylebox_override("background", NavalUiTheme.make_ship_hp_bar_background_style(accent))
+	hp_bar.add_theme_stylebox_override("fill", NavalUiTheme.make_ship_hp_bar_fill_style())
 
 	hud.ship_hp_bars[ship_id] = bar_root
 	return bar_root
+
+static func _ship_hp_bar_overlaps_reserved_hud(hud, rect: Rect2) -> bool:
+	var reserved_controls: Array = [
+		hud.top_left_container,
+		hud.top_right_container,
+		hud.bottom_left_container,
+		hud.bottom_right_container,
+		hud.boss_hp_container,
+	]
+	for control in reserved_controls:
+		if not is_instance_valid(control) or not control.visible:
+			continue
+		var reserved_rect: Rect2 = control.get_global_rect().grow(SHIP_HP_UI_SAFE_PADDING)
+		if reserved_rect.intersects(rect, true):
+			return true
+	return false
 
 
 static func _get_short_ship_name(ship) -> String:

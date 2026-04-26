@@ -1,6 +1,7 @@
 extends RefCounted
 class_name PreviewHarnessHelper
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 
 static func setup_common(root: Node, auto_open_debug_panel: bool, stop_regular_spawns: bool) -> void:
@@ -114,13 +115,19 @@ static func set_preview_deck_light_enabled(ship: Node, enabled: bool) -> bool:
 	return false
 
 
-static func add_billboard_label(parent: Node, text: String, position: Vector3, modulate: Color, font_size: int = 40) -> Label3D:
+static func add_billboard_label(parent: Node, text: String, position: Vector3, modulate: Color, font_size: int = 40, style_kind: String = "") -> Label3D:
 	var label := Label3D.new()
 	label.text = text
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.font_size = font_size
-	label.outline_size = 8
-	label.modulate = modulate
 	label.position = position
+	var resolved_style_kind := style_kind
+	if resolved_style_kind.is_empty():
+		resolved_style_kind = "hint" if font_size <= 28 else "callout"
+	match resolved_style_kind:
+		"marker":
+			NavalUiTheme.style_world_marker(label, font_size, modulate)
+		"hint":
+			NavalUiTheme.style_world_hint(label, font_size, modulate)
+		_:
+			NavalUiTheme.style_world_callout(label, font_size, modulate)
 	parent.add_child(label)
 	return label

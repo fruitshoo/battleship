@@ -14,29 +14,11 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(MIN_WIDTH, 0)
 	modulate = Color(1.0, 1.0, 1.0, 1.0)
 
-	var tip_style = StyleBoxFlat.new()
-	tip_style.bg_color = NavalUiTheme.PANEL_BG
-	tip_style.border_color = NavalUiTheme.BORDER_GOLD_SOFT
-	tip_style.border_width_top = 1
-	tip_style.border_width_bottom = 1
-	tip_style.border_width_left = 1
-	tip_style.border_width_right = 1
-	tip_style.set_corner_radius_all(8)
-	tip_style.shadow_color = Color(0, 0, 0, 0.45)
-	tip_style.shadow_size = 6
-	tip_style.content_margin_left = 12
-	tip_style.content_margin_right = 12
-	tip_style.content_margin_top = 10
-	tip_style.content_margin_bottom = 10
-	add_theme_stylebox_override("panel", tip_style)
+	add_theme_stylebox_override("panel", NavalUiTheme.make_tooltip_panel_style())
 
 	_label = Label.new()
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_label.add_theme_font_size_override("font_size", 12)
-	_label.add_theme_constant_override("line_spacing", 2)
-	_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_BODY)
-	_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-	_label.add_theme_constant_override("outline_size", 2)
+	NavalUiTheme.style_tooltip_body(_label, 12)
 	_label.custom_minimum_size = Vector2(MIN_WIDTH - 24.0, 0.0)
 	add_child(_label)
 

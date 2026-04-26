@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SoldierSpeechHelper
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+
 const SPEECH_LABEL_NAME := "SpeechLabel"
 const SPEECH_LABEL_META := "speech_label_instance"
 const SPEECH_TIMER_META := "speech_timer"
@@ -162,13 +164,7 @@ static func _get_label(soldier) -> Label3D:
 static func _configure_label(soldier, label: Label3D) -> void:
 	var is_captain := bool(soldier.get("is_captain"))
 	label.position = Vector3(0.0, _get_label_base_height(soldier), 0.0)
-	label.font_size = 72 if is_captain else 64
-	label.outline_size = 7 if is_captain else 6
-	label.extra_cull_margin = 16.0
-	label.no_depth_test = true
-	label.render_priority = 20
-	label.outline_render_priority = 21
-	label.modulate = _get_label_color(soldier, 0.0)
+	NavalUiTheme.style_world_speech(label, is_captain, _get_label_color(soldier, 0.0))
 
 
 static func _get_label_base_height(soldier) -> float:

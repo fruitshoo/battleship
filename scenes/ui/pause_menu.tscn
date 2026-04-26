@@ -13,7 +13,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.02, 0.05, 0.1, 0.6)
+color = Color(1, 1, 1, 1)
 
 [node name="Center" type="CenterContainer" parent="."]
 anchors_preset = 15
@@ -23,50 +23,63 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="Center"]
-custom_minimum_size = Vector2(400, 0)
+custom_minimum_size = Vector2(432, 0)
 layout_mode = 2
 
 [node name="Margin" type="MarginContainer" parent="Center/Panel"]
 layout_mode = 2
-theme_override_constants/margin_left = 30
-theme_override_constants/margin_top = 40
-theme_override_constants/margin_right = 30
-theme_override_constants/margin_bottom = 40
 
 [node name="VBox" type="VBoxContainer" parent="Center/Panel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 20
+
+[node name="EyebrowWrap" type="PanelContainer" parent="Center/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Eyebrow" type="Label" parent="Center/Panel/Margin/VBox/EyebrowWrap"]
+layout_mode = 2
+text = "항해 정지"
+horizontal_alignment = 1
 
 [node name="Title" type="Label" parent="Center/Panel/Margin/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 42
 text = "일시정지"
 horizontal_alignment = 1
 
-[node name="Spacer" type="Control" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 20)
+[node name="Subtitle" type="Label" parent="Center/Panel/Margin/VBox"]
+layout_mode = 2
+text = "전투와 항해가 잠시 멈췄습니다"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Divider" type="ColorRect" parent="Center/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.72, 0.62, 0.42, 0.28)
+
+[node name="Buttons" type="VBoxContainer" parent="Center/Panel/Margin/VBox"]
 layout_mode = 2
 
-[node name="ResumeBtn" type="Button" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 60)
+[node name="ResumeBtn" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
 text = "계속하기"
 
-[node name="OptionsBtn" type="Button" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 60)
+[node name="OptionsBtn" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
 text = "설정"
 
-[node name="MainMenuBtn" type="Button" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 60)
+[node name="MainMenuBtn" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
 text = "메인 메뉴"
 
-[node name="QuitBtn" type="Button" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 60)
+[node name="QuitBtn" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
 text = "게임 종료"
+
+[node name="FooterHint" type="Label" parent="Center/Panel/Margin/VBox"]
+layout_mode = 2
+text = "ESC 복귀 · 방향키 또는 마우스로 선택"
+horizontal_alignment = 1

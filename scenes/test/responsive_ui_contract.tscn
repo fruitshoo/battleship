@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/test/responsive_ui_contract.gd" id="1_responsive_ui_contract"]
+
+[node name="ResponsiveUiContract" type="Node"]
+script = ExtResource("1_responsive_ui_contract")

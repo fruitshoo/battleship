@@ -1,25 +1,10 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/menus/options_panel.gd" id="1_script"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0.06, 0.10, 0.16, 0.97)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.75, 0.63, 0.37, 0.9)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-content_margin_left = 24.0
-content_margin_top = 22.0
-content_margin_right = 24.0
-content_margin_bottom = 20.0
-
 [node name="OptionsPanel" type="CanvasLayer"]
 process_mode = 3
+layer = 110
 script = ExtResource("1_script")
 
 [node name="Backdrop" type="ColorRect" parent="."]
@@ -40,29 +25,22 @@ offset_right = 270.0
 offset_bottom = 210.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="Shell" type="VBoxContainer" parent="Panel"]
 layout_mode = 2
-theme_override_constants/separation = 18
 
 [node name="Title" type="Label" parent="Panel/Shell"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 30
-theme_override_colors/font_color = Color(0.95, 0.9, 0.72, 1)
 text = "항해 설정"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="Panel/Shell"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.72, 0.79, 0.87, 1)
 text = "음향과 화면 모드를 조정합니다."
 horizontal_alignment = 1
 
 [node name="Content" type="VBoxContainer" parent="Panel/Shell"]
 layout_mode = 2
-theme_override_constants/separation = 14
 
 [node name="MasterRow" type="VBoxContainer" parent="Panel/Shell/Content"]
 layout_mode = 2
@@ -119,6 +97,33 @@ max_value = 1.0
 step = 0.01
 size_flags_horizontal = 3
 value = 0.85
+
+[node name="ScreenFxCheck" type="CheckBox" parent="Panel/Shell/Content"]
+layout_mode = 2
+text = "가장자리 연출 사용"
+
+[node name="ScreenFxRow" type="VBoxContainer" parent="Panel/Shell/Content"]
+layout_mode = 2
+
+[node name="ScreenFxHeader" type="HBoxContainer" parent="Panel/Shell/Content/ScreenFxRow"]
+layout_mode = 2
+
+[node name="ScreenFxLabel" type="Label" parent="Panel/Shell/Content/ScreenFxRow/ScreenFxHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "가장자리 연출 강도"
+
+[node name="ScreenFxValue" type="Label" parent="Panel/Shell/Content/ScreenFxRow/ScreenFxHeader"]
+layout_mode = 2
+text = "75%"
+horizontal_alignment = 2
+
+[node name="ScreenFxSlider" type="HSlider" parent="Panel/Shell/Content/ScreenFxRow"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+size_flags_horizontal = 3
+value = 0.75
 
 [node name="FullscreenCheck" type="CheckBox" parent="Panel/Shell/Content"]
 layout_mode = 2

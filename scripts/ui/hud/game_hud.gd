@@ -1,5 +1,4 @@
 extends CanvasLayer
-const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const HudGameOverOverlay = preload("res://scripts/ui/hud/hud_game_over_overlay.gd")
 const HudLayoutBuilder = preload("res://scripts/ui/hud/hud_layout_builder.gd")
 const HudUpdateHelper = preload("res://scripts/ui/hud/hud_update_helper.gd")
@@ -44,8 +43,11 @@ var _cached_environment_preset_manager: Node = null
 # Layout references
 var hp_bar: ProgressBar = null
 var hp_text_label: Label = null
+var boss_hp_container: VBoxContainer = null
 var boss_hp_bar_new: ProgressBar = null
 var boss_hp_text_label: Label = null
+var boss_hp_entries: Dictionary = {}
+var boss_hp_visible_count: int = 0
 var stamina_bar: ProgressBar = null
 var top_left_container: VBoxContainer = null
 var top_right_container: VBoxContainer = null
@@ -62,7 +64,7 @@ var support_row: HBoxContainer = null
 var support_panel: PanelContainer = null
 var crew_status_bar: ProgressBar = null
 var support_status_label: Label = null
-var support_slot_container: VBoxContainer = null
+var support_slot_container: HBoxContainer = null
 var support_fleet_hud_slots: Array[PanelContainer] = []
 var sail_debug_panel: PanelContainer = null
 var sail_debug_toggle_button: Button = null
@@ -178,7 +180,7 @@ const SHIP_HP_BAR_OFFSET_Y: float = 34.0
 
 const SHIP_UPGRADE_IDS := [
 	"cannon", "cannon_damage", "cannon_reload", "janggun",
-	"hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal",
+	"hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade",
 	"supply", "gold"
 ]
 const CREW_UPGRADE_IDS := [
@@ -192,8 +194,11 @@ func _ready() -> void:
 	_apply_overlay_theme()
 	_setup_top_xp_bar()
 	_setup_new_layout()
+	_apply_layout_density()
 	_setup_game_over_overlay()
 	_setup_ship_hp_overlay()
+	if get_viewport() != null:
+		get_viewport().size_changed.connect(_apply_layout_density)
 
 	update_level(1)
 	update_score(0)
@@ -206,6 +211,11 @@ func _ready() -> void:
 
 func _apply_overlay_theme() -> void:
 	HudProgressionLayoutHelper.apply_overlay_theme(self)
+
+
+func _apply_layout_density() -> void:
+	HudProgressionLayoutHelper.apply_overlay_density(self)
+	HudLayoutBuilder.apply_layout_density(self)
 
 func _ensure_hud_label(existing: Label, node_name: String, default_text: String) -> Label:
 	return HudProgressionLayoutHelper.ensure_hud_label(self, existing, node_name, default_text)
@@ -486,6 +496,9 @@ func _update_boarding_display() -> void:
 
 func _update_capture_opportunity_display() -> void:
 	HudUpdateHelper.update_capture_opportunity_display(self)
+
+func _update_boss_hp_display() -> void:
+	HudUpdateHelper.refresh_boss_hp_display(self)
 
 
 func _update_ammo_mode_display() -> void:

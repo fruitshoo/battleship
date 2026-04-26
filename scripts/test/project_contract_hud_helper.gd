@@ -1132,6 +1132,29 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 		failures.append("hud smoke compass far site marker was not near the rim: %.2f" % marker.position.length())
 
 	site.queue_free()
+
+	var decoy_site := Node3D.new()
+	decoy_site.name = "CompassTreasureDecoySiteSmoke"
+	decoy_site.add_to_group("sea_site")
+	smoke_root.add_child(decoy_site)
+	decoy_site.global_position = player_ship.global_position + Vector3(3.0, 0.0, 0.0)
+
+	var chest := Node3D.new()
+	chest.name = "CompassTreasureChestSmoke"
+	chest.add_to_group("treasure_chest")
+	smoke_root.add_child(chest)
+	chest.global_position = player_ship.global_position + Vector3(-72.0, 0.0, 0.0)
+	await _wait_frames(owner, 15)
+
+	if not is_instance_valid(marker):
+		failures.append("hud smoke compass treasure marker missing after chest spawn")
+	elif not marker.visible:
+		failures.append("hud smoke compass treasure marker did not become visible")
+	elif marker.position.length() < 48.0:
+		failures.append("hud smoke compass treasure marker was not near the rim: %.2f" % marker.position.length())
+
+	chest.queue_free()
+	decoy_site.queue_free()
 	control_panel.queue_free()
 	ui_layer.queue_free()
 	await _wait_frames(owner, 1)

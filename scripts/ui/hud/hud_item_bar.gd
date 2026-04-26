@@ -1,6 +1,5 @@
 extends MarginContainer
 
-const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const SLOT_SIZE := Vector2(40, 40)
 
 var item_container: HBoxContainer = null
@@ -61,11 +60,7 @@ func _create_slot(icon_data) -> PanelContainer:
 	var icon_label = Label.new()
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	icon_label.add_theme_font_size_override("font_size", 24)
-	icon_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
-	icon_label.text = str(_extract_icon_data(icon_data))
-	if MATERIAL_SYMBOLS_FONT:
-		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
+	NavalUiTheme.apply_emblem(icon_label, str(_extract_icon_data(icon_data)), 18, NavalUiTheme.TEXT_MAIN)
 
 	slot_bg.add_child(icon_label)
 	return slot_bg

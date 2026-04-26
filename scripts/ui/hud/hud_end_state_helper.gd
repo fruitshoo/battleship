@@ -48,7 +48,7 @@ static func show_victory_with_damage(hud, rows: Array, total_damage: float) -> v
 	hud.victory_label.offset_top = -180.0
 	hud.victory_label.offset_right = 320.0
 	hud.victory_label.offset_bottom = 220.0
-	hud.victory_label.add_theme_font_size_override("font_size", 24)
+	NavalUiTheme.style_status_banner(hud.victory_label, 24, NavalUiTheme.TEXT_GOLD, 4)
 
 	var tween: Tween = hud.create_tween()
 	hud.victory_label.modulate.a = 0.0

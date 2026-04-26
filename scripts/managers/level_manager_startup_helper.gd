@@ -1,6 +1,8 @@
 class_name LevelManagerStartupHelper
 extends RefCounted
 
+const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+
 const STARTUP_BLOCKING_PREWARM_MIN_SECONDS: float = 1.6
 const STARTUP_POOL_PREWARM_DEFAULT: int = 4
 const STARTUP_POOL_PREWARM_MAX: int = 12
@@ -75,11 +77,7 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		loading_label.set_anchors_preset(Control.PRESET_CENTER)
 		loading_label.position = Vector2(-120.0, -16.0)
 		loading_label.size = Vector2(240.0, 32.0)
-		loading_label.add_theme_font_size_override("font_size", 24)
-		loading_label.add_theme_color_override("font_color", Color(0.93, 0.9, 0.82, 0.96))
-		loading_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.45))
-		loading_label.add_theme_constant_override("shadow_offset_x", 2)
-		loading_label.add_theme_constant_override("shadow_offset_y", 2)
+		NavalUiTheme.style_loading_message(loading_label, 24)
 		loading_layer.add_child(loading_label)
 		lm.add_child(loading_layer)
 

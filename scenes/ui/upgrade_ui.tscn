@@ -1,9 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud/upgrade_ui.gd" id="1"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0, 0, 0, 0.7)
 
 [node name="UpgradeUI" type="CanvasLayer"]
 layer = 10
@@ -33,8 +30,6 @@ alignment = 1
 
 [node name="TitleLabel" type="Label" parent="VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
-theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
 text = "⬆️ 업그레이드 선택"
 horizontal_alignment = 1
 
@@ -44,7 +39,6 @@ custom_minimum_size = Vector2(0, 20)
 
 [node name="CardsContainer" type="HBoxContainer" parent="VBox"]
 layout_mode = 2
-theme_override_constants/separation = 20
 alignment = 1
 
 [node name="FooterSpacer" type="Control" parent="VBox"]

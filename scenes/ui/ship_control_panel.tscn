@@ -4,20 +4,6 @@
 [ext_resource type="Script" path="res://scripts/ui/hud/wind_compass_art.gd" id="2_wind_art"]
 [ext_resource type="Texture2D" uid="uid://cword2lxgbv6o" path="res://assets/ui/hud/compass/compass_frame_ilseongjeongsiui.png" id="3_frame"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_round"]
-bg_color = Color(0.05, 0.08, 0.15, 0.8)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.7, 0.8, 1, 0.5)
-corner_radius_top_left = 90
-corner_radius_top_right = 90
-corner_radius_bottom_right = 90
-corner_radius_bottom_left = 90
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wind"]
-
 [node name="ShipControlPanel" type="Control" unique_id=285848495]
 layout_mode = 3
 anchors_preset = 15
@@ -39,7 +25,6 @@ offset_top = 46.0
 offset_right = -20.0
 offset_bottom = 266.0
 grow_horizontal = 0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_wind")
 
 [node name="WindIndicator" type="Control" parent="WindPanel" unique_id=961735496]
 unique_name_in_owner = true
@@ -73,7 +58,6 @@ offset_right = 90.0
 offset_bottom = 90.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_round")
 
 [node name="Art" type="Node2D" parent="WindPanel/WindIndicator/CompassWheel" unique_id=137842191]
 script = ExtResource("2_wind_art")
@@ -107,7 +91,6 @@ offset_right = 15.0
 offset_bottom = -75.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 18
 text = "N"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -124,7 +107,6 @@ offset_right = 95.0
 offset_bottom = 10.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 18
 text = "E"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -141,7 +123,6 @@ offset_right = 15.0
 offset_bottom = 95.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 18
 text = "S"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -158,7 +139,6 @@ offset_right = -75.0
 offset_bottom = 10.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 18
 text = "W"
 horizontal_alignment = 1
 vertical_alignment = 1

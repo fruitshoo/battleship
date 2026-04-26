@@ -5,6 +5,7 @@ extends Control
 @export var controlled_ship: NodePath
 
 var ship: Node3D = null
+@onready var wind_panel: PanelContainer = $WindPanel
 @onready var wind_indicator: Control = %WindIndicator
 @onready var wind_arrow: Node2D = %Arrow
 @onready var compass_wheel: Node2D = %CompassWheel
@@ -37,6 +38,15 @@ const SITE_MARKER_REFRESH_INTERVAL: float = 0.18
 const SITE_MARKER_OUTER_RADIUS: float = 64.0
 const SITE_MARKER_DISTANCE_AT_EDGE: float = 90.0
 const SITE_MARKER_FADE_SPEED: float = 5.5
+const BASE_WIND_PANEL_SIZE: float = 220.0
+const SEA_SITE_GROUP := "sea_site"
+const TREASURE_CHEST_GROUP := "treasure_chest"
+const SITE_MARKER_GLOW_COLOR := Color(0.24, 0.64, 1.0, 0.18)
+const SITE_MARKER_DOT_COLOR := Color(1.0, 0.88, 0.28, 0.96)
+const TREASURE_MARKER_GLOW_COLOR := Color(1.0, 0.62, 0.18, 0.20)
+const TREASURE_MARKER_DOT_COLOR := Color(1.0, 0.94, 0.34, 1.0)
+
+var _compass_base_scale: float = 1.0
 
 
 func _resolve_controlled_ship() -> void:
@@ -58,6 +68,9 @@ func _resolve_controlled_ship() -> void:
 func _ready() -> void:
 	_resolve_controlled_ship()
 	_apply_theme()
+	_apply_layout_density()
+	if get_viewport() != null:
+		get_viewport().size_changed.connect(_apply_layout_density)
 	if is_instance_valid(compass_wheel):
 		_displayed_compass_rotation = compass_wheel.rotation
 	if is_instance_valid(wind_arrow):
@@ -74,14 +87,16 @@ func _process(delta: float) -> void:
 
 
 func _apply_theme() -> void:
+	if is_instance_valid(wind_panel):
+		wind_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if is_instance_valid(compass_background):
 		compass_background.add_theme_stylebox_override(
 			"panel",
 			NavalUiTheme.make_panel_style(
-				Color(0.04, 0.08, 0.12, 0.48),
-				Color(0.32, 0.24, 0.12, 0.0),
+				Color(0.04, 0.08, 0.12, 0.52),
+				NavalUiTheme.BORDER_GOLD_SOFT,
 				90,
-				0,
+				1,
 				0.0,
 				0.0,
 				0.0,
@@ -132,10 +147,33 @@ func _apply_theme() -> void:
 		arrow_glow.visible = false
 	if is_instance_valid(arrow_center_cap):
 		arrow_center_cap.color = cap_color
-	if is_instance_valid(site_marker_glow):
-		site_marker_glow.color = Color(0.24, 0.64, 1.0, 0.18)
-	if is_instance_valid(site_marker_dot):
-		site_marker_dot.color = Color(1.0, 0.88, 0.28, 0.96)
+	_apply_site_marker_palette(_nearest_site)
+
+func _apply_layout_density() -> void:
+	var viewport := get_viewport()
+	if viewport == null or not is_instance_valid(wind_panel):
+		return
+	var viewport_size := viewport.get_visible_rect().size
+	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.17, 156.0, BASE_WIND_PANEL_SIZE)
+	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - 164.0) / (BASE_WIND_PANEL_SIZE - 164.0), 0.0, 1.0)))
+	var top_offset := roundf(clampf(viewport_size.y * 0.07, 48.0, 72.0))
+	wind_panel.offset_left = -panel_size - panel_margin
+	wind_panel.offset_top = top_offset
+	wind_panel.offset_right = -panel_margin
+	wind_panel.offset_bottom = top_offset + panel_size
+	if is_instance_valid(wind_indicator):
+		wind_indicator.custom_minimum_size = Vector2(panel_size, panel_size)
+		wind_indicator.offset_left = -panel_size * 0.5
+		wind_indicator.offset_top = -panel_size * 0.5
+		wind_indicator.offset_right = panel_size * 0.5
+		wind_indicator.offset_bottom = panel_size * 0.5
+	var center := Vector2(panel_size * 0.5, panel_size * 0.5)
+	_compass_base_scale = panel_size / BASE_WIND_PANEL_SIZE
+	if is_instance_valid(compass_wheel):
+		compass_wheel.position = center
+		compass_wheel.scale = Vector2.ONE * _compass_base_scale
+	if is_instance_valid(wind_arrow):
+		wind_arrow.position = center
 
 func _update_wind_indicator(delta: float) -> void:
 	if not is_instance_valid(WindManager):
@@ -161,7 +199,7 @@ func _update_wind_indicator(delta: float) -> void:
 	var target_scale: float = lerpf(0.92, 1.12, clampf((wind_strength - 0.55) / 0.35, 0.0, 1.0))
 	_displayed_arrow_scale = lerpf(_displayed_arrow_scale, target_scale, minf(1.0, delta * 6.0))
 	wind_arrow.rotation = _displayed_arrow_rotation
-	wind_arrow.scale = Vector2(_displayed_arrow_scale, _displayed_arrow_scale)
+	wind_arrow.scale = Vector2.ONE * (_displayed_arrow_scale * _compass_base_scale)
 	if is_instance_valid(arrow_glow):
 		var glow_alpha: float = lerpf(0.10, 0.22, clampf((wind_strength - 0.55) / 0.35, 0.0, 1.0))
 		glow_alpha += sin(_glow_phase) * 0.02
@@ -206,6 +244,7 @@ func _update_site_marker(delta: float) -> void:
 	_site_marker_alpha = move_toward(_site_marker_alpha, 1.0, delta * SITE_MARKER_FADE_SPEED)
 	site_marker.modulate = Color(1.0, 1.0, 1.0, _site_marker_alpha)
 	site_marker.visible = true
+	_apply_site_marker_palette(_nearest_site)
 
 	var pulse := 0.12 + sin(_glow_phase * 1.7) * 0.035
 	if is_instance_valid(site_marker_glow):
@@ -234,9 +273,16 @@ func _get_site_marker_distance_ratio(distance: float) -> float:
 
 
 func _find_nearest_site() -> Node3D:
+	var closest_treasure := _find_nearest_site_in_group(TREASURE_CHEST_GROUP)
+	if is_instance_valid(closest_treasure):
+		return closest_treasure
+	return _find_nearest_site_in_group(SEA_SITE_GROUP)
+
+
+func _find_nearest_site_in_group(group_name: String) -> Node3D:
 	var closest_site: Node3D = null
 	var closest_distance_sq := INF
-	for candidate in get_tree().get_nodes_in_group("sea_site"):
+	for candidate in get_tree().get_nodes_in_group(group_name):
 		var site := candidate as Node3D
 		if not _is_valid_site_marker_target(site):
 			continue
@@ -252,8 +298,24 @@ func _find_nearest_site() -> Node3D:
 func _is_valid_site_marker_target(site: Node) -> bool:
 	if not is_instance_valid(site) or not (site is Node3D):
 		return false
+	if not site.is_inside_tree():
+		return false
 	if site.is_queued_for_deletion():
+		return false
+	if _is_treasure_marker_target(site) and site.get("_is_collected") == true:
 		return false
 	if site.get("is_collected") != null and site.get("is_collected") == true:
 		return false
 	return true
+
+
+func _is_treasure_marker_target(site: Node) -> bool:
+	return is_instance_valid(site) and site.is_in_group(TREASURE_CHEST_GROUP)
+
+
+func _apply_site_marker_palette(target: Node) -> void:
+	var is_treasure := _is_treasure_marker_target(target)
+	if is_instance_valid(site_marker_glow):
+		site_marker_glow.color = TREASURE_MARKER_GLOW_COLOR if is_treasure else SITE_MARKER_GLOW_COLOR
+	if is_instance_valid(site_marker_dot):
+		site_marker_dot.color = TREASURE_MARKER_DOT_COLOR if is_treasure else SITE_MARKER_DOT_COLOR

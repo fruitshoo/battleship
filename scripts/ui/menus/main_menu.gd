@@ -3,14 +3,18 @@ extends Control
 const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
+const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
+const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 @export var background_texture: Texture2D
 @export_range(0.0, 1.0, 0.01) var background_dim: float = 0.18
 @export var fallback_version_text: String = "v0.1.0"
 
 @onready var background_image: TextureRect = $BackgroundImage
 @onready var background_overlay: ColorRect = $Background
+@onready var title_block: VBoxContainer = $TitleBlock
 @onready var eyebrow_label: Label = $TitleBlock/Eyebrow
 @onready var title_label: Label = $TitleBlock/Title
+@onready var button_block: VBoxContainer = $ButtonBlock
 @onready var start_button: Button = $ButtonBlock/StartButton
 @onready var meta_button: Button = $ButtonBlock/MetaButton
 @onready var options_button: Button = $ButtonBlock/OptionsButton
@@ -33,26 +37,29 @@ func _ready() -> void:
 	_menu_buttons = [start_button, meta_button, options_button]
 	if quit_button.visible:
 		_menu_buttons.append(quit_button)
+	_apply_layout_density()
 	_refresh_version_label()
 	SaveManager.apply_settings()
+	if get_viewport() != null:
+		get_viewport().size_changed.connect(_apply_layout_density)
 	_focus_first_menu_button()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _modal_open:
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
-		var key_event: InputEventKey = event
-		match key_event.physical_keycode:
-			KEY_W, KEY_A:
-				_move_menu_focus(-1)
-				if get_viewport(): get_viewport().set_input_as_handled()
-			KEY_S, KEY_D:
-				_move_menu_focus(1)
-				if get_viewport(): get_viewport().set_input_as_handled()
-			KEY_SPACE:
-				_activate_focused_menu_button()
-				if get_viewport(): get_viewport().set_input_as_handled()
+	if _is_menu_prev_event(event):
+		_move_menu_focus(-1)
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	elif _is_menu_next_event(event):
+		_move_menu_focus(1)
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	elif _is_confirm_event(event):
+		_activate_focused_menu_button()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 
 
 func _focus_first_menu_button() -> void:
@@ -88,25 +95,45 @@ func _activate_focused_menu_button() -> void:
 		return
 	button.emit_signal("pressed")
 
+
+func _is_menu_prev_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_up") or _is_physical_key_pressed(event, KEY_W) or _is_physical_key_pressed(event, KEY_A)
+
+
+func _is_menu_next_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_down") or _is_physical_key_pressed(event, KEY_S) or _is_physical_key_pressed(event, KEY_D)
+
+
+func _is_confirm_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
+
+
+func _is_physical_key_pressed(event: InputEvent, keycode: Key) -> bool:
+	return event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == keycode
+
+
+func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
+	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode
+
 func _apply_background_settings() -> void:
 	if is_instance_valid(background_image):
 		background_image.texture = background_texture
 		background_image.visible = background_texture != null
-	if is_instance_valid(background_overlay) and background_overlay.material is ShaderMaterial:
-		var vignette_material := background_overlay.material as ShaderMaterial
-		vignette_material.set_shader_parameter("vignette_color", Color(0.02, 0.04, 0.07, clamp(background_dim, 0.0, 1.0)))
+	if is_instance_valid(background_overlay):
+		background_overlay.color = Color.WHITE
+		background_overlay.material = UiOverlayFx.make_radial_darken_material(
+			Color(0.02, 0.04, 0.07, clamp(background_dim, 0.0, 1.0)),
+			0.42,
+			0.72
+		)
 
 
 func _apply_ui_theme() -> void:
 	NavalUiTheme.style_heading(eyebrow_label, 16)
 	if is_instance_valid(title_label):
-		title_label.add_theme_font_size_override("font_size", 68)
-		title_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
-		title_label.add_theme_color_override("font_shadow_color", NavalUiTheme.OUTLINE_DARK)
-		title_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
-		title_label.add_theme_constant_override("shadow_offset_x", 3)
-		title_label.add_theme_constant_override("shadow_offset_y", 4)
-		title_label.add_theme_constant_override("outline_size", 2)
+		NavalUiTheme.style_display_title(title_label, 68)
+	if is_instance_valid(version_label):
+		NavalUiTheme.style_caption(version_label, 13, NavalUiTheme.TEXT_MUTED)
 	for button in [start_button, meta_button, options_button, quit_button]:
 		_apply_compact_menu_button(button)
 
@@ -114,11 +141,51 @@ func _apply_ui_theme() -> void:
 func _apply_compact_menu_button(button: Button) -> void:
 	if not is_instance_valid(button):
 		return
-	NavalUiTheme.apply_menu_button(button, 18)
-	button.add_theme_stylebox_override("normal", NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_SOFT, 8, 1, 16.0, 8.0, 16.0, 8.0))
-	button.add_theme_stylebox_override("hover", NavalUiTheme.make_panel_style(Color(0.16, 0.23, 0.31, 0.82), NavalUiTheme.BORDER_GOLD, 8, 1, 16.0, 8.0, 16.0, 8.0))
-	button.add_theme_stylebox_override("pressed", NavalUiTheme.make_panel_style(Color(0.09, 0.13, 0.18, 0.90), Color(0.93, 0.84, 0.56, 0.92), 8, 1, 16.0, 8.0, 16.0, 8.0))
-	button.add_theme_stylebox_override("focus", NavalUiTheme.make_panel_style(Color(0.16, 0.23, 0.31, 0.82), NavalUiTheme.BORDER_GOLD, 8, 1, 16.0, 8.0, 16.0, 8.0))
+	ModalMenuSkin.apply_action_button_theme(button, button == start_button, true)
+
+
+func _apply_layout_density() -> void:
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var viewport_size := viewport.get_visible_rect().size
+	var width_fit: float = clampf((viewport_size.x - 900.0) / 420.0, 0.0, 1.0)
+	var height_fit: float = clampf((viewport_size.y - 640.0) / 220.0, 0.0, 1.0)
+	var density: float = min(width_fit, height_fit)
+	var title_half_width := roundi(lerpf(320.0, 430.0, density))
+	var title_top := roundi(lerpf(44.0, 68.0, density))
+	var title_bottom := roundi(lerpf(182.0, 220.0, density))
+	var button_width := roundi(lerpf(252.0, 300.0, density))
+	var button_height := roundi(lerpf(42.0, 46.0, density))
+	var button_separation := roundi(lerpf(8.0, 10.0, density))
+
+	if is_instance_valid(title_block):
+		title_block.offset_left = -title_half_width
+		title_block.offset_right = title_half_width
+		title_block.offset_top = title_top
+		title_block.offset_bottom = title_bottom
+		title_block.add_theme_constant_override("separation", roundi(lerpf(6.0, 8.0, density)))
+	if is_instance_valid(button_block):
+		button_block.custom_minimum_size.x = button_width
+		button_block.offset_left = -button_width * 0.5
+		button_block.offset_right = button_width * 0.5
+		button_block.offset_bottom = roundi(lerpf(214.0, 246.0, density))
+		button_block.add_theme_constant_override("separation", button_separation)
+	if is_instance_valid(eyebrow_label):
+		NavalUiTheme.style_heading(eyebrow_label, roundi(lerpf(13.0, 16.0, density)))
+	if is_instance_valid(title_label):
+		NavalUiTheme.style_display_title(title_label, roundi(lerpf(52.0, 68.0, density)))
+	for button in _menu_buttons:
+		if not is_instance_valid(button):
+			continue
+		button.custom_minimum_size.y = button_height
+		button.add_theme_font_size_override("font_size", roundi(lerpf(16.0, 18.0, density)))
+	if is_instance_valid(version_label):
+		version_label.offset_left = roundi(lerpf(-92.0, -116.0, density))
+		version_label.offset_top = roundi(lerpf(-30.0, -34.0, density))
+		version_label.offset_right = -20.0
+		version_label.offset_bottom = -12.0
+		NavalUiTheme.style_caption(version_label, roundi(lerpf(11.0, 13.0, density)), NavalUiTheme.TEXT_MUTED)
 
 func _refresh_version_label() -> void:
 	if not is_instance_valid(version_label):

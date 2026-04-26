@@ -7,7 +7,7 @@ static func setup_ship_hp_overlay(hud) -> void:
 	hud.ship_hp_overlay = Control.new()
 	hud.ship_hp_overlay.name = "ShipHealthOverlay"
 	hud.ship_hp_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.ship_hp_overlay.z_index = 20
+	hud.ship_hp_overlay.z_index = -30
 	hud.add_child(hud.ship_hp_overlay)
 	hud.ship_hp_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 

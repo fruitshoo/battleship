@@ -1,6 +1,5 @@
 extends RefCounted
 
-const MATERIAL_SYMBOLS_FONT = preload("res://assets/fonts/MaterialSymbolsOutlined.ttf")
 const HudItemBar = preload("res://scripts/ui/hud/hud_item_bar.gd")
 const HudUpgradeTrack = preload("res://scripts/ui/hud/hud_upgrade_track.gd")
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
@@ -18,6 +17,129 @@ static func setup_new_layout(hud) -> void:
 	setup_bottom_left_layout(hud)
 	setup_boss_hp_bar(hud)
 	setup_boarding_ui(hud)
+
+
+static func apply_layout_density(hud) -> void:
+	if hud == null or hud.get_viewport() == null:
+		return
+	var viewport_size: Vector2 = hud.get_viewport().get_visible_rect().size
+	var width_fit: float = clampf((viewport_size.x - 1280.0) / 640.0, 0.0, 1.0)
+	var height_fit: float = clampf((viewport_size.y - 720.0) / 360.0, 0.0, 1.0)
+	var density: float = min(width_fit, height_fit)
+	var edge_margin := roundf(lerpf(16.0, 24.0, density))
+	var top_margin := roundf(lerpf(44.0, 56.0, density))
+	var lower_margin := roundf(lerpf(18.0, 24.0, density))
+	var panel_gap := roundi(lerpf(8.0, 10.0, density))
+	var hp_width := roundf(lerpf(208.0, 240.0, density))
+	var hp_height := roundf(lerpf(20.0, 24.0, density))
+	var stamina_height := roundf(lerpf(7.0, 8.0, density))
+	var boss_width := roundf(lerpf(420.0, 560.0, density))
+	var boss_height := roundf(lerpf(16.0, 20.0, density))
+	var boss_gap := roundf(lerpf(5.0, 7.0, density))
+	var boss_label_height := roundf(lerpf(14.0, 16.0, density))
+	var boss_bottom_margin := roundf(lerpf(132.0, 206.0, density))
+	var boarding_width := roundf(lerpf(168.0, 200.0, density))
+	var speed_row_width := roundf(lerpf(160.0, 180.0, density))
+	var speed_bar_width := roundf(lerpf(128.0, 148.0, density))
+	var stat_panel_width := roundf(lerpf(320.0, 376.0, density))
+	var stat_panel_height := roundf(lerpf(420.0, 496.0, density))
+
+	if is_instance_valid(hud.top_left_container):
+		hud.top_left_container.offset_left = edge_margin
+		hud.top_left_container.offset_top = top_margin
+	if is_instance_valid(hud.weapon_track):
+		hud.weapon_track.custom_minimum_size.x = roundf(lerpf(176.0, 200.0, density))
+	if is_instance_valid(hud.support_track):
+		hud.support_track.custom_minimum_size.x = roundf(lerpf(176.0, 200.0, density))
+	if is_instance_valid(hud.combat_stats_row):
+		hud.combat_stats_row.add_theme_constant_override("separation", panel_gap)
+	if is_instance_valid(hud.score_label):
+		NavalUiTheme.style_gold(hud.score_label, roundi(lerpf(16.0, 18.0, density)))
+	if is_instance_valid(hud.difficulty_label):
+		NavalUiTheme.style_muted(hud.difficulty_label, roundi(lerpf(11.0, 12.0, density)))
+	if is_instance_valid(hud.combat_sunk_value_label):
+		NavalUiTheme.style_overlay_value(hud.combat_sunk_value_label, roundi(lerpf(11.0, 12.0, density)))
+	if is_instance_valid(hud.combat_soldier_value_label):
+		NavalUiTheme.style_overlay_value(hud.combat_soldier_value_label, roundi(lerpf(11.0, 12.0, density)))
+
+	var timer_only := hud.get_node_or_null("TimerOnly") as Control
+	if is_instance_valid(timer_only):
+		var timer_half_width := roundf(lerpf(74.0, 90.0, density))
+		timer_only.offset_left = -timer_half_width
+		timer_only.offset_right = timer_half_width
+		timer_only.offset_top = roundf(lerpf(52.0, 60.0, density))
+		timer_only.offset_bottom = timer_only.offset_top + roundf(lerpf(30.0, 34.0, density))
+	if is_instance_valid(hud.timer_label):
+		NavalUiTheme.style_timer_value(hud.timer_label, roundi(lerpf(22.0, 26.0, density)))
+	if is_instance_valid(hud.capture_opportunity_label):
+		var capture_half_width := roundf(lerpf(150.0, 180.0, density))
+		hud.capture_opportunity_label.offset_left = -capture_half_width
+		hud.capture_opportunity_label.offset_right = capture_half_width
+		hud.capture_opportunity_label.offset_top = roundf(lerpf(88.0, 96.0, density))
+		hud.capture_opportunity_label.offset_bottom = hud.capture_opportunity_label.offset_top + 22.0
+		NavalUiTheme.style_caption(hud.capture_opportunity_label, roundi(lerpf(10.0, 11.0, density)), NavalUiTheme.TEXT_GOLD)
+	if is_instance_valid(hud.debug_distance_label):
+		var debug_half_width := roundf(lerpf(150.0, 180.0, density))
+		hud.debug_distance_label.offset_left = -debug_half_width
+		hud.debug_distance_label.offset_right = debug_half_width
+		hud.debug_distance_label.offset_top = roundf(lerpf(92.0, 100.0, density))
+		hud.debug_distance_label.offset_bottom = hud.debug_distance_label.offset_top + 22.0
+		NavalUiTheme.style_caption(hud.debug_distance_label, roundi(lerpf(9.0, 10.0, density)), NavalUiTheme.TEXT_MUTED)
+
+	if is_instance_valid(hud.top_right_container):
+		hud.top_right_container.offset_right = -edge_margin
+		hud.top_right_container.offset_top = roundf(lerpf(220.0, 248.0, density))
+	if is_instance_valid(hud.speed_bar):
+		var speed_row := hud.speed_bar.get_parent() as HBoxContainer
+		if is_instance_valid(speed_row):
+			speed_row.custom_minimum_size = Vector2(speed_row_width, roundf(lerpf(16.0, 18.0, density)))
+			speed_row.add_theme_constant_override("separation", panel_gap)
+		hud.speed_bar.custom_minimum_size = Vector2(speed_bar_width, roundf(lerpf(16.0, 18.0, density)))
+	if is_instance_valid(hud.speed_mode_icon):
+		hud.speed_mode_icon.custom_minimum_size = Vector2(roundf(lerpf(20.0, 24.0, density)), roundf(lerpf(20.0, 24.0, density)))
+	if is_instance_valid(hud.speed_bar_label):
+		NavalUiTheme.style_overlay_value(hud.speed_bar_label, roundi(lerpf(10.0, 11.0, density)))
+
+	if is_instance_valid(hud.stat_panel):
+		hud.stat_panel.offset_left = edge_margin
+		hud.stat_panel.offset_right = edge_margin + stat_panel_width
+		hud.stat_panel.offset_top = roundf(lerpf(42.0, 48.0, density))
+		hud.stat_panel.offset_bottom = hud.stat_panel.offset_top + stat_panel_height
+		var stat_box := hud.stat_panel.get_child(0) as VBoxContainer
+		if is_instance_valid(stat_box):
+			stat_box.custom_minimum_size = Vector2(stat_panel_width - 24.0, stat_panel_height - 40.0)
+
+	if is_instance_valid(hud.bottom_right_container):
+		hud.bottom_right_container.offset_right = -edge_margin
+		hud.bottom_right_container.offset_bottom = -lower_margin
+	if is_instance_valid(hud.bottom_left_container):
+		hud.bottom_left_container.offset_left = edge_margin
+		hud.bottom_left_container.offset_bottom = -lower_margin
+		hud.bottom_left_container.add_theme_constant_override("separation", roundi(lerpf(6.0, 8.0, density)))
+	if is_instance_valid(hud.support_row):
+		hud.support_row.add_theme_constant_override("separation", roundi(lerpf(4.0, 6.0, density)))
+	if is_instance_valid(hud.support_slot_container):
+		hud.support_slot_container.add_theme_constant_override("separation", roundi(lerpf(4.0, 6.0, density)))
+	if is_instance_valid(hud.hp_bar):
+		hud.hp_bar.custom_minimum_size = Vector2(hp_width, hp_height)
+	if is_instance_valid(hud.hp_text_label):
+		NavalUiTheme.style_overlay_value(hud.hp_text_label, roundi(lerpf(13.0, 14.0, density)))
+	if is_instance_valid(hud.stamina_bar):
+		hud.stamina_bar.custom_minimum_size = Vector2(hp_width, stamina_height)
+
+	if is_instance_valid(hud.boss_hp_container):
+		var boss_stack_count := 0
+		var boss_entries_variant = hud.get("boss_hp_entries")
+		if boss_entries_variant is Dictionary:
+			boss_stack_count = (boss_entries_variant as Dictionary).size()
+		_apply_boss_hp_stack_layout(hud, boss_width, boss_height, boss_bottom_margin, boss_gap, boss_label_height, boss_stack_count)
+	if is_instance_valid(hud.boarding_ui):
+		hud.boarding_ui.offset_top = roundf(lerpf(88.0, 100.0, density))
+	if is_instance_valid(hud.boarding_label):
+		NavalUiTheme.style_overlay_value(hud.boarding_label, roundi(lerpf(14.0, 16.0, density)))
+		hud.boarding_label.add_theme_constant_override("outline_size", 4)
+	if is_instance_valid(hud.boarding_bar):
+		hud.boarding_bar.custom_minimum_size = Vector2(boarding_width, roundf(lerpf(10.0, 12.0, density)))
 
 # Shared helpers
 static func move_label_to_container(node: Control, container: Control) -> void:
@@ -38,13 +160,13 @@ static func setup_top_left_layout(hud) -> void:
 	hud.add_child(hud.top_left_container)
 	hud.top_left_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	hud.top_left_container.offset_left = 24
-	hud.top_left_container.offset_top = 32
+	hud.top_left_container.offset_top = 48
 	hud.score_label = hud._ensure_hud_label(hud.score_label, "ScoreLabel", "Gold: 0")
 	hud.difficulty_label = hud._ensure_hud_label(hud.difficulty_label, "DifficultyLabel", "[Diff] 1")
 	hud._attach_level_label_to_xp_bar()
 
 	hud.weapon_track = HudUpgradeTrack.new()
-	hud.weapon_track.setup_track("[함선 업그레이드]", NavalUiTheme.TEXT_BLUE, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM)
+	hud.weapon_track.setup_track("", NavalUiTheme.TEXT_BLUE, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM)
 	hud.top_left_container.add_child(hud.weapon_track)
 	hud.weapon_container = hud.weapon_track.slot_container
 	hud.weapon_slots = hud.weapon_track.slots
@@ -52,7 +174,7 @@ static func setup_top_left_layout(hud) -> void:
 		hud._bind_upgrade_slot_hover(slot)
 
 	hud.support_track = HudUpgradeTrack.new()
-	hud.support_track.setup_track("[병사 업그레이드]", NavalUiTheme.TEXT_ACCENT, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM)
+	hud.support_track.setup_track("", NavalUiTheme.TEXT_ACCENT, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.BORDER_GOLD_DIM)
 	hud.top_left_container.add_child(hud.support_track)
 	hud.support_container = hud.support_track.slot_container
 	hud.support_slots = hud.support_track.slots
@@ -66,13 +188,7 @@ static func setup_top_left_layout(hud) -> void:
 	if hud.score_label:
 		move_label_to_container(hud.score_label, hud.top_left_container)
 		hud.score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		NavalUiTheme.style_gold(hud.score_label, 18)
-
-	hud.combat_stats_label = Label.new()
-	hud.combat_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	NavalUiTheme.style_muted(hud.combat_stats_label, 12)
-	hud.combat_stats_label.text = "[전과]"
-	hud.top_left_container.add_child(hud.combat_stats_label)
+		NavalUiTheme.style_gold(hud.score_label, 17)
 
 	hud.combat_stats_row = HBoxContainer.new()
 	hud.combat_stats_row.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -80,30 +196,22 @@ static func setup_top_left_layout(hud) -> void:
 	hud.top_left_container.add_child(hud.combat_stats_row)
 
 	var sunk_chip: PanelContainer = _create_combat_stat_chip(hud, "directions_boat", NavalUiTheme.TEXT_BLUE, "combat_sunk_value_label", "0")
-	var derelict_chip: PanelContainer = _create_combat_stat_chip(hud, "sailing", NavalUiTheme.TEXT_GOLD, "combat_derelict_value_label", "0")
 	var soldier_chip: PanelContainer = _create_combat_stat_chip(hud, "groups", NavalUiTheme.TEXT_ACCENT, "combat_soldier_value_label", "0")
-	sunk_chip.set_meta("tooltip_text", "격침: 적 함선을 침몰시킨 횟수")
+	sunk_chip.set_meta("tooltip_text", "배 파괴: 침몰과 폐선화를 포함한 적 함선 무력화 수")
 	sunk_chip.set_meta("tooltip_color", NavalUiTheme.TEXT_BLUE)
-	derelict_chip.set_meta("tooltip_text", "나포(폐선화): 적 병사를 모두 제거해 폐선 상태로 만든 횟수")
-	derelict_chip.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
 	soldier_chip.set_meta("tooltip_text", "병사 처치: 전투 사살과 수장을 포함한 적 병사 총 처치 수")
 	soldier_chip.set_meta("tooltip_color", NavalUiTheme.TEXT_ACCENT)
 	hud._bind_upgrade_slot_hover(sunk_chip)
-	hud._bind_upgrade_slot_hover(derelict_chip)
 	hud._bind_upgrade_slot_hover(soldier_chip)
 	hud.combat_stats_row.add_child(sunk_chip)
-	hud.combat_stats_row.add_child(derelict_chip)
 	hud.combat_stats_row.add_child(soldier_chip)
 
 	if hud.difficulty_label:
-		move_label_to_container(hud.difficulty_label, hud.top_left_container)
-		hud.difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		NavalUiTheme.style_muted(hud.difficulty_label, 12)
+		hud.difficulty_label.visible = false
 
 static func _create_combat_stat_chip(hud, icon_name: String, icon_color: Color, value_property_name: String, initial_text: String) -> PanelContainer:
 	var chip := PanelContainer.new()
-	var chip_style := NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_DIM, 9, 1, 8.0, 5.0, 8.0, 5.0)
-	chip.add_theme_stylebox_override("panel", chip_style)
+	chip.add_theme_stylebox_override("panel", NavalUiTheme.make_hud_chip_style())
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 5)
@@ -113,11 +221,7 @@ static func _create_combat_stat_chip(hud, icon_name: String, icon_color: Color, 
 	icon_label.custom_minimum_size = Vector2(16, 16)
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	icon_label.add_theme_font_size_override("font_size", 14)
-	icon_label.add_theme_color_override("font_color", icon_color)
-	if MATERIAL_SYMBOLS_FONT:
-		icon_label.add_theme_font_override("font", MATERIAL_SYMBOLS_FONT)
-	icon_label.text = icon_name
+	NavalUiTheme.apply_emblem(icon_label, icon_name, 13, icon_color)
 	row.add_child(icon_label)
 
 	var value_label := Label.new()
@@ -138,19 +242,16 @@ static func setup_top_center_layout(hud) -> void:
 	hud.add_child(top_center_container)
 	top_center_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	top_center_container.offset_left = -90
-	top_center_container.offset_top = 40
+	top_center_container.offset_top = 58
 	top_center_container.offset_right = 90
-	top_center_container.offset_bottom = 72
+	top_center_container.offset_bottom = 92
 	top_center_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
 
 	move_label_to_container(hud.timer_label, top_center_container)
 	hud.timer_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hud.timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hud.timer_label.add_theme_font_size_override("font_size", 28)
-	hud.timer_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
-	hud.timer_label.add_theme_color_override("font_shadow_color", NavalUiTheme.OUTLINE_DARK)
-	hud.timer_label.add_theme_constant_override("shadow_outline_size", 3)
+	NavalUiTheme.style_timer_value(hud.timer_label, 26)
 
 	hud.capture_opportunity_label = Label.new()
 	hud.capture_opportunity_label.name = "CaptureOpportunityLabel"
@@ -158,12 +259,12 @@ static func setup_top_center_layout(hud) -> void:
 	hud.capture_opportunity_label.visible = false
 	hud.capture_opportunity_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	hud.capture_opportunity_label.offset_left = -180
-	hud.capture_opportunity_label.offset_top = 74
+	hud.capture_opportunity_label.offset_top = 96
 	hud.capture_opportunity_label.offset_right = 180
-	hud.capture_opportunity_label.offset_bottom = 96
+	hud.capture_opportunity_label.offset_bottom = 118
 	hud.capture_opportunity_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	hud.capture_opportunity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_gold(hud.capture_opportunity_label, 11)
+	NavalUiTheme.style_caption(hud.capture_opportunity_label, 11, NavalUiTheme.TEXT_GOLD)
 	hud.capture_opportunity_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	hud.capture_opportunity_label.add_theme_constant_override("outline_size", 3)
 	hud.add_child(hud.capture_opportunity_label)
@@ -180,12 +281,12 @@ static func setup_top_center_layout(hud) -> void:
 	hud.debug_distance_label.visible = false
 	hud.debug_distance_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	hud.debug_distance_label.offset_left = -180
-	hud.debug_distance_label.offset_top = 78
+	hud.debug_distance_label.offset_top = 100
 	hud.debug_distance_label.offset_right = 180
-	hud.debug_distance_label.offset_bottom = 100
+	hud.debug_distance_label.offset_bottom = 122
 	hud.debug_distance_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	hud.debug_distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_muted(hud.debug_distance_label, 10)
+	NavalUiTheme.style_caption(hud.debug_distance_label, 10, NavalUiTheme.TEXT_MUTED)
 	hud.debug_distance_label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	hud.debug_distance_label.add_theme_constant_override("outline_size", 3)
 	hud.add_child(hud.debug_distance_label)
@@ -318,14 +419,15 @@ static func setup_bottom_left_layout(hud) -> void:
 		hud.support_row = HBoxContainer.new()
 		hud.support_row.name = "SupportRow"
 		hud.support_row.alignment = BoxContainer.ALIGNMENT_BEGIN
-		hud.support_row.add_theme_constant_override("separation", 10)
+		hud.support_row.add_theme_constant_override("separation", 4)
 	if hud.support_row.get_parent() != hud.bottom_left_container:
 		move_label_to_container(hud.support_row, hud.bottom_left_container)
 
 	if hud.support_slot_container == null:
-		hud.support_slot_container = VBoxContainer.new()
+		hud.support_slot_container = HBoxContainer.new()
 		hud.support_slot_container.name = "SupportSlots"
-		hud.support_slot_container.add_theme_constant_override("separation", 6)
+		hud.support_slot_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+		hud.support_slot_container.add_theme_constant_override("separation", 4)
 	if hud.support_slot_container.get_parent() != hud.support_row:
 		move_label_to_container(hud.support_slot_container, hud.support_row)
 
@@ -354,25 +456,50 @@ static func setup_bottom_left_layout(hud) -> void:
 static func setup_boss_hp_bar(hud) -> void:
 	if hud == null:
 		return
-	if hud.boss_hp_bar_new:
+	if hud.boss_hp_container:
 		return
-	hud.boss_hp_bar_new = ProgressBar.new()
-	hud.add_child(hud.boss_hp_bar_new)
-	hud.boss_hp_bar_new.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	hud.boss_hp_bar_new.offset_top = 80
-	hud.boss_hp_bar_new.custom_minimum_size = Vector2(500, 28)
-	hud.boss_hp_bar_new.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	hud.boss_hp_bar_new.show_percentage = false
-	hud.boss_hp_bar_new.visible = false
+	hud.boss_hp_container = VBoxContainer.new()
+	hud.boss_hp_container.name = "BossHPStack"
+	hud.boss_hp_container.visible = false
+	hud.boss_hp_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.boss_hp_container.alignment = BoxContainer.ALIGNMENT_END
+	hud.boss_hp_container.z_index = 30
+	hud.add_child(hud.boss_hp_container)
+	_apply_boss_hp_stack_layout(hud, 560.0, 20.0, 206.0, 7.0, 16.0, 0)
 
-	NavalUiTheme.apply_progress_bar(hud.boss_hp_bar_new, Color(0.07, 0.08, 0.10, 0.92), Color(0.77, 0.22, 0.20, 0.95), 4)
+static func _apply_boss_hp_stack_layout(hud, boss_width: float, boss_height: float, bottom_margin: float, gap: float, label_height: float, stack_count: int) -> void:
+	if hud == null or not is_instance_valid(hud.boss_hp_container):
+		return
+	var visible_count: int = maxi(stack_count, 1)
+	var show_labels: bool = stack_count > 0
+	var label_gap: float = 2.0 if show_labels else 0.0
+	var row_height: float = boss_height + (label_height + label_gap if show_labels else 0.0)
+	var stack_height: float = row_height * float(visible_count) + gap * float(maxi(visible_count - 1, 0))
+	hud.boss_hp_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	hud.boss_hp_container.offset_left = -boss_width * 0.5
+	hud.boss_hp_container.offset_right = boss_width * 0.5
+	hud.boss_hp_container.offset_bottom = -bottom_margin
+	hud.boss_hp_container.offset_top = -bottom_margin - stack_height
+	hud.boss_hp_container.custom_minimum_size = Vector2(boss_width, stack_height)
+	hud.boss_hp_container.add_theme_constant_override("separation", int(gap))
 
-	hud.boss_hp_text_label = Label.new()
-	hud.boss_hp_text_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hud.boss_hp_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.boss_hp_text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_overlay_value(hud.boss_hp_text_label, 13)
-	hud.boss_hp_bar_new.add_child(hud.boss_hp_text_label)
+	var entries_variant = hud.get("boss_hp_entries")
+	if not (entries_variant is Dictionary):
+		return
+	for entry in (entries_variant as Dictionary).values():
+		if not (entry is Dictionary):
+			continue
+		var root := (entry as Dictionary).get("root", null) as VBoxContainer
+		if is_instance_valid(root):
+			root.custom_minimum_size = Vector2(boss_width, row_height)
+			root.add_theme_constant_override("separation", int(label_gap))
+		var bar := (entry as Dictionary).get("bar", null) as ProgressBar
+		if is_instance_valid(bar):
+			bar.custom_minimum_size = Vector2(boss_width, boss_height)
+		var label := (entry as Dictionary).get("label", null) as Label
+		if is_instance_valid(label):
+			label.custom_minimum_size = Vector2(boss_width, label_height)
+			NavalUiTheme.style_caption(label, 10, NavalUiTheme.TEXT_MUTED)
 
 static func setup_boarding_ui(hud) -> void:
 	if hud == null:
