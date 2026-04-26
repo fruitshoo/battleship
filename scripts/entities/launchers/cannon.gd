@@ -8,7 +8,9 @@ const CANNON_RELOAD_TEMPO_MULT := 1.10
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
-@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
+@export var muzzle_smoke_uses_positive_z_forward: bool = true
+@export_range(0.0, 0.5, 0.01) var muzzle_smoke_follow_muzzle_time: float = 0.22
 @export var fire_cooldown: float = 2.8
 @export var crew_operated_reload_enabled: bool = true
 @export_range(0.0, 3.0, 0.05) var max_reload_crew_power: float = 3.0
@@ -522,6 +524,8 @@ func _execute_fire() -> void:
 	# 머즐 연기 생성
 	if muzzle_smoke_scene:
 		var smoke = ScenePool.acquire(get_tree(), muzzle_smoke_scene)
+		if not is_instance_valid(smoke):
+			return
 		if smoke.has_method("configure_as_muzzle"):
 			smoke.configure_as_muzzle()
 		if smoke.has_method("set_intensity"):
@@ -529,13 +533,84 @@ func _execute_fire() -> void:
 			if projectile_base_damage > 0.0:
 				muzzle_intensity = clampf(final_damage / projectile_base_damage, 0.85, 1.45)
 			smoke.set_intensity(muzzle_intensity)
-		smoke.position = muzzle.global_position
 		# Basis.looking_at 안전 가드
 		var smoke_dir = fire_direction if not fire_direction.is_zero_approx() else Vector3.FORWARD
-		smoke.basis = Basis.looking_at(smoke_dir, Vector3.UP)
-		get_tree().root.add_child(smoke)
+		var smoke_position := muzzle.global_position
+		var smoke_basis := _get_muzzle_smoke_basis(smoke_dir)
+		var smoke_parent: Node = muzzle if muzzle_smoke_follow_muzzle_time > 0.0 and is_instance_valid(muzzle) else get_tree().root
+		smoke_parent.add_child(smoke)
+		if smoke is Node3D:
+			(smoke as Node3D).global_transform = Transform3D(smoke_basis, smoke_position)
+		if smoke_parent == muzzle:
+			_schedule_muzzle_smoke_detach(smoke, muzzle_smoke_follow_muzzle_time)
 		if smoke.has_method("pool_activate"):
 			smoke.pool_activate()
+		else:
+			_activate_plain_muzzle_smoke(smoke)
+
+
+func _get_muzzle_smoke_basis(smoke_dir: Vector3) -> Basis:
+	var dir := smoke_dir.normalized()
+	if dir.is_zero_approx():
+		dir = Vector3.FORWARD
+	if muzzle_smoke_uses_positive_z_forward:
+		return Basis.looking_at(-dir, Vector3.UP)
+	return Basis.looking_at(dir, Vector3.UP)
+
+
+func _schedule_muzzle_smoke_detach(smoke: Node, delay: float) -> void:
+	var tree := get_tree()
+	if not is_instance_valid(tree) or delay <= 0.0:
+		return
+	var smoke_id := smoke.get_instance_id()
+	var muzzle_id := muzzle.get_instance_id() if is_instance_valid(muzzle) else 0
+	tree.create_timer(delay).timeout.connect(func() -> void:
+		_detach_muzzle_smoke_to_world(smoke_id, muzzle_id)
+	)
+
+
+func _detach_muzzle_smoke_to_world(smoke_id: int, muzzle_id: int) -> void:
+	var smoke := instance_from_id(smoke_id) as Node
+	var muzzle_node := instance_from_id(muzzle_id) as Node
+	var tree := get_tree()
+	if not is_instance_valid(smoke) or not is_instance_valid(muzzle_node) or not is_instance_valid(tree):
+		return
+	if smoke.get_parent() != muzzle_node:
+		return
+	var saved_transform := Transform3D.IDENTITY
+	if smoke is Node3D:
+		saved_transform = (smoke as Node3D).global_transform
+	muzzle_node.remove_child(smoke)
+	tree.root.add_child(smoke)
+	if smoke is Node3D:
+		(smoke as Node3D).global_transform = saved_transform
+
+
+func _activate_plain_muzzle_smoke(smoke: Node) -> void:
+	var max_lifetime := _restart_plain_muzzle_particles(smoke)
+	if max_lifetime <= 0.0:
+		ScenePool.release(smoke)
+		return
+	var tree := get_tree()
+	if not is_instance_valid(tree):
+		ScenePool.release(smoke)
+		return
+	tree.create_timer(max_lifetime + 0.35).timeout.connect(func() -> void:
+		ScenePool.release(smoke)
+	)
+
+
+func _restart_plain_muzzle_particles(node: Node) -> float:
+	var max_lifetime := 0.0
+	if node is GPUParticles3D:
+		var particles := node as GPUParticles3D
+		particles.visible = true
+		particles.restart()
+		particles.emitting = true
+		max_lifetime = maxf(max_lifetime, particles.lifetime)
+	for child in node.get_children():
+		max_lifetime = maxf(max_lifetime, _restart_plain_muzzle_particles(child))
+	return max_lifetime
 
 
 func _get_projectile_speed() -> float:

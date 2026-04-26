@@ -174,7 +174,8 @@ func _ready() -> void:
 	_apply_runtime_scene_safety_defaults()
 	_apply_start_marker_transform_from_parent()
 	super._ready()
-	fire_effect_offset = Vector3(0, 1.0, 0.0)
+	fire_effect_offset = Vector3(0.0, 0.55, -0.25)
+	fire_effect_scale = 1.6
 	print("[Ship] Total masts connected: ", masts.size())
 	
 	# 영구 업그레이드 보너스 적용

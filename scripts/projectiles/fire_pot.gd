@@ -6,6 +6,8 @@ extends Area3D
 @export var damage: float = 15.0
 @export var explosion_radius: float = 3.0
 @export var lifetime: float = 3.0
+@export_range(0.0, 1.0, 0.01) var ignition_chance: float = 0.45
+@export_range(0.1, 20.0, 0.1) var burn_duration: float = 7.0
 
 var team: String = "player"
 var target_pos: Vector3 = Vector3.ZERO
@@ -15,7 +17,9 @@ var flight_duration: float = 1.0 # 1초 동안 날아감
 var arc_height: float = 3.0
 
 var explosion_scene: PackedScene = preload("res://scenes/effects/fire_pot_explosion.tscn")
-var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
+
+const DEFAULT_IGNITION_CHANCE: float = 0.45
+const DEFAULT_BURN_DURATION: float = 7.0
 
 var has_exploded: bool = false
 var velocity: Vector3 = Vector3.ZERO
@@ -46,6 +50,8 @@ func pool_reset() -> void:
 	velocity = Vector3.ZERO
 	_life_left = lifetime
 	_rotation_update_timer = 0.0
+	ignition_chance = DEFAULT_IGNITION_CHANCE
+	burn_duration = DEFAULT_BURN_DURATION
 
 func setup_flight(start: Vector3, target: Vector3, flight_time: float = 1.0, arc: float = 3.0) -> void:
 	start_pos = start
@@ -97,27 +103,18 @@ func _physics_process(delta: float) -> void:
 func explode() -> void:
 	if has_exploded: return
 	has_exploded = true
-	var affected_target: bool = _apply_area_damage()
+	_apply_area_damage()
 
-	# 1. 폭발 이펙트 
-	if explosion_scene and VfxBudget.allow_spawn(get_tree(), "fire_pot_explosion", global_position, 3, 65.0):
+	# 1. 폭발 이펙트
+	if explosion_scene:
 		var expl = ScenePool.acquire(get_tree(), explosion_scene)
-		expl.position = global_position
+		if expl is Node3D:
+			(expl as Node3D).position = global_position
 		get_tree().root.add_child.call_deferred(expl)
+		if expl.has_method("pool_activate"):
+			expl.call_deferred("pool_activate")
 	
-	# 2. 바닥 잔여 화염 이펙트 (1.5초). 물에 빗나간 투척은 검은 연기를 남기지 않는다.
-	if affected_target and fire_effect_scene and VfxBudget.allow_spawn(get_tree(), "fire_effect", global_position, 2, 55.0):
-		var fire = ScenePool.acquire(get_tree(), fire_effect_scene)
-		fire.position = global_position
-		get_tree().root.add_child.call_deferred(fire)
-		if fire.has_method("pool_activate"):
-			fire.call_deferred("pool_activate")
-
-		var timer = get_tree().create_timer(1.5)
-		var fire_id: int = fire.get_instance_id()
-		timer.timeout.connect(func(): ScenePool.release_by_instance_id(fire_id))
-	
-	# 3. 사운드
+	# 2. 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("explosion_small", global_position, randf_range(0.9, 1.2))
@@ -157,8 +154,8 @@ func _apply_area_damage() -> bool:
 			var source_id = "fire_pot" if team == "player" else ""
 			if ship.has_method("take_damage"):
 				ship.take_damage(damage * 1.5, global_position, source_id) # 배에는 데미지 1.5배
-			if ship.has_method("add_fire_buildup"):
-				ship.add_fire_buildup(30.0) # 화재 게이지 폭증
+			if ship.has_method("try_ignite_fire"):
+				ship.try_ignite_fire(ignition_chance, burn_duration)
 			elif ship.has_method("apply_status_effect"):
 				ship.apply_status_effect("burn", 5.0)
 			affected_target = true

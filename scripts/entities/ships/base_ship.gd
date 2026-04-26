@@ -148,6 +148,10 @@ var boarding_pull_velocity: Vector3 = Vector3.ZERO
 
 var fire_build_up: float = 0.0
 var fire_threshold: float = 100.0
+@export_range(0.0, 1.0, 0.01) var fire_damage_ignition_chance_per_point: float = 0.012
+@export_range(0.0, 1.0, 0.01) var fire_pot_ignition_chance: float = 0.45
+@export_range(0.1, 20.0, 0.1) var fire_pot_burn_duration: float = 7.0
+@export_range(0.0, 20.0, 0.1) var burn_hull_damage_per_second: float = 2.0
 
 # === 충돌 및 충각(Ramming) 관련 상태 ===
 var _recent_ram_targets: Dictionary = {}
@@ -168,7 +172,10 @@ var _hull_half_extents: Vector2 = Vector2(1.5, 4.0) # X:반폭, Y:반길이
 @export var survivor_scene: PackedScene = preload("res://scenes/effects/survivor.tscn")
 var _fire_instance: Node3D = null
 
-@export var fire_effect_offset: Vector3 = Vector3(0, 1.5, 0.0)
+@export var fire_effect_offset: Vector3 = Vector3(0.0, 0.55, -0.25)
+@export var fire_effect_offset_randomness: Vector3 = Vector3(0.65, 0.05, 1.1)
+@export_range(0.25, 4.0, 0.05) var fire_effect_scale: float = 1.6
+@export_range(0.0, 0.6, 0.01) var fire_effect_scale_randomness: float = 0.18
 
 # === 노드 참조 (이제 HullScene 내부를 스캔) ===
 var masts: Array[Node] = []
@@ -1455,8 +1462,14 @@ func _flash_damage(amount: float = 10.0) -> void:
 	shake_tween.tween_property(self , "rotation:z", 0.0, 0.2)
 
 ## 화염 데미지
-func take_fire_damage(_dps: float, duration: float) -> void:
-	BaseShipStatusHelper.take_fire_damage(self, duration)
+func take_fire_damage(dps: float, duration: float) -> void:
+	BaseShipStatusHelper.take_fire_damage(self, dps, duration)
+
+func try_ignite_fire(chance: float, duration: float) -> bool:
+	return BaseShipStatusHelper.try_ignite_fire(self, chance, duration)
+
+func add_fire_buildup(amount: float) -> void:
+	BaseShipStatusHelper.try_ignite_fire(self, clampf(amount / maxf(fire_threshold, 1.0), 0.0, 1.0), fire_pot_burn_duration)
 
 func _update_burning_status(delta: float) -> void:
 	BaseShipStatusHelper.update_burning_status(self, delta)

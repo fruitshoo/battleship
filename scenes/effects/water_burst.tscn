@@ -1,67 +1,7 @@
-[gd_scene format=3 uid="uid://cm4c0u30p0035"]
+[gd_scene load_steps=3 format=3 uid="uid://cm4c0u30p0035"]
 
-[ext_resource type="Texture2D" uid="uid://bjesxwfjdqo6x" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_water"]
+[ext_resource type="PackedScene" path="res://scenes/effects/water_blast.tscn" id="1_blast"]
 [ext_resource type="Script" uid="uid://dowesoy8yplyl" path="res://scripts/effects/water_burst.gd" id="2_script"]
 
-[sub_resource type="Gradient" id="Gradient_water"]
-offsets = PackedFloat32Array(0, 0.15, 0.6, 1)
-colors = PackedColorArray(0.9, 0.95, 1, 1, 0.4, 0.8, 1, 0.8, 0.1, 0.4, 0.8, 0.5, 0, 0.2, 0.5, 0)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_water"]
-gradient = SubResource("Gradient_water")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_water"]
-emission_shape = 1
-emission_sphere_radius = 0.5
-direction = Vector3(0, 1, 0)
-spread = 40.0
-initial_velocity_min = 4.0
-initial_velocity_max = 7.0
-gravity = Vector3(0, -10, 0)
-damping_min = 2.0
-damping_max = 4.0
-scale_max = 1.2
-color_ramp = SubResource("GradientTexture1D_water")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_water"]
-render_priority = 10
-transparency = 1
-blend_mode = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("1_water")
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-
-[sub_resource type="QuadMesh" id="QuadMesh_water"]
-material = SubResource("StandardMaterial3D_water")
-size = Vector2(1.5, 1.5)
-
-[node name="WaterBurst" type="GPUParticles3D" unique_id=537832488]
-emitting = false
-amount = 10
-one_shot = true
-explosiveness = 0.95
-randomness = 0.5
-fixed_fps = 24
-interpolate = false
-fract_delta = false
-process_material = SubResource("ParticleProcessMaterial_water")
-draw_pass_1 = SubResource("QuadMesh_water")
+[node name="WaterBurst" instance=ExtResource("1_blast")]
 script = ExtResource("2_script")
-
-[node name="SecondaryBurst" type="GPUParticles3D" parent="." unique_id=1551724802]
-emitting = false
-amount = 1
-lifetime = 1.6
-one_shot = true
-explosiveness = 0.75
-randomness = 0.45
-fixed_fps = 20
-interpolate = false
-fract_delta = false
-process_material = SubResource("ParticleProcessMaterial_water")
-draw_pass_1 = SubResource("QuadMesh_water")

@@ -1,64 +1,66 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://7oya787bmntu"]
 
-[ext_resource type="Texture2D" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_smoke"]
-[ext_resource type="Script" path="res://scripts/effects/one_shot_particle.gd" id="2_script"]
+[ext_resource type="Texture2D" uid="uid://dlg7mj85jaow2" path="res://assets/vfx/flipbooks/explosion_smoke_01_8x8.tga" id="2_smoke"]
+[ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="7_script"]
 
-[sub_resource type="Gradient" id="Gradient_firepot"]
-offsets = PackedFloat32Array(0, 0.2, 0.6, 1)
-colors = PackedColorArray(1, 0.95, 0.7, 0.95, 1, 0.65, 0.2, 0.85, 0.5, 0.18, 0.05, 0.45, 0.08, 0.06, 0.05, 0)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_firepot"]
-gradient = SubResource("Gradient_firepot")
-
-[sub_resource type="Curve" id="Curve_firepot_scale"]
-_data = [Vector2(0, 0.35), 0.0, 0.0, 0, 0, Vector2(0.25, 1.0), 0.0, 0.0, 0, 0, Vector2(1, 1.7), 0.0, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="CurveTexture" id="CurveTexture_firepot_scale"]
-curve = SubResource("Curve_firepot_scale")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_firepot"]
-emission_shape = 1
-emission_sphere_radius = 0.35
-direction = Vector3(0, 1, 0)
-spread = 65.0
-initial_velocity_min = 2.8
-initial_velocity_max = 5.4
-gravity = Vector3(0, -3.6, 0)
-damping_min = 1.2
-damping_max = 2.2
-scale_min = 0.7
-scale_max = 1.2
-scale_curve = SubResource("CurveTexture_firepot_scale")
-color_ramp = SubResource("GradientTexture1D_firepot")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_firepot"]
-render_priority = 10
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3k83x"]
 transparency = 1
-blend_mode = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("1_smoke")
-emission_enabled = true
-emission = Color(1, 0.5, 0.2, 1)
-emission_energy_multiplier = 0.7
+vertex_color_is_srgb = true
+albedo_texture = ExtResource("2_smoke")
+albedo_texture_force_srgb = true
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
+particles_anim_h_frames = 5
+particles_anim_v_frames = 5
 particles_anim_loop = false
 
-[sub_resource type="QuadMesh" id="QuadMesh_firepot"]
-material = SubResource("StandardMaterial3D_firepot")
-size = Vector2(1.2, 1.2)
+[sub_resource type="Curve" id="Curve_nnqk4"]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0), 0.0, 5.161916, 0, 0, Vector2(0.12159863, 0.6847079), -0.06588974, -0.06588974, 0, 0, Vector2(1.8290817, 0), -0.96549684, 0.0, 0, 0]
+point_count = 3
 
-[node name="FirePotExplosion" type="GPUParticles3D"]
+[sub_resource type="CurveTexture" id="CurveTexture_0mxcn"]
+curve = SubResource("Curve_nnqk4")
+
+[sub_resource type="Curve" id="Curve_core_scale"]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0.03178692), 0.0, 3.763779, 0, 0, Vector2(0.19685374, 0.9321306), 0.0, 0.0, 0, 0, Vector2(1.9923469, 0), -1.1610411, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_core_scale"]
+curve = SubResource("Curve_core_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_core"]
+lifetime_randomness = 0.2
+particle_flag_rotate_y = true
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 15.0
+initial_velocity_min = 0.79999995
+initial_velocity_max = 1.0
+gravity = Vector3(0, 0, 0)
+damping_min = 0.4
+damping_max = 0.8
+scale_max = 2.0
+scale_curve = SubResource("CurveTexture_core_scale")
+alpha_curve = SubResource("CurveTexture_0mxcn")
+anim_speed_min = 1.0
+anim_speed_max = 1.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_fv44f"]
+
+[node name="FirePotExplosion" type="GPUParticles3D" unique_id=2000374880]
+material_override = SubResource("StandardMaterial3D_3k83x")
 emitting = false
-amount = 24
-lifetime = 0.9
+amount = 7
+lifetime = 1.2
 one_shot = true
 explosiveness = 0.9
-randomness = 0.55
-process_material = SubResource("ParticleProcessMaterial_firepot")
-draw_pass_1 = SubResource("QuadMesh_firepot")
-script = ExtResource("2_script")
+randomness = 0.24
+fixed_fps = 20
+process_material = SubResource("ParticleProcessMaterial_core")
+draw_pass_1 = SubResource("QuadMesh_fv44f")
+script = ExtResource("7_script")

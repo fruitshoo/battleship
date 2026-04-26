@@ -2,9 +2,9 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ok1ihome6xv1"
-path.s3tc="res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.s3tc.ctex"
-path.etc2="res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.etc2.ctex"
+uid="uid://daf52s8eb6kyi"
+path.s3tc="res://.godot/imported/boat_wake_sides_texturesheet_2k.png-e5d6fa5aa2c1873031545cf90cfe9f34.s3tc.ctex"
+path.etc2="res://.godot/imported/boat_wake_sides_texturesheet_2k.png-e5d6fa5aa2c1873031545cf90cfe9f34.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -12,8 +12,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/vfx/particles/alpha/scorch_03_a.png"
-dest_files=["res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.s3tc.ctex", "res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.etc2.ctex"]
+source_file="res://assets/vfx/particles/water/boat_wake_sides_texturesheet_2k.png"
+dest_files=["res://.godot/imported/boat_wake_sides_texturesheet_2k.png-e5d6fa5aa2c1873031545cf90cfe9f34.s3tc.ctex", "res://.godot/imported/boat_wake_sides_texturesheet_2k.png-e5d6fa5aa2c1873031545cf90cfe9f34.etc2.ctex"]
 
 [params]
 

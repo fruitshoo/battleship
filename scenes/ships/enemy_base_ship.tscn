@@ -3,7 +3,6 @@
 [ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/ships/chaser_ship.gd" id="1_chaser"]
 [ext_resource type="PackedScene" uid="uid://bbrb610a2rv1j" path="res://scenes/ships/hulls/kobayabune_hull.tscn" id="2_73pna"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
-[ext_resource type="PackedScene" uid="uid://byq85motbiafl" path="res://scenes/effects/wake_trail.tscn" id="3_wake_trail"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_73pna"]
@@ -58,9 +57,6 @@ team = "enemy"
 
 [node name="Archer3" parent="Soldiers" unique_id=2073146356 instance=ExtResource("2_soldier")]
 team = "enemy"
-
-[node name="WakeTrail" parent="." unique_id=1464356147 instance=ExtResource("3_wake_trail")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 4.5)
 
 [node name="CollisionVisualizer" type="Node3D" parent="." unique_id=1919619224]
 visible = false

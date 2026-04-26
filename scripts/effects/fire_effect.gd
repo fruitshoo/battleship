@@ -1,19 +1,29 @@
 extends Node3D
 
+const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
+
+var _active: bool = false
+
 
 func pool_capacity() -> int:
 	return 12
 
 
 func pool_activate() -> void:
-	visible = true
-	_set_particles_emitting(self, true, true)
+	set_fire_active(true, true)
 
 
 func pool_reset() -> void:
-	_set_particles_emitting(self, false, false)
-	_stop_audio(self)
-	visible = false
+	set_fire_active(false, false)
+
+
+func set_fire_active(active: bool, play_crackle: bool = true) -> void:
+	var changed := active != _active
+	_active = active
+	visible = active
+	if changed:
+		_set_particles_emitting(self, active, active)
+	_sync_audio(active and play_crackle)
 
 
 func _set_particles_emitting(node: Node, active: bool, restart_particles: bool) -> void:
@@ -26,10 +36,19 @@ func _set_particles_emitting(node: Node, active: bool, restart_particles: bool) 
 		_set_particles_emitting(child, active, restart_particles)
 
 
-func _stop_audio(node: Node) -> void:
+func _sync_audio(should_play: bool) -> void:
+	_sync_audio_recursive(self, should_play)
+
+
+func _sync_audio_recursive(node: Node, should_play: bool) -> void:
 	for child in node.get_children():
 		if child is AudioStreamPlayer3D:
 			var player := child as AudioStreamPlayer3D
-			if player.playing:
+			if player.stream == null:
+				player.stream = FIRE_CRACKLE_STREAM
+			if should_play:
+				if not player.playing:
+					player.play()
+			elif player.playing:
 				player.stop()
-		_stop_audio(child)
+		_sync_audio_recursive(child, should_play)

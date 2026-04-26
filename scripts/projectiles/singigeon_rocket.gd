@@ -337,27 +337,21 @@ func _on_hit(target: Variant) -> void:
 
 func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 	if not is_instance_valid(target_node): return
-	
+
 	# 데미지 보정 (블랙 파우더 업그레이드 등)
 	var dmg_mult = 1.0
-	var fire_lv = 0
 	var upgrade_manager = _cached_upgrade_manager
 	if is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
 		var singigeon_lv = upgrade_manager.current_levels.get("singigeon", 0)
 		dmg_mult += (0.15 * singigeon_lv) # 레벨당 데미지 15% 증가
-		fire_lv = int(singigeon_lv / 3.0) # 3레벨마다 화염 데미지 상승
 
 	if target_node.has_method("take_damage"):
 		var final_damage = damage * dmg_mult * scale
 		if target_node is CharacterBody3D or target_node.is_in_group("soldiers"):
 			final_damage *= personnel_damage_mult
-		
+
 		var source_id = "singigeon" if team == "player" else ""
 		target_node.take_damage(final_damage, global_position, source_id)
-		
-		# 점화 효과
-		if fire_lv > 0 and target_node.has_method("take_fire_damage"):
-			target_node.take_fire_damage(fire_lv * 2.0, 5.0)
 	elif target_node.has_method("die"):
 		target_node.die()
 

@@ -277,8 +277,6 @@ static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float)
 		return
 	ship.get_tree().root.add_child(smoke)
 	smoke.global_position = ship.to_global(local_offset)
-	if smoke.has_method("configure_as_muzzle"):
-		smoke.configure_as_muzzle()
 	if smoke.has_method("set_intensity"):
 		smoke.set_intensity(intensity)
 	if smoke.has_method("pool_activate"):

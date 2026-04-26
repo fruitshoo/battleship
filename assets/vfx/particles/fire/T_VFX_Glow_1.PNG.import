@@ -2,9 +2,9 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ok1ihome6xv1"
-path.s3tc="res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.s3tc.ctex"
-path.etc2="res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.etc2.ctex"
+uid="uid://j3er0rga8slr"
+path.s3tc="res://.godot/imported/T_VFX_Glow_1.PNG-4cad3191bf11b7fb6fb9166805d7a521.s3tc.ctex"
+path.etc2="res://.godot/imported/T_VFX_Glow_1.PNG-4cad3191bf11b7fb6fb9166805d7a521.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -12,8 +12,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/vfx/particles/alpha/scorch_03_a.png"
-dest_files=["res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.s3tc.ctex", "res://.godot/imported/scorch_03_a.png-ff47ad55fe4a10d5bd8d124796ad5427.etc2.ctex"]
+source_file="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG"
+dest_files=["res://.godot/imported/T_VFX_Glow_1.PNG-4cad3191bf11b7fb6fb9166805d7a521.s3tc.ctex", "res://.godot/imported/T_VFX_Glow_1.PNG-4cad3191bf11b7fb6fb9166805d7a521.etc2.ctex"]
 
 [params]
 

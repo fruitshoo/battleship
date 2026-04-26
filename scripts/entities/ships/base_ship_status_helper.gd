@@ -2,23 +2,73 @@ extends RefCounted
 class_name BaseShipStatusHelper
 
 const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
+const FIRE_EFFECT_RANDOM_OFFSET_META := "fire_effect_random_offset"
+const FIRE_EFFECT_RANDOM_SCALE_META := "fire_effect_random_scale"
 
 static func update_fire_effect(ship) -> void:
 	if (ship.is_burning or ship.is_derelict) and not ship.is_sinking and not ship.is_dying:
 		if not is_instance_valid(ship._fire_instance):
 			ship._fire_instance = ship.fire_effect_scene.instantiate() as Node3D
 			ship.add_child(ship._fire_instance)
-			ship._fire_instance.position = ship.fire_effect_offset
+			_apply_fire_effect_transform(ship)
 			set_fire_emitting(ship, true)
 		else:
+			_apply_fire_effect_transform(ship)
 			set_fire_emitting(ship, true)
 	else:
 		if is_instance_valid(ship._fire_instance):
 			set_fire_emitting(ship, false)
+		_clear_fire_effect_random_transform(ship)
+
+
+static func _apply_fire_effect_transform(ship) -> void:
+	if not is_instance_valid(ship._fire_instance):
+		return
+	ship._fire_instance.position = ship.fire_effect_offset + _get_fire_effect_random_offset(ship)
+	var effect_scale := 1.0
+	if "fire_effect_scale" in ship:
+		effect_scale = maxf(0.05, float(ship.fire_effect_scale))
+	ship._fire_instance.scale = Vector3.ONE * effect_scale * _get_fire_effect_random_scale(ship)
+
+
+static func _get_fire_effect_random_offset(ship) -> Vector3:
+	if ship.has_meta(FIRE_EFFECT_RANDOM_OFFSET_META):
+		return ship.get_meta(FIRE_EFFECT_RANDOM_OFFSET_META) as Vector3
+	var extents := Vector3.ZERO
+	if "fire_effect_offset_randomness" in ship:
+		extents = ship.fire_effect_offset_randomness
+	var offset := Vector3(
+		randf_range(-absf(extents.x), absf(extents.x)),
+		randf_range(-absf(extents.y), absf(extents.y)),
+		randf_range(-absf(extents.z), absf(extents.z))
+	)
+	ship.set_meta(FIRE_EFFECT_RANDOM_OFFSET_META, offset)
+	return offset
+
+
+static func _get_fire_effect_random_scale(ship) -> float:
+	if ship.has_meta(FIRE_EFFECT_RANDOM_SCALE_META):
+		return float(ship.get_meta(FIRE_EFFECT_RANDOM_SCALE_META))
+	var randomness := 0.0
+	if "fire_effect_scale_randomness" in ship:
+		randomness = clampf(float(ship.fire_effect_scale_randomness), 0.0, 0.95)
+	var scale := randf_range(1.0 - randomness, 1.0 + randomness)
+	ship.set_meta(FIRE_EFFECT_RANDOM_SCALE_META, scale)
+	return scale
+
+
+static func _clear_fire_effect_random_transform(ship) -> void:
+	if ship.has_meta(FIRE_EFFECT_RANDOM_OFFSET_META):
+		ship.remove_meta(FIRE_EFFECT_RANDOM_OFFSET_META)
+	if ship.has_meta(FIRE_EFFECT_RANDOM_SCALE_META):
+		ship.remove_meta(FIRE_EFFECT_RANDOM_SCALE_META)
 
 
 static func set_fire_emitting(ship, active: bool) -> void:
 	if not is_instance_valid(ship._fire_instance):
+		return
+	if ship._fire_instance.has_method("set_fire_active"):
+		ship._fire_instance.call("set_fire_active", active, ship.is_burning)
 		return
 	var flame = ship._fire_instance.get_node_or_null("FlameParticles") as GPUParticles3D
 	var smoke = ship._fire_instance.get_node_or_null("SmokeParticles") as GPUParticles3D
@@ -180,22 +230,40 @@ static func _resolve_boarding_capture_tick(ship, ship_team: String, attacker_shi
 		ship._cached_hud.show_message("갑판 장악! 적선 선체를 파괴 중", 1.5)
 
 
-static func take_fire_damage(ship, duration: float) -> void:
+static func take_fire_damage(ship, dps: float, duration: float) -> void:
 	if ship.is_burning:
 		ship.burn_timer = max(ship.burn_timer, duration)
 		return
 
-	ship.fire_build_up += duration * 6.0
-	if ship.fire_build_up >= ship.fire_threshold:
-		ship.is_burning = true
-		ship.fire_build_up = ship.fire_threshold
-		ship.burn_timer = duration
-		print("[Status] 배에 불이 붙었습니다!")
+	var chance_per_point := 0.012
+	if "fire_damage_ignition_chance_per_point" in ship:
+		chance_per_point = maxf(0.0, float(ship.fire_damage_ignition_chance_per_point))
+	var ignition_chance := clampf(maxf(dps, 0.0) * maxf(duration, 0.0) * chance_per_point, 0.0, 0.65)
+	try_ignite_fire(ship, ignition_chance, duration)
+
+
+static func try_ignite_fire(ship, chance: float, duration: float) -> bool:
+	if ship == null or ship.is_sinking or ship.is_dying:
+		return false
+	if ship.is_burning:
+		ship.burn_timer = maxf(ship.burn_timer, duration)
+		return true
+	var ignition_chance := clampf(chance, 0.0, 1.0)
+	if randf() > ignition_chance:
+		return false
+	ship.is_burning = true
+	ship.fire_build_up = ship.fire_threshold
+	ship.burn_timer = maxf(duration, 0.1)
+	print("[Status] 배에 불이 붙었습니다!")
+	return true
 
 
 static func update_burning_status(ship, delta: float) -> void:
 	if ship.is_burning:
-		ship.hull_hp = move_toward(ship.hull_hp, 0, 2.0 * delta)
+		var burn_damage_per_second := 2.0
+		if "burn_hull_damage_per_second" in ship:
+			burn_damage_per_second = maxf(0.0, float(ship.burn_hull_damage_per_second))
+		ship.hull_hp = move_toward(ship.hull_hp, 0, burn_damage_per_second * delta)
 		# Let burning sails visibly deteriorate over time without jumping straight to holes.
 		for mast in ship.masts:
 			if is_instance_valid(mast) and mast.has_method("add_sail_damage"):

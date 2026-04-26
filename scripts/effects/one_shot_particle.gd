@@ -3,26 +3,80 @@ extends GPUParticles3D
 ## 원샷 파티클 — 재생 즉시 emit을 시작하고, 수명이 다하면 자동으로 노드를 제거합니다.
 ## muzzle_smoke, hit_effect, slash_effect, rocket_explosion 등 일회성 GPUParticles3D에 공용으로 사용합니다.
 
+var _active: bool = false
+var _activate_when_ready: bool = false
+var _life_left: float = 0.0
+
+
+func _enter_tree() -> void:
+	if _activate_when_ready and is_node_ready():
+		_activate_when_ready = false
+		call_deferred("pool_activate")
+
+
 func _ready() -> void:
+	var should_activate_when_ready := _activate_when_ready
+	pool_reset()
 	if _is_prewarm_mode():
-		emitting = false
-		for child in get_children():
-			if child is GPUParticles3D:
-				child.emitting = false
+		return
+
+	if should_activate_when_ready:
+		call_deferred("pool_activate")
+	elif not has_meta(ScenePool.KEY_META):
+		call_deferred("pool_activate")
+
+
+func pool_capacity() -> int:
+	return 12
+
+
+func pool_activate() -> void:
+	if not is_inside_tree():
+		_activate_when_ready = true
 		return
 
 	if not VfxBudget.allow_spawn(get_tree(), _budget_key(), global_position, _budget_limit(), _budget_distance()):
-		queue_free()
+		ScenePool.release(self)
 		return
 
+	_active = true
+	_life_left = lifetime + 0.3
+	visible = true
+	set_process(true)
+	restart()
 	emitting = true
 	# 자식 파티클도 함께 emit
 	var max_life = lifetime
 	for child in get_children():
 		if child is GPUParticles3D:
-			child.emitting = true
-			max_life = max(max_life, child.lifetime)
-	get_tree().create_timer(max_life + 0.3).timeout.connect(queue_free)
+			var particles := child as GPUParticles3D
+			particles.visible = true
+			particles.restart()
+			particles.emitting = true
+			max_life = max(max_life, particles.lifetime)
+	_life_left = max_life + 0.3
+
+
+func pool_reset() -> void:
+	_active = false
+	_activate_when_ready = false
+	_life_left = 0.0
+	set_process(false)
+	emitting = false
+	visible = false
+	for child in get_children():
+		if child is GPUParticles3D:
+			var particles := child as GPUParticles3D
+			particles.emitting = false
+			particles.visible = false
+
+
+func _process(delta: float) -> void:
+	if not _active:
+		return
+	_life_left -= delta
+	if _life_left <= 0.0:
+		ScenePool.release(self)
 
 func _is_prewarm_mode() -> bool:
 	var n: Node = self
@@ -44,6 +98,8 @@ func _budget_key() -> String:
 			return "blood_mist"
 		"RocketExplosion":
 			return "rocket_explosion"
+		"FirePotExplosion":
+			return "fire_pot_explosion"
 	return name.to_snake_case()
 
 func _budget_limit() -> int:
@@ -58,6 +114,8 @@ func _budget_limit() -> int:
 			return 5
 		"RocketExplosion":
 			return 5
+		"FirePotExplosion":
+			return 3
 	return 6
 
 func _budget_distance() -> float:
@@ -72,4 +130,6 @@ func _budget_distance() -> float:
 			return 45.0
 		"RocketExplosion":
 			return 90.0
+		"FirePotExplosion":
+			return 65.0
 	return 60.0

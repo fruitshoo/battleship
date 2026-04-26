@@ -1,17 +1,19 @@
 [gd_scene format=3 uid="uid://sdp4lml0kdip"]
 
-[ext_resource type="Texture2D" uid="uid://bjesxwfjdqo6x" path="res://assets/vfx/particles/alpha/smoke_04_a.png" id="1_smoke"]
+[ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="1_wwc0d"]
 [ext_resource type="Script" uid="uid://n272bcxm7bos" path="res://scripts/effects/impact_puff.gd" id="2_script"]
 
 [sub_resource type="Curve" id="Curve_alpha"]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.1, 0.5), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+_limits = [0.0, 1.0, 0.0, 2.0]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.15943877, 0.69845355), -0.07624954, -0.07624954, 0, 0, Vector2(1.0059524, 0), -1.749913, 0.0, 0, 0]
 point_count = 3
 
 [sub_resource type="CurveTexture" id="CurveTexture_alpha"]
 curve = SubResource("Curve_alpha")
 
 [sub_resource type="Curve" id="Curve_scale"]
-_data = [Vector2(0, 0.2), 0.0, 0.0, 0, 0, Vector2(0.2, 1), 0.0, 0.0, 0, 0, Vector2(1, 1.5), 0.0, 0.0, 0, 0]
+_limits = [0.0, 2.0, 0.0, 2.0]
+_data = [Vector2(0, 0.2285223), 0.0, 2.2821105, 0, 0, Vector2(0.20323128, 0.88831615), 0.0, 0.0, 0, 0, Vector2(2, 0), -1.7256368, 0.0, 0, 0]
 point_count = 3
 
 [sub_resource type="CurveTexture" id="CurveTexture_scale"]
@@ -19,7 +21,7 @@ curve = SubResource("Curve_scale")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puff"]
 direction = Vector3(0, 0, -1)
-spread = 20.0
+spread = 25.0
 initial_velocity_min = 3.0
 initial_velocity_max = 6.0
 gravity = Vector3(0, 0.3, 0)
@@ -29,16 +31,18 @@ scale_max = 2.0
 scale_curve = SubResource("CurveTexture_scale")
 color = Color(0.9, 0.9, 0.9, 0.6)
 alpha_curve = SubResource("CurveTexture_alpha")
+anim_speed_min = 0.29999998
+anim_speed_max = 0.39999998
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_puff"]
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("1_smoke")
+albedo_texture = ExtResource("1_wwc0d")
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
 particles_anim_loop = false
 proximity_fade_enabled = true
 
@@ -47,9 +51,7 @@ material = SubResource("StandardMaterial3D_puff")
 size = Vector2(2, 2)
 
 [node name="ImpactPuff" type="GPUParticles3D" unique_id=1810622181]
-emitting = false
 lifetime = 1.2
-one_shot = true
 explosiveness = 0.95
 fixed_fps = 24
 process_material = SubResource("ParticleProcessMaterial_puff")

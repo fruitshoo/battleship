@@ -12,7 +12,7 @@ const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 @export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
 @export var arc_height: float = 8.0
-@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
+@export var impact_puff_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
 
@@ -218,11 +218,9 @@ func _play_impact_vfx() -> void:
 			target_pos - start_pos
 		)
 			
-	# 타격 시 검은 연기 (발사 연기 재사용)
-	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
-		var smoke = ScenePool.acquire(get_tree(), muzzle_smoke_scene)
-		if smoke.has_method("configure_as_hit"):
-			smoke.configure_as_hit()
+	# 타격 이펙트
+	if impact_puff_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 8, 55.0):
+		var smoke = ScenePool.acquire(get_tree(), impact_puff_scene)
 		smoke.position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
 		var smoke_dir = Vector3.UP
@@ -241,18 +239,3 @@ func _play_launch_vfx() -> void:
 	var cam = get_viewport().get_camera_3d()
 	if cam and cam.has_method("shake"):
 		cam.shake(0.6, 0.3)
-	
-	var launch_dir = (target_pos - start_pos).normalized()
-	
-	# 머즐 연기
-	if muzzle_smoke_scene and VfxBudget.allow_spawn(get_tree(), "muzzle_smoke", global_position, 5, 65.0):
-		var smoke = ScenePool.acquire(get_tree(), muzzle_smoke_scene)
-		if smoke.has_method("configure_as_muzzle"):
-			smoke.configure_as_muzzle()
-		smoke.position = global_position
-		# Basis.looking_at은 타겟 벡터가 0이면 오류가 발생하므로 체크
-		var smoke_look_dir = launch_dir if not launch_dir.is_zero_approx() else Vector3.FORWARD
-		smoke.basis = Basis.looking_at(smoke_look_dir, Vector3.UP)
-		get_tree().root.add_child(smoke)
-		if smoke.has_method("pool_activate"):
-			smoke.pool_activate()

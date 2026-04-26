@@ -413,8 +413,6 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 		var smoke = ScenePool.acquire(ship.get_tree(), ship.impact_puff_scene)
 		ship.get_tree().root.add_child(smoke)
 		smoke.position = impact_pos + Vector3(0.0, 0.6, 0.0)
-		if smoke.has_method("configure_as_muzzle"):
-			smoke.configure_as_muzzle()
 		if smoke.has_method("set_intensity"):
 			smoke.set_intensity(clampf(impact_speed / 6.5, 0.9, 1.6))
 		if smoke.has_method("pool_activate"):
