@@ -1,9 +1,14 @@
 extends RefCounted
 class_name ChaserShipMinionHelper
 
+const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
+const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 
 const SUPPORT_FORMATION_SPACING := 10.0
+const SUPPORT_COLUMN_FORMATION_SPACING := 14.0
 const SUPPORT_JOIN_SPACING := 14.0
+const SUPPORT_COLUMN_JOIN_SPACING := 18.0
+const SUPPORT_FLEET_SLOT_INDEX_META := "support_fleet_slot_index"
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
 const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
@@ -19,9 +24,42 @@ const SUPPORT_FORMUP_DISTANCE := 1.75
 const SUPPORT_FORMUP_SPEED_GAIN := 0.32
 const SUPPORT_MAX_FORMUP_SPEED := 3.85
 const SUPPORT_FORMATION_SETTLE_DISTANCE := 10.0
+const SUPPORT_WING_LATERAL_SETTLE_TOLERANCE := 2.4
+const SUPPORT_WING_LATERAL_FORMUP_GAIN := 0.46
+const SUPPORT_WING_FORMUP_SPEED_SCALE := 1.32
+const SUPPORT_WING_DIRECT_STEER_GAIN := 0.72
 const SUPPORT_FORMATION_TURN_COMMIT_ANGLE := 1.45
+const SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE := 0.24
+const SUPPORT_COLUMN_TURN_ASSIST_FULL_ANGLE := 0.92
+const SUPPORT_COLUMN_TURN_POSITION_BLEND := 0.82
+const SUPPORT_COLUMN_TURN_FORWARD_BLEND := 0.9
+const SUPPORT_COLUMN_TURN_MODE_START_RUDDER := 16.0
+const SUPPORT_COLUMN_TURN_MODE_FULL_RUDDER := 30.0
+const SUPPORT_COLUMN_TURN_MODE_MIN_BLEND := 0.16
 const SUPPORT_HEADING_CORRECTION_GAIN := 0.07
 const SUPPORT_MAX_HEADING_CORRECTION := 0.42
+const SUPPORT_TURN_BRAKE_START_ANGLE := 0.38
+const SUPPORT_TURN_BRAKE_FULL_ANGLE := 1.1
+const SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT := 0.58
+const SUPPORT_SPREAD_TURN_BRAKE_MIN_MULT := 0.68
+const SUPPORT_COLUMN_TURN_AUTHORITY_BONUS := 0.34
+const SUPPORT_SPREAD_TURN_AUTHORITY_BONUS := 0.22
+const SUPPORT_PANOKSEON_CATCHUP_SPEED_SCALE := 0.78
+const SUPPORT_PANOKSEON_FORMUP_SPEED_SCALE := 0.86
+const SUPPORT_PANOKSEON_BRAKE_START_SCALE := 0.74
+const SUPPORT_PANOKSEON_BRAKE_FULL_SCALE := 0.84
+const SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT := 0.48
+const SUPPORT_PANOKSEON_SPREAD_TURN_BRAKE_MIN_MULT := 0.56
+const SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS := 0.46
+const SUPPORT_PANOKSEON_SPREAD_TURN_AUTHORITY_BONUS := 0.3
+const SUPPORT_PRE_AVOID_LOOKAHEAD := 0.88
+const SUPPORT_PRE_AVOID_LOOKAHEAD_SPEED_SCALE := 0.06
+const SUPPORT_PRE_AVOID_TRIGGER_PAD := 4.2
+const SUPPORT_PRE_AVOID_PANOKSEON_EXTRA_PAD := 1.8
+const SUPPORT_PRE_AVOID_MAX_LATERAL_OFFSET := 4.8
+const SUPPORT_PRE_AVOID_BASE_BRAKE_MULT := 0.54
+const SUPPORT_PRE_AVOID_PANOKSEON_BRAKE_MULT := 0.42
+const SUPPORT_PRE_AVOID_MIN_FORWARD_ALIGNMENT := -0.15
 const SUPPORT_TARGET_GUARD_RATIO := 0.84
 const SUPPORT_DIRECT_STEER_DISTANCE := 7.0
 const SUPPORT_BRAKE_LATERAL_TOLERANCE := 2.5
@@ -73,16 +111,18 @@ const ALLY_GUARD_ROWING_WIND_FLOOR := 0.78
 static func process_minion_ai(ship, delta: float) -> void:
 	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
 	var is_captured_minion: bool = ShipAllyRoleHelper.is_captured_minion(ship) and not is_support_ship
-	if not is_instance_valid(ship.target) or _is_ship_disabled(ship.target):
+	var movement_target: Node3D = _get_support_flagship(ship) if is_support_ship else (ship.target as Node3D if is_instance_valid(ship.target) else null)
+	if not is_instance_valid(movement_target) or _is_ship_disabled(movement_target):
 		ship._find_player()
-		if not is_instance_valid(ship.target) or _is_ship_disabled(ship.target):
+		movement_target = _get_support_flagship(ship) if is_support_ship else (ship.target as Node3D if is_instance_valid(ship.target) else null)
+		if not is_instance_valid(movement_target) or _is_ship_disabled(movement_target):
 			if is_support_ship and _has_support_anchor(ship):
 				_process_support_idle_patrol(ship, delta)
 			return
 
 	if is_support_ship:
-		_record_support_anchor(ship, ship.target)
-		_record_support_trail_point(ship.target)
+		_record_support_anchor(ship, movement_target)
+		_record_support_trail_point(movement_target)
 
 	var minions: Array = _get_minion_roster(ship, is_support_ship)
 	var my_index: int = minions.find(ship)
@@ -90,7 +130,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 		my_index = 0
 
 	var offset: Vector3 = _get_minion_offset(ship, my_index, is_support_ship)
-	var player_fwd: Vector3 = -ship.target.global_transform.basis.z
+	var player_fwd: Vector3 = -movement_target.global_transform.basis.z
 	player_fwd.y = 0.0
 	if player_fwd.length_squared() <= 0.0001:
 		player_fwd = Vector3.FORWARD
@@ -110,19 +150,27 @@ static func process_minion_ai(ship, delta: float) -> void:
 		# Keep support ships from pushing each other forward/backward in line.
 		sep_force = player_right * sep_force.dot(player_right) * SUPPORT_LATERAL_SEP_SCALE
 
-	var target_pos = ship.target.to_global(offset)
+	var target_pos = movement_target.to_global(offset)
 	target_pos += sep_force
 
 	var dist_to_target = ship.global_position.distance_to(target_pos)
-	var player_speed = ship.target.get("current_speed")
+	var player_speed = movement_target.get("current_speed")
 	if player_speed == null:
 		player_speed = 0.0
-	var support_lead_ship: Node3D = ship.target
+	var support_lead_ship: Node3D = movement_target
 	var support_lead_fwd: Vector3 = player_fwd
 	var support_lead_speed: float = float(player_speed)
 	var support_assist_target: Node3D = null
-	var support_formation_value: int = int(ship.fleet_formation) if is_support_ship and "fleet_formation" in ship else 0
+	var support_formation_value: int = SupportFleetStateHelper.get_effective_formation(ship) if is_support_ship else 0
 	var is_spread_support_formation: bool = is_support_ship and support_formation_value != 0
+	var is_panokseon_support: bool = is_support_ship and _is_panokseon_support(ship)
+	var support_column_turn_blend: float = 0.0
+	var support_column_turn_angle: float = 0.0
+	var support_column_turn_mode: bool = false
+	var support_slot_lateral_error: float = 0.0
+	var support_pre_avoid_brake_mult: float = 1.0
+	var support_pre_avoid_hazard: float = 0.0
+	var support_pre_avoid_lateral: float = 0.0
 	var ally_limbo_payload := _get_recent_ally_limbo_payload(ship) if is_captured_minion else {}
 	var ally_limbo_mode := str(ally_limbo_payload.get("mode", "")).strip_edges()
 	var ally_guard_target := ally_limbo_payload.get("target", null) as Node3D
@@ -130,31 +178,90 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var to_target_vec = target_pos - ship.global_position
 	var direction = to_target_vec.normalized()
 	var rel_depth = to_target_vec.dot(player_fwd)
-	var dist_to_player = ship.global_position.distance_to(ship.target.global_position)
+	var dist_to_player = ship.global_position.distance_to(movement_target.global_position)
 	var is_joining_support: bool = ship.has_meta("support_joining") and ship.get_meta("support_joining") == true
 	if is_support_ship:
-		support_lead_ship = _get_support_lead_ship(ship, minions, my_index)
+		var support_spacing: float = SUPPORT_COLUMN_FORMATION_SPACING if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_FORMATION_SPACING
+		support_lead_ship = SupportFleetFormationHelper.get_support_lead_ship(ship, minions, my_index)
 		_record_support_trail_point(support_lead_ship)
 		support_lead_speed = _get_ship_speed(support_lead_ship, float(player_speed))
-		var support_goal: Dictionary = _get_support_chain_goal(ship, minions, my_index, SUPPORT_FORMATION_SPACING)
+		var support_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_spacing)
 		target_pos = support_goal.get("position", ship.global_position)
 		support_lead_fwd = support_goal.get("forward", _get_ship_forward_flat(support_lead_ship))
-		support_assist_target = _get_support_assist_target(ship, ship.target, delta)
+		if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN and is_instance_valid(support_lead_ship):
+			var flagship_turn_fwd: Vector3 = player_fwd if player_fwd.length_squared() > 0.0001 else _get_ship_forward_flat(movement_target)
+			var trail_head_rot: float = atan2(-support_lead_fwd.x, -support_lead_fwd.z)
+			var flagship_head_rot: float = atan2(-flagship_turn_fwd.x, -flagship_turn_fwd.z)
+			support_column_turn_angle = absf(wrapf(flagship_head_rot - trail_head_rot, -PI, PI))
+			var flagship_rudder_abs: float = absf(float(movement_target.get("rudder_angle"))) if movement_target.get("rudder_angle") != null else 0.0
+			var turn_mode_blend: float = clampf(
+				(flagship_rudder_abs - SUPPORT_COLUMN_TURN_MODE_START_RUDDER) / maxf(SUPPORT_COLUMN_TURN_MODE_FULL_RUDDER - SUPPORT_COLUMN_TURN_MODE_START_RUDDER, 0.001),
+				0.0,
+				1.0
+			)
+			if support_column_turn_angle > SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE:
+				support_column_turn_blend = clampf(
+					(support_column_turn_angle - SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE) / maxf(SUPPORT_COLUMN_TURN_ASSIST_FULL_ANGLE - SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE, 0.001),
+					0.0,
+					1.0
+				)
+				var live_follow_distance: float = SupportFleetFormationHelper.get_follow_distance(ship, support_lead_ship, support_spacing)
+				var direct_goal: Vector3 = support_lead_ship.global_position - flagship_turn_fwd * live_follow_distance
+				direct_goal.y = ship.global_position.y
+				target_pos = target_pos.lerp(direct_goal, support_column_turn_blend * SUPPORT_COLUMN_TURN_POSITION_BLEND)
+				var blended_lead_fwd: Vector3 = support_lead_fwd.lerp(flagship_turn_fwd, support_column_turn_blend * SUPPORT_COLUMN_TURN_FORWARD_BLEND)
+				blended_lead_fwd.y = 0.0
+				if blended_lead_fwd.length_squared() > 0.0001:
+					support_lead_fwd = blended_lead_fwd.normalized()
+			turn_mode_blend = maxf(turn_mode_blend, support_column_turn_blend)
+			support_column_turn_mode = turn_mode_blend >= SUPPORT_COLUMN_TURN_MODE_MIN_BLEND
+			if support_column_turn_mode:
+				var turn_slot_offset: Vector3 = SupportFleetFormationHelper.get_support_fleet_offset(ship, my_index, support_spacing, minions.size())
+				var flagship_follow_distance: float = maxf(turn_slot_offset.z, support_spacing + float(my_index) * support_spacing * 0.9)
+				var flagship_goal: Dictionary = SupportFleetFormationHelper.get_trail_goal(movement_target, flagship_follow_distance, flagship_turn_fwd, SUPPORT_TRAIL_POINTS_META)
+				var flagship_goal_fwd: Vector3 = flagship_goal.get("forward", flagship_turn_fwd)
+				var flagship_goal_right: Vector3 = flagship_goal_fwd.cross(Vector3.UP).normalized()
+				if flagship_goal_right.length_squared() <= 0.0001:
+					flagship_goal_right = player_right
+				var direct_column_goal: Vector3 = flagship_goal.get("position", movement_target.global_position) + flagship_goal_right * turn_slot_offset.x
+				direct_column_goal.y = ship.global_position.y
+				target_pos = target_pos.lerp(direct_column_goal, clampf(turn_mode_blend * 0.92, 0.0, 0.92))
+				support_lead_ship = movement_target
+				support_lead_speed = float(player_speed)
+				support_lead_fwd = flagship_goal_fwd if flagship_goal_fwd.length_squared() > 0.0001 else flagship_turn_fwd
+		var support_pre_avoidance: Dictionary = _calculate_support_pre_avoidance(
+			ship,
+			minions,
+			movement_target,
+			target_pos,
+			maxf(maxf(ship.current_speed, float(ship._last_ai_speed)), maxf(float(player_speed), support_lead_speed)),
+			is_panokseon_support
+		)
+		var support_pre_avoid_offset: Vector3 = support_pre_avoidance.get("position_offset", Vector3.ZERO)
+		if support_pre_avoid_offset.length_squared() > 0.0001:
+			target_pos += support_pre_avoid_offset
+		support_pre_avoid_brake_mult = float(support_pre_avoidance.get("brake_mult", 1.0))
+		support_pre_avoid_hazard = float(support_pre_avoidance.get("hazard", 0.0))
+		support_pre_avoid_lateral = float(support_pre_avoidance.get("lateral", 0.0))
+		support_assist_target = _get_support_assist_target(ship, movement_target, delta)
 		to_target_vec = target_pos - ship.global_position
 		if to_target_vec.length_squared() > 0.0001:
 			direction = to_target_vec.normalized()
 		rel_depth = to_target_vec.dot(support_lead_fwd)
-		dist_to_player = ship.global_position.distance_to(ship.target.global_position)
-	if is_joining_support:
-		var join_goal: Dictionary = _get_support_chain_goal(ship, minions, my_index, SUPPORT_JOIN_SPACING)
-		target_pos = join_goal.get("position", ship.global_position)
-		support_lead_fwd = join_goal.get("forward", support_lead_fwd)
+		dist_to_player = ship.global_position.distance_to(movement_target.global_position)
+		if is_joining_support:
+			var support_join_spacing: float = SUPPORT_COLUMN_JOIN_SPACING if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_JOIN_SPACING
+			var join_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_join_spacing)
+			if support_formation_value == SupportFleetFormationHelper.FORMATION_WING:
+				join_goal = SupportFleetFormationHelper.get_support_join_chain_goal(ship, minions, my_index, support_join_spacing)
+			target_pos = join_goal.get("position", ship.global_position)
+			support_lead_fwd = join_goal.get("forward", support_lead_fwd)
 		target_pos += sep_force * 0.15
 		to_target_vec = target_pos - ship.global_position
 		if to_target_vec.length_squared() > 0.0001:
 			direction = to_target_vec.normalized()
 		var dist_to_join_target: float = ship.global_position.distance_to(target_pos)
-		dist_to_player = ship.global_position.distance_to(ship.target.global_position)
+		dist_to_player = ship.global_position.distance_to(movement_target.global_position)
 		if dist_to_join_target <= 14.0 or dist_to_player <= 20.0:
 			ship.set_meta("support_joining", false)
 			is_joining_support = false
@@ -175,21 +282,35 @@ static func process_minion_ai(ship, delta: float) -> void:
 	elif is_support_ship:
 		var slot_depth_error: float = rel_depth
 		var slot_lateral_error: float = absf(to_target_vec.dot(support_lead_fwd.cross(Vector3.UP).normalized()))
+		support_slot_lateral_error = slot_lateral_error
 		var speed_offset: float = 0.0
+		var max_catchup_speed: float = SUPPORT_MAX_CATCHUP_SPEED * (SUPPORT_PANOKSEON_CATCHUP_SPEED_SCALE if is_panokseon_support else 1.0)
+		var max_formup_speed: float = SUPPORT_MAX_FORMUP_SPEED * (SUPPORT_PANOKSEON_FORMUP_SPEED_SCALE if is_panokseon_support else 1.0)
+		if is_spread_support_formation:
+			max_formup_speed *= SUPPORT_WING_FORMUP_SPEED_SCALE
 		if slot_depth_error >= 0.0:
-			speed_offset = min(slot_depth_error * SUPPORT_SLOT_SPEED_GAIN, SUPPORT_MAX_CATCHUP_SPEED)
+			speed_offset = minf(slot_depth_error * SUPPORT_SLOT_SPEED_GAIN, max_catchup_speed)
 		else:
 			if dist_to_target <= SUPPORT_DIRECT_STEER_DISTANCE and slot_lateral_error <= SUPPORT_BRAKE_LATERAL_TOLERANCE:
-				speed_offset = -min(abs(slot_depth_error) * SUPPORT_SLOT_BRAKE_GAIN, SUPPORT_MAX_BRAKE_SPEED)
+				speed_offset = -minf(absf(slot_depth_error) * SUPPORT_SLOT_BRAKE_GAIN, SUPPORT_MAX_BRAKE_SPEED)
 		var formup_speed: float = 0.0
 		if dist_to_target > SUPPORT_FORMUP_DISTANCE:
-			formup_speed = min((dist_to_target - SUPPORT_FORMUP_DISTANCE) * SUPPORT_FORMUP_SPEED_GAIN, SUPPORT_MAX_FORMUP_SPEED)
+			formup_speed = minf((dist_to_target - SUPPORT_FORMUP_DISTANCE) * SUPPORT_FORMUP_SPEED_GAIN, max_formup_speed)
+		if is_spread_support_formation and slot_lateral_error > SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
+			var lateral_formup_speed: float = minf(
+				(slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) * SUPPORT_WING_LATERAL_FORMUP_GAIN,
+				max_formup_speed
+			)
+			formup_speed = maxf(formup_speed, lateral_formup_speed)
 		target_final_speed = maxf(maxf(support_lead_speed + speed_offset, formup_speed), 0.0)
-		if is_spread_support_formation and dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE:
+		if is_spread_support_formation \
+				and dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE \
+				and slot_lateral_error <= SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
 			var settle_cap := maxf(support_lead_speed + minf(dist_to_target * 0.12, 0.9), ship.move_speed * 0.52)
 			target_final_speed = min(target_final_speed, settle_cap)
 		if dist_to_target <= 2.0:
 			target_final_speed = lerp(target_final_speed, support_lead_speed, 0.85)
+		target_final_speed *= support_pre_avoid_brake_mult
 	elif ally_regrouping:
 		target_final_speed = maxf(player_speed + 2.4, ship.move_speed * 1.55)
 	elif dist_to_player < 10.0:
@@ -202,15 +323,10 @@ static func process_minion_ai(ship, delta: float) -> void:
 		var sync_speed_mult = lerp(1.0, 1.3, lag_factor)
 		target_final_speed = max(player_speed * sync_speed_mult, ship.move_speed * 0.8)
 
-	var speed_response: float = SUPPORT_SPEED_RESPONSE if is_support_ship else (1.55 if ally_regrouping else 1.2)
-	ship._last_ai_speed = lerp(ship._last_ai_speed, target_final_speed, delta * speed_response)
-	var final_move_speed = ship._last_ai_speed
-	ship.current_speed = maxf(final_move_speed, 0.0)
-
 	var target_head_rot = atan2(-direction.x, -direction.z)
 	var player_head_rot = ship.rotation.y
-	if ship.target and "rotation" in ship.target:
-		player_head_rot = ship.target.rotation.y
+	if is_instance_valid(movement_target) and "rotation" in movement_target:
+		player_head_rot = movement_target.rotation.y
 	if is_support_ship:
 		var lead_head_rot: float = player_head_rot
 		if support_lead_fwd.length_squared() > 0.0001:
@@ -225,6 +341,13 @@ static func process_minion_ai(ship, delta: float) -> void:
 		var direct_head_rot: float = atan2(-direction.x, -direction.z)
 		if is_spread_support_formation:
 			var align_weight: float = clampf((dist_to_target - SUPPORT_FORMATION_SETTLE_DISTANCE) / SUPPORT_FORMATION_SETTLE_DISTANCE, 0.0, 1.0)
+			if support_slot_lateral_error > SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
+				var direct_steer_weight := clampf(
+					(support_slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) / maxf(SUPPORT_FORMATION_SETTLE_DISTANCE, 0.001),
+					0.0,
+					1.0
+				)
+				align_weight *= 1.0 - direct_steer_weight * SUPPORT_WING_DIRECT_STEER_GAIN
 			target_head_rot = lerp_angle(direct_head_rot, aligned_head_rot, align_weight)
 			var align_angle_diff: float = absf(wrapf(aligned_head_rot - ship.rotation.y, -PI, PI))
 			if dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE and align_angle_diff > SUPPORT_FORMATION_TURN_COMMIT_ANGLE:
@@ -235,7 +358,41 @@ static func process_minion_ai(ship, delta: float) -> void:
 		else:
 			target_head_rot = aligned_head_rot
 
+	var support_turn_angle: float = 0.0
+	if is_support_ship:
+		var turn_brake_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_panokseon_support else 1.0)
+		var turn_brake_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_panokseon_support else 1.0)
+		support_turn_angle = absf(wrapf(target_head_rot - ship.rotation.y, -PI, PI))
+		if support_turn_angle > turn_brake_start_angle:
+			var turn_brake_blend: float = clampf(
+				(support_turn_angle - turn_brake_start_angle) / maxf(turn_brake_full_angle - turn_brake_start_angle, 0.001),
+				0.0,
+				1.0
+			)
+			var min_turn_speed_mult: float
+			if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN:
+				min_turn_speed_mult = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_panokseon_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
+			else:
+				min_turn_speed_mult = SUPPORT_PANOKSEON_SPREAD_TURN_BRAKE_MIN_MULT if is_panokseon_support else SUPPORT_SPREAD_TURN_BRAKE_MIN_MULT
+			var turn_speed_mult: float = lerpf(1.0, min_turn_speed_mult, turn_brake_blend)
+			if support_column_turn_blend > 0.0:
+				var column_turn_floor: float = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_panokseon_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
+				turn_speed_mult = minf(turn_speed_mult, lerpf(1.0, column_turn_floor, support_column_turn_blend))
+			target_final_speed *= turn_speed_mult
+
+	var speed_response: float = SUPPORT_SPEED_RESPONSE if is_support_ship else (1.55 if ally_regrouping else 1.2)
+	ship._last_ai_speed = lerp(ship._last_ai_speed, target_final_speed, delta * speed_response)
+	var final_move_speed = ship._last_ai_speed
+	ship.current_speed = maxf(final_move_speed, 0.0)
+
 	var rotation_blend = clamp(dist_to_target / 15.0, 0.0, 1.0)
+	if is_spread_support_formation:
+		var lateral_rotation_blend := clampf(
+			(support_slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) / maxf(SUPPORT_FORMATION_SETTLE_DISTANCE, 0.001),
+			0.0,
+			0.92
+		)
+		rotation_blend = maxf(rotation_blend, lateral_rotation_blend)
 	var blended_target_rot = lerp_angle(player_head_rot, target_head_rot, rotation_blend)
 	var angle_diff = wrapf(blended_target_rot - ship.rotation.y, -PI, PI)
 	var desired_rudder = clamp(-rad_to_deg(angle_diff) * 2.0, -45.0, 45.0)
@@ -244,7 +401,25 @@ static func process_minion_ai(ship, delta: float) -> void:
 
 	if final_move_speed > 0.1:
 		var speed_ratio = final_move_speed / ship.max_speed
-		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * delta
+		var turn_authority_mult: float = 1.0
+		if is_support_ship and support_turn_angle > (SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_panokseon_support else 1.0)):
+			var turn_boost_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_panokseon_support else 1.0)
+			var turn_boost_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_panokseon_support else 1.0)
+			var turn_boost_blend: float = clampf(
+				(support_turn_angle - turn_boost_start_angle) / maxf(turn_boost_full_angle - turn_boost_start_angle, 0.001),
+				0.0,
+				1.0
+			)
+			var max_turn_bonus: float
+			if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN:
+				max_turn_bonus = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_panokseon_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
+			else:
+				max_turn_bonus = SUPPORT_PANOKSEON_SPREAD_TURN_AUTHORITY_BONUS if is_panokseon_support else SUPPORT_SPREAD_TURN_AUTHORITY_BONUS
+			turn_authority_mult += max_turn_bonus * turn_boost_blend
+			if support_column_turn_blend > 0.0:
+				var column_turn_bonus: float = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_panokseon_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
+				turn_authority_mult += column_turn_bonus * 0.35 * support_column_turn_blend
+		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority_mult * delta
 		ship.rotation.y -= deg_to_rad(actual_turn)
 	else:
 		if dist_to_target <= 1.5:
@@ -259,10 +434,10 @@ static func process_minion_ai(ship, delta: float) -> void:
 
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + velocity * delta
-	if is_instance_valid(ship.target):
+	if is_instance_valid(movement_target):
 		var target_guard_ratio: float = SUPPORT_TARGET_GUARD_RATIO if is_support_ship else 0.94
-		next_pos = ship._apply_ship_collision_guard(ship.target, prev_pos, next_pos, target_guard_ratio, velocity.length(), false)
-	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, ship.target)
+		next_pos = ship._apply_ship_collision_guard(movement_target, prev_pos, next_pos, target_guard_ratio, velocity.length(), false)
+	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, movement_target)
 	ship.global_position = next_pos
 	if is_support_ship:
 		_record_support_trail_point(ship)
@@ -278,6 +453,11 @@ static func process_minion_ai(ship, delta: float) -> void:
 		ship.set_meta("support_debug_player_speed", float(player_speed))
 		ship.set_meta("support_debug_lead_speed", float(support_lead_speed))
 		ship.set_meta("support_debug_target_speed", float(target_final_speed))
+		ship.set_meta("support_debug_turn_angle", support_turn_angle)
+		ship.set_meta("support_debug_turn_blend", support_column_turn_blend)
+		ship.set_meta("support_debug_turn_mode", support_column_turn_mode)
+		ship.set_meta("support_debug_pre_avoid_hazard", support_pre_avoid_hazard)
+		ship.set_meta("support_debug_pre_avoid_lateral", support_pre_avoid_lateral)
 		ShipBoardingMetaHelper.set_support_debug_mode(ship, ShipBoardingMetaHelper.SUPPORT_DEBUG_TRAIL)
 		_draw_support_limbo_debug(ship)
 	elif is_captured_minion:
@@ -323,7 +503,8 @@ static func _process_support_idle_patrol(ship, delta: float) -> void:
 		anchor_fwd = anchor_fwd.normalized()
 	var anchor_right: Vector3 = anchor_fwd.cross(Vector3.UP).normalized()
 
-	var order_index: int = int(ship.get_meta(SUPPORT_FLEET_ORDER_META, 0))
+	var order_fallback: int = int(ship.get_meta(SUPPORT_FLEET_ORDER_META, 0))
+	var order_index: int = int(ship.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, order_fallback))
 	var orbit_time: float = float(ship.get_meta(SUPPORT_IDLE_ORBIT_TIME_META, 0.0)) + delta
 	ship.set_meta(SUPPORT_IDLE_ORBIT_TIME_META, orbit_time)
 	var orbit_angle: float = orbit_time * SUPPORT_IDLE_ORBIT_SPEED + (float(order_index) * 1.35)
@@ -372,7 +553,7 @@ static func _process_support_idle_patrol(ship, delta: float) -> void:
 static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D, minions: Array, my_index: int) -> void:
 	if not is_instance_valid(assist_target) or _is_ship_disabled(assist_target):
 		return
-	var emergency_assist: bool = _is_player_deck_emergency(ship.target)
+	var emergency_assist: bool = _is_player_deck_emergency(_get_support_flagship(ship))
 	var rescue_assist: bool = _is_support_rescue_target(ship, assist_target)
 	var boss_breach_assist: bool = _is_support_boss_breach_target(ship, assist_target)
 
@@ -568,17 +749,23 @@ static func try_interrupt_boarding_for_flagship_rescue(ship) -> bool:
 		return false
 	if ship.get("is_boarding") != true:
 		return false
-	var player_ship := ship.get("target") as Node3D
+	var player_ship := _get_support_flagship(ship)
 	if not is_instance_valid(player_ship):
 		return false
 	var limbo_payload := _get_recent_support_limbo_payload(ship)
 	var limbo_target := limbo_payload.get("target", null) as Node3D
 	var limbo_rescue_mode := str(limbo_payload.get("mode", "")) == ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP
 	var limbo_rescue_player := limbo_rescue_mode and (not is_instance_valid(limbo_target) or limbo_target == player_ship)
-	if not _is_player_deck_emergency(player_ship) and not limbo_rescue_player:
-		return false
 	var current_boarding_target := ship.get("boarding_target") as Node3D
-	if current_boarding_target == player_ship and ShipBoardingMetaHelper.is_boarding_purpose(ship, SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE):
+	var rescue_boarding_active := current_boarding_target == player_ship \
+		and ShipBoardingMetaHelper.is_boarding_purpose(ship, SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE)
+	if rescue_boarding_active:
+		return false
+	var current_target_team: String = ""
+	if is_instance_valid(current_boarding_target):
+		current_target_team = current_boarding_target.get_team_tag() if current_boarding_target.has_method("get_team_tag") else str(current_boarding_target.get("team"))
+	var enemy_boarding_active := is_instance_valid(current_boarding_target) and current_target_team == "enemy"
+	if not _is_player_deck_emergency(player_ship) and not limbo_rescue_player and not enemy_boarding_active:
 		return false
 	if ship.has_method("_cancel_boarding"):
 		ship.call("_cancel_boarding")
@@ -587,7 +774,8 @@ static func try_interrupt_boarding_for_flagship_rescue(ship) -> bool:
 		ship.set("boarding_target", null)
 		ShipBoardingMetaHelper.clear_boarding_link_meta(ship)
 	_clear_support_assist_target_lock(ship)
-	_set_support_assist_target_lock(ship, player_ship)
+	if _is_player_deck_emergency(player_ship) or limbo_rescue_player:
+		_set_support_assist_target_lock(ship, player_ship)
 	ShipBoardingMetaHelper.set_support_debug_mode(ship, ShipBoardingMetaHelper.SUPPORT_DEBUG_ASSIST)
 	return true
 
@@ -605,15 +793,10 @@ static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
 		return false
 	var target_team: String = assist_target.get_team_tag() if assist_target.has_method("get_team_tag") else str(assist_target.get("team"))
 	var rescue_boarding: bool = _is_support_rescue_target(ship, assist_target)
-	var boss_breach_boarding: bool = _is_support_boss_breach_target(ship, assist_target)
-	if rescue_boarding:
-		if target_team != "player":
-			return false
-	else:
-		if target_team != "enemy":
-			return false
-		if assist_target.get("is_derelict") == true:
-			return false
+	if not rescue_boarding:
+		return false
+	if target_team != "player":
+		return false
 	if ship.has_method("get_alive_crew_count") and ship.get_alive_crew_count() <= 1:
 		return false
 
@@ -629,7 +812,7 @@ static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
 	# Rescue boarding is an emergency docking action. Once the support ship is
 	# close enough, let boarding motion settle the exact angle instead of
 	# falling back to ranged support while the flagship deck is being overrun.
-	if rescue_boarding or boss_breach_boarding:
+	if rescue_boarding:
 		return true
 	if ship.has_method("_is_side_boarding_approach") and ship._is_side_boarding_approach(assist_target):
 		return true
@@ -672,7 +855,7 @@ static func _start_support_boarding_link(ship, assist_target: Node3D) -> void:
 	ship.set_meta("support_debug_assist_target", assist_target.name)
 
 static func _build_support_assist_navigation(ship, assist_target: Node3D, my_index: int) -> Dictionary:
-	var player_ship: Node3D = ship.target if is_instance_valid(ship.target) else null
+	var player_ship: Node3D = _get_support_flagship(ship)
 	var emergency_assist: bool = _is_player_deck_emergency(player_ship)
 	var rescue_assist: bool = _is_support_rescue_target(ship, assist_target)
 	var boss_breach_assist: bool = _is_support_boss_breach_target(ship, assist_target)
@@ -712,8 +895,48 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 		lane_distance = maxf(lane_base + float(pair_index) * lane_step, collision_distance + lane_clearance)
 		rear_bias = (0.8 + float(pair_index) * 0.8) if emergency_assist else (2.4 + float(pair_index) * 1.2)
 	var desired_point: Vector3 = assist_target.global_position
-	desired_point += player_right * lane_side * lane_distance
-	desired_point -= player_fwd * rear_bias
+	if boss_breach_assist and is_instance_valid(player_ship):
+		var breach_axis: Vector3 = assist_target.global_position - player_ship.global_position
+		breach_axis.y = 0.0
+		if breach_axis.length_squared() <= 0.001:
+			breach_axis = player_fwd
+		else:
+			breach_axis = breach_axis.normalized()
+		var breach_right: Vector3 = breach_axis.cross(Vector3.UP)
+		if breach_right.length_squared() <= 0.0001:
+			breach_right = player_right
+		else:
+			breach_right = breach_right.normalized()
+		var flagship_collision: float = ship.get_collision_distance_to(player_ship)
+		var flagship_target_distance: float = player_ship.global_position.distance_to(assist_target.global_position)
+		var stand_off: float = maxf(collision_distance + 6.0, 11.0)
+		var advance: float = clampf(flagship_target_distance * 0.42, 5.5, 14.0)
+		advance = minf(advance, maxf(flagship_target_distance - stand_off, 4.8))
+		var boss_lane_distance: float = maxf(7.8, flagship_collision + 2.8) + float(pair_index) * 1.15
+		desired_point = player_ship.global_position + breach_axis * advance
+		desired_point += breach_right * lane_side * boss_lane_distance
+		desired_point -= breach_axis * (1.1 + float(pair_index) * 0.45)
+	elif is_instance_valid(player_ship):
+		var threat_axis: Vector3 = assist_target.global_position - player_ship.global_position
+		threat_axis.y = 0.0
+		if threat_axis.length_squared() <= 0.001:
+			threat_axis = player_fwd
+		else:
+			threat_axis = threat_axis.normalized()
+		var flagship_target_distance: float = player_ship.global_position.distance_to(assist_target.global_position)
+		var stand_off: float = maxf(collision_distance + (4.0 if emergency_assist else 6.0), 8.0 if emergency_assist else 11.0)
+		var advance: float = clampf(
+			flagship_target_distance * (0.30 if emergency_assist else 0.24),
+			3.8 if emergency_assist else 4.8,
+			9.5 if emergency_assist else 11.5
+		)
+		advance = minf(advance, maxf(flagship_target_distance - stand_off, 3.4))
+		desired_point = player_ship.global_position + threat_axis * advance
+		desired_point += player_right * lane_side * lane_distance
+		desired_point -= player_fwd * rear_bias
+	else:
+		desired_point += player_right * lane_side * lane_distance
+		desired_point -= player_fwd * rear_bias
 	desired_point.y = ship.global_position.y
 
 	if is_instance_valid(player_ship) and not rescue_assist:
@@ -864,6 +1087,7 @@ static func _calculate_captured_guard_separation(ship, minions: Array, guard_tar
 
 static func _get_minion_roster(ship, support_only: bool) -> Array:
 	var roster: Array = []
+	var roster_flagship: Node3D = SupportFleetStateHelper.get_support_owner_flagship(ship) if support_only else null
 	var all_minions: Array = ship.get_minions_cached(ship.get_tree())
 	for minion in all_minions:
 		if not is_instance_valid(minion):
@@ -873,22 +1097,32 @@ static func _get_minion_roster(ship, support_only: bool) -> Array:
 			continue
 		if not support_only and is_roster_support:
 			continue
+		if support_only and is_instance_valid(roster_flagship) and not SupportFleetStateHelper.is_support_owned_by_flagship(minion, roster_flagship):
+			continue
 		roster.append(minion)
 	if support_only:
 		roster.sort_custom(func(a, b):
-			return int(a.get_meta(SUPPORT_FLEET_ORDER_META, a.get_instance_id())) < int(b.get_meta(SUPPORT_FLEET_ORDER_META, b.get_instance_id()))
+			var order_a: int = int(a.get_meta(SUPPORT_FLEET_ORDER_META, a.get_instance_id()))
+			var order_b: int = int(b.get_meta(SUPPORT_FLEET_ORDER_META, b.get_instance_id()))
+			var slot_a: int = int(a.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, order_a))
+			var slot_b: int = int(b.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, order_b))
+			if slot_a != slot_b:
+				return slot_a < slot_b
+			return order_a < order_b
 		)
 	return roster
 
 static func _get_minion_offset(ship, my_index: int, is_support_ship: bool) -> Vector3:
 	if is_support_ship:
-		return _get_support_fleet_offset(ship, my_index)
+		var support_spacing: float = SUPPORT_COLUMN_FORMATION_SPACING if SupportFleetStateHelper.get_effective_formation(ship) == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_FORMATION_SPACING
+		return SupportFleetFormationHelper.get_support_fleet_offset(ship, my_index, support_spacing)
 
 	var offset: Vector3 = Vector3.ZERO
 	var base_spacing: float = 10.0
 	var formation_dist: float = base_spacing + (my_index * base_spacing)
+	var formation_value: int = 0 if int(ship.fleet_formation) == 0 else 1
 
-	match int(ship.fleet_formation):
+	match formation_value:
 		0:
 			offset = Vector3(0, 0, formation_dist)
 		1:
@@ -897,91 +1131,24 @@ static func _get_minion_offset(ship, my_index: int, is_support_ship: bool) -> Ve
 			offset = Vector3(base_spacing * side * row, 0, base_spacing * row)
 	return offset
 
-static func _get_support_fleet_offset(ship, my_index: int) -> Vector3:
-	return _get_support_formation_offset(ship, my_index, SUPPORT_FORMATION_SPACING)
-
-static func _get_support_join_offset(ship, my_index: int) -> Vector3:
-	return _get_support_formation_offset(ship, my_index, 18.0)
-
-static func _get_support_chain_goal(ship, minions: Array, my_index: int, trailing_distance: float) -> Dictionary:
-	if not is_instance_valid(ship.target):
-		return {"position": ship.global_position, "forward": Vector3.FORWARD}
-	var formation_value: int = int(ship.fleet_formation) if "fleet_formation" in ship else 0
-	if formation_value != 0:
-		var flagship_fwd: Vector3 = _get_ship_forward_flat(ship.target)
-		var offset: Vector3 = _get_support_formation_offset(ship, my_index, trailing_distance, minions.size())
-		var anchor_goal: Dictionary = _get_support_trail_goal(ship.target, maxf(offset.z, 0.0), flagship_fwd)
-		var anchor_pos: Vector3 = anchor_goal.get("position", ship.target.global_position)
-		var anchor_fwd: Vector3 = anchor_goal.get("forward", flagship_fwd)
-		var anchor_right: Vector3 = anchor_fwd.cross(Vector3.UP)
-		anchor_right.y = 0.0
-		if anchor_right.length_squared() <= 0.0001:
-			anchor_right = ship.target.global_transform.basis.x
-			anchor_right.y = 0.0
-		if anchor_right.length_squared() <= 0.0001:
-			anchor_right = Vector3.RIGHT
-		else:
-			anchor_right = anchor_right.normalized()
-		var goal_pos: Vector3 = anchor_pos + anchor_right * offset.x
-		goal_pos.y = ship.global_position.y
-		return {
-			"position": goal_pos,
-			"forward": anchor_fwd,
-		}
-	var lead_ship: Node3D = _get_support_lead_ship(ship, minions, my_index)
-	var lead_fwd: Vector3 = _get_ship_forward_flat(lead_ship)
-	var follow_distance: float = _get_support_follow_distance(ship, lead_ship, trailing_distance)
-	return _get_support_trail_goal(lead_ship, follow_distance, lead_fwd)
-
-static func _get_support_formation_offset(ship, my_index: int, spacing: float, roster_size: int = -1) -> Vector3:
-	var formation_value: int = int(ship.fleet_formation) if "fleet_formation" in ship else 0
-	var effective_roster_size: int = roster_size if roster_size >= 0 else (my_index + 1)
-	var base_spacing: float = maxf(spacing, 0.01)
-	if effective_roster_size <= 1:
-		return Vector3(0.0, 0.0, base_spacing)
-	var row: float = floor(my_index / 2.0) + 1.0
-	var has_center_tail: bool = effective_roster_size % 2 == 1 and my_index == effective_roster_size - 1
-	if has_center_tail:
-		return Vector3(0.0, 0.0, base_spacing * (row + 0.35))
-	var side: float = 1.0 if my_index % 2 == 0 else -1.0
-	match formation_value:
-		1:
-			var lateral: float = base_spacing * 1.18 * row
-			var trailing: float = base_spacing * 0.58 + (row - 1.0) * base_spacing * 0.18
-			return Vector3(lateral * side, 0.0, trailing)
-		2:
-			var wedge_scale: float = 0.94 * row
-			return Vector3(base_spacing * wedge_scale * side, 0.0, base_spacing * wedge_scale)
-		_:
-			return Vector3(0.0, 0.0, base_spacing + (my_index * base_spacing))
-
 static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) -> Node3D:
 	if not is_instance_valid(ship) or not is_instance_valid(player_ship):
 		return null
 	var limbo_payload := _get_recent_support_limbo_payload(ship)
+	var has_limbo_decision := not limbo_payload.is_empty()
 	var limbo_mode := str(limbo_payload.get("mode", ""))
 	var limbo_target := limbo_payload.get("target", null) as Node3D
-	var manual_breach_target: Node3D = null
-	var manual_boarding_value: Variant = player_ship.get("manual_boarding_target")
-	if is_instance_valid(manual_boarding_value):
-		var manual_target := manual_boarding_value as Node3D
-		if is_instance_valid(manual_target) and not _is_ship_disabled(manual_target) and _is_boss_ship(manual_target):
-			manual_breach_target = manual_target
 	var deck_emergency: bool = _is_player_deck_emergency(player_ship)
-	var pilot_breach_mode: bool = limbo_mode == ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS \
-		and is_instance_valid(limbo_target) and _is_boss_ship(limbo_target)
-	var manual_breach_mode: bool = is_instance_valid(manual_breach_target)
 	var pilot_rescue_mode: bool = limbo_mode == ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP \
 		and (not is_instance_valid(limbo_target) or limbo_target == player_ship)
 	if pilot_rescue_mode:
 		deck_emergency = true
-	var boss_breach_mode: bool = pilot_breach_mode or manual_breach_mode
-	var recall_distance: float = SUPPORT_ASSIST_BOSS_BREACH_RECALL_DISTANCE if boss_breach_mode else (SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE if deck_emergency else SUPPORT_ASSIST_RECALL_DISTANCE)
-	var leash_distance: float = SUPPORT_ASSIST_BOSS_BREACH_LEASH_DISTANCE if boss_breach_mode else (SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE if deck_emergency else SUPPORT_ASSIST_LEASH_DISTANCE)
+	var recall_distance: float = SUPPORT_ASSIST_EMERGENCY_RECALL_DISTANCE if deck_emergency else SUPPORT_ASSIST_RECALL_DISTANCE
+	var leash_distance: float = SUPPORT_ASSIST_EMERGENCY_LEASH_DISTANCE if deck_emergency else SUPPORT_ASSIST_LEASH_DISTANCE
 	var threat_range: float = SUPPORT_ASSIST_EMERGENCY_THREAT_RANGE if deck_emergency else SUPPORT_ASSIST_THREAT_RANGE
-	var eval_interval: float = SUPPORT_ASSIST_EVAL_INTERVAL_BOSS_BREACH if boss_breach_mode else (SUPPORT_ASSIST_EVAL_INTERVAL_EMERGENCY if deck_emergency else SUPPORT_ASSIST_EVAL_INTERVAL)
-	var switch_margin: float = SUPPORT_ASSIST_SWITCH_MARGIN_BOSS_BREACH if boss_breach_mode else SUPPORT_ASSIST_SWITCH_MARGIN
-	var lock_duration: float = SUPPORT_ASSIST_TARGET_LOCK_DURATION_BOSS_BREACH if boss_breach_mode else SUPPORT_ASSIST_TARGET_LOCK_DURATION
+	var eval_interval: float = SUPPORT_ASSIST_EVAL_INTERVAL_EMERGENCY if deck_emergency else SUPPORT_ASSIST_EVAL_INTERVAL
+	var switch_margin: float = SUPPORT_ASSIST_SWITCH_MARGIN
+	var lock_duration: float = SUPPORT_ASSIST_TARGET_LOCK_DURATION
 	var support_dist_to_player: float = ship.global_position.distance_to(player_ship.global_position)
 	if support_dist_to_player > recall_distance:
 		_clear_support_assist_target_lock(ship)
@@ -998,36 +1165,61 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 	ship.set_meta(SUPPORT_ASSIST_EVAL_TIMER_META, eval_timer)
 	var deck_contested: bool = player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true
 	var deck_overrun: bool = player_ship.get("deck_is_overrun") == true
+	var formation_hold_enabled: bool = _is_support_formation_hold_enabled(ship)
+	var line_holder_free_assist: bool = SupportFleetFormationHelper.should_hold_line_during_free_assist(ship)
 	var player_boarding_attacker: Node3D = null
 	if player_ship.has_method("get_boarding_attacker_ship"):
 		player_boarding_attacker = player_ship.call("get_boarding_attacker_ship")
+	if has_limbo_decision:
+		match limbo_mode:
+			ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP:
+				if support_dist_to_player <= leash_distance:
+					_set_support_assist_target_lock(ship, player_ship, lock_duration)
+					return player_ship
+				_clear_support_assist_target_lock(ship)
+				return null
+			ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS:
+				_clear_support_assist_target_lock(ship)
+				return null
+			ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT:
+				if formation_hold_enabled and is_instance_valid(player_boarding_attacker) and limbo_target != player_boarding_attacker:
+					_clear_support_assist_target_lock(ship)
+					return null
+				if is_instance_valid(limbo_target) and not _is_ship_disabled(limbo_target):
+					var pilot_target_dist: float = ship.global_position.distance_to(limbo_target.global_position)
+					if pilot_target_dist <= leash_distance:
+						_set_support_assist_target_lock(ship, limbo_target, lock_duration)
+						return limbo_target
+				_clear_support_assist_target_lock(ship)
+				return null
+			ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP, ShipAILimboKeys.SUPPORT_MODE_REGROUP:
+				_clear_support_assist_target_lock(ship)
+				return null
 	if pilot_rescue_mode and support_dist_to_player <= leash_distance:
 		_set_support_assist_target_lock(ship, player_ship, lock_duration)
 		return player_ship
-	if pilot_breach_mode:
-		var pilot_breach_dist: float = ship.global_position.distance_to(limbo_target.global_position)
-		if pilot_breach_dist <= leash_distance:
-			_set_support_assist_target_lock(ship, limbo_target, lock_duration)
-			return limbo_target
-	if manual_breach_mode:
-		var manual_breach_dist: float = ship.global_position.distance_to(manual_breach_target.global_position)
-		if manual_breach_dist <= leash_distance:
-			_set_support_assist_target_lock(ship, manual_breach_target, lock_duration)
-			return manual_breach_target
 	if _is_support_rescue_target(ship, player_ship):
 		if support_dist_to_player <= leash_distance:
 			_set_support_assist_target_lock(ship, player_ship, lock_duration)
 			return player_ship
-	if not deck_emergency and support_dist_to_player > SUPPORT_ASSIST_SOFT_RECALL_DISTANCE and not is_instance_valid(player_boarding_attacker):
-		_clear_support_assist_target_lock(ship)
-		return null
-	if _is_support_formation_hold_enabled(ship):
+	if formation_hold_enabled:
 		var hold_boarding_attacker: Node3D = player_boarding_attacker
 		if is_instance_valid(hold_boarding_attacker) and not _is_ship_disabled(hold_boarding_attacker):
 			var hold_support_dist: float = ship.global_position.distance_to(hold_boarding_attacker.global_position)
 			if hold_support_dist <= leash_distance:
 				_set_support_assist_target_lock(ship, hold_boarding_attacker, lock_duration)
 				return hold_boarding_attacker
+		_clear_support_assist_target_lock(ship)
+		return null
+	if line_holder_free_assist:
+		if is_instance_valid(player_boarding_attacker) and not _is_ship_disabled(player_boarding_attacker):
+			var line_holder_attacker_dist: float = ship.global_position.distance_to(player_boarding_attacker.global_position)
+			if line_holder_attacker_dist <= leash_distance:
+				_set_support_assist_target_lock(ship, player_boarding_attacker, lock_duration)
+				return player_boarding_attacker
+		_clear_support_assist_target_lock(ship)
+		return null
+	if not deck_emergency and support_dist_to_player > SUPPORT_ASSIST_SOFT_RECALL_DISTANCE and not is_instance_valid(player_boarding_attacker):
 		_clear_support_assist_target_lock(ship)
 		return null
 	if limbo_mode == ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT and is_instance_valid(limbo_target):
@@ -1140,20 +1332,7 @@ static func _is_support_rescue_target(ship, assist_target: Node3D) -> bool:
 
 
 static func _is_support_boss_breach_target(ship, assist_target: Node3D) -> bool:
-	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
-		return false
-	if not ShipAllyRoleHelper.is_support_ship(ship):
-		return false
-	if not _is_boss_ship(assist_target):
-		return false
-	var limbo_payload := _get_recent_support_limbo_payload(ship)
-	var limbo_target := limbo_payload.get("target", null) as Node3D
-	if str(limbo_payload.get("mode", "")) == ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS \
-		and (not is_instance_valid(limbo_target) or limbo_target == assist_target):
-		return true
-	var flagship: Node3D = ship.target as Node3D if is_instance_valid(ship.target) else null
-	var manual_boarding_value: Variant = flagship.get("manual_boarding_target") if is_instance_valid(flagship) else null
-	return is_instance_valid(manual_boarding_value) and manual_boarding_value == assist_target
+	return false
 
 
 static func _is_boss_ship(ship: Node3D) -> bool:
@@ -1166,11 +1345,16 @@ static func _is_boss_ship(ship: Node3D) -> bool:
 
 
 static func _is_support_formation_hold_enabled(ship) -> bool:
+	return SupportFleetStateHelper.is_effective_hold_enabled(ship)
+
+
+static func _get_support_flagship(ship) -> Node3D:
 	if not is_instance_valid(ship):
-		return false
-	if "support_hold_formation" in ship:
-		return ship.get("support_hold_formation") == true
-	return ship.get_meta("support_hold_formation", false) == true
+		return null
+	var owner_flagship := SupportFleetStateHelper.get_support_owner_flagship(ship)
+	if is_instance_valid(owner_flagship):
+		return owner_flagship
+	return ship.target as Node3D if is_instance_valid(ship.target) else null
 
 
 static func _get_recent_support_limbo_payload(ship) -> Dictionary:
@@ -1298,22 +1482,82 @@ static func _clear_support_assist_target_lock(ship) -> void:
 	if ship.has_meta(SUPPORT_ASSIST_LANE_SIDE_META):
 		ship.remove_meta(SUPPORT_ASSIST_LANE_SIDE_META)
 
-static func _get_support_follow_distance(follower_ship: Node3D, lead_ship: Node3D, minimum_spacing: float) -> float:
-	if not is_instance_valid(follower_ship) or not is_instance_valid(lead_ship):
-		return minimum_spacing
-	if follower_ship.has_method("get_collision_distance_to"):
-		var safe_follow_distance: float = float(follower_ship.call("get_collision_distance_to", lead_ship)) + 2.0
-		return maxf(minimum_spacing, safe_follow_distance)
-	return minimum_spacing
 
-static func _get_support_lead_ship(ship, minions: Array, my_index: int) -> Node3D:
-	if my_index <= 0:
-		return ship.target
-	for i in range(my_index - 1, -1, -1):
-		var candidate = minions[i]
-		if is_instance_valid(candidate):
-			return candidate
-	return ship.target
+static func _is_panokseon_support(ship) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	var ship_type_value: Variant = ship.get("ship_type")
+	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
+
+
+static func _calculate_support_pre_avoidance(
+	ship,
+	minions: Array,
+	flagship: Node3D,
+	target_pos: Vector3,
+	planning_speed: float,
+	is_panokseon_support: bool
+) -> Dictionary:
+	if not is_instance_valid(ship):
+		return {"position_offset": Vector3.ZERO, "brake_mult": 1.0, "hazard": 0.0, "lateral": 0.0}
+	var to_target: Vector3 = target_pos - ship.global_position
+	to_target.y = 0.0
+	if to_target.length_squared() <= 0.0001:
+		return {"position_offset": Vector3.ZERO, "brake_mult": 1.0, "hazard": 0.0, "lateral": 0.0}
+	var planned_dir: Vector3 = to_target.normalized()
+	var planned_right: Vector3 = planned_dir.cross(Vector3.UP).normalized()
+	if planned_right.length_squared() <= 0.0001:
+		planned_right = Vector3.RIGHT
+	var lookahead_time: float = SUPPORT_PRE_AVOID_LOOKAHEAD + minf(planning_speed * SUPPORT_PRE_AVOID_LOOKAHEAD_SPEED_SCALE, 0.42)
+	var projected_self: Vector3 = ship.global_position + planned_dir * maxf(planning_speed, ship.current_speed) * lookahead_time
+	var lateral_offset := Vector3.ZERO
+	var brake_mult: float = 1.0
+	var max_hazard: float = 0.0
+	var candidate_ships: Array = minions.duplicate()
+	if is_instance_valid(flagship) and not candidate_ships.has(flagship):
+		candidate_ships.append(flagship)
+	for candidate in candidate_ships:
+		if candidate == ship or not is_instance_valid(candidate) or _is_ship_disabled(candidate):
+			continue
+		if not (candidate is Node3D):
+			continue
+		var candidate_ship := candidate as Node3D
+		var to_candidate: Vector3 = candidate_ship.global_position - ship.global_position
+		to_candidate.y = 0.0
+		if to_candidate.length_squared() <= 0.0001:
+			continue
+		var forward_alignment: float = planned_dir.dot(to_candidate.normalized())
+		if forward_alignment < SUPPORT_PRE_AVOID_MIN_FORWARD_ALIGNMENT:
+			continue
+		var candidate_dir: Vector3 = _get_ship_forward_flat(candidate_ship)
+		var candidate_speed: float = _get_ship_speed(candidate_ship, 0.0)
+		var projected_candidate: Vector3 = candidate_ship.global_position + candidate_dir * candidate_speed * lookahead_time
+		var predicted_diff: Vector3 = projected_self - projected_candidate
+		predicted_diff.y = 0.0
+		var predicted_dist: float = predicted_diff.length()
+		var safe_distance: float = ShipContactGeometry.get_collision_distance_between(ship, candidate_ship) + SUPPORT_PRE_AVOID_TRIGGER_PAD
+		if is_panokseon_support or _is_panokseon_support(candidate_ship):
+			safe_distance += SUPPORT_PRE_AVOID_PANOKSEON_EXTRA_PAD
+		var trigger_distance: float = safe_distance * 1.12
+		if predicted_dist >= trigger_distance:
+			continue
+		var hazard: float = clampf((trigger_distance - predicted_dist) / maxf(trigger_distance, 0.001), 0.0, 1.0)
+		max_hazard = maxf(max_hazard, hazard)
+		var min_brake_mult: float = SUPPORT_PRE_AVOID_PANOKSEON_BRAKE_MULT if is_panokseon_support else SUPPORT_PRE_AVOID_BASE_BRAKE_MULT
+		brake_mult = minf(brake_mult, lerpf(1.0, min_brake_mult, hazard))
+		var side_sign: float = signf(predicted_diff.dot(planned_right))
+		if absf(side_sign) < 0.5:
+			side_sign = 1.0 if ship.get_instance_id() < candidate_ship.get_instance_id() else -1.0
+		lateral_offset += planned_right * side_sign * hazard * SUPPORT_PRE_AVOID_MAX_LATERAL_OFFSET
+	if lateral_offset.length_squared() > 0.0001:
+		lateral_offset = lateral_offset.limit_length(SUPPORT_PRE_AVOID_MAX_LATERAL_OFFSET * (1.2 if is_panokseon_support else 1.0))
+	return {
+		"position_offset": lateral_offset,
+		"brake_mult": brake_mult,
+		"hazard": max_hazard,
+		"lateral": lateral_offset.dot(planned_right),
+	}
+
 
 static func _get_ship_forward_flat(node: Node3D) -> Vector3:
 	if not is_instance_valid(node):
@@ -1333,47 +1577,9 @@ static func _get_ship_speed(node: Node3D, fallback: float) -> float:
 	return float(speed)
 
 static func _record_support_trail_point(node: Node3D) -> void:
-	if not is_instance_valid(node):
-		return
-	var points: Array = node.get_meta(SUPPORT_TRAIL_POINTS_META, [])
-	var current_pos: Vector3 = node.global_position
-	if points.is_empty():
-		points.append(current_pos)
-	else:
-		var last_point: Variant = points[points.size() - 1]
-		if last_point is Vector3 and Vector3(last_point).distance_to(current_pos) >= SUPPORT_TRAIL_POINT_DISTANCE:
-			points.append(current_pos)
-	while points.size() > SUPPORT_TRAIL_MAX_POINTS:
-		points.remove_at(0)
-	node.set_meta(SUPPORT_TRAIL_POINTS_META, points)
-
-static func _get_support_trail_goal(lead_ship: Node3D, trailing_distance: float, fallback_forward: Vector3) -> Dictionary:
-	if not is_instance_valid(lead_ship):
-		return {"position": Vector3.ZERO, "forward": fallback_forward}
-	var trail_points: Array = lead_ship.get_meta(SUPPORT_TRAIL_POINTS_META, [])
-	if trail_points.is_empty():
-		return {"position": lead_ship.global_position - fallback_forward * trailing_distance, "forward": fallback_forward}
-
-	var remaining_distance: float = trailing_distance
-	var segment_end: Vector3 = lead_ship.global_position
-	for i in range(trail_points.size() - 1, -1, -1):
-		var trail_point: Variant = trail_points[i]
-		if not (trail_point is Vector3):
-			continue
-		var segment_start: Vector3 = trail_point
-		var segment: Vector3 = segment_end - segment_start
-		segment.y = 0.0
-		var segment_length: float = segment.length()
-		if segment_length <= 0.001:
-			segment_end = segment_start
-			continue
-		var segment_forward: Vector3 = segment / segment_length
-		if remaining_distance <= segment_length:
-			return {
-				"position": segment_end - segment_forward * remaining_distance,
-				"forward": segment_forward
-			}
-		remaining_distance -= segment_length
-		segment_end = segment_start
-
-	return {"position": segment_end, "forward": fallback_forward}
+	SupportFleetFormationHelper.record_trail_point(
+		node,
+		SUPPORT_TRAIL_POINT_DISTANCE,
+		SUPPORT_TRAIL_MAX_POINTS,
+		SUPPORT_TRAIL_POINTS_META
+	)

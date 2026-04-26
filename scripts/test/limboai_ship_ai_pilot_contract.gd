@@ -1,4 +1,7 @@
 extends Node
+# @scene_contract_encapsulated
+
+const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 
 
 const PILOT_TREE_PATH := "res://resources/ai/limbo/ship_ai_pilot_skeleton.tres"
@@ -30,8 +33,10 @@ class MockShip:
 	var is_dying := false
 	var is_dead := false
 	var is_derelict := false
+	var ship_type := ""
 	var target: Node3D = null
 	var boarding_target: Node3D = null
+	var boarding_attacker: Node3D = null
 	var auto_raid_target: Node3D = null
 	var manual_boarding_target: Node3D = null
 	var preferred_range := 24.0
@@ -84,6 +89,12 @@ class MockShip:
 
 	func get_boarding_target_ship() -> Node3D:
 		return boarding_target
+
+	func set_boarding_attacker_ship(attacker: Node3D) -> void:
+		boarding_attacker = attacker
+
+	func get_boarding_attacker_ship() -> Node3D:
+		return boarding_attacker
 
 	func get_hull_ratio() -> float:
 		return hull_hp / maxf(max_hull_hp, 0.001)
@@ -210,8 +221,8 @@ func _run_contract() -> void:
 		support_ship,
 		player_ship,
 		enemy_ship,
-		ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS,
-		"flagship_boss_boarding",
+		ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT,
+		"nearby_threat",
 		enemy_ship,
 		Vector3(-10.0, 0.0, 0.0),
 		Vector3.ZERO,
@@ -226,8 +237,8 @@ func _run_contract() -> void:
 		support_ship,
 		player_ship,
 		enemy_ship,
-		ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS,
-		"flagship_manual_boarding",
+		ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT,
+		"nearby_threat",
 		enemy_ship,
 		Vector3(-10.0, 0.0, 0.0),
 		Vector3.ZERO,
@@ -238,6 +249,42 @@ func _run_contract() -> void:
 		false,
 		null,
 		enemy_ship
+	)
+	await _verify_support_pilot_mode(
+		support_ship,
+		player_ship,
+		enemy_ship,
+		ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP,
+		"formation_hold",
+		player_ship,
+		Vector3(-10.0, 0.0, 0.0),
+		Vector3.ZERO,
+		Vector3(20.0, 0.0, 0.0),
+		false,
+		false,
+		0,
+		true,
+		enemy_ship,
+		null,
+		true
+	)
+	await _verify_support_pilot_mode(
+		support_ship,
+		player_ship,
+		enemy_ship,
+		ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP,
+		"formation_hold",
+		player_ship,
+		Vector3(-10.0, 0.0, 0.0),
+		Vector3.ZERO,
+		Vector3(20.0, 0.0, 0.0),
+		false,
+		false,
+		0,
+		true,
+		null,
+		enemy_ship,
+		true
 	)
 	enemy_ship.remove_from_group("boss")
 	await _verify_support_pilot_mode(
@@ -300,6 +347,67 @@ func _run_contract() -> void:
 		0,
 		true
 	)
+	await _verify_support_pilot_mode(
+		support_ship,
+		player_ship,
+		enemy_ship,
+		ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP,
+		"formation_hold",
+		player_ship,
+		Vector3(-16.0, 0.0, 0.0),
+		Vector3.ZERO,
+		Vector3(18.0, 0.0, 0.0),
+		false,
+		false,
+		0,
+		true,
+		null,
+		null,
+		true
+	)
+	await _verify_support_pilot_mode(
+		support_ship,
+		player_ship,
+		enemy_ship,
+		ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT,
+		"flagship_boarding_attacker",
+		enemy_ship,
+		Vector3(-16.0, 0.0, 0.0),
+		Vector3.ZERO,
+		Vector3(18.0, 0.0, 0.0),
+		false,
+		false,
+		0,
+		true,
+		null,
+		null,
+		true,
+		enemy_ship
+	)
+	support_ship.ship_type = "panokseon_ally"
+	support_ship.set_meta("support_squadron_slot_role", "artillery_lead")
+	await _verify_support_pilot_mode(
+		support_ship,
+		player_ship,
+		enemy_ship,
+		ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT,
+		"flagship_boarding_attacker",
+		enemy_ship,
+		Vector3(-16.0, 0.0, 0.0),
+		Vector3.ZERO,
+		Vector3(18.0, 0.0, 0.0),
+		false,
+		false,
+		0,
+		false,
+		null,
+		null,
+		false,
+		enemy_ship
+	)
+	support_ship.ship_type = ""
+	if support_ship.has_meta("support_squadron_slot_role"):
+		support_ship.remove_meta("support_squadron_slot_role")
 
 	var captured_ship := MockShip.new()
 	captured_ship.name = "LimboPilotCapturedMinion"
@@ -589,7 +697,9 @@ func _verify_support_pilot_mode(
 	hostile_boarder_count: int,
 	support_hold_formation: bool,
 	player_auto_raid_target: Node3D = null,
-	player_manual_boarding_target: Node3D = null
+	player_manual_boarding_target: Node3D = null,
+	use_flagship_owner_state: bool = false,
+	player_boarding_attacker: Node3D = null
 ) -> void:
 	support_ship.position = support_position
 	player_ship.position = player_position
@@ -597,12 +707,25 @@ func _verify_support_pilot_mode(
 	enemy_ship.boarding_target = player_ship if player_deck_contested else null
 	player_ship.auto_raid_target = player_auto_raid_target
 	player_ship.manual_boarding_target = player_manual_boarding_target
+	player_ship.set_boarding_attacker_ship(player_boarding_attacker)
 	player_ship.deck_is_contested = player_deck_contested
 	player_ship.deck_is_overrun = player_deck_overrun
 	player_ship.deck_hostile_boarder_count = hostile_boarder_count
-	support_ship.support_hold_formation = support_hold_formation
+	if player_ship.has_meta(SupportFleetStateHelper.SUPPORT_FLEET_FORMATION_META):
+		player_ship.remove_meta(SupportFleetStateHelper.SUPPORT_FLEET_FORMATION_META)
+	if player_ship.has_meta(SupportFleetStateHelper.SUPPORT_HOLD_FORMATION_META):
+		player_ship.remove_meta(SupportFleetStateHelper.SUPPORT_HOLD_FORMATION_META)
+	if support_ship.has_meta(SupportFleetStateHelper.SUPPORT_FLEET_OWNER_ID_META):
+		support_ship.remove_meta(SupportFleetStateHelper.SUPPORT_FLEET_OWNER_ID_META)
+	if support_hold_formation and not use_flagship_owner_state:
+		support_ship.set_meta(SupportFleetStateHelper.SUPPORT_HOLD_FORMATION_META, true)
+	elif support_ship.has_meta(SupportFleetStateHelper.SUPPORT_HOLD_FORMATION_META):
+		support_ship.remove_meta(SupportFleetStateHelper.SUPPORT_HOLD_FORMATION_META)
+	if use_flagship_owner_state:
+		SupportFleetStateHelper.set_flagship_hold_enabled(player_ship, support_hold_formation)
+		SupportFleetStateHelper.assign_support_ship_to_flagship(support_ship, player_ship)
 	support_ship.limbo_ai_pilot_enabled = true
-	support_ship.target = null
+	support_ship.target = player_ship if use_flagship_owner_state else null
 
 	ShipLimboAIPilot.tick(support_ship, 0.016, SUPPORT_PILOT_TREE_PATH)
 	await get_tree().process_frame

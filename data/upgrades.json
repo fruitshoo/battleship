@@ -3,20 +3,24 @@
 		"cannon": {
 			"name": "포문",
 			"category": 0,
-			"description": "대포 수 증가. 지원함은 3문까지 공유",
+			"description": "대포 수 증가. 판옥선 지원함은 최대 5문까지 공유",
+			"card_art_path": "res://assets/ui/upgrades/cannon_card.png",
 			"max_level": 5,
 			"color": "ff7f33",
 			"stats": {
 				"player_base_cannon_count": 3,
 				"player_extra_cannon_levels": [2, 3, 4, 5],
 				"support_base_cannon_count": 1,
-				"support_max_cannon_count": 3
+				"support_max_cannon_count": 3,
+				"panokseon_support_base_cannon_count": 3,
+				"panokseon_support_max_cannon_count": 5
 			}
 		},
 		"cannon_damage": {
-			"name": "화약",
+			"name": "철환",
 			"category": 0,
-			"description": "대포 데미지 강화",
+			"description": "무거운 철환으로 대포 피해 강화",
+			"card_art_path": "res://assets/ui/upgrades/iron_shot_card.png",
 			"max_level": 5,
 			"color": "ff9b42",
 			"stats": {
@@ -24,9 +28,10 @@
 			}
 		},
 		"cannon_reload": {
-			"name": "장전",
+			"name": "화약",
 			"category": 0,
-			"description": "대포 재장전 강화",
+			"description": "정련된 화약으로 점화와 재장전 속도 개선",
+			"card_art_path": "res://assets/ui/upgrades/cannon_damage_card.png",
 			"max_level": 5,
 			"color": "ffd166",
 			"stats": {
@@ -61,7 +66,7 @@
 		"fire_pot": {
 			"name": "화통",
 			"category": 1,
-			"description": "화통 투척",
+			"description": "화통 투척 및 착화 확률 강화",
 			"max_level": 5,
 			"color": "e54c19",
 			"stats": {
@@ -71,7 +76,11 @@
 				"base_radius": 3.0,
 				"radius_per_lv": 0.5,
 				"base_cooldown": 6.0,
-				"cooldown_reduce_per_lv": 1.0
+				"cooldown_reduce_per_lv": 1.0,
+				"base_ignition_chance": 0.45,
+				"ignition_chance_per_lv": 0.075,
+				"max_ignition_chance": 0.75,
+				"burn_duration": 7.0
 			}
 		},
 		"repeating_crossbow": {
@@ -116,18 +125,21 @@
 			}
 		},
 		"crew_reserve": {
-			"name": "생존",
+			"name": "구호",
 			"category": 1,
-			"description": "전투불능 병사의 회복 시간과 회복 체력 강화",
+			"description": "쓰러진 병사를 더 빠르고 안전하게 일으킴",
 			"max_level": 5,
 			"color": "8fd46b",
 			"stats": {
 				"respawn_reduce_per_lv": 0.25,
 				"min_respawn_interval": 10.5,
-				"incapacitated_recovery_reduce_per_lv": 1.8,
-				"min_incapacitated_recovery_delay": 7.0,
-				"incapacitated_recovery_health_add_per_lv": 0.08,
-				"max_incapacitated_recovery_health_ratio": 0.75,
+				"base_assist_channel_duration": 1.1,
+				"assist_channel_reduce_per_lv": 0.1,
+				"min_assist_channel_duration": 0.55,
+				"assist_recovery_health_add_per_lv": 0.07,
+				"max_assist_recovery_health_ratio": 0.7,
+				"assist_acquire_range_add_per_lv": 0.45,
+				"assist_use_range_add_per_lv": 0.04,
 				"instant_restore_levels": [5],
 				"survivor_hull_heal_per_lv": 0.5
 			}
@@ -135,13 +147,15 @@
 		"boarding_resist": {
 			"name": "방책",
 			"category": 1,
-			"description": "적 장악과 갑판 혼란 저항",
+			"description": "도선병을 갑판에서 소모시키고 혼란 피해를 줄임",
 			"max_level": 5,
 			"color": "4ca6ff",
+			"card_art_path": "res://assets/ui/upgrades/boarding_resist_card.png",
 			"stats": {
-				"capture_duration_mult_per_lv": 0.08,
-				"capture_damage_reduction_per_lv": 0.05,
-				"boarding_fire_reduce_per_lv": 0.08
+				"boarding_defense_damage_per_tick_per_lv": 1.4,
+				"boarding_defense_max_damage_per_tick": 7.0,
+				"capture_damage_reduction_per_lv": 0.06,
+				"boarding_fire_reduce_per_lv": 0.1
 			}
 		},
 		"crew_attack": {
@@ -160,6 +174,7 @@
 			"description": "병사 방어력과 받는 피해 감소",
 			"max_level": 5,
 			"color": "7fb6ff",
+			"card_art_path": "res://assets/ui/upgrades/crew_defense_card.png",
 			"stats": {
 				"defense_add_per_lv": 1.0,
 				"damage_reduction_per_lv": 0.04,
@@ -169,24 +184,30 @@
 		"hull_defense": {
 			"name": "선체",
 			"category": 2,
-			"description": "장갑, 수리, 재생 강화",
+			"description": "선체 방어력 강화",
 			"max_level": 5,
 			"color": "994c19",
 			"stats": {
-				"def_levels": [1, 4],
-				"def_add": 2.0,
-				"repair_levels": [2, 5],
-				"repair_add": 35.0,
-				"crew_ranged_block_levels": [3],
-				"crew_ranged_block_add": 0.10,
-				"regen_levels": [5],
-				"regen_add": 1.5
+				"def_levels": [1, 2, 3, 4, 5],
+				"def_add": 1.0
+			}
+		},
+		"hull_repair": {
+			"name": "수리",
+			"category": 2,
+			"description": "선체 자동 수리",
+			"max_level": 5,
+			"color": "3a8f65",
+			"stats": {
+				"regen_per_lv": 0.2,
+				"max_regen": 1.0
 			}
 		},
 		"sailing": {
 			"name": "돛",
 			"category": 3,
 			"description": "돛 속도와 회전 강화",
+			"card_art_path": "res://assets/ui/upgrades/sail_card.png",
 			"max_level": 5,
 			"color": "58cfff",
 			"stats": {
@@ -204,6 +225,7 @@
 			"description": "노 속도와 스태미나 강화",
 			"max_level": 5,
 			"color": "ffc65a",
+			"card_art_path": "res://assets/ui/upgrades/rowing_card.png",
 			"stats": {
 				"speed_levels": [1, 5],
 				"speed_mult": 1.15,
@@ -259,13 +281,26 @@
 		"fleet_signal": {
 			"name": "지원함",
 			"category": 4,
-			"description": "지원함 호출 또는 수리, Lv2 판옥선 편대와 한계 +1",
+			"description": "지원함 호출 또는 수리, Lv2 지원함 한계 +1",
+			"card_art_path": "res://assets/ui/upgrades/fleet_signal_card.png",
 			"max_level": 2,
 			"color": "ffb347",
 			"stats": {
 				"limit_add_level": 2,
-				"limit_add": 1,
-				"panokseon_level": 2
+				"limit_add": 1
+			}
+		},
+		"panokseon_upgrade": {
+			"name": "판옥선",
+			"category": 5,
+			"description": "판옥선 포격함 1척 추가 합류",
+			"card_art_path": "res://assets/ui/upgrades/panokseon_upgrade_card.png",
+			"max_level": 1,
+			"color": "d7b45a",
+			"stats": {
+				"panokseon_upgrade_id": "panokseon_upgrade",
+				"panokseon_level": 1,
+				"panokseon_squadron_limit_add": 1
 			}
 		},
 		"fleet_hull": {

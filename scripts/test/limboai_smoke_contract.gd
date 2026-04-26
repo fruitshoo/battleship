@@ -1,4 +1,5 @@
 extends Node
+# @scene_contract_encapsulated
 
 const LimboAISmokeTickTaskScript = preload("res://scripts/test/limboai_smoke_tick_task.gd")
 

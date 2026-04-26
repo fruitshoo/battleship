@@ -1,6 +1,22 @@
 extends RefCounted
 class_name ProjectContractSupportHelper
 
+const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
+const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
+
+
+static func _reconcile_support_fleet(player_ship: Node3D, failures: Array[String], reason: String, options: Dictionary = {}) -> Dictionary:
+	if not is_instance_valid(UpgradeManager) or not UpgradeManager.has_method("reconcile_support_fleet"):
+		failures.append("support fleet smoke missing support fleet reconcile helper")
+		return {}
+	return UpgradeManager.call("reconcile_support_fleet", player_ship, reason, options)
+
+
+static func _request_support_spawn(player_ship: Node3D, failures: Array[String], reason: String) -> Dictionary:
+	return _reconcile_support_fleet(player_ship, failures, reason, {
+		"allow_autospawn": true,
+		"spawn_now": true,
+	})
 
 
 static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
@@ -33,9 +49,11 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	if "support_fleet_limit" in player_ship:
 		player_ship.set("support_fleet_limit", 1)
 
+	_run_support_wing_join_geometry_contract(failures, smoke_root, player_ship)
+
 	var captured_before: int = EntityRegistry.count_captured_minions()
 	var capture_slots_before: int = ShipAllyRoleHelper.count_capture_slot_minions(EntityRegistry.get_captured_minions())
-	player_ship.call("_spawn_or_repair_ally")
+	_request_support_spawn(player_ship, failures, "support_contract_initial_spawn")
 	await _wait_frames(owner, wait_frames_after_spawn + 2)
 
 	var support_ships: Array = player_ship.call("_get_support_fleet_ships")
@@ -65,6 +83,8 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		failures.append("support fleet smoke missing captured_minion group")
 	if support_ship.get_meta("support_fleet_ship", false) != true:
 		failures.append("support fleet smoke missing support_fleet_ship meta")
+	if int(support_ship.get_meta("support_fleet_owner_id", 0)) != player_ship.get_instance_id():
+		failures.append("support fleet smoke support ship owner mismatch")
 	if EntityRegistry.count_captured_minions() <= captured_before:
 		failures.append("support fleet smoke did not increase captured minion count")
 	if not EntityRegistry.get_captured_minions().has(support_ship):
@@ -128,7 +148,7 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		repair_before = max_hull_hp * 0.2
 		support_ship.set("hull_hp", repair_before)
 
-	player_ship.call("_spawn_or_repair_ally")
+	_request_support_spawn(player_ship, failures, "support_contract_repair")
 	await _wait_frames(owner, 1)
 
 	var support_ships_after: Array = player_ship.call("_get_support_fleet_ships")
@@ -137,10 +157,45 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	if support_ship.get("hull_hp") != null and float(support_ship.get("hull_hp")) <= repair_before:
 		failures.append("support fleet smoke repair path did not heal support ship")
 
+	await _run_support_panokseon_upgrade_smoke(owner, failures, player_ship, wait_frames_after_spawn)
 	await _run_support_signal_level_two_limit_smoke(owner, failures, player_ship, wait_frames_after_spawn)
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
+
+
+static func _run_support_wing_join_geometry_contract(failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+	var previous_formation := SupportFleetStateHelper.get_flagship_formation(player_ship)
+	SupportFleetStateHelper.set_flagship_formation(player_ship, SupportFleetStateHelper.FORMATION_WING)
+
+	var extra_support := Node3D.new()
+	extra_support.name = "WingExtraSupportGeometryContract"
+	extra_support.set_meta("support_squadron_slot_role", "screen_extra_7")
+	smoke_root.add_child(extra_support)
+	extra_support.global_position = player_ship.global_position + Vector3(44.0, 0.0, 44.0)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(extra_support, player_ship)
+
+	var extra_offset := SupportFleetFormationHelper.get_support_fleet_offset(extra_support, 5, 10.0, 7)
+	if absf(extra_offset.x) < 0.1:
+		failures.append("support fleet smoke wing extra support role collapsed to center instead of generic wing lane")
+
+	var player_forward: Vector3 = -player_ship.global_transform.basis.z
+	player_forward.y = 0.0
+	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.001 else Vector3.FORWARD
+	var player_right := player_forward.cross(Vector3.UP)
+	player_right = player_right.normalized() if player_right.length_squared() > 0.001 else Vector3.RIGHT
+
+	var join_goal := SupportFleetFormationHelper.get_support_join_chain_goal(extra_support, [extra_support], 5, 14.0)
+	var join_position: Vector3 = join_goal.get("position", extra_support.global_position)
+	var join_offset := join_position - player_ship.global_position
+	join_offset.y = 0.0
+	if absf(join_offset.dot(player_right)) > 0.5:
+		failures.append("support fleet smoke wing join goal should stage on column centerline before spreading")
+	if join_offset.dot(player_forward) > -10.0:
+		failures.append("support fleet smoke wing join goal should stage behind flagship before spreading")
+
+	SupportFleetStateHelper.set_flagship_formation(player_ship, previous_formation)
+	extra_support.queue_free()
 
 
 static func _run_support_rescue_emergency_smoke(owner: Node, failures: Array[String], player_ship: Node3D, support_ship: Node3D, spawner: Node, wait_frames_after_spawn: int) -> void:
@@ -206,6 +261,7 @@ static func _run_support_rescue_emergency_smoke(owner: Node, failures: Array[Str
 static func _run_support_boss_breach_smoke(owner: Node, failures: Array[String], player_ship: Node3D, support_ship: Node3D, spawner: Node, wait_frames_after_spawn: int, use_manual_boarding_intent: bool = false) -> void:
 	if not is_instance_valid(owner) or not is_instance_valid(player_ship) or not is_instance_valid(support_ship) or not is_instance_valid(spawner):
 		return
+	SupportFleetStateHelper.set_flagship_hold_enabled(player_ship, false)
 	if not spawner.has_method("debug_spawn_final_boss"):
 		failures.append("support fleet smoke boss breach missing debug_spawn_final_boss")
 		return
@@ -238,25 +294,25 @@ static func _run_support_boss_breach_smoke(owner: Node, failures: Array[String],
 	var breach_start_distance: float = support_ship.global_position.distance_to(boss_ship.global_position)
 	await _wait_frames(owner, wait_frames_after_spawn + 10)
 	var breach_mode := str(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_MODE, "")).strip_edges()
-	if breach_mode != ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS:
-		failures.append("support fleet smoke support ship did not enter boss breach mode")
-	var breach_target_id := int(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0))
-	if breach_target_id != boss_ship.get_instance_id():
-		failures.append("support fleet smoke support ship boss breach target mismatch")
+	if breach_mode == ShipAILimboKeys.SUPPORT_MODE_BREACH_BOSS:
+		failures.append("support fleet smoke support ship should no longer enter boss breach mode")
+	if not breach_mode.is_empty() and breach_mode != ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT:
+		failures.append("support fleet smoke boss pressure should stay in threat-screening doctrine: %s" % breach_mode)
 	var breach_reason := str(support_ship.get_meta(ShipAILimboKeys.META_SUPPORT_REASON, "")).strip_edges()
-	var expected_reason := "flagship_manual_boarding" if use_manual_boarding_intent else "flagship_boss_boarding"
-	if breach_reason != expected_reason:
-		failures.append("support fleet smoke support ship boss breach reason mismatch: %s" % breach_reason)
+	if not breach_reason.is_empty() and breach_reason != "nearby_threat":
+		failures.append("support fleet smoke boss pressure reason mismatch: %s" % breach_reason)
 	var breach_boarding: bool = support_ship.get("is_boarding") == true and support_ship.get("boarding_target") == boss_ship
 	var breach_end_distance: float = support_ship.global_position.distance_to(boss_ship.global_position)
 	var breach_travel_distance: float = support_ship.global_position.distance_to(breach_start_position)
-	if not breach_boarding:
-		if breach_travel_distance < 0.35:
-			failures.append("support fleet smoke support ship did not move into boss breach approach")
-		elif breach_end_distance >= breach_start_distance - 0.2:
-			failures.append("support fleet smoke support ship did not close boss breach distance")
+	if breach_boarding:
+		failures.append("support fleet smoke support ship should not board the boss under artillery doctrine")
+	elif breach_travel_distance < 0.35:
+		failures.append("support fleet smoke support ship did not react to nearby boss pressure")
+	elif breach_end_distance >= breach_start_distance - 0.2:
+		failures.append("support fleet smoke support ship did not close boss screening distance")
 	player_ship.set("boarding_target", null)
 	player_ship.set("manual_boarding_target", null)
+	SupportFleetStateHelper.set_flagship_hold_enabled(player_ship, true)
 	if support_ship.has_method("_cancel_boarding"):
 		support_ship.call("_cancel_boarding")
 	EntityRegistry.unregister_ship(boss_ship)
@@ -332,32 +388,157 @@ static func _run_captured_minion_guard_smoke(owner: Node, failures: Array[String
 	await _wait_frames(owner, 1)
 
 
+static func _run_support_panokseon_upgrade_smoke(owner: Node, failures: Array[String], player_ship: Node3D, wait_frames_after_spawn: int) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("support fleet smoke missing UpgradeManager for panokseon upgrade")
+		return
+
+	var original_signal_level: int = int(UpgradeManager.current_levels.get("fleet_signal", 0))
+	var original_panokseon_level: int = int(UpgradeManager.current_levels.get("panokseon_upgrade", 0))
+	var original_crew_level: int = int(UpgradeManager.current_levels.get("fleet_crew", 0))
+	var original_cannon_level: int = int(UpgradeManager.current_levels.get("cannon", 0))
+	UpgradeManager.current_levels["fleet_signal"] = max(1, original_signal_level)
+	UpgradeManager.current_levels["panokseon_upgrade"] = 1
+	UpgradeManager.current_levels["fleet_crew"] = 0
+	UpgradeManager.current_levels["cannon"] = 5
+	_reconcile_support_fleet(player_ship, failures, "support_contract_panokseon_upgrade")
+	await _wait_frames(owner, wait_frames_after_spawn + 2)
+
+	var upgraded_supports: Array = player_ship.call("_get_support_fleet_ships")
+	if upgraded_supports.size() < 2:
+		failures.append("support fleet smoke panokseon upgrade should add a second support ship")
+	else:
+		var screen_support := upgraded_supports[0] as Node3D
+		var panokseon_support := upgraded_supports[1] as Node3D
+		if not is_instance_valid(screen_support):
+			failures.append("support fleet smoke panokseon upgrade lead screen support invalid")
+		else:
+			if int(screen_support.get_meta("support_fleet_slot_index", -1)) != 0:
+				failures.append("support fleet smoke panokseon upgrade should preserve the first maengseon in slot 0")
+			elif str(screen_support.get("ship_type")) != "maengseon_ally":
+				failures.append("support fleet smoke panokseon upgrade should keep the first support ship as maengseon")
+		if not is_instance_valid(panokseon_support):
+			failures.append("support fleet smoke panokseon upgrade added panokseon invalid")
+		else:
+			if int(panokseon_support.get_meta("support_fleet_slot_index", -1)) != 1:
+				failures.append("support fleet smoke panokseon upgrade should add panokseon in slot 1")
+			elif str(panokseon_support.get("ship_type")) != "panokseon_ally":
+				failures.append("support fleet smoke panokseon upgrade should add a new panokseon support ship")
+			elif str(panokseon_support.get_meta("support_fleet_profile", "")) != "panokseon_escort":
+				failures.append("support fleet smoke panokseon upgrade profile mismatch")
+			UpgradeManager.apply_fleet_upgrades_to_ship(panokseon_support)
+			if _count_visible_fleet_cannons(panokseon_support) != 5:
+				failures.append("support fleet smoke panokseon upgrade should expose 5 shared cannons on the added panokseon at cannon Lv.5")
+
+	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
+	UpgradeManager.current_levels["panokseon_upgrade"] = original_panokseon_level
+	UpgradeManager.current_levels["fleet_crew"] = original_crew_level
+	UpgradeManager.current_levels["cannon"] = original_cannon_level
+	_reconcile_support_fleet(player_ship, failures, "support_contract_panokseon_restore")
+
+
 static func _run_support_signal_level_two_limit_smoke(owner: Node, failures: Array[String], player_ship: Node3D, wait_frames_after_spawn: int) -> void:
 	if not is_instance_valid(UpgradeManager):
 		failures.append("support fleet smoke missing UpgradeManager for signal level 2")
 		return
-	if not UpgradeManager.has_method("_refresh_support_fleet_upgrade_state"):
-		failures.append("support fleet smoke missing support fleet refresh helper")
-		return
 
 	var original_signal_level: int = int(UpgradeManager.current_levels.get("fleet_signal", 0))
+	var original_panokseon_level: int = int(UpgradeManager.current_levels.get("panokseon_upgrade", 0))
 	var original_crew_level: int = int(UpgradeManager.current_levels.get("fleet_crew", 0))
 	UpgradeManager.current_levels["fleet_signal"] = 2
+	UpgradeManager.current_levels["panokseon_upgrade"] = 0
 	UpgradeManager.current_levels["fleet_crew"] = 0
-	UpgradeManager.call("_refresh_support_fleet_upgrade_state", player_ship)
+	_reconcile_support_fleet(player_ship, failures, "support_contract_signal_level_two")
+	await _wait_frames(owner, 2)
 
 	if int(player_ship.get("support_fleet_limit")) < 2:
 		failures.append("support fleet smoke signal Lv2 did not increase support limit")
 
-	player_ship.call("_spawn_or_repair_ally")
+	_request_support_spawn(player_ship, failures, "support_contract_signal_level_two_spawn")
 	await _wait_frames(owner, wait_frames_after_spawn + 2)
 	var support_ships: Array = player_ship.call("_get_support_fleet_ships")
 	if support_ships.size() < 2:
 		failures.append("support fleet smoke signal Lv2 did not spawn second support ship")
+	else:
+		var lead_support := support_ships[0] as Node3D
+		var second_support := support_ships[1] as Node3D
+		if not is_instance_valid(lead_support):
+			failures.append("support fleet smoke signal Lv2 lead support ship invalid")
+		elif int(lead_support.get_meta("support_fleet_slot_index", -1)) != 0:
+			failures.append("support fleet smoke signal Lv2 lead support should keep slot 0")
+		elif str(lead_support.get("ship_type")) != "maengseon_ally":
+			failures.append("support fleet smoke signal Lv2 lead support should remain maengseon without panokseon upgrade")
+		if not is_instance_valid(second_support):
+			failures.append("support fleet smoke signal Lv2 second support ship invalid")
+		elif int(second_support.get_meta("support_fleet_slot_index", -1)) != 1:
+			failures.append("support fleet smoke signal Lv2 second support should keep slot 1")
+		elif str(second_support.get("ship_type")) != "maengseon_ally":
+			failures.append("support fleet smoke signal Lv2 second support ship should remain maengseon")
+		elif str(second_support.get_meta("support_fleet_profile", "")) != "maengseon_screen":
+			failures.append("support fleet smoke signal Lv2 second support ship profile mismatch")
+
+		if is_instance_valid(lead_support):
+			EntityRegistry.unregister_captured_minion(lead_support)
+			EntityRegistry.unregister_ship(lead_support)
+			lead_support.queue_free()
+			await _wait_frames(owner, 2)
+			_reconcile_support_fleet(player_ship, failures, "support_contract_slot_stability_refresh")
+			await _wait_frames(owner, 2)
+
+			var remaining_supports: Array = player_ship.call("_get_support_fleet_ships")
+			if remaining_supports.size() != 1:
+				failures.append("support fleet smoke slot stability expected 1 surviving support ship, got %d" % remaining_supports.size())
+			else:
+				var remaining_support := remaining_supports[0] as Node3D
+				if not is_instance_valid(remaining_support):
+					failures.append("support fleet smoke slot stability surviving support invalid")
+				elif int(remaining_support.get_meta("support_fleet_slot_index", -1)) != 1:
+					failures.append("support fleet smoke slot stability should preserve the surviving support slot id")
+				elif str(remaining_support.get("ship_type")) != "maengseon_ally":
+					failures.append("support fleet smoke slot stability should keep the surviving screen ship as maengseon")
+
+			_request_support_spawn(player_ship, failures, "support_contract_slot_stability_refill")
+			await _wait_frames(owner, wait_frames_after_spawn + 2)
+			var restored_supports: Array = player_ship.call("_get_support_fleet_ships")
+			if restored_supports.size() < 2:
+				failures.append("support fleet smoke slot stability did not refill the vacated lead slot")
+			else:
+				var restored_lead := restored_supports[0] as Node3D
+				var restored_screen := restored_supports[1] as Node3D
+				if not is_instance_valid(restored_lead):
+					failures.append("support fleet smoke slot stability restored lead invalid")
+				elif int(restored_lead.get_meta("support_fleet_slot_index", -1)) != 0:
+					failures.append("support fleet smoke slot stability restored lead should reclaim slot 0")
+				elif str(restored_lead.get("ship_type")) != "maengseon_ally":
+					failures.append("support fleet smoke slot stability restored lead should respawn as maengseon")
+				if not is_instance_valid(restored_screen):
+					failures.append("support fleet smoke slot stability restored screen invalid")
+				elif int(restored_screen.get_meta("support_fleet_slot_index", -1)) != 1:
+					failures.append("support fleet smoke slot stability restored screen should remain in slot 1")
+				elif str(restored_screen.get("ship_type")) != "maengseon_ally":
+					failures.append("support fleet smoke slot stability restored screen should remain maengseon")
+
+		UpgradeManager.current_levels["panokseon_upgrade"] = 1
+		_reconcile_support_fleet(player_ship, failures, "support_contract_signal_plus_panokseon")
+		await _wait_frames(owner, wait_frames_after_spawn + 2)
+		var panokseon_supports: Array = player_ship.call("_get_support_fleet_ships")
+		if panokseon_supports.size() < 3:
+			failures.append("support fleet smoke panokseon upgrade after two maengseon supports should add a third ship")
+		else:
+			var slot_zero := panokseon_supports[0] as Node3D
+			var slot_one := panokseon_supports[1] as Node3D
+			var slot_two := panokseon_supports[2] as Node3D
+			if not is_instance_valid(slot_zero) or int(slot_zero.get_meta("support_fleet_slot_index", -1)) != 0 or str(slot_zero.get("ship_type")) != "maengseon_ally":
+				failures.append("support fleet smoke panokseon unlock should preserve maengseon at slot 0")
+			if not is_instance_valid(slot_one) or int(slot_one.get_meta("support_fleet_slot_index", -1)) != 1 or str(slot_one.get("ship_type")) != "panokseon_ally":
+				failures.append("support fleet smoke panokseon unlock should insert a new panokseon at slot 1")
+			if not is_instance_valid(slot_two) or int(slot_two.get_meta("support_fleet_slot_index", -1)) != 2 or str(slot_two.get("ship_type")) != "maengseon_ally":
+				failures.append("support fleet smoke panokseon unlock should preserve existing maengseon by shifting it to slot 2")
 
 	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
+	UpgradeManager.current_levels["panokseon_upgrade"] = original_panokseon_level
 	UpgradeManager.current_levels["fleet_crew"] = original_crew_level
-	UpgradeManager.call("_refresh_support_fleet_upgrade_state", player_ship)
+	_reconcile_support_fleet(player_ship, failures, "support_contract_signal_level_two_restore")
 
 
 static func _run_support_shared_cannon_cap_smoke(failures: Array[String], support_ship: Node3D) -> void:

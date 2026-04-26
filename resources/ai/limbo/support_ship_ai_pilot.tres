@@ -1,7 +1,7 @@
 [gd_resource type="BehaviorTree" format=3 uid="uid://bsuabsmyffsf2"]
 
 [ext_resource type="Script" uid="uid://48jeqwf0vy8s" path="res://scripts/ai/limbo/tasks/bt_ship_select_player_target.gd" id="1_select"]
-[ext_resource type="Script" path="res://scripts/ai/limbo/tasks/bt_support_ship_set_mode.gd" id="2_support_mode"]
+[ext_resource type="Script" uid="uid://ccivj5yxie0ui" path="res://scripts/ai/limbo/tasks/bt_support_ship_set_mode.gd" id="2_support_mode"]
 
 [sub_resource type="BlackboardPlan" id="BlackboardPlan_support"]
 

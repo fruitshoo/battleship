@@ -1,6 +1,7 @@
 @tool
 extends Node
 const UpgradeManagerItemHelper = preload("res://scripts/managers/upgrade_manager_item_helper.gd")
+const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
 ## 업그레이드 데이터 및 적용 로직 관리
@@ -40,6 +41,7 @@ const SHIP_UPGRADE_IDS: Array[String] = [
 	"cannon_reload",
 	"janggun",
 	"hull_defense",
+	"hull_repair",
 	"sailing",
 	"rowing",
 	"supply_bonus",
@@ -63,11 +65,15 @@ const PRIORITY_CREW_UPGRADE_IDS: Array[String] = [
 	"crew_reserve",
 	"boarding_resist",
 ]
-const SUPPORT_SHIP_UPGRADE_IDS: Array[String] = []
+const PANOKSEON_SUPPORT_UPGRADE_ID: String = "panokseon_upgrade"
+const SUPPORT_SHIP_UPGRADE_IDS: Array[String] = [
+	PANOKSEON_SUPPORT_UPGRADE_ID,
+]
 const SUPPORT_CREW_UPGRADE_IDS: Array[String] = [
 	"fleet_crew",
 ]
 const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
+	PANOKSEON_SUPPORT_UPGRADE_ID,
 	"fleet_crew",
 ]
 const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
@@ -153,11 +159,11 @@ func get_ship_upgrade_choices(count: int = 3) -> Array:
 		UPGRADES,
 		current_levels,
 		SHIP_UPGRADE_IDS,
-		SUPPORT_SHIP_UPGRADE_IDS,
+		_get_available_support_ship_upgrade_ids(),
 		_get_priority_ship_upgrade_ids(),
 		RARE_FLEET_UPGRADE_ID,
 		RARE_FLEET_UPGRADE_CHANCE,
-		_is_fleet_ship_progress_available(),
+		_are_support_ship_choices_available(),
 		count
 	)
 
@@ -192,6 +198,26 @@ func _is_fleet_crew_progress_available() -> bool:
 	if not _is_fleet_progress_available():
 		return false
 	return _get_non_fleet_progress_levels() >= SUPPORT_CREW_PROGRESS_MIN_LEVELS
+
+
+func _are_support_ship_choices_available() -> bool:
+	return _is_fleet_ship_progress_available() or _is_panokseon_upgrade_choice_available()
+
+
+func _is_panokseon_upgrade_choice_available() -> bool:
+	return int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0
+
+
+func _get_available_support_ship_upgrade_ids() -> Array[String]:
+	var support_ids: Array[String] = []
+	for upgrade_id in SUPPORT_SHIP_UPGRADE_IDS:
+		if upgrade_id == PANOKSEON_SUPPORT_UPGRADE_ID:
+			if _is_panokseon_upgrade_choice_available():
+				support_ids.append(upgrade_id)
+			continue
+		if _is_fleet_ship_progress_available():
+			support_ids.append(upgrade_id)
+	return support_ids
 
 
 func _get_non_fleet_progress_levels() -> int:
@@ -295,7 +321,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	upgrade_applied.emit(upgrade_id, new_level)
 	
 	# 함대 업그레이드인 경우 현재 활성화된 모든 미니언에 즉시 적용
-	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS or upgrade_id in ["cannon", "hull_defense"]:
+	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS or upgrade_id in ["cannon", "hull_defense", "hull_repair"]:
 		var minions = EntityRegistry.get_captured_minions()
 		for m in minions:
 			apply_fleet_upgrades_to_ship(m)
@@ -303,7 +329,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
-	var ship_ui_ids = ["cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "sailing", "rowing", "supply_bonus", "fleet_signal", "supply", "gold"]
+	var ship_ui_ids = ["cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "supply", "gold"]
 	var crew_ui_ids = ["crew_numbers", "crew_reserve", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
@@ -351,17 +377,25 @@ func _refresh_player_crew_capacity(ship: Node3D) -> void:
 
 func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 	var stats: Dictionary = UPGRADES["crew_reserve"].get("stats", {})
-	var recovery_delay: float = maxf(
-		float(stats.get("min_incapacitated_recovery_delay", 7.0)),
-		16.0 - (float(level) * float(stats.get("incapacitated_recovery_reduce_per_lv", 1.8)))
+	var assist_duration: float = maxf(
+		float(stats.get("min_assist_channel_duration", 0.55)),
+		float(stats.get("base_assist_channel_duration", 1.1)) - (float(level) * float(stats.get("assist_channel_reduce_per_lv", 0.1)))
 	)
-	var recovery_health_ratio: float = clampf(
-		0.35 + (float(level) * float(stats.get("incapacitated_recovery_health_add_per_lv", 0.08))),
+	var assist_health_ratio: float = clampf(
+		0.35 + (float(level) * float(stats.get("assist_recovery_health_add_per_lv", 0.07))),
 		0.35,
-		float(stats.get("max_incapacitated_recovery_health_ratio", 0.75))
+		float(stats.get("max_assist_recovery_health_ratio", 0.7))
 	)
-	ship.set_meta("incapacitated_recovery_delay", recovery_delay)
-	ship.set_meta("incapacitated_recovery_health_ratio", recovery_health_ratio)
+	var assist_acquire_range: float = 4.6 + (float(level) * float(stats.get("assist_acquire_range_add_per_lv", 0.45)))
+	var assist_use_range: float = 1.15 + (float(level) * float(stats.get("assist_use_range_add_per_lv", 0.04)))
+	if ship.has_meta("incapacitated_recovery_delay"):
+		ship.remove_meta("incapacitated_recovery_delay")
+	if ship.has_meta("incapacitated_recovery_health_ratio"):
+		ship.remove_meta("incapacitated_recovery_health_ratio")
+	ship.set_meta("incapacitated_assist_channel_duration", assist_duration)
+	ship.set_meta("incapacitated_assist_health_ratio", assist_health_ratio)
+	ship.set_meta("incapacitated_assist_acquire_range", assist_acquire_range)
+	ship.set_meta("incapacitated_assist_use_range", assist_use_range)
 	if "crew_respawn_interval" in ship:
 		var base_interval: float = float(ship.get_meta("base_crew_respawn_interval", ship.crew_respawn_interval))
 		if not ship.has_meta("base_crew_respawn_interval"):
@@ -378,7 +412,7 @@ func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 			ship.add_survivor()
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[CrewReserve] 생존 Lv.%d (전투불능 회복 %.1fs, 회복 %.0f%%)" % [level, recovery_delay, recovery_health_ratio * 100.0])
+	print("[CrewReserve] 구호 Lv.%d (일으키기 %.2fs, 회복 %.0f%%)" % [level, assist_duration, assist_health_ratio * 100.0])
 
 func _recover_incapacitated_player_soldiers(ship: Node3D) -> int:
 	var recovered_count := 0
@@ -395,13 +429,18 @@ func _recover_incapacitated_player_soldiers(ship: Node3D) -> int:
 
 func _apply_boarding_resist(ship: Node3D, level: int) -> void:
 	var stats: Dictionary = UPGRADES["boarding_resist"].get("stats", {})
-	var duration_bonus: float = float(stats.get("capture_duration_mult_per_lv", 0.14)) * float(level)
-	var capture_damage_reduction: float = float(stats.get("capture_damage_reduction_per_lv", 0.08)) * float(level)
-	var boarding_fire_reduction: float = float(stats.get("boarding_fire_reduce_per_lv", 0.12)) * float(level)
-	ship.set_meta("boarding_capture_duration_multiplier", 1.0 + duration_bonus)
+	var defense_damage: float = minf(
+		float(stats.get("boarding_defense_max_damage_per_tick", 7.0)),
+		float(stats.get("boarding_defense_damage_per_tick_per_lv", 1.4)) * float(level)
+	)
+	var capture_damage_reduction: float = float(stats.get("capture_damage_reduction_per_lv", 0.06)) * float(level)
+	var boarding_fire_reduction: float = float(stats.get("boarding_fire_reduce_per_lv", 0.1)) * float(level)
+	if ship.has_meta("boarding_capture_duration_multiplier"):
+		ship.remove_meta("boarding_capture_duration_multiplier")
+	ship.set_meta("boarding_defense_damage_per_tick", defense_damage)
 	ship.set_meta("boarding_capture_damage_reduction", clampf(capture_damage_reduction, 0.0, 0.75))
 	ship.set_meta("boarding_fire_damage_reduction", clampf(boarding_fire_reduction, 0.0, 0.75))
-	print("[BoardingResist] 방책 Lv.%d (장악 %.0f%% 지연)" % [level, duration_bonus * 100.0])
+	print("[BoardingResist] 방책 Lv.%d (도선병 피해 %.1f/s)" % [level, defense_damage])
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
 	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")
@@ -446,25 +485,12 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	var def_lv = current_levels.get("hull_defense", 0)
 	var s = UPGRADES["hull_defense"]["stats"]
-	if _level_matches(def_lv, s.get("repair_levels", [])) and "hull_hp" in ship:
-		ship.hull_hp += float(s.get("repair_add", 35.0))
 	if "hull_defense" in ship:
 		var defense_bonus := 0.0
 		for level_entry in s.get("def_levels", []):
 			if int(level_entry) <= def_lv:
 				defense_bonus += float(s.get("def_add", 2.0))
 		ship.hull_defense = defense_bonus
-	var ranged_block := 0.0
-	for level_entry in s.get("crew_ranged_block_levels", []):
-		if int(level_entry) <= def_lv:
-			ranged_block += float(s.get("crew_ranged_block_add", 0.10))
-	ship.set_meta("crew_ranged_damage_reduction", ranged_block)
-	if "hull_regen_rate" in ship:
-		var regen_bonus := 0.0
-		for level_entry in s.get("regen_levels", []):
-			if int(level_entry) <= def_lv:
-				regen_bonus += float(s.get("regen_add", 1.5))
-		ship.hull_regen_rate = regen_bonus
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.hull_hp, ship.max_hull_hp)
 
@@ -474,6 +500,17 @@ func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	if hud and hud.has_method("update_hull_hp"):
 		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 	print("[Hull] 선체 장갑 강화 Lv.%d" % def_lv)
+
+
+func _apply_hull_repair(ship: Node3D, level: int) -> void:
+	var stats: Dictionary = UPGRADES["hull_repair"].get("stats", {})
+	var regen_rate: float = minf(
+		float(stats.get("max_regen", 1.0)),
+		float(level) * float(stats.get("regen_per_lv", 0.2))
+	)
+	if "hull_regen_rate" in ship:
+		ship.hull_regen_rate = regen_rate
+	print("[HullRepair] 선체 자동 수리 Lv.%d (%.1f/s)" % [level, regen_rate])
 
 func _apply_sailing(ship: Node3D, level: int) -> void:
 	var s = UPGRADES["sailing"]["stats"]
@@ -683,7 +720,16 @@ func _apply_janggun(ship: Node3D, level: int) -> void:
 
 func _apply_fire_pot(ship: Node3D, level: int) -> void:
 	_refresh_player_crew_capacity(ship)
-		
+	var stats: Dictionary = UPGRADES["fire_pot"].get("stats", {})
+	if "fire_pot_ignition_chance" in ship:
+		ship.fire_pot_ignition_chance = clampf(
+			float(stats.get("base_ignition_chance", 0.45)) + float(level - 1) * float(stats.get("ignition_chance_per_lv", 0.075)),
+			0.0,
+			float(stats.get("max_ignition_chance", 0.75))
+		)
+	if "fire_pot_burn_duration" in ship:
+		ship.fire_pot_burn_duration = float(stats.get("burn_duration", 7.0))
+
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
 	print("[FirePot] 화통 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
@@ -736,34 +782,48 @@ func _apply_gold(_ship: Node3D, _level: int) -> void:
 func _apply_fleet_signal(ship: Node3D, _level: int) -> void:
 	if not is_instance_valid(ship):
 		return
-	_refresh_support_fleet_upgrade_state(ship)
-	if _should_skip_support_fleet_autospawn():
+	var reconcile_state := reconcile_support_fleet(ship, "fleet_signal", {
+		"allow_autospawn": true,
+		"spawn_now": true,
+	})
+	if reconcile_state.get("autospawn_skipped", false):
 		print("[Support] 지원함 자동 소환 건너뜀 (probe)")
 		return
-	if ship.has_method("_spawn_or_repair_ally"):
-		ship.call_deferred("_spawn_or_repair_ally")
+	if reconcile_state.get("spawn_requested", false):
 		print("[Support] 지원함 소집 발동!")
 		return
 	print("[Support] 지원함 소집은 플레이어 함선에서만 사용할 수 있습니다.")
 
+func _apply_panokseon_upgrade(ship: Node3D, _level: int) -> void:
+	if not is_instance_valid(ship):
+		return
+	var reconcile_state := reconcile_support_fleet(ship, "panokseon_upgrade", {
+		"allow_autospawn": true,
+		"spawn_now": true,
+		"require_signal_unlock": true,
+	})
+	if reconcile_state.get("autospawn_skipped", false):
+		print("[Support] 판옥선 자동 보강 건너뜀 (probe)")
+		return
+	if reconcile_state.get("spawn_requested", false):
+		print("[Support] 판옥선 포격함이 지원 함대에 합류했습니다!")
+		return
+	print("[Support] 판옥선은 지원함 해금 후 사용할 수 있습니다.")
+
 func _apply_fleet_crew(ship: Node3D, level: int) -> void:
 	if not is_instance_valid(ship):
 		return
-	_refresh_support_fleet_upgrade_state(ship)
 	var stats: Dictionary = UPGRADES["fleet_crew"].get("stats", {})
-	var reduce_levels: int = mini(level, int(stats.get("respawn_reduce_max_level", 4)))
-	var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 3.0))
-	var min_respawn_interval: float = float(stats.get("min_respawn_interval", 18.0))
-	var base_interval: float = float(ship.get_meta("base_support_fleet_respawn_interval", ship.support_fleet_respawn_interval))
-	var next_respawn_interval: float = maxf(min_respawn_interval, base_interval - (reduce_per_level * float(reduce_levels)))
-	if "support_fleet_respawn_timer" in ship and "support_fleet_respawn_interval" in ship:
-		if float(ship.support_fleet_respawn_timer) >= float(ship.support_fleet_respawn_interval):
-			ship.support_fleet_respawn_timer = 0.0
-			if not _should_skip_support_fleet_autospawn() and ship.has_method("_spawn_or_repair_ally") and int(current_levels.get("fleet_signal", 0)) > 0:
-				ship.call_deferred("_spawn_or_repair_ally")
-	if level >= int(stats.get("limit_add_level", 5)):
-		if not _should_skip_support_fleet_autospawn() and ship.has_method("_spawn_or_repair_ally") and int(current_levels.get("fleet_signal", 0)) > 0:
-			ship.call_deferred("_spawn_or_repair_ally")
+	var reconcile_state := reconcile_support_fleet(ship, "fleet_crew", {
+		"allow_autospawn": true,
+		"spawn_if_respawn_ready": true,
+		"spawn_if_limit_increased": level >= int(stats.get("limit_add_level", 5)),
+		"require_signal_unlock": true,
+	})
+	var next_respawn_interval := float(reconcile_state.get(
+		"support_fleet_respawn_interval",
+		float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else 0.0
+	))
 	print("[Support] 지원함 재합류 강화 Lv.%d (재합류 %.0f초)" % [level, next_respawn_interval])
 
 
@@ -822,9 +882,10 @@ func _apply_item_choyogi(ship: Node3D) -> void:
 	if ship.has_meta("item_choyogi_applied"):
 		return
 	ship.set_meta("item_choyogi_applied", true)
-	_refresh_support_fleet_upgrade_state(ship)
-	if not _should_skip_support_fleet_autospawn() and ship.has_method("_spawn_or_repair_ally"):
-		ship.call_deferred("_spawn_or_repair_ally")
+	reconcile_support_fleet(ship, "item_choyogi", {
+		"allow_autospawn": true,
+		"spawn_now": true,
+	})
 
 func _apply_item_ilseongjeongsiui(ship: Node3D) -> void:
 	if ship.has_meta("item_ilseongjeongsiui_applied"):
@@ -870,10 +931,8 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 		return
 	var lv: int = int(current_levels.get("hull_defense", 0))
 	var s: Dictionary = UPGRADES.get("hull_defense", {}).get("stats", {})
-	if s.is_empty():
-		return
 
-	if "hull_defense" in ship:
+	if not s.is_empty() and "hull_defense" in ship:
 		var base_defense: float
 		if ship.has_meta("fleet_base_shared_hull_defense"):
 			base_defense = float(ship.get_meta("fleet_base_shared_hull_defense"))
@@ -887,41 +946,62 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 		ship.hull_defense = base_defense + defense_bonus
 
 	if "hull_regen_rate" in ship:
+		var repair_lv: int = int(current_levels.get("hull_repair", 0))
+		var repair_stats: Dictionary = UPGRADES.get("hull_repair", {}).get("stats", {})
 		var base_regen: float
 		if ship.has_meta("fleet_base_shared_hull_regen_rate"):
 			base_regen = float(ship.get_meta("fleet_base_shared_hull_regen_rate"))
 		else:
 			base_regen = float(ship.hull_regen_rate)
 			ship.set_meta("fleet_base_shared_hull_regen_rate", base_regen)
-		var regen_bonus := 0.0
-		for level_entry in s.get("regen_levels", []):
-			if int(level_entry) <= lv:
-				regen_bonus += float(s.get("regen_add", 1.5))
+		var regen_bonus: float = minf(
+			float(repair_stats.get("max_regen", 1.0)),
+			float(repair_lv) * float(repair_stats.get("regen_per_lv", 0.2))
+		)
 		ship.hull_regen_rate = base_regen + regen_bonus
 
-	var ranged_block := 0.0
-	for level_entry in s.get("crew_ranged_block_levels", []):
-		if int(level_entry) <= lv:
-			ranged_block += float(s.get("crew_ranged_block_add", 0.10))
-	ship.set_meta("crew_ranged_damage_reduction", ranged_block)
+	ship.set_meta("crew_ranged_damage_reduction", 0.0)
 
 	if "hull_hp" in ship and "max_hull_hp" in ship:
-		var prev_level: int = int(ship.get_meta("fleet_shared_hull_level_applied", 0))
-		if lv > prev_level:
-			var repair_add := 0.0
-			for level_entry in s.get("repair_levels", []):
-				var repair_level := int(level_entry)
-				if repair_level > prev_level and repair_level <= lv:
-					repair_add += float(s.get("repair_add", 35.0))
-			if repair_add > 0.0:
-				ship.hull_hp = minf(float(ship.hull_hp) + repair_add, float(ship.max_hull_hp))
-		else:
-			ship.hull_hp = minf(float(ship.hull_hp), float(ship.max_hull_hp))
+		ship.hull_hp = minf(float(ship.hull_hp), float(ship.max_hull_hp))
 		ship.set_meta("fleet_shared_hull_level_applied", lv)
 			
+func reconcile_support_fleet(ship: Node3D, _reason: String = "", options: Dictionary = {}) -> Dictionary:
+	var state := _sync_support_fleet_upgrade_state(ship)
+	if state.is_empty():
+		return state
+	if not bool(options.get("allow_autospawn", false)):
+		return state
+	if _should_skip_support_fleet_autospawn():
+		state["autospawn_skipped"] = true
+		return state
+	var require_signal_unlock: bool = options.get("require_signal_unlock", false) == true
+	if require_signal_unlock and int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) <= 0:
+		state["autospawn_blocked"] = "fleet_signal_locked"
+		return state
+	var should_spawn: bool = options.get("spawn_now", false) == true
+	if options.get("spawn_if_respawn_ready", false) == true:
+		var timer_ready := "support_fleet_respawn_timer" in ship and "support_fleet_respawn_interval" in ship
+		if timer_ready and float(ship.support_fleet_respawn_timer) >= float(ship.support_fleet_respawn_interval):
+			ship.support_fleet_respawn_timer = 0.0
+			should_spawn = true
+	if options.get("spawn_if_limit_increased", false) == true and state.get("support_limit_increased", false):
+		should_spawn = true
+	if should_spawn and ship.has_method("_spawn_or_repair_ally"):
+		ship.call_deferred("_spawn_or_repair_ally")
+		state["spawn_requested"] = true
+	return state
+
+
 func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
+	_sync_support_fleet_upgrade_state(ship)
+
+
+func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 	if not is_instance_valid(ship):
-		return
+		return {}
+	var previous_respawn_interval: float = float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else 0.0
+	var previous_limit: int = int(ship.get("support_fleet_limit")) if "support_fleet_limit" in ship else 0
 	var level: int = int(current_levels.get("fleet_crew", 0))
 	var stats: Dictionary = UPGRADES.get("fleet_crew", {}).get("stats", {})
 	if "support_fleet_respawn_interval" in ship:
@@ -940,6 +1020,13 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 		var upgrade_bonus: int = _get_support_fleet_limit_upgrade_bonus()
 		var squadron_bonus: int = PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, UPGRADES)
 		ship.support_fleet_limit = base_limit + item_bonus + upgrade_bonus + squadron_bonus
+	if ShipAllyRoleHelper.is_player_flagship(ship):
+		PlayerShipSupportHelper.refresh_support_fleet_composition(ship)
+	return {
+		"support_fleet_respawn_interval": float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else previous_respawn_interval,
+		"support_fleet_limit": int(ship.get("support_fleet_limit")) if "support_fleet_limit" in ship else previous_limit,
+		"support_limit_increased": ("support_fleet_limit" in ship) and int(ship.get("support_fleet_limit")) > previous_limit,
+	}
 
 
 func _get_support_fleet_limit_upgrade_bonus() -> int:

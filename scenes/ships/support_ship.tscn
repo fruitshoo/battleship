@@ -6,10 +6,10 @@
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="5_cannon"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="6_collision_visualizer"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_46xrd"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_6oovs"]
 size = Vector3(2.7199998, 2.6000001, 6.42)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_6oovs"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_5qbug"]
 size = Vector3(2.12, 2.4, 5.62)
 
 [node name="SupportShip" type="Node3D" unique_id=603951927 groups=["player"]]
@@ -42,14 +42,14 @@ collision_layer = 4
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=1607305721]
-shape = SubResource("BoxShape3D_46xrd")
+shape = SubResource("BoxShape3D_6oovs")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=433385544 groups=["ship_hitbox"]]
 collision_layer = 4
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=465804758]
-shape = SubResource("BoxShape3D_6oovs")
+shape = SubResource("BoxShape3D_5qbug")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=764909694]
 

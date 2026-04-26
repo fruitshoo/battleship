@@ -1,6 +1,7 @@
 extends RefCounted
 class_name UpgradeManagerDataHelper
 
+const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
 const CREW_ROLE_GENERAL := "general"
 const CREW_ROLE_SPEARMAN := "spearman"
 const CREW_ROLE_FIRE_POT := "fire_pot"
@@ -84,18 +85,13 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		return data["level_desc"][next_level]
 
 	var s: Dictionary = data.get("stats", {})
+	var preview_levels: Dictionary = current_levels.duplicate(true)
+	preview_levels[upgrade_id] = next_level
 	match upgrade_id:
 		"cannon":
-			var player_count := int(s.get("player_base_cannon_count", 3))
-			for entry in s.get("player_extra_cannon_levels", [2, 3, 4, 5]):
-				if next_level >= int(entry):
-					player_count += 1
-			var support_count := int(s.get("support_base_cannon_count", 1))
-			for entry in s.get("player_extra_cannon_levels", [2, 3, 4, 5]):
-				if next_level >= int(entry):
-					support_count += 1
-			support_count = mini(support_count, int(s.get("support_max_cannon_count", 3)))
-			return "포문 %d문 | 지원함 %d문" % [player_count, support_count]
+			var player_count: int = SupportFleetCannonRules.get_player_cannon_count_for_level(next_level, s)
+			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(next_level, s, preview_levels, upgrades)
+			return "포문 %d문 | 지원함 %s" % [player_count, support_summary]
 		"cannon_damage":
 			return "대포 데미지 +%d%%" % int(s.get("dmg_pct_per_lv", 8))
 		"cannon_reload":
@@ -112,45 +108,27 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var spearmen: int = get_specialist_unit_count(upgrades, current_levels, "crew_numbers", next_level)
 			return "창병 %d명 편성" % spearmen
 		"crew_reserve":
-			var recovery_delay: float = maxf(
-				float(s.get("min_incapacitated_recovery_delay", 7.0)),
-				16.0 - (float(next_level) * float(s.get("incapacitated_recovery_reduce_per_lv", 1.8)))
-			)
-			var recovery_health_ratio: float = clampf(
-				0.35 + (float(next_level) * float(s.get("incapacitated_recovery_health_add_per_lv", 0.08))),
-				0.35,
-				float(s.get("max_incapacitated_recovery_health_ratio", 0.75))
-			)
-			return "전투불능 회복 %.1f초 | 회복 체력 %.0f%%" % [recovery_delay, recovery_health_ratio * 100.0]
+			var assist_duration: float = maxf(float(s.get("min_assist_channel_duration", 0.55)), float(s.get("base_assist_channel_duration", 1.1)) - (float(next_level) * float(s.get("assist_channel_reduce_per_lv", 0.1))))
+			var assist_health_ratio: float = clampf(0.35 + (float(next_level) * float(s.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(s.get("max_assist_recovery_health_ratio", 0.7)))
+			var assist_range: float = 4.6 + (float(next_level) * float(s.get("assist_acquire_range_add_per_lv", 0.45)))
+			return "일으키기 %.2f초 | 복귀 체력 %.0f%% | 구호 반경 %.1fm" % [assist_duration, assist_health_ratio * 100.0, assist_range]
 		"boarding_resist":
-			var capture_delay_pct: int = int(round(float(next_level) * float(s.get("capture_duration_mult_per_lv", 0.08)) * 100.0))
-			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.08)) * 100.0))
-			return "적 장악 %d%% 지연 | 갑판 혼란 피해 -%d%%" % [capture_delay_pct, boarding_fire_reduce_pct]
+			var defense_damage: float = minf(float(s.get("boarding_defense_max_damage_per_tick", 7.0)), float(next_level) * float(s.get("boarding_defense_damage_per_tick_per_lv", 1.4)))
+			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.1)) * 100.0))
+			return "도선병 피해 %.1f/초 | 갑판 혼란 피해 -%d%%" % [defense_damage, boarding_fire_reduce_pct]
 		"crew_attack":
 			return "무기 피해 +%.0f%%" % [next_level * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0]
 		"crew_defense":
 			var defense_bonus: float = next_level * float(s.get("defense_add_per_lv", 1.0))
-			var damage_reduction: float = clampf(
-				float(next_level) * float(s.get("damage_reduction_per_lv", 0.04)),
-				0.0,
-				float(s.get("max_damage_reduction", 0.22))
-			)
+			var damage_reduction: float = clampf(float(next_level) * float(s.get("damage_reduction_per_lv", 0.04)), 0.0, float(s.get("max_damage_reduction", 0.22)))
 			return "병사 방어력 +%.0f | 받는 피해 -%.0f%%" % [defense_bonus, damage_reduction * 100.0]
 		"hull_defense":
-			if level_matches(next_level, s.get("repair_levels", [])):
-				if level_matches(next_level, s.get("regen_levels", [])):
-					return "즉시 수리 +%d 및 선체 재생 +%.1f/s" % [
-						int(s.get("repair_add", 35.0)),
-						float(s.get("regen_add", 1.5)),
-					]
-				return "즉시 수리 +%d" % int(s.get("repair_add", 35.0))
 			if level_matches(next_level, s.get("def_levels", [])):
-				return "선체 방어력 +%d" % int(s.get("def_add", 2.0))
-			if level_matches(next_level, s.get("crew_ranged_block_levels", [])):
-				return "병사 원거리 피해 -%d%%" % int(round(float(s.get("crew_ranged_block_add", 0.10)) * 100.0))
-			if level_matches(next_level, s.get("regen_levels", [])):
-				return "선체 재생 +%.1f/s" % float(s.get("regen_add", 1.5))
+				return "선체 방어력 +%.1f" % float(s.get("def_add", 1.0))
 			return "선체 보강"
+		"hull_repair":
+			var regen_rate: float = minf(float(s.get("max_regen", 1.0)), float(next_level) * float(s.get("regen_per_lv", 0.2)))
+			return "선체 자동 수리 %.1f/s" % regen_rate
 		"sailing":
 			var sailing_parts: Array[String] = []
 			if level_matches(next_level, s.get("speed_levels", [])):
@@ -181,11 +159,12 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var throwers: int = get_specialist_unit_count(upgrades, current_levels, "fire_pot", next_level)
 			var dmg: float = s.get("base_damage", 15.0) + (next_level - 1) * s.get("damage_per_lv", 5.0)
 			var cd: float = s.get("base_cooldown", 6.0) - (next_level - 1) * s.get("cooldown_reduce_per_lv", 1.0)
+			var ignite_pct: int = int(round(clampf(float(s.get("base_ignition_chance", 0.45)) + float(next_level - 1) * float(s.get("ignition_chance_per_lv", 0.075)), 0.0, float(s.get("max_ignition_chance", 0.75))) * 100.0))
 			if next_level == 4:
 				cd = 3.5
 			if next_level >= 5:
 				cd = 3.0
-			return "화통 %d명 | 화염 %.0f | 재사용 %.1f초" % [throwers, dmg, cd]
+			return "화통 %d명 | 화염 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, dmg, ignite_pct, cd]
 		"repeating_crossbow":
 			var repeaters: int = get_specialist_unit_count(upgrades, current_levels, "repeating_crossbow", next_level)
 			var burst: int = 3
@@ -208,18 +187,21 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var pierce: int = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))
 			return "관통 화살 데미지 %.0f, 최대 %d명 관통 및 넉백" % [ballista_damage, pierce]
 		"fleet_signal":
-			if next_level >= int(s.get("limit_add_level", 2)):
-				return "판옥선 포격 편대 해금 | 지원함 한계 +%d | 즉시 추가 소집" % int(s.get("limit_add", 1))
-			return "희귀 카드: 지원함을 호출합니다.\n(이미 지원함이 있으면 수리 및 재정비)"
+			var signal_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades)
+			var signal_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
+			return "지원함 소집 | 한계 %d척 | 편성 %s" % [signal_limit, signal_summary]
+		"panokseon_upgrade":
+			var panokseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
+			return "판옥선 포격함 1척 합류 | 편성 %s" % panokseon_summary
 		"fleet_crew":
 			var reduce_per_level: float = float(s.get("respawn_reduce_per_lv", 4.0))
 			var max_reduce_levels: int = int(s.get("respawn_reduce_max_level", 4))
 			var reduce_levels: int = mini(next_level, max_reduce_levels)
 			var min_respawn_interval: float = float(s.get("min_respawn_interval", 14.0))
 			var respawn_interval: float = maxf(min_respawn_interval, 30.0 - (reduce_per_level * float(reduce_levels)))
-			if next_level >= int(s.get("limit_add_level", 5)):
-				return "지원함 재합류 %.0f초 | 지원함 한계 +%d" % [respawn_interval, int(s.get("limit_add", 1))]
-			return "지원함 재합류 %.0f초" % respawn_interval
+			var fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades)
+			var fleet_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
+			return "지원함 재합류 %.0f초 | 한계 %d척 | 편성 %s" % [respawn_interval, fleet_limit, fleet_summary]
 		"supply":
 			return "선체 수리 (즉시 HP +%d 회복)" % int(s.get("max_hp_add", 20))
 		"gold":

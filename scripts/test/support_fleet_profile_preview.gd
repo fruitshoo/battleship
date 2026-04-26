@@ -9,7 +9,13 @@ const FLEET_UPGRADES := {
 		"stats": {
 			"limit_add_level": 2,
 			"limit_add": 1,
-			"panokseon_level": 2,
+		},
+	},
+	"panokseon_upgrade": {
+		"stats": {
+			"panokseon_upgrade_id": "panokseon_upgrade",
+			"panokseon_level": 1,
+			"panokseon_squadron_limit_add": 1,
 		},
 	},
 }
@@ -60,17 +66,18 @@ func _assert_profile_resolution() -> void:
 	var pre_unlock_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1}, FLEET_UPGRADES, 1)
 	_assert_equal("pre_unlock_slot1_profile", pre_unlock_profile.get("ship_type", ""), "maengseon_ally")
 
-	var unlocked_screen_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 2}, FLEET_UPGRADES, 0)
+	var unlocked_screen_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1}, FLEET_UPGRADES, 0)
 	_assert_equal("unlocked_slot0_profile", unlocked_screen_profile.get("ship_type", ""), "maengseon_ally")
 	_assert_equal("unlocked_slot0_squadron", unlocked_screen_profile.get("squadron_id", ""), "flagship_screen")
+	_assert_equal("unlocked_slot0_role", unlocked_screen_profile.get("slot_role", ""), "screen_lead")
 
-	var unlocked_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 2}, FLEET_UPGRADES, 1)
+	var unlocked_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1}, FLEET_UPGRADES, 1)
 	_assert_equal("unlocked_slot1_profile", unlocked_profile.get("ship_type", ""), "panokseon_ally")
 	_assert_equal("unlocked_slot1_squadron", unlocked_profile.get("squadron_id", ""), "panokseon_artillery")
 	_assert_equal("unlocked_slot1_role", unlocked_profile.get("slot_role", ""), "artillery_lead")
 
-	var legacy_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_hull": 5}, LEGACY_FLEET_HULL_UPGRADES, 1)
-	_assert_equal("legacy_hull_unlock_slot1_profile", legacy_profile.get("ship_type", ""), "panokseon_ally")
+	var legacy_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_hull": 5}, LEGACY_FLEET_HULL_UPGRADES, 0)
+	_assert_equal("legacy_hull_unlock_slot0_profile", legacy_profile.get("ship_type", ""), "maengseon_ally")
 
 
 func _assert_profile_application() -> void:
@@ -79,7 +86,7 @@ func _assert_profile_application() -> void:
 		_record_failure("cannot_instantiate_support_ship")
 		return
 
-	var profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 2}, FLEET_UPGRADES, 1)
+	var profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1}, FLEET_UPGRADES, 1)
 	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, profile)
 	_assert_equal("applied_ship_type", ally.get("ship_type"), "panokseon_ally")
 	_assert_equal("applied_hull_scene", _scene_path(ally.get("hull_scene")), "res://scenes/ships/hulls/panokseon_hull.tscn")
@@ -96,8 +103,8 @@ func _assert_upgrade_manager_limit() -> void:
 	if not ("current_levels" in upgrade_manager) or not upgrade_manager.current_levels is Dictionary:
 		_record_failure("missing_current_levels")
 		return
-	if not upgrade_manager.has_method("_refresh_support_fleet_upgrade_state"):
-		_record_failure("missing_refresh_support_fleet_upgrade_state")
+	if not upgrade_manager.has_method("reconcile_support_fleet"):
+		_record_failure("missing_reconcile_support_fleet")
 		return
 
 	var original_levels: Dictionary = upgrade_manager.current_levels.duplicate(true)
@@ -110,9 +117,10 @@ func _assert_upgrade_manager_limit() -> void:
 	if player.has_meta("item_choyogi_applied"):
 		player.remove_meta("item_choyogi_applied")
 	upgrade_manager.current_levels["fleet_crew"] = 0
-	upgrade_manager.current_levels["fleet_signal"] = 2
-	upgrade_manager.call("_refresh_support_fleet_upgrade_state", player)
-	_assert_equal("fleet_signal_limit_supports_panokseon_slot", int(player.get("support_fleet_limit")), 2)
+	upgrade_manager.current_levels["fleet_signal"] = 1
+	upgrade_manager.current_levels["panokseon_upgrade"] = 1
+	upgrade_manager.call("reconcile_support_fleet", player, "preview_limit", {})
+	_assert_equal("panokseon_upgrade_adds_support_slot", int(player.get("support_fleet_limit")), 2)
 
 	upgrade_manager.current_levels = original_levels
 	player.set("support_fleet_limit", original_limit)
@@ -158,7 +166,7 @@ func _add_preview_labels() -> void:
 		anchor = player.global_position + Vector3(0.0, 8.0, 0.0)
 	var label := PreviewHarnessHelper.add_billboard_label(
 		self,
-		"Support squadron slots\nMaengseon screen + Panokseon artillery",
+		"Support squadron slots\nMaengseon screen + added Panokseon artillery",
 		anchor,
 		Color(0.58, 0.9, 1.0, 1.0),
 		32

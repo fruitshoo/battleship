@@ -3,6 +3,7 @@ extends "res://scripts/entities/ships/base_ship.gd"
 class_name ChaserShip
 const DEBUG_CHASER_LOGS := false
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
@@ -78,9 +79,9 @@ var _enemy_crew_spawn_index: int = 0
 
 
 # === 함대 진형 (Formation) 관련 ===
-enum Formation {COLUMN, WING, WEDGE}
+enum Formation {COLUMN, WING, WEDGE} # WEDGE is kept as a legacy saved-value alias of WING.
 static var fleet_formation: Formation = Formation.COLUMN # 공유 진형 설정 (기본: 장사진)
-static var support_hold_formation: bool = false # 지원함 자유 교전/진형 유지 토글
+static var support_hold_formation: bool = true # 지원함 자유 교전/진형 유지 토글
 
 var formation_spacing: float = 14.0 # 선박 간 간격 축소 (밀집 대형)
 
@@ -969,26 +970,27 @@ func _respawn_minion_soldier() -> void:
 ## 충돌 감지 (Area3D signal 연결 필요)
 ## 함대 업그레이드 (대포 수량 조절 등)
 func apply_fleet_weapon_upgrade(level: int) -> void:
-	# 대포 노드들 찾기
 	var cannons = []
 	for child in get_children():
 		if child.name.begins_with("FleetCannon_"):
 			cannons.append(child)
-	
-	# 플레이어 포문 업그레이드를 공유하되 지원함은 전방/양현 3문까지만 활성화한다.
-	var active_count: int = clampi(level, 1, 3)
-	
-	for i in range(cannons.size()):
-		var cannon = cannons[i]
-		if i < active_count:
+
+	var effective_level := maxi(level, 1)
+	var active_cannon_names := SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type(ship_type, effective_level)
+
+	var active_count := 0
+	for cannon in cannons:
+		var should_enable := active_cannon_names.has(str(cannon.name))
+		if should_enable:
 			cannon.visible = true
 			cannon.set_process(true)
 			cannon.set_physics_process(true)
+			active_count += 1
 		else:
 			cannon.visible = false
 			cannon.set_process(false)
 			cannon.set_physics_process(false)
-	
+
 	print("[Fleet] 공유 포문 적용: Lv.%d (지원함 대포 %d문 활성화)" % [level, active_count])
 
 

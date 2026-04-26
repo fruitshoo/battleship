@@ -188,7 +188,9 @@
 			"weapon_loadout": [
 				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1},
 				{"profile": "joseon_light_cannon", "name": "FleetCannon_1", "slot": "CannonLeft", "position": [-1.3, 0.6, 0.0], "rotation_y": 90.0, "required_level": 1},
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_2", "slot": "CannonRight", "position": [1.3, 0.6, 0.0], "rotation_y": -90.0, "required_level": 1}
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_2", "slot": "CannonRight", "position": [1.3, 0.6, 0.0], "rotation_y": -90.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_3", "slot": "CannonLeftExtra", "position": [-1.3, 0.6, -2.0], "rotation_y": 90.0, "required_level": 2},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_4", "slot": "CannonRightExtra", "position": [1.3, 0.6, 2.0], "rotation_y": -90.0, "required_level": 3}
 			],
 			"deck_height": 0.5,
 			"combat_profile": "stand_off_gunner",
