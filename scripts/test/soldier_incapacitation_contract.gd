@@ -3,6 +3,7 @@ extends Node
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
+const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const SoldierScript = preload("res://scripts/entities/soldiers/soldier.gd")
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
 
@@ -14,6 +15,10 @@ class MockShip:
 	var is_sinking: bool = false
 	var is_dying: bool = false
 	var derelict_checks: int = 0
+	var base_collision_radius: float = 4.5
+	var width_multiplier: float = 1.0
+	var length_multiplier: float = 1.0
+	var deck_height: float = 0.0
 
 	func get_team_tag() -> String:
 		return team
@@ -121,6 +126,9 @@ class MockSoldier:
 	func get_owned_ship_node() -> Node3D:
 		return owned_ship
 
+	func find_nearest_hostile_on_owned_ship() -> Node3D:
+		return null
+
 
 func _ready() -> void:
 	var failures: Array[String] = []
@@ -128,6 +136,8 @@ func _ready() -> void:
 	_verify_defense_reduction_mitigates_player_damage(failures)
 	_verify_heal_full_recovers_incapacitated_player(failures)
 	_verify_recovery_uses_ship_medical_upgrade_stats(failures)
+	_verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures)
+	_verify_shipmate_assist_uses_standoff_without_pushing(failures)
 	_verify_player_soldier_level_progression(failures)
 	_verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures)
 	_verify_cross_ship_attack_state_exits_unreachable_melee(failures)
@@ -226,6 +236,132 @@ func _verify_recovery_uses_ship_medical_upgrade_stats(failures: Array[String]) -
 		failures.append("medical recovery stat did not set upgraded recovery health: %.2f vs %.2f" % [soldier.current_health, expected_health])
 	if soldier.xp_awards != 1 or not is_equal_approx(soldier.soldier_xp, 1.0):
 		failures.append("recovered soldier did not receive survival level xp")
+
+
+func _verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures: Array[String]) -> void:
+	var ship := _make_ship("player")
+	ship.set_meta("incapacitated_assist_health_ratio", 0.5)
+	var soldiers := Node3D.new()
+	soldiers.name = "Soldiers"
+	ship.add_child(soldiers)
+	var downed = SOLDIER_SCENE.instantiate()
+	var helper = SOLDIER_SCENE.instantiate()
+	if downed == null or helper == null:
+		failures.append("shipmate assist recovery could not instantiate soldier scene")
+		return
+	downed.team = "player"
+	helper.team = "player"
+	downed.set("player_visual_scene", null)
+	downed.set("enemy_visual_scene", null)
+	downed.set("captain_visual_scene", null)
+	helper.set("player_visual_scene", null)
+	helper.set("enemy_visual_scene", null)
+	helper.set("captain_visual_scene", null)
+	soldiers.add_child(downed)
+	soldiers.add_child(helper)
+	downed.owned_ship = ship
+	downed.home_ship = ship
+	helper.owned_ship = ship
+	helper.home_ship = ship
+	downed.current_health = 8.0
+	downed.global_position = Vector3.ZERO
+	helper.global_position = Vector3(0.65, 0.0, 0.0)
+
+	SoldierLifecycleHelper.take_damage(downed, 20.0, Vector3.ZERO, "sword")
+	var assist_started: bool = helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
+	if helper.get_named_action() != SoldierActionHelper.ACTION_INCAPACITATED_ASSIST:
+		failures.append("shipmate assist recovery did not enter the revive assist action")
+	if SoldierActionHelper.get_action_animation_name(helper) != SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY:
+		failures.append("shipmate assist recovery did not reuse the corpse cleanup carry animation")
+	if helper.get_carry_payload() != downed:
+		failures.append("shipmate assist recovery did not bind the downed ally as a temporary pickup payload")
+	var assist_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST)
+	if assist_definition.get(SoldierActionHelper.ACTION_DEF_LOCKS_AI, true) != false:
+		failures.append("shipmate assist recovery action should not lock AI while channeling")
+	var downed_during_channel: Vector3 = downed.global_position
+	if Vector2(downed_during_channel.x, downed_during_channel.z).distance_to(Vector2.ZERO) > 0.05:
+		failures.append("shipmate assist recovery dragged the downed ally away from the fall position during channel")
+	var assist_finished: bool = helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
+
+	if not assist_started or not assist_finished:
+		failures.append("shipmate assist recovery did not engage the incapacitated ally")
+	if downed.current_state != SoldierScript.State.IDLE:
+		failures.append("shipmate assist recovery did not return incapacitated ally to idle")
+	var expected_health: float = downed.max_health * 0.5
+	if not is_equal_approx(downed.current_health, expected_health):
+		failures.append("shipmate assist recovery did not use ship recovery health ratio: %.2f vs %.2f" % [downed.current_health, expected_health])
+	if helper.has_meta("incapacitated_assist_target_id"):
+		failures.append("shipmate assist recovery left stale assist target metadata on helper")
+	if helper.has_named_action(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST):
+		failures.append("shipmate assist recovery left the revive assist action active")
+	if helper.get_carry_payload() != null or downed.has_meta(SoldierActionHelper.CARRY_PAYLOAD_OWNER_META):
+		failures.append("shipmate assist recovery left stale temporary pickup payload metadata")
+	if not is_equal_approx(downed.global_position.y, helper.global_position.y):
+		failures.append("shipmate assist recovery did not settle the recovered ally back onto deck height")
+	if Vector2(downed.global_position.x, downed.global_position.z).distance_to(Vector2.ZERO) > 0.05:
+		failures.append("shipmate assist recovery recovered the ally away from the original fall position")
+
+
+func _verify_shipmate_assist_uses_standoff_without_pushing(failures: Array[String]) -> void:
+	var ship := _make_ship("player")
+	ship.set_meta("incapacitated_assist_health_ratio", 0.5)
+	var soldiers := Node3D.new()
+	soldiers.name = "Soldiers"
+	ship.add_child(soldiers)
+	var downed = SOLDIER_SCENE.instantiate()
+	var helper = SOLDIER_SCENE.instantiate()
+	if downed == null or helper == null:
+		failures.append("shipmate standoff assist could not instantiate soldier scene")
+		return
+	downed.team = "player"
+	helper.team = "player"
+	downed.set("player_visual_scene", null)
+	downed.set("enemy_visual_scene", null)
+	downed.set("captain_visual_scene", null)
+	helper.set("player_visual_scene", null)
+	helper.set("enemy_visual_scene", null)
+	helper.set("captain_visual_scene", null)
+	soldiers.add_child(downed)
+	soldiers.add_child(helper)
+	downed.owned_ship = ship
+	downed.home_ship = ship
+	helper.owned_ship = ship
+	helper.home_ship = ship
+	downed.current_health = 8.0
+	downed.global_position = Vector3(3.7, 0.0, 0.0)
+	helper.global_position = Vector3(0.4, 0.0, 0.0)
+
+	SoldierLifecycleHelper.take_damage(downed, 20.0, Vector3.ZERO, "sword")
+	var target_pos: Vector3 = downed.global_position
+	target_pos.y = helper.global_position.y
+	var use_range: float = helper._get_incapacitated_assist_use_range()
+	var stand_pos: Vector3 = helper._get_incapacitated_assist_stand_position(downed, use_range)
+	if stand_pos.distance_to(target_pos) < use_range:
+		failures.append("shipmate standoff assist still selected a body-overlapping approach point")
+	var half_ext: Vector2 = helper._get_ship_deck_half_extents(ship)
+	var local_stand: Vector3 = ship.to_local(stand_pos)
+	if absf(local_stand.x) > half_ext.x or absf(local_stand.z) > half_ext.y:
+		failures.append("shipmate standoff assist selected an approach point outside the deck")
+
+	var downed_before_approach: Vector3 = downed.global_position
+	var approach_started: bool = helper._try_assist_incapacitated_ally(0.18, 0.72, 7.0)
+	if not approach_started:
+		failures.append("shipmate standoff assist did not engage the downed ally")
+	if helper.get_named_action() == SoldierActionHelper.ACTION_INCAPACITATED_ASSIST:
+		failures.append("shipmate standoff assist started channeling before reaching its stand point")
+	if downed.global_position.distance_to(downed_before_approach) > 0.01:
+		failures.append("shipmate standoff assist pushed the downed ally while approaching")
+
+	helper.global_position = stand_pos
+	helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
+	if downed.global_position.distance_to(downed_before_approach) > 0.05:
+		failures.append("shipmate standoff assist dragged the downed ally while channeling")
+	helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
+	if downed.current_state != SoldierScript.State.IDLE:
+		failures.append("shipmate standoff assist did not recover the ally from its stand point")
+	var local_recovered: Vector3 = ship.to_local(downed.global_position)
+	if absf(local_recovered.x) > half_ext.x or absf(local_recovered.z) > half_ext.y:
+		failures.append("shipmate standoff assist recovered ally outside the deck bounds")
 
 
 func _verify_player_soldier_level_progression(failures: Array[String]) -> void:

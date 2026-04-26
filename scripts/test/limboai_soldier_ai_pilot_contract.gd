@@ -1,10 +1,12 @@
 extends Node
+# @scene_contract_encapsulated
 
 
 const SoldierScene = preload("res://scenes/entities/soldiers/soldier.tscn")
 const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
 const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 const CONTRACT_META_STALE_FRAMES := 8
 
@@ -33,12 +35,13 @@ class MockShip:
 	var is_dying := false
 	var boarding_target: Node3D = null
 	var _initial_rope_deployed := false
+	var _soldiers_container: Node3D = null
 
 	func get_team_tag() -> String:
 		return team
 
 	func get_soldiers_container() -> Node:
-		return get_node_or_null("Soldiers")
+		return _soldiers_container
 
 	func get_deck_half_extents() -> Vector2:
 		return deck_half_extents
@@ -69,9 +72,9 @@ func _run_contract() -> void:
 	await _verify_boarding_tree_selection_contract()
 	await _verify_attack_mode_contract()
 	await _verify_move_mode_contract()
-	await _verify_ship_duty_mode_contract()
 	await _verify_boarding_profile_prefers_active_boarding_target_contract()
 	await _verify_ranged_profile_suppresses_cross_ship_muster_contract()
+	await _verify_player_melee_profile_holds_home_deck_contract()
 	await _verify_cross_ship_muster_mode_contract()
 	await _verify_wander_mode_contract()
 
@@ -111,7 +114,7 @@ func _verify_default_tree_selection_contract() -> void:
 
 func _verify_attack_mode_contract() -> void:
 	var scenario := await _spawn_scenario("Attack", Vector3.ZERO, Vector3(16.0, 0.0, 0.0))
-	var shared_ship: MockShip = scenario.player_ship
+	var shared_ship: MockShip = scenario.enemy_ship
 	var enemy_soldier := await _spawn_soldier(shared_ship, "enemy", Vector3(-0.4, 0.4, 0.0), true)
 	var player_soldier := await _spawn_soldier(shared_ship, "player", Vector3(0.4, 0.4, 0.0), true)
 	enemy_soldier.current_state = enemy_soldier.State.IDLE
@@ -141,7 +144,7 @@ func _verify_boarding_tree_selection_contract() -> void:
 
 func _verify_move_mode_contract() -> void:
 	var scenario := await _spawn_scenario("Move", Vector3.ZERO, Vector3(16.0, 0.0, 0.0))
-	var shared_ship: MockShip = scenario.player_ship
+	var shared_ship: MockShip = scenario.enemy_ship
 	var enemy_soldier := await _spawn_soldier(shared_ship, "enemy", Vector3(-2.0, 0.4, 0.0), true)
 	var player_soldier := await _spawn_soldier(shared_ship, "player", Vector3(12.0, 0.4, 0.0), true)
 	enemy_soldier.current_state = enemy_soldier.State.IDLE
@@ -157,6 +160,8 @@ func _verify_move_mode_contract() -> void:
 func _verify_ship_duty_mode_contract() -> void:
 	var scenario := await _spawn_scenario("Duty", Vector3.ZERO, Vector3(120.0, 0.0, 0.0))
 	scenario.player_ship.shiphandling_crew_ratio = 1.0
+	scenario.player_ship.is_rowing = true
+	scenario.player_ship.rudder_angle = 14.0
 	scenario.player_ship.current_speed = 2.4
 	var player_soldier := await _spawn_soldier(scenario.player_ship, "player", Vector3(0.0, 0.4, 0.0), true)
 	player_soldier.current_state = player_soldier.State.IDLE
@@ -219,13 +224,31 @@ func _verify_ranged_profile_suppresses_cross_ship_muster_contract() -> void:
 
 func _verify_cross_ship_muster_mode_contract() -> void:
 	var scenario := await _spawn_scenario("Muster", Vector3.ZERO, Vector3(0.0, 0.0, 12.0))
+	scenario.enemy_ship.is_boarding = true
+	scenario.enemy_ship.boarding_target = scenario.player_ship
+	scenario.enemy_ship._initial_rope_deployed = true
+	var enemy_soldier := await _spawn_soldier(scenario.enemy_ship, "enemy", Vector3(-2.3, 0.4, -4.2), true)
+	enemy_soldier.current_state = enemy_soldier.State.IDLE
+	enemy_soldier.current_target = null
+	enemy_soldier._update_limbo_ai_pilot(0.016)
+
+	_assert_mode(enemy_soldier, SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP, "cross-ship muster mode")
+	_assert_recent_point(enemy_soldier, "cross-ship muster mode")
+	await _cleanup_scenario(scenario.root)
+
+
+func _verify_player_melee_profile_holds_home_deck_contract() -> void:
+	var scenario := await _spawn_scenario("PlayerDefensiveMuster", Vector3.ZERO, Vector3(0.0, 0.0, 12.0))
 	var player_soldier := await _spawn_soldier(scenario.player_ship, "player", Vector3(-2.3, 0.4, -4.2), true)
 	player_soldier.current_state = player_soldier.State.IDLE
 	player_soldier.current_target = null
 	player_soldier._update_limbo_ai_pilot(0.016)
 
-	_assert_mode(player_soldier, SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP, "cross-ship muster mode")
-	_assert_recent_point(player_soldier, "cross-ship muster mode")
+	_assert_mode(player_soldier, SoldierAILimboKeys.MODE_WANDER, "player defensive melee hold mode")
+	if player_soldier.has_meta(SoldierAILimboKeys.META_POINT):
+		var point_value: Variant = player_soldier.get_meta(SoldierAILimboKeys.META_POINT)
+		if point_value is Vector3:
+			_fail("player melee defenders should not publish cross-ship muster points from the home deck")
 	await _cleanup_scenario(scenario.root)
 
 
@@ -266,7 +289,8 @@ func _spawn_ship(parent: Node, ship_name: String, team_name: String, position_va
 	ship.team = team_name
 	ship.position = position_value
 	var soldiers_node := Node3D.new()
-	soldiers_node.name = "Soldiers"
+	soldiers_node.name = NodeContractHelper.SHIP_NODE_SOLDIERS
+	ship._soldiers_container = soldiers_node
 	ship.add_child(soldiers_node)
 	parent.add_child(ship)
 	EntityRegistry.register_ship(ship)

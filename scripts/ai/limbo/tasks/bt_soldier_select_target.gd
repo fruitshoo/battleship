@@ -2,7 +2,6 @@
 extends BTAction
 
 
-const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 const SoldierAILimboKeysScript = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
 
 
@@ -19,7 +18,9 @@ func _tick(_delta: float) -> Status:
 	if not is_instance_valid(soldier):
 		return FAILURE
 
-	var target: Node3D = SoldierShipHelper.find_nearest_enemy(soldier)
+	var target: Node3D = null
+	if soldier.has_method("find_nearest_enemy"):
+		target = soldier.call("find_nearest_enemy") as Node3D
 	var target_distance: float = INF
 	if is_instance_valid(target):
 		target_distance = _get_planar_distance(soldier.global_position, target.global_position)

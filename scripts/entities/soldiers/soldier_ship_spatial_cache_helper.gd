@@ -1,0 +1,280 @@
+extends RefCounted
+class_name SoldierShipSpatialCacheHelper
+
+const SHIP_ENEMY_SCAN_CACHE_FRAME_WINDOW := 2
+const SHIP_ENEMY_SCAN_PRUNE_INTERVAL := 30
+const SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ := 1600.0
+const SHIP_PAIR_GEOMETRY_CACHE_FRAME_WINDOW := 2
+const SHIP_PAIR_GEOMETRY_PRUNE_INTERVAL := 30
+const SHIP_DECK_BUCKET_CACHE_FRAME_WINDOW := 2
+const SHIP_DECK_BUCKET_PRUNE_INTERVAL := 30
+const SHIP_DECK_BUCKET_CELL_SIZE := 2.4
+
+static var _ship_enemy_scan_cache: Dictionary = {}
+static var _ship_enemy_scan_cache_last_prune_frame: int = -1000
+static var _ship_pair_geometry_cache: Dictionary = {}
+static var _ship_pair_geometry_cache_last_prune_frame: int = -1000
+static var _ship_deck_bucket_cache: Dictionary = {}
+static var _ship_deck_bucket_cache_last_prune_frame: int = -1000
+
+
+static func get_valid_node3d(value: Variant) -> Node3D:
+	if not is_instance_valid(value):
+		return null
+	var node: Node3D = value as Node3D
+	if node == null or not is_instance_valid(node):
+		return null
+	return node
+
+
+static func get_ship_enemy_scan_data(soldier) -> Dictionary:
+	var owned_ship: Node3D = get_valid_node3d(soldier.owned_ship)
+	if owned_ship == null:
+		return {}
+	var current_frame: int = Engine.get_physics_frames()
+	var cache_key: String = _make_ship_enemy_scan_cache_key(owned_ship, str(soldier.team))
+	var cached_variant: Variant = _ship_enemy_scan_cache.get(cache_key, null)
+	if typeof(cached_variant) == TYPE_DICTIONARY:
+		var cached: Dictionary = cached_variant as Dictionary
+		var cached_frame: int = int(cached.get("frame", -1000))
+		if current_frame - cached_frame < SHIP_ENEMY_SCAN_CACHE_FRAME_WINDOW:
+			return cached
+	var rebuilt: Dictionary = _build_ship_enemy_scan_data(soldier, owned_ship, current_frame)
+	_ship_enemy_scan_cache[cache_key] = rebuilt
+	_prune_ship_enemy_scan_cache(current_frame)
+	return rebuilt
+
+
+static func _build_ship_enemy_scan_data(soldier, owned_ship: Node3D, current_frame: int) -> Dictionary:
+	var nearby_enemy_ships: Array = []
+	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
+	for other_ship in EntityRegistry.get_ships_by_team(opposing_team):
+		if not is_instance_valid(other_ship) or other_ship == owned_ship:
+			continue
+		if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
+			continue
+		var ship_diff_xz := Vector2(
+			owned_ship.global_position.x - other_ship.global_position.x,
+			owned_ship.global_position.z - other_ship.global_position.z
+		)
+		if ship_diff_xz.length_squared() > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
+			continue
+		nearby_enemy_ships.append(other_ship)
+
+	return {
+		"frame": current_frame,
+		"ship": owned_ship,
+		"nearby_enemy_ships": nearby_enemy_ships,
+	}
+
+
+static func _make_ship_enemy_scan_cache_key(ship: Node3D, team_name: String) -> String:
+	return "%d:%s" % [ship.get_instance_id(), team_name.strip_edges().to_lower()]
+
+
+static func _prune_ship_enemy_scan_cache(current_frame: int) -> void:
+	if current_frame - _ship_enemy_scan_cache_last_prune_frame < SHIP_ENEMY_SCAN_PRUNE_INTERVAL:
+		return
+	_ship_enemy_scan_cache_last_prune_frame = current_frame
+	for cache_key in _ship_enemy_scan_cache.keys():
+		var entry_variant: Variant = _ship_enemy_scan_cache.get(cache_key, null)
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			_ship_enemy_scan_cache.erase(cache_key)
+			continue
+		var entry: Dictionary = entry_variant as Dictionary
+		var cached_ship: Node3D = get_valid_node3d(entry.get("ship", null))
+		var cached_frame: int = int(entry.get("frame", -1000))
+		if cached_ship == null or current_frame - cached_frame >= SHIP_ENEMY_SCAN_PRUNE_INTERVAL:
+			_ship_enemy_scan_cache.erase(cache_key)
+
+
+static func get_ship_pair_geometry(soldier, other_ship: Node3D) -> Dictionary:
+	var owned_ship: Node3D = get_valid_node3d(soldier.owned_ship)
+	if owned_ship == null or not is_instance_valid(other_ship) or owned_ship == other_ship:
+		return {}
+	var current_frame: int = Engine.get_physics_frames()
+	var cache_key: String = _make_ship_pair_geometry_cache_key(owned_ship, other_ship)
+	var cached_variant: Variant = _ship_pair_geometry_cache.get(cache_key, null)
+	if typeof(cached_variant) == TYPE_DICTIONARY:
+		var cached: Dictionary = cached_variant as Dictionary
+		var cached_frame: int = int(cached.get("frame", -1000))
+		if current_frame - cached_frame < SHIP_PAIR_GEOMETRY_CACHE_FRAME_WINDOW:
+			return cached
+	var rebuilt: Dictionary = _build_ship_pair_geometry(soldier, owned_ship, other_ship, current_frame)
+	_ship_pair_geometry_cache[cache_key] = rebuilt
+	_prune_ship_pair_geometry_cache(current_frame)
+	return rebuilt
+
+
+static func _build_ship_pair_geometry(soldier, owned_ship: Node3D, other_ship: Node3D, current_frame: int) -> Dictionary:
+	var my_half_ext: Vector2 = resolve_ship_deck_half_extents(soldier, owned_ship)
+	var other_half_ext: Vector2 = resolve_ship_deck_half_extents(soldier, other_ship)
+	var combined_width: float = my_half_ext.x + other_half_ext.x
+	var combined_length: float = my_half_ext.y + other_half_ext.y
+	var ship_distance_bonus: float = clampf(maxf(0.0, combined_length - 3.4) * 0.6, 0.0, 15.0)
+	var width_bonus: float = maxf(0.0, combined_width - 2.4) * 0.6
+	var length_bonus: float = maxf(0.0, combined_length - 3.4) * 0.5
+	var max_distance_bonus: float = clampf(width_bonus + length_bonus, 0.0, 20.0)
+	var size_pressure: float = maxf(0.0, (combined_width + combined_length) - 10.0)
+
+	var contact_span_ratio: float = 0.72
+	if my_half_ext.x >= 3.2 or my_half_ext.y >= 5.6:
+		contact_span_ratio = 0.84
+	var other_local: Vector3 = owned_ship.to_local(other_ship.global_position)
+	var use_side_edge: bool = absf(other_local.x / maxf(my_half_ext.x, 0.01)) > absf(other_local.z / maxf(my_half_ext.y, 0.01))
+	var contact_local := Vector3.ZERO
+	if use_side_edge:
+		var x_sign: float = 1.0 if other_local.x >= 0.0 else -1.0
+		contact_local.x = x_sign * my_half_ext.x
+		contact_local.z = clampf(other_local.z, -my_half_ext.y * contact_span_ratio, my_half_ext.y * contact_span_ratio)
+	else:
+		var z_sign: float = 1.0 if other_local.z >= 0.0 else -1.0
+		contact_local.x = clampf(other_local.x, -my_half_ext.x * contact_span_ratio, my_half_ext.x * contact_span_ratio)
+		contact_local.z = z_sign * my_half_ext.y
+
+	var ship_diff_xz := Vector2(
+		owned_ship.global_position.x - other_ship.global_position.x,
+		owned_ship.global_position.z - other_ship.global_position.z
+	)
+	return {
+		"frame": current_frame,
+		"ship": owned_ship,
+		"other_ship": other_ship,
+		"my_half_ext": my_half_ext,
+		"other_half_ext": other_half_ext,
+		"ship_distance_bonus": ship_distance_bonus,
+		"max_distance_bonus": max_distance_bonus,
+		"size_pressure": size_pressure,
+		"contact_local": contact_local,
+		"ship_diff_xz_sq": ship_diff_xz.length_squared(),
+	}
+
+
+static func _make_ship_pair_geometry_cache_key(owned_ship: Node3D, other_ship: Node3D) -> String:
+	return "%d>%d" % [owned_ship.get_instance_id(), other_ship.get_instance_id()]
+
+
+static func _prune_ship_pair_geometry_cache(current_frame: int) -> void:
+	if current_frame - _ship_pair_geometry_cache_last_prune_frame < SHIP_PAIR_GEOMETRY_PRUNE_INTERVAL:
+		return
+	_ship_pair_geometry_cache_last_prune_frame = current_frame
+	for cache_key in _ship_pair_geometry_cache.keys():
+		var entry_variant: Variant = _ship_pair_geometry_cache.get(cache_key, null)
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			_ship_pair_geometry_cache.erase(cache_key)
+			continue
+		var entry: Dictionary = entry_variant as Dictionary
+		var cached_ship: Node3D = get_valid_node3d(entry.get("ship", null))
+		var cached_other_ship: Node3D = get_valid_node3d(entry.get("other_ship", null))
+		var cached_frame: int = int(entry.get("frame", -1000))
+		if cached_ship == null or cached_other_ship == null or current_frame - cached_frame >= SHIP_PAIR_GEOMETRY_PRUNE_INTERVAL:
+			_ship_pair_geometry_cache.erase(cache_key)
+
+
+static func resolve_ship_deck_half_extents(_soldier, ship: Node3D) -> Vector2:
+	if is_instance_valid(ship) and ship.has_method("get_deck_half_extents"):
+		var ext: Variant = ship.call("get_deck_half_extents")
+		if ext is Vector2 and ext.x > 0.01 and ext.y > 0.01:
+			return ext
+
+	var radius: float = ship.get("base_collision_radius") if "base_collision_radius" in ship else 4.5
+	var w_mult: float = ship.get("width_multiplier") if "width_multiplier" in ship else 1.0
+	var l_mult: float = ship.get("length_multiplier") if "length_multiplier" in ship else 1.0
+	return Vector2(
+		maxf(0.4, radius * w_mult * 0.85),
+		maxf(0.8, radius * l_mult * 0.85)
+	)
+
+
+static func get_ship_deck_bucket_candidates(ship: Node3D, team_name: String, local_center: Vector3, radius: float) -> Array:
+	var bucket_data: Dictionary = _get_ship_deck_bucket_data(ship)
+	if bucket_data.is_empty():
+		return []
+	var buckets_variant: Variant = bucket_data.get("buckets_by_team", {})
+	if typeof(buckets_variant) != TYPE_DICTIONARY:
+		return []
+	var buckets_by_team: Dictionary = buckets_variant as Dictionary
+	var normalized_team: String = team_name.strip_edges().to_lower()
+	var team_bucket_variant: Variant = buckets_by_team.get(normalized_team, {})
+	if typeof(team_bucket_variant) != TYPE_DICTIONARY:
+		return []
+	var team_buckets: Dictionary = team_bucket_variant as Dictionary
+	var cell_size: float = float(bucket_data.get("cell_size", SHIP_DECK_BUCKET_CELL_SIZE))
+	var center_cell: Vector2i = _get_ship_deck_bucket_cell(local_center, cell_size)
+	var cell_radius: int = maxi(0, int(ceil(maxf(radius, 0.01) / maxf(cell_size, 0.01))))
+	var candidates: Array = []
+	for x in range(center_cell.x - cell_radius, center_cell.x + cell_radius + 1):
+		for y in range(center_cell.y - cell_radius, center_cell.y + cell_radius + 1):
+			var bucket: Array = team_buckets.get(Vector2i(x, y), [])
+			if bucket.is_empty():
+				continue
+			candidates.append_array(bucket)
+	return candidates
+
+
+static func _get_ship_deck_bucket_data(ship: Node3D) -> Dictionary:
+	if not is_instance_valid(ship):
+		return {}
+	var current_frame: int = Engine.get_physics_frames()
+	var cache_key: int = ship.get_instance_id()
+	var cached_variant: Variant = _ship_deck_bucket_cache.get(cache_key, null)
+	if typeof(cached_variant) == TYPE_DICTIONARY:
+		var cached: Dictionary = cached_variant as Dictionary
+		var cached_frame: int = int(cached.get("frame", -1000))
+		if current_frame - cached_frame < SHIP_DECK_BUCKET_CACHE_FRAME_WINDOW:
+			return cached
+	var rebuilt: Dictionary = _build_ship_deck_bucket_data(ship, current_frame)
+	_ship_deck_bucket_cache[cache_key] = rebuilt
+	_prune_ship_deck_bucket_cache(current_frame)
+	return rebuilt
+
+
+static func _build_ship_deck_bucket_data(ship: Node3D, current_frame: int) -> Dictionary:
+	var buckets_by_team: Dictionary = {}
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(soldier):
+			continue
+		if SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		var team_name: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		team_name = team_name.strip_edges().to_lower()
+		if team_name.is_empty():
+			continue
+		var team_bucket_variant: Variant = buckets_by_team.get(team_name, {})
+		var team_buckets: Dictionary = team_bucket_variant as Dictionary if typeof(team_bucket_variant) == TYPE_DICTIONARY else {}
+		var local_pos: Vector3 = ship.to_local(soldier.global_position)
+		var cell: Vector2i = _get_ship_deck_bucket_cell(local_pos, SHIP_DECK_BUCKET_CELL_SIZE)
+		var bucket: Array = team_buckets.get(cell, [])
+		bucket.append(soldier)
+		team_buckets[cell] = bucket
+		buckets_by_team[team_name] = team_buckets
+	return {
+		"frame": current_frame,
+		"ship": ship,
+		"cell_size": SHIP_DECK_BUCKET_CELL_SIZE,
+		"buckets_by_team": buckets_by_team,
+	}
+
+
+static func _get_ship_deck_bucket_cell(local_pos: Vector3, cell_size: float) -> Vector2i:
+	var safe_cell_size: float = maxf(cell_size, 0.01)
+	return Vector2i(
+		floori(local_pos.x / safe_cell_size),
+		floori(local_pos.z / safe_cell_size)
+	)
+
+
+static func _prune_ship_deck_bucket_cache(current_frame: int) -> void:
+	if current_frame - _ship_deck_bucket_cache_last_prune_frame < SHIP_DECK_BUCKET_PRUNE_INTERVAL:
+		return
+	_ship_deck_bucket_cache_last_prune_frame = current_frame
+	for cache_key in _ship_deck_bucket_cache.keys():
+		var entry_variant: Variant = _ship_deck_bucket_cache.get(cache_key, null)
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			_ship_deck_bucket_cache.erase(cache_key)
+			continue
+		var entry: Dictionary = entry_variant as Dictionary
+		var cached_ship: Node3D = get_valid_node3d(entry.get("ship", null))
+		var cached_frame: int = int(entry.get("frame", -1000))
+		if cached_ship == null or current_frame - cached_frame >= SHIP_DECK_BUCKET_PRUNE_INTERVAL:
+			_ship_deck_bucket_cache.erase(cache_key)

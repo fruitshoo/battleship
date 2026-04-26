@@ -1,11 +1,8 @@
 extends RefCounted
-
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
-
 const WANDER_TURN_SPEED := 7.0
 const MOVE_TURN_SPEED := 10.0
 const ATTACK_TURN_SPEED := 16.0
-
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
@@ -15,11 +12,13 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 		else:
 			soldier.wander_timer = randf_range(1.5, 3.0)
 		return
-
+	if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.72, WANDER_TURN_SPEED):
+		return
+	if _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
+		return
 	if run_heavy_logic:
 		if _try_priority_ship_duty_before_enemy(soldier, 0.78, delta, WANDER_TURN_SPEED):
 			return
-
 		var enemy = soldier.find_nearest_enemy()
 		if enemy:
 			if soldier.is_stationary:
@@ -41,14 +40,10 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 			if duty_target != Vector3.INF:
 				_move_toward_point(soldier, duty_target, 0.75, delta, WANDER_TURN_SPEED)
 				return
-	elif _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
-		return
-
 	if soldier.wander_timer > 0:
 		soldier.wander_timer -= delta
 	else:
 		start_wander(soldier)
-
 
 static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run_heavy_logic: bool = false) -> void:
 	var delta := 0.016
@@ -61,6 +56,11 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		soldier.velocity = Vector3.ZERO
 		soldier.wander_timer = randf_range(1.5, 3.0)
 		soldier._change_state(soldier.State.IDLE)
+		return
+	if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.68, WANDER_TURN_SPEED):
+		return
+
+	if _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
 		return
 
 	if run_heavy_logic:
@@ -91,9 +91,6 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 			if duty_target != Vector3.INF:
 				_move_toward_point(soldier, duty_target, 0.7, delta, WANDER_TURN_SPEED)
 				return
-	elif _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
-		return
-
 	if not is_instance_valid(soldier.owned_ship):
 		soldier._change_state(soldier.State.IDLE)
 		return
@@ -112,10 +109,7 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 	soldier.move_and_slide()
 
 	if direction.length_squared() > 0.01:
-		var target_look = soldier.global_position + direction
-		target_look.y = soldier.global_position.y
-		turn_toward_position(soldier, target_look, WANDER_TURN_SPEED, delta)
-
+		turn_toward_position(soldier, current_global_target, WANDER_TURN_SPEED, delta)
 
 static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, delta: float, turn_speed: float) -> bool:
 	if not soldier.has_method("_find_ship_duty_target"):
@@ -132,8 +126,6 @@ static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, de
 		return false
 	_move_toward_point(soldier, duty_target, speed_scale, delta, turn_speed)
 	return true
-
-
 static func start_wander(soldier) -> void:
 	if not is_instance_valid(soldier.owned_ship):
 		return
@@ -144,8 +136,6 @@ static func start_wander(soldier) -> void:
 
 	soldier.wander_target_local = Vector3(random_x, 0.0, random_z)
 	soldier._change_state(soldier.State.WANDER)
-
-
 static func state_move(soldier, delta: float = 0.016) -> void:
 	if soldier.is_stationary:
 		soldier._change_state(soldier.State.IDLE)
@@ -167,6 +157,14 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
+	var target_node := soldier.current_target as Node3D
+	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
+		soldier.current_target = null
+		if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
+			return
+		soldier._change_state(soldier.State.IDLE)
+		return
+
 	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
@@ -181,6 +179,10 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
 
 	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
+		if soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
+			soldier.current_target = null
+			soldier._change_state(soldier.State.IDLE)
+			return
 		if not soldier._is_ship_pair_in_melee_range(target_ship):
 			soldier._change_state(soldier.State.IDLE)
 			return
@@ -205,7 +207,7 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 		soldier._change_state(soldier.State.ATTACK)
 		return
 
-	var target_pos = soldier.current_target.global_position
+	var target_pos = target_node.global_position
 	var direction = (target_pos - soldier.global_position).normalized()
 	soldier.velocity = direction * soldier.move_speed
 	soldier.move_and_slide()
@@ -231,6 +233,14 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
+	var target_node := soldier.current_target as Node3D
+	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
+		soldier.current_target = null
+		if _try_muster_to_cross_ship_contact(soldier, 0.95, delta, ATTACK_TURN_SPEED):
+			return
+		soldier._change_state(soldier.State.IDLE)
+		return
+
 	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
@@ -241,10 +251,14 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 			return
 
 	var pos_self_2d = Vector2(soldier.global_position.x, soldier.global_position.z)
-	var pos_target_2d = Vector2(soldier.current_target.global_position.x, soldier.current_target.global_position.z)
+	var pos_target_2d = Vector2(target_node.global_position.x, target_node.global_position.z)
 	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
 
 	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
+		if soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
+			soldier.current_target = null
+			soldier._change_state(soldier.State.IDLE)
+			return
 		if not soldier._is_ship_pair_in_melee_range(target_ship):
 			soldier._change_state(soldier.State.IDLE)
 			return
@@ -259,7 +273,7 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 
 	turn_toward_position(
 		soldier,
-		Vector3(soldier.current_target.global_position.x, soldier.global_position.y, soldier.current_target.global_position.z),
+		Vector3(target_node.global_position.x, soldier.global_position.y, target_node.global_position.z),
 		ATTACK_TURN_SPEED,
 		delta
 	)
@@ -286,9 +300,7 @@ static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float 
 	soldier.move_and_slide()
 
 	if direction.length_squared() > 0.01:
-		var target_look: Vector3 = soldier.global_position + direction
-		target_look.y = soldier.global_position.y
-		turn_toward_position(soldier, target_look, turn_speed, delta)
+		turn_toward_position(soldier, flat_target, turn_speed, delta)
 
 
 static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> bool:

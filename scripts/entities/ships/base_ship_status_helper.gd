@@ -94,17 +94,16 @@ static func check_derelict_status(ship) -> void:
 
 	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else str(ship.get("team"))
 	var all_crew_dead = true
-	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
-	if soldiers_node:
-		for child in EntityRegistry.get_soldiers_by_ship(ship):
-			var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
-			if child_team != ship_team:
-				continue
-			if SoldierStateHelper.is_alive_soldier(child):
-				all_crew_dead = false
-				break
+	for child in EntityRegistry.get_soldiers_by_ship(ship):
+		var child_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
+		if child_team != ship_team:
+			continue
+		if SoldierStateHelper.is_alive_soldier(child):
+			all_crew_dead = false
+			break
 
 	if all_crew_dead:
+		# 폐선은 빈 갑판이 아니라 원소속 승조원 전체 전멸로 판단한다.
 		var all_soldiers = EntityRegistry.get_soldiers()
 		for s in all_soldiers:
 			var soldier_team: String = s.get_team_tag() if s.has_method("get_team_tag") else str(s.get("team"))

@@ -312,6 +312,15 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 
 	pot.damage = stats.get("base_damage", 15.0) + (fp_lv - 1) * stats.get("damage_per_lv", 5.0)
 	pot.explosion_radius = stats.get("base_radius", 3.0) + (fp_lv - 1) * stats.get("radius_per_lv", 0.5)
+	if "ignition_chance" in pot:
+		var max_ignition_chance: float = float(stats.get("max_ignition_chance", 0.75))
+		pot.ignition_chance = clampf(
+			float(stats.get("base_ignition_chance", 0.45)) + float(fp_lv - 1) * float(stats.get("ignition_chance_per_lv", 0.075)),
+			0.0,
+			max_ignition_chance
+		)
+	if "burn_duration" in pot:
+		pot.burn_duration = float(stats.get("burn_duration", 7.0))
 	pot.team = ship.team
 
 	ship.get_tree().root.add_child.call_deferred(pot)
@@ -323,86 +332,37 @@ static func update_fire_pot_logic(ship, delta: float) -> void:
 
 
 static func update_auto_boarding_raid(ship, delta: float) -> void:
-	var manual_target: Node3D = ship.manual_boarding_target if "manual_boarding_target" in ship else null
-	if is_instance_valid(manual_target) and not _can_keep_manual_boarding_target(ship, manual_target):
-		clear_manual_boarding_intent(ship)
-		manual_target = null
-	if ship.auto_raid_enabled != true and not is_instance_valid(manual_target):
-		_recall_raid_boarders(ship)
-		_cancel_auto_raid_boarding_link(ship)
-		ship.auto_raid_target = null
+	# Player boarding is no longer part of the core combat loop.
+	# Keep the legacy fields tidy and recall any away team back home, but do not
+	# issue new raid intents or boarding links from the flagship.
+	if not is_instance_valid(ship):
 		return
-	var is_auto_raid_boarding: bool = ship.is_boarding and ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE)
-	if ship.is_sinking or ship.is_dying or (ship.is_boarding and not is_auto_raid_boarding):
+	ship.auto_raid_enabled = false
+	if "manual_boarding_target" in ship:
+		ship.manual_boarding_target = null
+	ship.auto_raid_target = null
+	if "auto_raid_eval_timer" in ship:
+		ship.auto_raid_eval_timer = 0.0
+	var current_boarding_target: Node3D = ship.get_boarding_target_ship() if ship.has_method("get_boarding_target_ship") else ship.get("boarding_target")
+	var target_team: String = current_boarding_target.get_team_tag() if is_instance_valid(current_boarding_target) and current_boarding_target.has_method("get_team_tag") else (str(current_boarding_target.get("team")) if is_instance_valid(current_boarding_target) else "")
+	var offensive_boarding_active: bool = ship.get("is_boarding") == true \
+		and is_instance_valid(current_boarding_target) \
+		and target_team == "enemy"
+	if offensive_boarding_active and is_instance_valid(current_boarding_target):
+		_recall_raid_boarders_with_link(ship, current_boarding_target)
+	else:
 		_recall_raid_boarders(ship)
-		_cancel_auto_raid_boarding_link(ship)
-		ship.auto_raid_target = null
-		if "manual_boarding_target" in ship:
-			ship.manual_boarding_target = null
-		return
-
-	ship.auto_raid_eval_timer = maxf(0.0, float(ship.auto_raid_eval_timer) - delta)
-
-	var current_target: Node3D = ship.auto_raid_target
-	var current_is_manual: bool = is_instance_valid(manual_target) and current_target == manual_target
-	if is_instance_valid(current_target) and not (_can_keep_manual_boarding_target(ship, current_target) if current_is_manual else _can_continue_raid(ship, current_target)):
-		if _recall_raid_boarders_with_link(ship, current_target):
-			ship.auto_raid_target = current_target
-			return
-		current_target = null
-
-	if ship.auto_raid_eval_timer <= 0.0:
-		ship.auto_raid_eval_timer = float(ship.auto_raid_eval_interval)
-		var next_target: Node3D = manual_target if is_instance_valid(manual_target) else (_find_raid_target(ship) if ship.auto_raid_enabled == true else null)
-		if current_target != next_target and _count_boarders_from_home(ship) > 0:
-			if _recall_raid_boarders_with_link(ship, current_target):
-				ship.auto_raid_target = current_target
-				return
-			_recall_raid_boarders(ship, current_target)
-			current_target = null
-		else:
-			current_target = next_target
-
-	ship.auto_raid_target = current_target
-
-	if is_instance_valid(current_target):
-		current_is_manual = is_instance_valid(manual_target) and current_target == manual_target
-		var can_hold_manual_contact: bool = current_is_manual \
-			and _is_valid_raid_target_ship(ship, current_target) \
-			and _is_ship_close_for_raid(ship, current_target)
-		var can_dispatch_manual: bool = can_hold_manual_contact and _can_initiate_raid(ship)
-		if current_is_manual and not can_hold_manual_contact:
-			if ship.is_boarding and ShipBoardingMetaHelper.is_boarding_purpose(ship, AUTO_RAID_BOARDING_PURPOSE) and ship.get_boarding_target_ship() == current_target:
-				if _recall_raid_boarders_with_link(ship, current_target):
-					return
-				_cancel_auto_raid_boarding_link(ship)
-			return
-		_ensure_auto_raid_boarding_link(ship, current_target)
-		if current_is_manual and not can_dispatch_manual:
-			_recall_raid_boarders(ship, current_target)
-			return
-		_dispatch_raid_boarders(ship, current_target, current_is_manual)
+	if offensive_boarding_active and ship.has_method("_cancel_boarding"):
+		ship._cancel_boarding()
 	else:
 		_cancel_auto_raid_boarding_link(ship)
-		_recall_raid_boarders(ship)
 
 
 static func toggle_manual_boarding_intent(ship) -> void:
 	if not is_instance_valid(ship):
 		return
-	var current_target: Node3D = ship.manual_boarding_target if "manual_boarding_target" in ship else null
-	if is_instance_valid(current_target):
-		clear_manual_boarding_intent(ship)
-		_show_ship_hud_message(ship, "도선 해제", 1.4)
-		return
-	var next_target := _find_manual_boarding_target(ship)
-	if not is_instance_valid(next_target):
-		_show_ship_hud_message(ship, "도선 목표 없음", 1.4)
-		return
-	ship.manual_boarding_target = next_target
-	ship.auto_raid_target = next_target
-	ship.auto_raid_eval_timer = 0.0
-	_show_ship_hud_message(ship, "도선 시도: %s" % next_target.name, 1.6)
+	clear_manual_boarding_intent(ship)
+	_show_ship_hud_message(ship, "도선 명령 비활성화", 1.6)
 
 
 static func clear_manual_boarding_intent(ship) -> void:

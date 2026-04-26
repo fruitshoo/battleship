@@ -9,19 +9,18 @@ const TASK_CORPSE_CLEANUP := "corpse_cleanup"
 const TASK_CANNON_RELOAD := "cannon_reload"
 const TASK_RIGGING_REPAIR := "rigging_repair"
 const TASK_GUNNERY_STATION := "gunnery_station"
-const TASK_SHIPHANDLING_ROWING := "shiphandling_rowing"
-const TASK_SHIPHANDLING_RUDDER := "shiphandling_rudder"
-const TASK_SHIPHANDLING_CRUISE := "shiphandling_cruise"
+const TASK_SHIPHANDLING_STATION := "shiphandling_station"
+const TASK_SHIPHANDLING_ROWING := TASK_SHIPHANDLING_STATION
+const TASK_SHIPHANDLING_RUDDER := TASK_SHIPHANDLING_STATION
+const TASK_SHIPHANDLING_CRUISE := TASK_SHIPHANDLING_STATION
 
 const PRIORITY_NONE := 0
 const PRIORITY_DECK_DEFENSE := 100
 const PRIORITY_CORPSE_CLEANUP := 80
 const PRIORITY_CANNON_RELOAD := 70
 const PRIORITY_RIGGING_REPAIR := 62
-const PRIORITY_GUNNERY_STATION := 56
-const PRIORITY_SHIPHANDLING_ROWING := 46
-const PRIORITY_SHIPHANDLING_RUDDER := 42
-const PRIORITY_SHIPHANDLING_CRUISE := 34
+const PRIORITY_GUNNERY_STATION := PRIORITY_NONE
+const PRIORITY_SHIPHANDLING_STATION := 42
 
 const KEY_TASK := "task"
 const KEY_PRIORITY := "priority"
@@ -45,10 +44,7 @@ const TASK_PRIORITY_TABLE := [
 	{KEY_TASK: TASK_CORPSE_CLEANUP, KEY_PRIORITY: PRIORITY_CORPSE_CLEANUP, KEY_PHASE: PHASE_CLEANUP, KEY_RUNTIME: "player_ship", KEY_REASON: "clear enemy corpse from allied deck", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_CANNON_RELOAD, KEY_PRIORITY: PRIORITY_CANNON_RELOAD, KEY_PHASE: PHASE_WEAPON_SUPPORT, KEY_RUNTIME: "cannon_reload", KEY_REASON: "weapon reload support", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_RIGGING_REPAIR, KEY_PRIORITY: PRIORITY_RIGGING_REPAIR, KEY_PHASE: PHASE_REPAIR, KEY_RUNTIME: "ship_duty", KEY_REASON: "damaged rigging", KEY_PREEMPTS_ROUTINE: true},
-	{KEY_TASK: TASK_GUNNERY_STATION, KEY_PRIORITY: PRIORITY_GUNNERY_STATION, KEY_PHASE: PHASE_BATTLE_STATION, KEY_RUNTIME: "ship_duty", KEY_REASON: "gunnery posture", KEY_PREEMPTS_ROUTINE: false},
-	{KEY_TASK: TASK_SHIPHANDLING_ROWING, KEY_PRIORITY: PRIORITY_SHIPHANDLING_ROWING, KEY_PHASE: PHASE_SHIPHANDLING, KEY_RUNTIME: "ship_duty", KEY_REASON: "rowing", KEY_PREEMPTS_ROUTINE: false},
-	{KEY_TASK: TASK_SHIPHANDLING_RUDDER, KEY_PRIORITY: PRIORITY_SHIPHANDLING_RUDDER, KEY_PHASE: PHASE_SHIPHANDLING, KEY_RUNTIME: "ship_duty", KEY_REASON: "rudder", KEY_PREEMPTS_ROUTINE: false},
-	{KEY_TASK: TASK_SHIPHANDLING_CRUISE, KEY_PRIORITY: PRIORITY_SHIPHANDLING_CRUISE, KEY_PHASE: PHASE_SHIPHANDLING, KEY_RUNTIME: "ship_duty", KEY_REASON: "under way", KEY_PREEMPTS_ROUTINE: false},
+	{KEY_TASK: TASK_SHIPHANDLING_STATION, KEY_PRIORITY: PRIORITY_SHIPHANDLING_STATION, KEY_PHASE: PHASE_SHIPHANDLING, KEY_RUNTIME: "ship_duty", KEY_REASON: "shiphandling station", KEY_PREEMPTS_ROUTINE: false},
 ]
 
 const DUTY_TARGET_REACHED_DISTANCE_SQ := 1.2
@@ -115,9 +111,6 @@ static func get_active_ship_work_target(soldier) -> Vector3:
 			return Vector3.INF
 		_sync_cannon_reload_duty_state_from_active(soldier, ship, local_target, global_target)
 		return global_target
-	if _is_local_target_reached(soldier, ship, local_target):
-		clear_active_ship_work_target(soldier)
-		return Vector3.INF
 	return global_target
 
 
@@ -296,7 +289,7 @@ static func get_role_affinity_for_task(soldier, task_name: String) -> float:
 		if role == "general" or role == "spearman":
 			return 0.85
 		return 0.6
-	if normalized_task == TASK_CANNON_RELOAD or normalized_task == TASK_GUNNERY_STATION:
+	if normalized_task == TASK_CANNON_RELOAD:
 		if _is_ranged_only(soldier):
 			return 1.0
 		if role == "general" or role == "fire_pot" or role == "repeating_crossbow" or role == "singigeon":
@@ -316,7 +309,11 @@ static func get_role_affinity_for_task(soldier, task_name: String) -> float:
 
 
 static func normalize_task_name(task_name: String) -> String:
-	return task_name.strip_edges().to_lower().replace(" ", "_")
+	var normalized := task_name.strip_edges().to_lower().replace(" ", "_")
+	match normalized:
+		"shiphandling_rowing", "shiphandling_rudder", "shiphandling_cruise":
+			return TASK_SHIPHANDLING_STATION
+	return normalized
 
 
 static func _build_rigging_repair_directive(soldier, ship: Node3D, half_ext: Vector2) -> Dictionary:
@@ -342,33 +339,23 @@ static func _build_gunnery_station_directive(soldier, ship: Node3D, half_ext: Ve
 		return _none_directive()
 	if not _can_work_gunnery(soldier):
 		return _none_directive()
-	var cannon_directive := _build_cannon_reload_slot_directive(soldier, ship)
-	if int(cannon_directive.get(KEY_PRIORITY, PRIORITY_NONE)) > PRIORITY_NONE:
-		return cannon_directive
-	var side_sign: float = _get_enemy_side_sign(soldier, _get_soldier_bias_sign(soldier))
-	var lane_index: int = int(soldier.get_instance_id()) % 5
-	var lane_offset: float = clampf((float(lane_index) - 2.0) * 0.45, -half_ext.y * 0.42, half_ext.y * 0.42)
-	var local_target := Vector3(side_sign * half_ext.x * 0.76, 0.0, lane_offset)
-	return _build_directive(TASK_GUNNERY_STATION, local_target, ship, "gunnery posture")
+	return _build_cannon_reload_slot_directive(soldier, ship)
 
 
 static func _build_shiphandling_directive(soldier, ship: Node3D, half_ext: Vector2) -> Dictionary:
 	var handling_ratio: float = float(ship.get("shiphandling_crew_ratio")) if ship.get("shiphandling_crew_ratio") != null else 0.0
 	if handling_ratio < 0.45:
 		return _none_directive()
+	var rowing_active: bool = ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
+	var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
+	var current_speed: float = ship.get_current_speed_value() if ship.has_method("get_current_speed_value") else 0.0
+	if not rowing_active and absf(rudder_angle) < 7.5 and current_speed <= 1.2:
+		return _none_directive()
 	var bias_sign: float = _get_soldier_bias_sign(soldier)
 	var duty_lane: int = int(soldier.get_instance_id()) % 5
-	var duty_offset: float = clampf((float(duty_lane) - 2.0) * 0.55, -half_ext.y * 0.58, half_ext.y * 0.58)
-	var rowing_active: bool = ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
-	if rowing_active:
-		return _build_directive(TASK_SHIPHANDLING_ROWING, Vector3(bias_sign * half_ext.x * 0.72, 0.0, duty_offset), ship, "rowing")
-	var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
-	if absf(rudder_angle) >= 7.5:
-		return _build_directive(TASK_SHIPHANDLING_RUDDER, Vector3(bias_sign * half_ext.x * 0.32, 0.0, half_ext.y * 0.82), ship, "rudder")
-	var current_speed: float = ship.get_current_speed_value() if ship.has_method("get_current_speed_value") else 0.0
-	if current_speed > 1.2:
-		return _build_directive(TASK_SHIPHANDLING_CRUISE, Vector3(bias_sign * half_ext.x * 0.22, 0.0, half_ext.y * 0.35), ship, "under way")
-	return _none_directive()
+	var duty_offset: float = clampf((float(duty_lane) - 2.0) * 0.52, -half_ext.y * 0.52, half_ext.y * 0.52)
+	var local_target := Vector3(bias_sign * half_ext.x * 0.38, 0.0, duty_offset)
+	return _build_directive(TASK_SHIPHANDLING_STATION, local_target, ship, "shiphandling station")
 
 static func _build_cannon_reload_slot_directive(soldier, ship: Node3D) -> Dictionary:
 	var slots: Array[Dictionary] = _collect_cannon_reload_slots(ship)
@@ -788,16 +775,15 @@ static func _is_active_work_task_still_valid(soldier, ship: Node3D, task_name: S
 			var gunnery_ratio: float = float(ship.get("gunnery_crew_ratio")) if ship.get("gunnery_crew_ratio") != null else 0.0
 			return gunnery_ratio >= 0.45 and _can_work_gunnery(soldier) and not _get_cannon_reload_slot_by_key(ship, str(soldier.get_meta(ACTIVE_WORK_SLOT_META, ""))).is_empty()
 		TASK_GUNNERY_STATION:
-			var gunnery_ratio: float = float(ship.get("gunnery_crew_ratio")) if ship.get("gunnery_crew_ratio") != null else 0.0
-			return gunnery_ratio >= 0.45 and _can_work_gunnery(soldier)
-		TASK_SHIPHANDLING_ROWING:
-			return ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
-		TASK_SHIPHANDLING_RUDDER:
+			return false
+		TASK_SHIPHANDLING_STATION:
+			var handling_ratio: float = float(ship.get("shiphandling_crew_ratio")) if ship.get("shiphandling_crew_ratio") != null else 0.0
+			if handling_ratio < 0.45:
+				return false
+			var rowing_active: bool = ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
 			var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
-			return absf(rudder_angle) >= 7.5
-		TASK_SHIPHANDLING_CRUISE:
 			var current_speed: float = ship.get_current_speed_value() if ship.has_method("get_current_speed_value") else 0.0
-			return current_speed > 1.2
+			return rowing_active or absf(rudder_angle) >= 7.5 or current_speed > 1.2
 	return false
 
 

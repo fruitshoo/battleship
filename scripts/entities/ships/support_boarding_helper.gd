@@ -139,18 +139,10 @@ static func _count_support_attack_boarders_on_target(target_ship: Node, attack_s
 
 
 static func _should_hold_support_attack_boarders_on_target(target_ship: Node) -> bool:
-	if not is_instance_valid(target_ship):
-		return false
-	if target_ship.get("is_sinking") == true or target_ship.get("is_dying") == true:
-		return false
-	if target_ship.has_method("is_derelict_ship") and target_ship.call("is_derelict_ship") == true:
-		return false
-	if target_ship.get("is_derelict") == true:
-		return false
-	if target_ship.is_in_group("boss"):
-		return true
-	var ship_type_value: Variant = target_ship.get("ship_type") if target_ship.get("ship_type") != null else null
-	return str(ship_type_value).to_lower().contains("atakebune")
+	# Support ships no longer keep offensive boarding pressure on any enemy hull,
+	# including bosses. If a stale legacy boarding link exists, evacuate the
+	# support boarders once the deck is secure instead of holding capture pressure.
+	return false
 
 
 static func _set_support_attack_transfer_suppressed(attack_ships: Array[Node], suppressed: bool) -> void:

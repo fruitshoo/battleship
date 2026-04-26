@@ -69,6 +69,8 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 		var cross_ship_contact_ready: bool = false
 		if cross_ship_close and soldier.has_method("_is_in_cross_ship_contact_zone"):
 			cross_ship_contact_ready = soldier._is_in_cross_ship_contact_zone(target_ship) == true
+		if cross_ship_close and soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
+			cross_ship_contact_ready = false
 		var cross_ship_melee_ready: bool = cross_ship_contact_ready and _can_cross_ship_melee_reach_target(soldier, dist_xz)
 
 		if soldier.is_melee_only:

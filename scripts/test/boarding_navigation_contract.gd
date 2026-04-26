@@ -1,4 +1,5 @@
 extends Node
+# @scene_contract_encapsulated
 
 
 

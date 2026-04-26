@@ -1,4 +1,5 @@
 extends Node
+# @scene_contract_encapsulated
 
 const PlayerShipCrewHelper = preload("res://scripts/entities/ships/player_ship_crew_helper.gd")
 
@@ -227,14 +228,14 @@ func _verify_manual_boarding_intent_prefers_boss_and_uses_auto_raid_link(failure
 	PlayerShipCrewHelper.toggle_manual_boarding_intent(player)
 	PlayerShipCrewHelper.update_auto_boarding_raid(player, 0.1)
 
-	if player.manual_boarding_target != boss_enemy:
-		failures.append("manual boarding intent did not prefer the nearby boss target")
-	if player.auto_raid_target != boss_enemy:
-		failures.append("manual boarding intent did not publish the boss as the active raid target")
-	if player.is_boarding != true or player.boarding_target != boss_enemy:
-		failures.append("manual boarding intent did not reuse the auto raid boarding link path")
-	if str(player.get_meta("boarding_purpose", "")).strip_edges() != "auto_raid":
-		failures.append("manual boarding intent did not mark the boarding link as auto_raid purpose")
+	if is_instance_valid(player.manual_boarding_target):
+		failures.append("manual boarding intent should stay disabled")
+	if is_instance_valid(player.auto_raid_target):
+		failures.append("manual boarding intent should not publish an active raid target")
+	if player.is_boarding == true or is_instance_valid(player.boarding_target):
+		failures.append("manual boarding intent should not start an offensive boarding link")
+	if player.has_meta("boarding_purpose"):
+		failures.append("manual boarding intent should not mark a boarding purpose while disabled")
 
 	PlayerShipCrewHelper.clear_manual_boarding_intent(player)
 	EntityRegistry.unregister_soldier(defender_a)

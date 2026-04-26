@@ -1,6 +1,8 @@
 extends Node
+# @scene_contract_encapsulated
 
 const CANNON_SCENE := preload("res://scenes/entities/launchers/cannon.tscn")
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 
 class MockShip:
@@ -28,6 +30,9 @@ class MockShip:
 
 	func is_combat_disabled() -> bool:
 		return false
+
+	func get_current_speed_value() -> float:
+		return current_speed
 
 
 class MockLegacyShip:
@@ -74,6 +79,9 @@ func _run_contract() -> void:
 	if _failed:
 		return
 	await _run_cannon_slot_reservation_contract()
+	if _failed:
+		return
+	await _run_active_shiphandling_station_hold_contract()
 	if _failed:
 		return
 	await _run_legacy_multiplier_contract()
@@ -150,7 +158,7 @@ func _run_soldier_cannon_slot_contract() -> void:
 	EntityRegistry.register_ship(ship)
 
 	var soldiers := Node3D.new()
-	soldiers.name = "Soldiers"
+	soldiers.name = NodeContractHelper.SHIP_NODE_SOLDIERS
 	ship.add_child(soldiers)
 
 	var soldier := MockSoldier.new()
@@ -190,7 +198,7 @@ func _run_cannon_slot_reservation_contract() -> void:
 	EntityRegistry.register_ship(ship)
 
 	var soldiers := Node3D.new()
-	soldiers.name = "Soldiers"
+	soldiers.name = NodeContractHelper.SHIP_NODE_SOLDIERS
 	ship.add_child(soldiers)
 
 	var occupant := MockSoldier.new()
@@ -227,6 +235,32 @@ func _run_cannon_slot_reservation_contract() -> void:
 	EntityRegistry.unregister_soldier(occupant)
 	EntityRegistry.unregister_soldier(extra_worker)
 	EntityRegistry.unregister_ship(ship)
+	ship.queue_free()
+
+
+func _run_active_shiphandling_station_hold_contract() -> void:
+	var ship := MockShip.new()
+	ship.name = "HandlingShip"
+	ship.shiphandling_crew_ratio = 0.6
+	ship.current_speed = 2.4
+	add_child(ship)
+
+	var soldier := MockSoldier.new()
+	soldier.name = "CruiseCrew"
+	soldier.owned_ship = ship
+	ship.add_child(soldier)
+
+	var local_station := Vector3(1.25, 0.0, 2.0)
+	soldier.global_position = ship.to_global(local_station)
+	soldier.set_meta("ship_work_active_task", "shiphandling_station")
+	soldier.set_meta("ship_work_active_slot", "shiphandling_station:test")
+	soldier.set_meta("ship_work_active_target_local", local_station)
+
+	var active_target: Vector3 = SoldierShipDutyHelper.get_active_ship_duty_target(soldier)
+
+	_assert_true("shiphandling_station_target_persists_when_arrived", active_target != Vector3.INF)
+	_assert_vec3_close("shiphandling_station_returns_current_slot", active_target, ship.to_global(local_station))
+
 	ship.queue_free()
 
 

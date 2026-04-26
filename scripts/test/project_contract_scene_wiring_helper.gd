@@ -2246,10 +2246,7 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 		"TASK_CORPSE_CLEANUP",
 		"TASK_CANNON_RELOAD",
 		"TASK_RIGGING_REPAIR",
-		"TASK_GUNNERY_STATION",
-		"TASK_SHIPHANDLING_ROWING",
-		"TASK_SHIPHANDLING_RUDDER",
-		"TASK_SHIPHANDLING_CRUISE",
+		"TASK_SHIPHANDLING_STATION",
 		"static func get_ship_work_directive",
 		"static func score_worker_for_task",
 		"static func can_accept_immediate_work",
@@ -2267,9 +2264,9 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 	]:
 		if not work_priority_source.contains(str(token)):
 			failures.append("soldier ship work priority helper missing token: %s" % token)
-	if not work_priority_source.contains("PRIORITY_CANNON_RELOAD := 70") or not work_priority_source.contains("PRIORITY_GUNNERY_STATION := 56"):
-		failures.append("cannon reload should outrank routine gunnery station work")
-	if not work_priority_source.contains("PRIORITY_RIGGING_REPAIR := 62") or not work_priority_source.contains("PRIORITY_SHIPHANDLING_ROWING := 46"):
+	if not work_priority_source.contains("PRIORITY_CANNON_RELOAD := 70") or not work_priority_source.contains("PRIORITY_SHIPHANDLING_STATION := 42"):
+		failures.append("cannon reload should outrank routine shiphandling station work")
+	if not work_priority_source.contains("PRIORITY_RIGGING_REPAIR := 62"):
 		failures.append("rigging repair should outrank routine shiphandling work")
 	_validate_soldier_ship_work_priority_table(failures)
 
@@ -2331,10 +2328,7 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 		SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP,
 		SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD,
 		SoldierShipWorkPriorityHelper.TASK_RIGGING_REPAIR,
-		SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION,
-		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_ROWING,
-		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_RUDDER,
-		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_CRUISE,
+		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_STATION,
 	]
 	for task_name in expected_order:
 		if not priorities.has(task_name):
@@ -2346,6 +2340,10 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 			failures.append("soldier ship work priority order invalid: %s should outrank %s" % [higher, lower])
 	if SoldierShipWorkPriorityHelper.get_task_phase(SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP) != SoldierShipWorkPriorityHelper.PHASE_CLEANUP:
 		failures.append("soldier ship work priority corpse cleanup phase mismatch")
+	if priorities.has(SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION):
+		failures.append("routine gunnery station should not remain in the active ship work priority table")
+	if SoldierShipWorkPriorityHelper.get_task_priority(SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION) != SoldierShipWorkPriorityHelper.PRIORITY_NONE:
+		failures.append("routine gunnery station should no longer advertise a ship work priority")
 	if SoldierShipWorkPriorityHelper.get_task_priority("unknown") != SoldierShipWorkPriorityHelper.PRIORITY_NONE:
 		failures.append("soldier ship work priority unknown task should have no priority")
 
@@ -2383,6 +2381,9 @@ static func _validate_ship_work_target_tracks_moving_ship(owner: Node, failures:
 	var stale_target := SoldierShipWorkPriorityHelper.get_active_ship_work_target(soldier)
 	if stale_target != Vector3.INF:
 		failures.append("ship work active rowing target should clear when rowing stops")
+	var idle_target := SoldierShipWorkPriorityHelper.find_ship_work_target(soldier)
+	if idle_target != Vector3.INF:
+		failures.append("ship work target should stay idle when the ship is not rowing, steering, or moving")
 
 	ship.queue_free()
 	soldier.queue_free()

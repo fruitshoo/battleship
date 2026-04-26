@@ -96,6 +96,12 @@ static func update_boarding_chaos(soldier, delta: float) -> void:
 
 	if soldier.chaos_tick_timer <= 0.0:
 		soldier.chaos_tick_timer = 1.0
+		if soldier.owned_ship.has_meta("boarding_defense_damage_per_tick"):
+			var defense_damage: float = maxf(0.0, float(soldier.owned_ship.get_meta("boarding_defense_damage_per_tick")))
+			if defense_damage > 0.0:
+				take_damage(soldier, defense_damage, soldier.global_position, "boarding_defense")
+				if soldier.current_state == soldier.State.DEAD:
+					return
 		var chaos_damage: float = soldier.chaos_damage_per_tick
 		if soldier.owned_ship.has_meta("boarding_fire_damage_reduction"):
 			var reduction: float = clampf(float(soldier.owned_ship.get_meta("boarding_fire_damage_reduction")), 0.0, 0.75)
@@ -184,6 +190,20 @@ static func heal_full(soldier) -> void:
 		soldier.current_health = soldier.max_health
 
 
+static func assist_recover_incapacitated(soldier) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if soldier.get_meta("incapacitated", false) != true:
+		return false
+	var recovery_ratio := _get_incapacitated_recovery_health_ratio(soldier)
+	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_meta("incapacitated_assist_health_ratio"):
+		recovery_ratio = clampf(float(soldier.owned_ship.get_meta("incapacitated_assist_health_ratio")), 0.05, 1.0)
+	elif is_instance_valid(soldier.home_ship) and soldier.home_ship.has_meta("incapacitated_assist_health_ratio"):
+		recovery_ratio = clampf(float(soldier.home_ship.get_meta("incapacitated_assist_health_ratio")), 0.05, 1.0)
+	_recover_incapacitated_now(soldier, recovery_ratio)
+	return true
+
+
 static func incapacitate(soldier) -> void:
 	if soldier.current_state == soldier.State.DEAD:
 		return
@@ -196,6 +216,7 @@ static func incapacitate(soldier) -> void:
 	soldier.velocity = Vector3.ZERO
 	soldier.set_meta("incapacitated", true)
 	soldier.set_meta("incapacitated_recovery_pending", true)
+	soldier.remove_meta("incapacitated_assist_reviver_id")
 
 	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("check_derelict_status"):
 		soldier.home_ship.call_deferred("check_derelict_status")
@@ -225,6 +246,7 @@ static func die(soldier) -> void:
 	soldier.current_target = null
 	soldier.attack_timer = 0.0
 	soldier.is_boarder_on_player_ship = false
+	soldier.remove_meta("incapacitated_assist_reviver_id")
 
 	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("check_derelict_status"):
 		soldier.home_ship.call_deferred("check_derelict_status")
@@ -364,6 +386,7 @@ static func _try_recover_incapacitated(soldier) -> void:
 static func _recover_incapacitated_now(soldier, health_ratio: float) -> void:
 	soldier.remove_meta("incapacitated")
 	soldier.remove_meta("incapacitated_recovery_pending")
+	soldier.remove_meta("incapacitated_assist_reviver_id")
 	soldier.current_health = maxf(8.0, soldier.max_health * health_ratio)
 	soldier.current_target = null
 	soldier.attack_timer = 1.2

@@ -1,6 +1,7 @@
 extends Node3D
+# @scene_contract_encapsulated
 
-
+const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 class MockSoldier:
 	extends Node3D
@@ -18,8 +19,8 @@ func _ready() -> void:
 func _run_contract() -> void:
 	var source_ship := _make_ship("SourceShip", Vector3.ZERO)
 	var target_ship := _make_ship("TargetShip", Vector3(8.0, 0.0, 0.0))
-	var source_soldiers := source_ship.get_node("Soldiers") as Node3D
-	var target_soldiers := target_ship.get_node("Soldiers") as Node3D
+	var source_soldiers := NodeContractHelper.get_soldiers_container(source_ship) as Node3D
+	var target_soldiers := NodeContractHelper.get_soldiers_container(target_ship) as Node3D
 
 	var soldier := MockSoldier.new()
 	soldier.name = "BoardingSoldier"
@@ -59,7 +60,7 @@ func _make_ship(ship_name: String, world_position: Vector3) -> Node3D:
 	ship.global_position = world_position
 
 	var soldiers := Node3D.new()
-	soldiers.name = "Soldiers"
+	soldiers.name = NodeContractHelper.SHIP_NODE_SOLDIERS
 	ship.add_child(soldiers)
 	return ship
 

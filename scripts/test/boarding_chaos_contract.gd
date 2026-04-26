@@ -1,4 +1,5 @@
 extends Node
+# @scene_contract_encapsulated
 
 
 
@@ -27,8 +28,13 @@ class MockSoldier:
 		DEAD,
 	}
 
+	const RANGED_DAMAGE_SOURCES := {}
+
 	var current_state: int = State.IDLE
 	var team: String = "enemy"
+	var current_health: float = 20.0
+	var defense: float = 0.0
+	var velocity: Vector3 = Vector3.ZERO
 	var owned_ship: Node3D = null
 	var home_ship: Node3D = null
 	var current_target: Node3D = null
@@ -37,6 +43,7 @@ class MockSoldier:
 	var chaos_tick_timer: float = 0.01
 	var chaos_damage_per_tick: float = 5.0
 	var evacuation_attempts: int = 0
+	var _cached_level_manager: Node = null
 
 	func get_team_tag() -> String:
 		return team
@@ -51,6 +58,7 @@ class MockSoldier:
 func _ready() -> void:
 	var failures: Array[String] = []
 	_verify_enemy_boarder_does_not_retreat_on_timer(failures)
+	_verify_boarding_defense_damages_loose_boarder(failures)
 	_verify_enemy_boarder_pauses_chaos_while_fighting_defender(failures)
 	_verify_enemy_boarder_pauses_chaos_while_support_rescue_boarding(failures)
 	if failures.is_empty():
@@ -87,6 +95,33 @@ func _verify_enemy_boarder_does_not_retreat_on_timer(failures: Array[String]) ->
 		failures.append("enemy boarder was not marked as active on player ship")
 	if player_ship.fire_ticks <= 0:
 		failures.append("enemy boarder did not keep applying boarding chaos damage")
+
+
+func _verify_boarding_defense_damages_loose_boarder(failures: Array[String]) -> void:
+	var player_ship := MockShip.new()
+	player_ship.team = "player"
+	player_ship.set_meta("boarding_defense_damage_per_tick", 3.0)
+	player_ship.set_meta("boarding_fire_damage_reduction", 0.5)
+	add_child(player_ship)
+
+	var boarder := MockSoldier.new()
+	add_child(boarder)
+	boarder.owned_ship = player_ship
+	boarder.global_position = Vector3.ZERO
+	boarder.current_health = 20.0
+	boarder.chaos_tick_timer = 0.01
+
+	SoldierLifecycleHelper.update_boarding_chaos(boarder, 0.25)
+
+	if not is_equal_approx(boarder.current_health, 17.0):
+		failures.append("boarding defense did not damage loose enemy boarder: %.2f" % boarder.current_health)
+	if player_ship.fire_ticks != 1:
+		failures.append("boarding defense prevented surviving boarder from applying chaos damage")
+	if not is_equal_approx(player_ship.fire_damage_total, 2.5):
+		failures.append("boarding fire reduction did not apply after defense damage: %.2f" % player_ship.fire_damage_total)
+
+	boarder.queue_free()
+	player_ship.queue_free()
 
 
 func _verify_enemy_boarder_pauses_chaos_while_fighting_defender(failures: Array[String]) -> void:

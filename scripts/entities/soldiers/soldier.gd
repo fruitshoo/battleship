@@ -115,6 +115,8 @@ var _lod_is_combat_priority: bool = false
 var _cached_nearest_enemy: Node3D = null
 var _nearest_enemy_cache_timer: float = 0.0
 var _nearest_enemy_cache_interval_runtime: float = 0.2
+var _limbo_ai_update_timer: float = 0.0
+var _limbo_ai_update_interval_runtime: float = 0.08
 var soldier_level: int = 1
 var soldier_xp: float = 0.0
 
@@ -143,6 +145,22 @@ const BOARDING_STATUS_ON_DECK := "on_deck"
 const BOARDING_STATUS_BOARDING := "boarding"
 const BOARDING_STATUS_RETURNING := "returning"
 const BOARDING_STATUS_STRANDED := "stranded"
+const INCAPACITATED_ASSIST_ACQUIRE_RANGE := 4.6
+const INCAPACITATED_ASSIST_USE_RANGE := 1.15
+const INCAPACITATED_ASSIST_STAND_DISTANCE := 1.28
+const INCAPACITATED_ASSIST_STAND_REACHED_RANGE := 0.32
+const INCAPACITATED_ASSIST_DECK_MARGIN := 0.45
+const INCAPACITATED_ASSIST_CHANNEL_DURATION := 1.1
+const INCAPACITATED_ASSIST_PICKUP_MAX_PROGRESS := 0.72
+const INCAPACITATED_ASSIST_PICKUP_FORWARD_OFFSET := 0.06
+const INCAPACITATED_ASSIST_PICKUP_SIDE_OFFSET := 0.04
+const INCAPACITATED_ASSIST_PICKUP_HEIGHT_OFFSET := 0.18
+const INCAPACITATED_ASSIST_TARGET_ID_META := "incapacitated_assist_target_id"
+const INCAPACITATED_ASSIST_PROGRESS_META := "incapacitated_assist_progress"
+const INCAPACITATED_ASSIST_REVIVER_ID_META := "incapacitated_assist_reviver_id"
+const INCAPACITATED_ASSIST_PICKUP_START_POSITION_META := "incapacitated_assist_pickup_start_position"
+const INCAPACITATED_ASSIST_PICKUP_START_LOCAL_POSITION_META := "incapacitated_assist_pickup_start_local_position"
+const INCAPACITATED_ASSIST_PICKUP_START_ROTATION_META := "incapacitated_assist_pickup_start_rotation"
 
 # === 성능 최적화용 캐싱 (성능 저하 방지) ===
 static var _cached_soldiers: Array = []
@@ -240,6 +258,7 @@ func _ready() -> void:
 	decision_timer = randf_range(0.0, 0.2)
 	combat_timer = randf_range(0.0, 0.12)
 	_nearest_enemy_cache_timer = randf_range(0.0, 0.18)
+	_limbo_ai_update_timer = randf_range(0.0, 0.08)
 	SoldierSpeechHelper.reset(self)
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
@@ -754,7 +773,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	SoldierSpeechHelper.update(self, delta)
-	_update_limbo_ai_pilot(delta)
+	_update_limbo_ai_pilot_runtime(delta)
 		
 	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
 	if not _is_jumping and current_state != State.DEAD:
@@ -1119,6 +1138,267 @@ func _spawn_slash_effect() -> void:
 func heal_full() -> void:
 	SoldierLifecycleHelper.heal_full(self)
 
+
+func _try_assist_incapacitated_ally(delta: float, speed_scale: float, turn_speed: float) -> bool:
+	if current_state == State.DEAD:
+		return false
+	if has_named_action() and not has_named_action(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST):
+		_clear_incapacitated_assist_target()
+		return false
+	if team != "player":
+		_clear_incapacitated_assist_target()
+		return false
+	if not is_instance_valid(owned_ship):
+		_clear_incapacitated_assist_target()
+		return false
+	if is_instance_valid(find_nearest_hostile_on_owned_ship()):
+		_clear_incapacitated_assist_target()
+		return false
+
+	var assist_target: Node3D = _resolve_incapacitated_assist_target()
+	if not is_instance_valid(assist_target):
+		_clear_incapacitated_assist_target()
+		return false
+
+	var target_pos := assist_target.global_position
+	target_pos.y = global_position.y
+	var use_range := _get_incapacitated_assist_use_range()
+	var distance_to_target: float = global_position.distance_to(target_pos)
+	var stand_pos := _get_incapacitated_assist_stand_position(assist_target, use_range)
+	var distance_to_stand: float = global_position.distance_to(stand_pos)
+	var can_channel := distance_to_target <= use_range or distance_to_stand <= INCAPACITATED_ASSIST_STAND_REACHED_RANGE
+	if not can_channel:
+		set_meta(INCAPACITATED_ASSIST_PROGRESS_META, 0.0)
+		_finish_incapacitated_assist_action(assist_target)
+		SoldierAiHelper._move_toward_point(self, stand_pos, speed_scale, delta, turn_speed)
+		return true
+
+	current_target = null
+	velocity = Vector3.ZERO
+	move_and_slide()
+	SoldierAiHelper.turn_toward_position(self, target_pos, turn_speed, delta)
+	_settle_incapacitated_assist_target_on_deck(assist_target)
+	_begin_incapacitated_assist_action(assist_target)
+	var progress: float = float(get_meta(INCAPACITATED_ASSIST_PROGRESS_META, 0.0)) + delta
+	set_meta(INCAPACITATED_ASSIST_PROGRESS_META, progress)
+	var channel_duration := _get_incapacitated_assist_channel_duration()
+	_apply_incapacitated_assist_pickup_motion(assist_target, progress / channel_duration)
+	if progress < channel_duration:
+		return true
+
+	_settle_incapacitated_assist_target_on_deck(assist_target)
+	SoldierLifecycleHelper.assist_recover_incapacitated(assist_target)
+	_clear_incapacitated_assist_target()
+	return true
+
+
+func _begin_incapacitated_assist_action(assist_target: Node3D) -> void:
+	if not is_instance_valid(assist_target):
+		return
+	if has_named_action(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST):
+		return
+	begin_named_action(
+		SoldierActionHelper.ACTION_INCAPACITATED_ASSIST,
+		false,
+		SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY
+	)
+	set_meta(INCAPACITATED_ASSIST_PICKUP_START_POSITION_META, assist_target.global_position)
+	var assist_ship := _get_incapacitated_assist_ship(assist_target)
+	if is_instance_valid(assist_ship):
+		set_meta(INCAPACITATED_ASSIST_PICKUP_START_LOCAL_POSITION_META, assist_ship.to_local(assist_target.global_position))
+	set_meta(INCAPACITATED_ASSIST_PICKUP_START_ROTATION_META, assist_target.rotation)
+	begin_typed_carry_payload(
+		assist_target,
+		SoldierActionHelper.CARRY_PAYLOAD_KIND_CORPSE,
+		1.0,
+		{
+			SoldierActionHelper.PAYLOAD_DEF_FORWARD_OFFSET: INCAPACITATED_ASSIST_PICKUP_FORWARD_OFFSET,
+			SoldierActionHelper.PAYLOAD_DEF_SIDE_OFFSET: INCAPACITATED_ASSIST_PICKUP_SIDE_OFFSET,
+			SoldierActionHelper.PAYLOAD_DEF_HEIGHT_OFFSET: INCAPACITATED_ASSIST_PICKUP_HEIGHT_OFFSET,
+		}
+	)
+
+
+func _finish_incapacitated_assist_action(assist_target: Node3D = null) -> void:
+	var was_assist_action := has_named_action(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST)
+	if has_named_action(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST):
+		finish_named_action(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST)
+	if was_assist_action:
+		finish_carry_payload(assist_target)
+	remove_meta(INCAPACITATED_ASSIST_PICKUP_START_POSITION_META)
+	remove_meta(INCAPACITATED_ASSIST_PICKUP_START_LOCAL_POSITION_META)
+	remove_meta(INCAPACITATED_ASSIST_PICKUP_START_ROTATION_META)
+
+
+func _apply_incapacitated_assist_pickup_motion(assist_target: Node3D, normalized_progress: float) -> void:
+	if not is_instance_valid(assist_target):
+		return
+	if not has_meta(INCAPACITATED_ASSIST_PICKUP_START_POSITION_META) \
+	or not has_meta(INCAPACITATED_ASSIST_PICKUP_START_ROTATION_META):
+		return
+	var start_rotation: Vector3 = get_meta(INCAPACITATED_ASSIST_PICKUP_START_ROTATION_META)
+	var target_rotation := Vector3(start_rotation.x, rotation.y, start_rotation.z)
+	var eased_t: float = smoothstep(0.0, 1.0, clampf(minf(normalized_progress, INCAPACITATED_ASSIST_PICKUP_MAX_PROGRESS), 0.0, 1.0))
+	assist_target.global_position = _get_incapacitated_assist_anchor_position(assist_target)
+	assist_target.rotation = Vector3(
+		lerp_angle(start_rotation.x, target_rotation.x, eased_t),
+		lerp_angle(start_rotation.y, target_rotation.y, eased_t),
+		lerp_angle(start_rotation.z, target_rotation.z, eased_t)
+	)
+
+
+func _settle_incapacitated_assist_target_on_deck(assist_target: Node3D) -> void:
+	if not is_instance_valid(assist_target):
+		return
+	var settled_position := _get_incapacitated_assist_anchor_position(assist_target)
+	settled_position.y = global_position.y
+	settled_position = _clamp_incapacitated_assist_position_to_deck(assist_target, settled_position)
+	settled_position.y = global_position.y
+	assist_target.global_position = settled_position
+
+
+func _get_incapacitated_assist_anchor_position(assist_target: Node3D) -> Vector3:
+	var assist_ship := _get_incapacitated_assist_ship(assist_target)
+	if is_instance_valid(assist_ship) and has_meta(INCAPACITATED_ASSIST_PICKUP_START_LOCAL_POSITION_META):
+		var stored_local: Variant = get_meta(INCAPACITATED_ASSIST_PICKUP_START_LOCAL_POSITION_META)
+		if stored_local is Vector3:
+			return assist_ship.to_global(stored_local)
+	if has_meta(INCAPACITATED_ASSIST_PICKUP_START_POSITION_META):
+		var stored_global: Variant = get_meta(INCAPACITATED_ASSIST_PICKUP_START_POSITION_META)
+		if stored_global is Vector3:
+			return stored_global
+	return assist_target.global_position
+
+
+func _get_incapacitated_assist_ship(assist_target: Node3D) -> Node3D:
+	if is_instance_valid(assist_target):
+		var target_ship := assist_target.get("owned_ship") as Node3D
+		if is_instance_valid(target_ship):
+			return target_ship
+	if is_instance_valid(owned_ship):
+		return owned_ship
+	return home_ship
+
+
+func _get_incapacitated_assist_stand_position(assist_target: Node3D, use_range: float) -> Vector3:
+	var target_pos := assist_target.global_position
+	target_pos.y = global_position.y
+	var away_from_target := global_position - target_pos
+	away_from_target.y = 0.0
+	if away_from_target.length_squared() <= 0.0001:
+		if is_instance_valid(owned_ship):
+			away_from_target = owned_ship.global_transform.basis.x
+		else:
+			away_from_target = Vector3.RIGHT
+	away_from_target = away_from_target.normalized()
+	var stand_distance := maxf(INCAPACITATED_ASSIST_STAND_DISTANCE, use_range * 0.92)
+	var stand_pos := target_pos + away_from_target * stand_distance
+	stand_pos.y = global_position.y
+	return _clamp_incapacitated_assist_position_to_deck(assist_target, stand_pos, INCAPACITATED_ASSIST_DECK_MARGIN)
+
+
+func _clamp_incapacitated_assist_position_to_deck(assist_target: Node3D, world_position: Vector3, deck_margin: float = 0.0) -> Vector3:
+	var assist_ship := _get_incapacitated_assist_ship(assist_target)
+	if not is_instance_valid(assist_ship):
+		return world_position
+
+	var local_pos := assist_ship.to_local(world_position)
+	var half_ext := _get_ship_deck_half_extents(assist_ship)
+	var safe_x := maxf(0.0, half_ext.x - deck_margin)
+	var safe_z := maxf(0.0, half_ext.y - deck_margin)
+	local_pos.x = clampf(local_pos.x, -safe_x, safe_x)
+	local_pos.z = clampf(local_pos.z, -safe_z, safe_z)
+	var clamped_pos := assist_ship.to_global(local_pos)
+	clamped_pos.y = world_position.y
+	return clamped_pos
+
+
+func _resolve_incapacitated_assist_target() -> Node3D:
+	var current_id: int = int(get_meta(INCAPACITATED_ASSIST_TARGET_ID_META, 0))
+	if current_id != 0:
+		var current_target_node := instance_from_id(current_id) as Node3D
+		if is_instance_valid(current_target_node) \
+		and current_target_node.get_meta("incapacitated", false) == true \
+		and current_target_node.get("owned_ship") == owned_ship:
+			var claimed_reviver := instance_from_id(int(current_target_node.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0)))
+			if not is_instance_valid(claimed_reviver) or claimed_reviver == self:
+				current_target_node.set_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, get_instance_id())
+				return current_target_node
+
+	var nearest_target: Node3D = null
+	var nearest_distance_sq: float = INF
+	for other in EntityRegistry.get_soldiers_by_ship(owned_ship):
+		if other == self or not is_instance_valid(other):
+			continue
+		if other.get_meta("incapacitated", false) != true:
+			continue
+		if str(other.get("team")) != team:
+			continue
+		var claimed_reviver_id: int = int(other.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0))
+		if claimed_reviver_id != 0 and claimed_reviver_id != get_instance_id():
+			var claimed_reviver = instance_from_id(claimed_reviver_id)
+			if is_instance_valid(claimed_reviver):
+				continue
+			other.remove_meta(INCAPACITATED_ASSIST_REVIVER_ID_META)
+		var distance_sq: float = global_position.distance_squared_to(other.global_position)
+		var acquire_range := _get_incapacitated_assist_acquire_range()
+		if distance_sq > acquire_range * acquire_range:
+			continue
+		if distance_sq < nearest_distance_sq:
+			nearest_distance_sq = distance_sq
+			nearest_target = other
+	if is_instance_valid(nearest_target):
+		set_meta(INCAPACITATED_ASSIST_TARGET_ID_META, nearest_target.get_instance_id())
+		set_meta(INCAPACITATED_ASSIST_PROGRESS_META, 0.0)
+		nearest_target.set_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, get_instance_id())
+	return nearest_target
+
+
+func _get_incapacitated_assist_channel_duration() -> float:
+	var stat_ship := _get_incapacitated_assist_stat_ship()
+	if is_instance_valid(stat_ship) and stat_ship.has_meta("incapacitated_assist_channel_duration"):
+		return maxf(0.25, float(stat_ship.get_meta("incapacitated_assist_channel_duration")))
+	return INCAPACITATED_ASSIST_CHANNEL_DURATION
+
+
+func _get_incapacitated_assist_acquire_range() -> float:
+	var stat_ship := _get_incapacitated_assist_stat_ship()
+	if is_instance_valid(stat_ship) and stat_ship.has_meta("incapacitated_assist_acquire_range"):
+		return maxf(INCAPACITATED_ASSIST_USE_RANGE, float(stat_ship.get_meta("incapacitated_assist_acquire_range")))
+	return INCAPACITATED_ASSIST_ACQUIRE_RANGE
+
+
+func _get_incapacitated_assist_use_range() -> float:
+	var stat_ship := _get_incapacitated_assist_stat_ship()
+	if is_instance_valid(stat_ship) and stat_ship.has_meta("incapacitated_assist_use_range"):
+		return maxf(0.5, float(stat_ship.get_meta("incapacitated_assist_use_range")))
+	return INCAPACITATED_ASSIST_USE_RANGE
+
+
+func _get_incapacitated_assist_stat_ship() -> Node:
+	if is_instance_valid(owned_ship) and owned_ship.has_meta("incapacitated_assist_channel_duration"):
+		return owned_ship
+	if is_instance_valid(home_ship) and home_ship.has_meta("incapacitated_assist_channel_duration"):
+		return home_ship
+	if is_instance_valid(owned_ship) and owned_ship.has_meta("incapacitated_assist_health_ratio"):
+		return owned_ship
+	if is_instance_valid(home_ship) and home_ship.has_meta("incapacitated_assist_health_ratio"):
+		return home_ship
+	if is_instance_valid(owned_ship):
+		return owned_ship
+	return home_ship
+
+
+func _clear_incapacitated_assist_target() -> void:
+	var target_id: int = int(get_meta(INCAPACITATED_ASSIST_TARGET_ID_META, 0))
+	var target := instance_from_id(target_id) as Node3D if target_id != 0 else null
+	_finish_incapacitated_assist_action(target)
+	if target_id != 0:
+		if is_instance_valid(target) and int(target.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0)) == get_instance_id():
+			target.remove_meta(INCAPACITATED_ASSIST_REVIVER_ID_META)
+	remove_meta(INCAPACITATED_ASSIST_TARGET_ID_META)
+	remove_meta(INCAPACITATED_ASSIST_PROGRESS_META)
+
 ## 사망 처리
 func _die() -> void:
 	SoldierLifecycleHelper.die(self)
@@ -1240,6 +1520,24 @@ func _allow_cross_ship_enemy_scan() -> bool:
 		return true
 	return not _is_passive_ally_ship_crew()
 
+func _should_hold_defensive_deck_position_against(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship) or not is_instance_valid(owned_ship):
+		return false
+	if target_ship == owned_ship:
+		return false
+	if team != "player":
+		return false
+	if boarding_status != BOARDING_STATUS_ON_DECK or _is_jumping:
+		return false
+	if is_instance_valid(home_ship) and owned_ship != home_ship:
+		return false
+	if owned_ship.get("deck_is_contested") == true or owned_ship.get("deck_is_overrun") == true:
+		return false
+	var hostile_boarders: int = int(owned_ship.get("deck_hostile_boarder_count")) if owned_ship.get("deck_hostile_boarder_count") != null else 0
+	if hostile_boarders > 0:
+		return false
+	return is_melee_only or crew_role == "spearman"
+
 func _is_lod_combat_priority() -> bool:
 	if _is_jumping:
 		return true
@@ -1310,6 +1608,25 @@ func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> 
 func _get_nearest_enemy_cache_interval() -> float:
 	return _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
 
+func _get_limbo_ai_update_interval() -> float:
+	if _is_far_lod_sleep_candidate():
+		return 0.12
+	if _is_passive_ally_ship_crew():
+		if _lod_dist_to_player > 24.0:
+			return 0.12
+		return 0.10
+	if _lod_is_combat_priority:
+		if _lod_dist_to_player > 45.0:
+			return 0.10
+		if _lod_dist_to_player > 28.0:
+			return 0.08
+		return 0.06
+	if _lod_dist_to_player > 60.0:
+		return 0.12
+	if _lod_dist_to_player > 40.0:
+		return 0.10
+	return 0.08
+
 func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
 	var limbo_target: Node3D = _get_recent_limbo_target()
 	if is_instance_valid(limbo_target):
@@ -1361,6 +1678,19 @@ func _ship_has_active_boarding_link_to(from_ship: Node3D, to_ship: Node3D) -> bo
 	if target_ship != to_ship:
 		return false
 	return from_ship.get("_initial_rope_deployed") == true
+
+
+func _update_limbo_ai_pilot_runtime(delta: float) -> void:
+	if not limbo_ai_pilot_enabled:
+		return
+	if current_state == State.DEAD or current_state == State.BOARDING_JUMP:
+		return
+	_limbo_ai_update_timer -= delta
+	if _limbo_ai_update_timer > 0.0:
+		return
+	_limbo_ai_update_interval_runtime = _get_limbo_ai_update_interval()
+	_limbo_ai_update_timer = _limbo_ai_update_interval_runtime + randf_range(0.0, 0.015)
+	_update_limbo_ai_pilot(delta)
 
 
 func _update_limbo_ai_pilot(delta: float) -> void:

@@ -225,12 +225,8 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 				else:
 					ally_count_on_deck += 1
 
-		if enemy_count_on_deck > 0 and ally_count_on_deck <= enemy_count_on_deck:
-			return false
-
-		# 적 함선인 경우 최소한 한 명은 배를 지키기 위해 남겨둠
-		if team_prop == "enemy" and ally_count_on_deck <= 1:
-			return false
+			if enemy_count_on_deck > 0 and ally_count_on_deck <= enemy_count_on_deck:
+				return false
 
 		var nearest_boarder_distance_sq: float = INF
 		for child in soldiers:
@@ -295,12 +291,10 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team_prop, ship.boarding_target.name])
 		return true
 	else:
-		if ship.has_method("_become_derelict") and not ship.is_in_group("player"):
-			print("[Status] 모든 병사 도선 완료. 무인선 상태로 표류합니다.")
-			ship.call("_become_derelict")
-		else:
-			print("[Status] 도선할 병사가 더 이상 없습니다.")
-			cancel_boarding(ship)
+		print("[Status] 도선할 병사가 더 이상 없습니다.")
+		cancel_boarding(ship)
+		if ship.has_method("check_derelict_status"):
+			ship.call("check_derelict_status")
 	return false
 
 
