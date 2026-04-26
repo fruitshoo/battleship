@@ -92,6 +92,7 @@ const DAMAGE_SOURCE_NAME := {
 	"spear": "창",
 	"trident": "삼지창",
 	"harpoon": "작살",
+	"boarding_defense": "방책",
 }
 
 # 공적(Merit) 시스템: 병사(지휘) 업그레이드 전용 트랙
@@ -758,8 +759,8 @@ func _debug_spawn_support_ship() -> void:
 	if not is_instance_valid(player_ship):
 		print("[DEBUG] 플레이어 배 없음!")
 		return
-	if not player_ship.has_method("_spawn_or_repair_ally"):
-		print("[DEBUG] 플레이어 배에 지원함 소환 함수 없음!")
+	if not is_instance_valid(UpgradeManager) or not UpgradeManager.has_method("reconcile_support_fleet"):
+		print("[DEBUG] 지원함 reconcile helper 없음!")
 		return
 
 	var current_support_count: int = 0
@@ -767,9 +768,14 @@ func _debug_spawn_support_ship() -> void:
 		current_support_count = player_ship._get_support_fleet_ships().size()
 
 	if current_support_count >= int(player_ship.support_fleet_limit):
-		player_ship.support_fleet_limit = current_support_count + 1
+		var next_limit := current_support_count + 1
+		player_ship.support_fleet_limit = next_limit
+		player_ship.set_meta("base_support_fleet_limit", next_limit)
 
-	player_ship._spawn_or_repair_ally()
+	UpgradeManager.call("reconcile_support_fleet", player_ship, "debug_spawn_support", {
+		"allow_autospawn": true,
+		"spawn_now": true,
+	})
 	print("[DEBUG] 지원함 디버그 추가: 현재 %d척 / 한계 %d" % [
 		current_support_count + 1,
 		int(player_ship.support_fleet_limit)

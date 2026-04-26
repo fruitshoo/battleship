@@ -111,6 +111,18 @@
       "layer": "entities/ships/ship_weapon_loadout_helper.gd",
       "responsibility": "Owns the current ship weapon loadout helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
+    "res://scripts/entities/ships/support_fleet_cannon_helper.gd": {
+      "layer": "entities/ships/support_fleet_cannon_helper.gd",
+      "responsibility": "Owns support-fleet cannon scaling rules, slot-aware support roster summaries, upgrade-facing support cannon counts, and authored support loadout activation."
+    },
+    "res://scripts/entities/ships/support_fleet_formation_helper.gd": {
+      "layer": "entities/ships/support_fleet_formation_helper.gd",
+      "responsibility": "Owns role-aware support-fleet anchor selection, trail goals, and hull-size-based formation spacing for mixed support squadrons."
+    },
+    "res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "layer": "entities/ships/support_fleet_state_helper.gd",
+      "responsibility": "Owns flagship-scoped support doctrine state, support ship ownership metadata, and effective formation or hold lookups."
+    },
     "res://scripts/entities/ships/support_boarding_helper.gd": {
       "layer": "entities/ships/support_boarding_helper.gd",
       "responsibility": "Owns the current support boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
@@ -142,6 +154,10 @@
     "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
       "layer": "entities/soldiers/soldier_ship_helper.gd",
       "responsibility": "Owns the current soldier ship helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
+      "layer": "entities/soldiers/soldier_ship_spatial_cache_helper.gd",
+      "responsibility": "Owns ship-level soldier spatial caches, deck bucket scans, and cross-ship pair geometry baselines."
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
       "layer": "entities/soldiers/soldier_ship_work_priority_helper.gd",
@@ -255,6 +271,10 @@
       "layer": "test/project_contract_support_helper.gd",
       "responsibility": "Owns the current project contract support helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
+    "res://scripts/test/project_contract_typography_helper.gd": {
+      "layer": "test/project_contract_typography_helper.gd",
+      "responsibility": "Owns typography smoke checks for semantic menu labels, HUD timer presentation, preview billboard labels, and soldier speech label styling."
+    },
     "res://scripts/test/project_contract_upgrade_helper.gd": {
       "layer": "test/project_contract_upgrade_helper.gd",
       "responsibility": "Owns the current project contract upgrade helper responsibilities; update this baseline when moving behavior across module boundaries."
@@ -340,6 +360,7 @@
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/chaser_ship_support_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/support_fleet_formation_helper.gd": "Support fleet formation helper owns mixed-role offset, anchor, trail, and join-staging geometry; split only with a dedicated formation-geometry extraction.",
     "res://scripts/entities/ships/player_ship_crew_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/ship_authoring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/soldiers/soldier_action_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
@@ -447,22 +468,6 @@
         "res://scripts/world/sea_sites/sea_site_reward_helper.gd"
       ],
       "reason": "Crew training and sea-site rewards both need a local read-only soldier level adapter while sharing only node contracts."
-    },
-    {
-      "name": "_get_player_cannon_count_for_level",
-      "paths": [
-        "res://scripts/test/project_contract_upgrade_helper.gd",
-        "res://scripts/ui/hud/hud_upgrade_info_helper.gd"
-      ],
-      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
-    },
-    {
-      "name": "_get_support_cannon_count_for_level",
-      "paths": [
-        "res://scripts/test/project_contract_upgrade_helper.gd",
-        "res://scripts/ui/hud/hud_upgrade_info_helper.gd"
-      ],
-      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
     {
       "name": "_get_target_deck_half_extents",
@@ -894,7 +899,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
-      "count": 43,
+      "count": 39,
       "functions": [
         "process_minion_ai",
         "_is_ship_disabled",
@@ -912,16 +917,13 @@
         "_calculate_support_assist_separation",
         "_get_minion_roster",
         "_get_minion_offset",
-        "_get_support_fleet_offset",
-        "_get_support_join_offset",
-        "_get_support_chain_goal",
-        "_get_support_formation_offset",
         "_get_support_assist_target",
         "_is_player_deck_emergency",
         "_is_support_rescue_target",
         "_is_support_boss_breach_target",
         "_is_boss_ship",
         "_is_support_formation_hold_enabled",
+        "_get_support_flagship",
         "_get_recent_support_limbo_payload",
         "_get_recent_ally_limbo_payload",
         "_draw_support_limbo_debug",
@@ -930,17 +932,16 @@
         "_get_ally_limbo_color",
         "_set_support_assist_target_lock",
         "_clear_support_assist_target_lock",
-        "_get_support_follow_distance",
-        "_get_support_lead_ship",
+        "_is_panokseon_support",
+        "_calculate_support_pre_avoidance",
         "_get_ship_forward_flat",
         "_get_ship_speed",
         "_record_support_trail_point",
-        "_get_support_trail_goal",
         "_process_captured_guard_ai",
         "_build_captured_guard_navigation",
         "_calculate_captured_guard_separation"
       ],
-      "reason": "Support-fleet and captured-minion LimboAI bridges intentionally extend the minion helper with recent payload reads while the helper remains the execution owner for allied movement, escorting, and boarding. Boss-breach support routing also lives here because it is still an allied escort execution concern, not a separate owner."
+      "reason": "Support-fleet and captured-minion LimboAI bridges intentionally extend the minion helper with allied escort execution, while role-aware support squadron spacing now delegates to the dedicated support fleet formation helper."
     },
     "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
       "count": 27,
@@ -1075,17 +1076,18 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
-      "count": 7,
+      "count": 8,
       "functions": [
         "handle_input",
         "toggle_fleet_formation",
         "cycle_fleet_formation",
         "_get_fleet_formation_label",
+        "_get_normalized_fleet_formation",
         "update_rowing_audio",
         "capture_derelict_ship",
         "replenish_crew"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Player ship runtime helper now normalizes legacy support formation values so the user-facing formation cycle stays on the two supported modes."
     },
     "res://scripts/entities/ships/player_ship_sink_helper.gd": {
       "count": 5,
@@ -1099,18 +1101,25 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_support_helper.gd": {
-      "count": 8,
+      "count": 15,
       "functions": [
         "spawn_or_repair_ally",
         "resolve_support_fleet_profile",
+        "refresh_support_fleet_composition",
         "_get_upgrade_manager",
         "_get_support_repair_fraction",
+        "_configure_support_ship_instance",
+        "_apply_support_profile_meta",
+        "_build_runtime_slot_assignments",
+        "_get_runtime_support_profile_id",
+        "_find_matching_unoccupied_slot",
+        "_find_first_unoccupied_slot",
         "get_support_fleet_ships",
         "get_offscreen_ally_spawn_position",
         "update_support_fleet_respawn",
         "_is_world_position_offscreen"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Support fleet refresh now preserves existing runtime ship profiles while reassigning inserted squadron slots such as newly added panokseon support entries."
     },
     "res://scripts/entities/ships/ship_ally_role_helper.gd": {
       "count": 20,
@@ -1417,7 +1426,7 @@
       "reason": "Scene contract encapsulation routes soldier hand-pivot lookup through the Soldier owner contract."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
-      "count": 24,
+      "count": 25,
       "functions": [
         "take_damage",
         "get_ship_ranged_cover_reduction",
@@ -1426,6 +1435,7 @@
         "_is_support_rescue_boarding_active",
         "_find_nearest_hostile_on_owned_ship",
         "heal_full",
+        "assist_recover_incapacitated",
         "incapacitate",
         "die",
         "_is_sinking_death_context",
@@ -1470,6 +1480,27 @@
         "get_clamped_ship_deck_local",
         "_get_ship_soldier_parent",
         "get_ship_deck_half_extents"
+      ],
+      "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
+      "count": 15,
+      "functions": [
+        "get_valid_node3d",
+        "get_ship_enemy_scan_data",
+        "_build_ship_enemy_scan_data",
+        "_make_ship_enemy_scan_cache_key",
+        "_prune_ship_enemy_scan_cache",
+        "get_ship_pair_geometry",
+        "_build_ship_pair_geometry",
+        "_make_ship_pair_geometry_cache_key",
+        "_prune_ship_pair_geometry_cache",
+        "resolve_ship_deck_half_extents",
+        "get_ship_deck_bucket_candidates",
+        "_get_ship_deck_bucket_data",
+        "_build_ship_deck_bucket_data",
+        "_get_ship_deck_bucket_cell",
+        "_prune_ship_deck_bucket_cache"
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
@@ -2131,12 +2162,16 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/test/project_contract_support_helper.gd": {
-      "count": 9,
+      "count": 13,
       "functions": [
+        "_reconcile_support_fleet",
+        "_request_support_spawn",
         "run_support_fleet_contract_smoke",
+        "_run_support_wing_join_geometry_contract",
         "_run_support_rescue_emergency_smoke",
         "_run_support_boss_breach_smoke",
         "_run_captured_minion_guard_smoke",
+        "_run_support_panokseon_upgrade_smoke",
         "_run_support_signal_level_two_limit_smoke",
         "_run_support_shared_cannon_cap_smoke",
         "_run_support_shared_hull_upgrade_smoke",
@@ -2145,14 +2180,33 @@
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
+    "res://scripts/test/project_contract_typography_helper.gd": {
+      "count": 14,
+      "functions": [
+        "run_typography_contract_smoke",
+        "_run_main_menu_typography_check",
+        "_run_preview_typography_check",
+        "_expect_control_font",
+        "_expect_control_color",
+        "_expect_control_constant",
+        "_expect_label3d_font",
+        "_expect_label3d_billboard",
+        "_wait_typography_frames",
+        "_compute_main_menu_density",
+        "_compute_hud_density",
+        "_font_matches",
+        "_font_path",
+        "_colors_match"
+      ],
+      "reason": "Typography contract smoke owns semantic UI and world-text preset assertions, including responsive size expectations derived from active viewport density."
+    },
     "res://scripts/test/project_contract_upgrade_helper.gd": {
-      "count": 5,
+      "count": 4,
       "functions": [
         "run_upgrade_contract_smoke",
         "_validate_cannon_upgrade_split",
         "_validate_support_hull_upgrade_retired",
-        "_get_player_cannon_count_for_level",
-        "_get_support_cannon_count_for_level"
+        "_validate_panokseon_upgrade_gate"
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
@@ -2328,14 +2382,15 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/ui/hud/hud_progression_layout_helper.gd": {
-      "count": 4,
+      "count": 5,
       "functions": [
         "apply_overlay_theme",
+        "apply_overlay_density",
         "ensure_hud_label",
         "setup_top_xp_bar",
         "attach_level_label_to_xp_bar"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Responsive HUD overlay density now lives alongside the rest of the progression overlay layout owner surface."
     },
     "res://scripts/ui/hud/hud_runtime_helper.gd": {
       "count": 2,
@@ -2437,7 +2492,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/ui/hud/hud_update_helper.gd": {
-      "count": 34,
+      "count": 36,
       "functions": [
         "update_level",
         "update_score",
@@ -2455,7 +2510,9 @@
         "_get_support_respawn_timer_text",
         "_ensure_support_slot_count",
         "_create_support_slot",
+        "_apply_support_slot_density",
         "_update_support_slot",
+        "_get_support_slot_visual",
         "update_hull_display",
         "update_stamina_display",
         "update_boarding_display",
@@ -2477,7 +2534,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
-      "count": 16,
+      "count": 14,
       "functions": [
         "is_ship_upgrade",
         "is_crew_upgrade",
@@ -2488,8 +2545,6 @@
         "get_upgrade_icon_texture_path",
         "get_upgrade_color",
         "_percent_delta_from_ratio",
-        "_get_player_cannon_count_for_level",
-        "_get_support_cannon_count_for_level",
         "_level_matches",
         "_calculate_sailing_stats",
         "_calculate_rowing_stats",
@@ -2497,6 +2552,76 @@
         "_calculate_supply_bonus_stats"
       ],
       "reason": "Generated baseline for the current helper public static surface."
+    },
+    "res://scripts/entities/ships/support_fleet_cannon_helper.gd": {
+      "count": 13,
+      "functions": [
+        "get_player_cannon_count_for_level",
+        "is_panokseon_support_active",
+        "get_support_cannon_count_for_current_levels",
+        "get_support_cannon_count_for_level",
+        "get_active_support_cannon_names_for_ship_type",
+        "get_support_fleet_limit_for_current_levels",
+        "get_active_support_slot_profiles_for_current_levels",
+        "get_support_slot_summary_for_current_levels",
+        "get_support_slot_cannon_entries_for_current_levels",
+        "get_support_cannon_summary_for_current_levels",
+        "_get_support_upgrade_limit_bonus",
+        "_is_panokseon_ship_type",
+        "_get_support_ship_summary_label"
+      ],
+      "reason": "Support fleet cannon helper owns support broadside scaling, slot-aware support summary generation, and authored support cannon activation rules."
+    },
+    "res://scripts/entities/ships/support_fleet_formation_helper.gd": {
+      "count": 28,
+      "functions": [
+        "get_support_fleet_offset",
+        "get_support_join_offset",
+        "get_support_join_chain_goal",
+        "get_support_lead_ship",
+        "get_support_chain_goal",
+        "should_hold_line_during_free_assist",
+        "record_trail_point",
+        "get_trail_goal",
+        "get_ship_forward_flat",
+        "get_follow_distance",
+        "_get_generic_support_chain_goal",
+        "_get_generic_support_formation_offset",
+        "_get_generic_support_lead_ship",
+        "_resolve_role_anchor_ship",
+        "_find_squadron_lead",
+        "_get_role_follow_distance",
+        "_get_role_lateral_distance",
+        "_get_pair_lateral_spacing",
+        "_get_ship_half_extents",
+        "_get_ship_spacing_hint",
+        "_get_role_spacing_value",
+        "_get_role_lateral_scale",
+        "_get_role_side_sign",
+        "_is_named_support_role",
+        "_get_formation_value",
+        "_get_support_slot_role",
+        "_get_support_squadron_id",
+        "_get_flagship_anchor"
+      ],
+      "reason": "Support fleet formation helper owns role-aware squadron anchors, trail-follow goals, and hull-size spacing for mixed support formations."
+    },
+    "res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "count": 11,
+      "functions": [
+        "initialize_flagship_state",
+        "set_flagship_formation",
+        "get_flagship_formation",
+        "set_flagship_hold_enabled",
+        "is_flagship_hold_enabled",
+        "assign_support_ship_to_flagship",
+        "get_support_owner_flagship",
+        "is_support_owned_by_flagship",
+        "get_effective_formation",
+        "is_effective_hold_enabled",
+        "normalize_formation_value"
+      ],
+      "reason": "Support fleet state helper owns flagship-scoped support doctrine state, ownership links, and effective formation or hold lookup."
     },
     "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
       "count": 15,
@@ -2520,7 +2645,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
-      "count": 10,
+      "count": 15,
       "functions": [
         "resolve_support_fleet_profile_for_levels",
         "get_support_slot_plan_for_levels",
@@ -2528,6 +2653,11 @@
         "get_panokseon_unlock_upgrade_id",
         "get_panokseon_unlock_level",
         "get_support_limit_bonus_for_levels",
+        "get_profile_id",
+        "get_profile_ship_type",
+        "get_profile_hull_scene",
+        "get_profile_cannon_scene",
+        "profile_matches_runtime_ship",
         "apply_support_fleet_profile",
         "_build_profile_for_slot",
         "_build_fallback_slot",
@@ -2670,6 +2800,16 @@
       "to": "res://scripts/entities/ships/support_boarding_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/support_fleet_formation_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
+      "reason": "Support minion AI delegates mixed-hull squadron anchor selection and spacing rules to the dedicated support fleet formation helper."
+    },
+    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "reason": "Support minion AI now reads flagship-owned support doctrine and support ownership through the dedicated support fleet state helper."
+    },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
       "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
       "to": "res://scripts/entities/ships/ship_boarding_meta_helper.gd",
@@ -2745,10 +2885,20 @@
       "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/entities/ships/player_ship_runtime_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "reason": "Player ship runtime input now mutates flagship-owned support doctrine state through the dedicated support fleet state helper."
+    },
     "res://scripts/entities/ships/player_ship_support_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
       "from": "res://scripts/entities/ships/player_ship_support_helper.gd",
       "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/player_ship_support_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "reason": "Player support helper now assigns support-ship ownership and filters support rosters through the dedicated support fleet state helper."
     },
     "res://scripts/entities/ships/ship_authoring_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
       "from": "res://scripts/entities/ships/ship_authoring_helper.gd",
@@ -2774,6 +2924,31 @@
       "from": "res://scripts/entities/ships/ship_weapon_loadout_helper.gd",
       "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/ships/support_fleet_cannon_helper.gd|res://scripts/entities/ships/ship_blueprint_helper.gd": {
+      "from": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
+      "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
+      "reason": "Support fleet cannon rules resolve authored support ship archetypes through the ship blueprint helper."
+    },
+    "res://scripts/entities/ships/support_fleet_cannon_helper.gd|res://scripts/entities/ships/ship_weapon_loadout_helper.gd": {
+      "from": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
+      "to": "res://scripts/entities/ships/ship_weapon_loadout_helper.gd",
+      "reason": "Support fleet cannon rules reuse the authored ship weapon loadout helper to activate support broadside nodes by required level."
+    },
+    "res://scripts/entities/ships/support_fleet_cannon_helper.gd|res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
+      "from": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
+      "to": "res://scripts/entities/ships/player_ship_support_squadron_helper.gd",
+      "reason": "Support fleet cannon rules now read the active support slot plan to build slot-aware support cannon and roster summaries."
+    },
+    "res://scripts/entities/ships/support_fleet_formation_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "reason": "Support fleet formation helper now resolves the effective support formation through the dedicated support fleet state helper."
+    },
+    "res://scripts/entities/ships/support_fleet_state_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "from": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "reason": "Support fleet state helper reuses ship ally role tagging to validate fallback support-owner relationships through the player flagship."
     },
     "res://scripts/entities/ships/support_boarding_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
       "from": "res://scripts/entities/ships/support_boarding_helper.gd",
@@ -2835,15 +3010,10 @@
       "to": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
-    "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/entities/soldiers/soldier_state_helper.gd": {
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
-      "to": "res://scripts/entities/soldiers/soldier_state_helper.gd",
-      "reason": "Generated baseline for current helper-to-helper preload boundary."
-    },
-    "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/helpers/node_contract_helper.gd": {
-      "from": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
-      "to": "res://scripts/helpers/node_contract_helper.gd",
-      "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
+      "to": "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd",
+      "reason": "Soldier ship helper delegates ship-level spatial cache ownership to a dedicated helper to keep targeting APIs slimmer."
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/entities/soldiers/soldier_action_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",
@@ -2879,6 +3049,11 @@
       "from": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
       "to": "res://scripts/entities/ships/ship_blueprint_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/managers/upgrade_manager_data_helper.gd|res://scripts/entities/ships/support_fleet_cannon_helper.gd": {
+      "from": "res://scripts/managers/upgrade_manager_data_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
+      "reason": "Upgrade next-description formatting shares support cannon count rules with the dedicated support fleet cannon helper."
     },
     "res://scripts/managers/enemy_spawner_fleet_helper.gd|res://scripts/entities/ships/ship_combat_mode_helper.gd": {
       "from": "res://scripts/managers/enemy_spawner_fleet_helper.gd",
@@ -2975,6 +3150,11 @@
       "to": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/test/project_contract_upgrade_helper.gd|res://scripts/entities/ships/support_fleet_cannon_helper.gd": {
+      "from": "res://scripts/test/project_contract_upgrade_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
+      "reason": "Upgrade contract smoke reuses the support fleet cannon helper so contracts and runtime share the same support broadside rules."
+    },
     "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/ship_authoring_helper.gd": {
       "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
       "to": "res://scripts/entities/ships/ship_authoring_helper.gd",
@@ -3025,6 +3205,26 @@
       "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
     },
+    "res://scripts/test/project_contract_support_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/test/project_contract_support_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "reason": "Support fleet contract smoke now explicitly drops the flagship into free-assist mode when validating boss breach behavior, so the test helper reads support doctrine state through the shared support fleet state helper."
+    },
+    "res://scripts/test/project_contract_support_helper.gd|res://scripts/entities/ships/support_fleet_formation_helper.gd": {
+      "from": "res://scripts/test/project_contract_support_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
+      "reason": "Support fleet contract smoke validates wing join staging and fallback support lanes against the dedicated formation helper."
+    },
+    "res://scripts/test/project_contract_typography_helper.gd|res://scripts/test/preview_harness_helper.gd": {
+      "from": "res://scripts/test/project_contract_typography_helper.gd",
+      "to": "res://scripts/test/preview_harness_helper.gd",
+      "reason": "Typography smoke reuses the shared preview billboard helper so preview labels and contract labels stay on the same world-text path."
+    },
+    "res://scripts/test/project_contract_typography_helper.gd|res://scripts/entities/soldiers/soldier_speech_helper.gd": {
+      "from": "res://scripts/test/project_contract_typography_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_speech_helper.gd",
+      "reason": "Typography smoke validates runtime soldier speech labels through the live speech helper instead of duplicating label setup."
+    },
     "res://scripts/ui/hud/hud_distance_debug_helper.gd|res://scripts/ui/hud/hud_lookup_helper.gd": {
       "from": "res://scripts/ui/hud/hud_distance_debug_helper.gd",
       "to": "res://scripts/ui/hud/hud_lookup_helper.gd",
@@ -3055,6 +3255,11 @@
       "to": "res://scripts/helpers/node_contract_helper.gd",
       "reason": "Scene contract encapsulation routes ship crew container lookup through the shared node contract helper."
     },
+    "res://scripts/ui/hud/hud_upgrade_info_helper.gd|res://scripts/entities/ships/support_fleet_cannon_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_upgrade_info_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
+      "reason": "HUD upgrade info shares support-fleet cannon count rules with the dedicated support fleet cannon helper."
+    },
     "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd|res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
       "from": "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd",
       "to": "res://scripts/ui/hud/hud_upgrade_info_helper.gd",
@@ -3064,6 +3269,11 @@
       "from": "res://scripts/entities/ships/player_ship_support_helper.gd",
       "to": "res://scripts/entities/ships/player_ship_support_squadron_helper.gd",
       "reason": "Support spawn helper delegates support slot profile resolution to the squadron helper."
+    },
+    "res://scripts/ui/hud/hud_update_helper.gd|res://scripts/entities/ships/player_ship_support_helper.gd": {
+      "from": "res://scripts/ui/hud/hud_update_helper.gd",
+      "to": "res://scripts/entities/ships/player_ship_support_helper.gd",
+      "reason": "HUD support slots mirror live support fleet slot profiles so empty and respawn slots keep the correct ship type identity."
     }
   },
   "hazard_baselines": {
@@ -3211,6 +3421,11 @@
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/support_fleet_formation_helper.gd": {
+      "reason": "Support fleet formation helper owns mixed-role offset, anchor, trail, and join-staging geometry; split only with a dedicated formation-geometry extraction.",
+      "priority": "baseline",
+      "recommended_action": "Revisit if support formation geometry grows beyond offset/anchor/trail responsibilities."
     },
     "large_helper|res://scripts/entities/ships/player_ship_crew_helper.gd": {
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
@@ -3476,16 +3691,6 @@
       "reason": "Crew training and sea-site rewards both need a local read-only soldier level adapter while sharing only node contracts.",
       "priority": "known-local-adapter",
       "recommended_action": "Consolidate the soldier level adapter if a broader soldier stat contract owner is introduced."
-    },
-    "duplicate_static_function|_get_player_cannon_count_for_level|res://scripts/test/project_contract_upgrade_helper.gd,res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
-      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
-      "priority": "baseline",
-      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
-    },
-    "duplicate_static_function|_get_support_cannon_count_for_level|res://scripts/test/project_contract_upgrade_helper.gd,res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
-      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
-      "priority": "baseline",
-      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
     "duplicate_static_function|_get_target_deck_half_extents|res://scripts/entities/ships/base_ship_boarding_helper.gd,res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
