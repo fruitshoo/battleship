@@ -17,6 +17,8 @@ signal merit_full_action_completed() # 지휘 포인트 가득 참 후속 처리
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
 @export var boss_spawn_time: float = 600.0 # 보스 등장 시간 (초, 기본 10분)
 @export var survival_victory_time: float = 600.0 # 생존 승리 시간 (초)
+@export_range(1.0, 8.0, 0.1) var victory_result_delay: float = 2.2
+@export_range(2.0, 8.0, 0.1) var final_boss_victory_result_delay: float = 4.0
 @export var max_level: int = 15
 @export var max_hull_hp_cap: float = 800.0 # 레벨업 HP 보너스 상한 (함선 체력 상향에 맞춰 400->800)
 @export var hud: CanvasLayer = null
@@ -998,7 +1000,8 @@ func _schedule_result_scene_transition() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	_victory_result_transition_started = true
-	var timer := get_tree().create_timer(2.2, true, false, true)
+	var result_delay := final_boss_victory_result_delay if _boss_triggered else victory_result_delay
+	var timer := get_tree().create_timer(maxf(result_delay, 0.1), true, false, true)
 	timer.timeout.connect(_go_to_result_scene)
 
 

@@ -1,6 +1,8 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 const BASE_DAMAGE: float = 18.0
+const ARROW_SPEED: float = 30.0
+const MIN_ARROW_FLIGHT_TIME: float = 0.12
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -29,13 +31,12 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
 	
 	# === 예측 샷 (Predictive Aiming) ===
-	var arrow_speed = 23.0
+	var arrow_speed = ARROW_SPEED
 	var distance = spawn_pos.distance_to(current_target_pos)
 	var time_to_reach = distance / arrow_speed
 	
-	# arrow.gd 내부의 duration 최소값(0.2)과 동기화하여 근거리 예측 오류 방지
-	if time_to_reach < 0.2:
-		time_to_reach = 0.2
+	if time_to_reach < MIN_ARROW_FLIGHT_TIME:
+		time_to_reach = MIN_ARROW_FLIGHT_TIME
 		
 	# 타겟의 이동 속도(velocity)를 기반으로 미래 위치 예측
 	var local_vel: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
@@ -55,22 +56,21 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 				
 			ship_vel = s_dir * s_speed
 			
-	var total_vel = local_vel + ship_vel * 0.45
-	var lead_offset: Vector3 = total_vel * time_to_reach * 0.72
-	var max_lead: float = clampf(distance * 0.28, 0.45, 3.0)
+	var total_vel = local_vel + ship_vel * 0.32
+	var lead_offset: Vector3 = total_vel * time_to_reach * 0.5
+	var max_lead: float = clampf(distance * 0.18, 0.25, 1.8)
 	if lead_offset.length() > max_lead:
 		lead_offset = lead_offset.normalized() * max_lead
 	current_target_pos += lead_offset
 
 	
-	# 약간의 오차 (흩뿌림) 적용 - 기존보다 하향하여 명중률 상승 (-0.2 ~ 0.2)
-	current_target_pos.x += randf_range(-0.12, 0.12)
-	current_target_pos.z += randf_range(-0.12, 0.12)
+	current_target_pos.x += randf_range(-0.08, 0.08)
+	current_target_pos.z += randf_range(-0.08, 0.08)
 	
 	var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
 	var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 	var dist = spawn_pos.distance_to(current_target_pos)
-	var final_arc_height: float = clamp(dist * 0.3, 1.0, 5.0)
+	var final_arc_height: float = clamp(dist * 0.16, 0.35, 2.4)
 	
 	# 레벨 매니저 또는 부모 트리에 추가 (이 시점에 _ready 실행됨)
 	var spawn_parent = _resolve_spawn_parent(attacker.get_tree())

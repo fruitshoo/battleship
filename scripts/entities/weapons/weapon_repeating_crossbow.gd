@@ -1,6 +1,8 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 const DEFAULT_BASE_DAMAGE: float = 7.0
+const ARROW_SPEED: float = 36.0
+const MIN_ARROW_FLIGHT_TIME: float = 0.12
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -71,41 +73,39 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		spawn_pos.y += 0.8
 		
 		var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
-		
+
 		# === 예측 샷 (Predictive Aiming) ===
-		var arrow_speed = 27.0 # 연노 화살은 약간 더 빠름
+		var arrow_speed = ARROW_SPEED
 		var distance = spawn_pos.distance_to(current_target_pos)
 		var time_to_reach = distance / arrow_speed
-		
-		if time_to_reach < 0.2:
-			time_to_reach = 0.2
-			
+		if time_to_reach < MIN_ARROW_FLIGHT_TIME:
+			time_to_reach = MIN_ARROW_FLIGHT_TIME
+
 		var local_vel: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
-		
+
 		var ship = _resolve_parent_ship(target)
-			
+
 		var ship_vel = Vector3.ZERO
 		if ship and ship.has_method("get_current_speed_value"):
 			var s_speed = ship.get_current_speed_value()
 			if s_speed > 0.1:
 				var s_dir = ship.get_move_direction_value() if ship.has_method("get_move_direction_value") else -ship.global_transform.basis.z.normalized()
 				ship_vel = s_dir * s_speed
-				
-		var total_vel = local_vel + ship_vel * 0.45
-		var lead_offset: Vector3 = total_vel * time_to_reach * 0.72
-		var max_lead: float = clampf(distance * 0.28, 0.45, 3.0)
+
+		var total_vel = local_vel + ship_vel * 0.32
+		var lead_offset: Vector3 = total_vel * time_to_reach * 0.5
+		var max_lead: float = clampf(distance * 0.16, 0.2, 1.6)
 		if lead_offset.length() > max_lead:
 			lead_offset = lead_offset.normalized() * max_lead
 		current_target_pos += lead_offset
-		
-		# 약간의 오차 (흩뿌림) 적용 - 연사 시 오차를 더 크게 (현실감)
-		current_target_pos.x += randf_range(-0.22, 0.22)
-		current_target_pos.z += randf_range(-0.22, 0.22)
-		
+
+		current_target_pos.x += randf_range(-0.12, 0.12)
+		current_target_pos.z += randf_range(-0.12, 0.12)
+
 		var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
 		var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 		var dist = spawn_pos.distance_to(current_target_pos)
-		var final_arc_height: float = clamp(dist * 0.2, 0.5, 3.0) # 연노는 궤적이 더 낮음 (빠석궁)
+		var final_arc_height: float = clamp(dist * 0.08, 0.15, 1.2)
 		
 		# 씬 트리에 추가
 		var spawn_parent = _resolve_spawn_parent(attacker.get_tree())

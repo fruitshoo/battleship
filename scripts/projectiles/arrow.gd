@@ -7,7 +7,10 @@ const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
 @export var damage: float = 15.0
 @export var speed: float = 25.0 # 초당 이동 거리 (이전 20.0 -> 8.0 -> 14.0 -> 16.0 -> 25.0)
 @export var arc_height: float = 2.0 # 포물선 최대 높이
-@export var terminal_hit_radius: float = 3.8
+@export var terminal_hit_radius: float = 3.0
+
+const MIN_FLIGHT_DURATION := 0.12
+const TERMINAL_VISUAL_CONVERGE_START := 0.52
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -66,8 +69,8 @@ func launch(
 
 	var distance: float = start_pos.distance_to(target_pos)
 	duration = distance / speed
-	if duration < 0.2:
-		duration = 0.2
+	if duration < MIN_FLIGHT_DURATION:
+		duration = MIN_FLIGHT_DURATION
 
 	global_position = start_pos
 	var look_target: Vector3 = target_pos
@@ -115,13 +118,13 @@ func _physics_process(delta: float) -> void:
 	progress += delta / duration
 	
 	if progress >= 1.0:
-		global_position = target_pos
-		_resolve_terminal_hit()
+		global_position = _get_visual_target_pos()
+		_resolve_terminal_hit(target_pos)
 		_release_self()
 		return
 	
 	# 수평 이동 (LERP)
-	var current_pos = start_pos.lerp(target_pos, progress)
+	var current_pos = start_pos.lerp(_get_visual_target_pos(), progress)
 	
 	# 수직 곡선 (sin 이용)
 	var y_offset = sin(PI * progress) * arc_height
@@ -161,7 +164,25 @@ func _splash_and_sink() -> void:
 		
 	_release_self()
 
-func _resolve_terminal_hit() -> void:
+func _get_visual_target_pos() -> Vector3:
+	if not is_instance_valid(target_node):
+		return target_pos
+	if target_node.is_queued_for_deletion():
+		return target_pos
+	var live_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.5)
+	var planned_to_live := live_target_pos - target_pos
+	if planned_to_live.length() > terminal_hit_radius:
+		return target_pos
+	var converge_t := clampf(
+		(progress - TERMINAL_VISUAL_CONVERGE_START) / maxf(1.0 - TERMINAL_VISUAL_CONVERGE_START, 0.001),
+		0.0,
+		1.0
+	)
+	converge_t = converge_t * converge_t * (3.0 - 2.0 * converge_t)
+	return target_pos.lerp(live_target_pos, converge_t)
+
+
+func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
 	if not is_instance_valid(target_node):
 		return
 	if target_node.is_queued_for_deletion():
@@ -171,7 +192,7 @@ func _resolve_terminal_hit() -> void:
 	if NodeContractHelper.get_team_tag(target_node) == team:
 		return
 	var target_aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.5)
-	if global_position.distance_to(target_aim_point) > terminal_hit_radius:
+	if hit_check_position.distance_to(target_aim_point) > terminal_hit_radius:
 		return
 	if target_node.has_method("take_damage"):
 		target_node.take_damage(damage, global_position, damage_source)
