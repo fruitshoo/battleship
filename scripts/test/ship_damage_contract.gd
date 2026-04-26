@@ -1,4 +1,5 @@
 extends Node
+# @scene_contract_encapsulated
 
 const ShipScript = preload("res://scripts/test/chaser_isolation_boarding_collision.gd")
 
@@ -30,6 +31,7 @@ class MockHud:
 func _ready() -> void:
 	var failures: Array[String] = []
 	_verify_rigging_field_repair_waits_then_recovers(failures)
+	_verify_rudder_damage_gameplay_floor(failures)
 	if failures.is_empty():
 		print("[ShipDamageContract] ok")
 		return
@@ -101,5 +103,31 @@ func _verify_rigging_field_repair_waits_then_recovers(failures: Array[String]) -
 	ship.call("_update_rigging_recovery", 5.0)
 	if not is_equal_approx(float(ship.get("rudder_health")), 10.0) or not is_equal_approx(mast.get_sail_damage(), 0.9):
 		failures.append("rigging field repair ran while the ship was burning")
+
+	ship.free()
+
+
+func _verify_rudder_damage_gameplay_floor(failures: Array[String]) -> void:
+	var ship: Node = ShipScript.new()
+	add_child(ship)
+	ship.set("rudder_max_health", 100.0)
+	ship.set("rudder_health", 100.0)
+
+	var stern_hit: Vector3 = ship.global_position + Vector3.BACK * 12.0
+	ship.call("_apply_rudder_damage_from_hit", 40.0, stern_hit, "cannon")
+	if not is_equal_approx(float(ship.get("rudder_health")), 100.0):
+		failures.append("standard cannon hits should not damage rudder control anymore")
+
+	ship.call("_apply_rudder_damage_from_hit", 40.0, stern_hit, "chain_shot")
+	if float(ship.get("rudder_health")) >= 99.9:
+		failures.append("chain shot should still be able to damage rudder control")
+
+	ship.set("rudder_health", 0.0)
+	var turn_mult: float = float(ship.call("get_rudder_turn_multiplier"))
+	var response_mult: float = float(ship.call("get_rudder_response_multiplier"))
+	if turn_mult < 0.60:
+		failures.append("rudder turn multiplier fell too low for playable steering: %.3f" % turn_mult)
+	if response_mult < 0.70:
+		failures.append("rudder response multiplier fell too low for playable steering: %.3f" % response_mult)
 
 	ship.free()

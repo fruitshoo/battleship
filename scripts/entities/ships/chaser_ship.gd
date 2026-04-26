@@ -4,6 +4,7 @@ class_name ChaserShip
 const DEBUG_CHASER_LOGS := false
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
+const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
@@ -392,10 +393,10 @@ func _ready() -> void:
 		_remove_all_cannons()
 	
 	# 초기 팀 표식 설정. 돛 색은 선체/돛대 기본 재질을 유지한다.
-	var enemy_flag_style := FlagStyleLibrary.pick_enemy_style_for_ship_type(ship_type, formation_role_name)
+	var enemy_flag_kind := FlagSceneLibrary.pick_enemy_kind_for_ship_type(ship_type, formation_role_name)
 	for mast in masts:
-		if mast.has_method("set_flag_style"):
-			mast.set_flag_style(enemy_flag_style)
+		if mast.has_method("set_flag_kind"):
+			mast.set_flag_kind(enemy_flag_kind)
 		elif mast.has_method("set_team_color"):
 			mast.set_team_color("enemy")
 	add_to_group("ships")
@@ -615,7 +616,8 @@ func add_survivor(_allow_over_capacity: bool = true) -> bool:
 	return true
 
 func _get_next_crew_spawn_transform(fallback_x: float, fallback_z: float) -> Transform3D:
-	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-fallback_x, fallback_x), 0.5, randf_range(-fallback_z, fallback_z)))
+	var fallback_deck_height: float = float(get("deck_height")) if get("deck_height") != null else 0.5
+	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-fallback_x, fallback_x), fallback_deck_height, randf_range(-fallback_z, fallback_z)))
 	var soldiers_node := get_soldiers_container() as Node3D
 	if not is_instance_valid(soldiers_node):
 		return fallback
@@ -879,8 +881,8 @@ func _apply_minion_visuals() -> void:
 	for mast in masts:
 		if mast.has_method("set_sail_color"):
 			mast.set_sail_color(Color(0.9, 0.9, 1.0, 1.0)) # 밝은 하늘색/흰색
-		if mast.has_method("set_flag_style"):
-			mast.set_flag_style(FlagStyleLibrary.STYLE_PLAYER_SUPPORT)
+		if mast.has_method("set_flag_kind"):
+			mast.set_flag_kind(FlagSceneLibrary.KIND_PLAYER_SUPPORT)
 		elif mast.has_method("set_team_color"):
 			mast.set_team_color("player")
 			
@@ -903,8 +905,10 @@ func _auto_adjust_sail(delta: float) -> void:
 
 ## 동양식 노(Ro/Yuloh) 8자 젓기 애니메이션
 func _update_oar_visual(delta: float) -> void:
-	var has_oars = oar_pivot_left or oar_pivot_right
-	if not has_oars: return
+	var left_oars := _get_oar_pivots(true)
+	var right_oars := _get_oar_pivots(false)
+	if left_oars.is_empty() and right_oars.is_empty():
+		return
 	
 	var is_moving = not is_derelict and move_speed > 0.5 and is_instance_valid(target)
 	
@@ -914,22 +918,39 @@ func _update_oar_visual(delta: float) -> void:
 		_oar_time += delta * oar_speed
 		
 		# 8자 모션 (Lissajous curve 기반 Sculling)
-		var sweep_angle = sin(_oar_time) * 0.2
-		var twist_angle = sin(_oar_time * 2.0) * 0.1
-		
-		if oar_pivot_left:
-			oar_pivot_left.rotation.x = sweep_angle
-			oar_pivot_left.rotation.z = twist_angle
-		if oar_pivot_right:
-			oar_pivot_right.rotation.x = sweep_angle
-			oar_pivot_right.rotation.z = - twist_angle
+		for i in range(left_oars.size()):
+			_apply_sculling_oar_motion(left_oars[i], _oar_time + float(i) * 0.24, 1.0)
+		for i in range(right_oars.size()):
+			_apply_sculling_oar_motion(right_oars[i], _oar_time + float(i) * 0.24 + 0.12, -1.0)
 	else:
-		if oar_pivot_left:
-			oar_pivot_left.rotation.x = lerp_angle(oar_pivot_left.rotation.x, 0.0, delta * 2.0)
-			oar_pivot_left.rotation.z = lerp_angle(oar_pivot_left.rotation.z, 0.0, delta * 2.0)
-		if oar_pivot_right:
-			oar_pivot_right.rotation.x = lerp_angle(oar_pivot_right.rotation.x, 0.0, delta * 2.0)
-			oar_pivot_right.rotation.z = lerp_angle(oar_pivot_right.rotation.z, 0.0, delta * 2.0)
+		for pivot in left_oars:
+			_relax_oar_pivot(pivot, delta)
+		for pivot in right_oars:
+			_relax_oar_pivot(pivot, delta)
+
+func _get_oar_pivots(left_side: bool) -> Array:
+	var pivots: Array = oar_pivots_left if left_side else oar_pivots_right
+	if not pivots.is_empty():
+		return pivots
+	var fallback: Node3D = oar_pivot_left if left_side else oar_pivot_right
+	return [fallback] if is_instance_valid(fallback) else []
+
+func _apply_sculling_oar_motion(pivot: Node3D, phase: float, side_sign: float) -> void:
+	if not is_instance_valid(pivot):
+		return
+	var sweep_angle := sin(phase) * 0.34
+	var lift_angle := cos(phase * 2.0) * 0.055 - 0.025
+	var feather_angle := sin(phase + PI * 0.35) * 0.16
+	pivot.rotation.x = lift_angle
+	pivot.rotation.y = feather_angle * side_sign
+	pivot.rotation.z = sweep_angle * side_sign
+
+func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
+	if not is_instance_valid(pivot):
+		return
+	pivot.rotation.x = lerp_angle(pivot.rotation.x, 0.0, delta * 2.0)
+	pivot.rotation.y = lerp_angle(pivot.rotation.y, 0.0, delta * 2.0)
+	pivot.rotation.z = lerp_angle(pivot.rotation.z, 0.0, delta * 2.0)
 
 ## 나포함 AI 로직 (플레이어 호위 및 적 탐지)
 func _process_minion_ai(delta: float) -> void:

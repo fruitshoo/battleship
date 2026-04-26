@@ -1,4 +1,5 @@
 extends Node3D
+# @scene_contract_encapsulated
 
 const POOLED_TEST_NODE := preload("res://scenes/test/pooled_test_node.tscn")
 

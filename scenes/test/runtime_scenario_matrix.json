@@ -1,7 +1,7 @@
 {
   "version": 1,
   "kind": "runtime_scenario_matrix",
-  "description": "Machine-readable index of selected runtime and architecture harness coverage.",
+  "description": "Machine-readable index of selected runtime and architecture harness coverage and execution metadata.",
   "shared_references": [
     {
       "id": "preview_base",
@@ -24,6 +24,7 @@
       "id": "support_fleet_profile_preview",
       "scene": "res://scenes/test/support_fleet_profile_preview.tscn",
       "script": "res://scripts/test/support_fleet_profile_preview.gd",
+      "execution": "manual_preview",
       "focus": "Support-fleet squadron profile resolution.",
       "scenarios": [
         {
@@ -42,6 +43,8 @@
       "id": "scene_pool_contract",
       "scene": "res://scenes/test/scene_pool_contract.tscn",
       "script": "res://scripts/test/scene_pool_contract.gd",
+      "execution": "suite_wrapper",
+      "wrapper": "res://scripts/test/run_modularity_guard_suite.sh",
       "focus": "ScenePool release and reacquire ownership.",
       "scenarios": [
         {
@@ -55,12 +58,119 @@
       "id": "soldier_world_motion_contract",
       "scene": "res://scenes/test/soldier_world_motion_contract.tscn",
       "script": "res://scripts/test/soldier_world_motion_contract.gd",
+      "execution": "suite_wrapper",
+      "wrapper": "res://scripts/test/run_modularity_guard_suite.sh",
       "focus": "Soldier cross-deck jump ownership and landing.",
       "scenarios": [
         {
           "id": "jump_preserves_world_motion",
           "label": "Jump landing",
           "coverage": "Soldier jump preserves its start position, moves under the target deck, follows target motion, and clears jumping state on landing."
+        }
+      ]
+    },
+    {
+      "id": "cannon_crew_reload_contract",
+      "scene": "res://scenes/test/cannon_crew_reload_contract.tscn",
+      "script": "res://scripts/test/cannon_crew_reload_contract.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_cannon_crew_reload_contract.sh",
+      "focus": "Cannon reload slot reservation and crew power fallback.",
+      "scenarios": [
+        {
+          "id": "shared_broadside_slot_reservation",
+          "label": "Broadside reservation",
+          "coverage": "Active cannon slots stay reserved correctly while shared reload crew power updates broadside allocation."
+        },
+        {
+          "id": "legacy_reload_multiplier_fallback",
+          "label": "Legacy fallback",
+          "coverage": "Legacy reload multipliers still apply when newer shared crew-power fields are absent."
+        }
+      ]
+    },
+    {
+      "id": "flag_rig_contract",
+      "scene": "res://scenes/test/flag_rig_contract.tscn",
+      "script": "res://scripts/test/flag_rig_contract.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_flag_rig_contract.sh",
+      "focus": "Flag scene kind mapping and mast swap contract.",
+      "scenarios": [
+        {
+          "id": "boss_swallowtail_variant",
+          "label": "Boss swallowtail",
+          "coverage": "Boss flag scenes resolve to the concrete swallowtail scene and preserve yard and streamer presentation through the public flag API."
+        },
+        {
+          "id": "mast_flag_scene_swap",
+          "label": "Mast scene swap",
+          "coverage": "Mast kind swaps replace the active flag scene and report the new shape through the mast contract API."
+        }
+      ]
+    },
+    {
+      "id": "typography_contract",
+      "scene": "res://scenes/test/typography_contract.tscn",
+      "script": "res://scripts/test/typography_contract.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_typography_contract.sh",
+      "focus": "Semantic UI and world-text typography presets.",
+      "scenarios": [
+        {
+          "id": "menu_title_display_preset",
+          "label": "Menu display title",
+          "coverage": "Main menu title and caption labels resolve through the semantic display and caption presets instead of scene-authored overrides."
+        },
+        {
+          "id": "hud_timer_and_world_callout",
+          "label": "HUD and callout",
+          "coverage": "HUD timer labels, preview billboard labels, and soldier speech labels use the shared typography helpers for font weight, outline, and billboard presentation."
+        }
+      ]
+    },
+    {
+      "id": "screen_edge_fx_contract",
+      "scene": "res://scenes/test/screen_edge_fx_contract.tscn",
+      "script": "res://scripts/test/screen_edge_fx_contract.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_screen_edge_fx_contract.sh",
+      "focus": "Gameplay screen-edge vignette and motion blur overlay.",
+      "scenarios": [
+        {
+          "id": "neutral_stationary_overlay",
+          "label": "Stationary neutral",
+          "coverage": "The overlay initializes a base vignette without adding noticeable motion blur while the player ship is stationary."
+        },
+        {
+          "id": "rowing_motion_boost",
+          "label": "Rowing boost",
+          "coverage": "Rowing and high-speed motion increase the screen-edge blur strength, and the effect settles back down when movement ends."
+        }
+      ]
+    },
+    {
+      "id": "responsive_ui_contract",
+      "scene": "res://scenes/test/responsive_ui_contract.tscn",
+      "script": "res://scripts/test/responsive_ui_contract.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_responsive_ui_contract.sh",
+      "focus": "Responsive modal and HUD-adjacent UI layout fit across compact, HD, and ultrawide viewports.",
+      "scenarios": [
+        {
+          "id": "compact_viewport_fit",
+          "label": "Compact viewport",
+          "coverage": "Main menu, pause, options, upgrade, meta-upgrade, and ship-control panels stay inside a 960x540 viewport after density scaling."
+        },
+        {
+          "id": "hd_viewport_fit",
+          "label": "HD viewport",
+          "coverage": "The same UI shells preserve spacing and remain bounded across 1280x720, 1600x900, and 1920x1080 viewports."
+        },
+        {
+          "id": "wide_viewport_fit",
+          "label": "Ultrawide viewport",
+          "coverage": "The same UI shells preserve spacing and remain bounded inside a 2560x1080 ultrawide viewport without overflowing anchors."
         }
       ]
     }
@@ -71,6 +181,8 @@
       "scene": "res://scenes/test/modularity_guard.tscn",
       "script": "res://scripts/test/modularity_guard.gd",
       "registry": "res://scripts/test/module_boundaries.json",
+      "execution": "suite_wrapper",
+      "wrapper": "res://scripts/test/run_modularity_guard_suite.sh",
       "focus": "Helper ownership and boundary drift.",
       "scenarios": [
         {

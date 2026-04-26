@@ -1,12 +1,12 @@
 [gd_scene format=3 uid="uid://cplf8c3yy7afw"]
 
-[ext_resource type="PackedScene" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
-[ext_resource type="Script" path="res://scripts/entities/ships/enemy_melee_ship.gd" id="2_enemy_melee_script"]
+[ext_resource type="PackedScene" uid="uid://deprw2k61rllc" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
+[ext_resource type="Script" uid="uid://oetka4hxbhhp" path="res://scripts/entities/ships/enemy_melee_ship.gd" id="2_enemy_melee_script"]
 
 [node name="EnemyMeleeShip" unique_id=1144275544 instance=ExtResource("1_enemy_base")]
 script = ExtResource("2_enemy_melee_script")
+boarders_count = 6
+initial_crew_count = 6
 preferred_combat_range = 3.8
 combat_range_tolerance = 0.8
 retreat_distance = 3.0
-initial_crew_count = 6
-boarders_count = 6

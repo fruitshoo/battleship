@@ -9,7 +9,6 @@ const CANNON_RELOAD_TEMPO_MULT := 1.10
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
-@export var muzzle_smoke_uses_positive_z_forward: bool = true
 @export_range(0.0, 0.5, 0.01) var muzzle_smoke_follow_muzzle_time: float = 0.22
 @export var fire_cooldown: float = 2.8
 @export var crew_operated_reload_enabled: bool = true
@@ -553,8 +552,6 @@ func _get_muzzle_smoke_basis(smoke_dir: Vector3) -> Basis:
 	var dir := smoke_dir.normalized()
 	if dir.is_zero_approx():
 		dir = Vector3.FORWARD
-	if muzzle_smoke_uses_positive_z_forward:
-		return Basis.looking_at(-dir, Vector3.UP)
 	return Basis.looking_at(dir, Vector3.UP)
 
 

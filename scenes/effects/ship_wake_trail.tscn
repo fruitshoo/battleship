@@ -1,0 +1,70 @@
+[gd_scene format=3 uid="uid://c58kji4wu37n3"]
+
+[ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_wake_texture"]
+[ext_resource type="Script" path="res://scripts/effects/ship_wake_particles.gd" id="2_wake_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wake"]
+render_priority = 1
+transparency = 1
+blend_mode = 1
+depth_draw_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+albedo_color = Color(0.62352943, 0.70980394, 0.827451, 1)
+albedo_texture = ExtResource("1_wake_texture")
+albedo_texture_force_srgb = true
+billboard_keep_scale = true
+
+[sub_resource type="Curve" id="Curve_alpha"]
+_data = [Vector2(0, 0.9476681), 0.0, 0.0, 0, 0, Vector2(0.93998766, 0), -2.4919043, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_alpha"]
+curve = SubResource("Curve_alpha")
+
+[sub_resource type="Curve" id="Curve_emission"]
+_limits = [-0.2, 1.0, 0.0, 1.0]
+_data = [Vector2(0, 0.16810113), 0.0, 0.0, 0, 0, Vector2(1, -0.2), -0.66567487, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_emission"]
+curve = SubResource("Curve_emission")
+
+[sub_resource type="Curve" id="Curve_scale"]
+_data = [Vector2(0, 0.29802895), 0.0, 1.2411708, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wake"]
+lifetime_randomness = 0.12
+particle_flag_rotate_y = true
+angle_min = -176.49998
+angle_max = 176.6
+direction = Vector3(0, 0, 0)
+gravity = Vector3(0, 0, 0)
+linear_accel_min = -2.2351742e-06
+linear_accel_max = -2.2351742e-06
+radial_accel_min = -2.2351742e-06
+radial_accel_max = -2.2351742e-06
+scale_min = 8.0
+scale_max = 11.0
+scale_curve = SubResource("CurveTexture_scale")
+alpha_curve = SubResource("CurveTexture_alpha")
+emission_curve = SubResource("CurveTexture_emission")
+
+[sub_resource type="QuadMesh" id="QuadMesh_wake"]
+orientation = 1
+
+[node name="WakeTrail" type="GPUParticles3D"]
+emitting = false
+material_override = SubResource("StandardMaterial3D_wake")
+cast_shadow = 0
+amount = 20
+lifetime = 2.8
+fixed_fps = 20
+process_material = SubResource("ParticleProcessMaterial_wake")
+draw_pass_1 = SubResource("QuadMesh_wake")
+script = ExtResource("2_wake_script")

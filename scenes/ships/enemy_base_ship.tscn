@@ -1,14 +1,15 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://deprw2k61rllc"]
 
 [ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/ships/chaser_ship.gd" id="1_chaser"]
 [ext_resource type="PackedScene" uid="uid://bbrb610a2rv1j" path="res://scenes/ships/hulls/kobayabune_hull.tscn" id="2_73pna"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
+[ext_resource type="PackedScene" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_73pna"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_3ns7m"]
 size = Vector3(3.12, 2.6000001, 7.92)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_pukie"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_gbuj5"]
 size = Vector3(2.52, 2.4, 7.12)
 
 [node name="EnemyBaseShip" type="Node3D" unique_id=2138341481 groups=["enemy"]]
@@ -23,10 +24,10 @@ retreat_distance = 3.5
 limbo_ai_pilot_enabled = true
 max_crew = 7
 max_speed = 6.0
-base_collision_radius = 2.9568
-width_multiplier = 0.3465909319982925
-auto_fit_scale = 0.84
-floating_offset = 0.5
+base_collision_radius = 3.344
+width_multiplier = 0.34659091030620603
+auto_fit_scale = 0.95
+floating_offset = 0.85
 max_hull_hp = 145.0
 metadata/boarding_feedback_contested = false
 metadata/boarding_feedback_overrun = false
@@ -36,16 +37,19 @@ collision_layer = 4
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea" unique_id=1935515166]
-shape = SubResource("BoxShape3D_73pna")
+shape = SubResource("BoxShape3D_3ns7m")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=1043851433 groups=["ship_hitbox"]]
 collision_layer = 4
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea" unique_id=240060993]
-shape = SubResource("BoxShape3D_pukie")
+shape = SubResource("BoxShape3D_gbuj5")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=470013572]
+
+[node name="WakeTrail" parent="." instance=ExtResource("wake_trail_scene")]
+transform = Transform3D(0.72, 0, 0, 0, 0.72, 0, 0, 0, 0.72, 0, -0.9, -0.82)
 
 [node name="Archer1" parent="Soldiers" unique_id=438727161 instance=ExtResource("2_soldier")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)

@@ -33,6 +33,10 @@ UpgradeManager="*res://scripts/managers/upgrade_manager.gd"
 SaveManager="*res://scripts/managers/save_manager.gd"
 MetaManager="*res://scripts/managers/meta_manager.gd"
 
+[debug_draw_3d]
+
+settings/addon_root_folder="res://addons/debug_draw_3d"
+
 [display]
 
 window/stretch/mode="canvas_items"

@@ -2,77 +2,22 @@
 
 [ext_resource type="Script" uid="uid://cy7yako2yokck" path="res://scripts/entities/ships/player_ship.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
-[ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="6_r4bi8"]
 [ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
+[ext_resource type="PackedScene" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_k6xgn"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0dgdr"]
 size = Vector3(4.9047456, 3.2, 10.164231)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_8sy0v"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_r4bi8"]
 size = Vector3(4.3047457, 3, 9.364231)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d1kwh"]
-render_priority = 1
-transparency = 1
-blend_mode = 1
-depth_draw_mode = 2
-shading_mode = 0
-vertex_color_use_as_albedo = true
-vertex_color_is_srgb = true
-albedo_color = Color(0.62352943, 0.70980394, 0.827451, 1)
-albedo_texture = ExtResource("6_r4bi8")
-albedo_texture_force_srgb = true
-billboard_keep_scale = true
-
-[sub_resource type="Curve" id="Curve_r4bi8"]
-_data = [Vector2(0, 0.9476681), 0.0, 0.0, 0, 0, Vector2(0.93998766, 0), -2.4919043, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_k6xgn"]
-curve = SubResource("Curve_r4bi8")
-
-[sub_resource type="Curve" id="Curve_0dgdr"]
-_limits = [-0.2, 1.0, 0.0, 1.0]
-_data = [Vector2(0, 0.16810113), 0.0, 0.0, 0, 0, Vector2(1, -0.2), -0.66567487, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_r4bi8"]
-curve = SubResource("Curve_0dgdr")
-
-[sub_resource type="Curve" id="Curve_42wut"]
-_data = [Vector2(0, 0.29802895), 0.0, 1.2411708, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_dkbhc"]
-curve = SubResource("Curve_42wut")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_bgnsv"]
-lifetime_randomness = 0.12
-particle_flag_rotate_y = true
-angle_min = -176.49998
-angle_max = 176.6
-direction = Vector3(0, 0, 0)
-gravity = Vector3(0, 0, 0)
-linear_accel_min = -2.2351742e-06
-linear_accel_max = -2.2351742e-06
-radial_accel_min = -2.2351742e-06
-radial_accel_max = -2.2351742e-06
-scale_min = 8.0
-scale_max = 11.0
-scale_curve = SubResource("CurveTexture_dkbhc")
-alpha_curve = SubResource("CurveTexture_k6xgn")
-emission_curve = SubResource("CurveTexture_r4bi8")
-
-[sub_resource type="QuadMesh" id="QuadMesh_cv1jh"]
-orientation = 1
 
 [node name="PlayerShip" type="Node3D" unique_id=2118299445]
 script = ExtResource("1")
 max_crew_count = 6
 base_collision_radius = 4.6421156
 width_multiplier = 0.45504529840202923
-floating_offset = 0.5
+floating_offset = 0.85
 metadata/ally_ship_role = "player_flagship"
 
 [node name="ProximityArea" type="Area3D" parent="." unique_id=244065699 groups=["ship_proximity"]]
@@ -80,7 +25,7 @@ collision_layer = 2
 collision_mask = 2
 
 [node name="ProximityShape" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
-shape = SubResource("BoxShape3D_k6xgn")
+shape = SubResource("BoxShape3D_0dgdr")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=195625511 groups=["ship_hitbox"]]
 collision_layer = 2
@@ -88,7 +33,7 @@ collision_mask = 0
 
 [node name="HitShape" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-shape = SubResource("BoxShape3D_8sy0v")
+shape = SubResource("BoxShape3D_r4bi8")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=351081976]
 
@@ -112,12 +57,5 @@ script = ExtResource("sys_vis_script")
 
 [node name="PanokseonHull" parent="." unique_id=2050703077 instance=ExtResource("hull_scene")]
 
-[node name="wake" type="GPUParticles3D" parent="." unique_id=1714901661]
+[node name="WakeTrail" parent="." unique_id=1714901661 instance=ExtResource("wake_trail_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.407, -1.1577048)
-material_override = SubResource("StandardMaterial3D_d1kwh")
-cast_shadow = 0
-amount = 20
-lifetime = 2.8
-fixed_fps = 20
-process_material = SubResource("ParticleProcessMaterial_bgnsv")
-draw_pass_1 = SubResource("QuadMesh_cv1jh")

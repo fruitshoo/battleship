@@ -126,8 +126,9 @@ static func calculate_sail_speed(ship) -> float:
 	return thrust * ship.max_speed * wind_str * ship.sail_efficiency_mult * ship.get_shiphandling_multiplier()
 
 static func update_oar_visual(ship, delta: float) -> void:
-	var has_oars = ship.oar_pivot_left or ship.oar_pivot_right
-	if not has_oars:
+	var left_oars := _get_oar_pivots(ship, true)
+	var right_oars := _get_oar_pivots(ship, false)
+	if left_oars.is_empty() and right_oars.is_empty():
 		return
 	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
 	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
@@ -135,21 +136,41 @@ static func update_oar_visual(ship, delta: float) -> void:
 	if is_actively_rowing or is_exhausted_rowing or is_moving_fast:
 		var row_speed = 2.2 if is_actively_rowing else (1.45 if is_exhausted_rowing else 1.2)
 		ship._oar_time += delta * row_speed
-		var sweep_angle = sin(ship._oar_time) * 0.2
-		var twist_angle = sin(ship._oar_time * 2.0) * 0.1
-		if ship.oar_pivot_left:
-			ship.oar_pivot_left.rotation.x = sweep_angle
-			ship.oar_pivot_left.rotation.z = twist_angle
-		if ship.oar_pivot_right:
-			ship.oar_pivot_right.rotation.x = sweep_angle
-			ship.oar_pivot_right.rotation.z = -twist_angle
+		for i in range(left_oars.size()):
+			_apply_sculling_oar_motion(left_oars[i], ship._oar_time + float(i) * 0.24, 1.0)
+		for i in range(right_oars.size()):
+			_apply_sculling_oar_motion(right_oars[i], ship._oar_time + float(i) * 0.24 + 0.12, -1.0)
 	else:
-		if ship.oar_pivot_left:
-			ship.oar_pivot_left.rotation.x = lerp_angle(ship.oar_pivot_left.rotation.x, 0.0, delta * 2.0)
-			ship.oar_pivot_left.rotation.z = lerp_angle(ship.oar_pivot_left.rotation.z, 0.0, delta * 2.0)
-		if ship.oar_pivot_right:
-			ship.oar_pivot_right.rotation.x = lerp_angle(ship.oar_pivot_right.rotation.x, 0.0, delta * 2.0)
-			ship.oar_pivot_right.rotation.z = lerp_angle(ship.oar_pivot_right.rotation.z, 0.0, delta * 2.0)
+		for pivot in left_oars:
+			_relax_oar_pivot(pivot, delta)
+		for pivot in right_oars:
+			_relax_oar_pivot(pivot, delta)
+
+static func _get_oar_pivots(ship, left_side: bool) -> Array:
+	var pivots: Array = ship.oar_pivots_left if left_side and "oar_pivots_left" in ship else []
+	if not left_side:
+		pivots = ship.oar_pivots_right if "oar_pivots_right" in ship else []
+	if not pivots.is_empty():
+		return pivots
+	var fallback: Node3D = ship.oar_pivot_left if left_side else ship.oar_pivot_right
+	return [fallback] if is_instance_valid(fallback) else []
+
+static func _apply_sculling_oar_motion(pivot: Node3D, phase: float, side_sign: float) -> void:
+	if not is_instance_valid(pivot):
+		return
+	var sweep_angle := sin(phase) * 0.34
+	var lift_angle := cos(phase * 2.0) * 0.055 - 0.025
+	var feather_angle := sin(phase + PI * 0.35) * 0.16
+	pivot.rotation.x = lift_angle
+	pivot.rotation.y = feather_angle * side_sign
+	pivot.rotation.z = sweep_angle * side_sign
+
+static func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
+	if not is_instance_valid(pivot):
+		return
+	pivot.rotation.x = lerp_angle(pivot.rotation.x, 0.0, delta * 2.0)
+	pivot.rotation.y = lerp_angle(pivot.rotation.y, 0.0, delta * 2.0)
+	pivot.rotation.z = lerp_angle(pivot.rotation.z, 0.0, delta * 2.0)
 
 static func update_rowing_stamina(ship, delta: float) -> void:
 	if ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0:

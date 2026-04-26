@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bfupeiqcpx0ji"]
 
-[ext_resource type="PackedScene" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
-[ext_resource type="Script" path="res://scripts/entities/ships/enemy_gunner_ship.gd" id="2_enemy_gunner_script"]
+[ext_resource type="PackedScene" uid="uid://deprw2k61rllc" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
+[ext_resource type="Script" uid="uid://tyw3tgbe1u8y" path="res://scripts/entities/ships/enemy_gunner_ship.gd" id="2_enemy_gunner_script"]
 
 [node name="EnemyGunnerShip" unique_id=1910346140 instance=ExtResource("1_enemy_base")]
 script = ExtResource("2_enemy_gunner_script")
@@ -10,4 +10,3 @@ preferred_combat_range = 15.5
 combat_range_tolerance = 3.2
 retreat_distance = 10.0
 allow_boarding = false
-initial_crew_count = 5

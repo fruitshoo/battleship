@@ -28,7 +28,8 @@ const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_shi
 const PLAYER_MIN_VALID_HULL_HP := 100.0
 const PLAYER_FALLBACK_HULL_HP := 200.0
 const PLAYER_START_NODE_NAME := "PlayerStart"
-const PLAYER_RUNTIME_FLOATING_OFFSET := 1.0
+const PLAYER_RUNTIME_FLOATING_OFFSET := 1.35
+const PLAYER_RUNTIME_DECK_HEIGHT := 0.5
 const CORPSE_CLEANUP_CARRY_FORWARD_OFFSET := 0.08
 const CORPSE_CLEANUP_CARRY_SIDE_OFFSET := 0.08
 const CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET := 0.46
@@ -117,7 +118,7 @@ var crew_respawn_timer: float = 0.0
 
 # === 자동 공세 월선 (보수적 전술 판단) ===
 @export_group("Auto Raid")
-@export var auto_raid_enabled: bool = true
+@export var auto_raid_enabled: bool = false
 @export_range(0.1, 2.0, 0.05) var auto_raid_eval_interval: float = 0.35
 @export_range(1, 3, 1) var auto_raid_max_boarders: int = 2
 @export_range(1, 8, 1) var auto_raid_min_defenders: int = 3
@@ -218,6 +219,7 @@ func _apply_runtime_scene_safety_defaults() -> void:
 	loot_scene = null
 	deck_light_player_only = true
 	floating_offset = PLAYER_RUNTIME_FLOATING_OFFSET
+	deck_height = PLAYER_RUNTIME_DECK_HEIGHT
 
 	boarding_contact_grace_duration = 0.9
 	boarding_hook_throw_delay = 2.5

@@ -149,9 +149,21 @@ When adding a new harness:
   Broader combat playground for mixed-system checks.
   Script: `scripts/test/combat_sandbox.gd`
 - `project_contract_sweep.tscn`
-  Project-wide load sweep plus a legacy-pattern scan, save/load, HUD, support-fleet, bootstrap audio/effect, recovery-effect, and scene-wiring roundtrip smokes, and a small runtime smoke check for registry, boss, ship, launcher, and projectile contracts.
+  Project-wide load sweep plus a legacy-pattern scan, save/load, HUD, support-fleet, bootstrap audio/effect, recovery-effect, scene-wiring, typography, responsive UI, and screen-edge FX roundtrip smokes, and a small runtime smoke check for registry, boss, ship, launcher, and projectile contracts.
   Script: `scripts/test/project_contract_sweep.gd`
   Wrapper: `scripts/test/run_project_contract_sweep.sh`
+- `typography_contract.tscn`
+  Focused typography smoke for semantic menu labels, HUD timer styling, preview billboard labels, and soldier speech labels.
+  Script: `scripts/test/typography_contract.gd`
+  Wrapper: `scripts/test/run_typography_contract.sh`
+- `screen_edge_fx_contract.tscn`
+  Focused gameplay screen-edge FX smoke for vignette and motion blur intensity.
+  Script: `scripts/test/screen_edge_fx_contract.gd`
+  Wrapper: `scripts/test/run_screen_edge_fx_contract.sh`
+- `responsive_ui_contract.tscn`
+  Focused responsive UI smoke for main menu, pause, options, upgrade, meta-upgrade, and ship-control layout fit across compact, HD, and ultrawide viewport sizes.
+  Script: `scripts/test/responsive_ui_contract.gd`
+  Wrapper: `scripts/test/run_responsive_ui_contract.sh`
 - `modularity_guard.tscn`
   Static architecture guard for helper registry coverage, runtime scenario matrix validity, helper public-surface drift, dependency boundaries, and coordinate/pooling hazards.
   Script: `scripts/test/modularity_guard.gd`
@@ -184,8 +196,20 @@ When adding a new harness:
   Floating loot, survivor, and treasure chest collection smoke.
 - `scripts/test/project_contract_scene_wiring_helper.gd`
   Scene wiring smoke for player, enemy, boss, and firepot ship scene contracts.
+- `scripts/test/project_contract_typography_helper.gd`
+  Typography smoke for menu display labels, HUD timer presets, preview billboard labels, and runtime soldier speech labels.
+- `scripts/test/screen_edge_fx_contract_logic.gd`
+  Shared smoke logic for the gameplay screen-edge vignette and motion blur overlay.
+- `scripts/test/responsive_ui_contract_logic.gd`
+  Shared smoke logic that resizes the viewport and verifies core modal and HUD-adjacent panels stay inside compact and wide resolutions.
 - `scripts/test/run_project_contract_sweep.sh`
   Shell wrapper that runs the contract sweep and fails on common script/runtime log errors.
+- `scripts/test/run_typography_contract.sh`
+  Shell wrapper for the focused typography smoke harness.
+- `scripts/test/run_screen_edge_fx_contract.sh`
+  Shell wrapper for the focused gameplay screen-edge FX harness.
+- `scripts/test/run_responsive_ui_contract.sh`
+  Shell wrapper for the focused responsive UI layout harness.
 - `scripts/test/run_boarding_contracts.sh`
   Shell wrapper for focused combat contracts covering impact gating, ship damage, navigation, chaos, support boarding, auto-raid recall, and soldier incapacitation.
   Runs each contract through the generic scene load probe and fails on common script/runtime log errors.
@@ -246,3 +270,8 @@ When adding a new harness:
   Script: `scripts/test/cannon_crew_reload_contract.gd`
   Wrapper: `scripts/test/run_cannon_crew_reload_contract.sh`
   Checks modular cannon reload crew power, active broadside allocation, slot reservation, and the legacy reload multiplier fallback.
+
+- `flag_rig_contract.tscn`
+  Script: `scripts/test/flag_rig_contract.gd`
+  Wrapper: `scripts/test/run_flag_rig_contract.sh`
+  Checks concrete flag scene variants, yard-top rigs, streamer generation, and mast runtime flag-scene swapping.

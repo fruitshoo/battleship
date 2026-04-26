@@ -1,4 +1,4 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dtwfm6fynapr"]
 
 [ext_resource type="Texture2D" uid="uid://ok1ihome6xv1" path="res://assets/vfx/particles/alpha/scorch_03_a.png" id="1_e1ona"]
 [ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_pbyf8"]
@@ -42,8 +42,8 @@ linear_accel_min = -2.2351742e-06
 linear_accel_max = -2.2351742e-06
 radial_accel_min = -2.2351742e-06
 radial_accel_max = -2.2351742e-06
-scale_min = 1.4
-scale_max = 2.0
+scale_min = 2.0
+scale_max = 4.0
 scale_curve = SubResource("CurveTexture_e1ona")
 color = Color(1, 1, 1, 0.51500005)
 alpha_curve = SubResource("CurveTexture_dkbhc")
@@ -92,8 +92,8 @@ initial_velocity_max = 1.5999999
 gravity = Vector3(0, -0.5, 0)
 damping_min = 1.0
 damping_max = 1.0
-scale_min = 0.59999996
-scale_max = 2.0
+scale_min = 1.4
+scale_max = 3.0
 scale_curve = SubResource("CurveTexture_a6tlb")
 color = Color(1.0964336, 1.1494751, 1.2046967, 0.44200003)
 alpha_curve = SubResource("CurveTexture_p28u2")
@@ -139,10 +139,11 @@ direction = Vector3(0, 1, 0)
 spread = 30.0
 initial_velocity_min = 1.0
 initial_velocity_max = 3.0
-gravity = Vector3(0, 0, 0)
-damping_min = 4.0
-damping_max = 6.0000005
-scale_min = 0.59999996
+gravity = Vector3(0, -3, 0)
+damping_min = 1.0
+damping_max = 3.0000002
+scale_min = 1.1999999
+scale_max = 2.0
 scale_curve = SubResource("CurveTexture_1k72y")
 color = Color(0.6955359, 0.6955359, 0.6955359, 0.68700004)
 alpha_curve = SubResource("CurveTexture_yp7ow")
@@ -174,7 +175,6 @@ draw_pass_1 = SubResource("QuadMesh_dkbhc")
 [node name="particles" type="GPUParticles3D" parent="." unique_id=1758747020]
 material_override = SubResource("StandardMaterial3D_e1ona")
 emitting = false
-lifetime = 0.6
 one_shot = true
 explosiveness = 0.9
 randomness = 0.2

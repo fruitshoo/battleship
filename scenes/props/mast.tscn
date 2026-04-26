@@ -5,6 +5,7 @@
 [ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="2_nkkxi"]
 [ext_resource type="Texture2D" uid="uid://dfds5i3xuhjlk" path="res://assets/vfx/masks/sail_burn_mask_c.png" id="3_0u7u4"]
 [ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="3_flag_scene"]
+[ext_resource type="PackedScene" path="res://scenes/props/flags/flag_player_flagship.tscn" id="8_player_flag"]
 [ext_resource type="PackedScene" uid="uid://dnk408xuw63p4" path="res://assets/models/props/yardarm/yardarm.glb" id="6_nkkxi"]
 [ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="7_dskfr"]
 
@@ -80,6 +81,7 @@ shader_parameter/side_drag = 1.0
 
 [node name="Mast" type="Node3D" unique_id=1732171799]
 script = ExtResource("1_script")
+flag_scene_override = ExtResource("8_player_flag")
 use_sail_texture = true
 sail_texture = ExtResource("2_0u7u4")
 sail_uv_scale = Vector2(1, 2)
@@ -101,7 +103,6 @@ mesh = SubResource("PlaneMesh_dskfr")
 
 [node name="Flag" parent="SailVisual" unique_id=85230560 instance=ExtResource("3_flag_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.265, 0)
-pole_height = 1.505
 flag_size = Vector2(3, 0.5)
 
 [node name="Pole" parent="SailVisual/Flag" index="0" unique_id=555265591]

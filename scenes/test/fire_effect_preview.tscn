@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/test/preview_base.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/test/fire_effect_preview.gd" id="2_script"]
+
+[node name="FireEffectPreview" instance=ExtResource("1_base")]
+script = ExtResource("2_script")
+auto_open_debug_panel = false
+stop_regular_spawns = true
+preview_burn_duration = 120.0

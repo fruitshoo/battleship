@@ -5,18 +5,13 @@
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+[ext_resource type="PackedScene" uid="uid://betqhloq4wsph" path="res://scenes/props/sculling_oar.tscn" id="sculling_oar_scene"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(3, 1, 8)
 
 [sub_resource type="StandardMaterial3D" id="Material_wood"]
 albedo_color = Color(0.4, 0.25, 0.15, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_oar_shaft"]
-size = Vector3(0.1, 4, 0.1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_oar_blade"]
-size = Vector3(0.4, 2, 0.05)
 
 [node name="PanokseonHull" type="Node3D" unique_id=2050703077]
 
@@ -25,35 +20,29 @@ transform = Transform3D(1.3949152, 0, 0, 0, 1.7327454, 0, 0, 0, 1.1552713, 0, -0
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_wood")
 
-[node name="OarBaseLeft" type="Node3D" parent="." unique_id=32183522]
-transform = Transform3D(0.7680025, 0.10501643, -0.6317781, 0.55431855, 0.38510087, 0.7378536, 0.3207852, -0.9168797, 0.237546, -1.8566098, -0.27394366, 2.5)
+[node name="OarBaseLeftForward" parent="." unique_id=1399197087 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, 0.022970818, -0.19071235, -0.028417548, 0.4991164, -0.008668669, 0.18997708, 0.018842457, 0.46211863, -2.149312, -0.27394366, -2.55)
 
-[node name="OarPivot" type="Node3D" parent="OarBaseLeft" unique_id=1601308935]
+[node name="OarBaseLeftMidForward" parent="." unique_id=300654458 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, 0.022970818, -0.19071235, -0.028417548, 0.4991164, -0.008668669, 0.18997708, 0.018842457, 0.46211863, -2.149312, -0.27394366, -0.85)
 
-[node name="OarShaft" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=240277653]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
-mesh = SubResource("BoxMesh_oar_shaft")
-surface_material_override/0 = SubResource("Material_wood")
+[node name="OarBaseLeftMidRear" parent="." unique_id=1509489877 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, 0.022970818, -0.19071235, -0.028417548, 0.4991164, -0.008668669, 0.18997708, 0.018842457, 0.46211863, -2.149312, -0.27394366, 0.85)
 
-[node name="OarBlade" type="MeshInstance3D" parent="OarBaseLeft/OarPivot" unique_id=1182223753]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
-mesh = SubResource("BoxMesh_oar_blade")
-surface_material_override/0 = SubResource("Material_wood")
+[node name="OarBaseLeft" parent="." unique_id=32183522 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, 0.022970818, -0.19071235, -0.028417548, 0.4991164, -0.008668669, 0.18997708, 0.018842457, 0.46211863, -2.149312, -0.27394366, 2.55)
 
-[node name="OarBaseRight" type="Node3D" parent="." unique_id=1492738067]
-transform = Transform3D(0.7680025, -0.10501643, 0.6317781, -0.55431855, 0.38510087, 0.7378536, -0.3207852, -0.9168797, 0.237546, 2.0591192, -0.27394366, 2.5)
+[node name="OarBaseRightForward" parent="." unique_id=1151538962 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, -0.022970818, 0.19071235, 0.028417548, 0.4991164, -0.008668669, -0.18997708, 0.018842457, 0.46211863, 2.1133943, -0.27394366, -2.55)
 
-[node name="OarPivot" type="Node3D" parent="OarBaseRight" unique_id=2068383974]
+[node name="OarBaseRightMidForward" parent="." unique_id=1424323760 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, -0.022970818, 0.19071235, 0.028417548, 0.4991164, -0.008668669, -0.18997708, 0.018842457, 0.46211863, 2.1133943, -0.27394366, -0.85)
 
-[node name="OarShaft" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=1970184819]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
-mesh = SubResource("BoxMesh_oar_shaft")
-surface_material_override/0 = SubResource("Material_wood")
+[node name="OarBaseRightMidRear" parent="." unique_id=985237436 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, -0.022970818, 0.19071235, 0.028417548, 0.4991164, -0.008668669, -0.18997708, 0.018842457, 0.46211863, 2.1133943, -0.27394366, 0.85)
 
-[node name="OarBlade" type="MeshInstance3D" parent="OarBaseRight/OarPivot" unique_id=258162933]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.5, 0)
-mesh = SubResource("BoxMesh_oar_blade")
-surface_material_override/0 = SubResource("Material_wood")
+[node name="OarBaseRight" parent="." unique_id=1492738067 instance=ExtResource("sculling_oar_scene")]
+transform = Transform3D(0.46162885, -0.022970818, 0.19071235, 0.028417548, 0.4991164, -0.008668669, -0.18997708, 0.018842457, 0.46211863, 2.1133943, -0.27394366, 2.55)
 
 [node name="RudderVisual" parent="." unique_id=1132329710 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 5.0359435)
@@ -126,28 +115,28 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 4.15)
 [node name="CrewSlots" type="Node3D" parent="Authoring" unique_id=1435569493]
 
 [node name="CrewForwardLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=205584072]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.65, 0.6, -2.6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.65, 0.5, -2.6)
 
 [node name="CrewForwardRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=2019543527]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.65, 0.6, -2.6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.65, 0.5, -2.6)
 
 [node name="CrewMidLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=570920837]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.6, -0.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.5, -0.7)
 
 [node name="CrewMidRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1177936018]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.6, -0.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.5, -0.7)
 
 [node name="CrewRearLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1577258698]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.6, 1.25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.5, 1.25)
 
 [node name="CrewRearRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1107165690]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.6, 1.25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.5, 1.25)
 
 [node name="CrewSternLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=2042677593]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0.6, 2.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0.5, 2.75)
 
 [node name="CrewSternRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1239076716]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.6, 2.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.5, 2.75)
 
 [node name="RoundShield" parent="." unique_id=139845430 instance=ExtResource("4_77l81")]
 transform = Transform3D(-1.3113416e-07, 0, 3, 0, 3, 0, -3, 0, -1.3113416e-07, 2.3299522, 0.90132594, 2.2324524)

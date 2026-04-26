@@ -27,15 +27,17 @@ static func get_rudder_health_ratio(ship) -> float:
 static func get_rudder_turn_multiplier(ship) -> float:
 	var rudder_ratio: float = get_rudder_health_ratio(ship)
 	var handling_mult: float = ship.get_shiphandling_multiplier()
-	var compounded_penalty: float = lerpf(0.72, 1.0, rudder_ratio)
-	return lerpf(0.35, 1.0, rudder_ratio) * handling_mult * compounded_penalty
+	var steering_authority_mult: float = lerpf(0.72, 1.0, rudder_ratio)
+	var control_stability_mult: float = lerpf(0.86, 1.0, rudder_ratio)
+	return maxf(0.60, steering_authority_mult * handling_mult * control_stability_mult)
 
 
 static func get_rudder_response_multiplier(ship) -> float:
 	var rudder_ratio: float = get_rudder_health_ratio(ship)
 	var handling_mult: float = ship.get_shiphandling_multiplier()
-	var compounded_penalty: float = lerpf(0.78, 1.0, rudder_ratio)
-	return lerpf(0.45, 1.0, rudder_ratio) * handling_mult * compounded_penalty
+	var response_authority_mult: float = lerpf(0.78, 1.0, rudder_ratio)
+	var response_stability_mult: float = lerpf(0.90, 1.0, rudder_ratio)
+	return maxf(0.70, response_authority_mult * handling_mult * response_stability_mult)
 
 
 static func apply_rudder_damage_from_hit(ship, final_damage: float, hit_position: Vector3, damage_source: String) -> void:
@@ -43,21 +45,17 @@ static func apply_rudder_damage_from_hit(ship, final_damage: float, hit_position
 		return
 	var source_mult: float = 0.0
 	if damage_source.begins_with("ramming"):
-		source_mult = 0.7
+		source_mult = 0.42
 	elif damage_source.contains("chain"):
-		source_mult = 0.34
-	elif damage_source.contains("cannon"):
-		source_mult = 0.18
-	elif damage_source.contains("ballista") or damage_source.contains("singigeon") or damage_source.contains("fire"):
-		source_mult = 0.10
+		source_mult = 0.14
 	if source_mult <= 0.0:
 		return
 	var stern_factor: float = get_stern_hit_factor(ship, hit_position)
-	var damage_mult: float = lerpf(0.45, 1.8, stern_factor)
+	var damage_mult: float = lerpf(0.35, 1.2, stern_factor)
 	var rudder_damage: float = (final_damage * source_mult) * damage_mult
 	if damage_source.begins_with("ramming"):
-		rudder_damage = maxf(rudder_damage, 10.0 * damage_mult)
-	apply_rudder_damage(ship, clampf(rudder_damage, 0.0, ship.rudder_max_health * 0.45))
+		rudder_damage = maxf(rudder_damage, 6.0 * damage_mult)
+	apply_rudder_damage(ship, clampf(rudder_damage, 0.0, ship.rudder_max_health * 0.24))
 
 
 static func get_stern_hit_factor(ship, hit_position: Vector3) -> float:

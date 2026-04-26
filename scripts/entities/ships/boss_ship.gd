@@ -1,6 +1,7 @@
 @tool
 extends "res://scripts/entities/ships/base_ship.gd"
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -99,7 +100,7 @@ func _ready() -> void:
 	hull_hp = max_hull_hp
 	_cache_limbo_base_combat_values()
 	set_team(team)
-	_apply_boss_flag_style()
+	_apply_boss_flag_kind()
 	add_to_group("boss")
 	add_to_group("ships")
 	_find_player()
@@ -111,10 +112,10 @@ func _ready() -> void:
 	_update_boss_hp_hud()
 	call_deferred("_update_boss_hp_hud")
 
-func _apply_boss_flag_style() -> void:
+func _apply_boss_flag_kind() -> void:
 	for mast in masts:
-		if mast.has_method("set_flag_style"):
-			mast.set_flag_style(FlagStyleLibrary.STYLE_BOSS)
+		if mast.has_method("set_flag_kind"):
+			mast.set_flag_kind(FlagSceneLibrary.KIND_BOSS)
 		elif mast.has_method("set_team_color"):
 			mast.set_team_color(team)
 

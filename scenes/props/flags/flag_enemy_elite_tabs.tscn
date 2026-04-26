@@ -1,0 +1,57 @@
+[gd_scene format=3 uid="uid://b0jcqna2ogrqj"]
+
+[ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="1_base"]
+[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="2_spj3h"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_esw8q"]
+top_radius = 0.05
+bottom_radius = 0.05
+height = 2.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7ioui"]
+albedo_color = Color(0.35, 0.2, 0.1, 1)
+roughness = 0.85
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_pxi7s"]
+size = Vector2(1.32, 0.92)
+subdivide_width = 8
+subdivide_depth = 5
+orientation = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_4ds7u"]
+render_priority = 0
+shader = ExtResource("2_spj3h")
+shader_parameter/use_flag_texture = false
+shader_parameter/use_emblem_texture = false
+shader_parameter/emblem_color = Color(1, 0.92, 0.55, 1)
+shader_parameter/emblem_strength = 1.0
+shader_parameter/use_shape_mask = false
+shader_parameter/attachment_edge = 1
+shader_parameter/swallowtail_depth = 0.14
+shader_parameter/swallowtail_gap = 0.21
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/wave_speed = 4.3
+shader_parameter/wave_strength = 0.16
+shader_parameter/side_drag = 0.65
+
+[node name="FlagEnemyEliteTabs" unique_id=1695299619 instance=ExtResource("1_base")]
+flag_kind = "enemy_elite_tabs"
+color = Color(0.93, 0.86, 0.62, 1)
+flag_size = Vector2(1.32, 0.92)
+wind_mode = 1
+wave_strength = 0.16
+side_drag = 0.65
+
+[node name="Pole" parent="." index="0" unique_id=555265591]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.175, 0)
+mesh = SubResource("CylinderMesh_esw8q")
+surface_material_override/0 = SubResource("StandardMaterial3D_7ioui")
+
+[node name="FlagMesh" parent="." index="1" unique_id=722299975]
+transform = Transform3D(1, 0, 4.371139e-08, 0, 1, 0, -4.371139e-08, 0, 1, 0.66, 1.8899999, 0)
+instance_shader_parameters/albedo = Color(0.93, 0.86, 0.62, 1)
+mesh = SubResource("PlaneMesh_pxi7s")
+surface_material_override/0 = SubResource("ShaderMaterial_4ds7u")

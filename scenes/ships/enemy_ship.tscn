@@ -1,5 +1,17 @@
 [gd_scene format=3 uid="uid://dhgl16b2bfb5i"]
 
-[ext_resource type="PackedScene" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
+[ext_resource type="PackedScene" uid="uid://deprw2k61rllc" path="res://scenes/ships/enemy_base_ship.tscn" id="1_enemy_base"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pqtbs"]
+size = Vector3(3.12, 2.6000001, 7.92)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_espxg"]
+size = Vector3(2.52, 2.4, 7.12)
 
 [node name="EnemyShip" unique_id=2138341481 instance=ExtResource("1_enemy_base")]
+
+[node name="CollisionShape3D" parent="ProximityArea" parent_id_path=PackedInt32Array(694699390) index="0" unique_id=1935515166]
+shape = SubResource("BoxShape3D_pqtbs")
+
+[node name="CollisionShape3D" parent="HitArea" parent_id_path=PackedInt32Array(1043851433) index="0" unique_id=240060993]
+shape = SubResource("BoxShape3D_espxg")

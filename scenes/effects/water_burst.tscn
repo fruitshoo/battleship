@@ -1,7 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://cm4c0u30p0035"]
+[gd_scene format=3 uid="uid://cm4c0u30p0035"]
 
 [ext_resource type="PackedScene" path="res://scenes/effects/water_blast.tscn" id="1_blast"]
 [ext_resource type="Script" uid="uid://dowesoy8yplyl" path="res://scripts/effects/water_burst.gd" id="2_script"]
 
-[node name="WaterBurst" instance=ExtResource("1_blast")]
+[node name="WaterBurst" unique_id=1248743867 instance=ExtResource("1_blast")]
 script = ExtResource("2_script")

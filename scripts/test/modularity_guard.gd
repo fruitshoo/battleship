@@ -6,6 +6,14 @@ const HELPER_SUFFIX := "_helper.gd"
 const SCENE_CONTRACT_ALLOWED_OWNERS := {
 	"res://scripts/entities/ships/base_ship.gd": true,
 	"res://scripts/helpers/node_contract_helper.gd": true,
+	"res://scripts/props/flag.gd": true,
+	"res://scripts/props/mast.gd": true,
+}
+const SCENE_CONTRACT_TEST_OPT_IN_MARKER := "# @scene_contract_encapsulated"
+const MATRIX_EXECUTION_MODES := {
+	"manual_preview": true,
+	"standalone_wrapper": true,
+	"suite_wrapper": true,
 }
 const SCENE_CONTRACT_FORBIDDEN_SIGNATURES := [
 	"get_node_or_null(\"Soldiers\")",
@@ -60,6 +68,21 @@ const SCENE_CONTRACT_FORBIDDEN_SIGNATURES := [
 	"has_node(\"CollisionShape3D\")",
 	"name == \"CollisionShape3D\"",
 	"name = \"CollisionShape3D\"",
+	"get_node_or_null(\"Yard\")",
+	"get_node(\"Yard\")",
+	"has_node(\"Yard\")",
+	"name == \"Yard\"",
+	"name = \"Yard\"",
+	"get_node_or_null(\"Streamers\")",
+	"get_node(\"Streamers\")",
+	"has_node(\"Streamers\")",
+	"find_child(\"Streamers\"",
+	"name == \"Streamers\"",
+	"name = \"Streamers\"",
+	"get_node_or_null(\"SailVisual/Flag\")",
+	"get_node(\"SailVisual/Flag\")",
+	"has_node(\"SailVisual/Flag\")",
+	"$SailVisual/Flag",
 ]
 
 
@@ -244,6 +267,8 @@ func _check_matrix_harness_entries(entries: Array, label: String, all_harness_id
 		_check_optional_matrix_path(entry, "script", "%s %s" % [label, harness_id], violations)
 		_check_optional_matrix_path(entry, "registry", "%s %s" % [label, harness_id], violations)
 		_check_optional_matrix_path(entry, "document", "%s %s" % [label, harness_id], violations)
+		_check_optional_matrix_path(entry, "wrapper", "%s %s" % [label, harness_id], violations)
+		_check_matrix_execution_metadata(entry, label, harness_id, violations)
 
 		var scenarios_value = entry.get("scenarios", [])
 		if typeof(scenarios_value) != TYPE_ARRAY:
@@ -262,6 +287,18 @@ func _check_matrix_harness_entries(entries: Array, label: String, all_harness_id
 			scenario_ids[scenario_id] = true
 			if str(scenario.get("coverage", "")).strip_edges().is_empty():
 				violations.append("Runtime scenario matrix %s %s scenario has no coverage: %s" % [label, harness_id, scenario_id])
+
+
+func _check_matrix_execution_metadata(entry: Dictionary, label: String, harness_id: String, violations: Array[String]) -> void:
+	var execution := str(entry.get("execution", "")).strip_edges()
+	if execution.is_empty():
+		violations.append("Runtime scenario matrix %s %s has no execution metadata" % [label, harness_id])
+		return
+	if not MATRIX_EXECUTION_MODES.has(execution):
+		violations.append("Runtime scenario matrix %s %s execution is invalid: %s" % [label, harness_id, execution])
+		return
+	if execution in ["standalone_wrapper", "suite_wrapper"] and not entry.has("wrapper"):
+		violations.append("Runtime scenario matrix %s %s execution %s requires wrapper path" % [label, harness_id, execution])
 
 
 func _check_optional_matrix_path(entry: Dictionary, field_name: String, label: String, violations: Array[String]) -> void:
@@ -524,14 +561,22 @@ func _check_coordinate_pooling_hazards(script_paths: Array[String], registry: Di
 
 func _check_scene_contract_encapsulation(script_paths: Array[String], violations: Array[String]) -> void:
 	for path in script_paths:
-		if path.begins_with("res://scripts/test/"):
-			continue
-		if SCENE_CONTRACT_ALLOWED_OWNERS.has(path):
-			continue
 		var text := FileAccess.get_file_as_string(path)
+		var is_opted_in_test_contract: bool = path.begins_with("res://scripts/test/") and _has_scene_contract_test_marker(text)
+		if path.begins_with("res://scripts/test/") and not is_opted_in_test_contract:
+			continue
+		if not is_opted_in_test_contract and SCENE_CONTRACT_ALLOWED_OWNERS.has(path):
+			continue
 		for signature in SCENE_CONTRACT_FORBIDDEN_SIGNATURES:
 			if text.contains(signature):
-				violations.append("Scene contract access outside owner: %s uses %s. Use BaseShip/NodeContractHelper accessors instead." % [path, signature])
+				violations.append("Scene contract access outside owner: %s uses %s. Use owner accessors or contract APIs instead." % [path, signature])
+
+
+func _has_scene_contract_test_marker(text: String) -> bool:
+	for line in text.split("\n"):
+		if str(line).strip_edges() == SCENE_CONTRACT_TEST_OPT_IN_MARKER:
+			return true
+	return false
 
 
 func _build_allowed_duplicate_map(registry: Dictionary) -> Dictionary:

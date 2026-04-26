@@ -67,7 +67,7 @@ var _rigging_repair_complete_feedback_shown: bool = false
 @export var bobbing_amplitude: float = 0.3
 @export var bobbing_speed: float = 1.0
 @export var rocking_amplitude: float = 0.05
-@export var floating_offset: float = 0.2 ## 기본 부력 오프셋 (수면 위로 배를 띄움)
+@export var floating_offset: float = 0.55 ## 기본 부력 오프셋 (수면 위로 배를 띄움)
 var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
 
 # === 내부 상태 ===
@@ -196,6 +196,8 @@ var _cached_environment_preset_manager: Node = null
 # Oar (노) 레퍼런스
 var oar_pivot_left: Node3D = null
 var oar_pivot_right: Node3D = null
+var oar_pivots_left: Array[Node3D] = []
+var oar_pivots_right: Array[Node3D] = []
 
 var _cached_level_manager: Node = null
 var _cached_hud: Node = null
@@ -865,6 +867,8 @@ func _cache_hull_references(node: Node) -> void:
 		wake_trail = null
 		oar_pivot_left = null
 		oar_pivot_right = null
+		oar_pivots_left.clear()
+		oar_pivots_right.clear()
 
 	# 재귀적으로 내려가며 하드웨어 바인딩
 	for child in node.get_children():
@@ -874,10 +878,18 @@ func _cache_hull_references(node: Node) -> void:
 			rudder_visual = child
 		elif child.name == "WakeTrail" and child is Node3D:
 			wake_trail = child as Node3D
-		elif child.name == "OarBaseLeft" and child.has_node("OarPivot"):
-			oar_pivot_left = child.get_node("OarPivot")
-		elif child.name == "OarBaseRight" and child.has_node("OarPivot"):
-			oar_pivot_right = child.get_node("OarPivot")
+		elif child.name.begins_with("OarBaseLeft") and child.has_node("OarPivot"):
+			var left_pivot := child.get_node("OarPivot") as Node3D
+			if is_instance_valid(left_pivot) and not oar_pivots_left.has(left_pivot):
+				oar_pivots_left.append(left_pivot)
+				if not is_instance_valid(oar_pivot_left):
+					oar_pivot_left = left_pivot
+		elif child.name.begins_with("OarBaseRight") and child.has_node("OarPivot"):
+			var right_pivot := child.get_node("OarPivot") as Node3D
+			if is_instance_valid(right_pivot) and not oar_pivots_right.has(right_pivot):
+				oar_pivots_right.append(right_pivot)
+				if not is_instance_valid(oar_pivot_right):
+					oar_pivot_right = right_pivot
 			
 		# 자식 노드 재귀 탐색
 		if child.get_child_count() > 0:

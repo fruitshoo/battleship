@@ -249,7 +249,8 @@ static func _apply_initial_crew_slot_layout(ship, soldiers_node: Node) -> void:
 
 
 static func _get_next_player_crew_spawn_transform(ship, soldiers_node: Node) -> Transform3D:
-	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-1.2, 1.2), 0.5, randf_range(-2.5, 2.5)))
+	var fallback_deck_height: float = float(ship.get("deck_height")) if ship != null and ship.get("deck_height") != null else 0.5
+	var fallback := Transform3D(Basis.IDENTITY, Vector3(randf_range(-1.2, 1.2), fallback_deck_height, randf_range(-2.5, 2.5)))
 	var soldiers_node_3d := soldiers_node as Node3D
 	var ship_3d := ship as Node3D
 	if not is_instance_valid(soldiers_node_3d) or not is_instance_valid(ship_3d):

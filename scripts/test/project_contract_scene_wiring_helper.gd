@@ -254,7 +254,7 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		failures.append("player ship runtime safety should force deck_light_player_only")
 	if absf(float(player_ship.get("boarding_hook_throw_delay")) - 2.5) > 0.01:
 		failures.append("player ship runtime safety did not restore boarding_hook_throw_delay")
-	if absf(float(player_ship.get("floating_offset")) - 1.0) > 0.01:
+	if absf(float(player_ship.get("floating_offset")) - 1.35) > 0.01:
 		failures.append("player ship runtime safety did not restore floating_offset")
 	if player_ship.global_position.distance_to(start_marker.global_position) > 0.01:
 		failures.append("player ship runtime safety did not apply PlayerStart transform")
@@ -589,6 +589,11 @@ static func _run_player_crew_slot_authoring_contract(owner: Node, failures: Arra
 	var slot_transforms := ShipAuthoringHelper.get_crew_slot_transforms(player_ship, soldiers_node)
 	if slot_transforms.size() < 8:
 		failures.append("player crew slot authoring helper should expose eight crew transforms")
+	var player_deck_height := float(player_ship.get("deck_height")) if player_ship.get("deck_height") != null else 0.4
+	for slot_transform in slot_transforms:
+		if absf(slot_transform.origin.y - player_deck_height) > 0.05:
+			failures.append("player crew slot authoring y should match deck_height: %.2f vs %.2f" % [slot_transform.origin.y, player_deck_height])
+			break
 	var occupied_slots := {}
 	for child in soldiers_node.get_children():
 		var soldier := child as Node3D

@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="3_soldier"]
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="5_cannon"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="6_collision_visualizer"]
+[ext_resource type="PackedScene" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_6oovs"]
 size = Vector3(2.7199998, 2.6000001, 6.42)
@@ -31,7 +32,7 @@ max_speed = 4.5
 base_collision_radius = 2.493
 width_multiplier = 0.3682310355380437
 auto_fit_scale = 0.9
-floating_offset = 0.5
+floating_offset = 0.85
 metadata/ally_ship_role = "support_fleet"
 metadata/support_fleet_ship = true
 metadata/boarding_feedback_contested = false
@@ -52,6 +53,9 @@ collision_mask = 0
 shape = SubResource("BoxShape3D_5qbug")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=764909694]
+
+[node name="WakeTrail" parent="." instance=ExtResource("wake_trail_scene")]
+transform = Transform3D(0.68, 0, 0, 0, 0.68, 0, 0, 0, 0.68, 0, -0.9, -0.75)
 
 [node name="CollisionVisualizer" type="Node3D" parent="." unique_id=1064114260]
 visible = false

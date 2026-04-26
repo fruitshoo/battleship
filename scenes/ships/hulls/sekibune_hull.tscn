@@ -2,7 +2,8 @@
 
 [ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="5_ceply"]
 [ext_resource type="Texture2D" uid="uid://dfds5i3xuhjlk" path="res://assets/vfx/masks/sail_burn_mask_c.png" id="6_tmox3"]
-[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="7_fguii"]
+[ext_resource type="PackedScene" path="res://scenes/props/flags/flag_player_flagship.tscn" id="7_tmox3"]
+[ext_resource type="Script" uid="uid://bgw1gw7lkuq4a" path="res://scripts/props/flag.gd" id="8_fguii"]
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
@@ -33,41 +34,14 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.11634904714142427
+shader_parameter/damage_seed = 0.9819458375125376
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
 shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
-metadata/mast_owner_id = 1399382251504328
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_y0jtj"]
-top_radius = 0.05
-bottom_radius = 0.05
-height = 1.505
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uuomm"]
-albedo_color = Color(0.35, 0.2, 0.1, 1)
-roughness = 0.85
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_73hif"]
-size = Vector2(3, 0.5)
-subdivide_width = 8
-subdivide_depth = 5
-orientation = 2
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_pt1c8"]
-render_priority = 0
-shader = ExtResource("7_fguii")
-shader_parameter/use_flag_texture = false
-shader_parameter/uv_scale = Vector2(1, 1)
-shader_parameter/uv_offset = Vector2(0, 0)
-shader_parameter/flip_u = false
-shader_parameter/flip_v = false
-shader_parameter/wave_speed = 5.0
-shader_parameter/wave_strength = 0.25
-shader_parameter/side_drag = 1.0
+metadata/mast_owner_id = 134713981377794
 
 [node name="SekibuneHull" type="Node3D" unique_id=930639546]
 
@@ -154,20 +128,18 @@ transform = Transform3D(1.1879622, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.3933, 0)
 transform = Transform3D(1.2, 0, 0, 0, 0.8, 0, 0, 0, 1, 0, 0.1557436, -0.3)
 material_override = SubResource("ShaderMaterial_l0hkp")
 
-[node name="Flag" parent="Mast/SailVisual" index="1" unique_id=85230560]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.411583, 0)
-
-[node name="Pole" parent="Mast/SailVisual/Flag" index="0" unique_id=555265591]
-mesh = SubResource("CylinderMesh_y0jtj")
-surface_material_override/0 = SubResource("StandardMaterial3D_uuomm")
-
-[node name="FlagMesh" parent="Mast/SailVisual/Flag" index="1" unique_id=722299975]
-transform = Transform3D(0.8417776, 0, 3.6795267e-08, 0, 1, 0, -4.371139e-08, 0, 1, 1.2626665, 1.2550001, 0)
-mesh = SubResource("PlaneMesh_73hif")
-surface_material_override/0 = SubResource("ShaderMaterial_pt1c8")
-
-[node name="yardarm" parent="Mast/SailVisual" index="2" unique_id=1460797758]
+[node name="yardarm" parent="Mast/SailVisual" index="1" unique_id=1460797758]
 transform = Transform3D(0.41443405, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 0, 3.0346785, -0.301)
 
+[node name="Flag" type="Node3D" parent="Mast/SailVisual" index="2" unique_id=431687688 instance=ExtResource("7_tmox3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.411583, 0)
+script = ExtResource("8_fguii")
+color = Color(0.92, 0.73, 0.22, 1)
+flag_size = Vector2(1.45, 0.72)
+swallowtail_depth = 0.14
+swallowtail_gap = 0.21
+wave_speed = 4.3
+wave_strength = 0.18
+side_drag = 0.75
+
 [editable path="Mast"]
-[editable path="Mast/SailVisual/Flag"]

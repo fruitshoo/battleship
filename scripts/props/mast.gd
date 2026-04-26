@@ -4,6 +4,7 @@ extends Node3D
 const MastVisualHelper = preload("res://scripts/props/mast_visual_helper.gd")
 const MastGeometryHelper = preload("res://scripts/props/mast_geometry_helper.gd")
 const MastWindHelper = preload("res://scripts/props/mast_wind_helper.gd")
+const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
 const SAIL_SMOKE_SCENE = preload("res://scenes/effects/fire_effect.tscn")
 const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 
@@ -11,6 +12,18 @@ const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 ## 자체적으로 돛 각도 회전 및 펄럭임 제어
 
 @export var max_wind_intake: float = 1.0 # 모델별 바람 허용량 조절 가능
+@export_group("Flag")
+@export var flag_scene_override: PackedScene:
+	set(value):
+		flag_scene_override = value
+		if is_inside_tree() and value != null:
+			_replace_flag_scene(value)
+@export var flag_texture_override: Texture2D:
+	set(value):
+		flag_texture_override = value
+		if is_inside_tree():
+			_apply_flag_texture_override()
+
 @export_group("Sail Material")
 @export var use_sail_texture: bool = false:
 	set(value):
@@ -118,6 +131,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_damage_seed = float(get_instance_id() % 997) / 997.0
 	_cached_wind_manager = get_node_or_null("/root/WindManager")
+	_apply_flag_scene_override()
 	MastGeometryHelper.capture_base_state(self)
 	_apply_mast_geometry()
 	_apply_sail_geometry()
@@ -142,8 +156,83 @@ func _process(delta: float) -> void:
 	_update_sail_view_fade(delta)
 
 func set_team_color(team: String) -> void:
-	if flag and flag.has_method("set_team_color"):
-		flag.set_team_color(team)
+	set_flag_kind(FlagSceneLibrary.get_team_kind(team))
+
+func set_flag_kind(kind: String, texture: Texture2D = null) -> void:
+	var normalized_kind := FlagSceneLibrary.normalize_kind(kind)
+	var scene_path := FlagSceneLibrary.get_scene_path(normalized_kind)
+	if not scene_path.is_empty():
+		var scene := load(scene_path) as PackedScene
+		if scene != null and _replace_flag_scene(scene):
+			if texture != null:
+				set_flag_texture(texture)
+			elif flag_texture_override != null:
+				_apply_flag_texture_override()
+			_apply_flag_kind_to_active_flag(normalized_kind)
+			return
+	if is_instance_valid(flag):
+		_apply_flag_kind_to_active_flag(normalized_kind)
+		if texture != null:
+			set_flag_texture(texture)
+
+func set_flag_scene(scene: PackedScene, texture: Texture2D = null) -> void:
+	flag_scene_override = scene
+	if texture != null:
+		set_flag_texture(texture)
+
+func set_flag_texture(texture: Texture2D) -> void:
+	flag_texture_override = texture
+
+func get_flag_node() -> Node3D:
+	if is_instance_valid(flag):
+		return flag
+	return get_node_or_null("SailVisual/Flag") as Node3D
+
+func get_flag_shape_name() -> String:
+	var active_flag := get_flag_node()
+	if is_instance_valid(active_flag) and active_flag.has_method("get_flag_shape_name"):
+		return str(active_flag.call("get_flag_shape_name"))
+	return ""
+
+func _apply_flag_scene_override() -> void:
+	if flag_scene_override != null:
+		_replace_flag_scene(flag_scene_override)
+	elif not is_instance_valid(flag):
+		flag = get_node_or_null("SailVisual/Flag") as Node3D
+
+func _replace_flag_scene(scene: PackedScene) -> bool:
+	if scene == null or not is_instance_valid(sail_visual):
+		return false
+	var old_transform := Transform3D.IDENTITY
+	if is_instance_valid(flag):
+		old_transform = flag.transform
+		if flag.get_parent() == sail_visual:
+			sail_visual.remove_child(flag)
+		flag.queue_free()
+	var new_flag := scene.instantiate() as Node3D
+	if new_flag == null:
+		return false
+	new_flag.name = "Flag"
+	new_flag.transform = old_transform
+	sail_visual.add_child(new_flag)
+	if Engine.is_editor_hint():
+		var edited_root := get_tree().edited_scene_root if get_tree() else null
+		if edited_root != null:
+			new_flag.owner = edited_root
+	flag = new_flag
+	if flag_texture_override != null:
+		_apply_flag_texture_override()
+	return true
+
+func _apply_flag_texture_override() -> void:
+	if not is_instance_valid(flag):
+		return
+	if flag.has_method("set_flag_texture"):
+		flag.call("set_flag_texture", flag_texture_override)
+
+func _apply_flag_kind_to_active_flag(kind: String) -> void:
+	if is_instance_valid(flag) and flag.has_method("set_flag_kind"):
+		flag.call("set_flag_kind", kind)
 
 func set_sail_color(color: Color) -> void:
 	for mesh in _get_sail_meshes():

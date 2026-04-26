@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cs6tj62g3wuin" path="res://scripts/entities/ships/boss_ship.gd" id="1"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
+[ext_resource type="PackedScene" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_2242h"]
 size = Vector3(5.22, 2.95, 11.92)
@@ -31,6 +32,9 @@ collision_mask = 0
 shape = SubResource("BoxShape3D_1olwy")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=57025064]
+
+[node name="WakeTrail" parent="." instance=ExtResource("wake_trail_scene")]
+transform = Transform3D(1.15, 0, 0, 0, 1.15, 0, 0, 0, 1.15, 0, -0.62, -1.4)
 
 [node name="CollisionVisualizer" type="Node3D" parent="." unique_id=737223088]
 visible = false

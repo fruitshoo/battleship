@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://3oyk8ux82y03"]
+
+[ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="1_base"]
+[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="2_ph5qy"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_bh1hl"]
+top_radius = 0.05
+bottom_radius = 0.05
+height = 2.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grlx7"]
+albedo_color = Color(0.35, 0.2, 0.1, 1)
+roughness = 0.85
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_cvgss"]
+size = Vector2(1.45, 0.72)
+subdivide_width = 8
+subdivide_depth = 5
+orientation = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ph5qy"]
+render_priority = 0
+shader = ExtResource("2_ph5qy")
+shader_parameter/use_flag_texture = false
+shader_parameter/use_emblem_texture = false
+shader_parameter/emblem_color = Color(1, 0.92, 0.55, 1)
+shader_parameter/emblem_strength = 1.0
+shader_parameter/use_shape_mask = false
+shader_parameter/attachment_edge = 1
+shader_parameter/swallowtail_depth = 0.33
+shader_parameter/swallowtail_gap = 0.5
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/wave_speed = 5.5
+shader_parameter/wave_strength = 0.31
+shader_parameter/side_drag = 1.95
+
+[node name="FlagPlayerFlagship" unique_id=355738673 instance=ExtResource("1_base")]
+flag_kind = "player_flagship"
+flag_size = Vector2(1.45, 0.72)
+swallowtail_depth = 0.33
+swallowtail_gap = 0.5
+wind_mode = 1
+wave_speed = 5.5
+wave_strength = 0.31
+side_drag = 1.95
+
+[node name="Pole" parent="." index="0" unique_id=555265591]
+transform = Transform3D(1, 0, 0, 0, 1.3416555, 0, 0, 0, 1, 0, 1.125, 0)
+mesh = SubResource("CylinderMesh_bh1hl")
+surface_material_override/0 = SubResource("StandardMaterial3D_grlx7")
+
+[node name="FlagMesh" parent="." index="1" unique_id=722299975]
+transform = Transform3D(1, 0, 4.371139e-08, 0, 1, 0, -4.371139e-08, 0, 1, 0.725, 1.89, 0)
+mesh = SubResource("PlaneMesh_cvgss")
+surface_material_override/0 = SubResource("ShaderMaterial_ph5qy")
