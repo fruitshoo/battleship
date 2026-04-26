@@ -859,8 +859,12 @@ func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
 	if water_splash_scene:
 		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
 		if is_instance_valid(splash):
-			if splash.has_method("configure_as_small"):
+			if splash.has_method("configure_as_splash"):
+				splash.configure_as_splash()
+			elif splash.has_method("configure_as_small"):
 				splash.configure_as_small()
+			if splash.has_method("set_intensity"):
+				splash.set_intensity(0.75)
 			splash.position = Vector3(splash_pos.x, 0.05, splash_pos.z)
 			get_tree().root.add_child(splash)
 			if splash.has_method("pool_activate"):
