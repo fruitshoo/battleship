@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 const PLAYER_BASE_MOVE_SPEED := 6.0
@@ -52,6 +53,8 @@ func _ready() -> void:
 	close_button.text = close_button_text
 	_apply_theme()
 	_apply_layout_density()
+	UiButtonAudio.wire_button(close_button)
+	UiButtonAudio.wire_button(buy_button)
 	close_button.pressed.connect(_on_close_pressed)
 	buy_button.pressed.connect(_on_buy_pressed)
 	buy_button.focus_entered.connect(func(): _footer_focus_index = 0)
@@ -98,10 +101,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif _is_confirm_event(event):
 		if _footer_focus_index == 0:
-			_on_buy_pressed()
+			if is_instance_valid(buy_button) and buy_button.visible and not buy_button.disabled:
+				buy_button.emit_signal("pressed")
 		elif _footer_focus_index == 1:
-			_on_close_pressed()
+			if is_instance_valid(close_button) and close_button.visible and not close_button.disabled:
+				close_button.emit_signal("pressed")
 		else:
+			UiButtonAudio.play_click()
 			_on_buy_pressed()
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
@@ -196,6 +202,7 @@ func update_ui() -> void:
 			_selected_upgrade_id = upgrade_ids[0]
 	_update_detail_panel()
 	_refresh_card_styles()
+	UiButtonAudio.wire_buttons(upgrade_grid)
 	if _footer_focus_index >= 0:
 		call_deferred("_focus_footer_button", _footer_focus_index)
 
@@ -225,6 +232,7 @@ func _create_upgrade_card(id: String) -> Button:
 	card.add_theme_stylebox_override("hover", _make_card_style(id, true))
 	card.add_theme_stylebox_override("pressed", _make_card_style(id, true))
 	card.add_theme_stylebox_override("disabled", _make_card_style(id, false, true))
+	UiButtonAudio.wire_button(card)
 	card.pressed.connect(_on_card_pressed.bind(id))
 	card.mouse_entered.connect(func():
 		_select_upgrade(id)

@@ -84,6 +84,8 @@ static func run_runtime_smoke(owner: Node, failures: Array[String], smoke_scene_
 		await _run_projectile_smoke_pass(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn, str(projectile_scene_path))
 	if smoke_spawn_projectile_scenes.has("res://scenes/projectiles/fire_pot.tscn"):
 		await _run_fire_pot_residual_smoke_contract(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
+	if smoke_spawn_projectile_scenes.has("res://scenes/projectiles/janggun_missile.tscn"):
+		await _run_janggun_missile_expiry_contract(owner, failures)
 	_run_projectile_aim_height_contract(failures)
 
 
@@ -1053,6 +1055,21 @@ static func _run_projectile_smoke_pass(owner: Node, failures: Array[String], pac
 					if projectile_team != "player":
 						failures.append("projectile team contract failed: %s" % projectile_scene_path)
 					_configure_projectile_smoke(projectile, projectile_scene_path, player_ship, target_ship)
+					if projectile_scene_path.ends_with("cannonball.tscn") and is_instance_valid(projectile):
+						var max_travel_variant: Variant = projectile.get("_max_travel_distance")
+						if max_travel_variant == null:
+							failures.append("cannonball should expose a miss travel limit")
+						else:
+							var cannon_spawn_pos := player_ship.global_position + Vector3(0.0, 1.2, 0.0)
+							var target_distance := cannon_spawn_pos.distance_to(target_aim_pos)
+							var max_travel_distance := float(max_travel_variant)
+							var lifetime_distance := float(projectile.get("speed")) * float(projectile.get("lifetime"))
+							if max_travel_distance <= target_distance:
+								failures.append("cannonball miss travel limit should extend past target distance")
+							if max_travel_distance > target_distance + 14.0:
+								failures.append("cannonball miss travel limit allows too much overshoot: %.2f" % (max_travel_distance - target_distance))
+							if max_travel_distance >= lifetime_distance:
+								failures.append("cannonball miss travel limit should be shorter than lifetime travel distance")
 					await _wait_frames(owner, wait_frames_after_spawn)
 					var after_projectiles := EntityRegistry.count_projectiles()
 					if after_projectiles <= before_projectiles:
@@ -1091,6 +1108,37 @@ static func _configure_projectile_smoke(projectile: Node, projectile_scene_path:
 	elif projectile_scene_path.ends_with("fire_pot.tscn"):
 		if projectile.has_method("setup_flight"):
 			projectile.call("setup_flight", projectile.start_pos, projectile.target_pos, 0.8, 3.5)
+
+
+static func _run_janggun_missile_expiry_contract(owner: Node, failures: Array[String]) -> void:
+	var projectile_scene := load("res://scenes/projectiles/janggun_missile.tscn") as PackedScene
+	if projectile_scene == null:
+		failures.append("janggun missile expiry contract scene load failed")
+		return
+	var root := Node3D.new()
+	owner.add_child(root)
+	var missile := ScenePool.acquire(owner.get_tree(), projectile_scene)
+	if missile == null:
+		failures.append("janggun missile expiry contract instantiate failed")
+		root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	root.add_child(missile)
+	if missile.has_method("launch"):
+		missile.call("launch", Vector3(0.0, 2.0, 0.0), Vector3(6.0, 2.0, 0.0), "player", 1.0, 24.0, 0)
+	else:
+		failures.append("janggun missile expiry contract missing launch method")
+		ScenePool.release(missile)
+		root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	await _wait_physics_frames(owner, 120)
+	if EntityRegistry.get_projectiles().has(missile):
+		failures.append("janggun missile should leave projectile registry after missed flight expiry")
+	if is_instance_valid(missile) and missile.get_parent() == root:
+		failures.append("janggun missile should release to pool or free after missed flight expiry")
+	root.queue_free()
+	await _wait_frames(owner, 1)
 
 
 static func _run_projectile_aim_height_contract(failures: Array[String]) -> void:

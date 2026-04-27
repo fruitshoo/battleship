@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 
@@ -34,6 +35,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_apply_theme()
 	_apply_layout_density()
+	UiButtonAudio.wire_buttons(self)
 	_bind_slider(master_slider, "master_volume")
 	_bind_slider(music_slider, "music_volume")
 	_bind_slider(sfx_slider, "sfx_volume")
@@ -227,6 +229,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_confirm_event(event):
 		var focused := get_viewport().gui_get_focus_owner() if get_viewport() != null else null
 		if focused is CheckBox:
+			UiButtonAudio.play_click()
 			(focused as CheckBox).button_pressed = not (focused as CheckBox).button_pressed
 			if get_viewport():
 				get_viewport().set_input_as_handled()

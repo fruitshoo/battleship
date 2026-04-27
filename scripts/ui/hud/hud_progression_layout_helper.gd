@@ -1,5 +1,6 @@
 extends RefCounted
 
+const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
 
 static func apply_overlay_theme(hud) -> void:
 	if is_instance_valid(hud.gust_warning):
@@ -28,7 +29,7 @@ static func apply_overlay_density(hud) -> void:
 	if is_instance_valid(hud.xp_bar):
 		hud.xp_bar.custom_minimum_size.y = top_bar_height
 	if is_instance_valid(hud.merit_bar):
-		hud.merit_bar.offset_top = top_bar_height + 6.0
+		hud.merit_bar.offset_top = top_bar_height + 1.0
 		hud.merit_bar.custom_minimum_size.y = merit_bar_height
 	if is_instance_valid(hud.level_label):
 		NavalUiTheme.style_overlay_caption(hud.level_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_MAIN, 4)
@@ -59,7 +60,7 @@ static func ensure_hud_label(hud, existing: Label, node_name: String, default_te
 
 static func setup_top_xp_bar(hud) -> void:
 	hud.level_label = ensure_hud_label(hud, hud.level_label, "LevelLabel", "[Lv] 1")
-	hud.xp_bar = ProgressBar.new()
+	hud.xp_bar = HudGaugeBar.new()
 	hud.xp_bar.name = "TopXPBar"
 	hud.add_child(hud.xp_bar)
 
@@ -69,18 +70,28 @@ static func setup_top_xp_bar(hud) -> void:
 	hud.xp_bar.z_index = 10
 
 	NavalUiTheme.apply_progress_bar(hud.xp_bar, Color(0.06, 0.08, 0.11, 0.82), Color(0.58, 0.77, 0.92, 0.94), 0)
+	hud.xp_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.82), Color(0.58, 0.77, 0.92, 0.94), 0, {
+		"damage_trail": false,
+		"border_color": Color(0.42, 0.56, 0.68, 0.72),
+		"shine_strength": 0.18,
+	})
 
-	hud.merit_bar = ProgressBar.new()
+	hud.merit_bar = HudGaugeBar.new()
 	hud.merit_bar.name = "TopMeritBar"
 	hud.add_child(hud.merit_bar)
 
 	hud.merit_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	hud.merit_bar.offset_top = 30.0
+	hud.merit_bar.offset_top = 25.0
 	hud.merit_bar.custom_minimum_size.y = 16.0
 	hud.merit_bar.show_percentage = false
 	hud.merit_bar.z_index = 10
 
 	NavalUiTheme.apply_progress_bar(hud.merit_bar, Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0)
+	hud.merit_bar.configure_gauge(Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0, {
+		"damage_trail": false,
+		"border_color": NavalUiTheme.BORDER_GOLD_SOFT,
+		"shine_strength": 0.22,
+	})
 
 	hud.merit_label = Label.new()
 	hud.merit_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

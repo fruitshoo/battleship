@@ -48,6 +48,14 @@ static func run_contract(owner: Node, failures: Array[String]) -> void:
 	var edge_vignette := float(material.get_shader_parameter("edge_vignette"))
 	if edge_vignette <= 0.0:
 		failures.append("ScreenEdgeFX should initialize a positive base vignette strength.")
+	var edge_blur := float(material.get_shader_parameter("edge_blur"))
+	if edge_blur <= 0.0:
+		failures.append("ScreenEdgeFX should initialize a positive base edge blur strength.")
+	if edge_blur < 0.68:
+		failures.append("ScreenEdgeFX default edge blur should be visible enough for gameplay.")
+	var shader_code := material.shader.code if material.shader != null else ""
+	if not shader_code.contains("textureLod"):
+		failures.append("ScreenEdgeFX should use mipmap sampling so ocean edges visibly blur.")
 
 	var initial_boost := float(material.get_shader_parameter("motion_boost"))
 	if initial_boost > 0.08:

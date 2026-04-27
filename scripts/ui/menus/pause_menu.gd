@@ -2,6 +2,7 @@ extends CanvasLayer
 
 const MAIN_MENU_PATH := "res://scenes/main_menu.tscn"
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 
@@ -38,6 +39,7 @@ func _ready() -> void:
 
 	_apply_background_fx()
 	_apply_ui_theme()
+	UiButtonAudio.wire_buttons(self)
 
 	resume_btn.pressed.connect(_on_resume_pressed)
 	options_btn.pressed.connect(_on_options_pressed)

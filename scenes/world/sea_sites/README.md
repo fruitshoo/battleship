@@ -11,3 +11,7 @@ Temporary static reward sites:
 - `reef_marker_site.tscn`
 - `tiny_islet_site.tscn`
 - `temporary_outpost_site.tscn`
+
+Static sites now grant small run-scoped `minor_stat_bonus` rewards by default.
+Drifting supplies remain recovery-focused so exploration and emergency pickup
+keep distinct roles.

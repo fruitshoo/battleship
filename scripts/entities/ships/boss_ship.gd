@@ -20,6 +20,9 @@ signal boss_died
 @export_range(0.2, 1.4, 0.05) var ai_turn_authority: float = 0.92
 @export_range(4.0, 24.0, 0.25) var ai_close_turn_soft_radius: float = 10.0
 @export_range(0.2, 1.0, 0.05) var ai_close_turn_scale: float = 0.72
+@export_range(0.0, 1.0, 0.01) var boss_wake_activation_speed: float = 0.12
+@export_range(0.0, 1.0, 0.01) var boss_wake_min_speed_ratio: float = 0.42
+@export_range(0.0, 1.0, 0.01) var boss_wake_turbulence_floor: float = 0.16
 @export_range(0.0, 1.0, 0.01) var orbit_inward_bias: float = 0.34 # 선회 중에도 플레이어 쪽으로 얼마나 파고들지
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/launchers/cannon_enemy_heavy.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/launchers/singigeon_launcher.tscn")
@@ -348,17 +351,31 @@ func _physics_process(delta: float) -> void:
 	velocity += hard_rep * delta
 	global_position += velocity * delta
 	_update_rudder_visual()
-	_set_wake_state(
-		current_speed > 0.4 or sep.length() > 0.12,
-		clampf(current_speed / maxf(move_speed, 0.01), 0.0, 1.0),
-		clampf(rudder_angle / 45.0, -1.0, 1.0),
-		clampf(sep.length() / 2.0, 0.0, 1.0)
-	)
+	_update_boss_wake_state(velocity, sep)
 	
 	_update_leaking_damage(delta)
 		
 	# === 둥실둥실 및 기울기 효과 ===
 	_apply_bobbing_effect()
+
+
+func _update_boss_wake_state(world_velocity: Vector3, separation_velocity: Vector3) -> void:
+	var planar_velocity := world_velocity
+	planar_velocity.y = 0.0
+	var actual_speed := planar_velocity.length()
+	var wake_active := actual_speed > boss_wake_activation_speed or separation_velocity.length() > 0.12
+	var base_speed_ratio := clampf(current_speed / maxf(move_speed, 0.01), 0.0, 1.0)
+	var size_floor := boss_wake_min_speed_ratio + (0.06 if tier >= 2 else 0.0)
+	var speed_ratio := maxf(base_speed_ratio, size_floor) if wake_active else 0.0
+	var turbulence := clampf(separation_velocity.length() / 2.0, 0.0, 1.0)
+	if wake_active:
+		turbulence = maxf(turbulence, boss_wake_turbulence_floor)
+	_set_wake_state(
+		wake_active,
+		clampf(speed_ratio, 0.0, 1.0),
+		clampf(rudder_angle / 45.0, -1.0, 1.0),
+		turbulence
+	)
 
 func _calculate_separation() -> Vector3:
 	if get_meta("derelict_nonblocking", false) == true:

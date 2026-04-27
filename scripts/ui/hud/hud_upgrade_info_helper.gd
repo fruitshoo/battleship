@@ -12,7 +12,7 @@ const PLAYER_SAIL_EFFICIENCY := 1.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const PLAYER_STAMINA_DRAIN_RATE := 10.0
 const PLAYER_STAMINA_RECOVERY_RATE := 6.5
-const SUPPLY_BASE_HEAL := 5.0
+const SUPPLY_BASE_HEAL := 15.0
 const SUPPLY_BASE_STAMINA_RECOVERY := 0.0
 const SOLDIER_SWORD_BASE_DAMAGE := 13.0
 const SOLDIER_BOW_BASE_DAMAGE := 18.0
@@ -92,7 +92,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var cooldown := maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 			var blast_radius := float(stats.get("base_blast_radius", 3.5)) + (float(level - 1) * float(stats.get("blast_radius_per_lv", 0.2)))
 			var rocket_damage := base_damage * (1.0 + 0.15 * float(level))
-			return "신기전 %d명 | 대병 %.0f | 폭발 %.1fm | 재사용 %.1f초" % [rocketeers, rocket_damage * personnel_mult, blast_radius, cooldown]
+			return "신기전 운용 %d명 | 대병 %.0f | 폭발 %.1fm | 재사용 %.1f초" % [rocketeers, rocket_damage * personnel_mult, blast_radius, cooldown]
 		"janggun":
 			return "명중 시 화염/둔화 디버프 강화"
 		"ballista":
@@ -155,7 +155,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "도선병 피해 %.1f/초 | 갑판 혼란 피해 -%d%%" % [defense_damage, boarding_fire_reduce_pct]
 		"crew_numbers":
 			var spearmen = int(UpgradeManager.get_specialist_unit_count("crew_numbers", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
-			return "창병 %d명 | 근접 방어/난간전 특화" % spearmen
+			return "창병 전환 %d명 | 근접 방어/난간전 특화" % spearmen
 		"crew_attack":
 			var damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
 			var sword_damage := SOLDIER_SWORD_BASE_DAMAGE * (1.0 + damage_bonus_pct)
@@ -170,7 +170,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var fp_dmg = stats.get("base_damage", 15.0) + (level - 1) * stats.get("damage_per_lv", 5.0)
 			var fp_cd = maxf(1.0, stats.get("base_cooldown", 6.0) - (level - 1) * stats.get("cooldown_reduce_per_lv", 1.0))
 			var ignite_pct: int = int(round(clampf(float(stats.get("base_ignition_chance", 0.45)) + float(level - 1) * float(stats.get("ignition_chance_per_lv", 0.075)), 0.0, float(stats.get("max_ignition_chance", 0.75))) * 100.0))
-			return "화통 %d명 | 폭발 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, fp_dmg, ignite_pct, fp_cd]
+			return "화통 운용 %d명 | 폭발 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, fp_dmg, ignite_pct, fp_cd]
 		"repeating_crossbow":
 			var repeaters = int(UpgradeManager.get_specialist_unit_count("repeating_crossbow", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
 			var burst = 3
@@ -179,7 +179,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			if level >= 5:
 				burst = 5
 			var rc_dmg = stats.get("base_damage", 10.0) + (level - 1) * stats.get("damage_per_lv", 2.0)
-			return "연노 %d명 | 연사 %d발 | 1발 %.0f" % [repeaters, burst, rc_dmg]
+			return "연노 운용 %d명 | 연사 %d발 | 1발 %.0f" % [repeaters, burst, rc_dmg]
 		"supply":
 			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(stats.get("hull_heal", 20.0)), int(stats.get("stamina_recover", 25.0))]
 		"gold":

@@ -89,7 +89,7 @@ func _pick_choice(round_type: String, choices: Array) -> String:
 		var upgrade_id := str(choice)
 		if round_type == "ship" and (upgrade_id in ["cannon", "cannon_damage", "cannon_reload", "janggun"]):
 			return upgrade_id
-		if round_type == "crew" and (upgrade_id == "crew_reserve" or upgrade_id == "boarding_resist"):
+		if round_type == "crew" and upgrade_id == "boarding_resist":
 			return upgrade_id
 	return str(choices[0])
 

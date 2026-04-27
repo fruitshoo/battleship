@@ -2,6 +2,7 @@
 extends Node
 const UpgradeManagerItemHelper = preload("res://scripts/managers/upgrade_manager_item_helper.gd")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
+const SeaSiteRewardHelper = preload("res://scripts/world/sea_sites/sea_site_reward_helper.gd")
 
 ## 업그레이드 매니저 (AutoLoad)
 ## 업그레이드 데이터 및 적용 로직 관리
@@ -48,7 +49,6 @@ const SHIP_UPGRADE_IDS: Array[String] = [
 ]
 const CREW_UPGRADE_IDS: Array[String] = [
 	"crew_numbers",
-	"crew_reserve",
 	"boarding_resist",
 	"crew_attack",
 	"crew_defense",
@@ -62,7 +62,6 @@ const PRIORITY_SHIP_UPGRADE_IDS: Array[String] = [
 	"janggun",
 ]
 const PRIORITY_CREW_UPGRADE_IDS: Array[String] = [
-	"crew_reserve",
 	"boarding_resist",
 ]
 const PANOKSEON_SUPPORT_UPGRADE_ID: String = "panokseon_upgrade"
@@ -80,6 +79,20 @@ const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
 const SUPPORT_CREW_PROGRESS_MIN_LEVELS: int = 6
 const RARE_FLEET_UPGRADE_ID: String = "fleet_signal"
 const RARE_FLEET_UPGRADE_CHANCE: float = 0.08
+const TREASURE_REWARD_EXCLUDED_IDS: Array[String] = [
+	"supply",
+	"gold",
+]
+const TREASURE_REWARD_ROLL_COUNTS: Array[int] = [
+	1,
+	3,
+	5,
+]
+const TREASURE_REWARD_ROLL_WEIGHTS: Array[float] = [
+	0.55,
+	0.35,
+	0.10,
+]
 const CREW_ROLE_GENERAL := "general"
 const CREW_ROLE_SPEARMAN := "spearman"
 const CREW_ROLE_FIRE_POT := "fire_pot"
@@ -244,8 +257,6 @@ func _get_priority_ship_upgrade_ids() -> Array[String]:
 
 func _get_priority_crew_upgrade_ids() -> Array[String]:
 	var priority_ids: Array[String] = []
-	if int(current_levels.get("crew_reserve", 0)) < 2:
-		priority_ids.append("crew_reserve")
 	if int(current_levels.get("boarding_resist", 0)) < 2:
 		priority_ids.append("boarding_resist")
 	return priority_ids
@@ -274,6 +285,89 @@ func _maybe_add_rare_fleet_upgrade(choices: Array, count: int) -> void:
 		RARE_FLEET_UPGRADE_ID,
 		RARE_FLEET_UPGRADE_CHANCE
 	)
+
+
+func get_treasure_upgrade_candidate_ids() -> Array[String]:
+	var candidate_ids: Array[String] = []
+	for upgrade_id in current_levels.keys():
+		var id := str(upgrade_id)
+		if id in TREASURE_REWARD_EXCLUDED_IDS:
+			continue
+		if id not in UPGRADES:
+			continue
+		var upgrade_data: Dictionary = UPGRADES[id]
+		if upgrade_data.get("disabled", false) == true:
+			continue
+		var current_level := int(current_levels.get(id, 0))
+		if current_level <= 0:
+			continue
+		if current_level >= int(upgrade_data.get("max_level", 0)):
+			continue
+		candidate_ids.append(id)
+	return candidate_ids
+
+
+func apply_treasure_upgrade_reward(forced_upgrade_count: int = -1) -> Dictionary:
+	var requested_count := forced_upgrade_count if forced_upgrade_count > 0 else _roll_treasure_upgrade_count()
+	var result := {
+		"success": false,
+		"requested_count": requested_count,
+		"applied_count": 0,
+		"upgrades": [],
+	}
+	var aggregate_by_id: Dictionary = {}
+	for _i in range(requested_count):
+		var candidates := get_treasure_upgrade_candidate_ids()
+		if candidates.is_empty():
+			break
+		var upgrade_id := candidates[randi() % candidates.size()]
+		var before_level := int(current_levels.get(upgrade_id, 0))
+		apply_upgrade(upgrade_id)
+		var after_level := int(current_levels.get(upgrade_id, before_level))
+		if after_level <= before_level:
+			continue
+		var entry: Dictionary = aggregate_by_id.get(upgrade_id, {})
+		if entry.is_empty():
+			var upgrade_data: Dictionary = UPGRADES.get(upgrade_id, {})
+			entry = {
+				"upgrade_id": upgrade_id,
+				"name": str(upgrade_data.get("name", upgrade_id)),
+				"from_level": before_level,
+				"to_level": after_level,
+				"levels_added": after_level - before_level,
+				"color": upgrade_data.get("color", Color.WHITE),
+			}
+		else:
+			entry["to_level"] = after_level
+			entry["levels_added"] = int(entry.get("levels_added", 0)) + after_level - before_level
+		aggregate_by_id[upgrade_id] = entry
+		result["applied_count"] = int(result["applied_count"]) + after_level - before_level
+
+	var applied: Array = []
+	for upgrade_id in aggregate_by_id.keys():
+		applied.append(aggregate_by_id[upgrade_id])
+	applied.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("name", "")) < str(b.get("name", ""))
+	)
+	result["upgrades"] = applied
+	result["success"] = int(result["applied_count"]) > 0
+	return result
+
+
+func _roll_treasure_upgrade_count() -> int:
+	var total_weight := 0.0
+	for weight in TREASURE_REWARD_ROLL_WEIGHTS:
+		total_weight += maxf(weight, 0.0)
+	if total_weight <= 0.0:
+		return TREASURE_REWARD_ROLL_COUNTS[0]
+	var roll := randf() * total_weight
+	var cursor := 0.0
+	for i in range(TREASURE_REWARD_ROLL_COUNTS.size()):
+		cursor += maxf(TREASURE_REWARD_ROLL_WEIGHTS[i], 0.0)
+		if roll <= cursor:
+			return TREASURE_REWARD_ROLL_COUNTS[i]
+	return TREASURE_REWARD_ROLL_COUNTS.back()
+
 
 func _fill_with_fallbacks(choices: Array, count: int) -> void:
 	UpgradeManagerChoiceHelper.fill_with_fallbacks(choices, count)
@@ -330,7 +424,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
 	var ship_ui_ids = ["cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "supply", "gold"]
-	var crew_ui_ids = ["crew_numbers", "crew_reserve", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
+	var crew_ui_ids = ["crew_numbers", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
 		if upgrade_id in ship_ui_ids:
@@ -357,7 +451,11 @@ func _apply_crew_numbers(ship: Node3D, level: int) -> void:
 
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[CrewFormation] 창병 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
+	print("[CrewFormation] 창병 Lv.%d 갱신! (배치: %d명, 정원: %d)" % [
+		level,
+		get_specialist_unit_count("crew_numbers"),
+		ship.max_crew_count,
+	])
 
 func _refresh_player_crew_capacity(ship: Node3D) -> void:
 	if not is_instance_valid(ship) or not "max_crew_count" in ship:
@@ -365,15 +463,7 @@ func _refresh_player_crew_capacity(ship: Node3D) -> void:
 	var base_capacity: int = int(ship.get_meta("base_player_max_crew_count", ship.max_crew_count))
 	if not ship.has_meta("base_player_max_crew_count"):
 		ship.set_meta("base_player_max_crew_count", base_capacity)
-	var capacity_bonus := 0
-	for upgrade_id in ["crew_numbers", "singigeon", "fire_pot", "repeating_crossbow"]:
-		var stats: Dictionary = UPGRADES.get(upgrade_id, {}).get("stats", {})
-		var thresholds: Array = stats.get("specialist_levels", [])
-		var level: int = int(current_levels.get(upgrade_id, 0))
-		for threshold in thresholds:
-			if level >= int(threshold):
-				capacity_bonus += 1
-	ship.max_crew_count = max(1, base_capacity + capacity_bonus)
+	ship.max_crew_count = max(1, base_capacity)
 
 func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 	var stats: Dictionary = UPGRADES["crew_reserve"].get("stats", {})
@@ -405,7 +495,6 @@ func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 		ship.crew_respawn_interval = maxf(min_interval, base_interval - (reduce_per_level * float(level)))
 	if "crew_respawn_timer" in ship:
 		ship.crew_respawn_timer = minf(float(ship.crew_respawn_timer), float(ship.crew_respawn_interval))
-	ship.set_meta("survivor_hull_heal_bonus", float(stats.get("survivor_hull_heal_per_lv", 0.5)) * float(level))
 	if _level_matches(level, stats.get("instant_restore_levels", [])) and ship.has_method("get_alive_crew_count") and "max_crew_count" in ship:
 		var recovered_count := _recover_incapacitated_player_soldiers(ship)
 		if recovered_count <= 0 and int(ship.call("get_alive_crew_count")) < int(ship.max_crew_count) and ship.has_method("add_survivor"):
@@ -466,6 +555,8 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var defense_stats: Dictionary = UPGRADES["crew_defense"]["stats"]
 	var damage_bonus_pct: float = attack_lv * float(attack_stats.get("damage_bonus_pct_per_lv", 0.06))
 	var defense_flat_bonus: float = defense_lv * float(defense_stats.get("defense_add_per_lv", 1.0))
+	damage_bonus_pct += _get_soldier_site_bonus_total(soldier, "crew_damage_pct")
+	defense_flat_bonus += _get_soldier_site_bonus_total(soldier, "crew_defense_add")
 	var defense_reduction: float = clampf(
 		defense_lv * float(defense_stats.get("damage_reduction_per_lv", 0.0)),
 		0.0,
@@ -482,6 +573,19 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	if soldier.has_method("apply_crew_role") and "crew_role" in soldier:
 		soldier.apply_crew_role(str(soldier.crew_role))
 
+
+func _get_soldier_site_bonus_total(soldier: Node, bonus_id: String) -> float:
+	if not is_instance_valid(soldier):
+		return 0.0
+	var owned_ship: Variant = soldier.get("owned_ship")
+	if is_instance_valid(owned_ship):
+		return SeaSiteRewardHelper.get_site_bonus_total(owned_ship as Node, bonus_id)
+	var home_ship: Variant = soldier.get("home_ship")
+	if is_instance_valid(home_ship):
+		return SeaSiteRewardHelper.get_site_bonus_total(home_ship as Node, bonus_id)
+	return 0.0
+
+
 func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	var def_lv = current_levels.get("hull_defense", 0)
 	var s = UPGRADES["hull_defense"]["stats"]
@@ -490,7 +594,7 @@ func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 		for level_entry in s.get("def_levels", []):
 			if int(level_entry) <= def_lv:
 				defense_bonus += float(s.get("def_add", 2.0))
-		ship.hull_defense = defense_bonus
+		ship.hull_defense = defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.hull_hp, ship.max_hull_hp)
 
@@ -508,6 +612,7 @@ func _apply_hull_repair(ship: Node3D, level: int) -> void:
 		float(stats.get("max_regen", 1.0)),
 		float(level) * float(stats.get("regen_per_lv", 0.2))
 	)
+	regen_rate += SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_regen_add")
 	if "hull_regen_rate" in ship:
 		ship.hull_regen_rate = regen_rate
 	print("[HullRepair] 선체 자동 수리 Lv.%d (%.1f/s)" % [level, regen_rate])
@@ -703,12 +808,16 @@ func _configure_player_cannon(cannon: Node, spec: Dictionary = {}) -> void:
 
 func _apply_singigeon(ship: Node3D, level: int) -> void:
 	NodeContractHelper.clear_singigeon_launcher(ship)
-	
+
 	_refresh_player_crew_capacity(ship)
-		
+
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[Singigeon] 신기전 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
+	print("[Singigeon] 신기전 Lv.%d 갱신! (배치: %d명, 정원: %d)" % [
+		level,
+		get_specialist_unit_count("singigeon"),
+		ship.max_crew_count,
+	])
 
 
 func _apply_janggun(ship: Node3D, level: int) -> void:
@@ -732,17 +841,25 @@ func _apply_fire_pot(ship: Node3D, level: int) -> void:
 
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[FirePot] 화통 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
+	print("[FirePot] 화통 Lv.%d 갱신! (배치: %d명, 정원: %d)" % [
+		level,
+		get_specialist_unit_count("fire_pot"),
+		ship.max_crew_count,
+	])
 
 
 var repeating_crossbow_scene: PackedScene = preload("res://scenes/entities/weapons/weapon_repeating_crossbow.tscn")
 
 func _apply_repeating_crossbow(ship: Node3D, level: int) -> void:
 	_refresh_player_crew_capacity(ship)
-		
+
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	print("[RepeatingCrossbow] 연노 Lv.%d 갱신! (정원: %d)" % [level, ship.max_crew_count])
+	print("[RepeatingCrossbow] 연노 Lv.%d 갱신! (배치: %d명, 정원: %d)" % [
+		level,
+		get_specialist_unit_count("repeating_crossbow"),
+		ship.max_crew_count,
+	])
 
 
 func _apply_supply(ship: Node3D, _level: int) -> void:
@@ -943,7 +1060,7 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 		for level_entry in s.get("def_levels", []):
 			if int(level_entry) <= lv:
 				defense_bonus += float(s.get("def_add", 2.0))
-		ship.hull_defense = base_defense + defense_bonus
+		ship.hull_defense = base_defense + defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
 
 	if "hull_regen_rate" in ship:
 		var repair_lv: int = int(current_levels.get("hull_repair", 0))
@@ -958,6 +1075,7 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 			float(repair_stats.get("max_regen", 1.0)),
 			float(repair_lv) * float(repair_stats.get("regen_per_lv", 0.2))
 		)
+		regen_bonus += SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_regen_add")
 		ship.hull_regen_rate = base_regen + regen_bonus
 
 	ship.set_meta("crew_ranged_damage_reduction", 0.0)

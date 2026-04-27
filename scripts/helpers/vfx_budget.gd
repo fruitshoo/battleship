@@ -5,6 +5,8 @@ const DISTANCE_BIAS_MULT: float = 1.2
 
 static var _last_frame: int = -1
 static var _spawn_counts: Dictionary = {}
+static var _budget_scale_frame: int = -1
+static var _cached_budget_scale: float = 1.0
 
 static func _refresh_if_needed() -> void:
 	var frame := Engine.get_physics_frames()
@@ -26,13 +28,17 @@ static func allow_spawn(tree: SceneTree, key: String, position: Vector3, max_per
 
 
 static func _get_effective_max_per_frame(max_per_frame: int) -> int:
-	var budget_scale := _get_budget_scale()
+	var budget_scale := get_budget_scale()
 	if budget_scale >= 0.999:
 		return max_per_frame
 	return maxi(1, int(ceil(float(max_per_frame) * budget_scale)))
 
 
-static func _get_budget_scale() -> float:
+static func get_budget_scale() -> float:
+	var frame := Engine.get_physics_frames()
+	if frame == _budget_scale_frame:
+		return _cached_budget_scale
+	_budget_scale_frame = frame
 	var ship_pressure: float = _pressure_from_count(EntityRegistry.count_ships(), 12, 20)
 	var soldier_pressure: float = _pressure_from_count(EntityRegistry.count_soldiers(), 40, 70)
 	var projectile_pressure: float = _pressure_from_count(EntityRegistry.count_projectiles(), 20, 50)
@@ -40,7 +46,12 @@ static func _get_budget_scale() -> float:
 	combined -= ship_pressure * 0.18
 	combined -= soldier_pressure * 0.12
 	combined -= projectile_pressure * 0.22
-	return clampf(combined, 0.35, 1.0)
+	_cached_budget_scale = clampf(combined, 0.35, 1.0)
+	return _cached_budget_scale
+
+
+static func get_continuous_effect_scale() -> float:
+	return get_budget_scale()
 
 
 static func _pressure_from_count(count: int, soft_threshold: int, hard_window: int) -> float:

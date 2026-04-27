@@ -131,7 +131,7 @@ static func get_projectiles() -> Array:
 
 
 static func count_projectiles() -> int:
-	return _projectiles.size()
+	return _compact_nodes(_projectiles).size()
 
 
 static func count_ships_by_team(team_name: String) -> int:

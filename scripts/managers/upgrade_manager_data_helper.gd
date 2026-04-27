@@ -37,6 +37,8 @@ static func get_supply_bonus_stats(upgrades: Dictionary, current_levels: Diction
 	var upgrade_data: Dictionary = upgrades.get("supply_bonus", {})
 	var stats: Dictionary = upgrade_data.get("stats", {})
 	var radius_bonus: float = 0.0
+	var heal_amount: float = float(stats.get("base_heal", 15.0))
+	var stamina_recovery: float = float(stats.get("base_stamina_recovery", 0.0))
 	var heal_bonus: float = 0.0
 	var stamina_recovery_bonus: float = 0.0
 	for current_level in range(1, target_level + 1):
@@ -46,8 +48,12 @@ static func get_supply_bonus_stats(upgrades: Dictionary, current_levels: Diction
 			heal_bonus += float(stats.get("heal_add", 10.0))
 		if level_matches(current_level, stats.get("stamina_recovery_levels", [])):
 			stamina_recovery_bonus += float(stats.get("stamina_recovery_add", 20.0))
+	heal_amount += heal_bonus
+	stamina_recovery += stamina_recovery_bonus
 	return {
 		"radius_bonus": radius_bonus,
+		"heal_amount": heal_amount,
+		"stamina_recovery": stamina_recovery,
 		"heal_bonus": heal_bonus,
 		"stamina_recovery_bonus": stamina_recovery_bonus,
 	}
@@ -61,18 +67,31 @@ static func get_player_crew_roster(upgrades: Dictionary, current_levels: Diction
 		CREW_ROLE_REPEATING_CROSSBOW: 0,
 		CREW_ROLE_SINGIGEON: 0,
 	}
-	var spearman_count: int = mini(get_specialist_unit_count(upgrades, current_levels, "crew_numbers"), remaining)
-	roster[CREW_ROLE_SPEARMAN] = spearman_count
-	remaining -= spearman_count
-	var repeater_count: int = mini(get_specialist_unit_count(upgrades, current_levels, "repeating_crossbow"), remaining)
-	roster[CREW_ROLE_REPEATING_CROSSBOW] = repeater_count
-	remaining -= repeater_count
-	var singigeon_count: int = mini(get_specialist_unit_count(upgrades, current_levels, "singigeon"), remaining)
-	roster[CREW_ROLE_SINGIGEON] = singigeon_count
-	remaining -= singigeon_count
-	var fire_pot_count: int = mini(get_specialist_unit_count(upgrades, current_levels, "fire_pot"), remaining)
-	roster[CREW_ROLE_FIRE_POT] = fire_pot_count
-	remaining -= fire_pot_count
+	var role_specs: Array[Dictionary] = [
+		{"role": CREW_ROLE_SPEARMAN, "upgrade_id": "crew_numbers"},
+		{"role": CREW_ROLE_FIRE_POT, "upgrade_id": "fire_pot"},
+		{"role": CREW_ROLE_REPEATING_CROSSBOW, "upgrade_id": "repeating_crossbow"},
+		{"role": CREW_ROLE_SINGIGEON, "upgrade_id": "singigeon"},
+	]
+	var desired_caps: Dictionary = {}
+	var max_specialist_cap := 0
+	for spec in role_specs:
+		var role := str(spec["role"])
+		var upgrade_id := str(spec["upgrade_id"])
+		var cap := get_specialist_unit_count(upgrades, current_levels, upgrade_id)
+		desired_caps[role] = cap
+		max_specialist_cap = maxi(max_specialist_cap, cap)
+	for slot_index in range(max_specialist_cap):
+		for spec in role_specs:
+			if remaining <= 0:
+				break
+			var role := str(spec["role"])
+			if int(roster[role]) >= int(desired_caps.get(role, 0)):
+				continue
+			roster[role] = int(roster[role]) + 1
+			remaining -= 1
+		if remaining <= 0:
+			break
 	roster[CREW_ROLE_GENERAL] = remaining
 	return roster
 
@@ -103,10 +122,10 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
 			var rocket_damage: float = rocket_base_damage * (1.0 + 0.15 * float(next_level))
 			var cooldown: float = maxf(2.2, float(s.get("base_cooldown", 5.0)) - (float(next_level - 1) * float(s.get("cooldown_reduce_per_lv", 0.35))))
-			return "신기전 %d명 | 로켓 %.1f | 재사용 %.1f초" % [rocketeers, rocket_damage, cooldown]
+			return "신기전 운용 %d명 | 로켓 %.1f | 재사용 %.1f초" % [rocketeers, rocket_damage, cooldown]
 		"crew_numbers":
 			var spearmen: int = get_specialist_unit_count(upgrades, current_levels, "crew_numbers", next_level)
-			return "창병 %d명 편성" % spearmen
+			return "창병 전환 %d명" % spearmen
 		"crew_reserve":
 			var assist_duration: float = maxf(float(s.get("min_assist_channel_duration", 0.55)), float(s.get("base_assist_channel_duration", 1.1)) - (float(next_level) * float(s.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio: float = clampf(0.35 + (float(next_level) * float(s.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(s.get("max_assist_recovery_health_ratio", 0.7)))
@@ -164,7 +183,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				cd = 3.5
 			if next_level >= 5:
 				cd = 3.0
-			return "화통 %d명 | 화염 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, dmg, ignite_pct, cd]
+			return "화통 운용 %d명 | 화염 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, dmg, ignite_pct, cd]
 		"repeating_crossbow":
 			var repeaters: int = get_specialist_unit_count(upgrades, current_levels, "repeating_crossbow", next_level)
 			var burst: int = 3
@@ -173,7 +192,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			if next_level >= 5:
 				burst = 5
 			var repeater_damage: float = s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 2.0)
-			return "연노 %d명 | %d연발 | 피해 %.0f" % [repeaters, burst, repeater_damage]
+			return "연노 운용 %d명 | %d연발 | 피해 %.0f" % [repeaters, burst, repeater_damage]
 		"supply_bonus":
 			if level_matches(next_level, s.get("radius_levels", [])):
 				return "보급 습득 반경 +%.1fm" % float(s.get("radius_add", 5.0))

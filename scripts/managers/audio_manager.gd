@@ -10,12 +10,10 @@ extends Node
 # preload는 컴파일 타임에 파일이 있어야 하므로, 안전을 위해 load() 사용
 var sfx_streams = {
 	"cannon_fire": [
-		"res://assets/audio/sfx/sfx_cannon_fire.ogg",
-		"res://assets/audio/sfx/sfx_cannon_fire_02.ogg"
+		"res://assets/audio/sfx/sfx_cannon_fire.ogg"
 	],
 	"cannon_fuse": [
-		"res://assets/audio/sfx/sfx_match_sizzle.ogg",
-		"res://assets/audio/sfx/sfx_steam_hiss.ogg"
+		"res://assets/audio/sfx/sfx_match_sizzle.ogg"
 	],
 	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.ogg", # 나무 부러지는/부딪히는 소리
 	"ui_click": [
@@ -93,6 +91,7 @@ var sfx_streams = {
 }
 
 var bgm_streams = {
+	"main_menu": "res://assets/audio/music/bgm_main_menu_battle_tactics.ogg",
 	"boss_taiko": "res://assets/audio/music/bgm_boss_taiko_loop_cc0.ogg",
 }
 
@@ -100,12 +99,15 @@ const DEFAULT_3D_SFX_VOLUME_DB := 3.0
 const DEFAULT_3D_SFX_MAX_DISTANCE := 220.0
 const DEFAULT_3D_SFX_UNIT_SIZE := 55.0
 const GILGUNAK_VOLUME_DB := -4.0
+const MAIN_MENU_BGM := "main_menu"
 const BOSS_TAIKO_BGM := "boss_taiko"
+const MAIN_MENU_BGM_VOLUME_DB := -8.0
 const BOSS_TAIKO_VOLUME_DB := 1.5
 const SFX_ALIASES := {
 	"arrow_shoot": "bow_shoot",
 	"critical_hit": "soldier_hit",
 	"trumpet_war": "support_foghorn",
+	"upgrade_select": "level_up",
 }
 const SFX_PROFILE_DEFAULT_3D := "default_3d"
 const SFX_PROFILE_WEAPON_CLOSE := "weapon_close"
@@ -184,6 +186,19 @@ const SFX_PROFILE_OVERRIDES := {
 		"max_distance": 230.0,
 		"unit_size": 65.0,
 	},
+	"cannon_fire": {
+		"volume_db": 2.5,
+		"max_distance": 360.0,
+		"unit_size": 110.0,
+		"pitch_jitter": 0.04,
+	},
+	"cannon_fuse": {
+		"volume_db": -12.0,
+		"max_distance": 80.0,
+		"unit_size": 28.0,
+		"pitch_jitter": 0.02,
+		"rate_limit_msec": 120,
+	},
 	"ship_sink_bubbles": {
 		"volume_db": -2.5,
 		"max_distance": 210.0,
@@ -234,6 +249,7 @@ var _essential_warm_keys: Array[String] = [
 	"soldier_hit",
 	"bow_shoot",
 	"musket_fire",
+	"level_up",
 	"wave_splash",
 	"water_splash_large",
 	"water_splash_small",
@@ -244,6 +260,7 @@ var _web_essential_warm_keys: Array[String] = [
 ]
 var _web_persistent_cache_keys: Array[String] = [
 	"ui_click",
+	"level_up",
 	"sword_swing",
 	"soldier_hit",
 	"bow_shoot",
@@ -599,7 +616,7 @@ func play_bgm(stream_name: String, _fade_duration: float = 1.0) -> void:
 		return
 	current_bgm_name = stream_name
 	bgm_player.stream = stream
-	bgm_player.volume_db = BOSS_TAIKO_VOLUME_DB if stream_name == BOSS_TAIKO_BGM else 0.0
+	bgm_player.volume_db = _get_bgm_volume_db(stream_name)
 	bgm_player.play()
 
 func stop_bgm(stream_name: String = "") -> void:
@@ -614,6 +631,22 @@ func set_boss_battle_music(active: bool) -> void:
 		play_bgm(BOSS_TAIKO_BGM)
 	elif current_bgm_name == BOSS_TAIKO_BGM:
 		stop_bgm(BOSS_TAIKO_BGM)
+
+
+func play_main_menu_music() -> void:
+	play_bgm(MAIN_MENU_BGM)
+
+
+func stop_main_menu_music() -> void:
+	stop_bgm(MAIN_MENU_BGM)
+
+
+func _get_bgm_volume_db(stream_name: String) -> float:
+	if stream_name == BOSS_TAIKO_BGM:
+		return BOSS_TAIKO_VOLUME_DB
+	if stream_name == MAIN_MENU_BGM:
+		return MAIN_MENU_BGM_VOLUME_DB
+	return 0.0
 ## === 길군악(노동요) 전용 재생 시스템 ===
 var _gilgunak_player: AudioStreamPlayer = null
 

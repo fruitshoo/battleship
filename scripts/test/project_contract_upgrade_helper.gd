@@ -2,9 +2,12 @@ extends RefCounted
 class_name ProjectContractUpgradeHelper
 
 const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
+const UpgradeDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 
 static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_cannon_upgrade_split(failures)
+	_validate_crew_reserve_retired(failures)
+	_validate_crew_weapon_upgrades_do_not_increase_capacity(failures)
 	_validate_support_hull_upgrade_retired(failures)
 	_validate_panokseon_upgrade_gate(failures)
 
@@ -73,14 +76,6 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 	if float(reload_stats.get("min_cd_mult", 0.0)) < 0.75:
 		failures.append("upgrade smoke 화약 min cooldown multiplier should not be below 0.75")
 
-	var rescue_stats: Dictionary = upgrades.get("crew_reserve", {}).get("stats", {})
-	if str(upgrades.get("crew_reserve", {}).get("name", "")) != "구호":
-		failures.append("upgrade smoke crew_reserve should be renamed 구호")
-	if rescue_stats.has("incapacitated_recovery_reduce_per_lv") or rescue_stats.has("incapacitated_recovery_health_add_per_lv"):
-		failures.append("upgrade smoke 구호 should tune assist revive, not passive incapacitated recovery")
-	if not rescue_stats.has("assist_channel_reduce_per_lv") or not rescue_stats.has("assist_recovery_health_add_per_lv"):
-		failures.append("upgrade smoke 구호 missing assisted revive tuning stats")
-
 	var barricade_stats: Dictionary = upgrades.get("boarding_resist", {}).get("stats", {})
 	if barricade_stats.has("capture_duration_mult_per_lv"):
 		failures.append("upgrade smoke 방책 should not be a capture-duration-only upgrade")
@@ -93,6 +88,56 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 화약 missing from ship upgrade pool")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
 		failures.append("upgrade smoke fleet_cannon should not be in support ship pool")
+
+
+static func _validate_crew_reserve_retired(failures: Array[String]) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("upgrade smoke missing UpgradeManager")
+		return
+	var upgrades: Dictionary = UpgradeManager.UPGRADES
+	if "crew_reserve" in UpgradeManager.CREW_UPGRADE_IDS:
+		failures.append("upgrade smoke crew_reserve should be retired from command choices")
+	if "crew_reserve" in UpgradeManager.PRIORITY_CREW_UPGRADE_IDS:
+		failures.append("upgrade smoke crew_reserve should not be a priority command choice")
+	if upgrades.has("crew_reserve") and upgrades["crew_reserve"].get("disabled", false) != true:
+		failures.append("upgrade smoke crew_reserve data should stay disabled")
+	var reserve_stats: Dictionary = upgrades.get("crew_reserve", {}).get("stats", {})
+	if reserve_stats.has("survivor_hull_heal_per_lv"):
+		failures.append("upgrade smoke crew_reserve should not add survivor rescue hull healing")
+	var survivor_source := FileAccess.get_file_as_string("res://scripts/effects/survivor.gd")
+	if survivor_source.contains("survivor_hull_heal_bonus") or survivor_source.contains("_can_apply_hull_rescue_heal"):
+		failures.append("upgrade smoke survivor rescue should not apply hull healing")
+
+
+static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Array[String]) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("upgrade smoke missing UpgradeManager")
+		return
+	var upgrades: Dictionary = UpgradeManager.UPGRADES
+	var levels := {
+		"crew_numbers": 5,
+		"fire_pot": 5,
+		"repeating_crossbow": 5,
+		"singigeon": 5,
+	}
+	var roster: Dictionary = UpgradeDataHelper.get_player_crew_roster(upgrades, levels, 5)
+	var specialist_roles := [
+		UpgradeDataHelper.CREW_ROLE_SPEARMAN,
+		UpgradeDataHelper.CREW_ROLE_FIRE_POT,
+		UpgradeDataHelper.CREW_ROLE_REPEATING_CROSSBOW,
+		UpgradeDataHelper.CREW_ROLE_SINGIGEON,
+	]
+	var total_roster := int(roster.get(UpgradeDataHelper.CREW_ROLE_GENERAL, 0))
+	for role in specialist_roles:
+		total_roster += int(roster.get(role, 0))
+		if int(roster.get(role, 0)) <= 0:
+			failures.append("upgrade smoke fixed crew roster should keep at least one %s operator when all crew weapons are active" % role)
+	if total_roster != 5:
+		failures.append("upgrade smoke crew weapon roster should not exceed fixed crew capacity")
+
+	var source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager.gd")
+	if source.contains("for upgrade_id in [\"crew_numbers\", \"singigeon\", \"fire_pot\", \"repeating_crossbow\"]"):
+		failures.append("upgrade smoke crew weapon upgrades should not add max_crew_count capacity")
 
 
 static func _validate_support_hull_upgrade_retired(failures: Array[String]) -> void:

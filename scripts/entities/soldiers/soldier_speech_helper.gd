@@ -58,7 +58,7 @@ const ENEMY_BOARDING_LINES: Array[String] = [
 
 
 static func reset(soldier) -> void:
-	soldier.set_meta(SPEECH_TIMER_META, randf_range(2.0, 5.0) if bool(soldier.get("is_captain")) else randf_range(10.0, 22.0))
+	soldier.set_meta(SPEECH_TIMER_META, randf_range(4.0, 8.0) if bool(soldier.get("is_captain")) else randf_range(16.0, 30.0))
 	soldier.set_meta(SPEECH_VISIBLE_TIMER_META, 0.0)
 	soldier.set_meta(SPEECH_DURATION_META, 2.0)
 	soldier.set_meta(SPEECH_LAST_CONTEXT_META, "")
@@ -80,7 +80,7 @@ static func update(soldier, delta: float) -> void:
 		soldier.set_meta(SPEECH_LAST_CONTEXT_META, context)
 		if context == "enemy_boarding":
 			var current_timer := float(soldier.get_meta(SPEECH_TIMER_META, 0.0))
-			soldier.set_meta(SPEECH_TIMER_META, minf(current_timer, randf_range(0.4, 1.2)))
+			soldier.set_meta(SPEECH_TIMER_META, minf(current_timer, randf_range(0.7, 1.6)))
 
 	var duration: float = float(soldier.get_meta(SPEECH_DURATION_META, 2.0))
 	var visible_timer: float = float(soldier.get_meta(SPEECH_VISIBLE_TIMER_META, 0.0))
@@ -220,28 +220,28 @@ static func _get_lines_for_context(soldier, context: String) -> Array[String]:
 
 static func _get_next_interval(soldier, context: String) -> float:
 	if _is_enemy_boarder_on_player_ship(soldier):
-		return randf_range(8.0, 14.0)
+		return randf_range(12.0, 20.0)
 
 	if bool(soldier.get("is_captain")):
 		match context:
 			"danger":
-				return randf_range(5.5, 9.0)
+				return randf_range(8.0, 13.0)
 			"melee":
-				return randf_range(6.5, 11.0)
+				return randf_range(9.5, 15.0)
 			"ranged":
-				return randf_range(7.5, 12.0)
+				return randf_range(10.5, 17.0)
 			_:
-				return randf_range(9.0, 15.0)
+				return randf_range(13.0, 22.0)
 
 	match context:
 		"danger":
-			return randf_range(11.0, 18.0)
+			return randf_range(16.0, 26.0)
 		"melee":
-			return randf_range(14.0, 24.0)
+			return randf_range(21.0, 34.0)
 		"ranged":
-			return randf_range(16.0, 28.0)
-		_:
 			return randf_range(24.0, 40.0)
+		_:
+			return randf_range(36.0, 58.0)
 
 
 static func _is_current_weapon_melee(soldier) -> bool:

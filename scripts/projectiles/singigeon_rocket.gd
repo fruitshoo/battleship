@@ -97,6 +97,9 @@ func pool_reset() -> void:
 	var trail = get_node_or_null("RocketTrail") as GPUParticles3D
 	if is_instance_valid(trail):
 		var enable_trail = VfxBudget.allow_spawn(get_tree(), "rocket_trail", global_position, 8, 75.0)
+		if VfxBudget.get_continuous_effect_scale() <= 0.42:
+			enable_trail = false
+		trail.visible = enable_trail
 		trail.emitting = enable_trail
 
 func restart_flight() -> void:

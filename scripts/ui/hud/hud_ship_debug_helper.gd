@@ -96,7 +96,9 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 		var support_mode := str(ally_limbo.get("support_mode", "")).strip_edges()
 		var ally_mode := str(ally_limbo.get("ally_mode", "")).strip_edges()
 		var ally_focus_reason := "rescue run" if support_mode == ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP else "screen threat" if support_mode == ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT or ally_mode == ShipAILimboKeys.ALLY_MODE_GUARD_THREAT else "escort flagship" if support_mode == ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP or ally_mode == ShipAILimboKeys.ALLY_MODE_FOLLOW_FLAGSHIP else "regroup" if support_mode == ShipAILimboKeys.SUPPORT_MODE_REGROUP or ally_mode == ShipAILimboKeys.ALLY_MODE_REGROUP else ""
-		var ally_focus_target_id := int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0)) if not support_mode.is_empty() else int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
+		var ally_focus_target_id := 0
+		if is_instance_valid(nearest_ally_ai_ship):
+			ally_focus_target_id = int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0)) if not support_mode.is_empty() else int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
 		var ally_focus_target := instance_from_id(ally_focus_target_id) as Node3D if ally_focus_target_id > 0 else null
 		if not is_instance_valid(ally_focus_target) and not ally_focus_reason.is_empty() and (ally_focus_reason == "escort flagship" or ally_focus_reason == "rescue run"):
 			ally_focus_target = player_ship

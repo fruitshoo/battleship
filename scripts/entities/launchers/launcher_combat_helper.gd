@@ -3,6 +3,14 @@ class_name LauncherCombatHelper
 
 
 const LIMBO_AI_WEAPON_INTENT_STALE_FRAMES := 4
+const TARGET_SCAN_LOAD_SHIP_SOFT_LIMIT := 12
+const TARGET_SCAN_LOAD_SOLDIER_SOFT_LIMIT := 60
+const TARGET_SCAN_LOAD_PROJECTILE_SOFT_LIMIT := 18
+
+static var _target_scan_load_frame: int = -1
+static var _target_scan_load_multiplier: float = 1.0
+static var _alive_soldier_cache_frame: int = -1
+static var _alive_soldier_cache: Dictionary = {}
 
 
 static func enemy_team_tag(team: String) -> String:
@@ -49,7 +57,27 @@ static func get_target_scan_interval(base_interval: float, tracking_multiplier: 
 	var interval := base_interval
 	if has_valid_target:
 		interval *= tracking_multiplier
+	interval *= get_target_scan_load_multiplier()
 	return interval + randf_range(0.0, jitter)
+
+
+static func get_target_scan_load_multiplier() -> float:
+	var frame := Engine.get_physics_frames()
+	if frame == _target_scan_load_frame:
+		return _target_scan_load_multiplier
+	_target_scan_load_frame = frame
+	var ship_count := EntityRegistry.count_ships()
+	var soldier_count := EntityRegistry.count_soldiers()
+	var projectile_count := EntityRegistry.count_projectiles()
+	var multiplier := 1.0
+	if ship_count > TARGET_SCAN_LOAD_SHIP_SOFT_LIMIT:
+		multiplier += minf(0.55, float(ship_count - TARGET_SCAN_LOAD_SHIP_SOFT_LIMIT) * 0.035)
+	if soldier_count > TARGET_SCAN_LOAD_SOLDIER_SOFT_LIMIT:
+		multiplier += minf(0.28, float(soldier_count - TARGET_SCAN_LOAD_SOLDIER_SOFT_LIMIT) * 0.006)
+	if projectile_count > TARGET_SCAN_LOAD_PROJECTILE_SOFT_LIMIT:
+		multiplier += minf(0.45, float(projectile_count - TARGET_SCAN_LOAD_PROJECTILE_SOFT_LIMIT) * 0.015)
+	_target_scan_load_multiplier = clampf(multiplier, 1.0, 2.1)
+	return _target_scan_load_multiplier
 
 
 static func get_valid_target_node(target: Variant) -> Node3D:
@@ -96,8 +124,13 @@ static func has_friendly_boarding_attacker(target_ship: Node, team: String) -> b
 static func has_alive_soldier_on_team(target_ship: Node, team: String) -> bool:
 	if not is_instance_valid(target_ship):
 		return false
+	_refresh_alive_soldier_cache_if_needed()
+	var cache_key := "%d:%s" % [target_ship.get_instance_id(), team]
+	if _alive_soldier_cache.has(cache_key):
+		return _alive_soldier_cache[cache_key] == true
 	var soldiers_node := NodeContractHelper.get_soldiers_container(target_ship)
 	if not is_instance_valid(soldiers_node):
+		_alive_soldier_cache[cache_key] = false
 		return false
 	for child in soldiers_node.get_children():
 		if not is_instance_valid(child):
@@ -106,8 +139,18 @@ static func has_alive_soldier_on_team(target_ship: Node, team: String) -> bool:
 			continue
 		if SoldierStateHelper.is_dead_soldier(child):
 			continue
+		_alive_soldier_cache[cache_key] = true
 		return true
+	_alive_soldier_cache[cache_key] = false
 	return false
+
+
+static func _refresh_alive_soldier_cache_if_needed() -> void:
+	var frame := Engine.get_physics_frames()
+	if frame == _alive_soldier_cache_frame:
+		return
+	_alive_soldier_cache_frame = frame
+	_alive_soldier_cache.clear()
 
 
 static func is_enemy_soldier_target(target: Variant, team: String, origin: Node3D, max_range: float) -> bool:

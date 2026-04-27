@@ -2,6 +2,7 @@ extends RefCounted
 
 const HudItemBar = preload("res://scripts/ui/hud/hud_item_bar.gd")
 const HudUpgradeTrack = preload("res://scripts/ui/hud/hud_upgrade_track.gd")
+const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 
 # Entry point
@@ -323,7 +324,7 @@ static func setup_top_right_layout(hud) -> void:
 	hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_ACCENT
 	speed_row.add_child(hud.speed_mode_icon)
 
-	hud.speed_bar = ProgressBar.new()
+	hud.speed_bar = HudGaugeBar.new()
 	hud.speed_bar.custom_minimum_size = Vector2(148, 18)
 	hud.speed_bar.min_value = 0.0
 	hud.speed_bar.max_value = 100.0
@@ -332,6 +333,11 @@ static func setup_top_right_layout(hud) -> void:
 	speed_row.add_child(hud.speed_bar)
 
 	NavalUiTheme.apply_progress_bar(hud.speed_bar, Color(0.06, 0.08, 0.11, 0.92), Color(0.64, 0.78, 0.88, 0.94), 4)
+	hud.speed_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.92), Color(0.64, 0.78, 0.88, 0.94), 4, {
+		"damage_trail": false,
+		"border_color": NavalUiTheme.BORDER_GOLD_SOFT,
+		"shine_strength": 0.18,
+	})
 
 	hud.speed_bar_label = Label.new()
 	hud.speed_bar_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -431,12 +437,20 @@ static func setup_bottom_left_layout(hud) -> void:
 	if hud.support_slot_container.get_parent() != hud.support_row:
 		move_label_to_container(hud.support_slot_container, hud.support_row)
 
-	hud.hp_bar = ProgressBar.new()
+	hud.hp_bar = HudGaugeBar.new()
 	hud.hp_bar.custom_minimum_size = Vector2(240, 24)
 	hud.hp_bar.show_percentage = false
 	hud.bottom_left_container.add_child(hud.hp_bar)
 
 	NavalUiTheme.apply_progress_bar(hud.hp_bar, Color(0.06, 0.08, 0.11, 0.92), Color(0.22, 0.74, 0.34, 0.92), 4)
+	hud.hp_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.92), Color(0.22, 0.74, 0.34, 0.92), 4, {
+		"border_color": NavalUiTheme.BORDER_GOLD,
+		"damage_trail": true,
+		"low_pulse": true,
+		"low_pulse_threshold": 0.28,
+		"segments": 4,
+		"shine_strength": 0.32,
+	})
 
 	hud.hp_text_label = Label.new()
 	hud.hp_text_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -445,12 +459,19 @@ static func setup_bottom_left_layout(hud) -> void:
 	NavalUiTheme.style_overlay_value(hud.hp_text_label, 14)
 	hud.hp_bar.add_child(hud.hp_text_label)
 
-	hud.stamina_bar = ProgressBar.new()
+	hud.stamina_bar = HudGaugeBar.new()
 	hud.stamina_bar.custom_minimum_size = Vector2(240, 8)
 	hud.stamina_bar.show_percentage = false
 	hud.bottom_left_container.add_child(hud.stamina_bar)
 
 	NavalUiTheme.apply_progress_bar(hud.stamina_bar, Color(0.06, 0.08, 0.11, 0.86), Color(0.88, 0.70, 0.24, 0.92), 2)
+	hud.stamina_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.86), Color(0.88, 0.70, 0.24, 0.92), 2, {
+		"damage_trail": false,
+		"low_pulse": true,
+		"low_pulse_threshold": 0.12,
+		"border_color": Color(0.78, 0.62, 0.30, 0.78),
+		"shine_strength": 0.24,
+	})
 
 # Combat overlays
 static func setup_boss_hp_bar(hud) -> void:
@@ -520,8 +541,13 @@ static func setup_boarding_ui(hud) -> void:
 	hud.boarding_label.add_theme_constant_override("outline_size", 4)
 	hud.boarding_ui.add_child(hud.boarding_label)
 
-	hud.boarding_bar = ProgressBar.new()
+	hud.boarding_bar = HudGaugeBar.new()
 	hud.boarding_bar.custom_minimum_size = Vector2(200, 12)
 	hud.boarding_bar.show_percentage = false
 	NavalUiTheme.apply_progress_bar(hud.boarding_bar, Color(0.06, 0.08, 0.11, 0.86), Color(0.90, 0.86, 0.74, 0.92), 4)
+	hud.boarding_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.86), Color(0.90, 0.86, 0.74, 0.92), 4, {
+		"damage_trail": false,
+		"border_color": NavalUiTheme.BORDER_GOLD_SOFT,
+		"shine_strength": 0.2,
+	})
 	hud.boarding_ui.add_child(hud.boarding_bar)

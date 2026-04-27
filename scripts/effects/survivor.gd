@@ -323,26 +323,6 @@ func _complete_collection(player_ship: Node3D) -> void:
 	# 플레이어 배에 병사 추가 시도
 	if player_ship and player_ship.has_method("add_survivor"):
 		if player_ship.add_survivor(false):
-			# 생존자 구조 시에도 체력 소폭 회복 로직 추가
-			if "hull_hp" in player_ship and "max_hull_hp" in player_ship and _can_apply_hull_rescue_heal(player_ship):
-				var um = get_node_or_null("/root/UpgradeManager")
-				var heal_amount: float = 5.0
-				var stamina_recover: float = 0.0
-				if is_instance_valid(um) and um.has_method("get_supply_bonus_stats"):
-					var supply_stats: Dictionary = um.get_supply_bonus_stats()
-					heal_amount += float(supply_stats.get("heal_bonus", 0.0))
-					stamina_recover += float(supply_stats.get("stamina_recovery_bonus", 0.0))
-				if player_ship.has_meta("survivor_hull_heal_bonus"):
-					heal_amount += float(player_ship.get_meta("survivor_hull_heal_bonus"))
-				player_ship.hull_hp = minf(player_ship.hull_hp + heal_amount, player_ship.max_hull_hp)
-				if "rowing_stamina" in player_ship and "max_rowing_stamina" in player_ship:
-					player_ship.rowing_stamina = minf(player_ship.max_rowing_stamina, player_ship.rowing_stamina + stamina_recover)
-				
-				if player_ship.has_method("_find_hud"):
-					var hud = player_ship._find_hud()
-					if hud and hud.has_method("update_hull_hp"):
-						hud.update_hull_hp(player_ship.hull_hp, player_ship.max_hull_hp)
-			
 			_finish_collection_effect()
 		else:
 			# 정원이 가득 찬 경우: 획득하지 않고 그냥 밀려남 (튕겨나가는 연출)
@@ -366,13 +346,3 @@ func _finish_collection_effect() -> void:
 		tween.chain().tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 	else:
 		ScenePool.release(self)
-
-
-func _can_apply_hull_rescue_heal(player_ship: Node) -> bool:
-	if not is_instance_valid(player_ship):
-		return false
-	if player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true:
-		return false
-	if player_ship.get("deck_hostile_boarder_count") != null and int(player_ship.get("deck_hostile_boarder_count")) > 0:
-		return false
-	return true

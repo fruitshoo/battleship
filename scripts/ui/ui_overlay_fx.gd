@@ -73,7 +73,8 @@ void fragment() {
 
 
 static func make_screen_edge_motion_material(
-	edge_vignette: float = 0.10,
+	edge_vignette: float = 0.18,
+	edge_blur: float = 0.92,
 	motion_boost: float = 0.0,
 	focus_point: Vector2 = Vector2(0.5, 0.55)
 ) -> ShaderMaterial:
@@ -84,7 +85,8 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
-uniform float edge_vignette = 0.10;
+uniform float edge_vignette = 0.18;
+uniform float edge_blur = 0.92;
 uniform float motion_boost = 0.0;
 uniform vec2 focus_point = vec2(0.5, 0.55);
 
@@ -92,19 +94,28 @@ void fragment() {
 	vec2 uv = SCREEN_UV;
 	vec2 screen_px = SCREEN_PIXEL_SIZE;
 	float center_distance = distance(uv, focus_point);
-	float edge_mask = smoothstep(0.34, 0.92, center_distance);
-	float blur_mix = edge_mask * motion_boost;
-	vec2 blur_offset = screen_px * (1.0 + motion_boost * 3.8);
+	float edge_mask = smoothstep(0.14, 0.72, center_distance);
+	float blur_amount = clamp(edge_blur + motion_boost, 0.0, 0.98);
+	float blur_mix = edge_mask * blur_amount;
+	float blur_radius_px = 2.0 + edge_blur * 42.0 + motion_boost * 12.0;
+	float blur_lod = clamp(1.0 + edge_blur * 7.0 + motion_boost * 3.0, 0.0, 6.0);
+	vec2 blur_offset = screen_px * blur_radius_px;
 
 	vec4 center = texture(screen_tex, uv);
-	vec4 blur = center * 0.28;
-	blur += texture(screen_tex, uv + vec2(blur_offset.x, 0.0)) * 0.18;
-	blur += texture(screen_tex, uv - vec2(blur_offset.x, 0.0)) * 0.18;
-	blur += texture(screen_tex, uv + vec2(0.0, blur_offset.y)) * 0.18;
-	blur += texture(screen_tex, uv - vec2(0.0, blur_offset.y)) * 0.18;
+	vec4 tap_blur = center * 0.16;
+	tap_blur += texture(screen_tex, uv + vec2(blur_offset.x, 0.0)) * 0.10;
+	tap_blur += texture(screen_tex, uv - vec2(blur_offset.x, 0.0)) * 0.10;
+	tap_blur += texture(screen_tex, uv + vec2(0.0, blur_offset.y)) * 0.10;
+	tap_blur += texture(screen_tex, uv - vec2(0.0, blur_offset.y)) * 0.10;
+	tap_blur += texture(screen_tex, uv + blur_offset) * 0.075;
+	tap_blur += texture(screen_tex, uv - blur_offset) * 0.075;
+	tap_blur += texture(screen_tex, uv + vec2(blur_offset.x, -blur_offset.y)) * 0.075;
+	tap_blur += texture(screen_tex, uv + vec2(-blur_offset.x, blur_offset.y)) * 0.075;
+	vec4 mip_blur = textureLod(screen_tex, uv, blur_lod);
+	vec4 blur = mix(tap_blur, mip_blur, clamp(edge_mask * 0.96, 0.0, 0.96));
 
-	vec3 mixed_rgb = mix(center.rgb, blur.rgb, clamp(blur_mix, 0.0, 0.55));
-	float vignette = smoothstep(0.32, 0.98, center_distance);
+	vec3 mixed_rgb = mix(center.rgb, blur.rgb, clamp(blur_mix, 0.0, 0.90));
+	float vignette = smoothstep(0.24, 0.94, center_distance);
 	float dim_strength = edge_vignette + motion_boost * 0.18;
 	mixed_rgb *= 1.0 - vignette * dim_strength;
 	mixed_rgb = mix(mixed_rgb, vec3(dot(mixed_rgb, vec3(0.299, 0.587, 0.114))), vignette * motion_boost * 0.08);
@@ -112,18 +123,20 @@ void fragment() {
 }
 """
 	material.shader = shader
-	set_screen_edge_motion_params(material, edge_vignette, motion_boost, focus_point)
+	set_screen_edge_motion_params(material, edge_vignette, edge_blur, motion_boost, focus_point)
 	return material
 
 
 static func set_screen_edge_motion_params(
 	material: ShaderMaterial,
 	edge_vignette: float,
+	edge_blur: float,
 	motion_boost: float,
 	focus_point: Vector2 = Vector2(0.5, 0.55)
 ) -> void:
 	if material == null:
 		return
 	material.set_shader_parameter("edge_vignette", edge_vignette)
+	material.set_shader_parameter("edge_blur", edge_blur)
 	material.set_shader_parameter("motion_boost", motion_boost)
 	material.set_shader_parameter("focus_point", focus_point)

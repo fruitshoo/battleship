@@ -3,7 +3,8 @@ extends CanvasLayer
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 
 @export var player_ship_path: NodePath = NodePath("../PlayerShip")
-@export_range(0.0, 1.0, 0.01) var base_vignette_strength: float = 0.10
+@export_range(0.0, 1.0, 0.01) var base_vignette_strength: float = 0.18
+@export_range(0.0, 1.0, 0.01) var base_blur_strength: float = 0.92
 @export_range(0.0, 1.0, 0.01) var motion_boost_strength: float = 0.36
 @export_range(0.0, 1.0, 0.01) var motion_response_speed: float = 2.2
 
@@ -38,7 +39,7 @@ func _process(delta: float) -> void:
 func _apply_overlay_material() -> void:
 	if not is_instance_valid(overlay):
 		return
-	overlay.material = UiOverlayFx.make_screen_edge_motion_material(_get_effective_vignette_strength(), _visual_motion_boost)
+	overlay.material = UiOverlayFx.make_screen_edge_motion_material(_get_effective_vignette_strength(), _get_effective_blur_strength(), _visual_motion_boost)
 	_update_overlay_shader()
 
 func _compute_target_motion_boost() -> float:
@@ -67,6 +68,7 @@ func _update_overlay_shader() -> void:
 	UiOverlayFx.set_screen_edge_motion_params(
 		material,
 		_get_effective_vignette_strength(),
+		_get_effective_blur_strength(),
 		_visual_motion_boost if _settings_enabled else 0.0
 	)
 
@@ -84,6 +86,11 @@ func _get_effective_vignette_strength() -> float:
 	if not _settings_enabled:
 		return 0.0
 	return base_vignette_strength * lerpf(0.35, 1.0, _settings_strength)
+
+func _get_effective_blur_strength() -> float:
+	if not _settings_enabled:
+		return 0.0
+	return base_blur_strength * lerpf(0.25, 1.0, _settings_strength)
 
 func _get_motion_strength_scale() -> float:
 	if not _settings_enabled:

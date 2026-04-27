@@ -90,8 +90,8 @@ static func _run_preview_typography_check(owner: Node, failures: Array[String], 
 				_expect_label3d_font(
 					speech_label,
 					NavalUiTheme.FONT_WORLD_SPEECH_EMPHASIS if is_captain else NavalUiTheme.FONT_WORLD_SPEECH,
-					72 if is_captain else 64,
-					7 if is_captain else 6,
+					88 if is_captain else 78,
+					8 if is_captain else 7,
 					failures,
 					"soldier speech"
 				)

@@ -3,6 +3,7 @@ extends Control
 
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 
@@ -42,6 +43,7 @@ func _ready() -> void:
 	_apply_theme()
 	_apply_layout_density()
 	_render_result(RunResultStore.get_latest_result())
+	UiButtonAudio.wire_buttons(self)
 	restart_button.pressed.connect(_on_restart_pressed)
 	main_menu_button.pressed.connect(_on_main_menu_pressed)
 	_action_buttons = [restart_button, main_menu_button]

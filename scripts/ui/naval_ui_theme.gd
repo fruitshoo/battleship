@@ -469,6 +469,8 @@ static func apply_progress_bar(bar: ProgressBar, bg_color: Color, fill_color: Co
 		return
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = bg_color
+	bg.border_color = BORDER_GOLD_DIM
+	bg.set_border_width_all(1)
 	bg.set_corner_radius_all(radius)
 	bar.add_theme_stylebox_override("background", bg)
 
@@ -476,6 +478,8 @@ static func apply_progress_bar(bar: ProgressBar, bg_color: Color, fill_color: Co
 	fill.bg_color = fill_color
 	fill.set_corner_radius_all(radius)
 	bar.add_theme_stylebox_override("fill", fill)
+	if bar.has_method("configure_gauge"):
+		bar.configure_gauge(bg_color, fill_color, radius)
 
 
 static func apply_slider(slider: Slider, bg_color: Color, fill_color: Color, radius: int = 4) -> void:
@@ -502,9 +506,9 @@ static func style_world_speech(label: Label3D, is_captain: bool, color: Color) -
 		return
 	_apply_label3d_font(label, FONT_WORLD_SPEECH_EMPHASIS if is_captain else FONT_WORLD_SPEECH)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.font_size = 72 if is_captain else 64
-	label.outline_size = 7 if is_captain else 6
-	label.extra_cull_margin = 16.0
+	label.font_size = 88 if is_captain else 78
+	label.outline_size = 8 if is_captain else 7
+	label.extra_cull_margin = 20.0
 	label.no_depth_test = true
 	label.render_priority = 20
 	label.outline_render_priority = 21

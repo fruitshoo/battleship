@@ -25,6 +25,7 @@ var is_sinking: bool = false
 var target_ship: Node3D = null
 var janggun_lv: int = 0
 var team: String = "player"
+var _is_releasing: bool = false
 
 func _ready() -> void:
 	# 시그널은 한 번만 연결
@@ -51,8 +52,11 @@ func pool_capacity() -> int:
 func pool_reset() -> void:
 	is_stuck = false
 	is_sinking = false
+	_is_releasing = false
 	progress = 0.0
 	target_ship = null
+	visible = false
+	process_mode = Node.PROCESS_MODE_DISABLED
 	monitoring = false
 	monitorable = false
 
@@ -77,15 +81,18 @@ func launch(
 func _begin_flight() -> void:
 	is_stuck = false
 	is_sinking = false
+	_is_releasing = false
 	progress = 0.0
 	target_ship = null
+	visible = true
+	process_mode = Node.PROCESS_MODE_INHERIT
 	monitoring = true
 	monitorable = true
 	_update_stats()
 	global_position = start_pos
 
 	var distance = start_pos.distance_to(target_pos)
-	duration = distance / speed
+	duration = distance / maxf(speed, 0.01)
 	if duration < 0.7:
 		duration = 0.7
 	arc_height = clamp(distance * 0.12, 1.5, 8.0)
@@ -103,10 +110,10 @@ func _update_stats() -> void:
 
 func _physics_process(delta: float) -> void:
 	if is_stuck or is_sinking: return
-	
+
 	progress += delta / duration
 	# SLBM 같은 느낌을 주는 비선형 가속(Ease-In) 제거 -> 강력한 초기 추진력 표현을 위해 선형(Linear)으로 변경
-	var t = progress
+	var t = minf(progress, 1.0)
 	
 	var current_pos = start_pos.lerp(target_pos, t)
 	var y_offset = sin(PI * t) * arc_height
@@ -125,9 +132,12 @@ func _physics_process(delta: float) -> void:
 	# 수면(y=0.0) 타격 감지 기능 추가
 	if current_pos.y <= 0.0:
 		_splash_and_sink()
+		return
+	if progress >= 1.0:
+		_finish_missed_flight()
 
 func _on_hit(target: Node) -> void:
-	if is_stuck: return
+	if is_stuck or is_sinking: return
 	
 	var ship = HitTargetResolver.resolve_ship_from_node(target)
 	
@@ -179,12 +189,21 @@ func _unstick() -> void:
 	if is_instance_valid(target_ship) and target_ship.has_method("remove_leak"):
 		target_ship.remove_leak(dot_damage)
 	
-	ScenePool.release(self)
+	_release_self()
+
+
+func _finish_missed_flight() -> void:
+	var splash_pos := global_position
+	splash_pos.y = minf(splash_pos.y, 0.2)
+	global_position = splash_pos
+	_splash_and_sink()
 
 
 func _splash_and_sink() -> void:
 	if is_sinking: return
 	is_sinking = true
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
 	
 	# 바다에 떨어질 때 물 폭발 이펙트 생성
 	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion", global_position, 4, 70.0):
@@ -206,6 +225,28 @@ func _splash_and_sink() -> void:
 	tween.tween_property(self , "position:y", position.y - 2.0, 1.0)
 	var self_id: int = get_instance_id()
 	tween.tween_callback(func(): ScenePool.release_by_instance_id(self_id))
+
+
+func _release_self() -> void:
+	if _is_releasing:
+		return
+	_is_releasing = true
+	if is_inside_tree():
+		set_deferred("monitoring", false)
+		set_deferred("monitorable", false)
+		set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+		call_deferred("_finalize_release")
+	else:
+		monitoring = false
+		monitorable = false
+		process_mode = Node.PROCESS_MODE_DISABLED
+		ScenePool.release(self)
+
+
+func _finalize_release() -> void:
+	if not is_instance_valid(self):
+		return
+	ScenePool.release(self)
 
 func _play_impact_vfx() -> void:
 	# 나무 파편 이펙트

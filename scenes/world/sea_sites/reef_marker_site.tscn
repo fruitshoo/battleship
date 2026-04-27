@@ -48,7 +48,7 @@ collision_mask = 2
 script = ExtResource("1_script")
 site_label = "얕은 암초"
 completed_label = "암초 조사 완료"
-reward_type = "upgrade_choices"
+reward_type = "minor_stat_bonus"
 
 [node name="Visual" type="Node3D" parent="."]
 transform = Transform3D(1.35, 0, 0, 0, 1.35, 0, 0, 0, 1.35, 0, 0.34, 0)

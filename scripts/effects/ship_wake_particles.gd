@@ -15,6 +15,16 @@ class_name ShipWakeParticles
 @export_range(1.0, 2.5, 0.01) var max_width_scale: float = 1.45
 @export_range(0.2, 1.0, 0.01) var min_length_scale: float = 0.65
 @export_range(1.0, 2.5, 0.01) var max_length_scale: float = 1.55
+@export_range(0.05, 2.0, 0.05) var auto_fit_refresh_interval: float = 0.5
+@export var distance_lod_enabled: bool = true
+@export_range(20.0, 180.0, 1.0) var lod_near_distance: float = 70.0
+@export_range(40.0, 240.0, 1.0) var lod_far_distance: float = 130.0
+@export_range(0.2, 1.0, 0.01) var lod_far_amount_multiplier: float = 0.48
+@export_range(80.0, 320.0, 1.0) var lod_hide_distance: float = 190.0
+@export_range(0.05, 2.0, 0.05) var lod_refresh_interval: float = 0.35
+@export var load_lod_enabled: bool = true
+@export_range(0.45, 1.0, 0.01) var load_lod_min_amount_multiplier: float = 0.68
+@export var preserve_player_flagship_wake: bool = true
 
 var _base_position: Vector3
 var _base_scale: Vector3 = Vector3.ONE
@@ -22,22 +32,34 @@ var _base_amount: int = 20
 var _base_values_cached: bool = false
 var _current_width_scale: float = 1.0
 var _current_length_scale: float = 1.0
+var _next_auto_fit_refresh_msec: int = 0
+var _next_lod_refresh_msec: int = 0
+var _lod_amount_multiplier: float = 1.0
+var _lod_hidden: bool = false
+var _last_amount_ratio: float = -1.0
+var _last_speed_scale: float = -1.0
 
 
 func _ready() -> void:
 	_cache_base_values()
-	_refresh_auto_fit()
+	_refresh_auto_fit(true)
+	_refresh_distance_lod(true)
 	set_wake_state(false, 0.0, 0.0, 0.0)
 
 
 func set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float = 0.0, turbulence: float = 0.0) -> void:
-	_refresh_auto_fit()
-	emitting = active
+	_refresh_auto_fit(false)
+	_refresh_distance_lod(false)
+	var effective_active := active and not _lod_hidden
+	if emitting != effective_active:
+		emitting = effective_active
 	var intensity := clampf(maxf(speed_ratio, turbulence * 0.65), 0.0, 1.0)
-	if not active:
+	if not effective_active:
 		intensity = 0.0
-	set("amount_ratio", lerpf(idle_amount_ratio, active_amount_ratio, intensity))
-	speed_scale = lerpf(idle_speed_scale, active_speed_scale, intensity)
+	var next_amount_ratio := lerpf(idle_amount_ratio, active_amount_ratio, intensity) * _lod_amount_multiplier * _get_load_lod_amount_multiplier()
+	var next_speed_scale := lerpf(idle_speed_scale, active_speed_scale, intensity)
+	_apply_amount_ratio(next_amount_ratio)
+	_apply_speed_scale(next_speed_scale)
 	position = _base_position + Vector3(clampf(turn_ratio, -1.0, 1.0) * turn_offset * _current_width_scale, 0.0, 0.0)
 
 
@@ -50,8 +72,14 @@ func _cache_base_values() -> void:
 	_base_values_cached = true
 
 
-func _refresh_auto_fit() -> void:
+func _refresh_auto_fit(force: bool = false) -> void:
 	_cache_base_values()
+	if not force and auto_fit_refresh_interval > 0.0:
+		var now_msec := Time.get_ticks_msec()
+		if now_msec < _next_auto_fit_refresh_msec:
+			return
+		_next_auto_fit_refresh_msec = now_msec + max(1, int(round(auto_fit_refresh_interval * 1000.0)))
+
 	_current_width_scale = 1.0
 	_current_length_scale = 1.0
 	if not auto_fit_to_parent_ship:
@@ -74,6 +102,62 @@ func _refresh_auto_fit() -> void:
 	var average_scale := (_current_width_scale + _current_length_scale) * 0.5
 	var amount_scale := lerpf(1.0, average_scale, amount_auto_fit_strength)
 	amount = maxi(1, int(round(float(_base_amount) * amount_scale)))
+
+
+func _refresh_distance_lod(force: bool = false) -> void:
+	if not distance_lod_enabled:
+		_lod_amount_multiplier = 1.0
+		_lod_hidden = false
+		return
+	if not force and lod_refresh_interval > 0.0:
+		var now_msec := Time.get_ticks_msec()
+		if now_msec < _next_lod_refresh_msec:
+			return
+		_next_lod_refresh_msec = now_msec + max(1, int(round(lod_refresh_interval * 1000.0)))
+
+	var viewport := get_viewport()
+	var camera := viewport.get_camera_3d() if viewport != null else null
+	if not is_instance_valid(camera):
+		_lod_amount_multiplier = 1.0
+		_lod_hidden = false
+		return
+
+	var distance := (camera as Node3D).global_position.distance_to(global_position)
+	if distance >= lod_hide_distance:
+		_lod_amount_multiplier = 0.0
+		_lod_hidden = true
+		return
+
+	_lod_hidden = false
+	var fade_range := maxf(lod_far_distance - lod_near_distance, 1.0)
+	var far_ratio := clampf((distance - lod_near_distance) / fade_range, 0.0, 1.0)
+	_lod_amount_multiplier = lerpf(1.0, lod_far_amount_multiplier, far_ratio)
+
+
+func _get_load_lod_amount_multiplier() -> float:
+	if not load_lod_enabled:
+		return 1.0
+	var ship := _find_parent_ship()
+	if preserve_player_flagship_wake and NodeContractHelper.is_player_controlled_ship(ship):
+		return 1.0
+	var budget_scale := VfxBudget.get_continuous_effect_scale()
+	var normalized_budget := clampf((budget_scale - 0.35) / 0.65, 0.0, 1.0)
+	return lerpf(load_lod_min_amount_multiplier, 1.0, normalized_budget)
+
+
+func _apply_amount_ratio(value: float) -> void:
+	var clamped_value := clampf(value, 0.0, 1.0)
+	if is_equal_approx(_last_amount_ratio, clamped_value):
+		return
+	_last_amount_ratio = clamped_value
+	set("amount_ratio", clamped_value)
+
+
+func _apply_speed_scale(value: float) -> void:
+	if is_equal_approx(_last_speed_scale, value):
+		return
+	_last_speed_scale = value
+	speed_scale = value
 
 
 func _find_parent_ship() -> Node:

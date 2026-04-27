@@ -40,7 +40,7 @@ static func run_recovery_effect_contract_smoke(owner: Node, failures: Array[Stri
 	await _run_static_sea_site_shape_contract(owner, failures, smoke_root)
 	await _run_sea_site_spawner_contract(owner, failures, smoke_root, player_ship)
 	await _run_sea_decor_contract(owner, failures, smoke_root, player_ship)
-	await _run_treasure_chest_smoke(owner, failures, smoke_root, player_ship)
+	await _run_treasure_chest_smoke(owner, failures, smoke_root, player_ship, level_manager)
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
@@ -82,6 +82,8 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		failures.append("recovery loot smoke did not grant score")
 	if player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) <= hull_before:
 		failures.append("recovery loot smoke did not repair player hull")
+	elif player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) - hull_before < 14.9:
+		failures.append("recovery loot smoke hull repair is below the expected base amount")
 
 
 static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
@@ -120,7 +122,7 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 	await _run_survivor_full_crew_trains_existing_roster(owner, failures, smoke_root, player_ship)
 
 
-static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
 	var chest_scene := load("res://scenes/effects/treasure_chest.tscn") as PackedScene
 	if chest_scene == null:
 		failures.append("recovery treasure smoke scene load failed")
@@ -129,6 +131,18 @@ static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smok
 	if chest == null:
 		failures.append("recovery treasure smoke instantiate failed")
 		return
+	var original_levels: Dictionary = {}
+	if is_instance_valid(UpgradeManager):
+		original_levels = UpgradeManager.current_levels.duplicate(true)
+		for upgrade_id in UpgradeManager.current_levels.keys():
+			UpgradeManager.current_levels[upgrade_id] = 0
+		UpgradeManager.current_levels["cannon"] = 5
+		UpgradeManager.current_levels["cannon_damage"] = 1
+		UpgradeManager.current_levels["crew_reserve"] = 1
+	else:
+		failures.append("recovery treasure smoke missing UpgradeManager")
+	if chest.get("debug_forced_reward_count") != null:
+		chest.set("debug_forced_reward_count", 3)
 	smoke_root.add_child(chest)
 	if chest.get_node_or_null("CollectionHint") != null:
 		failures.append("recovery treasure smoke should not show a pickup range hint")
@@ -157,6 +171,31 @@ static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smok
 			failures.append("recovery treasure smoke did not mark chest collected from reduced range")
 		if not chest.is_queued_for_deletion():
 			failures.append("recovery treasure smoke did not queue chest for deletion")
+	if is_instance_valid(UpgradeManager):
+		if int(UpgradeManager.current_levels.get("cannon_damage", 0)) < 4:
+			failures.append("recovery treasure smoke did not auto-upgrade an owned upgrade")
+		if int(UpgradeManager.current_levels.get("crew_reserve", 0)) != 1:
+			failures.append("recovery treasure smoke should ignore disabled owned upgrades")
+	var popup_found := false
+	for popup in owner.get_tree().get_nodes_in_group("treasure_reward_popup"):
+		popup_found = true
+		if is_instance_valid(popup):
+			popup.queue_free()
+	if not popup_found:
+		failures.append("recovery treasure smoke did not show reward result popup")
+	elif not owner.get_tree().paused:
+		failures.append("recovery treasure smoke should pause while reward result popup is visible")
+	await _wait_frames(owner, 1)
+	if owner.get_tree().paused:
+		failures.append("recovery treasure smoke did not restore pause after reward result popup closed")
+	var upgrade_ui: Variant = level_manager.get("_upgrade_ui_instance") if is_instance_valid(level_manager) else null
+	if is_instance_valid(upgrade_ui):
+		failures.append("recovery treasure smoke should not open upgrade choice UI")
+		upgrade_ui.queue_free()
+		level_manager.set("_upgrade_ui_instance", null)
+	if is_instance_valid(UpgradeManager) and not original_levels.is_empty():
+		UpgradeManager.current_levels = original_levels.duplicate(true)
+		UpgradeManager.upgrade_applied.emit("cannon_damage", int(UpgradeManager.current_levels.get("cannon_damage", 0)))
 
 
 static func _run_drifting_supply_site_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
@@ -214,15 +253,17 @@ static func _run_static_reward_site_smoke(owner: Node, failures: Array[String], 
 	if site.get("is_collected") != true:
 		failures.append("recovery static reward site did not mark collected")
 	var upgrade_ui: Variant = level_manager.get("_upgrade_ui_instance")
-	if not is_instance_valid(upgrade_ui):
-		failures.append("recovery static reward site did not open upgrade choices")
-	else:
+	if is_instance_valid(upgrade_ui):
+		failures.append("recovery static reward site should grant a minor stat bonus instead of opening upgrade choices")
 		upgrade_ui.queue_free()
 		level_manager.set("_upgrade_ui_instance", null)
+	var bonus_totals: Variant = player_ship.get_meta("sea_site_bonus_totals", {})
+	if not (bonus_totals is Dictionary) or (bonus_totals as Dictionary).is_empty():
+		failures.append("recovery static reward site did not grant a minor stat bonus")
 	if site.is_queued_for_deletion():
 		failures.append("recovery static reward site queued for deletion after reward")
-	if site.get("reward_type") != "upgrade_choices":
-		failures.append("recovery static reward reef should remain an upgrade-choice site")
+	if site.get("reward_type") != "minor_stat_bonus":
+		failures.append("recovery static reward reef should be a minor-stat-bonus site")
 	site.queue_free()
 	owner.get_tree().paused = false
 
@@ -238,7 +279,7 @@ static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[Str
 			"min_world_width": 3.8,
 			"min_top_y": 2.5,
 			"min_bottom_y": -0.3,
-			"reward_type": "upgrade_choices",
+			"reward_type": "minor_stat_bonus",
 		},
 		{
 			"path": "res://scenes/world/sea_sites/tiny_islet_site.tscn",
@@ -249,7 +290,7 @@ static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[Str
 			"min_world_width": 7.0,
 			"min_top_y": 1.0,
 			"min_bottom_y": -0.3,
-			"reward_type": "train_crew",
+			"reward_type": "minor_stat_bonus",
 		},
 		{
 			"path": "res://scenes/world/sea_sites/temporary_outpost_site.tscn",
@@ -260,7 +301,7 @@ static func _run_static_sea_site_shape_contract(owner: Node, failures: Array[Str
 			"min_world_width": 4.5,
 			"min_top_y": 3.0,
 			"min_bottom_y": -0.3,
-			"reward_type": "expand_crew_limit",
+			"reward_type": "minor_stat_bonus",
 		},
 	]
 

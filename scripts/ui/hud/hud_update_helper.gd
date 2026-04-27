@@ -2,6 +2,7 @@ extends RefCounted
 
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
+const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
 const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
 const CAPTURE_HINT_CREW_RATIO: float = 0.34
 const CAPTURE_HINT_CREW_MAX: int = 2
@@ -68,6 +69,8 @@ static func _apply_speed_bar_state(hud, speed_state: String) -> void:
 		hud.speed_mode_icon.modulate = NavalUiTheme.STATUS_WARN
 	elif speed_state == "locked":
 		hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_MUTED
+	elif speed_state == "furled":
+		hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_MUTED
 	else:
 		hud.speed_mode_icon.modulate = NavalUiTheme.TEXT_BLUE
 	var fill = hud.speed_bar.get_theme_stylebox("fill")
@@ -79,6 +82,8 @@ static func _apply_speed_bar_state(hud, speed_state: String) -> void:
 			fill_box.bg_color = Color(0.78, 0.58, 0.22, 0.92)
 		elif speed_state == "locked":
 			fill_box.bg_color = Color(0.52, 0.40, 0.32, 0.92)
+		elif speed_state == "furled":
+			fill_box.bg_color = Color(0.38, 0.45, 0.50, 0.86)
 		else:
 			fill_box.bg_color = NavalUiTheme.STATUS_ACTIVE_BLUE
 
@@ -94,7 +99,8 @@ static func update_speed_display(hud) -> void:
 	var speed_ratio: float = clampf(speed / max_speed, 0.0, 1.0)
 	var is_rowing_active: bool = hud.player_ship.get("is_rowing") == true
 	var is_rowing_locked: bool = hud.player_ship.get("rowing_locked") == true
-	var speed_state := "exhausted" if (is_rowing_active and is_rowing_locked) else ("locked" if is_rowing_locked else ("rowing" if is_rowing_active else "sail"))
+	var is_sail_furled: bool = hud.player_ship.get("sail_furled") == true
+	var speed_state := "exhausted" if (is_rowing_active and is_rowing_locked) else ("locked" if is_rowing_locked else ("rowing" if is_rowing_active else ("furled" if is_sail_furled else "sail")))
 	if hud.speed_bar:
 		var target_value = speed_ratio * 100.0
 		var speed_text = "%.1f" % speed
@@ -648,7 +654,7 @@ static func _ensure_boss_hp_entry(hud, boss_id: int) -> Dictionary:
 	label.add_theme_constant_override("outline_size", 2)
 	root.add_child(label)
 
-	var bar := ProgressBar.new()
+	var bar := HudGaugeBar.new()
 	bar.name = "BossHP_%s" % str(boss_id)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.custom_minimum_size = Vector2(560.0, 20.0)
@@ -657,6 +663,13 @@ static func _ensure_boss_hp_entry(hud, boss_id: int) -> Dictionary:
 	bar.value = 1.0
 	bar.show_percentage = false
 	NavalUiTheme.apply_progress_bar(bar, BOSS_HP_BG, BOSS_HP_FILL, 3)
+	bar.configure_gauge(BOSS_HP_BG, BOSS_HP_FILL, 3, {
+		"damage_trail": true,
+		"border_color": Color(0.92, 0.44, 0.30, 0.82),
+		"segments": 5,
+		"shine_strength": 0.24,
+		"trail_follow_speed": 2.2,
+	})
 	root.add_child(bar)
 
 	var entry := {
@@ -923,7 +936,7 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	boarding_label.visible = false
 	bar_root.add_child(boarding_label)
 
-	var hp_bar: ProgressBar = ProgressBar.new()
+	var hp_bar: ProgressBar = HudGaugeBar.new()
 	hp_bar.name = "Bar"
 	hp_bar.show_percentage = false
 	hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -934,8 +947,16 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 	bar_root.add_child(hp_bar)
 
 	var accent := NavalUiTheme.STATUS_ACTIVE_BLUE if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
-	hp_bar.add_theme_stylebox_override("background", NavalUiTheme.make_ship_hp_bar_background_style(accent))
-	hp_bar.add_theme_stylebox_override("fill", NavalUiTheme.make_ship_hp_bar_fill_style())
+	if hp_bar.has_method("configure_gauge"):
+		hp_bar.configure_gauge(Color(0.03, 0.04, 0.06, 0.72), NavalUiTheme.STATUS_GOOD, 3, {
+			"damage_trail": true,
+			"border_color": accent,
+			"shine_strength": 0.16,
+			"trail_follow_speed": 3.4,
+		})
+	else:
+		hp_bar.add_theme_stylebox_override("background", NavalUiTheme.make_ship_hp_bar_background_style(accent))
+		hp_bar.add_theme_stylebox_override("fill", NavalUiTheme.make_ship_hp_bar_fill_style())
 
 	hud.ship_hp_bars[ship_id] = bar_root
 	return bar_root

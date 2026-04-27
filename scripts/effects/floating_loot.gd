@@ -3,6 +3,8 @@ extends Area3D
 ## 부유물(Floating Loot) 시스템
 ## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
 
+const DEFAULT_HULL_HEAL: float = 15.0
+
 @export var gold_amount: int = 15
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
@@ -241,12 +243,12 @@ func _collect_loot() -> void:
 			
 	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
 	if is_instance_valid(target_player) and target_player.is_inside_tree() and "hull_hp" in target_player and "max_hull_hp" in target_player and _can_apply_loot_hull_heal(target_player):
-		var heal_amount: float = 5.0
+		var heal_amount: float = DEFAULT_HULL_HEAL
 		var stamina_recover: float = 0.0
 		if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
 			var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
-			heal_amount += float(supply_stats.get("heal_bonus", 0.0))
-			stamina_recover += float(supply_stats.get("stamina_recovery_bonus", 0.0))
+			heal_amount = float(supply_stats.get("heal_amount", heal_amount + float(supply_stats.get("heal_bonus", 0.0))))
+			stamina_recover = float(supply_stats.get("stamina_recovery", float(supply_stats.get("stamina_recovery_bonus", 0.0))))
 		target_player.hull_hp = minf(target_player.hull_hp + heal_amount, target_player.max_hull_hp)
 		if "rowing_stamina" in target_player and "max_rowing_stamina" in target_player:
 			target_player.rowing_stamina = minf(target_player.max_rowing_stamina, target_player.rowing_stamina + stamina_recover)

@@ -3,6 +3,7 @@ extends Control
 const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 @export var background_texture: Texture2D
@@ -29,6 +30,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_apply_background_settings()
 	_apply_ui_theme()
+	_play_menu_music()
+	UiButtonAudio.wire_buttons(self)
 	start_button.pressed.connect(_on_start_pressed)
 	meta_button.pressed.connect(_on_meta_pressed)
 	options_button.pressed.connect(_on_options_pressed)
@@ -43,6 +46,20 @@ func _ready() -> void:
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
 	_focus_first_menu_button()
+
+
+func _exit_tree() -> void:
+	_stop_menu_music()
+
+
+func _play_menu_music() -> void:
+	if is_instance_valid(AudioManager) and AudioManager.has_method("play_main_menu_music"):
+		AudioManager.play_main_menu_music()
+
+
+func _stop_menu_music() -> void:
+	if is_instance_valid(AudioManager) and AudioManager.has_method("stop_main_menu_music"):
+		AudioManager.stop_main_menu_music()
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -6,6 +6,7 @@ const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
 const UPGRADE_UI_SCENE := preload("res://scenes/ui/upgrade_ui.tscn")
 const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
 const SHIP_CONTROL_PANEL_SCENE := preload("res://scenes/ui/ship_control_panel.tscn")
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 
 const VIEWPORT_SIZES := [
 	Vector2i(960, 540),
@@ -38,6 +39,7 @@ static func _run_main_menu_check(owner: Node, failures: Array[String], viewport_
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(menu.get_node_or_null("TitleBlock") as Control, viewport_size, failures, "main menu title block")
 	_expect_control_within_viewport(menu.get_node_or_null("ButtonBlock") as Control, viewport_size, failures, "main menu button block")
+	_expect_button_audio_wired(menu, failures, "main menu")
 	menu.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -47,6 +49,7 @@ static func _run_pause_menu_check(owner: Node, failures: Array[String], viewport
 	owner.add_child(pause_menu)
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(pause_menu.get_node_or_null("Center/Panel") as Control, viewport_size, failures, "pause panel")
+	_expect_button_audio_wired(pause_menu, failures, "pause menu")
 	pause_menu.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -56,6 +59,7 @@ static func _run_options_panel_check(owner: Node, failures: Array[String], viewp
 	owner.add_child(options_panel)
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(options_panel.get_node_or_null("Panel") as Control, viewport_size, failures, "options panel")
+	_expect_button_audio_wired(options_panel, failures, "options panel")
 	options_panel.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -71,7 +75,45 @@ static func _run_upgrade_ui_check(owner: Node, failures: Array[String], viewport
 	if is_instance_valid(cards_container):
 		for child in cards_container.get_children():
 			_expect_control_within_viewport(child as Control, viewport_size, failures, "upgrade card")
+	_expect_button_audio_wired(upgrade_ui, failures, "upgrade UI")
+	var selected_upgrade := {"id": ""}
+	upgrade_ui.upgrade_chosen.connect(func(upgrade_id: String) -> void:
+		selected_upgrade["id"] = upgrade_id
+	)
+	upgrade_ui.call("_on_choice_pressed", "cannon_damage")
+	await _wait_seconds(owner, 0.25)
+	if str(selected_upgrade.get("id", "")) != "cannon_damage":
+		failures.append("upgrade UI choice animation did not emit selected upgrade")
 	upgrade_ui.queue_free()
+	await _wait_frames(owner, 1)
+
+	var reward_ui = UPGRADE_UI_SCENE.instantiate()
+	owner.add_child(reward_ui)
+	await _wait_frames(owner, 2)
+	reward_ui.show_reward_results({
+		"requested_count": 3,
+		"applied_count": 3,
+		"upgrades": [
+			{"upgrade_id": "cannon", "from_level": 1, "to_level": 2},
+			{"upgrade_id": "cannon_damage", "from_level": 1, "to_level": 2},
+			{"upgrade_id": "janggun", "from_level": 1, "to_level": 2},
+		],
+	}, 8.0)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(reward_ui.get_node_or_null("VBox") as Control, viewport_size, failures, "treasure reward root")
+	if reward_ui.get_node_or_null("TreasureShimmer") != null:
+		failures.append("treasure reward UI should not create background shimmer layer")
+	var reward_cards := reward_ui.get_node_or_null("VBox/CardsContainer") as HBoxContainer
+	if is_instance_valid(reward_cards):
+		for child in reward_cards.get_children():
+			var reward_card := child as PanelContainer
+			if not is_instance_valid(reward_card):
+				continue
+			var reward_style := reward_card.get_theme_stylebox("panel") as StyleBoxFlat
+			if reward_card.has_meta("reward_highlight") or reward_style == null or reward_style.border_width_top > 2 or reward_style.shadow_size > 12:
+				failures.append("treasure reward card should keep the plain non-halo reward style")
+	_expect_button_audio_wired(reward_ui, failures, "treasure reward UI")
+	reward_ui.queue_free()
 	await _wait_frames(owner, 1)
 
 
@@ -80,6 +122,7 @@ static func _run_meta_upgrade_check(owner: Node, failures: Array[String], viewpo
 	owner.add_child(meta_upgrade_ui)
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(meta_upgrade_ui.get_node_or_null("Backdrop/Panel") as Control, viewport_size, failures, "meta upgrade panel")
+	_expect_button_audio_wired(meta_upgrade_ui, failures, "meta upgrade UI")
 	meta_upgrade_ui.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -122,6 +165,31 @@ static func _expect_control_within_viewport(control: Control, viewport_size: Vec
 		failures.append("%s exceeds viewport %s with rect %s" % [label, viewport_size, rect])
 
 
+static func _expect_button_audio_wired(root: Node, failures: Array[String], label: String) -> void:
+	var buttons: Array[BaseButton] = []
+	_collect_buttons(root, buttons)
+	if buttons.is_empty():
+		return
+	for button in buttons:
+		if not is_instance_valid(button):
+			continue
+		if not button.has_meta(UiButtonAudio.WIRED_META):
+			failures.append("%s button missing ui click sound: %s" % [label, button.name])
+
+
+static func _collect_buttons(node: Node, buttons: Array[BaseButton]) -> void:
+	if not is_instance_valid(node):
+		return
+	if node is BaseButton:
+		buttons.append(node as BaseButton)
+	for child in node.get_children():
+		_collect_buttons(child, buttons)
+
+
 static func _wait_frames(owner: Node, count: int) -> void:
 	for _index in range(maxi(count, 1)):
 		await owner.get_tree().process_frame
+
+
+static func _wait_seconds(owner: Node, seconds: float) -> void:
+	await owner.get_tree().create_timer(maxf(seconds, 0.01), true).timeout

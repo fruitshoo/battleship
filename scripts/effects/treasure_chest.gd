@@ -3,6 +3,8 @@ extends Node3D
 ## 보물 상자 (Treasure Chest)
 ## 플레이어가 닿으면 특별한 업그레이드 보상을 제공
 
+const TREASURE_REWARD_UI_SCENE := preload("res://scenes/ui/upgrade_ui.tscn")
+
 @export var collection_range: float = 0.65
 @export var magnet_range: float = 6.0
 @export var magnet_speed: float = 12.0
@@ -13,6 +15,7 @@ extends Node3D
 @export_range(-0.5, 1.0, 0.05) var visual_waterline_offset: float = 0.18
 @export_range(0.2, 3.0, 0.05) var wave_tilt_strength: float = 0.55
 @export_range(0.03, 0.3, 0.01) var wave_sample_interval: float = 0.1
+@export_range(-1, 5, 1) var debug_forced_reward_count: int = -1
 
 var _is_collected: bool = false
 var _target_player: Node3D = null
@@ -69,11 +72,11 @@ func _collect() -> void:
 	if is_instance_valid(AudioManager):
 		AudioManager.play_sfx("treasure_collect")
 	
-	# 레벨 매니저를 통해 업그레이드 메뉴 호출 (보물 상자 전용)
-	var lm = LevelManagerRegistry.get_level_manager(get_tree())
-	if lm and lm.has_method("_show_upgrade_ui"):
-		# 보물 상자는 5개의 선택지 제공 및 특별 보너스
-		lm.call_deferred("_show_upgrade_ui", 5)
+	var reward_result := _apply_treasure_reward()
+	if bool(reward_result.get("success", false)):
+		_show_treasure_reward_popup(reward_result)
+	else:
+		_open_fallback_upgrade_choices()
 	
 	# 파티클 효과 (필요 시) 생성 후 제거
 	queue_free()
@@ -94,6 +97,45 @@ func _get_effective_magnet_range(player_ship: Node3D) -> float:
 	if not is_instance_valid(player_ship):
 		return 0.0
 	return maxf(magnet_range, collection_range + 2.0)
+
+
+func _apply_treasure_reward() -> Dictionary:
+	if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("apply_treasure_upgrade_reward"):
+		return UpgradeManager.call("apply_treasure_upgrade_reward", debug_forced_reward_count)
+	return {}
+
+
+func _show_treasure_reward_popup(result: Dictionary) -> void:
+	var popup := TREASURE_REWARD_UI_SCENE.instantiate()
+	if not is_instance_valid(popup):
+		_show_treasure_message(_build_reward_message(result), 2.4)
+		return
+	get_tree().root.add_child(popup)
+	if popup.has_method("show_reward_results"):
+		popup.call("show_reward_results", result)
+	else:
+		popup.queue_free()
+		_show_treasure_message(_build_reward_message(result), 2.4)
+
+
+func _open_fallback_upgrade_choices() -> void:
+	var lm = LevelManagerRegistry.get_level_manager(get_tree())
+	if lm and lm.has_method("_show_upgrade_ui"):
+		lm.call_deferred("_show_upgrade_ui", 5)
+
+
+func _build_reward_message(result: Dictionary) -> String:
+	var applied_count := int(result.get("applied_count", 0))
+	if applied_count <= 0:
+		return "보물 획득"
+	return "보물 강화 +%d" % applied_count
+
+
+func _show_treasure_message(message: String, duration: float) -> void:
+	var player := _get_target_player()
+	var hud = player._find_hud() if is_instance_valid(player) and player.has_method("_find_hud") else null
+	if is_instance_valid(hud) and hud.has_method("show_message"):
+		hud.call("show_message", message, duration)
 
 
 func _apply_floating(delta: float) -> void:

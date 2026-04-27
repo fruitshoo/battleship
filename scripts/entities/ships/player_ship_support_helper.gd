@@ -9,6 +9,8 @@ const SUPPORT_FLEET_PROFILE_META := "support_fleet_profile"
 const SUPPORT_FLEET_ROLE_META := "support_fleet_role"
 const SUPPORT_FLEET_SQUADRON_META := "support_squadron_id"
 const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
+const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
+const SITE_BONUS_COUNTS_META := "sea_site_bonus_counts"
 
 static func spawn_or_repair_ally(ship) -> void:
 	if not ShipAllyRoleHelper.is_player_flagship(ship):
@@ -27,6 +29,7 @@ static func spawn_or_repair_ally(ship) -> void:
 		for support_ship in support_ships:
 			if support_ship.has_method("repair_ship"):
 				support_ship.repair_ship(repair_fraction)
+			_copy_site_bonuses_from_flagship(ship, support_ship)
 			if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
 				upgrade_manager.apply_fleet_upgrades_to_ship(support_ship)
 		print("[Merit] 기존 지원 함대를 수리 및 강화했습니다.")
@@ -58,6 +61,7 @@ static func spawn_or_repair_ally(ship) -> void:
 	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, support_profile)
 	var next_support_order: int = int(ship.get_meta(SUPPORT_FLEET_NEXT_ORDER_META, 0))
 	_configure_support_ship_instance(ally, ship, support_profile, support_slot, next_support_order, true)
+	_copy_site_bonuses_from_flagship(ship, ally)
 
 	ship.get_parent().add_child(ally)
 
@@ -83,6 +87,9 @@ static func spawn_or_repair_ally(ship) -> void:
 		ally.current_speed = maxf(float(ship.get("current_speed")), float(ally.get("move_speed")) * 0.6)
 	if "_last_ai_speed" in ally:
 		ally._last_ai_speed = ally.current_speed
+	var new_support_upgrade_manager = _get_upgrade_manager(ship)
+	if is_instance_valid(new_support_upgrade_manager) and new_support_upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
+		new_support_upgrade_manager.apply_fleet_upgrades_to_ship(ally)
 
 	print("[Summon] 정규군 함선을 소환했습니다! profile=%s squadron=%s slot=%s" % [
 		str(support_profile.get("id", "unknown")),
@@ -145,6 +152,7 @@ static func refresh_support_fleet_composition(ship) -> void:
 		):
 			support_ship.set_meta("support_joining", true)
 		if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
+			_copy_site_bonuses_from_flagship(ship, support_ship)
 			upgrade_manager.apply_fleet_upgrades_to_ship(support_ship)
 
 static func _get_upgrade_manager(ship):
@@ -155,6 +163,19 @@ static func _get_upgrade_manager(ship):
 		if tree != null and is_instance_valid(tree.root):
 			return tree.root.get_node_or_null("UpgradeManager")
 	return null
+
+
+static func _copy_site_bonuses_from_flagship(flagship, support_ship) -> void:
+	if not is_instance_valid(flagship) or not is_instance_valid(support_ship):
+		return
+	for meta_key in [SITE_BONUS_TOTALS_META, SITE_BONUS_COUNTS_META]:
+		if not flagship.has_meta(meta_key):
+			continue
+		var value: Variant = flagship.get_meta(meta_key)
+		if value is Dictionary:
+			support_ship.set_meta(meta_key, (value as Dictionary).duplicate(true))
+		else:
+			support_ship.set_meta(meta_key, value)
 
 static func _get_support_repair_fraction(_ship) -> float:
 	return 0.2

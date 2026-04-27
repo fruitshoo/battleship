@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const CARD_WIDTH := 212
 const CARD_HEIGHT := 352
@@ -12,8 +13,12 @@ const CARD_ENTRY_SCALE := 0.94
 const CARD_FOCUS_SCALE := 1.042
 const CARD_ENTRY_DELAY := 0.055
 const CARD_ENTRY_DURATION := 0.22
+const CARD_ENTRY_Y_OFFSET := 16.0
 const REROLL_ENTRY_DELAY := 0.08
 const CARD_SHEEN_DURATION := 0.46
+const CARD_FOCUS_LIFT_Y := -5.0
+const CARD_CHOICE_FADE_DELAY := 0.05
+const CARD_CHOICE_FADE_DURATION := 0.13
 
 ## 업그레이드 선택 UI
 ## 레벨업 시 3개의 카드를 표시, 플레이어가 하나를 선택
@@ -53,6 +58,13 @@ var _effect_body_font_size_px: int = 13
 var _reroll_width_px: float = 200
 var _reroll_height_px: float = 46
 var _reroll_focused: bool = false
+var _display_only_mode: bool = false
+var _display_close_timer: float = 0.0
+var _display_closing: bool = false
+var _display_pause_active: bool = false
+var _display_previous_paused: bool = false
+var _display_confirm_button: Button = null
+var _reward_level_overrides: Dictionary = {}
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
@@ -135,8 +147,21 @@ func _apply_layout_density() -> void:
 func _process(delta: float) -> void:
 	if _input_lock_timer > 0:
 		_input_lock_timer -= delta
+	if _display_only_mode and visible and _display_close_timer > 0.0:
+		_display_close_timer -= delta
+		if _display_close_timer <= 0.0:
+			_close_display_only()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _display_only_mode:
+		if visible and (_is_confirm_event(event) or event.is_action_pressed("ui_cancel") or _is_keycode_pressed(event, KEY_ESCAPE)):
+			if _is_confirm_event(event) and is_instance_valid(_display_confirm_button) and _display_confirm_button.visible:
+				_display_confirm_button.emit_signal("pressed")
+			else:
+				_close_display_only(true)
+			if get_viewport():
+				get_viewport().set_input_as_handled()
+		return
 	if not visible or card_ids.is_empty() or _input_lock_timer > 0:
 		return
 
@@ -169,7 +194,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif _is_confirm_event(event):
 		if _reroll_focused and reroll_button and not reroll_button.disabled:
-			_on_reroll_pressed()
+			reroll_button.emit_signal("pressed")
 		elif _focused_index >= 0 and _focused_index < card_ids.size():
 			_on_choice_pressed(card_ids[_focused_index])
 		if get_viewport():
@@ -203,10 +228,22 @@ func _update_focus(immediate: bool = false) -> void:
 				blur_tween.tween_property(reroll_button, "scale", Vector2.ONE, 0.12)
 
 func show_upgrades(choices: Array, rerolls: int = 0) -> void:
+	_restore_display_pause()
+	_display_only_mode = false
+	_display_close_timer = 0.0
+	_display_closing = false
+	_reward_level_overrides.clear()
+	_apply_background_fx()
 	_apply_layout_density()
 	card_ids = []
 	_current_reroll_count = rerolls
 	_reroll_focused = false
+	if is_instance_valid(footer_spacer):
+		footer_spacer.visible = true
+	if is_instance_valid(footer_row):
+		footer_row.visible = true
+	if is_instance_valid(_display_confirm_button):
+		_display_confirm_button.visible = false
 	
 	# 기존 카드 제거
 	for child in cards_container.get_children():
@@ -243,16 +280,180 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	_animate_cards_in()
 
 
+func show_reward_results(result: Dictionary, duration: float = -1.0) -> void:
+	add_to_group("treasure_reward_popup")
+	_display_only_mode = true
+	_display_closing = false
+	_reward_level_overrides.clear()
+	_apply_background_fx()
+	_apply_layout_density()
+	card_ids = []
+	_current_reroll_count = 0
+	_reroll_focused = false
+	_pause_tree_for_display()
+
+	if is_instance_valid(title_label):
+		title_label.text = _build_reward_title(result)
+	if is_instance_valid(footer_spacer):
+		footer_spacer.visible = true
+	if is_instance_valid(footer_row):
+		footer_row.visible = true
+	if is_instance_valid(reroll_button):
+		reroll_button.visible = false
+	var confirm_button := _ensure_display_confirm_button()
+	if is_instance_valid(confirm_button):
+		confirm_button.visible = true
+
+	for child in cards_container.get_children():
+		child.queue_free()
+	card_buttons.clear()
+
+	var choices: Array[String] = []
+	var upgrades: Array = result.get("upgrades", [])
+	for entry in upgrades:
+		if not (entry is Dictionary):
+			continue
+		var upgrade_id := str(entry.get("upgrade_id", "")).strip_edges()
+		if upgrade_id.is_empty() or upgrade_id not in UpgradeManager.UPGRADES:
+			continue
+		if choices.has(upgrade_id):
+			continue
+		choices.append(upgrade_id)
+		_reward_level_overrides[upgrade_id] = entry
+
+	_fit_reward_layout_to_card_count(choices.size())
+	for i in range(choices.size()):
+		var upgrade_id := choices[i]
+		card_ids.append(upgrade_id)
+		var card := _create_card(upgrade_id, i)
+		cards_container.add_child(card)
+		card_buttons.append(card)
+
+	_focused_index = -1
+	_prepare_entry_animation()
+	_input_lock_timer = 0.0
+	_display_close_timer = duration
+	visible = true
+
+	background.modulate.a = 0.0
+	$VBox.modulate.a = 0.0
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(background, "modulate:a", 1.0, 0.3)
+	tween.tween_property($VBox, "modulate:a", 1.0, 0.3)
+	_animate_cards_in()
+
+
+func _build_reward_title(result: Dictionary) -> String:
+	var applied_count := int(result.get("applied_count", 0))
+	var requested_count := int(result.get("requested_count", applied_count))
+	if applied_count <= 0:
+		return "보물 획득"
+	if requested_count >= 5:
+		return "보물 대박 강화 +%d" % applied_count
+	if requested_count >= 3:
+		return "보물 희귀 강화 +%d" % applied_count
+	return "보물 강화 +%d" % applied_count
+
+
+func _get_reward_display_duration(card_count: int) -> float:
+	return 2.5 + minf(float(card_count) * 0.4, 1.5)
+
+
+func _close_display_only(play_sound: bool = false) -> void:
+	if not _display_only_mode or _display_closing:
+		return
+	if play_sound:
+		UiButtonAudio.play_click()
+	_display_closing = true
+	_display_only_mode = false
+	card_ids.clear()
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(background, "modulate:a", 0.0, 0.2)
+	tween.tween_property($VBox, "modulate:a", 0.0, 0.2)
+	tween.chain().tween_callback(func():
+		_restore_display_pause()
+		queue_free()
+	)
+
+
+func _pause_tree_for_display() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	if not _display_pause_active:
+		_display_previous_paused = tree.paused
+		_display_pause_active = true
+	tree.paused = true
+
+
+func _restore_display_pause() -> void:
+	if not _display_pause_active:
+		return
+	var tree := get_tree()
+	if tree != null:
+		tree.paused = _display_previous_paused
+	_display_pause_active = false
+
+
+func _exit_tree() -> void:
+	_restore_display_pause()
+
+
+func _ensure_display_confirm_button() -> Button:
+	if not is_instance_valid(_display_confirm_button):
+		_display_confirm_button = Button.new()
+		_display_confirm_button.text = "확인"
+		_display_confirm_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
+		_display_confirm_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		NavalUiTheme.apply_hud_button(_display_confirm_button, roundi(lerpf(15.0, 16.0, clampf((get_viewport().get_visible_rect().size.y - 700.0) / 220.0, 0.0, 1.0))))
+		UiButtonAudio.wire_button(_display_confirm_button)
+		_display_confirm_button.pressed.connect(_close_display_only)
+		footer_row.add_child(_display_confirm_button)
+	_display_confirm_button.text = "확인"
+	_display_confirm_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
+	return _display_confirm_button
+
+
+func _fit_reward_layout_to_card_count(card_count: int) -> void:
+	if card_count <= 3:
+		return
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var viewport_width := viewport.get_visible_rect().size.x
+	var spacing := 10
+	_cards_separation_px = spacing
+	var available_width := maxf(620.0, viewport_width - 92.0)
+	_card_width_px = clampf((available_width - float(card_count - 1) * float(spacing)) / float(card_count), 136.0, CARD_WIDTH)
+	_card_height_px = roundf(_card_width_px * 1.66)
+	_card_art_size_px = roundf(minf(_card_width_px - 28.0, _card_width_px * 0.74))
+	_card_art_corner_radius_px = 10.0
+	_card_placeholder_icon_size_px = roundi(clampf(_card_width_px * 0.22, 30.0, CARD_PLACEHOLDER_ICON_SIZE))
+	_card_corner_radius_px = 14
+	_card_content_padding_px = roundf(clampf(_card_width_px * 0.07, 10.0, CARD_CONTENT_PADDING))
+	_name_font_size_px = roundi(clampf(_card_width_px * 0.12, 17.0, 23.0))
+	_effect_heading_font_size_px = 10
+	_effect_body_font_size_px = 12
+	_level_font_size_px = 12
+	if is_instance_valid(cards_container):
+		cards_container.add_theme_constant_override("separation", spacing)
+	if is_instance_valid(root_vbox):
+		var content_width := roundf(_card_width_px * float(card_count) + float(spacing) * float(card_count - 1) + _card_content_padding_px * 2.0)
+		root_vbox.offset_left = -content_width * 0.5
+		root_vbox.offset_right = content_width * 0.5
+
+
 func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	var data = UpgradeManager.UPGRADES[upgrade_id]
-	var current_lv = UpgradeManager.current_levels[upgrade_id]
-	var next_lv = current_lv + 1
+	var reward_entry: Dictionary = _reward_level_overrides.get(upgrade_id, {})
+	var current_lv := int(reward_entry.get("from_level", UpgradeManager.current_levels[upgrade_id]))
+	var next_lv := int(reward_entry.get("to_level", current_lv + 1))
 	var color = data.get("color", Color.WHITE)
 	
 	var card = PanelContainer.new()
 	card.custom_minimum_size = Vector2(_card_width_px, _card_height_px)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.mouse_default_cursor_shape = Control.CURSOR_ARROW if _display_only_mode else Control.CURSOR_POINTING_HAND
 	
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.055, 0.085, 0.125, 0.96)
@@ -318,7 +519,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	vbox.add_child(rule)
 
 	var effect_heading := Label.new()
-	effect_heading.text = "다음 단계"
+	effect_heading.text = "강화 결과" if _display_only_mode else "다음 단계"
 	effect_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	NavalUiTheme.style_overlay_caption(effect_heading, _effect_heading_font_size_px, color.lerp(NavalUiTheme.TEXT_ACCENT, 0.35), 1)
 	vbox.add_child(effect_heading)
@@ -332,16 +533,17 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	card.set_meta("art_frame", art_frame)
 	card.set_meta("track_badge", meta_row.get_child(0))
 	
-	card.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			_on_choice_pressed(upgrade_id)
-	)
-	card.mouse_entered.connect(func():
-		var idx = card_ids.find(upgrade_id)
-		if idx != -1:
-			_focused_index = idx
-			_update_focus()
-	)
+	if not _display_only_mode:
+		card.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+				_on_choice_pressed(upgrade_id)
+		)
+		card.mouse_entered.connect(func():
+			var idx = card_ids.find(upgrade_id)
+			if idx != -1:
+				_focused_index = idx
+				_update_focus()
+		)
 	
 	return card
 
@@ -432,22 +634,72 @@ void fragment() {
 
 func _on_choice_pressed(upgrade_id: String) -> void:
 	if card_ids.is_empty(): return
-	var chosen_id = upgrade_id
+	var chosen_id := upgrade_id
+	var choice_ids := card_ids.duplicate()
+	var chosen_index := choice_ids.find(chosen_id)
 	card_ids.clear() # 두 번 눌리는 것 방지
+	_input_lock_timer = 0.35
 	
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("ui_click", null, 1.0, -4.0)
-	
-	# 시그널 발생
+	UiButtonAudio.play_upgrade_select()
+
+	_play_choice_selection_animation(chosen_id, choice_ids, chosen_index)
+
+
+func _play_choice_selection_animation(chosen_id: String, choice_ids: Array, chosen_index: int) -> void:
+	if chosen_index < 0:
+		_finish_choice_selection(chosen_id)
+		return
+
+	var tween := _create_ui_tween()
+	tween.set_parallel(true)
+	for i in range(card_buttons.size()):
+		var card := card_buttons[i] as PanelContainer
+		if not is_instance_valid(card):
+			continue
+		var selected := i == chosen_index
+		_apply_choice_card_style(card, str(choice_ids[i]), selected)
+		if selected:
+			tween.tween_property(card, "modulate", Color(1.22, 1.15, 0.92, 1.0), 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		else:
+			tween.tween_property(card, "modulate:a", 0.22, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	var footer_button := _get_visible_footer_button()
+	if footer_button:
+		tween.tween_property(footer_button, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(background, "modulate:a", 0.0, CARD_CHOICE_FADE_DURATION).set_delay(CARD_CHOICE_FADE_DELAY).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property($VBox, "modulate:a", 0.0, CARD_CHOICE_FADE_DURATION).set_delay(CARD_CHOICE_FADE_DELAY).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.finished.connect(_finish_choice_selection.bind(chosen_id), CONNECT_ONE_SHOT)
+
+
+func _create_ui_tween() -> Tween:
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	return tween
+
+
+func _apply_choice_card_style(card: PanelContainer, upgrade_id: String, selected: bool) -> void:
+	if not is_instance_valid(card) or upgrade_id not in UpgradeManager.UPGRADES:
+		return
+	var color: Color = UpgradeManager.UPGRADES[upgrade_id].get("color", Color.WHITE)
+	var style := card.get_theme_stylebox("panel") as StyleBoxFlat
+	if style != null:
+		if selected:
+			style.bg_color = Color(0.105, 0.16, 0.22, 0.99)
+			style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.82).lightened(0.12)
+			style.shadow_size = 22
+			style.shadow_color = Color(color.r, color.g, color.b, 0.26)
+		else:
+			style.bg_color = Color(0.035, 0.055, 0.075, 0.86)
+			style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.18)
+			style.shadow_size = 4
+			style.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
+	if selected:
+		_play_card_focus_sheen(card)
+
+
+func _finish_choice_selection(chosen_id: String) -> void:
+	visible = false
 	upgrade_chosen.emit(chosen_id)
-	
-	# 페이드아웃
-	var tween = create_tween().set_parallel(true)
-	tween.tween_property(background, "modulate:a", 0.0, 0.2)
-	tween.tween_property($VBox, "modulate:a", 0.0, 0.2)
-	tween.chain().tween_callback(func():
-		visible = false
-	)
 
 
 func _on_card_hover(card: PanelContainer, style: StyleBoxFlat, color: Color) -> void:
@@ -472,7 +724,7 @@ func _update_reroll_button(count: int) -> void:
 		reroll_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
 		reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		NavalUiTheme.apply_hud_button(reroll_button, roundi(lerpf(15.0, 16.0, clampf((get_viewport().get_visible_rect().size.y - 700.0) / 220.0, 0.0, 1.0))))
-		
+		UiButtonAudio.wire_button(reroll_button, -4.0, 1.1)
 		reroll_button.pressed.connect(_on_reroll_pressed)
 		
 		# 마우스 호버 지원
@@ -491,10 +743,6 @@ func _update_reroll_button(count: int) -> void:
 
 
 func _on_reroll_pressed() -> void:
-	# 사운드
-	if is_instance_valid(AudioManager):
-		AudioManager.play_sfx("ui_click", null, 1.1, -4.0)
-	
 	reroll_requested.emit()
 
 
@@ -631,7 +879,7 @@ void fragment() {
 	art_frame.set_meta("art_sheen", sheen)
 
 
-func _play_card_focus_sheen(card: PanelContainer) -> void:
+func _play_card_focus_sheen(card: PanelContainer, peak_intensity: float = 0.22, duration: float = CARD_SHEEN_DURATION) -> void:
 	if not is_instance_valid(card):
 		return
 	var art_frame := card.get_meta("art_frame", null) as PanelContainer
@@ -647,10 +895,10 @@ func _play_card_focus_sheen(card: PanelContainer) -> void:
 	sheen_material.set_shader_parameter("intensity", 0.0)
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("sweep", v), -0.35, 1.4, CARD_SHEEN_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("intensity", v), 0.0, 0.22, 0.14)
+	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("sweep", v), -0.35, 1.4, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("intensity", v), 0.0, peak_intensity, 0.14)
 	tween.chain()
-	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("intensity", v), 0.22, 0.0, 0.18)
+	tween.tween_method(func(v: float): sheen_material.set_shader_parameter("intensity", v), peak_intensity, 0.0, 0.18)
 
 
 func _prepare_entry_animation() -> void:
@@ -660,10 +908,12 @@ func _prepare_entry_animation() -> void:
 		card.pivot_offset = card.custom_minimum_size * 0.5
 		card.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		card.scale = Vector2(CARD_ENTRY_SCALE, CARD_ENTRY_SCALE)
-	if reroll_button:
-		reroll_button.pivot_offset = reroll_button.custom_minimum_size * 0.5
-		reroll_button.modulate = Color(1.0, 1.0, 1.0, 0.0)
-		reroll_button.scale = Vector2(0.96, 0.96)
+		card.position.y = CARD_ENTRY_Y_OFFSET
+	var footer_button := _get_visible_footer_button()
+	if footer_button:
+		footer_button.pivot_offset = footer_button.custom_minimum_size * 0.5
+		footer_button.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		footer_button.scale = Vector2(0.96, 0.96)
 
 
 func _animate_cards_in() -> void:
@@ -672,21 +922,32 @@ func _animate_cards_in() -> void:
 		if not is_instance_valid(card):
 			continue
 		var target_scale := Vector2(CARD_FOCUS_SCALE, CARD_FOCUS_SCALE) if i == _focused_index else Vector2.ONE
+		var target_y := CARD_FOCUS_LIFT_Y if i == _focused_index else 0.0
 		var tween := create_tween()
 		tween.tween_interval(CARD_ENTRY_DELAY * float(i))
 		tween.set_parallel(true)
 		tween.tween_property(card, "modulate:a", 1.0, CARD_ENTRY_DURATION)
 		tween.tween_property(card, "scale", target_scale, CARD_ENTRY_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	if reroll_button:
+		tween.tween_property(card, "position:y", target_y, CARD_ENTRY_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	var footer_button := _get_visible_footer_button()
+	if footer_button:
 		var reroll_tween := create_tween()
 		reroll_tween.tween_interval(CARD_ENTRY_DELAY * float(card_buttons.size()) + REROLL_ENTRY_DELAY)
 		reroll_tween.set_parallel(true)
-		reroll_tween.tween_property(reroll_button, "modulate:a", 1.0, 0.18)
-		reroll_tween.tween_property(reroll_button, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		reroll_tween.tween_property(footer_button, "modulate:a", 1.0, 0.18)
+		reroll_tween.tween_property(footer_button, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if _focused_index >= 0 and _focused_index < card_buttons.size():
 		var sheen_tween := create_tween()
 		sheen_tween.tween_interval(CARD_ENTRY_DELAY * float(_focused_index) + 0.12)
 		sheen_tween.tween_callback(func(): _play_card_focus_sheen(card_buttons[_focused_index]))
+
+
+func _get_visible_footer_button() -> Button:
+	if is_instance_valid(_display_confirm_button) and _display_confirm_button.visible:
+		return _display_confirm_button
+	if is_instance_valid(reroll_button) and reroll_button.visible:
+		return reroll_button
+	return null
 
 
 func _apply_card_focus_visuals(card: PanelContainer, color: Color, focused: bool, immediate: bool) -> void:
@@ -704,11 +965,15 @@ func _apply_card_focus_visuals(card: PanelContainer, color: Color, focused: bool
 			style.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
 
 	var target_scale := Vector2(CARD_FOCUS_SCALE, CARD_FOCUS_SCALE) if focused else Vector2.ONE
+	var target_y := CARD_FOCUS_LIFT_Y if focused else 0.0
 	if immediate:
 		card.scale = target_scale
+		card.position.y = target_y
 	else:
 		var tween := create_tween()
+		tween.set_parallel(true)
 		tween.tween_property(card, "scale", target_scale, 0.12)
+		tween.tween_property(card, "position:y", target_y, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 	var art_frame := card.get_meta("art_frame", null) as PanelContainer
 	if is_instance_valid(art_frame):

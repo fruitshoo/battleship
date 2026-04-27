@@ -1,6 +1,8 @@
 extends PanelContainer
 
 
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
+
 signal return_requested
 
 var subtitle_label: Label = null
@@ -39,6 +41,7 @@ func _ready() -> void:
 	return_button.custom_minimum_size = Vector2(220.0, 42.0)
 	return_button.text = "메인 메뉴로"
 	NavalUiTheme.apply_hud_button(return_button, 15)
+	UiButtonAudio.wire_button(return_button)
 	return_button.pressed.connect(_request_return)
 	vbox.add_child(return_button)
 

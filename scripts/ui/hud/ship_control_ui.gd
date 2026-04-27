@@ -215,11 +215,14 @@ func _update_site_marker(delta: float) -> void:
 
 	_site_marker_refresh_left -= delta
 	var previous_site := _nearest_site
+	if not _is_valid_site_marker_target(previous_site):
+		previous_site = null
 	if _site_marker_refresh_left <= 0.0 or not _is_valid_site_marker_target(_nearest_site):
 		_site_marker_refresh_left = SITE_MARKER_REFRESH_INTERVAL
 		_nearest_site = _find_nearest_site()
 
 	if not _is_valid_site_marker_target(_nearest_site):
+		_nearest_site = null
 		_site_marker_alpha = move_toward(_site_marker_alpha, 0.0, delta * SITE_MARKER_FADE_SPEED)
 		site_marker.modulate = Color(1.0, 1.0, 1.0, _site_marker_alpha)
 		site_marker.visible = false
@@ -283,6 +286,8 @@ func _find_nearest_site_in_group(group_name: String) -> Node3D:
 	var closest_site: Node3D = null
 	var closest_distance_sq := INF
 	for candidate in get_tree().get_nodes_in_group(group_name):
+		if not is_instance_valid(candidate) or not (candidate is Node3D):
+			continue
 		var site := candidate as Node3D
 		if not _is_valid_site_marker_target(site):
 			continue
@@ -295,7 +300,7 @@ func _find_nearest_site_in_group(group_name: String) -> Node3D:
 	return closest_site
 
 
-func _is_valid_site_marker_target(site: Node) -> bool:
+func _is_valid_site_marker_target(site: Variant) -> bool:
 	if not is_instance_valid(site) or not (site is Node3D):
 		return false
 	if not site.is_inside_tree():
@@ -309,11 +314,11 @@ func _is_valid_site_marker_target(site: Node) -> bool:
 	return true
 
 
-func _is_treasure_marker_target(site: Node) -> bool:
+func _is_treasure_marker_target(site: Variant) -> bool:
 	return is_instance_valid(site) and site.is_in_group(TREASURE_CHEST_GROUP)
 
 
-func _apply_site_marker_palette(target: Node) -> void:
+func _apply_site_marker_palette(target: Variant) -> void:
 	var is_treasure := _is_treasure_marker_target(target)
 	if is_instance_valid(site_marker_glow):
 		site_marker_glow.color = TREASURE_MARKER_GLOW_COLOR if is_treasure else SITE_MARKER_GLOW_COLOR

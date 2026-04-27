@@ -1154,6 +1154,11 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 		failures.append("hud smoke compass treasure marker was not near the rim: %.2f" % marker.position.length())
 
 	chest.queue_free()
+	await _wait_frames(owner, 8)
+	if not is_instance_valid(marker):
+		failures.append("hud smoke compass marker missing after treasure freed")
+	elif not marker.visible:
+		failures.append("hud smoke compass marker should recover to the remaining sea site after treasure freed")
 	decoy_site.queue_free()
 	control_panel.queue_free()
 	ui_layer.queue_free()

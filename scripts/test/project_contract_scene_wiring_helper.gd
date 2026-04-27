@@ -2,6 +2,7 @@ extends RefCounted
 class_name ProjectContractSceneWiringHelper
 
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
+const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
@@ -2649,6 +2650,10 @@ static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], 
 	for node_path in ["Content/TitleBlock/Title", "Content/TitleBlock/Subtitle", "Content/Body/SummaryPanel/Margin/SummaryList", "Content/Body/WeaponPanel/Margin/WeaponList", "ButtonBlock/RestartButton", "ButtonBlock/MainMenuButton"]:
 		if result_root.get_node_or_null(str(node_path)) == null:
 			failures.append("result scene wiring missing node: %s" % node_path)
+	for button_path in ["ButtonBlock/RestartButton", "ButtonBlock/MainMenuButton"]:
+		var button := result_root.get_node_or_null(button_path) as BaseButton
+		if is_instance_valid(button) and not button.has_meta(UiButtonAudio.WIRED_META):
+			failures.append("result scene button missing ui click sound: %s" % button_path)
 	var button_block := result_root.get_node_or_null("ButtonBlock") as Control
 	var content := result_root.get_node_or_null("Content") as Control
 	if is_instance_valid(button_block) and is_instance_valid(content):

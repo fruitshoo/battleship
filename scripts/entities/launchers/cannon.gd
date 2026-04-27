@@ -3,6 +3,7 @@ extends Node3D
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
 const CANNON_RELOAD_TEMPO_MULT := 1.10
+const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 
 ## 함포 (Cannon)
 ## 범위 내 적을 탐지하고 자동으로 발사 (Area3D 대신 직접 탐지)
@@ -58,8 +59,8 @@ var _cached_projectile_speed: float = 50.0
 
 func _ready() -> void:
 	# 초기 업그레이드 적용
-	_update_cached_stats()
 	_owner_ship = _resolve_owner_ship()
+	_update_cached_stats()
 	_target_scan_left = randf_range(0.0, target_scan_interval)
 	# 업그레이드 발생 시그널 연결
 	var upgrade_manager = _get_upgrade_manager()
@@ -91,6 +92,10 @@ func _update_cached_stats() -> void:
 			float(reload_stats.get("min_cd_mult", 0.75)),
 			1.0 - (float(reload_stats.get("cd_pct_per_lv", 4)) / 100.0) * float(reload_lv)
 		)
+	var site_damage_bonus := _get_owner_site_bonus_total("cannon_damage_pct")
+	var site_reload_bonus := clampf(_get_owner_site_bonus_total("cannon_reload_pct"), 0.0, 0.45)
+	_cached_dmg_mult += site_damage_bonus
+	_cached_cd_mult *= maxf(0.55, 1.0 - site_reload_bonus)
 
 
 func _get_upgrade_manager() -> Node:
@@ -103,6 +108,17 @@ func _get_upgrade_manager() -> Node:
 	if root == null:
 		return null
 	return root.get_node_or_null("UpgradeManager")
+
+
+func _get_owner_site_bonus_total(bonus_id: String) -> float:
+	if not is_instance_valid(_owner_ship):
+		_owner_ship = _resolve_owner_ship()
+	if not is_instance_valid(_owner_ship):
+		return 0.0
+	var totals: Variant = _owner_ship.get_meta(SITE_BONUS_TOTALS_META, {})
+	if totals is Dictionary:
+		return maxf(0.0, float((totals as Dictionary).get(bonus_id, 0.0)))
+	return 0.0
 
 func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 	fleet_damage_mult = dmg_mult
@@ -315,9 +331,6 @@ func _update_target() -> void:
 		if not _is_within_arc(enemy_ship):
 			continue
 			
-		if _is_ship_occupied_by_friendly(enemy_ship):
-			continue
-			
 		# [핵심 로직] 빈 배(is_derelict)는 아예 타겟에서 제외 (시스템 개편)
 		if enemy_ship.get("is_derelict") == true:
 			continue
@@ -346,10 +359,6 @@ func _is_target_valid(target: Variant) -> bool:
 	if not LauncherCombatHelper.is_target_in_range(self, target_node, current_range): return false
 	if not _is_within_arc(target_node): return false
 	
-	# 도선 중이거나 폐선인 배인지 최종 체크
-	if LauncherCombatHelper.has_friendly_boarding_attacker(target_node, team): return false
-		
-	if _is_ship_occupied_by_friendly(target_node): return false
 	return true
 
 func _is_within_arc(target: Node3D) -> bool:
@@ -369,10 +378,6 @@ func _is_within_arc(target: Node3D) -> bool:
 	var angle = rad_to_deg(acos(clamp(dot, -1.0, 1.0)))
 	return angle < detection_arc
 
-
-## 아군 오사 방지를 위해 배에 아군이 있는지 체크
-func _is_ship_occupied_by_friendly(target_ship: Node3D) -> bool:
-	return LauncherCombatHelper.has_alive_soldier_on_team(target_ship, team)
 
 ## 타겟 우선순위를 위해 배에 적군이 있는지 체크
 func _is_ship_occupied_by_enemy(target_ship: Node3D) -> bool:
@@ -487,8 +492,11 @@ func _execute_fire() -> void:
 		ball.crit_chance = _cached_crit_chance
 	if team == "player" and "crit_multiplier" in ball:
 		ball.crit_multiplier = _cached_crit_multiplier
+	var planned_travel_distance: float = muzzle.global_position.distance_to(predicted_pos)
+	if "miss_overshoot_distance" in ball:
+		planned_travel_distance += float(ball.miss_overshoot_distance)
 	if ball.has_method("launch"):
-		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult)
+		ball.launch(muzzle.global_position, team, fire_direction, target_node, final_damage, _cached_range_mult, planned_travel_distance)
 	else:
 		ball.position = muzzle.global_position
 		ball.team = team

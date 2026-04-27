@@ -14,6 +14,8 @@ const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
 @export var homing_duration: float = 0.0 # 유도 제거
 @export var crit_chance: float = 0.2 # 20% 크리티컬 확률
 @export var crit_multiplier: float = 1.5 # 크리티컬 1.5배 데미지
+@export_range(0.0, 24.0, 0.5) var miss_overshoot_distance: float = 8.0
+@export_range(4.0, 48.0, 0.5) var min_miss_travel_distance: float = 12.0
 @export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
@@ -25,6 +27,8 @@ var shooter_label: String = ""
 var launch_origin: Vector3 = Vector3.ZERO
 var time_alive: float = 0.0
 var _life_left: float = 0.0
+var _traveled_distance: float = 0.0
+var _max_travel_distance: float = -1.0
 var _signals_connected: bool = false
 var _base_lifetime: float = 0.0
 var _base_damage: float = 0.0
@@ -43,7 +47,7 @@ func get_base_damage() -> float:
 func pool_capacity() -> int:
 	return 24
 
-func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3, target: Node3D, final_damage: float, lifetime_mult: float = 1.0) -> void:
+func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3, target: Node3D, final_damage: float, lifetime_mult: float = 1.0, max_travel_distance: float = -1.0) -> void:
 	global_position = spawn_position
 	team = fire_team
 	damage = final_damage
@@ -51,6 +55,7 @@ func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3,
 	shooter_label = ""
 	launch_origin = spawn_position
 	time_alive = 0.0
+	_traveled_distance = 0.0
 	has_hit = false
 	_is_releasing = false
 	direction = fire_direction.normalized()
@@ -58,6 +63,7 @@ func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3,
 		direction = Vector3.FORWARD
 	lifetime = _base_lifetime * lifetime_mult
 	_life_left = lifetime
+	_max_travel_distance = _resolve_max_travel_distance(spawn_position, target, max_travel_distance)
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
 	monitoring = false
@@ -66,9 +72,7 @@ func launch(spawn_position: Vector3, fire_team: String, fire_direction: Vector3,
 		collision_mask = 4
 	else:
 		collision_mask = 2
-	if is_instance_valid(smoke_trail):
-		smoke_trail.restart()
-		smoke_trail.emitting = true
+	_configure_smoke_trail_for_launch(spawn_position)
 	var up_vec = Vector3.UP
 	if abs(direction.y) > 0.999:
 		up_vec = Vector3.RIGHT
@@ -79,6 +83,8 @@ func pool_reset() -> void:
 	_is_releasing = false
 	time_alive = 0.0
 	_life_left = 0.0
+	_traveled_distance = 0.0
+	_max_travel_distance = -1.0
 	target_node = null
 	shooter_label = ""
 	launch_origin = Vector3.ZERO
@@ -88,6 +94,21 @@ func pool_reset() -> void:
 	lifetime = _base_lifetime
 	if is_instance_valid(smoke_trail):
 		smoke_trail.emitting = false
+		smoke_trail.visible = false
+
+
+func _configure_smoke_trail_for_launch(spawn_position: Vector3) -> void:
+	if not is_instance_valid(smoke_trail):
+		return
+	var enable_trail := true
+	if is_inside_tree():
+		enable_trail = VfxBudget.allow_spawn(get_tree(), "cannonball_trail", spawn_position, 14, 95.0)
+		if team != "player" and VfxBudget.get_continuous_effect_scale() <= 0.48:
+			enable_trail = false
+	smoke_trail.visible = enable_trail
+	if enable_trail:
+		smoke_trail.restart()
+	smoke_trail.emitting = enable_trail
 
 func _release_self() -> void:
 	if _is_releasing:
@@ -206,6 +227,17 @@ func _physics_process(delta: float) -> void:
 		look_at(global_position + direction, up_vec)
 		
 	var move_vec = direction * speed * delta
+	var move_distance := move_vec.length()
+	var expires_by_distance := false
+	if _max_travel_distance > 0.0:
+		var remaining_distance := _max_travel_distance - _traveled_distance
+		if remaining_distance <= 0.0:
+			_on_travel_limit_reached()
+			return
+		if move_distance >= remaining_distance:
+			move_vec = direction * remaining_distance
+			move_distance = remaining_distance
+			expires_by_distance = true
 	var ray_start := global_position
 	var next_pos = global_position + move_vec
 	
@@ -223,10 +255,15 @@ func _physics_process(delta: float) -> void:
 			DebugDrawBridge.draw_line(ray_start, next_pos, Color(1.0, 0.82, 0.25, 0.45), 0.08, 0.026)
 	if result:
 		global_position = result.position
+		_traveled_distance += ray_start.distance_to(global_position)
 		_check_hit(result.collider)
 		return
-		
+
 	global_position = next_pos
+	_traveled_distance += move_distance
+	if expires_by_distance:
+		_on_travel_limit_reached()
+		return
 	
 	# 수면(y=0.0) 타격 감지 기능 추가
 	if global_position.y <= 0.0:
@@ -237,6 +274,27 @@ func _physics_process(delta: float) -> void:
 			audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
 		has_hit = true
 		_release_self()
+
+
+func _resolve_max_travel_distance(spawn_position: Vector3, target: Node3D, requested_distance: float) -> float:
+	if requested_distance > 0.0:
+		return maxf(requested_distance, min_miss_travel_distance)
+	if not is_instance_valid(target):
+		return -1.0
+	var target_distance := spawn_position.distance_to(NodeContractHelper.get_projectile_aim_point(target, 0.55))
+	return maxf(target_distance + miss_overshoot_distance, min_miss_travel_distance)
+
+
+func _on_travel_limit_reached() -> void:
+	if has_hit or _is_releasing:
+		return
+	_draw_projectile_marker("range", Color(0.25, 0.6, 1.0, 0.95))
+	_spawn_water_explosion()
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("water_splash_large", global_position, randf_range(0.8, 1.2))
+	has_hit = true
+	_release_self()
 
 
 func _on_area_entered(area: Area3D) -> void:
