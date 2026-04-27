@@ -105,23 +105,22 @@ var merit_level: int = 1
 # 레벨별 난이도 설정 (밸런스 조정)
 # spawn_interval: 적 생성 간격 (초)
 # max_enemies: 동시 최대 적 수
-# boarders: 도선 병사 수
 var level_data = {
-	1: {"spawn_interval": 5.2, "max_enemies": 3, "boarders": 1},
-	2: {"spawn_interval": 4.8, "max_enemies": 4, "boarders": 1},
-	3: {"spawn_interval": 4.4, "max_enemies": 5, "boarders": 2},
-	4: {"spawn_interval": 4.0, "max_enemies": 6, "boarders": 2},
-	5: {"spawn_interval": 3.7, "max_enemies": 7, "boarders": 2},
-	6: {"spawn_interval": 3.4, "max_enemies": 8, "boarders": 3},
-	7: {"spawn_interval": 3.1, "max_enemies": 9, "boarders": 3},
-	8: {"spawn_interval": 2.9, "max_enemies": 10, "boarders": 3},
-	9: {"spawn_interval": 2.7, "max_enemies": 11, "boarders": 3},
-	10: {"spawn_interval": 2.5, "max_enemies": 12, "boarders": 4},
-	11: {"spawn_interval": 2.3, "max_enemies": 13, "boarders": 4},
-	12: {"spawn_interval": 2.1, "max_enemies": 15, "boarders": 4},
-	13: {"spawn_interval": 1.9, "max_enemies": 16, "boarders": 5},
-	14: {"spawn_interval": 1.7, "max_enemies": 18, "boarders": 5},
-	15: {"spawn_interval": 1.6, "max_enemies": 20, "boarders": 6},
+	1: {"spawn_interval": 5.2, "max_enemies": 3},
+	2: {"spawn_interval": 4.8, "max_enemies": 4},
+	3: {"spawn_interval": 4.4, "max_enemies": 5},
+	4: {"spawn_interval": 4.0, "max_enemies": 6},
+	5: {"spawn_interval": 3.7, "max_enemies": 7},
+	6: {"spawn_interval": 3.4, "max_enemies": 8},
+	7: {"spawn_interval": 3.1, "max_enemies": 9},
+	8: {"spawn_interval": 2.9, "max_enemies": 10},
+	9: {"spawn_interval": 2.7, "max_enemies": 11},
+	10: {"spawn_interval": 2.5, "max_enemies": 12},
+	11: {"spawn_interval": 2.3, "max_enemies": 13},
+	12: {"spawn_interval": 2.1, "max_enemies": 15},
+	13: {"spawn_interval": 1.9, "max_enemies": 16},
+	14: {"spawn_interval": 1.7, "max_enemies": 18},
+	15: {"spawn_interval": 1.6, "max_enemies": 20},
 }
 
 # 참조
@@ -235,8 +234,7 @@ func _parse_level_progression_levels(levels_root: Dictionary) -> Dictionary:
 		var row: Dictionary = row_variant as Dictionary
 		parsed_levels[level_index] = {
 			"spawn_interval": float(row.get("spawn_interval", 5.0)),
-			"max_enemies": int(row.get("max_enemies", 3)),
-			"boarders": int(row.get("boarders", 1))
+			"max_enemies": int(row.get("max_enemies", 3))
 		}
 	return parsed_levels
 

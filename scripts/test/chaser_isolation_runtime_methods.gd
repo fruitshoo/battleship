@@ -5,7 +5,6 @@ extends "res://scripts/entities/ships/base_ship.gd"
 @export var team: String = "enemy"
 @export var move_speed: float = 3.5
 @export var soldier_scene: PackedScene
-@export var boarders_count: int = 4
 @export var cannon_scene: PackedScene
 @export var hull_scene: PackedScene
 @export var preferred_soldier_type: String = "general"

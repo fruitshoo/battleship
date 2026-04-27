@@ -6,7 +6,6 @@ const DEBUG_CHASER_LOGS := false
 @export var team: String = "enemy"
 @export var move_speed: float = 3.5
 @export var soldier_scene: PackedScene
-@export var boarders_count: int = 4
 @export var cannon_scene: PackedScene
 @export var hull_scene: PackedScene
 @export var preferred_soldier_type: String = "general"
@@ -63,4 +62,3 @@ var _ai_logic_update_interval_runtime: float = 0.2
 var _ai_separation_update_interval_runtime: float = 0.12
 var has_rammed: bool = false
 var _merit_granted: bool = false
-

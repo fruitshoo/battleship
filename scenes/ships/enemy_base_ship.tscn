@@ -15,7 +15,6 @@ size = Vector3(2.52, 2.4, 7.12)
 [node name="EnemyBaseShip" type="Node3D" unique_id=2138341481 groups=["enemy"]]
 script = ExtResource("1_chaser")
 move_speed = 4.2
-boarders_count = 5
 initial_crew_count = 5
 hull_scene = ExtResource("2_73pna")
 preferred_combat_range = 4.5

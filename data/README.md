@@ -20,7 +20,7 @@
 
 1. `level_progression.json`
 - 시간/레벨에 따른 난이도 진행
-- 레벨별 적 생성 간격, 동시 적 수, 도선 병사 수
+- 레벨별 적 생성 간격, 동시 적 수
 - XP/지휘 성장 곡선
 
 2. `reward_rules.json`

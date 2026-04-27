@@ -5,7 +5,6 @@
 
 [node name="EnemyMeleeShip" unique_id=1144275544 instance=ExtResource("1_enemy_base")]
 script = ExtResource("2_enemy_melee_script")
-boarders_count = 6
 initial_crew_count = 6
 preferred_combat_range = 3.8
 combat_range_tolerance = 0.8

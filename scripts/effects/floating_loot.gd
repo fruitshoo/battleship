@@ -4,7 +4,6 @@ extends Area3D
 ## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
 
 @export var gold_amount: int = 15
-@export var xp_amount: int = 15 # Deprecated: 부유물에서는 XP를 지급하지 않음(규칙 단순화용)
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도

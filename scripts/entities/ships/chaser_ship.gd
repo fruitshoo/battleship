@@ -23,7 +23,6 @@ const ENEMY_BOARDING_LATCH_SPEED_BONUS := 0.15
 @export var team: String = "enemy" # "enemy" or "player"
 @export var move_speed: float = 3.5
 @export var soldier_scene: PackedScene
-@export var boarders_count: int = 4 # 도선시킬 병사 수 (상향: 2 -> 4)
 @export_range(1, 12, 1) var initial_crew_count: int = 4
 
 @export var cannon_scene: PackedScene
@@ -260,6 +259,9 @@ func _sync_combat_profile_from_role_accessors() -> void:
 func _load_enemy_crew_composition_from_stats(stats: Dictionary) -> void:
 	enemy_crew_composition = ShipBlueprintHelper.build_crew_composition(stats)
 	_enemy_crew_spawn_index = 0
+	if not enemy_crew_composition.is_empty():
+		max_crew = maxi(max_crew, enemy_crew_composition.size())
+		initial_crew_count = clampi(enemy_crew_composition.size(), 1, max(1, max_crew))
 
 
 func _get_next_enemy_soldier_type() -> String:

@@ -72,7 +72,6 @@
 			"hull_scene": "res://scenes/ships/hulls/kobayabune_hull.tscn",
 			"hull_hp": 100,
 			"move_speed": 7.0,
-			"boarders": 3,
 			"has_cannons": false,
 			"soldier_type": "melee",
 			"crew_composition": {
@@ -86,12 +85,11 @@
 			"hull_scene": "res://scenes/ships/hulls/sekibune_melee_hull.tscn",
 			"hull_hp": 145,
 			"move_speed": 6.0,
-			"boarders": 4,
 			"has_cannons": false,
 			"soldier_type": "melee",
 			"crew_composition": {
-				"melee": 2,
 				"general": 1,
+				"melee": 4,
 				"fire_pot": 1
 			},
 			"collision_fit_scale": 0.95,
@@ -103,12 +101,11 @@
 			"hull_scene": "res://scenes/ships/hulls/sekibune_hull.tscn",
 			"hull_hp": 145,
 			"move_speed": 4.5,
-			"boarders": 3,
 			"has_cannons": true,
 			"soldier_type": "ranged",
 			"crew_composition": {
-				"ranged": 2,
 				"general": 1,
+				"ranged": 4,
 				"fire_pot": 1
 			},
 			"collision_fit_scale": 0.95,
@@ -125,8 +122,8 @@
 			"combat_profile": "mid_boss_gunner",
 			"crew_composition": {
 				"general": 2,
-				"melee": 2,
-				"ranged": 1,
+				"melee": 3,
+				"ranged": 2,
 				"fire_pot": 1
 			},
 			"weapon_loadout": [
@@ -144,9 +141,9 @@
 			"soldier_type": "general",
 			"combat_profile": "final_boss_gunner",
 			"crew_composition": {
-				"general": 1,
-				"melee": 1,
-				"ranged": 1,
+				"general": 2,
+				"melee": 2,
+				"ranged": 3,
 				"fire_pot": 1
 			},
 			"weapon_loadout": [
@@ -164,7 +161,6 @@
 			"hull_scene": "res://scenes/ships/hulls/maengseon_hull.tscn",
 			"hull_hp": 160,
 			"move_speed": 4.5,
-			"boarders": 4,
 			"has_cannons": true,
 			"soldier_type": "general",
 			"weapon_loadout": [
@@ -178,7 +174,6 @@
 			"hull_scene": "res://scenes/ships/hulls/panokseon_hull.tscn",
 			"hull_hp": 240,
 			"move_speed": 3.8,
-			"boarders": 4,
 			"has_cannons": true,
 			"soldier_type": "general",
 			"crew_composition": {
@@ -200,7 +195,6 @@
 			"hull_scene": "res://scenes/ships/hulls/panokseon_hull.tscn",
 			"hull_hp": 270,
 			"move_speed": 6.0,
-			"boarders": 4,
 			"weapon_loadout": [
 				{"profile": "joseon_light_cannon", "name": "CannonFront", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1},
 				{"profile": "joseon_light_cannon", "name": "CannonLeft", "slot": "CannonLeft", "position": [-1.3, 0.6, 0.0], "rotation_y": 90.0, "required_level": 1},

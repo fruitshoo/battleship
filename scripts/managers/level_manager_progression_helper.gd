@@ -150,8 +150,7 @@ static func update_difficulty(lm: Node) -> void:
 	if lm.enemy_spawner.has_method("set_difficulty"):
 		lm.enemy_spawner.set_difficulty(
 			data["spawn_interval"],
-			data["max_enemies"],
-			data.get("boarders", 2)
+			data["max_enemies"]
 		)
 
 static func _env_flag_enabled(name: String) -> bool:

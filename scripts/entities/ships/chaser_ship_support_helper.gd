@@ -223,8 +223,6 @@ static func become_derelict(ship) -> void:
 		print("[Status] 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
 
 	ship.leaking_rate += 1.5
-	if ship.boarders_count > 0:
-		ship.boarders_count = 0
 
 	ship.base_collision_radius *= 0.55
 	ship._sync_profile_from_runtime()

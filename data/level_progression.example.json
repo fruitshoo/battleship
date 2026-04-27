@@ -2,18 +2,15 @@
   "levels": {
     "1": {
       "spawn_interval": 5.2,
-      "max_enemies": 3,
-      "boarders": 1
+      "max_enemies": 3
     },
     "2": {
       "spawn_interval": 4.8,
-      "max_enemies": 4,
-      "boarders": 1
+      "max_enemies": 4
     },
     "3": {
       "spawn_interval": 4.4,
-      "max_enemies": 5,
-      "boarders": 2
+      "max_enemies": 5
     }
   },
   "xp_curve": {

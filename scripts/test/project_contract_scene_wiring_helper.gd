@@ -4,6 +4,7 @@ class_name ProjectContractSceneWiringHelper
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
+const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"
 const AUTHORING_INTENT_FAMILY_ENEMY_RUNTIME := "enemy_runtime"
 const AUTHORING_INTENT_FAMILY_SUPPORT_RUNTIME := "support_runtime"
@@ -206,6 +207,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	_run_ship_ally_role_contract(failures)
 	_run_hull_authoring_marker_contract(failures)
 	_run_ship_blueprint_weapon_loadout_contract(failures)
+	_run_level_progression_contract(failures)
 	_run_enemy_spawn_rules_contract(failures)
 	_run_scenario_action_authoring_negative_contract(failures)
 	_run_authoring_palette_contract(failures)
@@ -905,6 +907,7 @@ static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String])
 	_validate_weapon_profiles(profiles, failures)
 	var ship_archetypes := _load_ship_archetypes(all_stats, failures)
 	_validate_ship_archetypes(ship_archetypes, combat_profiles, profiles, failures)
+	_validate_ship_blueprint_crew_contracts(all_stats, ship_archetypes, combat_profiles, failures)
 	for type_name_variant in all_stats.keys():
 		var type_name := str(type_name_variant)
 		if _is_ship_blueprint_meta_key(type_name):
@@ -927,6 +930,69 @@ static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String])
 			continue
 		var loadout := loadout_variant as Array
 		_validate_weapon_loadout_entries(type_name, resolved_stats, loadout, profiles, failures)
+
+
+static func _validate_ship_blueprint_crew_contracts(all_stats: Dictionary, ship_archetypes: Dictionary, combat_profiles: Dictionary, failures: Array[String]) -> void:
+	var expected_crew_counts := {
+		"kobayabune_melee": 4,
+		"sekibune_melee": 6,
+		"sekibune_cannon": 6,
+		"atakebune_mid": 8,
+		"atakebune_final": 8,
+	}
+	var archetype_variant: Variant = all_stats.get(ShipBlueprintHelper.SHIP_ARCHETYPES, {})
+	if typeof(archetype_variant) == TYPE_DICTIONARY:
+		for archetype_name_variant in (archetype_variant as Dictionary).keys():
+			var archetype_stats: Variant = (archetype_variant as Dictionary)[archetype_name_variant]
+			if typeof(archetype_stats) == TYPE_DICTIONARY and (archetype_stats as Dictionary).has("boarders"):
+				failures.append("ship blueprint archetype %s should not use legacy boarders" % str(archetype_name_variant))
+
+	for type_name_variant in all_stats.keys():
+		var type_name := str(type_name_variant)
+		if _is_ship_blueprint_meta_key(type_name):
+			continue
+		var stats_variant: Variant = all_stats[type_name_variant]
+		if typeof(stats_variant) != TYPE_DICTIONARY:
+			continue
+		var stats := stats_variant as Dictionary
+		if stats.has("boarders"):
+			failures.append("ship blueprint %s should not use legacy boarders" % type_name)
+		if not expected_crew_counts.has(type_name):
+			continue
+		var resolved := ShipBlueprintHelper.resolve_ship_archetype(stats, ship_archetypes)
+		resolved = ShipBlueprintHelper.resolve_combat_profile(resolved, combat_profiles)
+		var actual_count := _count_crew_composition(resolved)
+		var expected_count: int = int(expected_crew_counts[type_name])
+		if actual_count != expected_count:
+			failures.append("ship blueprint %s crew_composition should total %d, got %d" % [type_name, expected_count, actual_count])
+
+
+static func _count_crew_composition(stats: Dictionary) -> int:
+	var composition_variant: Variant = stats.get("crew_composition", {})
+	if typeof(composition_variant) != TYPE_DICTIONARY:
+		return 0
+	var total := 0
+	for count_variant in (composition_variant as Dictionary).values():
+		total += maxi(0, int(count_variant))
+	return total
+
+
+static func _run_level_progression_contract(failures: Array[String]) -> void:
+	var root := _load_json_dictionary(LEVEL_PROGRESSION_DATA_PATH, "level progression", failures)
+	if root.is_empty():
+		return
+	var levels_variant: Variant = root.get("levels", {})
+	if typeof(levels_variant) != TYPE_DICTIONARY:
+		failures.append("level progression levels should be a Dictionary")
+		return
+	for level_key_variant in (levels_variant as Dictionary).keys():
+		var row_variant: Variant = (levels_variant as Dictionary)[level_key_variant]
+		if typeof(row_variant) != TYPE_DICTIONARY:
+			failures.append("level progression level %s should be a Dictionary" % str(level_key_variant))
+			continue
+		var row := row_variant as Dictionary
+		if row.has("boarders"):
+			failures.append("level progression level %s should not use legacy boarders" % str(level_key_variant))
 
 
 static func _load_ship_stats_dictionary(failures: Array[String]) -> Dictionary:

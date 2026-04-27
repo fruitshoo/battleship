@@ -13,7 +13,6 @@ const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 @export var min_spawn_distance: float = 50.0 # 최소 생성 거리 (화면 안으로 더 빨리 들어오게 조정)
 @export var max_spawn_distance: float = 70.0 # 최대 생성 거리
 @export var max_enemies: int = 3 # 최대 적 수
-@export var current_boarders: int = 1 # 레벨에 따른 도선 병사 수
 @export var max_distance_limit: float = 115.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
 
@@ -93,10 +92,9 @@ func _spawn_boss() -> Node3D:
 	return boss
 
 
-func set_difficulty(new_interval: float, new_max: int, new_boarders: int = 2) -> void:
+func set_difficulty(new_interval: float, new_max: int) -> void:
 	spawn_interval = new_interval
 	max_enemies = new_max
-	current_boarders = new_boarders
 	# timer가 너무 길게 남았으면 즉시 단축
 	if timer > spawn_interval:
 		timer = spawn_interval
@@ -260,10 +258,6 @@ func _spawn_enemy_from_template(fleet_template: Array[Dictionary], remaining_slo
 		enemy.global_position = spawn_pos
 		EnemySpawnerFleetHelper.apply_authoring_runtime_overrides(enemy, slot_info)
 		_prime_enemy_momentum(enemy)
-		
-		# 레벨 기반 스탯 설정 (이동 속도와 HP는 함선 씬 고유 스탯을 사용하도록 수정)
-		if "boarders_count" in enemy:
-			enemy.boarders_count = current_boarders
 
 
 ## 스폰 위치 계산 (플레이어 전방 집중 및 부하 선박 회피)

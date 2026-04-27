@@ -163,8 +163,6 @@ static func apply_chaser_stats(ship, stats: Dictionary) -> void:
 		ship.max_hull_hp = float(stats["hull_hp"])
 	if stats.has("move_speed"):
 		ship.move_speed = float(stats["move_speed"])
-	if stats.has("boarders"):
-		ship.boarders_count = int(stats["boarders"])
 	if stats.has("has_cannons"):
 		ship.has_cannons = stats["has_cannons"] == true
 	if stats.has("soldier_type"):

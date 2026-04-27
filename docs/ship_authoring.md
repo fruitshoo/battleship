@@ -17,7 +17,7 @@ Core blueprint fields:
 - `hull_scene`: hull scene used by editor previews and runtime spawning
 - `hull_hp`, `move_speed`, `deck_height`: base physical stats
 - `combat_profile`: reusable AI posture from `combat_profiles`
-- `crew_composition`: ordered crew bag expanded by `ShipBlueprintHelper`
+- `crew_composition`: ordered crew bag expanded by `ShipBlueprintHelper`; for enemy and boss ships, its total count is the initial crew count
 - `weapon_loadout`: ship weapons assembled by `ShipWeaponLoadoutHelper`
 
 `ShipBlueprintHelper` keeps fallback hull mapping for legacy ship ids, but the
