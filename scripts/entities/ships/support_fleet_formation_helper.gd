@@ -4,6 +4,7 @@ class_name SupportFleetFormationHelper
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
 const SUPPORT_FLEET_SQUADRON_META := "support_squadron_id"
+const SUPPORT_FLEET_SLOT_INDEX_META := "support_fleet_slot_index"
 
 const ROLE_SCREEN_LEAD := "screen_lead"
 const ROLE_SCREEN_FLANK := "screen_flank"
@@ -20,6 +21,74 @@ const FOLLOW_DISTANCE_PAD := 2.0
 const GENERIC_LATERAL_PAD := 1.6
 const ARTILLERY_LATERAL_PAD := 2.35
 const ROLE_EXTRA_TRAIL_PAD := 1.1
+const ROLE_ANCHOR_FLAGSHIP := "flagship"
+const ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN := "squadron_lead_in_column"
+const GENERATED_WING_FIRST_ROW_TRAIL_SCALE := 0.42
+const GENERATED_WING_ROW_TRAIL_SCALE := 0.36
+const GENERATED_WING_LATERAL_ROW_SCALE := 0.72
+const GENERATED_CENTER_TAIL_TRAIL_PAD := 0.35
+
+const ROLE_SPECS := {
+	ROLE_SCREEN_LEAD: {
+		"anchor": ROLE_ANCHOR_FLAGSHIP,
+		"wing_side": -1.0,
+		"wing_lateral": 1.28,
+		"wing_spacing": -0.68,
+		"column_spacing": 0.92,
+		"lateral_pad": GENERIC_LATERAL_PAD,
+		"wing_direct_depth": true,
+		"hold_line": false,
+	},
+	ROLE_SCREEN_FLANK: {
+		"anchor": ROLE_ANCHOR_FLAGSHIP,
+		"wing_side": 1.0,
+		"wing_lateral": 1.28,
+		"wing_spacing": -0.68,
+		"column_spacing": 0.96,
+		"lateral_pad": GENERIC_LATERAL_PAD,
+		"wing_direct_depth": true,
+		"hold_line": false,
+	},
+	ROLE_RESCUE_REAR: {
+		"anchor": ROLE_ANCHOR_FLAGSHIP,
+		"wing_side": 0.0,
+		"wing_lateral": 0.0,
+		"wing_spacing": 2.05,
+		"column_spacing": 1.75,
+		"lateral_pad": GENERIC_LATERAL_PAD,
+		"hold_line": false,
+	},
+	ROLE_ARTILLERY_LEAD: {
+		"anchor": ROLE_ANCHOR_FLAGSHIP,
+		"wing_side": 0.0,
+		"wing_lateral": 0.0,
+		"wing_spacing": 1.36,
+		"column_spacing": 1.18,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"extra_trail_pad": ROLE_EXTRA_TRAIL_PAD,
+		"rescue_lane": true,
+		"rescue_lateral": 0.92,
+		"hold_line": true,
+	},
+	ROLE_ARTILLERY_SCREEN_LEFT: {
+		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
+		"wing_side": -1.0,
+		"wing_lateral": 1.36,
+		"wing_spacing": 1.62,
+		"column_spacing": 1.02,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"hold_line": false,
+	},
+	ROLE_ARTILLERY_SCREEN_RIGHT: {
+		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
+		"wing_side": 1.0,
+		"wing_lateral": 1.36,
+		"wing_spacing": 1.62,
+		"column_spacing": 1.02,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"hold_line": false,
+	},
+}
 
 
 static func get_support_fleet_offset(ship, my_index: int, spacing: float, roster_size: int = -1) -> Vector3:
@@ -30,7 +99,7 @@ static func get_support_fleet_offset(ship, my_index: int, spacing: float, roster
 	var formation_value := _get_formation_value(ship)
 	var base_spacing := maxf(spacing, _get_ship_spacing_hint(ship))
 	var trail_distance := _get_role_spacing_value(base_spacing, role_name, formation_value)
-	var lateral_distance := _get_role_lateral_distance(ship, ship.target as Node3D, base_spacing, role_name, formation_value, my_index)
+	var lateral_distance := _get_role_lateral_distance(ship, _get_flagship_anchor(ship), base_spacing, role_name, formation_value, my_index)
 	return Vector3(lateral_distance, 0.0, trail_distance)
 
 
@@ -39,9 +108,13 @@ static func get_support_join_offset(ship, my_index: int) -> Vector3:
 
 
 static func get_support_lead_ship(ship, minions: Array, my_index: int) -> Node3D:
-	if _get_formation_value(ship) == FORMATION_COLUMN:
+	var formation_value := _get_formation_value(ship)
+	if formation_value == FORMATION_COLUMN:
 		return _get_generic_support_lead_ship(ship, minions, my_index)
 	if not _is_named_support_role(_get_support_slot_role(ship)):
+		var flagship_anchor := _get_flagship_anchor(ship)
+		if is_instance_valid(flagship_anchor):
+			return flagship_anchor
 		return _get_generic_support_lead_ship(ship, minions, my_index)
 	var role_anchor := _resolve_role_anchor_ship(ship, minions)
 	if is_instance_valid(role_anchor):
@@ -101,7 +174,8 @@ static func get_support_join_chain_goal(ship, minions: Array, my_index: int, tra
 static func should_hold_line_during_free_assist(ship) -> bool:
 	if not is_instance_valid(ship):
 		return false
-	if _get_support_slot_role(ship) == ROLE_ARTILLERY_LEAD:
+	var role_spec := _get_role_spec(_get_support_slot_role(ship))
+	if role_spec.get("hold_line", false) == true:
 		return true
 	var ship_type_value: Variant = ship.get("ship_type")
 	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
@@ -209,22 +283,60 @@ static func _get_generic_support_chain_goal(ship, minions: Array, my_index: int,
 
 static func _get_generic_support_formation_offset(ship, my_index: int, spacing: float, roster_size: int = -1) -> Vector3:
 	var formation_value := _get_formation_value(ship)
-	var effective_roster_size: int = roster_size if roster_size >= 0 else (my_index + 1)
-	var base_spacing: float = maxf(spacing, 0.01)
+	var generated_slot := _get_generated_support_slot(ship, my_index, spacing, roster_size, formation_value)
+	return Vector3(
+		float(generated_slot.get("lateral", 0.0)),
+		0.0,
+		float(generated_slot.get("trailing", maxf(spacing, 0.01)))
+	)
+
+
+static func _get_generated_support_slot(ship, my_index: int, spacing: float, roster_size: int, formation_value: int) -> Dictionary:
+	var index: int = maxi(my_index, 0)
+	var effective_roster_size: int = maxi(roster_size, index + 1) if roster_size >= 0 else index + 1
+	var base_spacing: float = maxf(maxf(spacing, _get_ship_spacing_hint(ship)), 0.01)
+	if formation_value == FORMATION_COLUMN:
+		return {
+			"row": float(index + 1),
+			"side": 0.0,
+			"lateral": 0.0,
+			"trailing": base_spacing * (float(index) + 1.0),
+		}
 	if effective_roster_size <= 1:
-		return Vector3(0.0, 0.0, base_spacing)
-	var row: float = floor(my_index / 2.0) + 1.0
-	var has_center_tail: bool = effective_roster_size % 2 == 1 and my_index == effective_roster_size - 1
+		return {
+			"row": 1.0,
+			"side": 0.0,
+			"lateral": 0.0,
+			"trailing": base_spacing,
+		}
+	var row: float = floor(float(index) / 2.0) + 1.0
+	var has_center_tail: bool = effective_roster_size % 2 == 1 and index == effective_roster_size - 1
 	if has_center_tail:
-		return Vector3(0.0, 0.0, base_spacing * (row + 0.35))
-	var side: float = 1.0 if my_index % 2 == 0 else -1.0
-	match formation_value:
-		FORMATION_WING:
-			var lateral: float = base_spacing * 1.18 * row
-			var trailing: float = base_spacing * 0.58 + (row - 1.0) * base_spacing * 0.18
-			return Vector3(lateral * side, 0.0, trailing)
-		_:
-			return Vector3(0.0, 0.0, base_spacing + (my_index * base_spacing))
+		return {
+			"row": row + GENERATED_CENTER_TAIL_TRAIL_PAD,
+			"side": 0.0,
+			"lateral": 0.0,
+			"trailing": base_spacing * (row + GENERATED_CENTER_TAIL_TRAIL_PAD),
+		}
+	var side: float = 1.0 if index % 2 == 0 else -1.0
+	var lateral: float = _get_generated_lateral_distance(ship, base_spacing, row)
+	var trailing: float = base_spacing * (
+		GENERATED_WING_FIRST_ROW_TRAIL_SCALE
+		+ maxf(row - 1.0, 0.0) * GENERATED_WING_ROW_TRAIL_SCALE
+	)
+	return {
+		"row": row,
+		"side": side,
+		"lateral": lateral * side,
+		"trailing": trailing,
+	}
+
+
+static func _get_generated_lateral_distance(ship, base_spacing: float, row: float) -> float:
+	var half_extents := _get_ship_half_extents(ship)
+	var lane_spacing := maxf(base_spacing, half_extents.x * 2.0 + GENERIC_LATERAL_PAD)
+	var lateral_row_scale: float = 1.0 + maxf(row - 1.0, 0.0) * GENERATED_WING_LATERAL_ROW_SCALE
+	return lane_spacing * lateral_row_scale
 
 
 static func _get_generic_support_lead_ship(ship, minions: Array, my_index: int) -> Node3D:
@@ -244,17 +356,14 @@ static func _resolve_role_anchor_ship(ship, minions: Array) -> Node3D:
 	var role_name := _get_support_slot_role(ship)
 	if not _is_named_support_role(role_name):
 		return null
-	if _get_formation_value(ship) == FORMATION_WING:
-		return flagship_anchor
-	if role_name == ROLE_ARTILLERY_SCREEN_LEFT or role_name == ROLE_ARTILLERY_SCREEN_RIGHT:
+	var anchor_mode := str(_get_role_spec(role_name).get("anchor", ROLE_ANCHOR_FLAGSHIP))
+	if _get_formation_value(ship) == FORMATION_COLUMN and anchor_mode == ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN:
 		var squadron_id := _get_support_squadron_id(ship)
 		var lead_ship := _find_squadron_lead(minions, squadron_id)
 		if is_instance_valid(lead_ship) and lead_ship != ship:
 			return lead_ship
 		return flagship_anchor
-	if role_name == ROLE_SCREEN_LEAD or role_name == ROLE_SCREEN_FLANK or role_name == ROLE_RESCUE_REAR or role_name == ROLE_ARTILLERY_LEAD:
-		return flagship_anchor
-	return null
+	return flagship_anchor
 
 
 static func _find_squadron_lead(minions: Array, squadron_id: String) -> Node3D:
@@ -272,27 +381,42 @@ static func _find_squadron_lead(minions: Array, squadron_id: String) -> Node3D:
 static func _get_role_follow_distance(ship, anchor_ship: Node3D, trailing_distance: float, role_name: String, formation_value: int) -> float:
 	var base_spacing := maxf(trailing_distance, _get_ship_spacing_hint(ship))
 	var desired_spacing := _get_role_spacing_value(base_spacing, role_name, formation_value)
-	if role_name == ROLE_ARTILLERY_LEAD:
-		desired_spacing += ROLE_EXTRA_TRAIL_PAD
+	var role_spec := _get_role_spec(role_name)
+	desired_spacing += float(role_spec.get("extra_trail_pad", 0.0))
+	if formation_value == FORMATION_WING and role_spec.get("wing_direct_depth", false) == true:
+		return desired_spacing
 	return get_follow_distance(ship, anchor_ship, desired_spacing)
 
 
 static func _get_role_lateral_distance(ship, anchor_ship: Node3D, spacing: float, role_name: String, formation_value: int, my_index: int) -> float:
 	var flagship := _get_flagship_anchor(ship)
-	var rescue_lane: bool = role_name == ROLE_ARTILLERY_LEAD and is_instance_valid(flagship) and (flagship.get("deck_is_overrun") == true or flagship.get("deck_is_contested") == true or int(flagship.get("deck_hostile_boarder_count")) > 0)
-	var lateral_scale: float = 0.92 if rescue_lane else _get_role_lateral_scale(role_name, formation_value)
+	var role_spec := _get_role_spec(role_name)
+	var rescue_lane: bool = role_spec.get("rescue_lane", false) == true and is_instance_valid(flagship) and (flagship.get("deck_is_overrun") == true or flagship.get("deck_is_contested") == true or int(flagship.get("deck_hostile_boarder_count")) > 0)
+	var lateral_scale: float = float(role_spec.get("rescue_lateral", 0.92)) if rescue_lane else _get_role_lateral_scale(role_name, formation_value)
 	if absf(lateral_scale) <= 0.001:
 		return 0.0
-	var side_sign: float = (1.0 if int(ship.get_instance_id()) % 2 == 0 else -1.0) if rescue_lane else _get_role_side_sign(role_name, my_index)
+	var side_sign: float = _get_rescue_lane_side_sign(ship, role_name, my_index) if rescue_lane else _get_role_side_sign(role_name, my_index)
 	var pair_spacing := _get_pair_lateral_spacing(ship, anchor_ship, role_name)
 	var minimum_spacing := maxf(spacing * 0.68, pair_spacing)
 	return minimum_spacing * lateral_scale * side_sign
 
 
+static func _get_rescue_lane_side_sign(ship, role_name: String, my_index: int) -> float:
+	var role_side := _get_role_side_sign(role_name, my_index)
+	if absf(role_side) > 0.001:
+		return role_side
+	var slot_index := my_index
+	if is_instance_valid(ship):
+		slot_index = int(ship.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, my_index))
+	return 1.0 if slot_index % 2 == 0 else -1.0
+
+
 static func _get_pair_lateral_spacing(ship, anchor_ship: Node3D, role_name: String) -> float:
 	var ship_half := _get_ship_half_extents(ship)
 	var anchor_half := _get_ship_half_extents(anchor_ship)
-	var pad := ARTILLERY_LATERAL_PAD if role_name.begins_with("artillery_") else GENERIC_LATERAL_PAD
+	var role_spec := _get_role_spec(role_name)
+	var fallback_pad := ARTILLERY_LATERAL_PAD if role_name.begins_with("artillery_") else GENERIC_LATERAL_PAD
+	var pad := float(role_spec.get("lateral_pad", fallback_pad))
 	return ship_half.x + anchor_half.x + pad
 
 
@@ -316,57 +440,29 @@ static func _get_ship_spacing_hint(ship) -> float:
 
 
 static func _get_role_spacing_value(base_spacing: float, role_name: String, formation_value: int) -> float:
-	match role_name:
-		ROLE_ARTILLERY_LEAD:
-			return base_spacing * (1.46 if formation_value == FORMATION_WING else 1.18)
-		ROLE_ARTILLERY_SCREEN_LEFT, ROLE_ARTILLERY_SCREEN_RIGHT:
-			return base_spacing * (1.62 if formation_value == FORMATION_WING else 1.02 if formation_value == FORMATION_COLUMN else 0.9)
-		ROLE_RESCUE_REAR:
-			return base_spacing * (2.05 if formation_value == FORMATION_WING else 1.75)
-		ROLE_SCREEN_FLANK:
-			return base_spacing * (0.9 if formation_value == FORMATION_WING else 0.96)
-		ROLE_SCREEN_LEAD:
-			return base_spacing * (0.9 if formation_value == FORMATION_WING else 0.92)
-		_:
-			return base_spacing
+	var role_spec := _get_role_spec(role_name)
+	if role_spec.is_empty():
+		return base_spacing
+	var spacing_key := "wing_spacing" if formation_value == FORMATION_WING else "column_spacing"
+	return base_spacing * float(role_spec.get(spacing_key, 1.0))
 
 
 static func _get_role_lateral_scale(role_name: String, formation_value: int) -> float:
 	if formation_value != FORMATION_WING:
 		return 0.0
-	match role_name:
-		ROLE_SCREEN_LEAD, ROLE_SCREEN_FLANK:
-			return 0.98
-		ROLE_ARTILLERY_LEAD:
-			return 0.42
-		ROLE_ARTILLERY_SCREEN_LEFT, ROLE_ARTILLERY_SCREEN_RIGHT:
-			return 1.36
-		_:
-			return 0.0
+	return float(_get_role_spec(role_name).get("wing_lateral", 0.0))
 
 
 static func _get_role_side_sign(role_name: String, my_index: int) -> float:
-	match role_name:
-		ROLE_SCREEN_LEAD:
-			return -1.0
-		ROLE_SCREEN_FLANK:
-			return 1.0
-		ROLE_ARTILLERY_LEAD:
-			return 1.0
-		ROLE_ARTILLERY_SCREEN_LEFT:
-			return -1.0
-		ROLE_ARTILLERY_SCREEN_RIGHT:
-			return 1.0
-		_:
-			return 0.0
+	return float(_get_role_spec(role_name).get("wing_side", 0.0))
 
 
 static func _is_named_support_role(role_name: String) -> bool:
-	match role_name:
-		ROLE_SCREEN_LEAD, ROLE_SCREEN_FLANK, ROLE_RESCUE_REAR, ROLE_ARTILLERY_LEAD, ROLE_ARTILLERY_SCREEN_LEFT, ROLE_ARTILLERY_SCREEN_RIGHT:
-			return true
-		_:
-			return false
+	return ROLE_SPECS.has(role_name)
+
+
+static func _get_role_spec(role_name: String) -> Dictionary:
+	return ROLE_SPECS.get(role_name, {})
 
 
 static func _get_formation_value(ship) -> int:

@@ -28,6 +28,7 @@ static func process_hud(hud, delta: float) -> void:
 			hud._sync_debug_tools_panel_state()
 	if hud.show_ship_health_bars:
 		hud._update_ship_health_bars(true)
+	hud._update_player_status_overlay(true)
 	hud._hud_refresh_left -= delta
 	if hud._hud_refresh_left <= 0.0:
 		hud._hud_refresh_left = hud.hud_refresh_interval
@@ -36,6 +37,7 @@ static func process_hud(hud, delta: float) -> void:
 		hud._update_force_panel()
 		hud._update_hull_display()
 		hud._update_stamina_display()
+		hud._update_player_status_overlay(false)
 		hud._update_boarding_display()
 		hud._update_capture_opportunity_display()
 		hud._update_boss_hp_display()

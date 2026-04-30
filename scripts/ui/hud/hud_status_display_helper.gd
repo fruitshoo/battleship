@@ -50,14 +50,14 @@ static func update_merit(hud, current: int, maximum: int, level: int = 1) -> voi
 
 		if hud.merit_label:
 			if current >= maximum:
-				hud.merit_label.text = "[ 병영 LEVEL UP! ]"
+				hud.merit_label.text = "[ 백병전 업그레이드! ]"
 				hud.merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
 
 				var style := hud.merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
 				if style:
 					style.bg_color = Color(1.0, 0.94, 0.58, 1.0)
 			else:
-				hud.merit_label.text = "지휘 Lv.%d (%d / %d)" % [level, current, maximum]
+				hud.merit_label.text = "백병전 Lv.%d (%d / %d)" % [level, current, maximum]
 				hud.merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
 
 				var style_normal := hud.merit_bar.get_theme_stylebox("fill") as StyleBoxFlat

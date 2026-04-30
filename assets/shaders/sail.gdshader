@@ -42,6 +42,7 @@ uniform float burn_edge_emission_strength : hint_range(0.0, 2.0) = 0.28;
 uniform vec3 deform_bounds_min = vec3(-2.0, -3.0, 0.0);
 uniform vec3 deform_bounds_size = vec3(4.0, 6.0, 0.001);
 uniform float bottom_width_scale : hint_range(0.35, 1.25) = 1.0;
+uniform float sail_deployed_ratio : hint_range(0.0, 1.0) = 1.0;
 
 vec2 apply_sail_uv_transform(vec2 source_uv, vec2 uv_scale, vec2 uv_offset) {
 	vec2 sail_uv = source_uv;
@@ -98,8 +99,12 @@ void vertex() {
 	float horizontal = clamp((base_vertex.x - deform_bounds_min.x) / width, 0.0, 1.0);
 	float vertical = clamp((base_vertex.y - deform_bounds_min.y) / height, 0.0, 1.0);
 	float center_x = deform_bounds_min.x + width * 0.5;
+	float deployed = clamp(sail_deployed_ratio, 0.0, 1.0);
+	float motion_scale = smoothstep(0.05, 1.0, deployed);
 	float width_scale = mix(bottom_width_scale, 1.0, vertical);
+	float folded_vertical = mix(vertical * 0.07, vertical, deployed);
 	VERTEX.x = center_x + (base_vertex.x - center_x) * width_scale;
+	VERTEX.y = deform_bounds_min.y + height * folded_vertical;
 	float bottom_loose_mask = pow(1.0 - vertical, 0.8);
 	float whole_sail_mask = mix(0.35, 1.0, bottom_loose_mask);
 	float middle_billow_mask = sin(vertical * PI);
@@ -110,20 +115,20 @@ void vertex() {
 	// 1. Billow Effect (Forward bulge)
 	// Local -Z is the front of the ship. We subtract to bulge forward.
 	// We use billow_mask so the bulge is concentrated in the middle.
-	float billow = middle_billow_mask * (0.45 + wind_strength * 1.05);
+	float billow = middle_billow_mask * (0.45 + wind_strength * 1.05) * motion_scale;
 	VERTEX.z -= billow;
 	
 	// 2. Sag Effect (Hanging down)
 	// Stronger when wind_strength is LOW (close to 0).
 	float sag_factor = clamp(1.0 - wind_strength, 0.0, 1.0);
-	float sag = sag_factor * 0.35 * sin(horizontal * PI) * whole_sail_mask;
+	float sag = sag_factor * 0.35 * sin(horizontal * PI) * whole_sail_mask * motion_scale;
 	VERTEX.y -= sag;
 	
 	// Added a slight Z push back when sagging to look collapsed
 	VERTEX.z += sag * 0.25;
 	
 	// 3. Waving/Flapping Motion
-	float flap_limit = 0.32 * wind_strength + 0.10;
+	float flap_limit = (0.32 * wind_strength + 0.10) * motion_scale;
 	float flap = sin(TIME * wave_speed + vertical * 7.0 + horizontal * 2.0) * wave_strength * flap_limit;
 	
 	// Add some secondary high-frequency ripple
@@ -138,7 +143,7 @@ void vertex() {
 	float flutter_time = TIME * (wave_speed * 2.65 + flutter_strength * 2.0) + flutter_phase;
 	float traveling_ripple = sin(flutter_time + horizontal * 16.0 + vertical * 3.5);
 	traveling_ripple += sin(flutter_time * 1.37 + horizontal * 25.0 - vertical * 6.0) * 0.42;
-	float flutter = traveling_ripple * wave_strength * flutter_strength * 0.18 * flutter_mask;
+	float flutter = traveling_ripple * wave_strength * flutter_strength * 0.18 * flutter_mask * motion_scale;
 	VERTEX.x += flutter * 0.18 * side_edge_mask;
 	VERTEX.y += flutter * 0.10 * lower_edge_mask;
 	flap += flutter;
@@ -148,6 +153,10 @@ void vertex() {
 
 // Damage / burn appearance
 void fragment() {
+	float sail_visibility = smoothstep(0.04, 0.22, clamp(sail_deployed_ratio, 0.0, 1.0));
+	if (sail_visibility <= 0.01) {
+		discard;
+	}
 	vec2 base_uv = UV;
 	float seed = damage_seed * 17.0;
 	float erosion_field = get_erosion_field(base_uv, seed);
@@ -211,7 +220,7 @@ void fragment() {
 		vec3 char_color = base_color * vec3(0.26, 0.18, 0.14);
 		vec3 ember_tint = base_color * vec3(0.56, 0.22, 0.12);
 		ALBEDO = mix(base_color, mix(char_color, ember_tint, burn_mask * 0.28), burn_scorch_mask);
-		ALPHA = clamp(texture_alpha * view_fade_alpha, 0.0, 1.0);
+		ALPHA = clamp(texture_alpha * view_fade_alpha * sail_visibility, 0.0, 1.0);
 	} else {
 		if (damage_alpha <= 0.14) {
 			discard;
@@ -219,7 +228,7 @@ void fragment() {
 		vec3 char_color = albedo.rgb * vec3(0.26, 0.18, 0.14);
 		vec3 ember_tint = albedo.rgb * vec3(0.56, 0.22, 0.12);
 		ALBEDO = mix(albedo.rgb, mix(char_color, ember_tint, burn_mask * 0.28), burn_scorch_mask);
-		ALPHA = clamp(damage_alpha * view_fade_alpha, 0.0, 1.0);
+		ALPHA = clamp(damage_alpha * view_fade_alpha * sail_visibility, 0.0, 1.0);
 	}
 	vec3 burn_edge_emission = burn_edge_emission_color * (burn_edge_emission_mask * burn_edge_emission_strength * ember_variation);
 	vec3 burn_core_emission = burn_core_emission_color * (burn_core_emission_mask * burn_edge_emission_strength * 0.72 * emission_variation);

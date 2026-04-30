@@ -53,6 +53,8 @@ func _ready() -> void:
 	if quit_btn.visible:
 		_menu_buttons.append(quit_btn)
 	_apply_layout_density()
+	if not LocaleManager.locale_changed.is_connected(_on_locale_changed):
+		LocaleManager.locale_changed.connect(_on_locale_changed)
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
 	_wire_button_interactions()
@@ -68,13 +70,25 @@ func _apply_ui_theme() -> void:
 		divider,
 		footer_hint_label
 	)
-	ModalMenuSkin.decorate_pause_button(resume_btn, "계속하기", "현재 전투와 항해로 돌아갑니다", "ESC", true)
-	ModalMenuSkin.decorate_pause_button(options_btn, "설정", "소리와 입력, 표시 옵션을 조정합니다", "", false)
-	ModalMenuSkin.decorate_pause_button(main_menu_btn, "메인 메뉴", "항구 화면으로 나가고 현재 항해를 정리합니다", "", false)
-	ModalMenuSkin.decorate_pause_button(quit_btn, "게임 종료", "현재 세션을 마치고 프로그램을 종료합니다", "", false)
+	if is_instance_valid(eyebrow_label):
+		eyebrow_label.text = LocaleManager.t("pause.eyebrow", "항해 정지")
+	if is_instance_valid(title_label):
+		title_label.text = LocaleManager.t("pause.title", "일시정지")
+	if is_instance_valid(subtitle_label):
+		subtitle_label.text = LocaleManager.t("pause.subtitle", "전투와 항해가 잠시 멈췄습니다")
+	if is_instance_valid(footer_hint_label):
+		footer_hint_label.text = LocaleManager.t("pause.footer", "ESC 복귀 · 방향키 또는 마우스로 선택")
+	ModalMenuSkin.decorate_pause_button(resume_btn, LocaleManager.t("pause.resume", "계속하기"), LocaleManager.t("pause.resume.desc", "현재 전투와 항해로 돌아갑니다"), "ESC", true)
+	ModalMenuSkin.decorate_pause_button(options_btn, LocaleManager.t("pause.options", "설정"), LocaleManager.t("pause.options.desc", "소리와 입력, 표시 옵션을 조정합니다"), "", false)
+	ModalMenuSkin.decorate_pause_button(main_menu_btn, LocaleManager.t("pause.main_menu", "메인 메뉴"), LocaleManager.t("pause.main_menu.desc", "항구 화면으로 나가고 현재 항해를 정리합니다"), "", false)
+	ModalMenuSkin.decorate_pause_button(quit_btn, LocaleManager.t("pause.quit", "게임 종료"), LocaleManager.t("pause.quit.desc", "현재 세션을 마치고 프로그램을 종료합니다"), "", false)
 
 	for button in [resume_btn, options_btn, main_menu_btn, quit_btn]:
 		ModalMenuSkin.apply_pause_button_theme(button, button == resume_btn)
+
+
+func _on_locale_changed(_locale: String) -> void:
+	_apply_ui_theme()
 
 
 func _apply_layout_density() -> void:

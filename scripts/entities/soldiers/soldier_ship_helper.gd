@@ -60,8 +60,8 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			return nearest_on_ship if nearest_on_ship else nearest_global
 		return nearest_on_ship if nearest_on_ship else nearest_global
 
-	var nearby_enemy_ships: Array = ship_scan_data.get("nearby_enemy_ships", [])
-	for other_ship_variant in nearby_enemy_ships:
+	var nearby_target_ships: Array = ship_scan_data.get("nearby_target_ships", ship_scan_data.get("nearby_enemy_ships", []))
+	for other_ship_variant in nearby_target_ships:
 		var other_ship: Node3D = SoldierShipSpatialCacheHelper.get_valid_node3d(other_ship_variant)
 		if other_ship == null or other_ship == soldier.owned_ship:
 			continue

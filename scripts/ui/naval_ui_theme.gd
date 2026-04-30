@@ -269,7 +269,6 @@ static func resolve_emblem_text(token: String) -> String:
 		"favorite": "심",
 		"fire_pot": "화",
 		"flag": "기",
-		"fleet_crew": "원",
 		"fleet_signal": "선",
 		"fort": "판",
 		"gold": "금",

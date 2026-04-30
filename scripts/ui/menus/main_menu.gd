@@ -30,6 +30,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_apply_background_settings()
 	_apply_ui_theme()
+	_apply_localized_text()
 	_play_menu_music()
 	UiButtonAudio.wire_buttons(self)
 	start_button.pressed.connect(_on_start_pressed)
@@ -43,6 +44,8 @@ func _ready() -> void:
 	_apply_layout_density()
 	_refresh_version_label()
 	SaveManager.apply_settings()
+	if not LocaleManager.locale_changed.is_connected(_on_locale_changed):
+		LocaleManager.locale_changed.connect(_on_locale_changed)
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
 	_focus_first_menu_button()
@@ -155,6 +158,25 @@ func _apply_ui_theme() -> void:
 		_apply_compact_menu_button(button)
 
 
+func _apply_localized_text() -> void:
+	if is_instance_valid(eyebrow_label):
+		eyebrow_label.text = LocaleManager.t("main_menu.eyebrow", "조선 수군 로그라이트 해전")
+	if is_instance_valid(title_label):
+		title_label.text = LocaleManager.t("main_menu.title", "남해 서바이버즈")
+	if is_instance_valid(start_button):
+		start_button.text = LocaleManager.t("main_menu.start", "항해 시작")
+	if is_instance_valid(meta_button):
+		meta_button.text = LocaleManager.t("main_menu.meta", "영구 업그레이드")
+	if is_instance_valid(options_button):
+		options_button.text = LocaleManager.t("main_menu.options", "옵션")
+	if is_instance_valid(quit_button):
+		quit_button.text = LocaleManager.t("main_menu.quit", "종료")
+
+
+func _on_locale_changed(_locale: String) -> void:
+	_apply_localized_text()
+
+
 func _apply_compact_menu_button(button: Button) -> void:
 	if not is_instance_valid(button):
 		return
@@ -236,8 +258,8 @@ func _on_meta_pressed() -> void:
 	_modal_open = true
 	_set_buttons_disabled(true)
 	var ui = META_UPGRADE_UI_SCENE.instantiate()
-	ui.title_text = "[항구] 영구 강화"
-	ui.close_button_text = "메뉴로 돌아가기"
+	ui.title_text = LocaleManager.t("meta.title", "[항구] 영구 강화")
+	ui.close_button_text = LocaleManager.t("meta.close_to_menu", "메뉴로 돌아가기")
 	add_child(ui)
 	ui.closed.connect(func():
 		_modal_open = false

@@ -256,12 +256,105 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		failures.append("player ship runtime safety should clear loot_scene")
 	if player_ship.get("deck_light_player_only") != true:
 		failures.append("player ship runtime safety should force deck_light_player_only")
-	if absf(float(player_ship.get("boarding_hook_throw_delay")) - 2.5) > 0.01:
+	if absf(float(player_ship.get("boarding_hook_throw_delay")) - 0.55) > 0.01:
 		failures.append("player ship runtime safety did not restore boarding_hook_throw_delay")
 	if absf(float(player_ship.get("floating_offset")) - 1.35) > 0.01:
 		failures.append("player ship runtime safety did not restore floating_offset")
 	if player_ship.global_position.distance_to(start_marker.global_position) > 0.01:
 		failures.append("player ship runtime safety did not apply PlayerStart transform")
+	if not InputMap.has_action("toggle_sail_furl"):
+		failures.append("player ship should expose toggle_sail_furl input action")
+	if not player_ship.has_method("toggle_sail_furl") or not player_ship.has_method("_update_sail_deployment"):
+		failures.append("player ship should expose sail furl controls")
+	else:
+		var sail_shader_source := FileAccess.get_file_as_string("res://assets/shaders/sail.gdshader")
+		if not sail_shader_source.contains("sail_visibility") or not sail_shader_source.contains("sail_visibility <= 0.01"):
+			failures.append("furled sail shader should hide fully folded sail cloth")
+		player_ship.call("set_sail_furled", true)
+		player_ship.set("sail_deployed_ratio", 1.0)
+		player_ship.call("_update_sail_deployment", 1.0)
+		var folded_ratio := float(player_ship.get("sail_deployed_ratio"))
+		if folded_ratio >= 0.99:
+			failures.append("player ship sail furl should lower deployed ratio")
+		if player_ship.has_method("_update_sail_visual"):
+			player_ship.call("_update_sail_visual")
+		var mast_received_deployment := false
+		var masts: Array = player_ship.get("masts") if player_ship.get("masts") != null else []
+		for mast in masts:
+			if is_instance_valid(mast) and mast.has_method("get_sail_deployed_ratio"):
+				mast_received_deployment = true
+				var mast_ratio := float(mast.call("get_sail_deployed_ratio"))
+				if absf(mast_ratio - folded_ratio) > 0.01:
+					failures.append("player ship should pass sail deployment ratio to masts")
+				var yardarm := mast.get_node_or_null("SailVisual/yardarm") as Node3D
+				if not is_instance_valid(yardarm):
+					failures.append("player ship mast should include a yardarm visual")
+				else:
+					mast.call("set_sail_deployed_ratio", 1.0)
+					var deployed_y := yardarm.position.y
+					mast.call("set_sail_deployed_ratio", 0.0)
+					var furled_y := yardarm.position.y
+					if furled_y >= deployed_y - 0.5:
+						failures.append("furled sail should lower the yardarm with the sail cloth")
+					mast.call("set_sail_deployed_ratio", mast_ratio)
+				break
+		if not mast_received_deployment:
+			failures.append("player ship masts should expose sail deployment visuals")
+		player_ship.call("set_sail_furled", false)
+		player_ship.set("rudder_health", player_ship.get("rudder_max_health"))
+		var open_turn_mult := float(player_ship.call("get_rudder_turn_multiplier"))
+		var open_response_mult := float(player_ship.call("get_rudder_response_multiplier"))
+		player_ship.call("set_sail_furled", true)
+		var furled_turn_mult := float(player_ship.call("get_rudder_turn_multiplier"))
+		var furled_response_mult := float(player_ship.call("get_rudder_response_multiplier"))
+		if furled_turn_mult <= open_turn_mult * 1.2:
+			failures.append("furled sail should improve rudder turn authority")
+		if furled_response_mult <= open_response_mult * 1.2:
+			failures.append("furled sail should improve rudder response")
+
+		player_ship.set("acceleration", 1000.0)
+		player_ship.set("is_rowing", true)
+		player_ship.set("rowing_locked", false)
+		player_ship.set("rowing_stamina", 100.0)
+		player_ship.set("current_speed", 0.0)
+		player_ship.call("_update_movement", 0.1)
+		var furled_rowing_speed := float(player_ship.get("current_speed"))
+		player_ship.call("set_sail_furled", false)
+		player_ship.set("current_speed", 0.0)
+		player_ship.call("_update_movement", 0.1)
+		var open_rowing_speed := float(player_ship.get("current_speed"))
+		if furled_rowing_speed <= open_rowing_speed * 1.1:
+			failures.append("furled sail should improve rowing speed efficiency")
+
+		player_ship.set("stamina_drain_rate", 10.0)
+		player_ship.call("set_sail_furled", true)
+		player_ship.set("rowing_stamina", 100.0)
+		player_ship.call("_update_rowing_stamina", 1.0)
+		var furled_stamina_loss := 100.0 - float(player_ship.get("rowing_stamina"))
+		player_ship.call("set_sail_furled", false)
+		player_ship.set("rowing_stamina", 100.0)
+		player_ship.call("_update_rowing_stamina", 1.0)
+		var open_stamina_loss := 100.0 - float(player_ship.get("rowing_stamina"))
+		if furled_stamina_loss >= open_stamina_loss:
+			failures.append("furled sail should reduce rowing stamina cost")
+
+		player_ship.set("burn_hull_damage_per_second", 10.0)
+		player_ship.set("hull_hp", 100.0)
+		player_ship.set("is_burning", true)
+		player_ship.set("burn_timer", 5.0)
+		player_ship.call("set_sail_furled", true)
+		player_ship.call("_update_burning_status", 1.0)
+		var furled_fire_damage := 100.0 - float(player_ship.get("hull_hp"))
+		player_ship.set("hull_hp", 100.0)
+		player_ship.set("is_burning", true)
+		player_ship.set("burn_timer", 5.0)
+		player_ship.call("set_sail_furled", false)
+		player_ship.call("_update_burning_status", 1.0)
+		var open_fire_damage := 100.0 - float(player_ship.get("hull_hp"))
+		if furled_fire_damage > open_fire_damage * 0.55:
+			failures.append("furled sail should reduce fire damage by about half")
+		player_ship.set("is_rowing", false)
+		player_ship.set("is_burning", false)
 
 	wrapper.queue_free()
 	await _wait_frames(owner, 1)
@@ -699,6 +792,16 @@ static func _run_support_ship_spawn_template_contract(owner: Node, failures: Arr
 		failures.append("support ship spawn should be tagged as support_fleet role")
 	if ShipAllyRoleHelper.is_captured_minion(spawned_support):
 		failures.append("support ship spawn should not consume captured-minion role slots")
+	if not spawned_support.has_method("sync_sail_furl_with_flagship"):
+		failures.append("support ship should mirror flagship sail furl state")
+	else:
+		player_ship.call("set_sail_furled", true)
+		spawned_support.call("sync_sail_furl_with_flagship", 1.0)
+		if spawned_support.get("sail_furled") != true:
+			failures.append("support ship did not inherit flagship furled sail state")
+		if float(spawned_support.get("sail_deployed_ratio")) >= 0.99:
+			failures.append("support ship should reduce sail deployment while flagship is furled")
+		player_ship.call("set_sail_furled", false)
 
 	var marker_counts: Dictionary = ShipAuthoringHelper.build_summary(spawned_support).get("authoring_markers", {})
 	if int(marker_counts.get("CannonSlots", 0)) < 3:
@@ -1017,6 +1120,7 @@ static func _run_enemy_spawn_rules_contract(failures: Array[String]) -> void:
 		return
 
 	var all_stats := _load_ship_stats_dictionary(failures)
+	var ship_types := _collect_ship_type_references(all_stats)
 	var authoring_palette := _load_json_dictionary(AUTHORING_PALETTE_DATA_PATH, "authoring palette", failures)
 	var combat_profiles := ShipBlueprintHelper.get_combat_profiles(all_stats)
 	var movement_intents := _collect_palette_catalog_entries_by_id(authoring_palette.get("movement_intents", []))
@@ -1053,6 +1157,135 @@ static func _run_enemy_spawn_rules_contract(failures: Array[String]) -> void:
 	var resolved_progression := EnemySpawnerFleetHelper.resolve_fleet_progression(formation, encounter_profiles)
 	_validate_fleet_progression("enemy spawn rules active encounter progression", resolved_progression, parsed_templates, failures)
 	_validate_scenario_trigger_definitions(root.get(EnemySpawnerFleetHelper.SCENARIO_TRIGGERS, []), scenario_triggers, encounter_profiles, parsed_templates, spawn_recipes, all_stats, combat_profiles, movement_intents, failures)
+	var elite_variant: Variant = root.get("elite", {})
+	if typeof(elite_variant) != TYPE_DICTIONARY:
+		failures.append("enemy spawn rules elite should be a Dictionary")
+	else:
+		var elite_rules: Dictionary = elite_variant as Dictionary
+		var wave_counts_variant: Variant = elite_rules.get("wave_counts", [])
+		if typeof(wave_counts_variant) != TYPE_ARRAY:
+			failures.append("enemy spawn rules elite.wave_counts should be an Array")
+		else:
+			var wave_counts: Array = wave_counts_variant as Array
+			if wave_counts.size() < int(elite_rules.get("max_elite_spawns", 0)):
+				failures.append("enemy spawn rules elite.wave_counts should cover every elite wave")
+			if wave_counts.size() >= 3 and (int(wave_counts[1]) < 2 or int(wave_counts[2]) < 2):
+				failures.append("enemy spawn rules 5:00 and 7:30 elite waves should spawn at least two mid bosses")
+	var boss_templates_variant: Variant = root.get(EnemySpawnerFleetHelper.BOSS_WAVE_TEMPLATES, {})
+	var boss_template_mid_counts: Dictionary = {}
+	var boss_template_final_counts: Dictionary = {}
+	if typeof(boss_templates_variant) != TYPE_DICTIONARY:
+		failures.append("enemy spawn rules boss_wave_templates should be a Dictionary")
+	else:
+		var boss_templates: Dictionary = boss_templates_variant as Dictionary
+		for required_template in ["mid_single", "mid_pair", "final"]:
+			if not boss_templates.has(required_template):
+				failures.append("enemy spawn rules boss_wave_templates missing template: %s" % required_template)
+		for template_id_variant in boss_templates.keys():
+			var template_id := str(template_id_variant).strip_edges()
+			var template_variant: Variant = boss_templates[template_id_variant]
+			if template_id.is_empty():
+				failures.append("enemy spawn rules boss_wave_templates should not use empty template ids")
+				continue
+			if typeof(template_variant) != TYPE_DICTIONARY:
+				failures.append("enemy spawn rules boss_wave_templates.%s should be a Dictionary" % template_id)
+				continue
+			var template: Dictionary = template_variant as Dictionary
+			var template_ships_variant: Variant = template.get("ships", [])
+			if typeof(template_ships_variant) != TYPE_ARRAY:
+				failures.append("enemy spawn rules boss_wave_templates.%s.ships should be an Array" % template_id)
+				continue
+			var template_ships: Array = template_ships_variant as Array
+			if template_ships.is_empty():
+				failures.append("enemy spawn rules boss_wave_templates.%s.ships should not be empty" % template_id)
+			var mid_boss_count := 0
+			var final_boss_count := 0
+			for ship_index in range(template_ships.size()):
+				var ship_variant: Variant = template_ships[ship_index]
+				if typeof(ship_variant) != TYPE_DICTIONARY:
+					failures.append("enemy spawn rules boss_wave_templates.%s.ships[%d] should be a Dictionary" % [template_id, ship_index])
+					continue
+				var ship_info: Dictionary = ship_variant as Dictionary
+				var ship_type_name := str(ship_info.get("ship_type", "")).strip_edges()
+				var ship_count: int = maxi(1, int(ship_info.get("count", 1)))
+				if ship_type_name.is_empty():
+					failures.append("enemy spawn rules boss_wave_templates.%s.ships[%d].ship_type should be non-empty" % [template_id, ship_index])
+				elif not ship_types.has(ship_type_name):
+					failures.append("enemy spawn rules boss_wave_templates.%s.ships[%d] unknown ship_type: %s" % [template_id, ship_index, ship_type_name])
+				if ship_type_name == "atakebune_mid":
+					mid_boss_count += ship_count
+				if ship_type_name == "atakebune_final":
+					final_boss_count += ship_count
+			boss_template_mid_counts[template_id] = mid_boss_count
+			boss_template_final_counts[template_id] = final_boss_count
+			if template_id == "mid_single" and mid_boss_count < 1:
+				failures.append("enemy spawn rules mid_single should spawn at least one mid boss")
+			if template_id == "mid_pair" and mid_boss_count < 2:
+				failures.append("enemy spawn rules mid_pair should spawn at least two mid bosses")
+			if template_id == "final":
+				if not bool(template.get("final", false)):
+					failures.append("enemy spawn rules final template should set final=true")
+				if not bool(template.get("stop_regular_spawns", false)):
+					failures.append("enemy spawn rules final template should stop regular spawns")
+				if final_boss_count < 1:
+					failures.append("enemy spawn rules final template should spawn at least one final boss")
+
+	var boss_progression_variant: Variant = root.get(EnemySpawnerFleetHelper.BOSS_PROGRESSION, {})
+	if typeof(boss_progression_variant) != TYPE_DICTIONARY:
+		failures.append("enemy spawn rules boss_progression should be a Dictionary")
+	else:
+		var boss_progression: Dictionary = boss_progression_variant as Dictionary
+		if float(boss_progression.get("mid_start_time", -1.0)) < 0.0:
+			failures.append("enemy spawn rules boss_progression.mid_start_time should be >= 0")
+		if float(boss_progression.get("mid_interval", 0.0)) <= 0.0:
+			failures.append("enemy spawn rules boss_progression.mid_interval should be > 0")
+		var mid_sequence_variant: Variant = boss_progression.get("mid_sequence", [])
+		if typeof(mid_sequence_variant) != TYPE_ARRAY:
+			failures.append("enemy spawn rules boss_progression.mid_sequence should be an Array")
+		else:
+			var mid_sequence: Array = mid_sequence_variant as Array
+			if mid_sequence.size() < 3:
+				failures.append("enemy spawn rules boss_progression.mid_sequence should cover the three mid-boss beats")
+			for sequence_index in range(mid_sequence.size()):
+				var template_ref := str(mid_sequence[sequence_index]).strip_edges()
+				if template_ref.is_empty():
+					failures.append("enemy spawn rules boss_progression.mid_sequence[%d] should be non-empty" % sequence_index)
+				elif not boss_template_mid_counts.has(template_ref):
+					failures.append("enemy spawn rules boss_progression.mid_sequence[%d] unknown template: %s" % [sequence_index, template_ref])
+				elif (sequence_index == 1 or sequence_index == 2) and int(boss_template_mid_counts[template_ref]) < 2:
+					failures.append("enemy spawn rules second and third mid-boss beats should use a two-boss template")
+		var final_template := str(boss_progression.get("final_template", "")).strip_edges()
+		if final_template.is_empty():
+			failures.append("enemy spawn rules boss_progression.final_template should be non-empty")
+		elif not boss_template_final_counts.has(final_template):
+			failures.append("enemy spawn rules boss_progression.final_template unknown template: %s" % final_template)
+		elif int(boss_template_final_counts[final_template]) < 1:
+			failures.append("enemy spawn rules boss_progression.final_template should spawn a final boss")
+		if float(boss_progression.get("final_time", 0.0)) <= 0.0:
+			failures.append("enemy spawn rules boss_progression.final_time should be > 0")
+	var spawner_script := load("res://scripts/managers/enemy_spawner.gd") as Script
+	if spawner_script == null:
+		failures.append("enemy spawn rules contract could not load EnemySpawner script")
+	else:
+		var spawner = spawner_script.new()
+		spawner.call("_apply_enemy_spawn_rules_root", root)
+		var generated_waves_variant: Variant = spawner.get("boss_waves")
+		if typeof(generated_waves_variant) != TYPE_ARRAY:
+			failures.append("enemy spawn rules boss_progression should generate runtime boss_waves")
+		else:
+			var generated_waves: Array = generated_waves_variant as Array
+			if generated_waves.size() < 4:
+				failures.append("enemy spawn rules boss_progression should generate three mid waves and one final wave")
+			var generated_wave_ids: Dictionary = {}
+			for generated_wave_variant in generated_waves:
+				if typeof(generated_wave_variant) != TYPE_DICTIONARY:
+					continue
+				var generated_wave: Dictionary = generated_wave_variant as Dictionary
+				generated_wave_ids[str(generated_wave.get("id", ""))] = true
+			for required_wave_id in ["mid_boss_1", "mid_boss_2", "mid_boss_3", "final_boss"]:
+				if not generated_wave_ids.has(required_wave_id):
+					failures.append("enemy spawn rules boss_progression did not generate wave: %s" % required_wave_id)
+		spawner.free()
 	_validate_mid_boss_escort_rules(root.get("mid_boss_escort", []), all_stats, failures)
 
 
@@ -2687,6 +2920,14 @@ static func _run_main_player_effect_scene_wiring_pass(failures: Array[String]) -
 
 	if player_ship.transform != Transform3D.IDENTITY:
 		failures.append("main scene PlayerShip should not carry placement override")
+
+	var screen_edge_fx := main_root.get_node_or_null("ScreenEdgeFx") as CanvasLayer
+	if not is_instance_valid(screen_edge_fx):
+		failures.append("main scene wiring missing ScreenEdgeFx")
+	elif screen_edge_fx.layer >= 1:
+		failures.append("ScreenEdgeFx should render below gameplay HUD canvas layers")
+	elif screen_edge_fx.get_node_or_null("Overlay") == null:
+		failures.append("ScreenEdgeFx should include a full-screen Overlay ColorRect")
 
 	var max_hull_hp = player_ship.get("max_hull_hp")
 	if max_hull_hp != null and float(max_hull_hp) < 100.0:

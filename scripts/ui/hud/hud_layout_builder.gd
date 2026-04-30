@@ -3,6 +3,7 @@ extends RefCounted
 const HudItemBar = preload("res://scripts/ui/hud/hud_item_bar.gd")
 const HudUpgradeTrack = preload("res://scripts/ui/hud/hud_upgrade_track.gd")
 const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
+const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
 
 # Entry point
@@ -31,9 +32,9 @@ static func apply_layout_density(hud) -> void:
 	var top_margin := roundf(lerpf(44.0, 56.0, density))
 	var lower_margin := roundf(lerpf(18.0, 24.0, density))
 	var panel_gap := roundi(lerpf(8.0, 10.0, density))
-	var hp_width := roundf(lerpf(208.0, 240.0, density))
-	var hp_height := roundf(lerpf(20.0, 24.0, density))
-	var stamina_height := roundf(lerpf(7.0, 8.0, density))
+	var player_status_width := roundf(lerpf(124.0, 136.0, density))
+	var player_status_hp_height := roundf(lerpf(8.0, 10.0, density))
+	var player_status_stamina_height := 3.0
 	var boss_width := roundf(lerpf(420.0, 560.0, density))
 	var boss_height := roundf(lerpf(16.0, 20.0, density))
 	var boss_gap := roundf(lerpf(5.0, 7.0, density))
@@ -42,8 +43,19 @@ static func apply_layout_density(hud) -> void:
 	var boarding_width := roundf(lerpf(168.0, 200.0, density))
 	var speed_row_width := roundf(lerpf(160.0, 180.0, density))
 	var speed_bar_width := roundf(lerpf(128.0, 148.0, density))
-	var stat_panel_width := roundf(lerpf(320.0, 376.0, density))
-	var stat_panel_height := roundf(lerpf(420.0, 496.0, density))
+	var stat_site_bonus_width := roundf(clampf(viewport_size.x * 0.26, 260.0, 340.0))
+	var stat_panel_width := roundf(minf(clampf(viewport_size.x * 0.54, 480.0, 680.0), maxf(320.0, viewport_size.x - edge_margin * 3.0 - stat_site_bonus_width)))
+	var stat_panel_height := roundf(clampf(viewport_size.y * 0.78, 420.0, 560.0))
+	var stat_site_bonus_height := roundf(lerpf(300.0, 382.0, density))
+	var stat_top := roundf(lerpf(42.0, 48.0, density))
+	var stat_rail_stacked := viewport_size.x < edge_margin * 3.0 + 320.0 + stat_site_bonus_width
+	if stat_rail_stacked:
+		var stacked_width := roundf(maxf(280.0, viewport_size.x - edge_margin * 2.0))
+		stat_panel_width = stacked_width
+		stat_site_bonus_width = stacked_width
+		stat_panel_height = roundf(clampf(viewport_size.y * 0.56, 300.0, 430.0))
+		var stacked_bonus_space := viewport_size.y - stat_top - stat_panel_height - panel_gap - lower_margin
+		stat_site_bonus_height = roundf(clampf(stacked_bonus_space, 118.0, 240.0))
 
 	if is_instance_valid(hud.top_left_container):
 		hud.top_left_container.offset_left = edge_margin
@@ -104,11 +116,31 @@ static func apply_layout_density(hud) -> void:
 	if is_instance_valid(hud.stat_panel):
 		hud.stat_panel.offset_left = edge_margin
 		hud.stat_panel.offset_right = edge_margin + stat_panel_width
-		hud.stat_panel.offset_top = roundf(lerpf(42.0, 48.0, density))
+		hud.stat_panel.offset_top = stat_top
 		hud.stat_panel.offset_bottom = hud.stat_panel.offset_top + stat_panel_height
 		var stat_box := hud.stat_panel.get_child(0) as VBoxContainer
 		if is_instance_valid(stat_box):
 			stat_box.custom_minimum_size = Vector2(stat_panel_width - 24.0, stat_panel_height - 40.0)
+	if is_instance_valid(hud.stat_site_bonus_panel):
+		if stat_rail_stacked:
+			hud.stat_site_bonus_panel.anchor_left = 0.0
+			hud.stat_site_bonus_panel.anchor_right = 0.0
+			hud.stat_site_bonus_panel.offset_left = edge_margin
+			hud.stat_site_bonus_panel.offset_right = edge_margin + stat_site_bonus_width
+			hud.stat_site_bonus_panel.offset_top = stat_top + stat_panel_height + panel_gap
+			hud.stat_site_bonus_panel.offset_bottom = hud.stat_site_bonus_panel.offset_top + stat_site_bonus_height
+			hud.stat_site_bonus_panel.grow_horizontal = Control.GROW_DIRECTION_END
+		else:
+			hud.stat_site_bonus_panel.anchor_left = 1.0
+			hud.stat_site_bonus_panel.anchor_right = 1.0
+			hud.stat_site_bonus_panel.offset_left = -edge_margin - stat_site_bonus_width
+			hud.stat_site_bonus_panel.offset_right = -edge_margin
+			hud.stat_site_bonus_panel.offset_top = stat_top
+			hud.stat_site_bonus_panel.offset_bottom = hud.stat_site_bonus_panel.offset_top + stat_site_bonus_height
+			hud.stat_site_bonus_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		var site_bonus_box := hud.stat_site_bonus_panel.get_child(0) as VBoxContainer
+		if is_instance_valid(site_bonus_box):
+			site_bonus_box.custom_minimum_size = Vector2(stat_site_bonus_width - 4.0, stat_site_bonus_height)
 
 	if is_instance_valid(hud.bottom_right_container):
 		hud.bottom_right_container.offset_right = -edge_margin
@@ -121,12 +153,19 @@ static func apply_layout_density(hud) -> void:
 		hud.support_row.add_theme_constant_override("separation", roundi(lerpf(4.0, 6.0, density)))
 	if is_instance_valid(hud.support_slot_container):
 		hud.support_slot_container.add_theme_constant_override("separation", roundi(lerpf(4.0, 6.0, density)))
+	if is_instance_valid(hud.player_status_root):
+		var player_status_height: float = player_status_hp_height + player_status_stamina_height + float(hud.PLAYER_STATUS_BAR_GAP)
+		hud.player_status_root.custom_minimum_size = Vector2(player_status_width, player_status_height)
+		hud.player_status_root.size = hud.player_status_root.custom_minimum_size
 	if is_instance_valid(hud.hp_bar):
-		hud.hp_bar.custom_minimum_size = Vector2(hp_width, hp_height)
+		hud.hp_bar.custom_minimum_size = Vector2(player_status_width, player_status_hp_height)
+		hud.hp_bar.size = hud.hp_bar.custom_minimum_size
 	if is_instance_valid(hud.hp_text_label):
-		NavalUiTheme.style_overlay_value(hud.hp_text_label, roundi(lerpf(13.0, 14.0, density)))
+		hud.hp_text_label.visible = false
 	if is_instance_valid(hud.stamina_bar):
-		hud.stamina_bar.custom_minimum_size = Vector2(hp_width, stamina_height)
+		hud.stamina_bar.position = Vector2(0.0, player_status_hp_height + hud.PLAYER_STATUS_BAR_GAP)
+		hud.stamina_bar.custom_minimum_size = Vector2(player_status_width, player_status_stamina_height)
+		hud.stamina_bar.size = hud.stamina_bar.custom_minimum_size
 
 	if is_instance_valid(hud.boss_hp_container):
 		var boss_stack_count := 0
@@ -355,9 +394,26 @@ static func setup_stat_panel(hud) -> void:
 		return
 	if hud.stat_panel:
 		return
+	hud.stat_backdrop = ColorRect.new()
+	hud.stat_backdrop.name = "StatBackdrop"
+	hud.add_child(hud.stat_backdrop)
+	hud.stat_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hud.stat_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.stat_backdrop.color = Color.WHITE
+	hud.stat_backdrop.material = UiOverlayFx.make_modal_blur_material(
+		Color(0.02, 0.03, 0.05, 0.42),
+		0.62,
+		14.0,
+		0.38,
+		Vector2(0.32, 0.48)
+	)
+	hud.stat_backdrop.visible = false
+	hud.stat_backdrop.z_index = 80
+
 	hud.stat_panel = PanelContainer.new()
 	hud.add_child(hud.stat_panel)
 	hud.stat_panel.visible = hud.show_stat_panel
+	hud.stat_panel.z_index = 90
 	hud.stat_panel.anchor_left = 0.0
 	hud.stat_panel.anchor_right = 0.0
 	hud.stat_panel.anchor_top = 0.0
@@ -378,7 +434,7 @@ static func setup_stat_panel(hud) -> void:
 	hud.stat_panel.add_child(stat_box)
 
 	var title = Label.new()
-	title.text = "전투 수치 [C]"
+	title.text = "전투 수치 [Tab]"
 	NavalUiTheme.style_heading(title, 15)
 	stat_box.add_child(title)
 
@@ -388,10 +444,62 @@ static func setup_stat_panel(hud) -> void:
 	hud.stat_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	stat_box.add_child(hud.stat_scroll)
 
+	var stat_scroll_gutter := MarginContainer.new()
+	stat_scroll_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stat_scroll_gutter.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stat_scroll_gutter.add_theme_constant_override("margin_right", 18)
+	hud.stat_scroll.add_child(stat_scroll_gutter)
+
 	hud.stat_content = VBoxContainer.new()
 	hud.stat_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hud.stat_content.add_theme_constant_override("separation", 10)
-	hud.stat_scroll.add_child(hud.stat_content)
+	stat_scroll_gutter.add_child(hud.stat_content)
+
+	hud.stat_site_bonus_panel = MarginContainer.new()
+	hud.add_child(hud.stat_site_bonus_panel)
+	hud.stat_site_bonus_panel.visible = hud.show_stat_panel
+	hud.stat_site_bonus_panel.z_index = 90
+	hud.stat_site_bonus_panel.anchor_left = 1.0
+	hud.stat_site_bonus_panel.anchor_right = 1.0
+	hud.stat_site_bonus_panel.anchor_top = 0.0
+	hud.stat_site_bonus_panel.anchor_bottom = 0.0
+	hud.stat_site_bonus_panel.offset_left = -364
+	hud.stat_site_bonus_panel.offset_right = -24
+	hud.stat_site_bonus_panel.offset_top = 48
+	hud.stat_site_bonus_panel.offset_bottom = 430
+	hud.stat_site_bonus_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	hud.stat_site_bonus_panel.grow_vertical = Control.GROW_DIRECTION_END
+	hud.stat_site_bonus_panel.add_theme_constant_override("margin_left", 4)
+	hud.stat_site_bonus_panel.add_theme_constant_override("margin_top", 2)
+	hud.stat_site_bonus_panel.add_theme_constant_override("margin_right", 0)
+	hud.stat_site_bonus_panel.add_theme_constant_override("margin_bottom", 0)
+
+	var site_bonus_box = VBoxContainer.new()
+	site_bonus_box.custom_minimum_size = Vector2(336, 382)
+	site_bonus_box.add_theme_constant_override("separation", 10)
+	hud.stat_site_bonus_panel.add_child(site_bonus_box)
+
+	var site_bonus_title = Label.new()
+	site_bonus_title.text = "해역 보너스"
+	NavalUiTheme.style_heading(site_bonus_title, 15)
+	site_bonus_box.add_child(site_bonus_title)
+
+	hud.stat_site_bonus_scroll = ScrollContainer.new()
+	hud.stat_site_bonus_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hud.stat_site_bonus_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hud.stat_site_bonus_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	site_bonus_box.add_child(hud.stat_site_bonus_scroll)
+
+	var site_bonus_scroll_gutter := MarginContainer.new()
+	site_bonus_scroll_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	site_bonus_scroll_gutter.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	site_bonus_scroll_gutter.add_theme_constant_override("margin_right", 14)
+	hud.stat_site_bonus_scroll.add_child(site_bonus_scroll_gutter)
+
+	hud.stat_site_bonus_content = VBoxContainer.new()
+	hud.stat_site_bonus_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hud.stat_site_bonus_content.add_theme_constant_override("separation", 10)
+	site_bonus_scroll_gutter.add_child(hud.stat_site_bonus_content)
 
 # Bottom corners
 static func setup_bottom_right_layout(hud) -> void:
@@ -436,42 +544,6 @@ static func setup_bottom_left_layout(hud) -> void:
 		hud.support_slot_container.add_theme_constant_override("separation", 4)
 	if hud.support_slot_container.get_parent() != hud.support_row:
 		move_label_to_container(hud.support_slot_container, hud.support_row)
-
-	hud.hp_bar = HudGaugeBar.new()
-	hud.hp_bar.custom_minimum_size = Vector2(240, 24)
-	hud.hp_bar.show_percentage = false
-	hud.bottom_left_container.add_child(hud.hp_bar)
-
-	NavalUiTheme.apply_progress_bar(hud.hp_bar, Color(0.06, 0.08, 0.11, 0.92), Color(0.22, 0.74, 0.34, 0.92), 4)
-	hud.hp_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.92), Color(0.22, 0.74, 0.34, 0.92), 4, {
-		"border_color": NavalUiTheme.BORDER_GOLD,
-		"damage_trail": true,
-		"low_pulse": true,
-		"low_pulse_threshold": 0.28,
-		"segments": 4,
-		"shine_strength": 0.32,
-	})
-
-	hud.hp_text_label = Label.new()
-	hud.hp_text_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hud.hp_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.hp_text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_overlay_value(hud.hp_text_label, 14)
-	hud.hp_bar.add_child(hud.hp_text_label)
-
-	hud.stamina_bar = HudGaugeBar.new()
-	hud.stamina_bar.custom_minimum_size = Vector2(240, 8)
-	hud.stamina_bar.show_percentage = false
-	hud.bottom_left_container.add_child(hud.stamina_bar)
-
-	NavalUiTheme.apply_progress_bar(hud.stamina_bar, Color(0.06, 0.08, 0.11, 0.86), Color(0.88, 0.70, 0.24, 0.92), 2)
-	hud.stamina_bar.configure_gauge(Color(0.06, 0.08, 0.11, 0.86), Color(0.88, 0.70, 0.24, 0.92), 2, {
-		"damage_trail": false,
-		"low_pulse": true,
-		"low_pulse_threshold": 0.12,
-		"border_color": Color(0.78, 0.62, 0.30, 0.78),
-		"shine_strength": 0.24,
-	})
 
 # Combat overlays
 static func setup_boss_hp_bar(hud) -> void:

@@ -96,7 +96,7 @@
     },
     {
       "id": "enter_late_battle_pressure",
-      "condition": { "elapsed_time": 300.0 },
+      "condition": { "elapsed_time": 330.0 },
       "actions": [
         { "type": "set_encounter_profile", "profile": "late_battle_pressure" }
       ]
@@ -129,10 +129,40 @@
   },
   "elite": {
     "spawn_interval": 150.0,
-    "max_elite_spawns": 3
+    "max_elite_spawns": 3,
+    "wave_counts": [1, 2, 2],
+    "allow_overlap": true
+  },
+  "boss_wave_templates": {
+    "mid_single": {
+      "ships": [
+        { "ship_type": "atakebune_mid", "count": 1, "escorts": true }
+      ]
+    },
+    "mid_pair": {
+      "ships": [
+        { "ship_type": "atakebune_mid", "count": 2, "escorts": true }
+      ]
+    },
+    "final": {
+      "final": true,
+      "stop_regular_spawns": true,
+      "ships": [
+        { "ship_type": "atakebune_final", "count": 1, "escorts": false }
+      ]
+    }
+  },
+  "boss_progression": {
+    "mid_start_time": 150.0,
+    "mid_interval": 150.0,
+    "mid_sequence": ["mid_single", "mid_pair", "mid_pair"],
+    "mid_id_prefix": "mid_boss",
+    "final_time": 600.0,
+    "final_template": "final",
+    "final_id": "final_boss"
   },
   "mid_boss_escort": [
-    { "ship_type": "sekibune_cannon", "role": "gunline", "lateral": -12.0, "back": 8.0 },
-    { "ship_type": "kobayabune_melee", "role": "vanguard", "lateral": 12.0, "back": 10.0 }
+    { "ship_type": "sekibune_cannon", "role": "gunline", "lateral": -12.0, "back": 8.0, "hold_radius": 42.0, "break_radius": 52.0 },
+    { "ship_type": "kobayabune_melee", "role": "vanguard", "lateral": 12.0, "back": 10.0, "hold_radius": 34.0, "break_radius": 44.0 }
   ]
 }

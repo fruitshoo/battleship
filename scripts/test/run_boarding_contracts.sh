@@ -11,7 +11,7 @@ declare -a contract_targets=(
 	"ship_damage_contract|res://scenes/test/ship_damage_contract.tscn|[ShipDamageContract] ok|0.05|0"
 	"boarding_navigation_contract|res://scenes/test/boarding_navigation_contract.tscn|[BoardingNavigationContract] ok|0.05|0"
 	"boarding_chaos_contract|res://scenes/test/boarding_chaos_contract.tscn|[BoardingChaosContract] ok|0.05|0"
-	"support_boarding_contract|res://scenes/test/support_boarding_contract.tscn|[SupportBoardingContract] ok|1.30|1"
+	"support_boarding_contract|res://scenes/test/support_boarding_contract.tscn|[SupportBoardingContract] ok|5.00|1"
 	"auto_raid_recall_contract|res://scenes/test/auto_raid_recall_contract.tscn|[AutoRaidRecallContract] ok|0.05|0"
 	"soldier_incapacitation_contract|res://scenes/test/soldier_incapacitation_contract.tscn|[SoldierIncapacitationContract] ok|0.05|0"
 )

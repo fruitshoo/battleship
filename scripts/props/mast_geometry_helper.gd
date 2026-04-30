@@ -1,5 +1,7 @@
 extends RefCounted
 
+const FOLDED_SAIL_TOP_RATIO := 0.07
+
 
 static func capture_base_state(mast: Node3D) -> void:
 	if is_instance_valid(mast.mast_mesh):
@@ -44,6 +46,30 @@ static func apply_sail_geometry(mast: Node3D) -> void:
 		var mat: ShaderMaterial = mast._ensure_sail_material(mesh)
 		if mat != null:
 			mast._apply_deform_bounds(mesh, mat)
+	apply_yardarm_furl_geometry(mast)
+
+
+static func apply_yardarm_furl_geometry(mast: Node3D) -> void:
+	if not is_instance_valid(mast.yardarm_model_root):
+		return
+	var deployed_ratio := clampf(float(mast.get("sail_deployed_ratio")), 0.0, 1.0)
+	var furled_ratio := 1.0 - deployed_ratio
+	var base_position: Vector3 = mast._base_yardarm_model_position + mast.yardarm_offset
+	mast.yardarm_model_root.position = base_position + Vector3.DOWN * get_yardarm_furl_drop(mast) * furled_ratio
+	mast.yardarm_model_root.scale = mast._base_yardarm_model_scale * mast.yardarm_scale
+
+
+static func get_yardarm_furl_drop(mast: Node3D) -> float:
+	if is_instance_valid(mast.sail_mesh) and mast.sail_mesh.mesh != null:
+		var sail_aabb: AABB = mast.sail_mesh.mesh.get_aabb()
+		var scale_y: float = mast.sail_mesh.scale.y
+		var sail_bottom_y: float = mast._base_sail_mesh_position.y + sail_aabb.position.y * scale_y
+		var sail_top_y: float = mast._base_sail_mesh_position.y + (sail_aabb.position.y + sail_aabb.size.y) * scale_y
+		var folded_top_y: float = lerpf(sail_bottom_y, sail_top_y, FOLDED_SAIL_TOP_RATIO)
+		return maxf(0.0, sail_top_y - folded_top_y)
+	if "sail_size" in mast:
+		return maxf(0.0, float(mast.get("sail_size").y) * (1.0 - FOLDED_SAIL_TOP_RATIO))
+	return 0.0
 
 
 static func get_current_mast_top_y(mast: Node3D, height_scale: float) -> float:

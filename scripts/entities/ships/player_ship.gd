@@ -60,6 +60,16 @@ var is_rowing: bool = false
 var rowing_locked: bool = false
 @export var sail_turn_speed: float = 60.0
 @export var sail_efficiency_mult: float = 1.0
+@export_group("Sail Handling")
+@export var sail_furled: bool = false
+@export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
+@export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 2.8
+@export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
+@export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
+@export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
+@export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.85
+@export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
+@export_group("")
 @export var max_rowing_stamina: float = 100.0
 @export var rowing_stamina: float = 100.0
 @export var rowing_acceleration_mult: float = 1.0
@@ -175,6 +185,7 @@ func _ready() -> void:
 	_apply_runtime_scene_safety_defaults()
 	_apply_start_marker_transform_from_parent()
 	super._ready()
+	sail_deployed_ratio = 0.0 if sail_furled else clampf(sail_deployed_ratio, 0.0, 1.0)
 	fire_effect_offset = Vector3(0.0, 0.55, -0.25)
 	fire_effect_scale = 1.6
 	print("[Ship] Total masts connected: ", masts.size())
@@ -221,12 +232,12 @@ func _apply_runtime_scene_safety_defaults() -> void:
 	floating_offset = PLAYER_RUNTIME_FLOATING_OFFSET
 	deck_height = PLAYER_RUNTIME_DECK_HEIGHT
 
-	boarding_contact_grace_duration = 0.9
-	boarding_hook_throw_delay = 2.5
-	boarding_secondary_rope_delay = 1.0
+	boarding_contact_grace_duration = 0.5
+	boarding_hook_throw_delay = 0.55
+	boarding_secondary_rope_delay = 0.45
 	boarding_max_relative_speed = 0.28
-	boarding_initial_rope_count = 0
-	boarding_rope_throw_duration = 0.0
+	boarding_initial_rope_count = 1
+	boarding_rope_throw_duration = 0.18
 
 
 func _apply_start_marker_transform_from_parent() -> void:
@@ -304,6 +315,7 @@ func _physics_process(delta: float) -> void:
 		_handle_input(delta)
 	if has_sextant:
 		_auto_adjust_sail(delta)
+	_update_sail_deployment(delta)
 	update_crew_allocation_state(delta)
 	_update_movement(delta)
 	_update_steering(delta)
@@ -335,7 +347,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("cycle_fleet_formation"):
 			_cycle_fleet_formation()
 			return
-		# 치트키: F2 누르면 바로 지휘(병영) 레벨업
+		# 치트키: F2 누르면 바로 백병전 업그레이드
 		if OS.is_debug_build() and event.keycode == KEY_F2:
 			if is_instance_valid(_cached_level_manager):
 				_cached_level_manager.add_merit(999)
@@ -347,10 +359,10 @@ func _execute_merit_action() -> void:
 		
 	if _cached_level_manager.merit_points < _cached_level_manager.max_merit_points:
 		if _cached_hud and _cached_hud.has_method("show_message"):
-			_cached_hud.show_message("지휘 포인트가 부족합니다!", 1.5)
+			_cached_hud.show_message("백병전 포인트가 부족합니다!", 1.5)
 		return
 		
-	# 지휘 포인트 소비 (병영 업그레이드 UI)
+	# 백병전 포인트 소비
 	_cached_level_manager.consume_merit()
 
 func _spawn_or_repair_ally() -> void:
@@ -970,6 +982,56 @@ func adjust_sail_angle(delta_angle: float) -> void:
 		_flap_timer = randf_range(1.5, 3.0)
 		
 	set_sail_angle(sail_angle + delta_angle)
+
+
+func set_sail_furled(furled: bool) -> void:
+	var target_furled := bool(furled)
+	if sail_furled == target_furled:
+		return
+	sail_furled = target_furled
+	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+		var pitch := 0.92 if sail_furled else 1.08
+		_cached_audio_manager.play_sfx("sail_flap", global_position, pitch, 4.0)
+	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
+		var message := "돛 접음: 조타·노젓기 강화 / 화재 피해 감소" if sail_furled else "돛 펼침: 항해 속도 회복"
+		_cached_hud.show_message(message, 1.4)
+	_sync_support_fleet_sail_furl()
+
+
+func toggle_sail_furl() -> void:
+	set_sail_furled(not sail_furled)
+
+
+func is_sail_furled() -> bool:
+	return sail_furled
+
+
+func get_effective_sail_deployment() -> float:
+	var residual_drive := clampf(furled_sail_drive_ratio, 0.0, 1.0)
+	var deployed := clampf(sail_deployed_ratio, 0.0, 1.0)
+	return clampf(lerpf(residual_drive, 1.0, deployed), 0.0, 1.0)
+
+
+func _update_sail_deployment(delta: float) -> void:
+	var target_ratio := 0.0 if sail_furled else 1.0
+	sail_deployed_ratio = move_toward(
+		clampf(sail_deployed_ratio, 0.0, 1.0),
+		target_ratio,
+		maxf(sail_furl_rate, 0.01) * delta
+	)
+
+
+func _sync_support_fleet_sail_furl() -> void:
+	if not is_inside_tree():
+		return
+	var support_ships: Array = PlayerShipSupportHelper.get_support_fleet_ships(self)
+	for support_ship in support_ships:
+		if not is_instance_valid(support_ship):
+			continue
+		if support_ship.has_method("set_sail_furled"):
+			support_ship.call("set_sail_furled", sail_furled)
+		if "sail_deployed_ratio" in support_ship:
+			support_ship.set("sail_deployed_ratio", sail_deployed_ratio)
 
 
 ## 노 젓기 활성화/비활성화

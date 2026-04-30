@@ -116,7 +116,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"cannon_reload":
 			return "대포 재장전 -%d%%" % int(s.get("cd_pct_per_lv", 4))
 		"janggun":
-			return "대장군전 파괴력 및 디버프 효과(화염/둔화) 대폭 강화"
+			return "포문 장군전 재장전 %.1f초 | 화염/둔화 강화" % maxf(6.0, 8.0 - float(next_level - 1) * 0.5)
 		"singigeon":
 			var rocketeers: int = get_specialist_unit_count(upgrades, current_levels, "singigeon", next_level)
 			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
@@ -212,21 +212,12 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"panokseon_upgrade":
 			var panokseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
 			return "판옥선 포격함 1척 합류 | 편성 %s" % panokseon_summary
-		"fleet_crew":
-			var reduce_per_level: float = float(s.get("respawn_reduce_per_lv", 4.0))
-			var max_reduce_levels: int = int(s.get("respawn_reduce_max_level", 4))
-			var reduce_levels: int = mini(next_level, max_reduce_levels)
-			var min_respawn_interval: float = float(s.get("min_respawn_interval", 14.0))
-			var respawn_interval: float = maxf(min_respawn_interval, 30.0 - (reduce_per_level * float(reduce_levels)))
-			var fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades)
-			var fleet_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
-			return "지원함 재합류 %.0f초 | 한계 %d척 | 편성 %s" % [respawn_interval, fleet_limit, fleet_summary]
 		"supply":
 			return "선체 수리 (즉시 HP +%d 회복)" % int(s.get("max_hp_add", 20))
 		"gold":
-			return "점수 +%d" % int(s.get("score_add", 50))
+			return "골드 +%d" % int(s.get("score_add", 50))
 
 	if next_level > 1 and upgrade_id not in ["supply", "gold"]:
-		return data["description"] + " (Lv.%d)" % next_level
+		return LocaleManager.data_text(data, upgrade_id, "upgrade", "description", "") + " (Lv.%d)" % next_level
 
-	return data["description"]
+	return LocaleManager.data_text(data, upgrade_id, "upgrade", "description", "")

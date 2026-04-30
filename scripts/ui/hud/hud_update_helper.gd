@@ -1,21 +1,30 @@
 extends RefCounted
 
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
+const SUPPORT_ICON_MAENGSEON_PATH := "res://assets/ui/support_fleet/support_fleet_maengseon_icon.png"
+const SUPPORT_ICON_PANOKSEON_PATH := "res://assets/ui/support_fleet/support_fleet_panokseon_icon.png"
+const SUPPORT_ICON_GEOBUKSEON_PATH := "res://assets/ui/support_fleet/support_fleet_geobukseon_icon.png"
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
 const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
 const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
 const CAPTURE_HINT_CREW_RATIO: float = 0.34
 const CAPTURE_HINT_CREW_MAX: int = 2
-const SUPPORT_SLOT_SIZE_DEFAULT := 42.0
-const SUPPORT_SLOT_SIZE_COMPACT := 38.0
-const SUPPORT_SLOT_SIZE_DENSE := 34.0
+const SUPPORT_SLOT_SIZE_DEFAULT := 56.0
+const SUPPORT_SLOT_SIZE_COMPACT := 52.0
+const SUPPORT_SLOT_SIZE_DENSE := 48.0
+const SUPPORT_SLOT_SIZE_MAENGSEON := 48.0
+const SUPPORT_SLOT_SIZE_PANOKSEON := 54.0
+const SUPPORT_SLOT_SIZE_GEOBUKSEON := 58.0
 const SUPPORT_SLOT_PANOKSEON_ACCENT := Color(0.86, 0.58, 0.34, 0.96)
 const SUPPORT_SLOT_MAENGSEON_ACCENT := Color(0.82, 0.69, 0.42, 0.92)
 const SUPPORT_SLOT_EMPTY_BG := Color(0.05, 0.07, 0.10, 0.72)
+const SUPPORT_SLOT_ICON_BLEED_RATIO := 0.06
 const BOSS_HP_FALLBACK_ID := -1
 const BOSS_HP_FILL := Color(0.77, 0.22, 0.20, 0.95)
 const BOSS_HP_BG := Color(0.07, 0.08, 0.10, 0.92)
 const SHIP_HP_UI_SAFE_PADDING := 10.0
+const PLAYER_STATUS_SCREEN_GAP := 8.0
+static var _support_icon_cache: Dictionary = {}
 
 # Top-line HUD text
 static func update_level(hud, val: int) -> void:
@@ -135,23 +144,27 @@ static func _update_support_force_status(hud) -> void:
 	var support_ships: Array = []
 	if hud.player_ship.has_method("_get_support_fleet_ships"):
 		support_ships = hud.player_ship._get_support_fleet_ships()
+	var visible_support_ships := _sort_support_ships_for_hud(support_ships)
 	var support_limit: int = int(hud.player_ship.get("support_fleet_limit")) if hud.player_ship.get("support_fleet_limit") != null else support_ships.size()
 	var respawn_active := _is_support_respawn_active(hud.player_ship)
 	var slot_count: int = support_ships.size()
 	if respawn_active:
 		slot_count = maxi(slot_count, support_limit)
 	_ensure_support_slot_count(hud, slot_count)
-	_apply_support_slot_density(hud, slot_count)
+	_apply_support_slot_density(hud, slot_count, visible_support_ships)
 
 	for i in range(hud.support_fleet_hud_slots.size()):
 		var slot: PanelContainer = hud.support_fleet_hud_slots[i]
 		if not is_instance_valid(slot):
 			continue
-		var ship = support_ships[i] if i < support_ships.size() else null
-		var slot_profile: Dictionary = PlayerShipSupportHelper.resolve_support_fleet_profile(hud.player_ship, i)
+		var ship = visible_support_ships[i] if i < visible_support_ships.size() else null
+		var profile_slot_index := i
+		if is_instance_valid(ship):
+			profile_slot_index = int(ship.get_meta("support_fleet_slot_index", i))
+		var slot_profile: Dictionary = PlayerShipSupportHelper.resolve_support_fleet_profile(hud.player_ship, profile_slot_index)
 		var timer_text := ""
 		if not is_instance_valid(ship):
-			timer_text = _get_support_respawn_timer_text(hud.player_ship) if i == support_ships.size() else "대기"
+			timer_text = _get_support_respawn_timer_text(hud.player_ship) if i == visible_support_ships.size() else "대기"
 		_update_support_slot(slot, ship, slot_profile, timer_text)
 
 static func update_crew_count(hud) -> void:
@@ -229,13 +242,23 @@ static func _create_support_slot() -> PanelContainer:
 	emblem_plate.anchor_top = 0.0
 	emblem_plate.anchor_right = 1.0
 	emblem_plate.anchor_bottom = 1.0
-	emblem_plate.offset_left = 4.0
-	emblem_plate.offset_top = 4.0
-	emblem_plate.offset_right = -4.0
-	emblem_plate.offset_bottom = -4.0
+	emblem_plate.offset_left = 0.0
+	emblem_plate.offset_top = 0.0
+	emblem_plate.offset_right = 0.0
+	emblem_plate.offset_bottom = 0.0
 	emblem_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	emblem_plate.clip_contents = true
 	emblem_plate.add_theme_stylebox_override("panel", NavalUiTheme.make_emblem_plate_style(SUPPORT_SLOT_MAENGSEON_ACCENT, true))
 	root.add_child(emblem_plate)
+
+	var ship_icon := TextureRect.new()
+	ship_icon.name = "ShipIcon"
+	ship_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ship_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	ship_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ship_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	ship_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	emblem_plate.add_child(ship_icon)
 
 	var icon := Label.new()
 	icon.name = "Icon"
@@ -273,32 +296,86 @@ static func _create_support_slot() -> PanelContainer:
 
 	return slot
 
-static func _apply_support_slot_density(hud, slot_count: int) -> void:
-	var slot_size: float = SUPPORT_SLOT_SIZE_DEFAULT
+static func _apply_support_slot_density(hud, slot_count: int, visible_support_ships: Array = []) -> void:
+	var empty_slot_size: float = SUPPORT_SLOT_SIZE_DEFAULT
 	if slot_count >= 5:
-		slot_size = SUPPORT_SLOT_SIZE_DENSE
+		empty_slot_size = SUPPORT_SLOT_SIZE_DENSE
 	elif slot_count >= 4:
-		slot_size = SUPPORT_SLOT_SIZE_COMPACT
+		empty_slot_size = SUPPORT_SLOT_SIZE_COMPACT
 	if is_instance_valid(hud.support_row):
 		hud.support_row.add_theme_constant_override("separation", 4)
 	if is_instance_valid(hud.support_slot_container):
 		hud.support_slot_container.add_theme_constant_override("separation", 4 if slot_count >= 5 else 5)
-	for slot in hud.support_fleet_hud_slots:
+	for slot_index in range(hud.support_fleet_hud_slots.size()):
+		var slot: PanelContainer = hud.support_fleet_hud_slots[slot_index]
 		if not is_instance_valid(slot):
 			continue
+		var support_ship = visible_support_ships[slot_index] if slot_index < visible_support_ships.size() else null
+		var slot_size: float = _get_support_slot_display_size(support_ship, empty_slot_size)
 		slot.custom_minimum_size = Vector2(slot_size, slot_size)
+		slot.size = slot.custom_minimum_size
+		var slot_style := slot.get_theme_stylebox("panel") as StyleBoxFlat
+		if is_instance_valid(slot_style):
+			slot_style.set_corner_radius_all(roundi(slot_size * 0.5))
 		var emblem_plate := slot.get_node_or_null("Root/EmblemPlate") as PanelContainer
 		if is_instance_valid(emblem_plate):
-			emblem_plate.offset_left = 4.0
-			emblem_plate.offset_top = 4.0
-			emblem_plate.offset_right = -4.0
-			emblem_plate.offset_bottom = -4.0
+			emblem_plate.offset_left = 0.0
+			emblem_plate.offset_top = 0.0
+			emblem_plate.offset_right = 0.0
+			emblem_plate.offset_bottom = 0.0
+		var ship_icon := slot.get_node_or_null("Root/EmblemPlate/ShipIcon") as TextureRect
+		if is_instance_valid(ship_icon):
+			var icon_bleed := roundf(slot_size * SUPPORT_SLOT_ICON_BLEED_RATIO)
+			ship_icon.offset_left = -icon_bleed
+			ship_icon.offset_top = -icon_bleed
+			ship_icon.offset_right = icon_bleed
+			ship_icon.offset_bottom = icon_bleed
 		var badge := slot.get_node_or_null("Root/TypeBadge") as Label
 		if is_instance_valid(badge):
 			badge.offset_left = -roundf(slot_size * 0.34)
 			badge.offset_top = 2.0
 			badge.offset_right = -4.0
 			badge.offset_bottom = roundf(slot_size * 0.28)
+
+static func _sort_support_ships_for_hud(support_ships: Array) -> Array:
+	var visible_support_ships: Array = support_ships.duplicate()
+	visible_support_ships.sort_custom(func(a, b):
+		var rank_a := _get_support_ship_display_rank(a)
+		var rank_b := _get_support_ship_display_rank(b)
+		if rank_a != rank_b:
+			return rank_a < rank_b
+		var order_a: int = int(a.get_meta("support_fleet_order", a.get_instance_id())) if is_instance_valid(a) else 0
+		var order_b: int = int(b.get_meta("support_fleet_order", b.get_instance_id())) if is_instance_valid(b) else 0
+		if order_a != order_b:
+			return order_a < order_b
+		var slot_a: int = int(a.get_meta("support_fleet_slot_index", order_a)) if is_instance_valid(a) else order_a
+		var slot_b: int = int(b.get_meta("support_fleet_slot_index", order_b)) if is_instance_valid(b) else order_b
+		return slot_a < slot_b
+	)
+	return visible_support_ships
+
+static func _get_support_ship_display_rank(ship) -> int:
+	var ship_type_name := _get_support_ship_type_name(ship)
+	if ship_type_name.contains("geobukseon") or ship_type_name.contains("turtle"):
+		return 0
+	if ship_type_name.contains("panokseon"):
+		return 1
+	return 2
+
+static func _get_support_slot_display_size(ship, fallback_size: float) -> float:
+	if not is_instance_valid(ship):
+		return fallback_size
+	var ship_type_name := _get_support_ship_type_name(ship)
+	if ship_type_name.contains("geobukseon") or ship_type_name.contains("turtle"):
+		return SUPPORT_SLOT_SIZE_GEOBUKSEON
+	if ship_type_name.contains("panokseon"):
+		return SUPPORT_SLOT_SIZE_PANOKSEON
+	return SUPPORT_SLOT_SIZE_MAENGSEON
+
+static func _get_support_ship_type_name(ship) -> String:
+	if is_instance_valid(ship) and ship.get("ship_type") != null:
+		return str(ship.get("ship_type")).strip_edges().to_lower()
+	return ""
 
 static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dictionary = {}, timer_text: String = "") -> void:
 	var slot_style: StyleBoxFlat = slot.get_theme_stylebox("panel") as StyleBoxFlat
@@ -307,6 +384,7 @@ static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dicti
 	var emblem_plate: PanelContainer = slot.get_node("Root/EmblemPlate") as PanelContainer
 	var emblem_style: StyleBoxFlat = emblem_plate.get_theme_stylebox("panel") as StyleBoxFlat if is_instance_valid(emblem_plate) else null
 	var icon: Label = slot.get_node("Root/EmblemPlate/Icon") as Label
+	var ship_icon: TextureRect = slot.get_node_or_null("Root/EmblemPlate/ShipIcon") as TextureRect
 	var badge: Label = slot.get_node("Root/TypeBadge") as Label
 	var timer: Label = slot.get_node("Root/Timer") as Label
 	if not is_instance_valid(icon) or not is_instance_valid(dead_overlay) or not is_instance_valid(damage_fill) or not is_instance_valid(timer):
@@ -318,6 +396,7 @@ static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dicti
 	var badge_color: Color = visual.get("badge_color", accent)
 	var emblem_token: String = str(visual.get("emblem", "fleet_signal"))
 	var emblem_color: Color = visual.get("emblem_color", NavalUiTheme.TEXT_ACCENT)
+	var icon_texture: Texture2D = visual.get("icon_texture", null) as Texture2D
 	var slot_size_px: float = slot.custom_minimum_size.x if slot.custom_minimum_size.x > 0.0 else SUPPORT_SLOT_SIZE_DEFAULT
 	var emblem_font_size := 15
 	if slot_size_px <= SUPPORT_SLOT_SIZE_DENSE + 0.5:
@@ -329,9 +408,17 @@ static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dicti
 		badge.text = badge_text
 		NavalUiTheme.style_overlay_caption(badge, 8, badge_color, 2)
 	NavalUiTheme.apply_emblem(icon, emblem_token, emblem_font_size, emblem_color)
+	if is_instance_valid(ship_icon):
+		ship_icon.texture = icon_texture
+		ship_icon.visible = icon_texture != null
+		ship_icon.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	if is_instance_valid(emblem_style):
-		emblem_style.bg_color = Color(accent.r, accent.g, accent.b, 0.08)
-		emblem_style.border_color = accent.lerp(NavalUiTheme.BORDER_GOLD_SOFT, 0.18)
+		if icon_texture != null:
+			emblem_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+			emblem_style.border_color = Color(accent.r, accent.g, accent.b, 0.0)
+		else:
+			emblem_style.bg_color = Color(accent.r, accent.g, accent.b, 0.08)
+			emblem_style.border_color = accent.lerp(NavalUiTheme.BORDER_GOLD_SOFT, 0.18)
 	if is_instance_valid(ship) and ship.get("hull_hp") != null and ship.get("max_hull_hp") != null:
 		var hull_hp: float = maxf(0.0, float(ship.get("hull_hp")))
 		var max_hull_hp: float = maxf(float(ship.get("max_hull_hp")), 1.0)
@@ -342,7 +429,7 @@ static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dicti
 		if is_instance_valid(damage_style):
 			damage_style.bg_color = NavalUiTheme.STATUS_DANGER.lerp(NavalUiTheme.STATUS_GOOD, hull_ratio)
 		dead_overlay.visible = false
-		icon.visible = true
+		icon.visible = icon_texture == null
 		timer.visible = false
 		timer.text = ""
 		if slot_style:
@@ -352,8 +439,10 @@ static func _update_support_slot(slot: PanelContainer, ship, slot_profile: Dicti
 		damage_fill.visible = false
 		damage_fill.anchor_right = 1.0
 		dead_overlay.visible = true
-		icon.visible = true
+		icon.visible = icon_texture == null
 		NavalUiTheme.apply_emblem(icon, emblem_token, emblem_font_size, Color(0.62, 0.66, 0.72, 0.82))
+		if is_instance_valid(ship_icon) and icon_texture != null:
+			ship_icon.modulate = Color(0.58, 0.62, 0.68, 0.78)
 		timer.visible = not timer_text.is_empty()
 		timer.text = timer_text
 		if slot_style:
@@ -370,14 +459,39 @@ static func _get_support_slot_visual(ship, slot_profile: Dictionary = {}) -> Dic
 	if ship_type_name.is_empty():
 		ship_type_name = str(slot_profile.get("ship_type", "maengseon_ally")).strip_edges().to_lower()
 	var is_panokseon := ship_type_name.contains("panokseon")
+	var is_geobukseon := ship_type_name.contains("geobukseon") or ship_type_name.contains("turtle")
+	var icon_path := SUPPORT_ICON_MAENGSEON_PATH
+	if is_geobukseon:
+		icon_path = SUPPORT_ICON_GEOBUKSEON_PATH
+	elif is_panokseon:
+		icon_path = SUPPORT_ICON_PANOKSEON_PATH
 	return {
 		"accent": SUPPORT_SLOT_PANOKSEON_ACCENT if is_panokseon else SUPPORT_SLOT_MAENGSEON_ACCENT,
 		"bg": Color(0.09, 0.07, 0.06, 0.92) if is_panokseon else NavalUiTheme.PANEL_BG_DARK,
 		"emblem": "fort" if is_panokseon else "fleet_signal",
 		"emblem_color": NavalUiTheme.TEXT_ACCENT if is_panokseon else NavalUiTheme.TEXT_MAIN,
+		"icon_texture": _get_support_icon_texture(icon_path),
 		"badge": "포" if is_panokseon else "",
 		"badge_color": NavalUiTheme.TEXT_ACCENT if is_panokseon else NavalUiTheme.TEXT_GOLD,
 	}
+
+static func _get_support_icon_texture(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if _support_icon_cache.has(path):
+		return _support_icon_cache[path] as Texture2D
+	var imported_texture := load(path) as Texture2D
+	if imported_texture != null:
+		_support_icon_cache[path] = imported_texture
+		return imported_texture
+	var image := Image.load_from_file(path)
+	if image == null or image.is_empty():
+		_support_icon_cache[path] = null
+		return null
+	image.generate_mipmaps()
+	var texture := ImageTexture.create_from_image(image)
+	_support_icon_cache[path] = texture
+	return texture
 
 static func update_hull_display(hud) -> void:
 	if is_instance_valid(hud.player_ship) and hud.player_ship.get("hull_hp") != null:
@@ -389,6 +503,69 @@ static func update_stamina_display(hud) -> void:
 		if hud.player_ship.get("max_rowing_stamina") != null:
 			max_stamina = float(hud.player_ship.max_rowing_stamina)
 		hud.update_stamina(hud.player_ship.rowing_stamina, max_stamina)
+
+static func update_player_status_overlay(hud, _positions_only: bool = false) -> void:
+	if not is_instance_valid(hud.player_status_root):
+		return
+	if not is_instance_valid(hud.player_ship) or not hud.player_ship.is_inside_tree():
+		hud.player_status_root.visible = false
+		return
+	var cam: Camera3D = hud.get_viewport().get_camera_3d()
+	if not is_instance_valid(cam):
+		hud.player_status_root.visible = false
+		return
+	if hud.player_ship.get("is_sinking") == true or hud.player_ship.get("is_dying") == true:
+		hud.player_status_root.visible = false
+		return
+	var viewport_rect: Rect2 = hud.get_viewport().get_visible_rect()
+	var root_size: Vector2 = hud.player_status_root.size
+	if root_size.x <= 0.0 or root_size.y <= 0.0:
+		root_size = hud.player_status_root.custom_minimum_size
+	var screen_bottom := _get_player_ship_screen_bottom(hud.player_ship, cam)
+	if screen_bottom == Vector2.INF:
+		hud.player_status_root.visible = false
+		return
+	var target_pos := screen_bottom + Vector2(-root_size.x * 0.5, PLAYER_STATUS_SCREEN_GAP)
+	var margin := 8.0
+	target_pos.x = clampf(target_pos.x, margin, maxf(margin, viewport_rect.size.x - root_size.x - margin))
+	target_pos.y = clampf(target_pos.y, margin, maxf(margin, viewport_rect.size.y - root_size.y - margin))
+	hud.player_status_root.position = target_pos
+	hud.player_status_root.visible = true
+
+static func _get_player_ship_screen_bottom(player_ship: Node3D, cam: Camera3D) -> Vector2:
+	var deck_half := Vector2(1.5, 4.0)
+	if player_ship.has_method("get_deck_half_extents"):
+		var extents = player_ship.call("get_deck_half_extents")
+		if extents is Vector2:
+			deck_half = extents as Vector2
+	elif player_ship.has_method("get_collision_half_extents"):
+		var collision_extents = player_ship.call("get_collision_half_extents")
+		if collision_extents is Vector2:
+			deck_half = collision_extents as Vector2
+	var deck_height: float = 0.5
+	if player_ship.get("deck_height") != null:
+		deck_height = float(player_ship.get("deck_height"))
+	var local_y_values := [0.0, maxf(0.1, deck_height * 0.35)]
+	var local_x_values := [-deck_half.x, 0.0, deck_half.x]
+	var local_z_values := [-deck_half.y, 0.0, deck_half.y]
+	var min_x := INF
+	var max_x := -INF
+	var max_y := -INF
+	var projected_count := 0
+	for local_y in local_y_values:
+		for local_x in local_x_values:
+			for local_z in local_z_values:
+				var world_pos := player_ship.to_global(Vector3(local_x, local_y, local_z))
+				if cam.is_position_behind(world_pos):
+					continue
+				var screen_pos := cam.unproject_position(world_pos)
+				min_x = minf(min_x, screen_pos.x)
+				max_x = maxf(max_x, screen_pos.x)
+				max_y = maxf(max_y, screen_pos.y)
+				projected_count += 1
+	if projected_count <= 0:
+		return Vector2.INF
+	return Vector2((min_x + max_x) * 0.5, max_y)
 
 static func update_boarding_display(hud) -> void:
 	if not hud.boarding_ui or not is_instance_valid(hud.player_ship):

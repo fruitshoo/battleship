@@ -30,15 +30,19 @@ var _displayed_arrow_rotation: float = 0.0
 var _displayed_arrow_scale: float = 1.0
 var _displayed_site_marker_position := Vector2.ZERO
 var _nearest_site: Node3D = null
+var _site_marker_slots: Array[Dictionary] = []
 var _site_marker_refresh_left: float = 0.0
 var _site_marker_alpha: float = 0.0
 var _glow_phase: float = 0.0
 
 const SITE_MARKER_REFRESH_INTERVAL: float = 0.18
 const SITE_MARKER_OUTER_RADIUS: float = 64.0
-const SITE_MARKER_DISTANCE_AT_EDGE: float = 90.0
+const SITE_MARKER_DISTANCE_AT_EDGE: float = 62.0
 const SITE_MARKER_FADE_SPEED: float = 5.5
+const MAX_SITE_MARKERS: int = 6
 const BASE_WIND_PANEL_SIZE: float = 220.0
+const MAX_WIND_PANEL_SIZE: float = 184.0
+const MIN_WIND_PANEL_SIZE: float = 156.0
 const SEA_SITE_GROUP := "sea_site"
 const TREASURE_CHEST_GROUP := "treasure_chest"
 const SITE_MARKER_GLOW_COLOR := Color(0.24, 0.64, 1.0, 0.18)
@@ -47,6 +51,8 @@ const TREASURE_MARKER_GLOW_COLOR := Color(1.0, 0.62, 0.18, 0.20)
 const TREASURE_MARKER_DOT_COLOR := Color(1.0, 0.94, 0.34, 1.0)
 
 var _compass_base_scale: float = 1.0
+var _last_layout_viewport_size := Vector2.ZERO
+var _layout_update_queued: bool = false
 
 
 func _resolve_controlled_ship() -> void:
@@ -70,7 +76,7 @@ func _ready() -> void:
 	_apply_theme()
 	_apply_layout_density()
 	if get_viewport() != null:
-		get_viewport().size_changed.connect(_apply_layout_density)
+		get_viewport().size_changed.connect(_queue_layout_density_update)
 	if is_instance_valid(compass_wheel):
 		_displayed_compass_rotation = compass_wheel.rotation
 	if is_instance_valid(wind_arrow):
@@ -78,6 +84,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var viewport_size := _get_layout_viewport_size()
+	if viewport_size != Vector2.ZERO and viewport_size != _last_layout_viewport_size:
+		_apply_layout_density()
 	# 카메라 yaw를 반영하므로 매 프레임 갱신해도 부담이 적고 더 자연스럽다.
 	if not is_instance_valid(ship):
 		_resolve_controlled_ship()
@@ -147,22 +156,41 @@ func _apply_theme() -> void:
 		arrow_glow.visible = false
 	if is_instance_valid(arrow_center_cap):
 		arrow_center_cap.color = cap_color
-	_apply_site_marker_palette(_nearest_site)
+	_apply_site_marker_palette_to_marker(site_marker, null)
 
 func _apply_layout_density() -> void:
 	var viewport := get_viewport()
 	if viewport == null or not is_instance_valid(wind_panel):
 		return
 	var viewport_size := viewport.get_visible_rect().size
-	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.17, 156.0, BASE_WIND_PANEL_SIZE)
+	if viewport_size == Vector2.ZERO:
+		return
+	_last_layout_viewport_size = viewport_size
+	_layout_update_queued = false
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	offset_left = 0.0
+	offset_top = 0.0
+	offset_right = 0.0
+	offset_bottom = 0.0
+
+	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.17, MIN_WIND_PANEL_SIZE, MAX_WIND_PANEL_SIZE)
 	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - 164.0) / (BASE_WIND_PANEL_SIZE - 164.0), 0.0, 1.0)))
-	var top_offset := roundf(clampf(viewport_size.y * 0.07, 48.0, 72.0))
-	wind_panel.offset_left = -panel_size - panel_margin
+	var top_offset := roundf(clampf(viewport_size.y * 0.08, 64.0, 76.0))
+	wind_panel.anchor_left = 0.0
+	wind_panel.anchor_right = 0.0
+	wind_panel.anchor_top = 0.0
+	wind_panel.anchor_bottom = 0.0
+	wind_panel.offset_left = maxf(panel_margin, viewport_size.x - panel_margin - panel_size)
 	wind_panel.offset_top = top_offset
-	wind_panel.offset_right = -panel_margin
+	wind_panel.offset_right = wind_panel.offset_left + panel_size
 	wind_panel.offset_bottom = top_offset + panel_size
+	wind_panel.custom_minimum_size = Vector2(panel_size, panel_size)
 	if is_instance_valid(wind_indicator):
 		wind_indicator.custom_minimum_size = Vector2(panel_size, panel_size)
+		wind_indicator.anchor_left = 0.5
+		wind_indicator.anchor_right = 0.5
+		wind_indicator.anchor_top = 0.5
+		wind_indicator.anchor_bottom = 0.5
 		wind_indicator.offset_left = -panel_size * 0.5
 		wind_indicator.offset_top = -panel_size * 0.5
 		wind_indicator.offset_right = panel_size * 0.5
@@ -174,6 +202,20 @@ func _apply_layout_density() -> void:
 		compass_wheel.scale = Vector2.ONE * _compass_base_scale
 	if is_instance_valid(wind_arrow):
 		wind_arrow.position = center
+
+
+func _queue_layout_density_update() -> void:
+	if _layout_update_queued:
+		return
+	_layout_update_queued = true
+	call_deferred("_apply_layout_density")
+
+
+func _get_layout_viewport_size() -> Vector2:
+	var viewport := get_viewport()
+	if viewport == null:
+		return Vector2.ZERO
+	return viewport.get_visible_rect().size
 
 func _update_wind_indicator(delta: float) -> void:
 	if not is_instance_valid(WindManager):
@@ -210,50 +252,119 @@ func _update_wind_indicator(delta: float) -> void:
 
 
 func _update_site_marker(delta: float) -> void:
-	if not is_instance_valid(site_marker) or not is_instance_valid(ship):
+	if not is_instance_valid(site_marker) or not is_instance_valid(compass_wheel) or not is_instance_valid(ship):
 		return
 
 	_site_marker_refresh_left -= delta
-	var previous_site := _nearest_site
-	if not _is_valid_site_marker_target(previous_site):
-		previous_site = null
-	if _site_marker_refresh_left <= 0.0 or not _is_valid_site_marker_target(_nearest_site):
+	if _site_marker_refresh_left <= 0.0:
 		_site_marker_refresh_left = SITE_MARKER_REFRESH_INTERVAL
-		_nearest_site = _find_nearest_site()
+		_sync_site_marker_slots(_collect_site_marker_targets())
 
-	if not _is_valid_site_marker_target(_nearest_site):
-		_nearest_site = null
-		_site_marker_alpha = move_toward(_site_marker_alpha, 0.0, delta * SITE_MARKER_FADE_SPEED)
-		site_marker.modulate = Color(1.0, 1.0, 1.0, _site_marker_alpha)
-		site_marker.visible = false
-		return
+	var active_count := 0
+	for slot_index in range(_site_marker_slots.size()):
+		var slot := _site_marker_slots[slot_index]
+		var marker_variant: Variant = slot.get("node", null)
+		if not is_instance_valid(marker_variant) or not (marker_variant is Node2D):
+			continue
+		var marker := marker_variant as Node2D
 
-	var offset := _nearest_site.global_position - ship.global_position
-	offset.y = 0.0
-	var distance := offset.length()
-	if distance <= 0.01:
-		site_marker.visible = false
-		return
+		var target_variant: Variant = slot.get("site", null)
+		if not _is_valid_site_marker_target(target_variant):
+			slot["site"] = null
+			slot["site_id"] = 0
+			slot["alpha"] = 0.0
+			_site_marker_slots[slot_index] = slot
+			marker.visible = false
+			continue
+		var target := target_variant as Node3D
+		if not _is_valid_site_marker_target(target):
+			marker.visible = false
+			continue
 
-	var distance_ratio := _get_site_marker_distance_ratio(distance)
-	var target_position := _get_site_marker_target_position(offset)
-	if previous_site != _nearest_site or not site_marker.visible or _site_marker_alpha <= 0.01:
-		_displayed_site_marker_position = target_position
-		_site_marker_alpha = 0.0
-	else:
-		var follow_weight := minf(1.0, delta * lerpf(18.0, 9.0, distance_ratio))
-		_displayed_site_marker_position = _displayed_site_marker_position.lerp(target_position, follow_weight)
-	site_marker.position = _displayed_site_marker_position
-	_site_marker_alpha = move_toward(_site_marker_alpha, 1.0, delta * SITE_MARKER_FADE_SPEED)
-	site_marker.modulate = Color(1.0, 1.0, 1.0, _site_marker_alpha)
-	site_marker.visible = true
-	_apply_site_marker_palette(_nearest_site)
+		var offset := target.global_position - ship.global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance <= 0.01:
+			marker.visible = false
+			continue
 
-	var pulse := 0.12 + sin(_glow_phase * 1.7) * 0.035
-	if is_instance_valid(site_marker_glow):
-		site_marker_glow.modulate = Color(1.0, 1.0, 1.0, clampf(pulse, 0.06, 0.18))
-	if is_instance_valid(site_marker_dot):
-		site_marker_dot.modulate = Color(1.0, 1.0, 1.0, lerpf(0.82, 1.0, 1.0 - distance_ratio))
+		var distance_ratio := _get_site_marker_distance_ratio(distance)
+		var target_position := _get_site_marker_target_position(offset)
+		var displayed_position: Vector2 = slot.get("position", target_position)
+		var target_id := int(target.get_instance_id())
+		if int(slot.get("site_id", 0)) != target_id or not marker.visible:
+			displayed_position = target_position
+			slot["alpha"] = 0.0
+			slot["site_id"] = target_id
+		else:
+			var follow_weight := minf(1.0, delta * lerpf(18.0, 9.0, distance_ratio))
+			displayed_position = displayed_position.lerp(target_position, follow_weight)
+
+		var alpha := move_toward(float(slot.get("alpha", 0.0)), 1.0, delta * SITE_MARKER_FADE_SPEED)
+		slot["position"] = displayed_position
+		slot["alpha"] = alpha
+		marker.position = displayed_position
+		marker.modulate = Color(1.0, 1.0, 1.0, alpha)
+		marker.visible = true
+		_apply_site_marker_palette_to_marker(marker, target)
+		_apply_site_marker_pulse(marker, distance_ratio)
+		_site_marker_slots[slot_index] = slot
+		active_count += 1
+
+	_site_marker_alpha = 1.0 if active_count > 0 else 0.0
+
+
+func _sync_site_marker_slots(targets: Array[Node3D]) -> void:
+	_nearest_site = targets[0] if not targets.is_empty() else null
+	for index in range(MAX_SITE_MARKERS):
+		var marker := _ensure_site_marker_slot(index)
+		if not is_instance_valid(marker):
+			continue
+		if index >= targets.size():
+			marker.visible = false
+			if index < _site_marker_slots.size():
+				var inactive_slot := _site_marker_slots[index]
+				inactive_slot["site"] = null
+				inactive_slot["site_id"] = 0
+				inactive_slot["alpha"] = 0.0
+				_site_marker_slots[index] = inactive_slot
+			continue
+
+		var target := targets[index]
+		var offset := target.global_position - ship.global_position
+		offset.y = 0.0
+		var target_position := _get_site_marker_target_position(offset)
+		var slot := _site_marker_slots[index]
+		if int(slot.get("site_id", 0)) != int(target.get_instance_id()):
+			slot["position"] = target_position
+			slot["alpha"] = 0.0
+		slot["site"] = target
+		slot["site_id"] = int(target.get_instance_id())
+		_site_marker_slots[index] = slot
+
+
+func _ensure_site_marker_slot(index: int) -> Node2D:
+	while _site_marker_slots.size() <= index:
+		var marker: Node2D = site_marker if _site_marker_slots.is_empty() else null
+		if marker == null:
+			marker = site_marker.duplicate() as Node2D
+			if is_instance_valid(marker):
+				marker.name = "SiteMarkerExtra%d" % _site_marker_slots.size()
+				compass_wheel.add_child(marker)
+		if not is_instance_valid(marker):
+			return null
+		marker.visible = false
+		_site_marker_slots.append({
+			"node": marker,
+			"site": null,
+			"site_id": 0,
+			"position": Vector2.ZERO,
+			"alpha": 0.0,
+		})
+	var marker_variant: Variant = _site_marker_slots[index].get("node", null)
+	if is_instance_valid(marker_variant) and marker_variant is Node2D:
+		return marker_variant as Node2D
+	return null
 
 
 func _get_site_marker_target_position(offset: Vector3) -> Vector2:
@@ -273,6 +384,48 @@ func _get_site_marker_radius(distance: float) -> float:
 
 func _get_site_marker_distance_ratio(distance: float) -> float:
 	return clampf(distance / SITE_MARKER_DISTANCE_AT_EDGE, 0.0, 1.0)
+
+
+func _collect_site_marker_targets() -> Array[Node3D]:
+	var candidates: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	_append_site_marker_candidates(candidates, seen, TREASURE_CHEST_GROUP, 2)
+	_append_site_marker_candidates(candidates, seen, SEA_SITE_GROUP, 1)
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var priority_a := int(a.get("priority", 0))
+		var priority_b := int(b.get("priority", 0))
+		if priority_a != priority_b:
+			return priority_a > priority_b
+		return float(a.get("distance_sq", INF)) < float(b.get("distance_sq", INF))
+	)
+	var targets: Array[Node3D] = []
+	for candidate in candidates:
+		if targets.size() >= MAX_SITE_MARKERS:
+			break
+		var site := candidate.get("site", null) as Node3D
+		if _is_valid_site_marker_target(site):
+			targets.append(site)
+	return targets
+
+
+func _append_site_marker_candidates(candidates: Array[Dictionary], seen: Dictionary, group_name: String, priority: int) -> void:
+	for candidate in get_tree().get_nodes_in_group(group_name):
+		if not is_instance_valid(candidate) or not (candidate is Node3D):
+			continue
+		var site := candidate as Node3D
+		if not _is_valid_site_marker_target(site):
+			continue
+		var site_id := int(site.get_instance_id())
+		if seen.has(site_id):
+			continue
+		seen[site_id] = true
+		var offset := site.global_position - ship.global_position
+		offset.y = 0.0
+		candidates.append({
+			"site": site,
+			"priority": priority,
+			"distance_sq": offset.length_squared(),
+		})
 
 
 func _find_nearest_site() -> Node3D:
@@ -319,8 +472,28 @@ func _is_treasure_marker_target(site: Variant) -> bool:
 
 
 func _apply_site_marker_palette(target: Variant) -> void:
+	_apply_site_marker_palette_to_marker(site_marker, target)
+
+
+func _apply_site_marker_palette_to_marker(marker: Node2D, target: Variant) -> void:
+	if not is_instance_valid(marker):
+		return
 	var is_treasure := _is_treasure_marker_target(target)
-	if is_instance_valid(site_marker_glow):
-		site_marker_glow.color = TREASURE_MARKER_GLOW_COLOR if is_treasure else SITE_MARKER_GLOW_COLOR
-	if is_instance_valid(site_marker_dot):
-		site_marker_dot.color = TREASURE_MARKER_DOT_COLOR if is_treasure else SITE_MARKER_DOT_COLOR
+	var glow := marker.get_node_or_null("Glow") as Polygon2D
+	var dot := marker.get_node_or_null("Dot") as Polygon2D
+	if is_instance_valid(glow):
+		glow.color = TREASURE_MARKER_GLOW_COLOR if is_treasure else SITE_MARKER_GLOW_COLOR
+	if is_instance_valid(dot):
+		dot.color = TREASURE_MARKER_DOT_COLOR if is_treasure else SITE_MARKER_DOT_COLOR
+
+
+func _apply_site_marker_pulse(marker: Node2D, distance_ratio: float) -> void:
+	if not is_instance_valid(marker):
+		return
+	var pulse := 0.12 + sin(_glow_phase * 1.7) * 0.035
+	var glow := marker.get_node_or_null("Glow") as Polygon2D
+	var dot := marker.get_node_or_null("Dot") as Polygon2D
+	if is_instance_valid(glow):
+		glow.modulate = Color(1.0, 1.0, 1.0, clampf(pulse, 0.06, 0.18))
+	if is_instance_valid(dot):
+		dot.modulate = Color(1.0, 1.0, 1.0, lerpf(0.82, 1.0, 1.0 - distance_ratio))

@@ -139,11 +139,33 @@ static func update_sail_visual(ship) -> void:
 			fire_ratio = clampf(float(ship.fire_build_up) / float(ship.fire_threshold), 0.0, 1.0)
 		# Burning ships should read clearly even before heavy sail holes appear.
 		burn_ratio = maxf(pow(fire_ratio, 0.7), 0.62)
+	var hull_wear_damage := get_hull_sail_wear_damage(ship)
+	var sail_deployed_ratio := 1.0
+	if "sail_deployed_ratio" in ship and ship.get("sail_deployed_ratio") != null:
+		sail_deployed_ratio = clampf(float(ship.get("sail_deployed_ratio")), 0.0, 1.0)
 	for mast in ship.masts:
 		if is_instance_valid(mast) and mast.has_method("set_sail_angle"):
 			mast.set_sail_angle(ship.sail_angle)
+		if is_instance_valid(mast) and mast.has_method("set_sail_deployed_ratio"):
+			mast.set_sail_deployed_ratio(sail_deployed_ratio)
+		if is_instance_valid(mast) and mast.has_method("set_hull_wear_damage"):
+			mast.set_hull_wear_damage(hull_wear_damage)
 		if is_instance_valid(mast) and mast.has_method("set_burn_amount"):
 			mast.set_burn_amount(burn_ratio)
+
+
+static func get_hull_sail_wear_damage(ship) -> float:
+	if ship == null:
+		return 0.0
+	if "hull_sail_wear_enabled" in ship and not bool(ship.hull_sail_wear_enabled):
+		return 0.0
+	var max_hull_hp: float = float(ship.max_hull_hp) if "max_hull_hp" in ship else 0.0
+	if max_hull_hp <= 0.0:
+		return 0.0
+	var hull_ratio: float = clampf(float(ship.hull_hp) / max_hull_hp, 0.0, 1.0) if "hull_hp" in ship else 1.0
+	var wear_max: float = clampf(float(ship.hull_sail_wear_max_damage) if "hull_sail_wear_max_damage" in ship else 0.5, 0.0, 1.0)
+	var wear_curve: float = maxf(float(ship.hull_sail_wear_curve) if "hull_sail_wear_curve" in ship else 1.0, 0.01)
+	return clampf(pow(1.0 - hull_ratio, wear_curve) * wear_max, 0.0, wear_max)
 
 
 static func update_rudder_visual(ship) -> void:

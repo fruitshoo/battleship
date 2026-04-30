@@ -6,8 +6,8 @@ extends Area3D
 @export var damage: float = 15.0
 @export var explosion_radius: float = 3.0
 @export var lifetime: float = 3.0
-@export_range(0.0, 1.0, 0.01) var ignition_chance: float = 0.45
-@export_range(0.1, 20.0, 0.1) var burn_duration: float = 7.0
+@export_range(0.0, 1.0, 0.01) var ignition_chance: float = 0.25
+@export_range(0.1, 20.0, 0.1) var burn_duration: float = 5.0
 
 var team: String = "player"
 var target_pos: Vector3 = Vector3.ZERO
@@ -18,8 +18,8 @@ var arc_height: float = 3.0
 
 var explosion_scene: PackedScene = preload("res://scenes/effects/fire_pot_explosion.tscn")
 
-const DEFAULT_IGNITION_CHANCE: float = 0.45
-const DEFAULT_BURN_DURATION: float = 7.0
+const DEFAULT_IGNITION_CHANCE: float = 0.25
+const DEFAULT_BURN_DURATION: float = 5.0
 
 var has_exploded: bool = false
 var velocity: Vector3 = Vector3.ZERO

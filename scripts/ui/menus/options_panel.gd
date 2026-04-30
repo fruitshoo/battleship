@@ -30,9 +30,14 @@ signal closed
 
 var _focusable_controls: Array[Control] = []
 var _focused_control_index: int = 0
+var _language_row: VBoxContainer = null
+var _language_label: Label = null
+var _language_option: OptionButton = null
+var _syncing_language_option: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_create_language_controls()
 	_apply_theme()
 	_apply_layout_density()
 	UiButtonAudio.wire_buttons(self)
@@ -44,7 +49,6 @@ func _ready() -> void:
 	music_slider.value = float(SaveManager.get_setting("music_volume", 0.75))
 	sfx_slider.value = float(SaveManager.get_setting("sfx_volume", 0.85))
 	ui_slider.value = float(SaveManager.get_setting("ui_volume", 0.85))
-	screen_fx_check.text = "가장자리 집중 연출"
 	screen_fx_check.button_pressed = SaveManager.get_setting("screen_edge_fx_enabled", true) == true
 	screen_fx_check.toggled.connect(_on_screen_fx_toggled)
 	screen_fx_slider.step = 0.05
@@ -53,10 +57,96 @@ func _ready() -> void:
 	fullscreen_check.button_pressed = SaveManager.get_setting("fullscreen", false) == true
 	fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	back_button.pressed.connect(_on_back_pressed)
+	_populate_language_options()
+	_apply_localized_text()
 	_sync_screen_fx_controls()
 	_setup_focus_navigation()
+	if not LocaleManager.locale_changed.is_connected(_on_locale_changed):
+		LocaleManager.locale_changed.connect(_on_locale_changed)
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
+
+
+func _create_language_controls() -> void:
+	if is_instance_valid(_language_option) or not is_instance_valid(content_box):
+		return
+	_language_row = VBoxContainer.new()
+	_language_row.name = "LanguageRow"
+	_language_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var header := HBoxContainer.new()
+	header.name = "LanguageHeader"
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.alignment = BoxContainer.ALIGNMENT_CENTER
+	header.add_theme_constant_override("separation", 12)
+	_language_row.add_child(header)
+
+	_language_label = Label.new()
+	_language_label.name = "LanguageLabel"
+	_language_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_language_label)
+
+	_language_option = OptionButton.new()
+	_language_option.name = "LanguageOption"
+	_language_option.custom_minimum_size = Vector2(172, 34)
+	_language_option.focus_mode = Control.FOCUS_ALL
+	_language_option.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_language_option.item_selected.connect(_on_language_selected)
+	header.add_child(_language_option)
+
+	content_box.add_child(_language_row)
+	var ui_row := ui_slider.get_parent()
+	if is_instance_valid(ui_row) and ui_row.get_parent() == content_box:
+		content_box.move_child(_language_row, ui_row.get_index() + 1)
+
+
+func _populate_language_options() -> void:
+	if not is_instance_valid(_language_option):
+		return
+	_syncing_language_option = true
+	_language_option.clear()
+	var locales := LocaleManager.get_supported_locales()
+	var selected_index := 0
+	for i in range(locales.size()):
+		var locale := str(locales[i])
+		_language_option.add_item(LocaleManager.get_locale_label(locale), i)
+		_language_option.set_item_metadata(i, locale)
+		if locale == LocaleManager.get_current_locale():
+			selected_index = i
+	_language_option.select(selected_index)
+	_syncing_language_option = false
+
+
+func _apply_localized_text() -> void:
+	if is_instance_valid(title_label):
+		title_label.text = LocaleManager.t("options.title", "항해 설정")
+	if is_instance_valid(subtitle_label):
+		subtitle_label.text = LocaleManager.t("options.subtitle", "음향과 화면 모드를 조정합니다.")
+	if is_instance_valid(master_label):
+		master_label.text = LocaleManager.t("options.master_volume", "전체 음량")
+	if is_instance_valid(music_label):
+		music_label.text = LocaleManager.t("options.music_volume", "음악")
+	if is_instance_valid(sfx_label):
+		sfx_label.text = LocaleManager.t("options.sfx_volume", "효과음")
+	if is_instance_valid(ui_label):
+		ui_label.text = LocaleManager.t("options.ui_volume", "UI")
+	if is_instance_valid(_language_label):
+		_language_label.text = LocaleManager.t("options.language", "언어")
+	if is_instance_valid(screen_fx_check):
+		screen_fx_check.text = LocaleManager.t("options.screen_fx_enabled", "가장자리 집중 연출")
+	if is_instance_valid(screen_fx_label):
+		screen_fx_label.text = LocaleManager.t("options.screen_fx_strength", "가장자리 연출 강도")
+	if is_instance_valid(fullscreen_check):
+		fullscreen_check.text = LocaleManager.t("options.fullscreen", "전체화면")
+	if is_instance_valid(back_button):
+		back_button.text = LocaleManager.t("options.close", "옵션 닫기")
+	_sync_screen_fx_controls()
+
+
+func _on_locale_changed(_locale: String) -> void:
+	_populate_language_options()
+	_apply_localized_text()
+
 
 func _apply_theme() -> void:
 	if is_instance_valid(backdrop):
@@ -72,7 +162,9 @@ func _apply_theme() -> void:
 		)
 	if is_instance_valid(panel):
 		ModalMenuSkin.apply_modal_shell(panel, title_label, subtitle_label, true)
-	for label in [master_label, music_label, sfx_label, ui_label]:
+	for label in [master_label, music_label, sfx_label, ui_label, _language_label]:
+		if not is_instance_valid(label):
+			continue
 		NavalUiTheme.style_body(label, 13)
 	if is_instance_valid(screen_fx_label):
 		NavalUiTheme.style_body(screen_fx_label, 13)
@@ -82,6 +174,8 @@ func _apply_theme() -> void:
 		NavalUiTheme.apply_menu_toggle(screen_fx_check, 13)
 	if is_instance_valid(fullscreen_check):
 		NavalUiTheme.apply_menu_toggle(fullscreen_check, 13)
+	if is_instance_valid(_language_option):
+		ModalMenuSkin.apply_action_button_theme(_language_option, false, true)
 	for slider in [master_slider, music_slider, sfx_slider, ui_slider, screen_fx_slider]:
 		NavalUiTheme.apply_slider(slider, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.STATUS_ACTIVE_BLUE, 4)
 	if is_instance_valid(back_button):
@@ -97,7 +191,12 @@ func _apply_layout_density() -> void:
 	var height_fit: float = clampf((viewport_size.y - 620.0) / 220.0, 0.0, 1.0)
 	var density: float = min(width_fit, height_fit)
 	if is_instance_valid(panel):
-		panel.custom_minimum_size.x = roundi(clampf(viewport_size.x - 148.0, 396.0, 540.0))
+		var panel_width := roundf(clampf(viewport_size.x - 148.0, 396.0, 560.0))
+		var panel_height := roundf(clampf(viewport_size.y - 72.0, 408.0, 488.0))
+		panel.offset_left = -panel_width * 0.5
+		panel.offset_right = panel_width * 0.5
+		panel.offset_top = -panel_height * 0.5
+		panel.offset_bottom = panel_height * 0.5
 	if is_instance_valid(shell):
 		shell.add_theme_constant_override("separation", roundi(lerpf(14.0, 18.0, density)))
 	if is_instance_valid(content_box):
@@ -106,7 +205,7 @@ func _apply_layout_density() -> void:
 		NavalUiTheme.style_display_title(title_label, roundi(lerpf(32.0, 40.0, density)))
 	if is_instance_valid(subtitle_label):
 		NavalUiTheme.style_caption(subtitle_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_BODY)
-	for label in [master_label, music_label, sfx_label, ui_label]:
+	for label in [master_label, music_label, sfx_label, ui_label, _language_label]:
 		if is_instance_valid(label):
 			NavalUiTheme.style_body(label, roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(screen_fx_label):
@@ -115,6 +214,9 @@ func _apply_layout_density() -> void:
 		NavalUiTheme.style_gold(screen_fx_value_label, roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(screen_fx_slider):
 		screen_fx_slider.custom_minimum_size.y = roundi(lerpf(18.0, 22.0, density))
+	if is_instance_valid(_language_option):
+		_language_option.custom_minimum_size = Vector2(roundf(lerpf(154.0, 172.0, density)), roundf(lerpf(32.0, 34.0, density)))
+		_language_option.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(screen_fx_check):
 		screen_fx_check.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(fullscreen_check):
@@ -131,6 +233,7 @@ func _setup_focus_navigation() -> void:
 		music_slider,
 		sfx_slider,
 		ui_slider,
+		_language_option,
 		screen_fx_check,
 		screen_fx_slider,
 		fullscreen_check,
@@ -178,6 +281,14 @@ func _on_fullscreen_toggled(pressed: bool) -> void:
 	SaveManager.set_setting("fullscreen", pressed, false)
 	SaveManager.apply_settings()
 
+
+func _on_language_selected(index: int) -> void:
+	if _syncing_language_option or not is_instance_valid(_language_option):
+		return
+	var locale := str(_language_option.get_item_metadata(index))
+	LocaleManager.set_locale(locale)
+
+
 func _on_screen_fx_toggled(pressed: bool) -> void:
 	SaveManager.set_setting("screen_edge_fx_enabled", pressed, false)
 	SaveManager.apply_settings()
@@ -196,16 +307,16 @@ func _sync_screen_fx_controls() -> void:
 	if is_instance_valid(screen_fx_value_label):
 		var strength_percent := int(round(screen_fx_slider.value * 100.0)) if is_instance_valid(screen_fx_slider) else 0
 		var descriptor := _describe_screen_fx_strength(screen_fx_slider.value if is_instance_valid(screen_fx_slider) else 0.0)
-		screen_fx_value_label.text = "꺼짐" if not enabled else "%s · %d%%" % [descriptor, strength_percent]
+		screen_fx_value_label.text = LocaleManager.t("options.off", "꺼짐") if not enabled else "%s · %d%%" % [descriptor, strength_percent]
 		screen_fx_value_label.modulate = Color.WHITE if enabled else Color(1.0, 1.0, 1.0, 0.5)
 
 
 func _describe_screen_fx_strength(value: float) -> String:
 	if value < 0.28:
-		return "약하게"
+		return LocaleManager.t("options.fx.weak", "약하게")
 	if value < 0.62:
-		return "표준"
-	return "강하게"
+		return LocaleManager.t("options.fx.standard", "표준")
+	return LocaleManager.t("options.fx.strong", "강하게")
 
 func _on_back_pressed() -> void:
 	SaveManager.save_game()
@@ -231,6 +342,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if focused is CheckBox:
 			UiButtonAudio.play_click()
 			(focused as CheckBox).button_pressed = not (focused as CheckBox).button_pressed
+			if get_viewport():
+				get_viewport().set_input_as_handled()
+		elif focused is OptionButton:
+			UiButtonAudio.play_click()
+			(focused as OptionButton).show_popup()
 			if get_viewport():
 				get_viewport().set_input_as_handled()
 		elif focused is Button:

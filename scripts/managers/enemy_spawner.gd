@@ -25,7 +25,11 @@ var boss_spawned: bool = false
 var elite_spawn_timer: float = 150.0 # 2분 30초 주기
 var elite_spawn_interval: float = 150.0
 var elite_spawn_count: int = 0
-var max_elite_spawns: int = 3 # 2:30/5:00/7:30에만 중간 보스 등장
+var max_elite_spawns: int = 3 # 2:30/5:00/7:30 중간 보스 웨이브 수
+var elite_spawn_wave_counts: Array[int] = [1, 2, 2]
+var elite_spawn_allow_overlap: bool = true
+var boss_waves: Array[Dictionary] = []
+var triggered_boss_wave_ids: Dictionary = {}
 var regular_spawn_stopped: bool = false
 var start_time: int = 0
 var blockade_spacing: float = 15.0
@@ -41,19 +45,19 @@ var scenario_triggers: Array[Dictionary] = []
 var triggered_scenario_ids: Dictionary = {}
 var fleet_progression: Array[Dictionary] = [
 	{"start_time": 0.0, "end_time": 120.0, "light_weight": 0.8, "mixed_weight": 0.2, "heavy_weight": 0.0},
-	{"start_time": 120.0, "end_time": 300.0, "light_weight": 0.45, "mixed_weight": 0.45, "heavy_weight": 0.10},
-	{"start_time": 300.0, "end_time": 9999.0, "light_weight": 0.20, "mixed_weight": 0.50, "heavy_weight": 0.30},
+	{"start_time": 120.0, "end_time": 330.0, "light_weight": 0.45, "mixed_weight": 0.45, "heavy_weight": 0.10},
+	{"start_time": 330.0, "end_time": 9999.0, "light_weight": 0.20, "mixed_weight": 0.50, "heavy_weight": 0.30},
 ]
 var cannon_chance_start_time: float = 75.0
 var cannon_chance_ramp_duration: float = 165.0
 var cannon_chance_max: float = 0.45
 var mid_boss_escort_layout: Array[Dictionary] = [
-	{"ship_type": "sekibune_cannon", "role": "gunline", "lateral": -12.0, "back": 8.0},
-	{"ship_type": "kobayabune_melee", "role": "vanguard", "lateral": 12.0, "back": 10.0},
+	{"ship_type": "sekibune_cannon", "role": "gunline", "lateral": -12.0, "back": 8.0, "hold_radius": 42.0, "break_radius": 52.0},
+	{"ship_type": "kobayabune_melee", "role": "vanguard", "lateral": 12.0, "back": 10.0, "hold_radius": 34.0, "break_radius": 44.0},
 ]
 
 
-func trigger_boss_event() -> Node3D:
+func trigger_boss_event(ship_type_name: String = "atakebune_final") -> Node3D:
 	regular_spawn_stopped = true
 	print("[Warning] 보스 등장 이벤트 시작! 일반 적 스폰 중단")
 	
@@ -64,31 +68,19 @@ func trigger_boss_event() -> Node3D:
 	# 		enemy.die()
 	
 	# 보스 소환
-	return _spawn_boss()
+	return _spawn_boss(ship_type_name)
 
 
-func _spawn_boss() -> Node3D:
-	if not boss_scene or boss_spawned:
+func _spawn_boss(ship_type_name: String = "atakebune_final") -> Node3D:
+	if not boss_scene or boss_spawned or not is_instance_valid(player):
 		return null
-	boss_spawned = true
-	
-	var boss = boss_scene.instantiate()
-	if boss.has_method("set_team"):
-		boss.set_team("enemy")
-	if "ship_type" in boss:
-		boss.ship_type = "atakebune_final" # 최종 보스 설정
 	# 플레이어 전방 50m 지점에 소환
 	var player_forward = - player.global_transform.basis.z
 	var spawn_pos = player.global_position + (player_forward * 50.0)
 	spawn_pos.y = 0
-	
-	get_parent().add_child(boss)
-	boss.global_position = spawn_pos
-	boss.look_at(player.global_position, Vector3.UP)
-	_prime_enemy_momentum(boss, true)
-	_push_boss_hp_to_hud(boss)
-	_start_boss_audio(boss)
-	print("[Boss] 최종 보스 소환 완료!")
+	var boss := _spawn_boss_ship(ship_type_name, spawn_pos, false, true)
+	if is_instance_valid(boss):
+		print("[Boss] 최종 보스 소환 완료!")
 	return boss
 
 
@@ -106,6 +98,7 @@ func _ready() -> void:
 	elite_spawn_timer = elite_spawn_interval
 	elite_spawn_count = 0
 	triggered_scenario_ids.clear()
+	triggered_boss_wave_ids.clear()
 	start_time = Time.get_ticks_msec()
 	_find_player()
 
@@ -115,6 +108,7 @@ func _process(delta: float) -> void:
 		return
 
 	_process_scenario_triggers()
+	_process_boss_waves()
 		
 	# 1. 적 생성 주기 관리
 	var enemies = EntityRegistry.get_ships_by_team("enemy")
@@ -122,12 +116,12 @@ func _process(delta: float) -> void:
 	
 	if not regular_spawn_stopped:
 		# 1-1. 엘리트 소환 주기 체크
-		if elite_spawn_count < max_elite_spawns:
+		if boss_waves.is_empty() and elite_spawn_count < max_elite_spawns and (elite_spawn_allow_overlap or elite_count == 0):
 			elite_spawn_timer -= delta
 			if elite_spawn_timer <= 0:
 				elite_spawn_timer = elite_spawn_interval
 				elite_spawn_count += 1
-				_spawn_elite_ship()
+				_spawn_elite_wave(_get_elite_wave_ship_count(elite_spawn_count))
 		
 		# 1-2. 일반 적 스폰 (엘리트가 있으면 최대 적 수 제한을 낮춰서 긴장감 조절)
 		var effective_max = max_enemies if elite_count == 0 else int(max_enemies * 0.6)
@@ -191,6 +185,130 @@ func _count_elite_enemy_ships() -> int:
 		if is_instance_valid(ship) and ship.is_in_group("elite"):
 			elite_count += 1
 	return elite_count
+
+func _get_elite_wave_ship_count(wave_number: int) -> int:
+	if elite_spawn_wave_counts.is_empty():
+		return 1
+	var index: int = clampi(wave_number - 1, 0, elite_spawn_wave_counts.size() - 1)
+	return maxi(1, int(elite_spawn_wave_counts[index]))
+
+
+func has_data_driven_boss_waves() -> bool:
+	return not boss_waves.is_empty()
+
+
+func _process_boss_waves() -> void:
+	if boss_waves.is_empty():
+		return
+	var elapsed_sec: float = _get_elapsed_spawn_time()
+	for wave in boss_waves:
+		var wave_id := str(wave.get("id", "")).strip_edges()
+		if wave_id.is_empty() or triggered_boss_wave_ids.has(wave_id):
+			continue
+		if elapsed_sec < float(wave.get("time", 0.0)):
+			continue
+		triggered_boss_wave_ids[wave_id] = true
+		_spawn_boss_wave(wave)
+
+
+func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
+	var spawned: Array[Node3D] = []
+	if not boss_scene:
+		return spawned
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		return spawned
+
+	var is_final_wave: bool = bool(wave.get("final", false))
+	if is_final_wave and boss_spawned:
+		return spawned
+	if bool(wave.get("stop_regular_spawns", false)):
+		regular_spawn_stopped = true
+
+	var wave_ships_variant: Variant = wave.get("ships", [])
+	if typeof(wave_ships_variant) != TYPE_ARRAY:
+		return spawned
+	var wave_ships: Array = wave_ships_variant as Array
+	var total_ship_count := 0
+	for ship_variant in wave_ships:
+		if typeof(ship_variant) != TYPE_DICTIONARY:
+			continue
+		var ship_info: Dictionary = ship_variant as Dictionary
+		total_ship_count += maxi(1, int(ship_info.get("count", 1)))
+	if total_ship_count <= 0:
+		return spawned
+
+	var center_pos: Vector3 = _get_biased_spawn_position()
+	var player_forward: Vector3 = -player.global_transform.basis.z
+	player_forward.y = 0.0
+	if player_forward.length_squared() <= 0.0001:
+		player_forward = Vector3.FORWARD
+	else:
+		player_forward = player_forward.normalized()
+	var player_right: Vector3 = player_forward.cross(Vector3.UP)
+	if player_right.length_squared() <= 0.0001:
+		player_right = Vector3.RIGHT
+	else:
+		player_right = player_right.normalized()
+
+	var spawned_index := 0
+	for ship_variant in wave_ships:
+		if typeof(ship_variant) != TYPE_DICTIONARY:
+			continue
+		var ship_info: Dictionary = ship_variant as Dictionary
+		var ship_type_name := str(ship_info.get("ship_type", "")).strip_edges()
+		if ship_type_name.is_empty():
+			continue
+		var ship_count: int = maxi(1, int(ship_info.get("count", 1)))
+		var lateral_spacing: float = maxf(1.0, float(ship_info.get("lateral_spacing", 28.0)))
+		for local_index in range(ship_count):
+			var lateral_offset := 0.0
+			if total_ship_count > 1:
+				lateral_offset = (float(spawned_index) - float(total_ship_count - 1) * 0.5) * lateral_spacing
+			var spawn_pos: Vector3 = center_pos + player_right * lateral_offset
+			spawn_pos += player_forward * -absf(lateral_offset) * 0.18
+			spawn_pos.y = 0.0
+			var escort_layout := _get_boss_wave_escort_layout(total_ship_count, spawned_index) if bool(ship_info.get("escorts", false)) else []
+			var boss_ship := _spawn_boss_ship(ship_type_name, spawn_pos, not escort_layout.is_empty(), is_final_wave, escort_layout)
+			if is_instance_valid(boss_ship):
+				spawned.append(boss_ship)
+			spawned_index += 1
+
+	if is_final_wave and not spawned.is_empty():
+		_notify_data_driven_boss_wave_started(wave)
+	if not spawned.is_empty():
+		print("[BossWave] %s 출현: %d척" % [str(wave.get("id", "")), spawned.size()])
+	return spawned
+
+
+func _spawn_elite_wave(ship_count: int) -> Array[Node3D]:
+	var spawned: Array[Node3D] = []
+	var wave_count: int = maxi(1, ship_count)
+	var center_pos: Vector3 = _get_biased_spawn_position()
+	var player_forward: Vector3 = -player.global_transform.basis.z if is_instance_valid(player) else Vector3.FORWARD
+	player_forward.y = 0.0
+	if player_forward.length_squared() <= 0.0001:
+		player_forward = Vector3.FORWARD
+	else:
+		player_forward = player_forward.normalized()
+	var player_right: Vector3 = player_forward.cross(Vector3.UP)
+	if player_right.length_squared() <= 0.0001:
+		player_right = Vector3.RIGHT
+	else:
+		player_right = player_right.normalized()
+
+	for index in range(wave_count):
+		var lateral_offset: float = 0.0
+		if wave_count > 1:
+			lateral_offset = (float(index) - float(wave_count - 1) * 0.5) * 28.0
+		var spawn_pos: Vector3 = center_pos + player_right * lateral_offset
+		spawn_pos += player_forward * -absf(lateral_offset) * 0.18
+		spawn_pos.y = 0.0
+		var elite := _spawn_elite_ship(spawn_pos, index == 0)
+		if is_instance_valid(elite):
+			spawned.append(elite)
+	return spawned
 
 func _spawn_enemy() -> void:
 	if not enemy_scene:
@@ -303,30 +421,64 @@ func _is_position_safe(pos: Vector3, min_dist: float) -> bool:
 	return true
 
 
-func _spawn_elite_ship() -> Node3D:
-	if not boss_scene:
-		return null
-	
-	# 중간 보스는 보스 베이스(Atakebune)를 사용하되 tier 1로 설정
-	var elite = boss_scene.instantiate()
-	if elite.has_method("set_team"):
-		elite.set_team("enemy")
-	if "ship_type" in elite:
-		# 중간 보스 성격의 엘리트 함선
-		elite.ship_type = "atakebune_mid"
-		
+func _spawn_elite_ship(spawn_pos_override: Variant = null, spawn_escorts: bool = true, ship_type_name: String = "atakebune_mid") -> Node3D:
 	# 스폰 위치 (전역 좌표로 변환)
 	var spawn_pos = _get_biased_spawn_position()
-	get_parent().add_child(elite)
-	elite.global_position = spawn_pos
-	elite.look_at(player.global_position, Vector3.UP)
-	_prime_enemy_momentum(elite, true)
-	_push_boss_hp_to_hud(elite)
-	_start_boss_audio(elite)
-	_spawn_elite_escorts(spawn_pos)
-	
-	print("[Event] 중간 보스 편대 출현!")
+	if spawn_pos_override is Vector3:
+		spawn_pos = spawn_pos_override
+	var elite := _spawn_boss_ship(ship_type_name, spawn_pos, spawn_escorts, false)
+	if is_instance_valid(elite):
+		print("[Event] 중간 보스 편대 출현!")
 	return elite
+
+
+func _get_boss_wave_escort_layout(ship_count: int, local_index: int) -> Array:
+	if mid_boss_escort_layout.is_empty():
+		return []
+	if ship_count <= 1:
+		return mid_boss_escort_layout
+	return [mid_boss_escort_layout[local_index % mid_boss_escort_layout.size()]]
+
+
+func _spawn_boss_ship(ship_type_name: String, spawn_pos: Vector3, spawn_escorts: bool = false, marks_final_boss: bool = false, escort_layout_override: Array = []) -> Node3D:
+	if not boss_scene:
+		return null
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		return null
+	if marks_final_boss and boss_spawned:
+		return null
+
+	var boss_ship = boss_scene.instantiate()
+	if boss_ship.has_method("set_team"):
+		boss_ship.set_team("enemy")
+	if "ship_type" in boss_ship:
+		boss_ship.ship_type = ship_type_name
+	if marks_final_boss:
+		boss_spawned = true
+
+	get_parent().add_child(boss_ship)
+	boss_ship.global_position = spawn_pos
+	boss_ship.look_at(player.global_position, Vector3.UP)
+	_prime_enemy_momentum(boss_ship, true)
+	_push_boss_hp_to_hud(boss_ship)
+	_start_boss_audio(boss_ship)
+	if spawn_escorts:
+		_spawn_elite_escorts(boss_ship, escort_layout_override)
+	return boss_ship
+
+
+func _notify_data_driven_boss_wave_started(wave: Dictionary) -> void:
+	var lm: Node = LevelManagerRegistry.get_level_manager(get_tree())
+	if not is_instance_valid(lm) or not lm.has_method("notify_data_driven_boss_wave_started"):
+		return
+	lm.call_deferred(
+		"notify_data_driven_boss_wave_started",
+		str(wave.get("id", "")),
+		float(wave.get("time", 0.0)),
+		bool(wave.get("final", false))
+	)
 
 
 func debug_spawn_mid_boss() -> Node3D:
@@ -420,19 +572,26 @@ func _stop_boss_audio_if_no_active_boss() -> void:
 		audio_manager.set_boss_battle_music(false)
 
 
-func _spawn_elite_escorts(flagship_pos: Vector3) -> void:
-	if not enemy_scene or not is_instance_valid(player):
+func _spawn_elite_escorts(flagship: Node3D, escort_layout_override: Array = []) -> void:
+	if not enemy_scene or not is_instance_valid(player) or not is_instance_valid(flagship):
 		return
 
-	var player_forward: Vector3 = -player.global_transform.basis.z
-	player_forward.y = 0.0
-	if player_forward.length_squared() <= 0.0001:
-		player_forward = Vector3.FORWARD
+	var flagship_forward: Vector3 = -flagship.global_transform.basis.z
+	flagship_forward.y = 0.0
+	if flagship_forward.length_squared() <= 0.0001:
+		flagship_forward = Vector3.FORWARD
 	else:
-		player_forward = player_forward.normalized()
-	var player_right: Vector3 = player_forward.cross(Vector3.UP).normalized()
+		flagship_forward = flagship_forward.normalized()
+	var flagship_right: Vector3 = flagship_forward.cross(Vector3.UP).normalized()
+	var flagship_pos: Vector3 = flagship.global_position
+	var escort_layout := escort_layout_override
+	if escort_layout.is_empty():
+		escort_layout = mid_boss_escort_layout
 
-	for escort_info in mid_boss_escort_layout:
+	for escort_info_variant in escort_layout:
+		if typeof(escort_info_variant) != TYPE_DICTIONARY:
+			continue
+		var escort_info: Dictionary = escort_info_variant as Dictionary
 		var escort_scene: PackedScene = _pick_enemy_scene_for_slot(escort_info)
 		if not is_instance_valid(escort_scene):
 			escort_scene = enemy_scene
@@ -440,10 +599,15 @@ func _spawn_elite_escorts(flagship_pos: Vector3) -> void:
 		if not is_instance_valid(escort):
 			continue
 		_apply_spawn_slot_info(escort, escort_info)
+		escort.set_meta("boss_escort_target_id", flagship.get_instance_id())
+		escort.set_meta("boss_escort_lateral", float(escort_info.get("lateral", 0.0)))
+		escort.set_meta("boss_escort_back", float(escort_info.get("back", 0.0)))
+		escort.set_meta("boss_escort_hold_radius", float(escort_info.get("hold_radius", 34.0)))
+		escort.set_meta("boss_escort_break_radius", float(escort_info.get("break_radius", 44.0)))
 
 		var escort_pos: Vector3 = flagship_pos
-		escort_pos += player_right * float(escort_info.get("lateral", 0.0))
-		escort_pos += player_forward * -float(escort_info.get("back", 0.0))
+		escort_pos += flagship_right * float(escort_info.get("lateral", 0.0))
+		escort_pos += flagship_forward * -float(escort_info.get("back", 0.0))
 		escort_pos.y = 0.0
 
 		get_parent().add_child(escort)
@@ -545,6 +709,9 @@ func _set_encounter_profile(profile_name: String) -> bool:
 
 
 func _get_elapsed_spawn_time() -> float:
+	var lm: Node = LevelManagerRegistry.get_level_manager(get_tree())
+	if is_instance_valid(lm) and "current_time" in lm:
+		return maxf(0.0, float(lm.get("current_time")))
 	if start_time <= 0:
 		return 0.0
 	return (Time.get_ticks_msec() - start_time) / 1000.0

@@ -115,7 +115,7 @@
 		},
 		"atakebune_mid_boss": {
 			"hull_scene": "res://scenes/ships/hulls/atakebune_hull.tscn",
-			"hull_hp": 680,
+			"hull_hp": 500,
 			"move_speed": 3.0,
 			"tier": 1,
 			"soldier_type": "general",
@@ -135,7 +135,7 @@
 		},
 		"atakebune_final_boss": {
 			"hull_scene": "res://scenes/ships/hulls/atakebune_hull.tscn",
-			"hull_hp": 5800,
+			"hull_hp": 2200,
 			"move_speed": 2.5,
 			"tier": 2,
 			"soldier_type": "general",
@@ -164,9 +164,7 @@
 			"has_cannons": true,
 			"soldier_type": "general",
 			"weapon_loadout": [
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.8, -3.5], "rotation_y": 0.0, "required_level": 1},
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_1", "slot": "CannonLeft", "position": [-1.0, 0.8, -0.5], "rotation_y": 90.0, "required_level": 2},
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_2", "slot": "CannonRight", "position": [1.0, 0.8, -0.5], "rotation_y": -90.0, "required_level": 3}
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.8, -3.5], "rotation_y": 0.0, "required_level": 1}
 			],
 			"deck_height": 0.4
 		},

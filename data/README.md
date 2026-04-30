@@ -21,7 +21,7 @@
 1. `level_progression.json`
 - 시간/레벨에 따른 난이도 진행
 - 레벨별 적 생성 간격, 동시 적 수
-- XP/지휘 성장 곡선
+- XP/백병전 성장 곡선
 
 2. `reward_rules.json`
 - 병사 처치 보상
@@ -34,6 +34,7 @@
 - `spawn_recipes` 기반 차단진/편대 조립 규칙
 - `encounter_profiles` 기반 시간대별 편대 풀 선택
 - `scenario_triggers` 기반 조건/액션형 전개 전환
+- `boss_wave_templates` / `boss_progression` 기반 중간/최종 보스 진행 규칙
 - 함종 비율 변화
 - 엘리트/중간보스 호위 구성
 

@@ -9,8 +9,9 @@ static func add_score(lm: Node, points: int) -> void:
 	lm.score_changed.emit(lm.current_score)
 
 	if is_instance_valid(SaveManager):
-		var gold_gain: int = max(1, int(round(points * 0.3)))
-		SaveManager.add_gold(gold_gain)
+		var gold_gain: int = max(0, points)
+		if gold_gain > 0:
+			SaveManager.add_gold(gold_gain)
 
 	if lm.hud:
 		lm.hud.update_score(lm.current_score)
@@ -111,7 +112,7 @@ static func add_merit(lm: Node, amount: int) -> void:
 
 	if lm.merit_points >= lm.max_merit_points:
 		lm.merit_full.emit()
-		print("[Command] 지휘 포인트가 가득 찼습니다! 병사 업그레이드를 시작합니다.")
+		print("[Boarding] 백병전 포인트가 가득 찼습니다! 업그레이드를 시작합니다.")
 		lm.consume_merit()
 
 static func calculate_next_level_xp(lm: Node) -> void:

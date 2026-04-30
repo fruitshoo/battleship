@@ -8,6 +8,7 @@ class MockMast:
 	extends Node
 
 	var sail_damage: float = 0.0
+	var hull_wear_damage: float = 0.0
 
 	func add_sail_damage(amount: float) -> void:
 		sail_damage = clampf(sail_damage + maxf(amount, 0.0), 0.0, 1.0)
@@ -17,6 +18,15 @@ class MockMast:
 
 	func get_sail_damage() -> float:
 		return sail_damage
+
+	func set_sail_angle(_angle: float) -> void:
+		pass
+
+	func set_hull_wear_damage(value: float) -> void:
+		hull_wear_damage = clampf(value, 0.0, 1.0)
+
+	func get_hull_wear_damage() -> float:
+		return hull_wear_damage
 
 
 class MockHud:
@@ -32,8 +42,10 @@ func _ready() -> void:
 	var failures: Array[String] = []
 	_verify_rigging_field_repair_waits_then_recovers(failures)
 	_verify_rudder_damage_gameplay_floor(failures)
+	_verify_hull_health_drives_sail_wear_visual_floor(failures)
 	if failures.is_empty():
 		print("[ShipDamageContract] ok")
+		get_tree().quit(0)
 		return
 	for failure in failures:
 		push_error("[ShipDamageContract] %s" % failure)
@@ -103,6 +115,34 @@ func _verify_rigging_field_repair_waits_then_recovers(failures: Array[String]) -
 	ship.call("_update_rigging_recovery", 5.0)
 	if not is_equal_approx(float(ship.get("rudder_health")), 10.0) or not is_equal_approx(mast.get_sail_damage(), 0.9):
 		failures.append("rigging field repair ran while the ship was burning")
+
+	ship.free()
+
+
+func _verify_hull_health_drives_sail_wear_visual_floor(failures: Array[String]) -> void:
+	var ship: Node = ShipScript.new()
+	add_child(ship)
+	ship.set("max_hull_hp", 200.0)
+	ship.set("hull_hp", 80.0)
+	ship.set("hull_sail_wear_enabled", true)
+	ship.set("hull_sail_wear_max_damage", 0.5)
+	ship.set("hull_sail_wear_curve", 1.0)
+	var mast := MockMast.new()
+	ship.add_child(mast)
+	var test_masts: Array[Node] = []
+	test_masts.append(mast)
+	ship.set("masts", test_masts)
+
+	ship.call("_update_sail_visual")
+	if absf(mast.get_hull_wear_damage() - 0.3) > 0.001:
+		failures.append("hull health did not drive sail visual wear: %.3f" % mast.get_hull_wear_damage())
+	if mast.get_sail_damage() > 0.001:
+		failures.append("hull-driven sail wear should not mutate rigging damage: %.3f" % mast.get_sail_damage())
+
+	ship.set("hull_hp", 200.0)
+	ship.call("_update_sail_visual")
+	if mast.get_hull_wear_damage() > 0.001:
+		failures.append("full hull health did not clear sail visual wear floor: %.3f" % mast.get_hull_wear_damage())
 
 	ship.free()
 

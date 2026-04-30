@@ -262,6 +262,7 @@ static func update_burning_status(ship, delta: float) -> void:
 		var burn_damage_per_second := 2.0
 		if "burn_hull_damage_per_second" in ship:
 			burn_damage_per_second = maxf(0.0, float(ship.burn_hull_damage_per_second))
+		burn_damage_per_second *= get_furled_sail_fire_damage_multiplier(ship)
 		ship.hull_hp = move_toward(ship.hull_hp, 0, burn_damage_per_second * delta)
 		# Let burning sails visibly deteriorate over time without jumping straight to holes.
 		for mast in ship.masts:
@@ -279,6 +280,13 @@ static func update_burning_status(ship, delta: float) -> void:
 	else:
 		if ship.fire_build_up > 0:
 			ship.fire_build_up = move_toward(ship.fire_build_up, 0, 15.0 * delta)
+
+
+static func get_furled_sail_fire_damage_multiplier(ship) -> float:
+	if "sail_furled" in ship and ship.get("sail_furled") == true:
+		if "furled_sail_fire_damage_multiplier" in ship and ship.get("furled_sail_fire_damage_multiplier") != null:
+			return clampf(float(ship.get("furled_sail_fire_damage_multiplier")), 0.0, 1.0)
+	return 1.0
 
 
 static func update_hull_regeneration(ship, delta: float) -> void:

@@ -122,6 +122,21 @@ var _last_applied_wind_strength: float = -1.0
 var _last_applied_flutter_strength: float = -1.0
 var _sail_view_fade_alpha: float = 1.0
 var _sail_view_fade_target_alpha: float = 1.0
+var sail_deployed_ratio: float = 1.0:
+	set(value):
+		var target_value: float = clamp(value, 0.0, 1.0)
+		if is_equal_approx(sail_deployed_ratio, target_value):
+			return
+		sail_deployed_ratio = target_value
+		_apply_sail_geometry()
+		_apply_sail_material_settings()
+var hull_wear_damage: float = 0.0:
+	set(value):
+		var target_value: float = clamp(value, 0.0, 1.0)
+		if is_equal_approx(hull_wear_damage, target_value):
+			return
+		hull_wear_damage = target_value
+		_apply_sail_material_settings()
 
 func _enter_tree() -> void:
 	# Apply the instance's exported sail settings as soon as the scene enters the tree,
@@ -294,6 +309,18 @@ func set_sail_damage(value: float) -> void:
 		return
 	sail_damage = target_damage
 	_apply_sail_material_settings()
+
+func set_hull_wear_damage(value: float) -> void:
+	hull_wear_damage = value
+
+func get_hull_wear_damage() -> float:
+	return hull_wear_damage
+
+func set_sail_deployed_ratio(value: float) -> void:
+	sail_deployed_ratio = value
+
+func get_sail_deployed_ratio() -> float:
+	return sail_deployed_ratio
 
 func set_burn_amount(value: float) -> void:
 	var target_burn: float = clamp(value, 0.0, 1.0)

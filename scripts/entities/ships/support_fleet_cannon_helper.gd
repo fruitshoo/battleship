@@ -4,7 +4,6 @@ class_name SupportFleetCannonHelper
 const PlayerShipSupportSquadronHelper = preload("res://scripts/entities/ships/player_ship_support_squadron_helper.gd")
 
 const FLEET_SIGNAL_UPGRADE_ID := "fleet_signal"
-const FLEET_CREW_UPGRADE_ID := "fleet_crew"
 const PANOKSEON_UPGRADE_ID := "panokseon_upgrade"
 const SUPPORT_BASE_CANNON_COUNT := "support_base_cannon_count"
 const SUPPORT_MAX_CANNON_COUNT := "support_max_cannon_count"
@@ -103,7 +102,7 @@ static func get_support_slot_summary_for_current_levels(current_levels: Dictiona
 
 static func get_support_slot_cannon_entries_for_current_levels(
 	level: int,
-	stats: Dictionary,
+	_stats: Dictionary,
 	current_levels: Dictionary,
 	upgrades: Dictionary = {},
 	support_limit_override: int = -1
@@ -116,7 +115,7 @@ static func get_support_slot_cannon_entries_for_current_levels(
 	for profile in profiles:
 		var ship_type_name := PlayerShipSupportSquadronHelper.get_profile_ship_type(profile)
 		var ship_label := _get_support_ship_summary_label(ship_type_name)
-		var cannon_count := get_support_cannon_count_for_level(level, stats, _is_panokseon_ship_type(ship_type_name))
+		var cannon_count := get_active_support_cannon_names_for_ship_type(ship_type_name, level).size()
 		var group_key := "%s|%d" % [ship_label, cannon_count]
 		if entry_indices.has(group_key):
 			var entry_index := int(entry_indices[group_key])
@@ -169,10 +168,6 @@ static func _get_support_upgrade_limit_bonus(current_levels: Dictionary, upgrade
 	var signal_stats: Dictionary = upgrades.get(FLEET_SIGNAL_UPGRADE_ID, {}).get("stats", {})
 	if signal_level >= int(signal_stats.get("limit_add_level", 999)):
 		upgrade_bonus += int(signal_stats.get("limit_add", 0))
-	var crew_level := int(current_levels.get(FLEET_CREW_UPGRADE_ID, 0))
-	var crew_stats: Dictionary = upgrades.get(FLEET_CREW_UPGRADE_ID, {}).get("stats", {})
-	if crew_level >= int(crew_stats.get("limit_add_level", 999)):
-		upgrade_bonus += int(crew_stats.get("limit_add", 0))
 	return upgrade_bonus
 
 

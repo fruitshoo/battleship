@@ -1,6 +1,7 @@
 extends Node3D
 
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
+const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 
 enum BattleMode {
 	STRESS,
@@ -28,6 +29,19 @@ enum BattleMode {
 @export var runtime_probe_duration_seconds: float = 300.0
 @export var runtime_probe_cycle_seconds: float = 60.0
 @export var runtime_probe_sample_interval_seconds: float = 5.0
+@export var support_probe_enabled: bool = false
+@export var support_probe_setup_delay_seconds: float = 0.35
+@export var support_probe_duration_seconds: float = 600.0
+@export var support_probe_warmup_seconds: float = 5.0
+@export var support_probe_sample_interval_seconds: float = 20.0
+@export var support_probe_support_limit: int = 5
+@export var support_probe_formation: int = SupportFleetStateHelper.FORMATION_WING
+@export var support_probe_player_speed: float = 3.2
+@export var support_probe_cannon_level: int = 5
+@export var support_probe_fleet_signal_level: int = 1
+@export var support_probe_fleet_crew_level: int = 0
+@export var support_probe_panokseon_upgrade_level: int = 1
+@export var support_probe_lock_survival: bool = true
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
@@ -56,6 +70,20 @@ var _runtime_monitor_last: Dictionary = {}
 var _runtime_monitor_peak_static_bytes: float = 0.0
 var _runtime_monitor_peak_objects: float = 0.0
 var _runtime_monitor_sample_count: int = 0
+var _support_probe_setup_done: bool = false
+var _support_probe_setup_elapsed: float = 0.0
+var _support_probe_started: bool = false
+var _support_probe_final_reported: bool = false
+var _support_probe_warmup_elapsed: float = 0.0
+var _support_probe_elapsed: float = 0.0
+var _support_probe_sample_elapsed: float = 0.0
+var _support_probe_frame_samples: Array = []
+var _support_probe_window_samples: Array = []
+var _support_probe_sample_index: int = 0
+var _support_probe_monitor_start: Dictionary = {}
+var _support_probe_monitor_last: Dictionary = {}
+var _support_probe_monitor_peak_static_bytes: float = 0.0
+var _support_probe_monitor_peak_objects: float = 0.0
 
 
 func _ready() -> void:
@@ -69,6 +97,10 @@ func _process(delta: float) -> void:
 		_runtime_probe_cycle_elapsed += delta
 		_sample_runtime_monitors(delta)
 		_handle_runtime_probe_cleanup()
+	if support_probe_enabled and battle_mode == BattleMode.STRESS:
+		_update_support_probe_setup(delta)
+		if _support_probe_setup_done:
+			_track_support_probe(delta)
 	_track_compare_sample(delta)
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
@@ -109,7 +141,15 @@ func _apply_env_overrides() -> void:
 	elif mode_text == "visual_compare" or mode_text == "compare":
 		battle_mode = BattleMode.VISUAL_COMPARE
 
+	var debug_panel_text := OS.get_environment("BATTLESHIP_MIDGAME_AUTO_OPEN_DEBUG_PANEL").strip_edges()
+	if not debug_panel_text.is_empty():
+		auto_open_debug_panel = _env_text_enabled(debug_panel_text)
+	var stat_panel_text := OS.get_environment("BATTLESHIP_MIDGAME_OPEN_STAT_PANEL").strip_edges()
+	if not stat_panel_text.is_empty():
+		open_stat_panel = _env_text_enabled(stat_panel_text)
+
 	runtime_probe_enabled = runtime_probe_enabled or _env_flag_enabled("BATTLESHIP_MIDGAME_RUNTIME_PROBE")
+	support_probe_enabled = support_probe_enabled or _env_flag_enabled("BATTLESHIP_MIDGAME_SUPPORT_PROBE")
 	var duration_text := OS.get_environment("BATTLESHIP_MIDGAME_RUNTIME_DURATION").strip_edges()
 	if not duration_text.is_empty():
 		runtime_probe_duration_seconds = maxf(1.0, float(duration_text))
@@ -128,6 +168,35 @@ func _apply_env_overrides() -> void:
 	var initial_wave_delay_text := OS.get_environment("BATTLESHIP_MIDGAME_INITIAL_WAVE_DELAY").strip_edges()
 	if not initial_wave_delay_text.is_empty():
 		initial_wave_delay = maxf(0.0, float(initial_wave_delay_text))
+	var support_probe_duration_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_DURATION").strip_edges()
+	if not support_probe_duration_text.is_empty():
+		support_probe_duration_seconds = maxf(1.0, float(support_probe_duration_text))
+	var support_probe_setup_delay_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_SETUP_DELAY").strip_edges()
+	if not support_probe_setup_delay_text.is_empty():
+		support_probe_setup_delay_seconds = maxf(0.0, float(support_probe_setup_delay_text))
+	var support_probe_warmup_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_WARMUP").strip_edges()
+	if not support_probe_warmup_text.is_empty():
+		support_probe_warmup_seconds = maxf(0.0, float(support_probe_warmup_text))
+	var support_probe_sample_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_SAMPLE_INTERVAL").strip_edges()
+	if not support_probe_sample_text.is_empty():
+		support_probe_sample_interval_seconds = maxf(0.25, float(support_probe_sample_text))
+	var support_probe_limit_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_SUPPORT_LIMIT").strip_edges()
+	if not support_probe_limit_text.is_empty():
+		support_probe_support_limit = maxi(0, int(support_probe_limit_text))
+	var support_probe_speed_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_PLAYER_SPEED").strip_edges()
+	if not support_probe_speed_text.is_empty():
+		support_probe_player_speed = maxf(0.0, float(support_probe_speed_text))
+	var support_probe_formation_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_FORMATION").strip_edges().to_lower()
+	if support_probe_formation_text == "column" or support_probe_formation_text == "0":
+		support_probe_formation = SupportFleetStateHelper.FORMATION_COLUMN
+	elif support_probe_formation_text == "wing" or support_probe_formation_text == "1":
+		support_probe_formation = SupportFleetStateHelper.FORMATION_WING
+	var support_probe_cannon_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_CANNON_LEVEL").strip_edges()
+	if not support_probe_cannon_text.is_empty():
+		support_probe_cannon_level = maxi(0, int(support_probe_cannon_text))
+	var support_probe_survival_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_LOCK_SURVIVAL").strip_edges()
+	if not support_probe_survival_text.is_empty():
+		support_probe_lock_survival = _env_text_enabled(support_probe_survival_text)
 
 
 func _ensure_stat_panel() -> void:
@@ -194,6 +263,78 @@ func _prepare_runtime_probe_player(player: Node3D) -> void:
 		player.set("is_dying", false)
 	if "is_derelict" in player:
 		player.set("is_derelict", false)
+
+
+func _prepare_support_probe_player(player: Node3D) -> void:
+	_prepare_runtime_probe_player(player)
+	_stabilize_support_probe_ship(player, true)
+	_apply_support_probe_upgrade_levels()
+	if "support_fleet_limit" in player:
+		player.set("support_fleet_limit", support_probe_support_limit)
+	if "support_fleet_respawn_interval" in player:
+		player.set("support_fleet_respawn_interval", 99999.0)
+	if "support_fleet_respawn_timer" in player:
+		player.set("support_fleet_respawn_timer", 0.0)
+	if "current_speed" in player:
+		player.set("current_speed", support_probe_player_speed)
+	if "is_rowing" in player:
+		player.set("is_rowing", support_probe_player_speed > 0.0)
+	SupportFleetStateHelper.set_flagship_formation(player, support_probe_formation)
+	SupportFleetStateHelper.set_flagship_hold_enabled(player, true)
+	_spawn_support_probe_fleet(player)
+
+
+func _apply_support_probe_upgrade_levels() -> void:
+	var upgrade_manager := get_node_or_null("/root/UpgradeManager")
+	if not is_instance_valid(upgrade_manager):
+		return
+	_raise_upgrade_level(upgrade_manager, "fleet_signal", support_probe_fleet_signal_level)
+	_raise_upgrade_level(upgrade_manager, "panokseon_upgrade", support_probe_panokseon_upgrade_level)
+	_raise_upgrade_level(upgrade_manager, "fleet_crew", support_probe_fleet_crew_level)
+	_raise_upgrade_level(upgrade_manager, "cannon", support_probe_cannon_level)
+
+
+func _raise_upgrade_level(upgrade_manager: Node, upgrade_id: String, target_level: int) -> void:
+	if target_level <= 0:
+		return
+	if not ("current_levels" in upgrade_manager) or not upgrade_manager.has_method("apply_upgrade"):
+		return
+	if "UPGRADES" in upgrade_manager:
+		var upgrades: Dictionary = upgrade_manager.get("UPGRADES")
+		var upgrade_data: Dictionary = upgrades.get(upgrade_id, {})
+		if upgrade_data.is_empty() or upgrade_data.get("disabled", false) == true:
+			return
+	var current_levels: Dictionary = upgrade_manager.get("current_levels")
+	while int(current_levels.get(upgrade_id, 0)) < target_level:
+		var previous_level := int(current_levels.get(upgrade_id, 0))
+		upgrade_manager.call("apply_upgrade", upgrade_id)
+		current_levels = upgrade_manager.get("current_levels")
+		if int(current_levels.get(upgrade_id, 0)) <= previous_level:
+			return
+
+
+func _spawn_support_probe_fleet(player: Node3D) -> void:
+	if support_probe_support_limit <= 0:
+		return
+	if not player.has_method("_spawn_or_repair_ally"):
+		return
+	var guard := 0
+	while _get_support_probe_support_ships().size() < support_probe_support_limit and guard < support_probe_support_limit + 2:
+		player.call("_spawn_or_repair_ally")
+		guard += 1
+	_configure_support_probe_supports(player)
+
+
+func _configure_support_probe_supports(player: Node3D) -> void:
+	for support_ship in _get_support_probe_support_ships():
+		if not is_instance_valid(support_ship):
+			continue
+		if "target" in support_ship:
+			support_ship.set("target", player)
+		if "current_speed" in support_ship:
+			support_ship.set("current_speed", support_probe_player_speed)
+		support_ship.set_meta("support_joining", false)
+		_stabilize_support_probe_ship(support_ship, false)
 
 
 func _clear_existing_preview_spawns() -> void:
@@ -412,6 +553,267 @@ func _print_runtime_probe_summary() -> void:
 
 
 func _runtime_monitor_value(snapshot: Dictionary, key: String) -> float:
+	return float(snapshot.get(key, 0.0))
+
+
+func _update_support_probe_setup(delta: float) -> void:
+	if _support_probe_setup_done:
+		return
+	if not _midgame_initialized:
+		return
+	_support_probe_setup_elapsed += delta
+	if _support_probe_setup_elapsed < support_probe_setup_delay_seconds:
+		return
+	var player: Node3D = get_node_or_null("PlayerShip")
+	if not is_instance_valid(player):
+		return
+	_prepare_support_probe_player(player)
+	_support_probe_setup_done = true
+
+
+func _track_support_probe(delta: float) -> void:
+	_maintain_support_probe_roster()
+	if _support_probe_final_reported:
+		return
+	if not _support_probe_started:
+		_support_probe_warmup_elapsed += delta
+		if _support_probe_warmup_elapsed < support_probe_warmup_seconds:
+			return
+		_begin_support_probe()
+
+	_support_probe_elapsed += delta
+	_support_probe_sample_elapsed += delta
+	_support_probe_frame_samples.append(delta)
+	_support_probe_window_samples.append(delta)
+	if _support_probe_sample_elapsed >= support_probe_sample_interval_seconds:
+		_print_support_probe_sample()
+	if _support_probe_elapsed >= support_probe_duration_seconds:
+		_support_probe_final_reported = true
+		_print_support_probe_summary()
+		if _should_auto_quit_after_report():
+			call_deferred("_quit_after_compare_report")
+
+
+func _begin_support_probe() -> void:
+	var player: Node3D = get_node_or_null("PlayerShip")
+	if is_instance_valid(player):
+		_prepare_support_probe_player(player)
+	_support_probe_started = true
+	_support_probe_elapsed = 0.0
+	_support_probe_sample_elapsed = 0.0
+	_support_probe_sample_index = 0
+	_support_probe_frame_samples.clear()
+	_support_probe_window_samples.clear()
+	_support_probe_monitor_start.clear()
+	_support_probe_monitor_last.clear()
+	_support_probe_monitor_peak_static_bytes = 0.0
+	_support_probe_monitor_peak_objects = 0.0
+	_capture_support_probe_monitor_sample()
+	var roster := _get_support_probe_roster_counts()
+	print("[MidgameSupportPerf] start duration=%.1f warmup=%.1f sample_interval=%.1f formation=%s support_limit=%d support=%d panokseon_total=%d maengseon=%d wave_limit=%d wave_interval=%.1f" % [
+		support_probe_duration_seconds,
+		support_probe_warmup_seconds,
+		support_probe_sample_interval_seconds,
+		"wing" if support_probe_formation == SupportFleetStateHelper.FORMATION_WING else "column",
+		support_probe_support_limit,
+		int(roster.get("support", 0)),
+		int(roster.get("panokseon_total", 0)),
+		int(roster.get("maengseon", 0)),
+		wave_limit,
+		wave_interval,
+	])
+
+
+func _maintain_support_probe_player_motion() -> void:
+	var player: Node3D = get_node_or_null("PlayerShip")
+	if not is_instance_valid(player):
+		return
+	_stabilize_support_probe_ship(player, true)
+	if "current_speed" in player:
+		player.set("current_speed", support_probe_player_speed)
+	if "is_rowing" in player:
+		player.set("is_rowing", support_probe_player_speed > 0.0)
+
+
+func _maintain_support_probe_roster() -> void:
+	var player: Node3D = get_node_or_null("PlayerShip")
+	if not is_instance_valid(player):
+		return
+	_maintain_support_probe_player_motion()
+	var support_ships := _get_support_probe_support_ships()
+	for support_ship in support_ships:
+		if is_instance_valid(support_ship):
+			_stabilize_support_probe_ship(support_ship, false)
+	if support_ships.size() < support_probe_support_limit:
+		_spawn_support_probe_fleet(player)
+	else:
+		_configure_support_probe_supports(player)
+
+
+func _stabilize_support_probe_ship(ship: Node3D, is_flagship: bool) -> void:
+	if not support_probe_lock_survival or not is_instance_valid(ship):
+		return
+	if "max_hull_hp" in ship:
+		ship.set("max_hull_hp", maxf(float(ship.get("max_hull_hp")), 999999.0))
+	if "hull_hp" in ship:
+		var target_hull := 999999.0
+		if "max_hull_hp" in ship:
+			target_hull = maxf(float(ship.get("max_hull_hp")), target_hull)
+		ship.set("hull_hp", target_hull)
+	for bool_property in [
+		"is_sinking",
+		"is_dying",
+		"is_derelict",
+		"is_burning",
+		"deck_is_overrun",
+	]:
+		if bool_property in ship:
+			ship.set(bool_property, false)
+	if "burn_timer" in ship:
+		ship.set("burn_timer", 0.0)
+	if "deck_hostile_boarder_count" in ship:
+		ship.set("deck_hostile_boarder_count", 0)
+	if is_flagship and "support_fleet_respawn_timer" in ship:
+		ship.set("support_fleet_respawn_timer", 0.0)
+
+
+func _capture_support_probe_monitor_sample() -> void:
+	var snapshot := {
+		"static_bytes": float(Performance.get_monitor(Performance.MEMORY_STATIC)),
+		"objects": float(Performance.get_monitor(Performance.OBJECT_COUNT)),
+		"resources": float(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)),
+		"nodes": float(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"orphan_nodes": float(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)),
+	}
+	if _support_probe_monitor_start.is_empty():
+		_support_probe_monitor_start = snapshot.duplicate()
+	_support_probe_monitor_last = snapshot.duplicate()
+	_support_probe_monitor_peak_static_bytes = maxf(_support_probe_monitor_peak_static_bytes, _support_probe_monitor_value(snapshot, "static_bytes"))
+	_support_probe_monitor_peak_objects = maxf(_support_probe_monitor_peak_objects, _support_probe_monitor_value(snapshot, "objects"))
+
+
+func _print_support_probe_sample() -> void:
+	_capture_support_probe_monitor_sample()
+	_support_probe_sample_index += 1
+	var stats := _summarize_delta_samples(_support_probe_window_samples)
+	var roster := _get_support_probe_roster_counts()
+	print("[MidgameSupportPerf] sample=%d elapsed=%.2f fps=%.1f avg=%.2fms p95=%.2fms p99=%.2fms max=%.2fms ships=%d enemies=%d support=%d panokseon_total=%d maengseon=%d soldiers=%d projectiles=%d static_mb=%.2f objects=%d nodes=%d" % [
+		_support_probe_sample_index,
+		_support_probe_elapsed,
+		float(stats.get("fps", 0.0)),
+		float(stats.get("avg_ms", 0.0)),
+		float(stats.get("p95_ms", 0.0)),
+		float(stats.get("p99_ms", 0.0)),
+		float(stats.get("max_ms", 0.0)),
+		_count_ships(),
+		EntityRegistry.get_ships_by_team("enemy").size(),
+		int(roster.get("support", 0)),
+		int(roster.get("panokseon_total", 0)),
+		int(roster.get("maengseon", 0)),
+		_count_soldiers(),
+		_count_projectiles(),
+		_support_probe_monitor_value(_support_probe_monitor_last, "static_bytes") / 1048576.0,
+		int(_support_probe_monitor_value(_support_probe_monitor_last, "objects")),
+		int(_support_probe_monitor_value(_support_probe_monitor_last, "nodes")),
+	])
+	_support_probe_window_samples.clear()
+	_support_probe_sample_elapsed = 0.0
+
+
+func _print_support_probe_summary() -> void:
+	if not _support_probe_window_samples.is_empty():
+		_print_support_probe_sample()
+	else:
+		_capture_support_probe_monitor_sample()
+	var stats := _summarize_delta_samples(_support_probe_frame_samples)
+	var roster := _get_support_probe_roster_counts()
+	var static_start_mb: float = _support_probe_monitor_value(_support_probe_monitor_start, "static_bytes") / 1048576.0
+	var static_end_mb: float = _support_probe_monitor_value(_support_probe_monitor_last, "static_bytes") / 1048576.0
+	print("[MidgameSupportPerf] summary duration=%.2f samples=%d fps=%.1f avg=%.2fms p95=%.2fms p99=%.2fms max=%.2fms ships=%d enemies=%d support=%d panokseon_total=%d maengseon=%d soldiers=%d projectiles=%d static_mb_start=%.2f static_mb_end=%.2f static_mb_delta=%.2f static_mb_peak=%.2f objects=%d objects_peak=%d resources=%d nodes=%d orphan_nodes=%d" % [
+		_support_probe_elapsed,
+		int(stats.get("sample_count", 0)),
+		float(stats.get("fps", 0.0)),
+		float(stats.get("avg_ms", 0.0)),
+		float(stats.get("p95_ms", 0.0)),
+		float(stats.get("p99_ms", 0.0)),
+		float(stats.get("max_ms", 0.0)),
+		_count_ships(),
+		EntityRegistry.get_ships_by_team("enemy").size(),
+		int(roster.get("support", 0)),
+		int(roster.get("panokseon_total", 0)),
+		int(roster.get("maengseon", 0)),
+		_count_soldiers(),
+		_count_projectiles(),
+		static_start_mb,
+		static_end_mb,
+		static_end_mb - static_start_mb,
+		_support_probe_monitor_peak_static_bytes / 1048576.0,
+		int(_support_probe_monitor_value(_support_probe_monitor_last, "objects")),
+		int(_support_probe_monitor_peak_objects),
+		int(_support_probe_monitor_value(_support_probe_monitor_last, "resources")),
+		int(_support_probe_monitor_value(_support_probe_monitor_last, "nodes")),
+		int(_support_probe_monitor_value(_support_probe_monitor_last, "orphan_nodes")),
+	])
+
+
+func _summarize_delta_samples(samples: Array) -> Dictionary:
+	var sample_count := samples.size()
+	var total_delta := 0.0
+	var max_delta := 0.0
+	for sample in samples:
+		var sample_delta: float = float(sample)
+		total_delta += sample_delta
+		max_delta = maxf(max_delta, sample_delta)
+	var avg_delta := total_delta / float(sample_count) if sample_count > 0 else 0.0
+	return {
+		"fps": 1.0 / avg_delta if avg_delta > 0.0 else 0.0,
+		"avg_ms": avg_delta * 1000.0,
+		"p95_ms": _get_percentile_delta_ms(samples, 0.95),
+		"p99_ms": _get_percentile_delta_ms(samples, 0.99),
+		"max_ms": max_delta * 1000.0,
+		"sample_count": sample_count,
+	}
+
+
+func _get_percentile_delta_ms(samples: Array, percentile: float) -> float:
+	if samples.is_empty():
+		return 0.0
+	var sorted_samples: Array = samples.duplicate()
+	sorted_samples.sort()
+	var sample_index := clampi(int(ceil(float(sorted_samples.size()) * percentile)) - 1, 0, sorted_samples.size() - 1)
+	return float(sorted_samples[sample_index]) * 1000.0
+
+
+func _get_support_probe_roster_counts() -> Dictionary:
+	var support_count := 0
+	var maengseon_count := 0
+	var panokseon_total := 0
+	for ship in EntityRegistry.get_ships_by_team("player"):
+		if not is_instance_valid(ship):
+			continue
+		var ship_type_name := str(ship.get("ship_type")).strip_edges().to_lower() if "ship_type" in ship else ""
+		if ship_type_name.contains("panokseon"):
+			panokseon_total += 1
+		if ship.get_meta("support_fleet_ship", false) == true:
+			support_count += 1
+			if ship_type_name.contains("maengseon"):
+				maengseon_count += 1
+	return {
+		"support": support_count,
+		"panokseon_total": panokseon_total,
+		"maengseon": maengseon_count,
+	}
+
+
+func _get_support_probe_support_ships() -> Array:
+	var support_ships: Array = []
+	for ship in EntityRegistry.get_ships_by_team("player"):
+		if is_instance_valid(ship) and ship.get_meta("support_fleet_ship", false) == true:
+			support_ships.append(ship)
+	return support_ships
+
+
+func _support_probe_monitor_value(snapshot: Dictionary, key: String) -> float:
 	return float(snapshot.get(key, 0.0))
 
 
@@ -663,4 +1065,9 @@ func _quit_after_compare_report() -> void:
 
 func _env_flag_enabled(name: String) -> bool:
 	var value := OS.get_environment(name).strip_edges().to_lower()
-	return value == "1" or value == "true" or value == "yes" or value == "on"
+	return _env_text_enabled(value)
+
+
+func _env_text_enabled(value: String) -> bool:
+	var normalized := value.strip_edges().to_lower()
+	return normalized == "1" or normalized == "true" or normalized == "yes" or normalized == "on"

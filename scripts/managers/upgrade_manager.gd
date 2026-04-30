@@ -68,15 +68,11 @@ const PANOKSEON_SUPPORT_UPGRADE_ID: String = "panokseon_upgrade"
 const SUPPORT_SHIP_UPGRADE_IDS: Array[String] = [
 	PANOKSEON_SUPPORT_UPGRADE_ID,
 ]
-const SUPPORT_CREW_UPGRADE_IDS: Array[String] = [
-	"fleet_crew",
-]
+const SUPPORT_CREW_UPGRADE_IDS: Array[String] = []
 const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
 	PANOKSEON_SUPPORT_UPGRADE_ID,
-	"fleet_crew",
 ]
 const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
-const SUPPORT_CREW_PROGRESS_MIN_LEVELS: int = 6
 const RARE_FLEET_UPGRADE_ID: String = "fleet_signal"
 const RARE_FLEET_UPGRADE_CHANCE: float = 0.08
 const TREASURE_REWARD_EXCLUDED_IDS: Array[String] = [
@@ -187,12 +183,12 @@ func get_command_upgrade_choices(count: int = 3) -> Array:
 		CREW_UPGRADE_IDS,
 		SUPPORT_CREW_UPGRADE_IDS,
 		_get_priority_crew_upgrade_ids(),
-		_is_fleet_crew_progress_available(),
+		false,
 		count
 	)
 
 func _is_fleet_progress_available() -> bool:
-	# 지원 함대를 해금했거나 이미 함대 강화가 시작됐으면 지휘 선택지에 함대 강화를 노출한다.
+	# 지원 함대를 해금했거나 이미 함대 강화가 시작됐으면 백병전 선택지에 함대 강화를 노출한다.
 	if int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0:
 		return true
 	for upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
@@ -205,12 +201,6 @@ func _is_fleet_ship_progress_available() -> bool:
 	if not _is_fleet_progress_available():
 		return false
 	return _get_non_fleet_progress_levels() >= SUPPORT_SHIP_PROGRESS_MIN_LEVELS
-
-
-func _is_fleet_crew_progress_available() -> bool:
-	if not _is_fleet_progress_available():
-		return false
-	return _get_non_fleet_progress_levels() >= SUPPORT_CREW_PROGRESS_MIN_LEVELS
 
 
 func _are_support_ship_choices_available() -> bool:
@@ -236,6 +226,9 @@ func _get_available_support_ship_upgrade_ids() -> Array[String]:
 func _get_non_fleet_progress_levels() -> int:
 	var total_levels := 0
 	for upgrade_id in current_levels.keys():
+		var upgrade_data: Dictionary = UPGRADES.get(upgrade_id, {})
+		if upgrade_data.get("disabled", false) == true:
+			continue
 		if upgrade_id == RARE_FLEET_UPGRADE_ID:
 			continue
 		if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
@@ -331,7 +324,7 @@ func apply_treasure_upgrade_reward(forced_upgrade_count: int = -1) -> Dictionary
 			var upgrade_data: Dictionary = UPGRADES.get(upgrade_id, {})
 			entry = {
 				"upgrade_id": upgrade_id,
-				"name": str(upgrade_data.get("name", upgrade_id)),
+				"name": LocaleManager.data_text(upgrade_data, upgrade_id, "upgrade", "name", upgrade_id),
 				"from_level": before_level,
 				"to_level": after_level,
 				"levels_added": after_level - before_level,
@@ -420,11 +413,11 @@ func apply_upgrade(upgrade_id: String) -> void:
 		for m in minions:
 			apply_fleet_upgrades_to_ship(m)
 	
-	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [UPGRADES[upgrade_id]["name"], new_level])
+	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [LocaleManager.data_text(UPGRADES[upgrade_id], upgrade_id, "upgrade", "name", upgrade_id), new_level])
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
 	var ship_ui_ids = ["cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "supply", "gold"]
-	var crew_ui_ids = ["crew_numbers", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow", "fleet_crew"]
+	var crew_ui_ids = ["crew_numbers", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
 		if upgrade_id in ship_ui_ids:
@@ -821,10 +814,8 @@ func _apply_singigeon(ship: Node3D, level: int) -> void:
 
 
 func _apply_janggun(ship: Node3D, level: int) -> void:
-	if level == 1:
-		NodeContractHelper.install_janggun_launcher(ship, janggun_scene, Vector3(0.0, 0.8, 2.0))
-	else:
-		print("[Janggun] 장군전 화력 및 디버프 강화! (Lv.%d)" % level)
+	NodeContractHelper.install_janggun_launcher(ship, janggun_scene, Vector3(0.0, 0.8, 2.0))
+	print("[Janggun] 포문 장군전 운용 갱신! (Lv.%d)" % level)
 
 
 func _apply_fire_pot(ship: Node3D, level: int) -> void:
@@ -894,7 +885,7 @@ func _apply_gold(_ship: Node3D, _level: int) -> void:
 			if node.has_method("add_score"):
 				node.add_score(pts)
 				break
-	print("[Gold] 전리품! 점수 +%d" % pts)
+	print("[Gold] 전리품! 골드 +%d" % pts)
 
 func _apply_fleet_signal(ship: Node3D, _level: int) -> void:
 	if not is_instance_valid(ship):
@@ -930,18 +921,8 @@ func _apply_panokseon_upgrade(ship: Node3D, _level: int) -> void:
 func _apply_fleet_crew(ship: Node3D, level: int) -> void:
 	if not is_instance_valid(ship):
 		return
-	var stats: Dictionary = UPGRADES["fleet_crew"].get("stats", {})
-	var reconcile_state := reconcile_support_fleet(ship, "fleet_crew", {
-		"allow_autospawn": true,
-		"spawn_if_respawn_ready": true,
-		"spawn_if_limit_increased": level >= int(stats.get("limit_add_level", 5)),
-		"require_signal_unlock": true,
-	})
-	var next_respawn_interval := float(reconcile_state.get(
-		"support_fleet_respawn_interval",
-		float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else 0.0
-	))
-	print("[Support] 지원함 재합류 강화 Lv.%d (재합류 %.0f초)" % [level, next_respawn_interval])
+	_refresh_support_fleet_upgrade_state(ship)
+	print("[Support] 지원함 재합류 업그레이드는 비활성화되었습니다. (Lv.%d 무시)" % level)
 
 
 func _get_player_ship() -> Node3D:
@@ -1120,16 +1101,11 @@ func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 		return {}
 	var previous_respawn_interval: float = float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else 0.0
 	var previous_limit: int = int(ship.get("support_fleet_limit")) if "support_fleet_limit" in ship else 0
-	var level: int = int(current_levels.get("fleet_crew", 0))
-	var stats: Dictionary = UPGRADES.get("fleet_crew", {}).get("stats", {})
 	if "support_fleet_respawn_interval" in ship:
 		var base_interval: float = float(ship.get_meta("base_support_fleet_respawn_interval", ship.support_fleet_respawn_interval))
 		if not ship.has_meta("base_support_fleet_respawn_interval"):
 			ship.set_meta("base_support_fleet_respawn_interval", base_interval)
-		var reduce_levels: int = mini(level, int(stats.get("respawn_reduce_max_level", 4)))
-		var reduce_per_level: float = float(stats.get("respawn_reduce_per_lv", 3.0))
-		var min_respawn_interval: float = float(stats.get("min_respawn_interval", 18.0))
-		ship.support_fleet_respawn_interval = maxf(min_respawn_interval, base_interval - (reduce_per_level * float(reduce_levels)))
+		ship.support_fleet_respawn_interval = base_interval
 	if "support_fleet_limit" in ship:
 		var base_limit: int = int(ship.get_meta("base_support_fleet_limit", ship.support_fleet_limit))
 		if not ship.has_meta("base_support_fleet_limit"):
@@ -1153,11 +1129,6 @@ func _get_support_fleet_limit_upgrade_bonus() -> int:
 	var signal_stats: Dictionary = UPGRADES.get("fleet_signal", {}).get("stats", {})
 	if signal_level >= int(signal_stats.get("limit_add_level", 999)):
 		upgrade_bonus += int(signal_stats.get("limit_add", 0))
-	var crew_level: int = int(current_levels.get("fleet_crew", 0))
-	var crew_stats: Dictionary = UPGRADES.get("fleet_crew", {}).get("stats", {})
-	if not crew_stats.is_empty():
-		if crew_level >= int(crew_stats.get("limit_add_level", 5)):
-			upgrade_bonus += int(crew_stats.get("limit_add", 1))
 	return upgrade_bonus
 
 

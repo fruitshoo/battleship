@@ -29,7 +29,7 @@ static func get_rudder_turn_multiplier(ship) -> float:
 	var handling_mult: float = ship.get_shiphandling_multiplier()
 	var steering_authority_mult: float = lerpf(0.72, 1.0, rudder_ratio)
 	var control_stability_mult: float = lerpf(0.86, 1.0, rudder_ratio)
-	return maxf(0.60, steering_authority_mult * handling_mult * control_stability_mult)
+	return maxf(0.60, steering_authority_mult * handling_mult * control_stability_mult) * get_furled_sail_rudder_multiplier(ship)
 
 
 static func get_rudder_response_multiplier(ship) -> float:
@@ -37,7 +37,14 @@ static func get_rudder_response_multiplier(ship) -> float:
 	var handling_mult: float = ship.get_shiphandling_multiplier()
 	var response_authority_mult: float = lerpf(0.78, 1.0, rudder_ratio)
 	var response_stability_mult: float = lerpf(0.90, 1.0, rudder_ratio)
-	return maxf(0.70, response_authority_mult * handling_mult * response_stability_mult)
+	return maxf(0.70, response_authority_mult * handling_mult * response_stability_mult) * get_furled_sail_rudder_multiplier(ship)
+
+
+static func get_furled_sail_rudder_multiplier(ship) -> float:
+	if "sail_furled" in ship and ship.get("sail_furled") == true:
+		if "furled_sail_rudder_multiplier" in ship and ship.get("furled_sail_rudder_multiplier") != null:
+			return maxf(1.0, float(ship.get("furled_sail_rudder_multiplier")))
+	return 1.0
 
 
 static func apply_rudder_damage_from_hit(ship, final_damage: float, hit_position: Vector3, damage_source: String) -> void:

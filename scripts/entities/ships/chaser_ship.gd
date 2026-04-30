@@ -529,12 +529,12 @@ func die() -> void:
 		remove_from_group("captured_minion")
 	EntityRegistry.unregister_captured_minion(self)
 	
-	# 점수 및 XP 추가
+	# 골드 및 XP 추가
 	if is_instance_valid(cached_lm):
 		if team == "enemy" and cached_lm.has_method("add_ship_sunk"):
 			cached_lm.add_ship_sunk(1)
 		if cached_lm.has_method("add_score"):
-			cached_lm.add_score(80)
+			cached_lm.add_score(25)
 		if cached_lm.has_method("add_xp"):
 			cached_lm.add_xp(30)
 			

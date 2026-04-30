@@ -112,6 +112,10 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 	player_ship.set("max_hull_hp", 200.0)
 	player_ship.set("rowing_stamina", 44.0)
 	player_ship.set("max_rowing_stamina", 100.0)
+	if player_ship.has_meta("sea_site_bonus_totals"):
+		player_ship.remove_meta("sea_site_bonus_totals")
+	if player_ship.has_meta("sea_site_bonus_counts"):
+		player_ship.remove_meta("sea_site_bonus_counts")
 	if hud.has_method("update_level"):
 		hud.call("update_level", 7)
 	if hud.has_method("update_score"):
@@ -126,6 +130,8 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 		hud.call("_update_hull_display")
 	if hud.has_method("_update_stamina_display"):
 		hud.call("_update_stamina_display")
+	if hud.has_method("_update_player_status_overlay"):
+		hud.call("_update_player_status_overlay", false)
 	if hud.has_method("_update_boarding_display"):
 		hud.call("_update_boarding_display")
 	if hud.has_method("_update_ammo_mode_display"):
@@ -139,6 +145,57 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 		hud.call("_update_stat_panel")
 	_validate_hud_message_api(hud, failures)
 	_validate_hud_baseline_state(hud, failures)
+	var random_site_bonus_button := _find_button_by_text(hud.sail_debug_panel, "해역 보너스")
+	if not is_instance_valid(random_site_bonus_button):
+		failures.append("hud smoke debug tools should include random sea-site bonus button")
+	else:
+		if random_site_bonus_button.focus_mode != Control.FOCUS_NONE:
+			failures.append("hud smoke random sea-site bonus debug button should not keep keyboard focus")
+		var previous_hull_hp := float(player_ship.get("hull_hp"))
+		var previous_max_hull_hp := float(player_ship.get("max_hull_hp"))
+		random_site_bonus_button.pressed.emit()
+		var random_bonus_totals_variant: Variant = player_ship.get_meta("sea_site_bonus_totals", {})
+		if not (random_bonus_totals_variant is Dictionary) or (random_bonus_totals_variant as Dictionary).is_empty():
+			failures.append("hud smoke random sea-site bonus debug did not grant a bonus")
+		if _find_label_by_text_prefix(hud.stat_site_bonus_panel, "누적 효과") == null:
+			failures.append("hud smoke random sea-site bonus debug did not refresh stat bonus rail")
+		if player_ship.has_meta("sea_site_bonus_totals"):
+			player_ship.remove_meta("sea_site_bonus_totals")
+		if player_ship.has_meta("sea_site_bonus_counts"):
+			player_ship.remove_meta("sea_site_bonus_counts")
+		player_ship.set("hull_hp", previous_hull_hp)
+		player_ship.set("max_hull_hp", previous_max_hull_hp)
+		SeaSiteRewardHelper._sync_site_bonus_consumers(hud, player_ship)
+		SeaSiteRewardHelper._sync_site_bonuses_to_player_fleet(hud, player_ship)
+		if "_last_stat_signature" in hud:
+			hud.set("_last_stat_signature", "")
+		if hud.has_method("_update_stat_panel"):
+			hud.call("_update_stat_panel")
+	player_ship.set_meta("sea_site_bonus_totals", {
+		"cannon_damage_pct": 0.08,
+		"hull_regen_add": 0.2,
+	})
+	player_ship.set_meta("sea_site_bonus_counts", {
+		"cannon_damage_pct": 2,
+		"hull_regen_add": 2,
+	})
+	if "_last_stat_signature" in hud:
+		hud.set("_last_stat_signature", "")
+	if hud.has_method("_update_stat_panel"):
+		hud.call("_update_stat_panel")
+	var site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
+	if not is_instance_valid(site_bonus_panel):
+		failures.append("hud smoke stat modal should create a right-side site bonus rail")
+	else:
+		var cannon_bonus := _find_label_by_text_prefix(site_bonus_panel, "포격 피해")
+		var cannon_bonus_value := _find_label_by_text_prefix(site_bonus_panel, "+8%")
+		var repair_bonus := _find_label_by_text_prefix(site_bonus_panel, "선체 수리")
+		if not is_instance_valid(cannon_bonus) or not is_instance_valid(cannon_bonus_value):
+			failures.append("hud smoke site bonus panel did not show cumulative cannon damage bonus")
+		if not is_instance_valid(repair_bonus):
+			failures.append("hud smoke site bonus panel did not show hull repair site bonus")
+	_validate_hud_upgrade_track_art(hud, failures)
+	_validate_hud_stat_modal_toggle(hud, failures)
 
 
 static func _run_hud_boarding_state_check(hud: Node, player_ship: Node3D, target_ship: Node3D, failures: Array[String]) -> void:
@@ -189,6 +246,9 @@ static func _run_hud_support_respawn_slot_check(hud: Node, player_ship: Node3D, 
 		var timer := slot.get_node_or_null("Root/Timer") as Label
 		if not is_instance_valid(timer) or not timer.visible or timer.text != "18s":
 			failures.append("hud smoke support respawn timer mismatch")
+		var ship_icon := slot.get_node_or_null("Root/EmblemPlate/ShipIcon") as TextureRect
+		if not is_instance_valid(ship_icon) or ship_icon.texture == null:
+			failures.append("hud smoke support slot missing ship icon texture")
 
 	UpgradeManager.current_levels["fleet_signal"] = previous_fleet_signal
 	player_ship.set("support_fleet_limit", previous_limit)
@@ -439,6 +499,48 @@ static func _run_hud_authoring_palette_harness(owner: Node, hud: Node, smoke_roo
 		missing_palette_controls = true
 	if missing_palette_controls:
 		return
+	var debug_panel := hud.sail_debug_panel as Control
+	if is_instance_valid(hud.bottom_right_container) and debug_panel.get_parent() == hud.bottom_right_container:
+		failures.append("hud authoring palette harness debug panel should be a fixed overlay, not bottom-right container content")
+	if not is_instance_valid(hud.debug_backdrop):
+		failures.append("hud authoring palette harness missing debug modal backdrop")
+	if is_instance_valid(hud.sail_debug_toggle_button):
+		failures.append("hud authoring palette harness should not create an on-screen debug toggle button")
+	var previous_debug_visible: bool = debug_panel.visible
+	debug_panel.visible = true
+	await _wait_frames(owner, 1)
+	var debug_panel_size: Vector2 = debug_panel.size
+	var debug_tabs := debug_panel.find_child("DebugToolsTabs", true, false) as TabContainer
+	if not is_instance_valid(debug_tabs):
+		failures.append("hud authoring palette harness missing debug tools tabs")
+	else:
+		if debug_tabs.focus_mode != Control.FOCUS_NONE:
+			failures.append("hud authoring palette harness debug tabs should not keep keyboard focus")
+		if debug_tabs.get_tab_count() < 6:
+			failures.append("hud authoring palette harness expected debug tools to be split into tabs")
+		var previous_tab: int = debug_tabs.current_tab
+		var next_tab: int = previous_tab + 1
+		if next_tab >= debug_tabs.get_tab_count():
+			next_tab = 0
+		debug_tabs.current_tab = next_tab
+		await _wait_frames(owner, 1)
+		if debug_panel.size.distance_to(debug_panel_size) > 0.5:
+			failures.append("hud authoring palette harness debug panel should not resize when tabs change")
+		debug_tabs.current_tab = previous_tab
+		await _wait_frames(owner, 1)
+	debug_panel.visible = previous_debug_visible
+	var debug_shortcut_event := InputEventKey.new()
+	debug_shortcut_event.pressed = true
+	debug_shortcut_event.physical_keycode = KEY_BACKSLASH
+	debug_shortcut_event.keycode = KEY_BACKSLASH
+	hud.call("_unhandled_input", debug_shortcut_event)
+	if debug_panel.visible == previous_debug_visible:
+		failures.append("hud authoring palette harness won/backslash key should toggle debug panel")
+	if is_instance_valid(hud.debug_backdrop) and hud.debug_backdrop.visible != debug_panel.visible:
+		failures.append("hud authoring palette harness debug backdrop should follow debug panel visibility")
+	hud.call("_unhandled_input", debug_shortcut_event)
+	if debug_panel.visible != previous_debug_visible:
+		failures.append("hud authoring palette harness won/backslash key should toggle debug panel back")
 
 	var selected_label: Label = hud.debug_authoring_palette_selected_value
 	var preview_label: Label = hud.debug_authoring_palette_preview_value
@@ -1104,6 +1206,11 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 	near_site.add_to_group("sea_site")
 	smoke_root.add_child(near_site)
 	near_site.global_position = player_ship.global_position + Vector3(3.0, 0.0, 0.0)
+	var second_site := Node3D.new()
+	second_site.name = "CompassSecondSiteSmoke"
+	second_site.add_to_group("sea_site")
+	smoke_root.add_child(second_site)
+	second_site.global_position = player_ship.global_position + Vector3(0.0, 0.0, -72.0)
 	await _wait_frames(owner, 5)
 
 	var marker := control_panel.get_node_or_null("WindPanel/WindIndicator/CompassWheel/SiteMarker") as Node2D
@@ -1113,8 +1220,16 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 		failures.append("hud smoke compass site marker did not become visible")
 	elif marker.position.length() > 10.0:
 		failures.append("hud smoke compass near site marker should stay near center: %.2f" % marker.position.length())
+	var second_marker := control_panel.get_node_or_null("WindPanel/WindIndicator/CompassWheel/SiteMarkerExtra1") as Node2D
+	if not is_instance_valid(second_marker):
+		failures.append("hud smoke compass should create an extra marker when multiple sites are visible")
+	elif not second_marker.visible:
+		failures.append("hud smoke compass extra site marker did not become visible")
+	elif second_marker.position.length() < 48.0:
+		failures.append("hud smoke compass extra far site marker was not near the rim: %.2f" % second_marker.position.length())
 
 	near_site.queue_free()
+	second_site.queue_free()
 	await _wait_frames(owner, 15)
 
 	var site := Node3D.new()
@@ -1180,6 +1295,132 @@ static func _validate_hud_baseline_state(hud: Node, failures: Array[String]) -> 
 		failures.append("hud smoke ship debug config was not populated")
 	if is_instance_valid(hud.stat_content) and hud.stat_content.get_child_count() <= 0:
 		failures.append("hud smoke stat panel was not populated")
+	if is_instance_valid(hud.stat_scroll) and is_instance_valid(hud.stat_content):
+		var stat_gutter := hud.stat_content.get_parent() as MarginContainer
+		if not is_instance_valid(stat_gutter) or stat_gutter.get_parent() != hud.stat_scroll:
+			failures.append("hud smoke stat panel content should sit inside a scrollbar gutter")
+		elif stat_gutter.get_theme_constant("margin_right") < 14:
+			failures.append("hud smoke stat panel scrollbar gutter should reserve right-side reading space")
+	var stat_title := _find_label_by_text_prefix(hud.stat_panel, "전투 수치")
+	if not is_instance_valid(stat_title) or not stat_title.text.contains("Tab"):
+		failures.append("hud smoke stat panel title should advertise Tab shortcut")
+	if is_instance_valid(hud.stat_content) and hud.stat_content.get_child_count() > 0:
+		var core_section := hud.stat_content.get_child(0) as Control
+		if not is_instance_valid(core_section) or _find_label_by_text_prefix(core_section, "핵심") == null:
+			failures.append("hud smoke stat panel should put core summary before detailed stat sections")
+		if core_section is PanelContainer:
+			failures.append("hud smoke stat panel core summary should use report-style rows instead of an inner card")
+		if is_instance_valid(core_section) and _find_label_by_text_prefix(core_section, "전과") != null:
+			failures.append("hud smoke stat panel should not put combat records first")
+		var stat_grid: GridContainer = null
+		if hud.stat_content.get_child_count() > 1:
+			stat_grid = hud.stat_content.get_child(1) as GridContainer
+		if not is_instance_valid(stat_grid):
+			failures.append("hud smoke stat panel should use a dense grid layout for detailed stats")
+		else:
+			if stat_grid.columns < 2:
+				failures.append("hud smoke stat panel should show dense two-column stats on desktop")
+			var first_section := stat_grid.get_child(0) if stat_grid.get_child_count() > 0 else null
+			if not is_instance_valid(first_section) or _find_label_by_text_prefix(first_section, "선체") == null:
+				failures.append("hud smoke stat panel should put ship body details directly after core summary")
+			if first_section is PanelContainer:
+				failures.append("hud smoke stat panel detail sections should use report-style rows instead of inner cards")
+	var site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
+	if not is_instance_valid(site_bonus_panel):
+		failures.append("hud smoke stat panel should include a right-side site bonus rail")
+	else:
+		if site_bonus_panel is PanelContainer:
+			failures.append("hud smoke site bonus rail should not use a card panel container")
+		var site_title := _find_label_by_text_prefix(site_bonus_panel, "해역 보너스")
+		if not is_instance_valid(site_title):
+			failures.append("hud smoke site bonus rail title missing")
+		if _find_label_by_text_prefix(site_bonus_panel, "포격 피해") != null:
+			failures.append("hud smoke empty site bonus panel should not list bonuses before rewards")
+	if is_instance_valid(hud.get("stat_site_bonus_scroll")) and is_instance_valid(hud.get("stat_site_bonus_content")):
+		var site_bonus_scroll := hud.get("stat_site_bonus_scroll") as ScrollContainer
+		var site_bonus_content := hud.get("stat_site_bonus_content") as VBoxContainer
+		var site_bonus_gutter := site_bonus_content.get_parent() as MarginContainer
+		if not is_instance_valid(site_bonus_gutter) or site_bonus_gutter.get_parent() != site_bonus_scroll:
+			failures.append("hud smoke site bonus content should sit inside a scrollbar gutter")
+		elif site_bonus_gutter.get_theme_constant("margin_right") < 10:
+			failures.append("hud smoke site bonus scrollbar gutter should reserve right-side reading space")
+	if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.visible:
+		failures.append("hud smoke player status overlay was not visible")
+	if is_instance_valid(hud.hp_bar):
+		if hud.hp_bar.get_parent() == hud.bottom_left_container:
+			failures.append("hud smoke player hp bar should not live in bottom-left hud")
+		if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.is_ancestor_of(hud.hp_bar):
+			failures.append("hud smoke player hp bar should live under player status overlay")
+	if is_instance_valid(hud.stamina_bar):
+		if hud.stamina_bar.get_parent() == hud.bottom_left_container:
+			failures.append("hud smoke player stamina bar should not live in bottom-left hud")
+		if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.is_ancestor_of(hud.stamina_bar):
+			failures.append("hud smoke player stamina bar should live under player status overlay")
+
+
+static func _validate_hud_upgrade_track_art(hud: Node, failures: Array[String]) -> void:
+	if not is_instance_valid(hud) or not hud.has_method("update_ship_upgrade_ui"):
+		return
+	hud.call("update_ship_upgrade_ui", "cannon", 1)
+	if not is_instance_valid(hud.weapon_track):
+		failures.append("hud smoke weapon upgrade track missing")
+		return
+	var art_slot: PanelContainer = null
+	for slot_variant in hud.weapon_track.slots:
+		var slot := slot_variant as PanelContainer
+		if is_instance_valid(slot) and str(slot.get_meta("upgrade_id", "")) == "cannon":
+			art_slot = slot
+			break
+	if not is_instance_valid(art_slot):
+		failures.append("hud smoke upgrade track did not create cannon slot")
+		return
+	var icon_texture := art_slot.get_node_or_null("IconTexture") as TextureRect
+	if not is_instance_valid(icon_texture) or icon_texture.texture == null or not icon_texture.visible:
+		failures.append("hud smoke upgrade track should show card art texture when available")
+	var icon_label := art_slot.get_node_or_null("Icon") as Label
+	if is_instance_valid(icon_label) and icon_label.visible:
+		failures.append("hud smoke upgrade track text icon should hide when card art is available")
+
+
+static func _validate_hud_stat_modal_toggle(hud: Node, failures: Array[String]) -> void:
+	if not is_instance_valid(hud) or not hud.has_method("toggle_stat_panel"):
+		return
+	var tree := hud.get_tree()
+	if tree == null:
+		return
+	var previous_show: bool = bool(hud.get("show_stat_panel"))
+	var previous_paused: bool = tree.paused
+	var previous_layer: int = int(hud.get("layer"))
+	hud.set("show_stat_panel", false)
+	if hud.has_method("_update_stat_panel"):
+		hud.call("_update_stat_panel")
+	hud.call("toggle_stat_panel")
+	if not bool(hud.get("show_stat_panel")):
+		failures.append("hud smoke stat modal did not open")
+	if not tree.paused:
+		failures.append("hud smoke stat modal should pause the tree")
+	var backdrop := hud.get("stat_backdrop") as ColorRect
+	if not is_instance_valid(backdrop) or not backdrop.visible:
+		failures.append("hud smoke stat modal backdrop should be visible")
+	if int(hud.get("layer")) <= previous_layer:
+		failures.append("hud smoke stat modal should raise GameHUD above later UI canvas layers")
+	var site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
+	if not is_instance_valid(site_bonus_panel) or not site_bonus_panel.visible:
+		failures.append("hud smoke stat modal site bonus rail should be visible while open")
+	hud.call("toggle_stat_panel")
+	if bool(hud.get("show_stat_panel")):
+		failures.append("hud smoke stat modal did not close")
+	if tree.paused != previous_paused:
+		failures.append("hud smoke stat modal did not restore previous pause state")
+	if int(hud.get("layer")) != previous_layer:
+		failures.append("hud smoke stat modal did not restore previous canvas layer")
+	if is_instance_valid(backdrop) and backdrop.visible:
+		failures.append("hud smoke stat modal backdrop should hide after closing")
+	if is_instance_valid(site_bonus_panel) and site_bonus_panel.visible:
+		failures.append("hud smoke stat modal site bonus rail should hide after closing")
+	hud.set("show_stat_panel", previous_show)
+	if previous_show and hud.has_method("_update_stat_panel"):
+		hud.call("_update_stat_panel")
 
 
 static func _validate_hud_message_api(hud: Node, failures: Array[String]) -> void:
@@ -1216,6 +1457,18 @@ static func _find_button_by_text(root: Node, button_text: String) -> Button:
 		return root as Button
 	for child in root.get_children():
 		var found := _find_button_by_text(child, button_text)
+		if is_instance_valid(found):
+			return found
+	return null
+
+
+static func _find_label_by_text_prefix(root: Node, text_prefix: String) -> Label:
+	if not is_instance_valid(root):
+		return null
+	if root is Label and str(root.get("text")).begins_with(text_prefix):
+		return root as Label
+	for child in root.get_children():
+		var found := _find_label_by_text_prefix(child, text_prefix)
 		if is_instance_valid(found):
 			return found
 	return null

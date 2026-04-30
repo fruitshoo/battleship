@@ -634,9 +634,9 @@ func die() -> void:
 	if is_instance_valid(cached_lm):
 		if cached_lm.has_method("add_ship_sunk"):
 			cached_lm.add_ship_sunk(1)
-		# 규칙 통일: 함선 격침은 XP/점수 지급
+		# 규칙 통일: 함선 격침은 XP/골드 지급
 		if cached_lm.has_method("add_score"):
-			cached_lm.add_score(400)
+			cached_lm.add_score(120)
 		if cached_lm.has_method("add_xp"):
 			cached_lm.add_xp(100)
 	

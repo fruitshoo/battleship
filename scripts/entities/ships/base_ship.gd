@@ -45,8 +45,13 @@ const SHIP_SINK_BUBBLES_PITCH_MAX := 1.06
 
 # === 돛 관련 ===
 @export var sail_angle: float = 0.0 # 돛 각도 (-90 ~ 90도)
+@export_group("Sail Wear")
+@export var hull_sail_wear_enabled: bool = true
+@export_range(0.0, 1.0, 0.01) var hull_sail_wear_max_damage: float = 0.5
+@export_range(0.25, 3.0, 0.05) var hull_sail_wear_curve: float = 1.05
 
 # === 러더(키) 관련 ===
+@export_group("")
 @export var rudder_angle: float = 0.0 # 러더 각도 (-45 ~ 45도)
 @export_range(10.0, 200.0, 1.0) var rudder_max_health: float = 100.0
 var rudder_health: float = 100.0
@@ -113,9 +118,9 @@ var _deck_overrun_announced: bool = false
 # === 도선(Boarding) 상태 및 변수 ===
 var is_boarding: bool = false
 var boarding_timer: float = 0.0
-var boarding_interval: float = 1.5
+var boarding_interval: float = 1.0
 var boarding_prep_timer: float = 0.0
-var boarding_prep_duration: float = 2.5
+var boarding_prep_duration: float = 0.0
 var boarding_target: Node3D = null
 var max_boarding_distance: float = 9.0
 var boarding_break_distance: float = 12.0
@@ -133,7 +138,7 @@ const BOARDING_PULL_DEFENDER_ACCEL_MULT := 0.22
 const BOARDING_PULL_DEFENDER_VELOCITY_MAX_MULT := 0.28
 const BOARDING_PULL_VELOCITY_DAMPING := 1.7
 const BOARDING_PULL_VELOCITY_RELEASE_DAMPING := 8.5
-@export_range(0.0, 3.0) var boarding_contact_grace_duration: float = 0.8
+@export_range(0.0, 3.0) var boarding_contact_grace_duration: float = 0.45
 @export_range(0.0, 2.0) var boarding_hook_throw_delay: float = 0.35
 @export_range(0.0, 3.0) var boarding_secondary_rope_delay: float = 0.9
 @export_range(0.5, 8.0) var boarding_max_relative_speed: float = 2.5
@@ -149,8 +154,8 @@ var boarding_pull_velocity: Vector3 = Vector3.ZERO
 var fire_build_up: float = 0.0
 var fire_threshold: float = 100.0
 @export_range(0.0, 1.0, 0.01) var fire_damage_ignition_chance_per_point: float = 0.012
-@export_range(0.0, 1.0, 0.01) var fire_pot_ignition_chance: float = 0.45
-@export_range(0.1, 20.0, 0.1) var fire_pot_burn_duration: float = 7.0
+@export_range(0.0, 1.0, 0.01) var fire_pot_ignition_chance: float = 0.25
+@export_range(0.1, 20.0, 0.1) var fire_pot_burn_duration: float = 5.0
 @export_range(0.0, 20.0, 0.1) var burn_hull_damage_per_second: float = 2.0
 
 # === 충돌 및 충각(Ramming) 관련 상태 ===
@@ -733,6 +738,8 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 	var support_fleet_limit_value: int = 0
 	var captain_count_value: int = 0
 	var is_rowing_value: bool = false
+	var sail_furled_value: bool = false
+	var sail_deployed_ratio_value: float = 1.0
 	var crew_respawn_interval_value: float = 0.0
 	var limbo_requested_tree_path: String = ""
 	var limbo_enabled_value: bool = false
@@ -760,6 +767,12 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 			captain_count_value = max(0, int(captain_count_variant))
 	if "is_rowing" in self:
 		is_rowing_value = get("is_rowing") == true
+	if "sail_furled" in self:
+		sail_furled_value = get("sail_furled") == true
+	if "sail_deployed_ratio" in self:
+		var sail_deployed_ratio_variant: Variant = get("sail_deployed_ratio")
+		if sail_deployed_ratio_variant != null:
+			sail_deployed_ratio_value = clampf(float(sail_deployed_ratio_variant), 0.0, 1.0)
 	if "crew_respawn_interval" in self:
 		var crew_respawn_interval_variant: Variant = get("crew_respawn_interval")
 		if crew_respawn_interval_variant != null:
@@ -808,6 +821,8 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		"support_fleet_limit": support_fleet_limit_value,
 		"captain_count": captain_count_value,
 		"is_rowing": is_rowing_value,
+		"sail_furled": sail_furled_value,
+		"sail_deployed_ratio": sail_deployed_ratio_value,
 		"max_speed": max_speed,
 		"turn_rate": turn_rate,
 		"hull_defense": hull_defense,

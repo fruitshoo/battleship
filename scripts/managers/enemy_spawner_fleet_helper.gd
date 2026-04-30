@@ -6,6 +6,9 @@ const SPAWN_RECIPES := "spawn_recipes"
 const ENCOUNTER_PROFILES := "encounter_profiles"
 const ENCOUNTER_PROFILE := "encounter_profile"
 const SCENARIO_TRIGGERS := "scenario_triggers"
+const BOSS_WAVES := "boss_waves"
+const BOSS_WAVE_TEMPLATES := "boss_wave_templates"
+const BOSS_PROGRESSION := "boss_progression"
 const RECIPE := "recipe"
 const SHIPS := "ships"
 const FORMATION_TYPE := "formation_type"
@@ -92,6 +95,126 @@ static func apply_enemy_spawn_rules_root(spawner, root: Dictionary) -> void:
 		var elite_rules: Dictionary = elite_variant as Dictionary
 		spawner.elite_spawn_interval = float(elite_rules.get("spawn_interval", spawner.elite_spawn_interval))
 		spawner.max_elite_spawns = int(elite_rules.get("max_elite_spawns", spawner.max_elite_spawns))
+		if "elite_spawn_wave_counts" in spawner:
+			var wave_counts_variant: Variant = elite_rules.get("wave_counts", spawner.elite_spawn_wave_counts)
+			if typeof(wave_counts_variant) == TYPE_ARRAY:
+				var parsed_wave_counts: Array[int] = []
+				for count_variant in wave_counts_variant:
+					parsed_wave_counts.append(maxi(1, int(count_variant)))
+				if not parsed_wave_counts.is_empty():
+					spawner.elite_spawn_wave_counts = parsed_wave_counts
+		if "elite_spawn_allow_overlap" in spawner:
+			spawner.elite_spawn_allow_overlap = bool(elite_rules.get("allow_overlap", spawner.elite_spawn_allow_overlap))
+
+	if "boss_waves" in spawner:
+		var parsed_boss_waves: Array[Dictionary] = []
+		var boss_wave_templates: Dictionary = {}
+		var templates_variant: Variant = root.get(BOSS_WAVE_TEMPLATES, {})
+		if typeof(templates_variant) == TYPE_DICTIONARY:
+			var raw_templates: Dictionary = templates_variant as Dictionary
+			for template_id_variant in raw_templates.keys():
+				var template_id := str(template_id_variant).strip_edges()
+				if template_id.is_empty():
+					continue
+				var template_variant: Variant = raw_templates[template_id_variant]
+				if typeof(template_variant) != TYPE_DICTIONARY:
+					continue
+				var template: Dictionary = template_variant as Dictionary
+				var template_ships_variant: Variant = template.get(SHIPS, [])
+				if typeof(template_ships_variant) != TYPE_ARRAY:
+					continue
+				var parsed_template_ships: Array[Dictionary] = []
+				for ship_variant in template_ships_variant:
+					if typeof(ship_variant) != TYPE_DICTIONARY:
+						continue
+					var ship_info: Dictionary = ship_variant as Dictionary
+					var ship_type_name := str(ship_info.get(SHIP_TYPE, "")).strip_edges()
+					if ship_type_name.is_empty():
+						continue
+					parsed_template_ships.append({
+						SHIP_TYPE: ship_type_name,
+						"count": maxi(1, int(ship_info.get("count", 1))),
+						"escorts": bool(ship_info.get("escorts", false)),
+						"lateral_spacing": maxf(1.0, float(ship_info.get("lateral_spacing", 28.0)))
+					})
+				if parsed_template_ships.is_empty():
+					continue
+				boss_wave_templates[template_id] = {
+					"final": bool(template.get("final", false)),
+					"stop_regular_spawns": bool(template.get("stop_regular_spawns", false)),
+					SHIPS: parsed_template_ships
+				}
+
+		var progression_variant: Variant = root.get(BOSS_PROGRESSION, {})
+		if typeof(progression_variant) == TYPE_DICTIONARY and not boss_wave_templates.is_empty():
+			var progression: Dictionary = progression_variant as Dictionary
+			var mid_sequence_variant: Variant = progression.get("mid_sequence", [])
+			if typeof(mid_sequence_variant) == TYPE_ARRAY:
+				var mid_sequence: Array = mid_sequence_variant as Array
+				var mid_start_time: float = maxf(0.0, float(progression.get("mid_start_time", 0.0)))
+				var mid_interval: float = maxf(0.0, float(progression.get("mid_interval", 0.0)))
+				var mid_id_prefix := str(progression.get("mid_id_prefix", "mid_boss")).strip_edges()
+				if mid_id_prefix.is_empty():
+					mid_id_prefix = "mid_boss"
+				for sequence_index in range(mid_sequence.size()):
+					var template_ref := str(mid_sequence[sequence_index]).strip_edges()
+					if not boss_wave_templates.has(template_ref):
+						continue
+					var template_wave: Dictionary = boss_wave_templates[template_ref] as Dictionary
+					var wave: Dictionary = template_wave.duplicate(true)
+					wave[ID] = "%s_%d" % [mid_id_prefix, sequence_index + 1]
+					wave["time"] = mid_start_time + mid_interval * float(sequence_index)
+					parsed_boss_waves.append(wave)
+
+			var final_template_id := str(progression.get("final_template", "")).strip_edges()
+			if not final_template_id.is_empty() and boss_wave_templates.has(final_template_id):
+				var final_template: Dictionary = boss_wave_templates[final_template_id] as Dictionary
+				var final_wave: Dictionary = final_template.duplicate(true)
+				var final_id := str(progression.get("final_id", "final_boss")).strip_edges()
+				final_wave[ID] = "final_boss" if final_id.is_empty() else final_id
+				final_wave["time"] = maxf(0.0, float(progression.get("final_time", 0.0)))
+				parsed_boss_waves.append(final_wave)
+
+		if parsed_boss_waves.is_empty():
+			var boss_waves_variant: Variant = root.get(BOSS_WAVES, [])
+			if typeof(boss_waves_variant) == TYPE_ARRAY:
+				for wave_variant in boss_waves_variant:
+					if typeof(wave_variant) != TYPE_DICTIONARY:
+						continue
+					var wave: Dictionary = wave_variant as Dictionary
+					var wave_ships_variant: Variant = wave.get(SHIPS, [])
+					if typeof(wave_ships_variant) != TYPE_ARRAY:
+						continue
+					var parsed_wave_ships: Array[Dictionary] = []
+					for ship_variant in wave_ships_variant:
+						if typeof(ship_variant) != TYPE_DICTIONARY:
+							continue
+						var ship_info: Dictionary = ship_variant as Dictionary
+						var ship_type_name := str(ship_info.get(SHIP_TYPE, "")).strip_edges()
+						if ship_type_name.is_empty():
+							continue
+						parsed_wave_ships.append({
+							SHIP_TYPE: ship_type_name,
+							"count": maxi(1, int(ship_info.get("count", 1))),
+							"escorts": bool(ship_info.get("escorts", false)),
+							"lateral_spacing": maxf(1.0, float(ship_info.get("lateral_spacing", 28.0)))
+						})
+					if parsed_wave_ships.is_empty():
+						continue
+					var wave_id := str(wave.get(ID, "boss_wave_%d" % parsed_boss_waves.size())).strip_edges()
+					if wave_id.is_empty():
+						wave_id = "boss_wave_%d" % parsed_boss_waves.size()
+					parsed_boss_waves.append({
+						ID: wave_id,
+						"time": maxf(0.0, float(wave.get("time", 0.0))),
+						"final": bool(wave.get("final", false)),
+						"stop_regular_spawns": bool(wave.get("stop_regular_spawns", false)),
+						SHIPS: parsed_wave_ships
+					})
+		parsed_boss_waves.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return float(a.get("time", 0.0)) < float(b.get("time", 0.0))
+		)
+		spawner.boss_waves = parsed_boss_waves
 
 	var escorts_variant: Variant = root.get("mid_boss_escort", [])
 	if typeof(escorts_variant) == TYPE_ARRAY:
@@ -100,12 +223,20 @@ static func apply_enemy_spawn_rules_root(spawner, root: Dictionary) -> void:
 			if typeof(entry_variant) != TYPE_DICTIONARY:
 				continue
 			var entry: Dictionary = entry_variant as Dictionary
-			parsed_escorts.append({
+			var parsed_escort := {
 				"ship_type": str(entry.get("ship_type", "kobayabune_melee")),
 				"role": str(entry.get("role", "")),
 				"lateral": float(entry.get("lateral", 0.0)),
 				"back": float(entry.get("back", 0.0))
-			})
+			}
+			if entry.has("hold_radius"):
+				parsed_escort["hold_radius"] = maxf(0.0, float(entry.get("hold_radius", 0.0)))
+			if entry.has("break_radius"):
+				parsed_escort["break_radius"] = maxf(0.0, float(entry.get("break_radius", 0.0)))
+			var authoring := normalize_authoring_meta(entry.get(AUTHORING, {}))
+			if not authoring.is_empty():
+				parsed_escort[AUTHORING] = authoring
+			parsed_escorts.append(parsed_escort)
 		if not parsed_escorts.is_empty():
 			spawner.mid_boss_escort_layout = parsed_escorts
 

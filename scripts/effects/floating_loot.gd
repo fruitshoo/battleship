@@ -5,7 +5,7 @@ extends Area3D
 
 const DEFAULT_HULL_HEAL: float = 15.0
 
-@export var gold_amount: int = 15
+@export var gold_amount: int = 5
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도

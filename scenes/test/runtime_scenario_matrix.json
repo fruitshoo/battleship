@@ -40,6 +40,26 @@
       ]
     },
     {
+      "id": "midgame_support_fleet_performance_probe",
+      "scene": "res://scenes/test/midgame_fleet_battle_preview.tscn",
+      "script": "res://scripts/test/midgame_fleet_battle_preview.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_midgame_support_fleet_performance_probe.sh",
+      "focus": "Midgame support-fleet AI and runtime performance under Panokseon plus Maengseon escort load.",
+      "scenarios": [
+        {
+          "id": "wing_formation_support_roster",
+          "label": "Wing support roster",
+          "coverage": "The probe builds one player Panokseon, one support Panokseon, and four Maengseon supports in wing formation before measuring runtime samples."
+        },
+        {
+          "id": "long_runtime_frame_memory_samples",
+          "label": "Long runtime samples",
+          "coverage": "The wrapper records FPS, frame-time percentiles, object counts, node counts, projectiles, and static memory across a configurable midgame duration."
+        }
+      ]
+    },
+    {
       "id": "scene_pool_contract",
       "scene": "res://scenes/test/scene_pool_contract.tscn",
       "script": "res://scripts/test/scene_pool_contract.gd",

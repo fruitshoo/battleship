@@ -60,6 +60,16 @@ static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) ->
 	return lerp(floor_ratio, 1.05, sail_efficiency)
 
 
+static func _get_sail_drive_ratio(ship) -> float:
+	if not is_instance_valid(ship):
+		return 1.0
+	if ship.has_method("get_effective_sail_deployment"):
+		return clampf(float(ship.call("get_effective_sail_deployment")), 0.0, 1.0)
+	if "sail_deployed_ratio" in ship and ship.get("sail_deployed_ratio") != null:
+		return clampf(float(ship.get("sail_deployed_ratio")), 0.0, 1.0)
+	return 1.0
+
+
 static func get_ships_cached(_tree: SceneTree) -> Array:
 	var current_frame = Engine.get_physics_frames()
 	if current_frame != _last_ships_cache_frame:
@@ -301,7 +311,8 @@ static func process_physics(ship, delta: float) -> void:
 	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
 
 	var leak_speed_mult = clamp(1.0 - (ship.leaking_rate * 0.05), 0.3, 1.0)
-	var desired_speed = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier()
+	var sail_drive_ratio: float = _get_sail_drive_ratio(ship)
+	var desired_speed = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier() * sail_drive_ratio
 
 	if not _is_gunner(ship) and dist_to_target < 4.4:
 		var slow_factor = clamp((dist_to_target - 1.4) / 3.0, 0.88, 1.0)

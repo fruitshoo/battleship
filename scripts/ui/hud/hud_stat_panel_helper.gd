@@ -2,6 +2,18 @@ extends RefCounted
 
 const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
+const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
+const SITE_BONUS_COUNTS_META := "sea_site_bonus_counts"
+const SITE_BONUS_DATA_PATH := "res://data/sea_site_rewards.json"
+const SITE_BONUS_ICON_BY_ID := {
+	"cannon_damage_pct": "sports_baseball",
+	"cannon_reload_pct": "timer",
+	"crew_damage_pct": "swords",
+	"crew_defense_add": "health_and_safety",
+	"hull_regen_add": "construction",
+	"hull_defense_add": "shield",
+	"max_hull_add": "favorite",
+}
 
 static func process_stat_panel(hud, delta: float) -> void:
 	if not hud.show_stat_panel:
@@ -15,10 +27,13 @@ static func process_stat_panel(hud, delta: float) -> void:
 static func toggle_stat_panel(hud) -> void:
 	hud.show_stat_panel = not hud.show_stat_panel
 	if hud.show_stat_panel:
+		_set_stat_modal_active(hud, true)
 		hud._tooltip_hover_slot = null
 		hud._tooltip_slot_ref = null
 		hud._tooltip_hover_elapsed = 0.0
 		hud._hide_upgrade_tooltip(true)
+	else:
+		_set_stat_modal_active(hud, false)
 	hud._stat_refresh_left = 0.0
 	update_stat_panel(hud)
 
@@ -27,16 +42,57 @@ static func update_stat_panel(hud) -> void:
 	if not is_instance_valid(hud.stat_panel):
 		return
 	hud.stat_panel.visible = hud.show_stat_panel
+	if is_instance_valid(hud.stat_site_bonus_panel):
+		hud.stat_site_bonus_panel.visible = hud.show_stat_panel
 	if not hud.show_stat_panel:
+		_set_stat_modal_active(hud, false)
 		return
 	if not is_instance_valid(hud.stat_content):
 		return
 	var sections: Array[Dictionary] = build_stat_sections(hud)
-	var signature: String = _build_signature(sections)
+	var site_bonus_sections: Array[Dictionary] = build_site_bonus_sections(hud)
+	var columns := 1
+	var viewport: Viewport = hud.get_viewport()
+	if viewport != null and viewport.get_visible_rect().size.x >= 940.0:
+		columns = 2
+	var signature: String = "%s||site:%s||cols:%d" % [_build_signature(sections), _build_signature(site_bonus_sections), columns]
 	if hud._last_stat_signature == signature:
 		return
 	hud._last_stat_signature = signature
 	_rebuild_stat_content(hud, sections)
+	_rebuild_site_bonus_content(hud, site_bonus_sections)
+
+
+static func _set_stat_modal_active(hud, active: bool) -> void:
+	if hud == null:
+		return
+	if active:
+		var tree: SceneTree = hud.get_tree() as SceneTree
+		if not hud._stat_modal_active:
+			hud._stat_modal_previous_layer = int(hud.layer)
+			hud._stat_modal_active = true
+			if tree != null:
+				hud._stat_modal_previous_paused = tree.paused
+				tree.paused = true
+		if "layer" in hud:
+			hud.layer = maxi(int(hud.layer), 20)
+		if tree != null:
+			tree.paused = true
+		if is_instance_valid(hud.stat_backdrop):
+			hud.stat_backdrop.visible = true
+			hud.stat_backdrop.modulate.a = 1.0
+		return
+
+	if is_instance_valid(hud.stat_backdrop):
+		hud.stat_backdrop.visible = false
+	if not hud._stat_modal_active:
+		return
+	if "layer" in hud:
+		hud.layer = hud._stat_modal_previous_layer
+	var restore_tree: SceneTree = hud.get_tree() as SceneTree
+	if restore_tree != null:
+		restore_tree.paused = hud._stat_modal_previous_paused
+	hud._stat_modal_active = false
 
 static func build_stat_sections(hud) -> Array[Dictionary]:
 	if not is_instance_valid(hud.player_ship):
@@ -54,8 +110,9 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	if not is_instance_valid(lm):
 		lm = LevelManagerRegistry.get_level_manager(hud.get_tree())
 
+	var combat_record_section: Dictionary = {}
 	if is_instance_valid(lm):
-		sections.append({
+		combat_record_section = {
 			"title": "전과",
 			"icon": "analytics",
 			"rows": [
@@ -65,7 +122,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 				{"icon": "swords", "label": "전투 사살", "value": str(int(lm.get("soldiers_slain")))},
 				{"icon": "water", "label": "수장", "value": str(int(lm.get("soldiers_drowned")))},
 			],
-		})
+		}
 
 	var ship_snapshot: Dictionary = ship.call("get_debug_ship_state_snapshot") if ship.has_method("get_debug_ship_state_snapshot") else {}
 	var hull_hp: float = float(ship_snapshot.get("hull_hp", 0.0))
@@ -176,6 +233,19 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		],
 	})
 
+	sections.insert(0, {
+		"title": "핵심",
+		"icon": "monitoring",
+		"style": "summary",
+		"rows": [
+			{"icon": "favorite", "label": "내구 / 방어", "value": "%.0f/%.0f | %.1f" % [hull_hp, max_hull_hp, hull_defense]},
+			{"icon": "sports_baseball", "label": "피해 / DPS", "value": "%.1f | %.1f" % [cannon_damage, cannon_expected_dps]},
+			{"icon": "groups", "label": "병력", "value": "%d / %d" % [int(crew_stats.get("alive_count", 0)), int(_get_int(ship, "max_crew_count", 0))]},
+			{"icon": "speed", "label": "속도", "value": "%.1f / %.1f" % [current_speed, max_speed]},
+			{"icon": "bolt", "label": "스태미나", "value": "%.0f / %.0f" % [rowing_stamina, max_rowing_stamina]},
+		],
+	})
+
 	var item_names: Array[String] = _get_item_names()
 	if not item_names.is_empty():
 		var item_rows: Array[Dictionary] = []
@@ -187,7 +257,21 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			"rows": item_rows,
 		})
 
+	if not combat_record_section.is_empty():
+		sections.append(combat_record_section)
+
 	return sections
+
+
+static func build_site_bonus_sections(hud) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	if is_instance_valid(hud.player_ship):
+		rows = _build_site_bonus_rows(hud.player_ship)
+	return [{
+		"title": "누적 효과",
+		"icon": "explore",
+		"rows": rows,
+	}]
 
 static func _build_signature(sections: Array[Dictionary]) -> String:
 	var parts: Array[String] = []
@@ -201,66 +285,136 @@ static func _build_signature(sections: Array[Dictionary]) -> String:
 static func _rebuild_stat_content(hud, sections: Array[Dictionary]) -> void:
 	for child in hud.stat_content.get_children():
 		child.queue_free()
+	var columns := 1
+	var viewport: Viewport = hud.get_viewport()
+	if viewport != null and viewport.get_visible_rect().size.x >= 940.0:
+		columns = 2
+	var section_start_index := 0
+	if not sections.is_empty() and str(sections[0].get("style", "")) == "summary":
+		hud.stat_content.add_child(_create_section(sections[0]))
+		section_start_index = 1
+	var grid := GridContainer.new()
+	grid.columns = columns
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 12)
+	hud.stat_content.add_child(grid)
+	for section_index in range(section_start_index, sections.size()):
+		var section: Dictionary = sections[section_index]
+		grid.add_child(_create_section(section))
+
+
+static func _rebuild_site_bonus_content(hud, sections: Array[Dictionary]) -> void:
+	if not is_instance_valid(hud.stat_site_bonus_content):
+		return
+	for child in hud.stat_site_bonus_content.get_children():
+		child.queue_free()
 	for section in sections:
-		hud.stat_content.add_child(_create_section(section))
+		var rows: Array = section.get("rows", [])
+		if rows.is_empty():
+			continue
+		hud.stat_site_bonus_content.add_child(_create_section(section))
 
 static func _create_section(section: Dictionary) -> Control:
-	var panel := PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	var panel_style := NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG_SOFT, NavalUiTheme.BORDER_GOLD_DIM, 10, 1, 10.0, 8.0, 10.0, 8.0)
-	panel.add_theme_stylebox_override("panel", panel_style)
+	var section_root := MarginContainer.new()
+	section_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section_root.add_theme_constant_override("margin_left", 2)
+	section_root.add_theme_constant_override("margin_top", 2)
+	section_root.add_theme_constant_override("margin_right", 2)
+	section_root.add_theme_constant_override("margin_bottom", 5)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	panel.add_child(vbox)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 4)
+	section_root.add_child(vbox)
 
 	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 8)
+	header.add_theme_constant_override("separation", 6)
 	vbox.add_child(header)
 
-	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 18, NavalUiTheme.TEXT_ACCENT)
+	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 13, NavalUiTheme.TEXT_ACCENT)
 	header.add_child(icon_label)
 
 	var title := Label.new()
 	title.text = str(section.get("title", ""))
-	NavalUiTheme.style_heading(title, 14)
+	NavalUiTheme.style_heading(title, 12)
 	header.add_child(title)
 
-	var separator := HSeparator.new()
+	var separator := ColorRect.new()
+	separator.color = NavalUiTheme.BORDER_GOLD_SOFT
+	separator.custom_minimum_size.y = 1.0
 	vbox.add_child(separator)
 
-	for row in section.get("rows", []):
-		if row is Dictionary:
-			vbox.add_child(_create_stat_row(row))
+	if str(section.get("style", "")) == "summary":
+		var summary_row := HBoxContainer.new()
+		summary_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		summary_row.add_theme_constant_override("separation", 6)
+		vbox.add_child(summary_row)
+		var rows: Array = section.get("rows", [])
+		for row_index in range(rows.size()):
+			var row = rows[row_index]
+			if not (row is Dictionary):
+				continue
+			if row_index > 0:
+				var divider := ColorRect.new()
+				divider.color = Color(NavalUiTheme.BORDER_GOLD_DIM.r, NavalUiTheme.BORDER_GOLD_DIM.g, NavalUiTheme.BORDER_GOLD_DIM.b, 0.44)
+				divider.custom_minimum_size = Vector2(1.0, 34.0)
+				summary_row.add_child(divider)
+			var cell := VBoxContainer.new()
+			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cell.add_theme_constant_override("separation", 1)
+			summary_row.add_child(cell)
 
-	return panel
+			var label_row := HBoxContainer.new()
+			label_row.add_theme_constant_override("separation", 3)
+			cell.add_child(label_row)
+			label_row.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 11, NavalUiTheme.TEXT_BLUE))
+
+			var summary_label := Label.new()
+			summary_label.text = str(row.get("label", ""))
+			summary_label.clip_text = true
+			NavalUiTheme.style_muted(summary_label, 10)
+			label_row.add_child(summary_label)
+
+			var summary_value := Label.new()
+			summary_value.text = str(row.get("value", ""))
+			summary_value.clip_text = true
+			NavalUiTheme.style_overlay_value(summary_value, 12)
+			summary_value.add_theme_constant_override("outline_size", 2)
+			cell.add_child(summary_value)
+	else:
+		for row in section.get("rows", []):
+			if row is Dictionary:
+				vbox.add_child(_create_stat_row(row))
+
+	return section_root
 
 static func _create_stat_row(row: Dictionary) -> Control:
 	var row_box := HBoxContainer.new()
 	row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row_box.add_theme_constant_override("separation", 8)
+	row_box.custom_minimum_size.y = 17.0
+	row_box.add_theme_constant_override("separation", 5)
 
-	row_box.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 16, NavalUiTheme.TEXT_BLUE))
+	row_box.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 13, NavalUiTheme.TEXT_BLUE))
 
 	var label := Label.new()
 	label.text = str(row.get("label", ""))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	NavalUiTheme.style_body(label, 12)
+	NavalUiTheme.style_body(label, 11)
 	row_box.add_child(label)
 
 	var value := Label.new()
 	value.text = str(row.get("value", ""))
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	NavalUiTheme.style_overlay_value(value, 12)
-	value.add_theme_constant_override("outline_size", 3)
+	NavalUiTheme.style_overlay_value(value, 11)
+	value.add_theme_constant_override("outline_size", 2)
 	row_box.add_child(value)
 
 	return row_box
 
 static func _create_icon_label(icon_name: String, font_size: int, color: Color) -> Label:
 	var icon_label := Label.new()
-	icon_label.custom_minimum_size = Vector2(18, 18)
+	icon_label.custom_minimum_size = Vector2(15, 15)
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	NavalUiTheme.apply_emblem(icon_label, icon_name, font_size, color)
@@ -388,6 +542,94 @@ static func _get_item_names() -> Array[String]:
 		if item_data is Dictionary:
 			item_names.append(str(item_data.get("name", item_id)))
 	return item_names
+
+
+static func _build_site_bonus_rows(player_ship: Node) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	if not is_instance_valid(player_ship):
+		return rows
+	var totals_variant: Variant = player_ship.get_meta(SITE_BONUS_TOTALS_META, {})
+	if not (totals_variant is Dictionary):
+		return rows
+	var totals: Dictionary = totals_variant as Dictionary
+	if totals.is_empty():
+		return rows
+	var counts_variant: Variant = player_ship.get_meta(SITE_BONUS_COUNTS_META, {})
+	var counts: Dictionary = counts_variant as Dictionary if counts_variant is Dictionary else {}
+	var handled_ids: Dictionary = {}
+	for entry in _load_site_bonus_entries():
+		if not (entry is Dictionary):
+			continue
+		var entry_dict: Dictionary = entry
+		var bonus_id := str(entry_dict.get("id", ""))
+		if bonus_id.is_empty() or not totals.has(bonus_id):
+			continue
+		var total_value := maxf(0.0, float(totals.get(bonus_id, 0.0)))
+		if total_value <= 0.0001:
+			continue
+		rows.append(_make_site_bonus_row(
+			bonus_id,
+			str(entry_dict.get("name", bonus_id)),
+			str(entry_dict.get("format", "flat")),
+			total_value,
+			int(counts.get(bonus_id, 0))
+		))
+		handled_ids[bonus_id] = true
+	var extra_ids: Array[String] = []
+	for bonus_id_variant in totals.keys():
+		var bonus_id := str(bonus_id_variant)
+		if handled_ids.has(bonus_id):
+			continue
+		if maxf(0.0, float(totals.get(bonus_id_variant, 0.0))) <= 0.0001:
+			continue
+		extra_ids.append(bonus_id)
+	extra_ids.sort()
+	for bonus_id in extra_ids:
+		rows.append(_make_site_bonus_row(
+			bonus_id,
+			bonus_id,
+			"flat",
+			maxf(0.0, float(totals.get(bonus_id, 0.0))),
+			int(counts.get(bonus_id, 0))
+		))
+	return rows
+
+
+static func _make_site_bonus_row(bonus_id: String, bonus_name: String, value_format: String, total_value: float, count: int) -> Dictionary:
+	var label := bonus_name
+	if count > 1:
+		label = "%s x%d" % [label, count]
+	return {
+		"icon": str(SITE_BONUS_ICON_BY_ID.get(bonus_id, "auto_awesome")),
+		"label": label,
+		"value": _format_site_bonus_value(value_format, total_value),
+	}
+
+
+static func _load_site_bonus_entries() -> Array:
+	if not FileAccess.file_exists(SITE_BONUS_DATA_PATH):
+		return []
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SITE_BONUS_DATA_PATH))
+	if not (parsed is Dictionary):
+		return []
+	var entries: Variant = (parsed as Dictionary).get("minor_stat_bonuses", [])
+	if entries is Array:
+		return entries as Array
+	return []
+
+
+static func _format_site_bonus_value(value_format: String, value: float) -> String:
+	match value_format:
+		"percent":
+			return "+%d%%" % int(round(value * 100.0))
+		"per_second":
+			return "+%.1f/초" % value
+		"hp":
+			return "+%d" % int(round(value))
+		_:
+			if absf(value - round(value)) < 0.01:
+				return "+%d" % int(round(value))
+			return "+%.1f" % value
 
 static func _get_float(obj, property_name: String, default_value: float) -> float:
 	if obj == null:

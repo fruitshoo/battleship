@@ -61,10 +61,11 @@ static func update_movement(ship, delta: float) -> void:
 	var target_speed: float = calculate_sail_speed(ship)
 	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
 	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
+	var rowing_efficiency: float = get_furled_sail_rowing_efficiency_multiplier(ship)
 	if is_actively_rowing:
-		target_speed += ship.rowing_speed
+		target_speed += ship.rowing_speed * rowing_efficiency
 	elif is_exhausted_rowing:
-		target_speed += ship.rowing_speed * float(ship.exhausted_rowing_speed_ratio)
+		target_speed += ship.rowing_speed * float(ship.exhausted_rowing_speed_ratio) * rowing_efficiency
 	target_speed *= ship.get_shiphandling_multiplier()
 	target_speed *= get_boarding_drag_multiplier(ship)
 	target_speed *= ship.speed_mult
@@ -72,7 +73,7 @@ static func update_movement(ship, delta: float) -> void:
 	if target_speed > ship.current_speed:
 		var accel: float = ship.acceleration
 		if (is_actively_rowing or is_exhausted_rowing) and "rowing_acceleration_mult" in ship:
-			accel *= float(ship.rowing_acceleration_mult)
+			accel *= float(ship.rowing_acceleration_mult) * rowing_efficiency
 			if is_exhausted_rowing:
 				accel *= 0.75
 		ship.current_speed = move_toward(ship.current_speed, target_speed, accel * delta)
@@ -100,21 +101,24 @@ static func update_steering(ship, delta: float) -> void:
 static func calculate_sail_speed(ship) -> float:
 	if not is_instance_valid(ship._cached_wind_manager) or not ship._cached_wind_manager.has_method("get_wind_direction") or not ship._cached_wind_manager.has_method("get_wind_strength"):
 		return 0.0
+	var sail_drive_ratio: float = get_sail_drive_ratio(ship)
 	var wind_dir: Vector2 = ship._cached_wind_manager.get_wind_direction()
 	var wind_str: float = ship._cached_wind_manager.get_wind_strength()
-	var ship_angle_rad = ship.rotation.y
-	var sail_world_rad = ship_angle_rad - deg_to_rad(ship.sail_angle)
-	var sail_normal = -Vector2(sin(sail_world_rad), cos(sail_world_rad))
-	var dot_prod = wind_dir.dot(sail_normal)
-	var wind_force = max(0.0, dot_prod)
-	var ship_forward = Vector2(-sin(ship_angle_rad), -cos(ship_angle_rad))
-	var forward_component = sail_normal.dot(ship_forward)
-	var thrust = wind_force * max(0.0, forward_component)
-	ship._current_wind_intake = wind_force
+	var ship_angle_rad: float = ship.rotation.y
+	var sail_world_rad: float = ship_angle_rad - deg_to_rad(ship.sail_angle)
+	var sail_normal: Vector2 = -Vector2(sin(sail_world_rad), cos(sail_world_rad))
+	var dot_prod: float = wind_dir.dot(sail_normal)
+	var wind_force: float = max(0.0, dot_prod)
+	var ship_forward := Vector2(-sin(ship_angle_rad), -cos(ship_angle_rad))
+	var forward_component: float = sail_normal.dot(ship_forward)
+	var effective_wind_force: float = wind_force * sail_drive_ratio
+	var thrust: float = effective_wind_force * max(0.0, forward_component)
+	ship._current_wind_intake = effective_wind_force
 	if Input.is_action_just_pressed("ui_accept"):
 		print("=== Physics Debug ===")
 		print("Wind Dir: ", wind_dir)
 		print("Sail Angle: ", ship.sail_angle, " deg")
+		print("Sail Drive Ratio: ", sail_drive_ratio)
 		print("Sail Arrow (Normal): ", sail_normal)
 		print("Ship Forward: ", ship_forward)
 		print("Dot Product (wind·sail): ", dot_prod)
@@ -124,6 +128,29 @@ static func calculate_sail_speed(ship) -> float:
 		print("Current Speed: ", ship.current_speed)
 		print("=====================")
 	return thrust * ship.max_speed * wind_str * ship.sail_efficiency_mult * ship.get_shiphandling_multiplier()
+
+static func get_sail_drive_ratio(ship) -> float:
+	if ship.has_method("get_effective_sail_deployment"):
+		return clampf(float(ship.call("get_effective_sail_deployment")), 0.0, 1.0)
+	var deployed_ratio := 1.0
+	if "sail_deployed_ratio" in ship and ship.get("sail_deployed_ratio") != null:
+		deployed_ratio = clampf(float(ship.get("sail_deployed_ratio")), 0.0, 1.0)
+	var residual_drive := 0.0
+	if "furled_sail_drive_ratio" in ship and ship.get("furled_sail_drive_ratio") != null:
+		residual_drive = clampf(float(ship.get("furled_sail_drive_ratio")), 0.0, 1.0)
+	return clampf(lerpf(residual_drive, 1.0, deployed_ratio), 0.0, 1.0)
+
+static func get_furled_sail_rowing_efficiency_multiplier(ship) -> float:
+	if "sail_furled" in ship and ship.get("sail_furled") == true:
+		if "furled_sail_rowing_efficiency_multiplier" in ship and ship.get("furled_sail_rowing_efficiency_multiplier") != null:
+			return maxf(1.0, float(ship.get("furled_sail_rowing_efficiency_multiplier")))
+	return 1.0
+
+static func get_furled_sail_rowing_stamina_cost_multiplier(ship) -> float:
+	if "sail_furled" in ship and ship.get("sail_furled") == true:
+		if "furled_sail_rowing_stamina_cost_multiplier" in ship and ship.get("furled_sail_rowing_stamina_cost_multiplier") != null:
+			return clampf(float(ship.get("furled_sail_rowing_stamina_cost_multiplier")), 0.0, 1.0)
+	return 1.0
 
 static func update_oar_visual(ship, delta: float) -> void:
 	var left_oars := _get_oar_pivots(ship, true)
@@ -174,7 +201,7 @@ static func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
 
 static func update_rowing_stamina(ship, delta: float) -> void:
 	if ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0:
-		ship.rowing_stamina -= ship.stamina_drain_rate * delta
+		ship.rowing_stamina -= ship.stamina_drain_rate * get_furled_sail_rowing_stamina_cost_multiplier(ship) * delta
 		ship.rowing_stamina = max(0.0, ship.rowing_stamina)
 		if ship.rowing_stamina <= 0:
 			ship.rowing_locked = true

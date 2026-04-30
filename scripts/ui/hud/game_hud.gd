@@ -66,6 +66,7 @@ var crew_status_bar: ProgressBar = null
 var support_status_label: Label = null
 var support_slot_container: HBoxContainer = null
 var support_fleet_hud_slots: Array[PanelContainer] = []
+var debug_backdrop: ColorRect = null
 var sail_debug_panel: PanelContainer = null
 var sail_debug_toggle_button: Button = null
 var sail_debug_damage_slider: HSlider = null
@@ -141,14 +142,26 @@ var _distance_debug_refresh_left: float = 0.0
 var item_bar = null
 var ship_hp_overlay: Control = null
 var ship_hp_bars: Dictionary = {}
+var player_status_root: Control = null
 @export var show_ship_health_bars: bool = true
 @export var show_stat_panel: bool = false
+var stat_backdrop: ColorRect = null
 var stat_panel: PanelContainer = null
 var stat_scroll: ScrollContainer = null
 var stat_content: VBoxContainer = null
+var stat_site_bonus_panel: Control = null
+var stat_site_bonus_scroll: ScrollContainer = null
+var stat_site_bonus_content: VBoxContainer = null
 var _last_stat_signature: String = ""
 @export_range(0.05, 1.0) var stat_refresh_interval: float = 0.2
 var _stat_refresh_left: float = 0.0
+var _stat_modal_active: bool = false
+var _stat_modal_previous_paused: bool = false
+var _stat_modal_previous_layer: int = 0
+var _debug_modal_active: bool = false
+var _debug_modal_previous_paused: bool = false
+var _debug_modal_previous_layer: int = 0
+var _debug_modal_previous_process_mode: ProcessMode = Node.PROCESS_MODE_INHERIT
 
 # Upgrade slot UI
 var weapon_container: Container = null
@@ -177,6 +190,11 @@ const UPGRADE_TOOLTIP_MIN_WIDTH: float = 320.0
 const SHIP_HP_BAR_WIDTH: float = 82.0
 const SHIP_HP_BAR_HEIGHT: float = 10.0
 const SHIP_HP_BAR_OFFSET_Y: float = 34.0
+const PLAYER_STATUS_BAR_WIDTH: float = 136.0
+const PLAYER_STATUS_HP_HEIGHT: float = 10.0
+const PLAYER_STATUS_STAMINA_HEIGHT: float = 3.0
+const PLAYER_STATUS_BAR_GAP: float = 1.0
+const PLAYER_STATUS_STACK_HEIGHT: float = 14.0
 
 const SHIP_UPGRADE_IDS := [
 	"cannon", "cannon_damage", "cannon_reload", "janggun",
@@ -184,8 +202,7 @@ const SHIP_UPGRADE_IDS := [
 	"supply", "gold"
 ]
 const CREW_UPGRADE_IDS := [
-	"crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow",
-	"fleet_crew"
+	"crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow"
 ]
 
 
@@ -197,6 +214,7 @@ func _ready() -> void:
 	_apply_layout_density()
 	_setup_game_over_overlay()
 	_setup_ship_hp_overlay()
+	_apply_layout_density()
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
 
@@ -208,6 +226,10 @@ func _ready() -> void:
 		gust_warning.visible = false
 	call_deferred("_refresh_owned_item_icons")
 
+func _exit_tree() -> void:
+	_set_debug_modal_active(false)
+	HudStatPanelHelper._set_stat_modal_active(self, false)
+
 
 func _apply_overlay_theme() -> void:
 	HudProgressionLayoutHelper.apply_overlay_theme(self)
@@ -216,6 +238,10 @@ func _apply_overlay_theme() -> void:
 func _apply_layout_density() -> void:
 	HudProgressionLayoutHelper.apply_overlay_density(self)
 	HudLayoutBuilder.apply_layout_density(self)
+	if show_stat_panel:
+		_last_stat_signature = ""
+		_stat_refresh_left = 0.0
+		_update_stat_panel()
 
 func _ensure_hud_label(existing: Label, node_name: String, default_text: String) -> Label:
 	return HudProgressionLayoutHelper.ensure_hud_label(self, existing, node_name, default_text)
@@ -411,6 +437,9 @@ func _setup_ship_hp_overlay() -> void:
 func _update_ship_health_bars(positions_only: bool = false) -> void:
 	HudShipHealthOverlayHelper.update_ship_health_bars(self, positions_only)
 
+func _update_player_status_overlay(positions_only: bool = false) -> void:
+	HudUpdateHelper.update_player_status_overlay(self, positions_only)
+
 func toggle_ship_health_bars() -> void:
 	HudShipHealthOverlayHelper.toggle_ship_health_bars(self)
 
@@ -420,6 +449,91 @@ func _update_stat_panel() -> void:
 
 func toggle_stat_panel() -> void:
 	HudStatPanelHelper.toggle_stat_panel(self)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _is_debug_tools_toggle_event(event):
+		_toggle_debug_tools_panel_from_shortcut()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
+	if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible:
+		if event.is_action_pressed("ui_cancel"):
+			_set_debug_modal_active(false)
+			_update_sail_debug_toggle_button_text()
+			if get_viewport():
+				get_viewport().set_input_as_handled()
+		return
+	if not show_stat_panel:
+		return
+	if event.is_action_pressed("toggle_stat_panel") or event.is_action_pressed("ui_cancel"):
+		toggle_stat_panel()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+
+
+func _is_debug_tools_toggle_event(event: InputEvent) -> bool:
+	if not OS.is_debug_build():
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.is_echo():
+		return false
+	if key_event.alt_pressed or key_event.ctrl_pressed or key_event.meta_pressed:
+		return false
+	return (
+		key_event.physical_keycode == KEY_BACKSLASH
+		or key_event.keycode == KEY_BACKSLASH
+		or key_event.unicode == 8361
+	)
+
+
+func _toggle_debug_tools_panel_from_shortcut() -> void:
+	if not OS.is_debug_build():
+		return
+	if not is_instance_valid(sail_debug_panel):
+		return
+	var next_visible := not sail_debug_panel.visible
+	if next_visible and show_stat_panel:
+		show_stat_panel = false
+		HudStatPanelHelper.update_stat_panel(self)
+	_set_debug_modal_active(next_visible)
+	_update_sail_debug_toggle_button_text()
+	if next_visible:
+		_sync_sail_debug_panel_from_player()
+		_sync_debug_tools_panel_state()
+
+
+func _set_debug_modal_active(active: bool) -> void:
+	if active:
+		var tree := get_tree()
+		if not _debug_modal_active:
+			_debug_modal_previous_layer = int(layer)
+			_debug_modal_previous_process_mode = process_mode
+			_debug_modal_active = true
+			if tree != null:
+				_debug_modal_previous_paused = tree.paused
+				tree.paused = true
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		layer = maxi(int(layer), 20)
+		if tree != null:
+			tree.paused = true
+		if is_instance_valid(debug_backdrop):
+			debug_backdrop.visible = true
+		if is_instance_valid(sail_debug_panel):
+			sail_debug_panel.visible = true
+		return
+
+	if is_instance_valid(debug_backdrop):
+		debug_backdrop.visible = false
+	if is_instance_valid(sail_debug_panel):
+		sail_debug_panel.visible = false
+	if not _debug_modal_active:
+		return
+	layer = _debug_modal_previous_layer
+	process_mode = _debug_modal_previous_process_mode
+	var restore_tree := get_tree()
+	if restore_tree != null:
+		restore_tree.paused = _debug_modal_previous_paused
+	_debug_modal_active = false
 
 func _setup_upgrade_tooltip() -> void:
 	HudUpgradeTooltipHelper.setup_upgrade_tooltip(self)

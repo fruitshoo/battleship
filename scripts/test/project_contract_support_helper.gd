@@ -3,6 +3,7 @@ class_name ProjectContractSupportHelper
 
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
+const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
 
 
 static func _reconcile_support_fleet(player_ship: Node3D, failures: Array[String], reason: String, options: Dictionary = {}) -> Dictionary:
@@ -175,9 +176,47 @@ static func _run_support_wing_join_geometry_contract(failures: Array[String], sm
 	extra_support.global_position = player_ship.global_position + Vector3(44.0, 0.0, 44.0)
 	SupportFleetStateHelper.assign_support_ship_to_flagship(extra_support, player_ship)
 
+	var screen_lead := Node3D.new()
+	screen_lead.name = "WingScreenLeadGeometryContract"
+	screen_lead.set_meta("support_squadron_slot_role", "screen_lead")
+	smoke_root.add_child(screen_lead)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(screen_lead, player_ship)
+	var screen_flank := Node3D.new()
+	screen_flank.name = "WingScreenFlankGeometryContract"
+	screen_flank.set_meta("support_squadron_slot_role", "screen_flank")
+	smoke_root.add_child(screen_flank)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(screen_flank, player_ship)
+	var screen_lead_offset := SupportFleetFormationHelper.get_support_fleet_offset(screen_lead, 0, 10.0, 2)
+	var screen_flank_offset := SupportFleetFormationHelper.get_support_fleet_offset(screen_flank, 1, 10.0, 2)
+	if screen_lead_offset.x * screen_flank_offset.x >= 0.0:
+		failures.append("support fleet smoke wing screen pair should split to opposite sides")
+	if screen_lead_offset.z >= -0.1 or screen_flank_offset.z >= -0.1:
+		failures.append("support fleet smoke wing screen pair should stage ahead of the flagship")
+	if absf(screen_lead_offset.x) <= absf(screen_lead_offset.z) or absf(screen_flank_offset.x) <= absf(screen_flank_offset.z):
+		failures.append("support fleet smoke wing screen pair should read as forward side screens, not rear chevrons")
+	var artillery_lead := Node3D.new()
+	artillery_lead.name = "EscortArtilleryLeadGeometryContract"
+	artillery_lead.set_meta("support_squadron_slot_role", "artillery_lead")
+	smoke_root.add_child(artillery_lead)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(artillery_lead, player_ship)
+	var artillery_lead_offset := SupportFleetFormationHelper.get_support_fleet_offset(artillery_lead, 1, 10.0, 5)
+	if absf(artillery_lead_offset.x) > 0.1:
+		failures.append("support fleet smoke escort artillery lead should hold the rear center lane")
+	if artillery_lead_offset.z <= screen_lead_offset.z:
+		failures.append("support fleet smoke escort artillery lead should trail behind side screen ships")
+
 	var extra_offset := SupportFleetFormationHelper.get_support_fleet_offset(extra_support, 5, 10.0, 7)
 	if absf(extra_offset.x) < 0.1:
 		failures.append("support fleet smoke wing extra support role collapsed to center instead of generic wing lane")
+	var late_extra_offset := SupportFleetFormationHelper.get_support_fleet_offset(extra_support, 19, 10.0, 20)
+	if absf(late_extra_offset.x) <= absf(extra_offset.x):
+		failures.append("support fleet smoke generated wing lanes did not expand for later support slots")
+	if late_extra_offset.z <= extra_offset.z:
+		failures.append("support fleet smoke generated wing lanes did not trail deeper for later support slots")
+	var generated_pair_left := SupportFleetFormationHelper.get_support_fleet_offset(extra_support, 8, 10.0, 20)
+	var generated_pair_right := SupportFleetFormationHelper.get_support_fleet_offset(extra_support, 9, 10.0, 20)
+	if generated_pair_left.x * generated_pair_right.x >= 0.0:
+		failures.append("support fleet smoke generated wing pair did not alternate sides")
 
 	var player_forward: Vector3 = -player_ship.global_transform.basis.z
 	player_forward.y = 0.0
@@ -195,6 +234,9 @@ static func _run_support_wing_join_geometry_contract(failures: Array[String], sm
 		failures.append("support fleet smoke wing join goal should stage behind flagship before spreading")
 
 	SupportFleetStateHelper.set_flagship_formation(player_ship, previous_formation)
+	screen_lead.queue_free()
+	screen_flank.queue_free()
+	artillery_lead.queue_free()
 	extra_support.queue_free()
 
 
@@ -556,7 +598,7 @@ static func _run_support_shared_cannon_cap_smoke(failures: Array[String], suppor
 		UpgradeManager.current_levels["cannon"] = level
 		UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
 		var visible_count := _count_visible_fleet_cannons(support_ship)
-		var expected_count: int = mini(level, 3)
+		var expected_count := SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type(str(support_ship.get("ship_type")), level).size()
 		if visible_count != expected_count:
 			failures.append("support fleet smoke shared cannon cap mismatch Lv.%d: %d != %d" % [level, visible_count, expected_count])
 	UpgradeManager.current_levels["cannon"] = original_cannon_level

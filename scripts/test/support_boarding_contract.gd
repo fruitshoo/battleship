@@ -7,6 +7,7 @@ const BallistaLauncherScript = preload("res://scripts/entities/launchers/ballist
 const JanggunLauncherScript = preload("res://scripts/entities/launchers/janggun_launcher.gd")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
+const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
 
 
@@ -252,9 +253,13 @@ class MockCombatSoldier:
 	var current_target: Node3D = null
 	var current_weapon: Node3D = null
 	var detection_range: float = 35.0
+	var is_ranged_only: bool = false
+	var is_melee_only: bool = false
 	var is_captain: bool = false
 	var is_stationary: bool = false
 	var _is_jumping: bool = false
+	var CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 8.0
+	var CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 14.0
 
 	func get_team_tag() -> String:
 		return team
@@ -295,6 +300,8 @@ func _ready() -> void:
 	_verify_support_artillery_screen_goal_tracks_flagship_wing_lane(failures)
 	_verify_panokseon_rescue_goal_opens_center_lane(failures)
 	_verify_support_assist_navigation_prefers_owner_flagship_lane(failures)
+	_verify_support_free_assist_uses_stable_role_lanes(failures)
+	_verify_support_free_assist_softly_distributes_targets(failures)
 	_verify_support_boss_breach_navigation_stages_from_flagship_lane(failures)
 	_verify_support_free_assist_recalls_near_player(failures)
 	_verify_enemy_boarding_transfers_last_available_soldier(failures)
@@ -308,6 +315,7 @@ func _ready() -> void:
 	_verify_overrun_deck_suppresses_ship_weapons(failures)
 	_verify_player_deck_emergency_speeds_support_assist(failures)
 	_verify_soldier_retargets_hostile_boarder_on_owned_ship(failures)
+	_verify_soldier_targets_boarder_on_distressed_ally_ship(failures)
 	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
 	_verify_support_rescue_boarding_holds_player_capture_progress(failures)
 	_verify_support_rescue_boarders_return_after_deck_safe(failures)
@@ -315,6 +323,7 @@ func _ready() -> void:
 	_verify_support_attack_boarders_hold_on_boss_until_sinking(failures)
 	if failures.is_empty():
 		print("[SupportBoardingContract] ok")
+		get_tree().quit(0)
 		return
 	for failure in failures:
 		push_error("[SupportBoardingContract] %s" % failure)
@@ -1016,6 +1025,126 @@ func _verify_support_assist_navigation_prefers_owner_flagship_lane(failures: Arr
 	support.queue_free()
 
 
+func _verify_support_free_assist_uses_stable_role_lanes(failures: Array[String]) -> void:
+	var owner_flagship := MockTargetShip.new()
+	add_child(owner_flagship)
+	owner_flagship.team = "player"
+	owner_flagship.global_position = Vector3.ZERO
+
+	var assist_target := MockTargetShip.new()
+	add_child(assist_target)
+	assist_target.team = "enemy"
+	assist_target.global_position = Vector3(18.0, 0.0, 0.0)
+
+	var screen_left := MockSupportShip.new()
+	add_child(screen_left)
+	screen_left.global_position = Vector3(0.0, 0.0, -18.0)
+	screen_left.set_meta("support_squadron_slot_role", "screen_lead")
+	screen_left.set_meta("support_fleet_slot_index", 0)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(screen_left, owner_flagship)
+
+	var screen_right := MockSupportShip.new()
+	add_child(screen_right)
+	screen_right.global_position = Vector3(0.0, 0.0, -17.0)
+	screen_right.set_meta("support_squadron_slot_role", "screen_flank")
+	screen_right.set_meta("support_fleet_slot_index", 2)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(screen_right, owner_flagship)
+
+	var nav_left := ChaserShipMinionHelper._build_support_assist_navigation(screen_left, assist_target, 0)
+	var nav_right := ChaserShipMinionHelper._build_support_assist_navigation(screen_right, assist_target, 1)
+	var player_forward: Vector3 = -owner_flagship.global_transform.basis.z
+	player_forward.y = 0.0
+	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.001 else Vector3.FORWARD
+	var player_right: Vector3 = player_forward.cross(Vector3.UP)
+	player_right = player_right.normalized() if player_right.length_squared() > 0.001 else Vector3.RIGHT
+	var left_lane: float = (ShipMovementIntent.get_desired_point(nav_left, Vector3.ZERO) - owner_flagship.global_position).dot(player_right)
+	var right_lane: float = (ShipMovementIntent.get_desired_point(nav_right, Vector3.ZERO) - owner_flagship.global_position).dot(player_right)
+	if left_lane * right_lane >= 0.0:
+		failures.append("support free assist should keep screen ships on opposite role lanes after formation-hold toggle")
+	if float(screen_left.get_meta("support_assist_lane_side", 0.0)) >= 0.0 or float(screen_right.get_meta("support_assist_lane_side", 0.0)) <= 0.0:
+		failures.append("support free assist lane side meta should be role-stable instead of current-position based")
+	if ChaserShipMinionHelper._get_support_assist_separation_radius(screen_left, screen_right) <= ChaserShipMinionHelper.SUPPORT_ASSIST_SEPARATION_RADIUS:
+		failures.append("support free assist separation radius should include hull clearance padding")
+
+	screen_right.queue_free()
+	screen_left.queue_free()
+	assist_target.queue_free()
+	owner_flagship.queue_free()
+
+
+func _verify_support_free_assist_softly_distributes_targets(failures: Array[String]) -> void:
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.name = "soft_distribution_player"
+	player.team = "player"
+	player.global_position = Vector3.ZERO
+	SupportFleetStateHelper.set_flagship_hold_enabled(player, false)
+
+	var support_a := MockSupportShip.new()
+	add_child(support_a)
+	support_a.name = "soft_distribution_support_a"
+	support_a.global_position = Vector3(0.0, 0.0, -2.0)
+	support_a.target = player
+	_set_support_hold_enabled(support_a, false)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(support_a, player)
+	_set_support_hold_enabled(support_a, false)
+	EntityRegistry.register_ship(support_a)
+
+	var support_b := MockSupportShip.new()
+	add_child(support_b)
+	support_b.name = "soft_distribution_support_b"
+	support_b.global_position = Vector3(0.0, 0.0, 2.0)
+	support_b.target = player
+	_set_support_hold_enabled(support_b, false)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(support_b, player)
+	_set_support_hold_enabled(support_b, false)
+	EntityRegistry.register_ship(support_b)
+
+	var near_enemy := MockTargetShip.new()
+	add_child(near_enemy)
+	near_enemy.name = "soft_distribution_near_enemy"
+	near_enemy.team = "enemy"
+	near_enemy.global_position = Vector3(10.0, 0.0, 0.0)
+	EntityRegistry.register_ship(near_enemy)
+
+	var alternate_enemy := MockTargetShip.new()
+	add_child(alternate_enemy)
+	alternate_enemy.name = "soft_distribution_alternate_enemy"
+	alternate_enemy.team = "enemy"
+	alternate_enemy.global_position = Vector3(16.0, 0.0, 0.0)
+	EntityRegistry.register_ship(alternate_enemy)
+
+	var selected_a: Node3D = ChaserShipMinionHelper._get_support_assist_target(support_a, player, 0.1)
+	var selected_b: Node3D = ChaserShipMinionHelper._get_support_assist_target(support_b, player, 0.1)
+	if selected_a != near_enemy:
+		failures.append("first support free assist should still prefer the nearest valid threat; selected=%s" % [selected_a.name if is_instance_valid(selected_a) else "null"])
+	if selected_b != alternate_enemy:
+		failures.append("second support free assist should prefer an alternate threat once the nearest target is already assigned; selected=%s" % [selected_b.name if is_instance_valid(selected_b) else "null"])
+	var near_penalty: float = ChaserShipMinionHelper._get_support_assist_assignment_penalty(
+		support_b,
+		player,
+		near_enemy,
+		ChaserShipMinionHelper.SUPPORT_ASSIST_LEASH_DISTANCE,
+		false,
+		false,
+		false,
+		false,
+		true
+	)
+	if near_penalty <= 0.0:
+		failures.append("support free assist target sharing should add a soft penalty to already assigned normal threats")
+
+	EntityRegistry.unregister_ship(alternate_enemy)
+	EntityRegistry.unregister_ship(near_enemy)
+	EntityRegistry.unregister_ship(support_b)
+	EntityRegistry.unregister_ship(support_a)
+	alternate_enemy.queue_free()
+	near_enemy.queue_free()
+	support_b.queue_free()
+	support_a.queue_free()
+	player.queue_free()
+
+
 func _verify_support_boss_breach_navigation_stages_from_flagship_lane(failures: Array[String]) -> void:
 	var support := MockSupportShip.new()
 	add_child(support)
@@ -1474,6 +1603,73 @@ func _verify_soldier_retargets_hostile_boarder_on_owned_ship(failures: Array[Str
 	remote_enemy.queue_free()
 	defender.queue_free()
 	enemy_ship.queue_free()
+	player_ship.queue_free()
+
+
+func _verify_soldier_targets_boarder_on_distressed_ally_ship(failures: Array[String]) -> void:
+	var player_ship := MockTargetShip.new()
+	add_child(player_ship)
+	player_ship.team = "player"
+	player_ship.global_position = Vector3.ZERO
+
+	var ally_ship := MockTargetShip.new()
+	add_child(ally_ship)
+	ally_ship.team = "player"
+	ally_ship.global_position = Vector3(9.0, 0.0, 0.0)
+	ally_ship.deck_is_contested = true
+	ally_ship.deck_hostile_boarder_count = 1
+
+	var enemy_ship := MockTargetShip.new()
+	add_child(enemy_ship)
+	enemy_ship.team = "enemy"
+	enemy_ship.global_position = Vector3(18.0, 0.0, 0.0)
+
+	var defender := MockCombatSoldier.new()
+	add_child(defender)
+	defender.team = "player"
+	defender.owned_ship = player_ship
+	defender.is_ranged_only = true
+	defender.global_position = Vector3.ZERO
+
+	var boarder := MockCombatSoldier.new()
+	add_child(boarder)
+	boarder.team = "enemy"
+	boarder.owned_ship = ally_ship
+	boarder.global_position = Vector3(9.0, 0.0, 0.0)
+
+	var remote_enemy := MockCombatSoldier.new()
+	add_child(remote_enemy)
+	remote_enemy.team = "enemy"
+	remote_enemy.owned_ship = enemy_ship
+	remote_enemy.global_position = Vector3(18.0, 0.0, 0.0)
+
+	EntityRegistry.register_ship(player_ship)
+	EntityRegistry.register_ship(ally_ship)
+	EntityRegistry.register_ship(enemy_ship)
+	EntityRegistry.register_soldier(defender)
+	EntityRegistry.register_soldier(boarder)
+	EntityRegistry.register_soldier(remote_enemy)
+
+	var scan_data := SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(defender)
+	var distress_ships: Array = scan_data.get("nearby_ally_distress_ships", [])
+	if not distress_ships.has(ally_ship):
+		failures.append("soldier targeting scan did not include distressed ally ship")
+
+	var nearest := SoldierShipHelper.find_nearest_enemy(defender)
+	if nearest != boarder:
+		failures.append("soldier targeting did not select enemy boarder on distressed ally ship")
+
+	EntityRegistry.unregister_soldier(remote_enemy)
+	EntityRegistry.unregister_soldier(boarder)
+	EntityRegistry.unregister_soldier(defender)
+	EntityRegistry.unregister_ship(enemy_ship)
+	EntityRegistry.unregister_ship(ally_ship)
+	EntityRegistry.unregister_ship(player_ship)
+	remote_enemy.queue_free()
+	boarder.queue_free()
+	defender.queue_free()
+	enemy_ship.queue_free()
+	ally_ship.queue_free()
 	player_ship.queue_free()
 
 

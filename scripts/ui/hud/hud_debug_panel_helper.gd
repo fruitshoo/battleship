@@ -11,6 +11,8 @@ const AUTHORING_SCENARIO_TRIGGER_USER_PATH := "user://authoring_palette_scenario
 const AUTHORING_SCENARIO_PRESETS_USER_PATH := "user://authoring_palette_scenario_presets.json"
 const AUTHORING_DATA_PATCH_USER_PATH := "user://authoring_palette_data_patch.json"
 const PALETTE_PRESET_FALLBACK_ID := "palette_queue"
+const DEBUG_PANEL_SIZE := Vector2(920.0, 560.0)
+const DEBUG_PANEL_MIN_SIZE := Vector2(760.0, 460.0)
 
 
 static func setup_debug_panel(hud) -> void:
@@ -19,70 +21,102 @@ static func setup_debug_panel(hud) -> void:
 	if is_instance_valid(hud.sail_debug_panel):
 		return
 
-	hud.sail_debug_toggle_button = Button.new()
-	hud.sail_debug_toggle_button.name = "DebugToolsToggle"
-	hud.sail_debug_toggle_button.text = "Debug"
-	hud.sail_debug_toggle_button.custom_minimum_size = Vector2(72, 30)
-	NavalUiTheme.apply_hud_button(hud.sail_debug_toggle_button, 11)
-	hud.sail_debug_toggle_button.pressed.connect(func() -> void:
-		if not is_instance_valid(hud.sail_debug_panel):
-			return
-		hud.sail_debug_panel.visible = not hud.sail_debug_panel.visible
-		hud._update_sail_debug_toggle_button_text()
-		if hud.sail_debug_panel.visible:
-			hud._sync_sail_debug_panel_from_player()
-			hud._sync_debug_tools_panel_state()
+	hud.debug_backdrop = ColorRect.new()
+	hud.debug_backdrop.name = "DebugToolsBackdrop"
+	hud.add_child(hud.debug_backdrop)
+	hud.debug_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hud.debug_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.debug_backdrop.process_mode = Node.PROCESS_MODE_ALWAYS
+	hud.debug_backdrop.color = Color.WHITE
+	hud.debug_backdrop.material = UiOverlayFx.make_modal_blur_material(
+		Color(0.02, 0.03, 0.05, 0.46),
+		0.64,
+		14.0,
+		0.38,
+		Vector2(0.5, 0.48)
 	)
-	if is_instance_valid(hud.bottom_right_container):
-		hud.bottom_right_container.add_child(hud.sail_debug_toggle_button)
-	else:
-		hud.add_child(hud.sail_debug_toggle_button)
-		hud.sail_debug_toggle_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-		hud.sail_debug_toggle_button.offset_right = -24
-		hud.sail_debug_toggle_button.offset_bottom = -24
+	hud.debug_backdrop.visible = false
+	hud.debug_backdrop.z_index = 130
+	hud.debug_backdrop.gui_input.connect(func(event: InputEvent) -> void:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event == null or not mouse_event.pressed:
+			return
+		hud._set_debug_modal_active(false)
+		hud._update_sail_debug_toggle_button_text()
+	)
 
 	hud.sail_debug_panel = PanelContainer.new()
 	hud.sail_debug_panel.name = "SailDebugPanel"
+	hud.sail_debug_panel.z_index = 140
+	hud.sail_debug_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	hud.sail_debug_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.sail_debug_panel.custom_minimum_size = DEBUG_PANEL_SIZE
+	hud.sail_debug_panel.size = DEBUG_PANEL_SIZE
 	var panel_style := NavalUiTheme.make_hud_panel_style()
 	hud.sail_debug_panel.add_theme_stylebox_override("panel", panel_style)
 
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(232, 280)
-	scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	hud.sail_debug_panel.add_child(scroll)
+	var modal_box := VBoxContainer.new()
+	modal_box.custom_minimum_size = DEBUG_PANEL_MIN_SIZE
+	modal_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modal_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	modal_box.add_theme_constant_override("separation", 8)
+	hud.sail_debug_panel.add_child(modal_box)
 
-	var panel_box := VBoxContainer.new()
-	panel_box.custom_minimum_size = Vector2(212, 0)
-	panel_box.add_theme_constant_override("separation", 6)
-	scroll.add_child(panel_box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 10)
+	modal_box.add_child(header)
 
 	var title := Label.new()
 	title.text = "Debug Tools"
 	NavalUiTheme.style_heading(title, 13)
-	panel_box.add_child(title)
+	header.add_child(title)
+
+	var header_spacer := Control.new()
+	header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(header_spacer)
 
 	var hint := Label.new()
-	hint.text = "기존 F키 기능을 버튼으로 모아둔 패널"
+	hint.text = "₩ / Esc"
 	NavalUiTheme.style_muted(hint, 10)
-	panel_box.add_child(hint)
+	header.add_child(hint)
 
-	_add_environment_section(hud, panel_box)
-	_add_debug_draw_section(hud, panel_box)
-	_add_spawn_section(hud, panel_box)
-	_add_authoring_palette_section(hud, panel_box)
-	_add_misc_section(hud, panel_box)
-	_add_ship_section(hud, panel_box)
-	_add_sail_section(hud, panel_box)
+	var close_button := Button.new()
+	close_button.text = "닫기"
+	close_button.custom_minimum_size = Vector2(64, 28)
+	close_button.focus_mode = Control.FOCUS_NONE
+	NavalUiTheme.apply_hud_button(close_button, 11)
+	close_button.pressed.connect(func() -> void:
+		hud._set_debug_modal_active(false)
+		hud._update_sail_debug_toggle_button_text()
+	)
+	header.add_child(close_button)
 
-	if is_instance_valid(hud.bottom_right_container):
-		hud.bottom_right_container.add_child(hud.sail_debug_panel)
-	else:
-		hud.add_child(hud.sail_debug_panel)
-		hud.sail_debug_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-		hud.sail_debug_panel.offset_right = -24
-		hud.sail_debug_panel.offset_bottom = -120
+	var debug_tabs := TabContainer.new()
+	debug_tabs.name = "DebugToolsTabs"
+	debug_tabs.focus_mode = Control.FOCUS_NONE
+	debug_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	debug_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	modal_box.add_child(debug_tabs)
+
+	_add_environment_section(hud, debug_tabs)
+	_add_debug_draw_section(hud, debug_tabs)
+	_add_spawn_section(hud, debug_tabs)
+	_add_authoring_palette_section(hud, debug_tabs)
+	_add_misc_section(hud, debug_tabs)
+	_add_ship_section(hud, debug_tabs)
+	_add_sail_section(hud, debug_tabs)
+
+	hud.add_child(hud.sail_debug_panel)
+	hud.sail_debug_panel.anchor_left = 0.5
+	hud.sail_debug_panel.anchor_right = 0.5
+	hud.sail_debug_panel.anchor_top = 0.5
+	hud.sail_debug_panel.anchor_bottom = 0.5
+	hud.sail_debug_panel.offset_left = -DEBUG_PANEL_SIZE.x * 0.5
+	hud.sail_debug_panel.offset_right = DEBUG_PANEL_SIZE.x * 0.5
+	hud.sail_debug_panel.offset_top = -DEBUG_PANEL_SIZE.y * 0.5
+	hud.sail_debug_panel.offset_bottom = DEBUG_PANEL_SIZE.y * 0.5
+	hud.sail_debug_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	hud.sail_debug_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	hud.sail_debug_panel.visible = false
 	hud._sync_sail_debug_panel_from_player()
 	hud._sync_debug_tools_panel_state()
@@ -148,7 +182,7 @@ static func sync_debug_tools_panel_state(hud) -> void:
 	hud._sync_ship_debug_panel_from_player()
 
 
-static func _add_environment_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_environment_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("환경", false)
 	panel_box.add_child(section["root"])
 
@@ -169,7 +203,7 @@ static func _add_environment_section(hud, panel_box: VBoxContainer) -> void:
 	))
 
 
-static func _add_debug_draw_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_debug_draw_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("드로우 채널", false)
 	panel_box.add_child(section["root"])
 
@@ -265,7 +299,7 @@ static func _toggle_debug_draw_channel(hud, channel: String) -> void:
 	hud._sync_debug_tools_panel_state()
 
 
-static func _add_spawn_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_spawn_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("스폰", false)
 	panel_box.add_child(section["root"])
 
@@ -313,7 +347,7 @@ static func _add_spawn_section(hud, panel_box: VBoxContainer) -> void:
 	))
 
 
-static func _add_authoring_palette_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_authoring_palette_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("조립 팔레트", false)
 	panel_box.add_child(section["root"])
 
@@ -390,6 +424,7 @@ static func _add_authoring_palette_section(hud, panel_box: VBoxContainer) -> voi
 	preset_select.name = "AuthoringPalettePresetSelect"
 	preset_select.custom_minimum_size = Vector2(0, 28)
 	preset_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preset_select.focus_mode = Control.FOCUS_NONE
 	preset_select.disabled = true
 	section["body"].add_child(preset_select)
 	hud.debug_authoring_palette_preset_select = preset_select
@@ -2483,7 +2518,7 @@ static func _palette_entry_has_tag(entry: Dictionary, tag_name: String) -> bool:
 	return false
 
 
-static func _add_misc_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_misc_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("게임", false)
 	panel_box.add_child(section["root"])
 
@@ -2518,9 +2553,31 @@ static func _add_misc_section(hud, panel_box: VBoxContainer) -> void:
 	row_c.add_child(create_debug_action_button("통계 패널", func() -> void:
 		hud.toggle_stat_panel()
 	))
+	row_c.add_child(create_debug_action_button("해역 보너스", func() -> void:
+		if not is_instance_valid(hud.player_ship):
+			hud.show_gust_warning_message("해역 보너스 대상 없음", 0.8)
+			return
+		var applied := SeaSiteRewardHelper.apply_reward(
+			hud,
+			hud.player_ship,
+			SeaSiteRewardHelper.REWARD_MINOR_STAT_BONUS,
+			0,
+			0.0,
+			0.0,
+			0.0,
+			0,
+			0
+		)
+		if applied:
+			if "_last_stat_signature" in hud:
+				hud.set("_last_stat_signature", "")
+			if hud.has_method("_update_stat_panel"):
+				hud.call("_update_stat_panel")
+			hud._sync_debug_tools_panel_state()
+	))
 
 
-static func _add_ship_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_ship_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("함선", false)
 	panel_box.add_child(section["root"])
 
@@ -2692,7 +2749,7 @@ static func _add_ship_section(hud, panel_box: VBoxContainer) -> void:
 	))
 
 
-static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
+static func _add_sail_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("돛", true)
 	panel_box.add_child(section["root"])
 
@@ -2725,6 +2782,7 @@ static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
 		preset_button.text = str(preset["name"])
 		preset_button.custom_minimum_size = Vector2(0, 26)
 		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preset_button.focus_mode = Control.FOCUS_NONE
 		NavalUiTheme.apply_hud_button(preset_button, 11)
 		preset_button.pressed.connect(func() -> void:
 			hud._apply_sail_debug_values(float(preset["damage"]), float(preset["burn"]), float(preset.get("hole", 1.0)))
@@ -2738,6 +2796,7 @@ static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
 	var sync_button := Button.new()
 	sync_button.text = "Sync"
 	sync_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sync_button.focus_mode = Control.FOCUS_NONE
 	NavalUiTheme.apply_hud_button(sync_button, 11)
 	sync_button.pressed.connect(hud._sync_sail_debug_panel_from_player)
 	action_row.add_child(sync_button)
@@ -2745,6 +2804,7 @@ static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
 	var reset_button := Button.new()
 	reset_button.text = "Reset"
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset_button.focus_mode = Control.FOCUS_NONE
 	NavalUiTheme.apply_hud_button(reset_button, 11)
 	reset_button.pressed.connect(func() -> void:
 		hud._apply_sail_debug_values(
@@ -2756,30 +2816,30 @@ static func _add_sail_section(hud, panel_box: VBoxContainer) -> void:
 	action_row.add_child(reset_button)
 
 
-static func create_debug_section(title_text: String, expanded: bool) -> Dictionary:
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 4)
+static func create_debug_section(title_text: String, _expanded: bool) -> Dictionary:
+	var root := ScrollContainer.new()
+	root.name = title_text
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	root.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 
-	var toggle := Button.new()
-	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	toggle.flat = true
-	toggle.text = ""
-	toggle.add_theme_font_size_override("font_size", 11)
-	toggle.add_theme_color_override("font_color", NavalUiTheme.TEXT_ACCENT)
-	root.add_child(toggle)
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_theme_constant_override("margin_left", 4)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	root.add_child(margin)
 
 	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 6)
-	body.visible = expanded
-	root.add_child(body)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 8)
+	margin.add_child(body)
 
-	toggle.pressed.connect(func() -> void:
-		body.visible = not body.visible
-		_update_debug_section_button_text(toggle, title_text, body.visible)
-	)
-	_update_debug_section_button_text(toggle, title_text, expanded)
-
-	return {"root": root, "toggle": toggle, "body": body}
+	return {"root": root, "toggle": null, "body": body}
 
 
 static func _update_debug_section_button_text(button: Button, title_text: String, expanded: bool) -> void:
@@ -2791,6 +2851,7 @@ static func create_debug_action_button(button_text: String, callback: Callable) 
 	button.text = button_text
 	button.custom_minimum_size = Vector2(0, 28)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.focus_mode = Control.FOCUS_NONE
 	NavalUiTheme.apply_hud_button(button, 11)
 	button.pressed.connect(callback)
 	return button

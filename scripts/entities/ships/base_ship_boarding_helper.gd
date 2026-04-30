@@ -38,7 +38,7 @@ static func process_boarding_common(ship, delta: float) -> void:
 
 	var stable_contact = ship._is_boarding_contact_stable()
 	if not stable_contact:
-		var force_hook_after = ship.boarding_contact_grace_duration + 1.2
+		var force_hook_after = ship.boarding_contact_grace_duration + 0.65
 		if ship.boarding_contact_timer < force_hook_after:
 			ship.boarding_contact_timer = maxf(ship.boarding_contact_grace_duration * 0.6, ship.boarding_contact_timer - delta * 1.4)
 			return

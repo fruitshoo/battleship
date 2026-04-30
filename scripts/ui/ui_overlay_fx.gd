@@ -72,6 +72,59 @@ void fragment() {
 	return material
 
 
+static func make_modal_blur_material(
+	tint_color: Color,
+	blur_mix: float = 0.58,
+	blur_radius_px: float = 14.0,
+	vignette_strength: float = 0.34,
+	focus_point: Vector2 = Vector2(0.5, 0.5)
+) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+render_mode unshaded;
+
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform vec4 tint_color : source_color;
+uniform float blur_mix = 0.58;
+uniform float blur_radius_px = 14.0;
+uniform float vignette_strength = 0.34;
+uniform vec2 focus_point = vec2(0.5, 0.5);
+
+void fragment() {
+	vec2 uv = SCREEN_UV;
+	vec2 blur_offset = SCREEN_PIXEL_SIZE * blur_radius_px;
+	vec4 center = texture(screen_tex, uv);
+	vec4 blur = center * 0.16;
+	blur += texture(screen_tex, uv + vec2(blur_offset.x, 0.0)) * 0.10;
+	blur += texture(screen_tex, uv - vec2(blur_offset.x, 0.0)) * 0.10;
+	blur += texture(screen_tex, uv + vec2(0.0, blur_offset.y)) * 0.10;
+	blur += texture(screen_tex, uv - vec2(0.0, blur_offset.y)) * 0.10;
+	blur += texture(screen_tex, uv + blur_offset) * 0.07;
+	blur += texture(screen_tex, uv - blur_offset) * 0.07;
+	blur += texture(screen_tex, uv + vec2(blur_offset.x, -blur_offset.y)) * 0.07;
+	blur += texture(screen_tex, uv + vec2(-blur_offset.x, blur_offset.y)) * 0.07;
+	blur += textureLod(screen_tex, uv, 3.2) * 0.16;
+
+	float focus_distance = distance(uv, focus_point);
+	float edge = smoothstep(0.22, 0.88, focus_distance);
+	float local_blur = clamp(blur_mix * (0.78 + edge * 0.32), 0.0, 0.94);
+	vec3 rgb = mix(center.rgb, blur.rgb, local_blur);
+	rgb *= 1.0 - edge * vignette_strength;
+	rgb = mix(rgb, tint_color.rgb, tint_color.a);
+	COLOR = vec4(rgb, 1.0);
+}
+"""
+	material.shader = shader
+	material.set_shader_parameter("tint_color", tint_color)
+	material.set_shader_parameter("blur_mix", blur_mix)
+	material.set_shader_parameter("blur_radius_px", blur_radius_px)
+	material.set_shader_parameter("vignette_strength", vignette_strength)
+	material.set_shader_parameter("focus_point", focus_point)
+	return material
+
+
 static func make_screen_edge_motion_material(
 	edge_vignette: float = 0.18,
 	edge_blur: float = 0.92,

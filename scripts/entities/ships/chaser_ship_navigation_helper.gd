@@ -6,6 +6,13 @@ const META_AUTHORING_MOVEMENT_MODE := "enemy_authoring_movement_mode"
 const META_AUTHORING_MOVEMENT_SPEED_MIN := "enemy_authoring_movement_speed_min"
 const META_AUTHORING_MOVEMENT_SPEED_MAX := "enemy_authoring_movement_speed_max"
 const META_AUTHORING_MOVEMENT_SPRINT := "enemy_authoring_movement_sprint"
+const META_BOSS_ESCORT_TARGET_ID := "boss_escort_target_id"
+const META_BOSS_ESCORT_LATERAL := "boss_escort_lateral"
+const META_BOSS_ESCORT_BACK := "boss_escort_back"
+const META_BOSS_ESCORT_HOLD_RADIUS := "boss_escort_hold_radius"
+const META_BOSS_ESCORT_BREAK_RADIUS := "boss_escort_break_radius"
+const BOSS_ESCORT_SLOT_TOLERANCE := 7.0
+const BOSS_ESCORT_MELEE_ENGAGE_RANGE := 13.5
 
 static func _is_true(value: Variant) -> bool:
 	return value == true
@@ -132,6 +139,61 @@ static func _build_authoring_movement_intent(ship, target_pos: Vector3, desired_
 		movement_params.get(ShipMovementIntent.PERMIT_SPRINT, permit_sprint) == true,
 		dir_to_target,
 		mode
+	)
+
+
+static func _flat_forward(node: Node3D) -> Vector3:
+	var forward: Vector3 = -node.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.001:
+		return Vector3.FORWARD
+	return forward.normalized()
+
+
+static func _boss_escort_flagship(ship) -> Node3D:
+	if not is_instance_valid(ship) or not ship.has_meta(META_BOSS_ESCORT_TARGET_ID):
+		return null
+	var flagship_id := int(ship.get_meta(META_BOSS_ESCORT_TARGET_ID, 0))
+	var flagship := instance_from_id(flagship_id)
+	if flagship is Node3D and is_instance_valid(flagship) and not _is_sinking_or_dying(flagship) and _team_tag(flagship) == _team_tag(ship):
+		return flagship
+	ship.remove_meta(META_BOSS_ESCORT_TARGET_ID)
+	return null
+
+
+static func _build_boss_escort_navigation(ship, target_node: Node3D, target_pos: Vector3, dist_to_target: float, dir_to_target: Vector3, movement_mode: String) -> Dictionary:
+	var flagship := _boss_escort_flagship(ship)
+	if not is_instance_valid(flagship):
+		return {}
+	var hold_radius := maxf(0.0, float(ship.get_meta(META_BOSS_ESCORT_HOLD_RADIUS, 34.0)))
+	var break_radius := maxf(hold_radius, float(ship.get_meta(META_BOSS_ESCORT_BREAK_RADIUS, 44.0)))
+	var target_dist_to_flagship: float = target_node.global_position.distance_to(flagship.global_position)
+	if not _is_gunner(ship) and dist_to_target <= BOSS_ESCORT_MELEE_ENGAGE_RANGE and target_dist_to_flagship <= break_radius:
+		return {}
+
+	var flagship_forward := _flat_forward(flagship)
+	var flagship_right := flagship_forward.cross(Vector3.UP).normalized()
+	var lateral := float(ship.get_meta(META_BOSS_ESCORT_LATERAL, 0.0))
+	var back := float(ship.get_meta(META_BOSS_ESCORT_BACK, 10.0))
+	var slot_pos: Vector3 = flagship.global_position + flagship_right * lateral - flagship_forward * back
+	slot_pos.y = ship.global_position.y
+
+	var slot_dist: float = ship.global_position.distance_to(slot_pos)
+	var speed_mult := 0.80 if slot_dist > BOSS_ESCORT_SLOT_TOLERANCE else 0.22
+	var permit_sprint := false
+	if not _is_gunner(ship) and slot_dist > hold_radius * 0.55:
+		speed_mult = 1.0
+		permit_sprint = true
+	return _build_authoring_movement_intent(
+		ship,
+		target_pos,
+		slot_pos,
+		target_pos,
+		dist_to_target,
+		speed_mult,
+		permit_sprint,
+		dir_to_target,
+		movement_mode if not movement_mode.is_empty() else "boss_escort"
 	)
 
 
@@ -352,6 +414,9 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	if to_target_flat.length_squared() <= 0.001:
 		to_target_flat = - ship.global_transform.basis.z
 	var dir_to_target: Vector3 = to_target_flat.normalized()
+	var boss_escort_nav := _build_boss_escort_navigation(ship, target_node, target_pos, dist_to_target, dir_to_target, movement_mode)
+	if not boss_escort_nav.is_empty():
+		return boss_escort_nav
 
 	if yield_overrun_target:
 		var standoff_distance: float = maxf(ship.max_boarding_distance + 3.5, 12.0)

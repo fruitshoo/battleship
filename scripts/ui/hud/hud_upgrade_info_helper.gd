@@ -26,10 +26,10 @@ static func is_crew_upgrade(hud, upgrade_id: String) -> bool:
 
 static func get_upgrade_track_name(hud, upgrade_id: String) -> String:
 	if is_crew_upgrade(hud, upgrade_id):
-		return "병사"
+		return LocaleManager.t("upgrade.track.boarding", "백병전")
 	if is_ship_upgrade(hud, upgrade_id):
-		return "함선"
-	return "강화"
+		return LocaleManager.t("upgrade.track.ship", "함선")
+	return LocaleManager.t("upgrade.track.default", "강화")
 
 static func build_upgrade_tooltip_text(hud, upgrade_id: String, level: int) -> String:
 	var track_name = get_upgrade_track_name(hud, upgrade_id)
@@ -42,8 +42,8 @@ static func build_upgrade_tooltip_text(hud, upgrade_id: String, level: int) -> S
 		if upgrades_data is Dictionary:
 			var data = (upgrades_data as Dictionary).get(upgrade_id, {})
 			if data is Dictionary:
-				name = str(data.get("name", upgrade_id))
-				desc = str(data.get("description", ""))
+				name = LocaleManager.data_text(data, upgrade_id, "upgrade", "name", upgrade_id)
+				desc = LocaleManager.data_text(data, upgrade_id, "upgrade", "description", "")
 				stats = data.get("stats", {})
 				max_level = int(data.get("max_level", level))
 	var spec = build_upgrade_spec_text(upgrade_id, level, stats)
@@ -94,7 +94,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var rocket_damage := base_damage * (1.0 + 0.15 * float(level))
 			return "신기전 운용 %d명 | 대병 %.0f | 폭발 %.1fm | 재사용 %.1f초" % [rocketeers, rocket_damage * personnel_mult, blast_radius, cooldown]
 		"janggun":
-			return "명중 시 화염/둔화 디버프 강화"
+			var janggun_cooldown := maxf(6.0, 8.0 - float(level - 1) * 0.5)
+			return "포문 추가 발사 | 재장전 %.1f초 | 화염/둔화" % janggun_cooldown
 		"ballista":
 			var dmg = stats.get("base_damage", 45.0) + (level - 1) * stats.get("damage_per_lv", 15.0)
 			var pierce = int(stats.get("base_pierce", 3) + (level - 1) * stats.get("pierce_per_lv", 1))
@@ -135,14 +136,6 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"panokseon_upgrade":
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
 			return "판옥선 포격함 1척 합류 | 편성 %s" % slot_summary
-		"fleet_crew":
-			var reduce_levels := mini(level, int(stats.get("respawn_reduce_max_level", 4)))
-			var reduce_per_level := float(stats.get("respawn_reduce_per_lv", 4.0))
-			var min_respawn_interval := float(stats.get("min_respawn_interval", 14.0))
-			var respawn_interval := maxf(min_respawn_interval, SUPPORT_FLEET_BASE_RESPAWN_INTERVAL - (reduce_per_level * float(reduce_levels)))
-			var fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades_data)
-			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
-			return "재합류 %.0f초 | 한계 %d척 | 편성 %s" % [respawn_interval, fleet_limit, slot_summary]
 		"crew_reserve":
 			var assist_duration := maxf(float(stats.get("min_assist_channel_duration", 0.55)), float(stats.get("base_assist_channel_duration", 1.1)) - (float(level) * float(stats.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio := clampf(0.35 + (float(level) * float(stats.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(stats.get("max_assist_recovery_health_ratio", 0.7)))
@@ -169,7 +162,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var throwers = int(UpgradeManager.get_specialist_unit_count("fire_pot", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
 			var fp_dmg = stats.get("base_damage", 15.0) + (level - 1) * stats.get("damage_per_lv", 5.0)
 			var fp_cd = maxf(1.0, stats.get("base_cooldown", 6.0) - (level - 1) * stats.get("cooldown_reduce_per_lv", 1.0))
-			var ignite_pct: int = int(round(clampf(float(stats.get("base_ignition_chance", 0.45)) + float(level - 1) * float(stats.get("ignition_chance_per_lv", 0.075)), 0.0, float(stats.get("max_ignition_chance", 0.75))) * 100.0))
+			var ignite_pct: int = int(round(clampf(float(stats.get("base_ignition_chance", 0.25)) + float(level - 1) * float(stats.get("ignition_chance_per_lv", 0.075)), 0.0, float(stats.get("max_ignition_chance", 0.65))) * 100.0))
 			return "화통 운용 %d명 | 폭발 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, fp_dmg, ignite_pct, fp_cd]
 		"repeating_crossbow":
 			var repeaters = int(UpgradeManager.get_specialist_unit_count("repeating_crossbow", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
@@ -183,7 +176,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"supply":
 			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(stats.get("hull_heal", 20.0)), int(stats.get("stamina_recover", 25.0))]
 		"gold":
-			return "점수 +%d" % int(stats.get("score_add", 50))
+			return "골드 +%d" % int(stats.get("score_add", 50))
 	return ""
 
 static func get_upgrade_icon(upgrade_id: String) -> String:
@@ -201,7 +194,6 @@ static func get_upgrade_icon(upgrade_id: String) -> String:
 		"supply_bonus": "medical_services",
 		"fleet_signal": "groups",
 		"panokseon_upgrade": "fort",
-		"fleet_crew": "update",
 		"crew_numbers": "swords",
 		"crew_attack": "swords",
 		"crew_defense": "shield",
@@ -213,9 +205,21 @@ static func get_upgrade_icon(upgrade_id: String) -> String:
 	return icon_map.get(upgrade_id, "build")
 
 static func get_upgrade_icon_texture_path(upgrade_id: String) -> String:
-	var path := "res://assets/ui/upgrades/%s.png" % upgrade_id
-	if ResourceLoader.exists(path):
-		return path
+	if is_instance_valid(UpgradeManager):
+		var upgrades_data = UpgradeManager.get("UPGRADES")
+		if upgrades_data is Dictionary:
+			var upgrade_data = (upgrades_data as Dictionary).get(upgrade_id, {})
+			if upgrade_data is Dictionary:
+				var card_art_path := str((upgrade_data as Dictionary).get("card_art_path", "")).strip_edges()
+				if not card_art_path.is_empty() and ResourceLoader.exists(card_art_path):
+					return card_art_path
+	for path in [
+		"res://assets/ui/upgrades/%s_icon.png" % upgrade_id,
+		"res://assets/ui/upgrades/%s.png" % upgrade_id,
+		"res://assets/ui/upgrades/%s_card.png" % upgrade_id,
+	]:
+		if ResourceLoader.exists(path):
+			return path
 	return ""
 
 static func get_upgrade_color(upgrade_id: String) -> Color:
@@ -233,7 +237,6 @@ static func get_upgrade_color(upgrade_id: String) -> Color:
 		"supply_bonus": Color(0.35, 0.95, 0.35),
 		"fleet_signal": Color(1.0, 0.75, 0.35),
 		"panokseon_upgrade": Color(0.84, 0.7, 0.35),
-		"fleet_crew": Color(0.35, 0.9, 1.0),
 		"crew_numbers": Color(0.5, 0.82, 1.0),
 		"crew_attack": Color(1.0, 0.9, 0.35),
 		"crew_defense": Color(0.55, 0.8, 1.0),

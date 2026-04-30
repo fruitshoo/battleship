@@ -74,10 +74,11 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	var icon_texture := TextureRect.new()
 	icon_texture.name = "IconTexture"
 	icon_texture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	icon_texture.offset_left = 3.0
-	icon_texture.offset_top = 3.0
-	icon_texture.offset_right = -3.0
-	icon_texture.offset_bottom = -3.0
+	icon_texture.offset_left = 2.0
+	icon_texture.offset_top = 2.0
+	icon_texture.offset_right = -2.0
+	icon_texture.offset_bottom = -2.0
+	icon_texture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	icon_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE

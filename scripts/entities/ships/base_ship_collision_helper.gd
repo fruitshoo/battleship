@@ -312,7 +312,7 @@ static func _repair_player_from_derelict_contact(player_ship, source_ship: Node 
 		if hull_hp_after > hull_hp_before and hud.has_method("show_message"):
 			var message := "폐선 해체! 선체 +%d" % int(round(hull_hp_after - hull_hp_before))
 			if is_boss_salvage:
-				message = "거함 해체! 선체 +%d / 점수 +%d / XP +%d / 지휘 +%d" % [
+				message = "거함 해체! 선체 +%d / 골드 +%d / XP +%d / 백병전 +%d" % [
 					int(round(hull_hp_after - hull_hp_before)),
 					BOSS_DERELICT_CONTACT_SCORE_REWARD,
 					BOSS_DERELICT_CONTACT_XP_REWARD,

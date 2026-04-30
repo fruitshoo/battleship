@@ -11,7 +11,7 @@ const RESULT_SCENE_PATH := "res://scenes/ui/result_screen.tscn"
 
 signal level_up(new_level: int)
 signal score_changed(new_score: int)
-signal merit_full_action_completed() # 지휘 포인트 가득 참 후속 처리 완료
+signal merit_full_action_completed() # 백병전 포인트 가득 참 후속 처리 완료
 
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
@@ -28,14 +28,14 @@ signal merit_full_action_completed() # 지휘 포인트 가득 참 후속 처리
 @export var merit_base_points: int = 50 ## 공적 레벨 1 기본 요구치
 @export var merit_growth_per_level: int = 10 ## 공적 레벨당 증가치
 @export var soldier_kill_xp_reward: int = 5 ## 일반 병사 처치 시 획득 XP
-@export var merit_per_soldier_kill: int = 1 ## 적 병사 1명 처치 시 획득 지휘 포인트
+@export var merit_per_soldier_kill: int = 1 ## 적 병사 1명 처치 시 획득 백병전 포인트
 @export var drowned_soldier_kill_xp_reward: int = 3 ## 적 병사를 수장시켰을 때 획득 XP
-@export var drowned_soldier_kill_merit_reward: int = 0 ## 적 병사를 수장시켰을 때 획득 지휘 포인트
+@export var drowned_soldier_kill_merit_reward: int = 0 ## 적 병사를 수장시켰을 때 획득 백병전 포인트
 @export var melee_kill_xp_bonus: int = 2 ## 백병전(검/창/작살) 처치 시 추가 XP
-@export var melee_kill_merit_bonus: int = 1 ## 백병전(검/창/작살) 처치 시 추가 지휘 포인트
-@export var boarding_capture_score_reward: int = 95 ## 나포 성공 시 추가 점수
+@export var melee_kill_merit_bonus: int = 1 ## 백병전(검/창/작살) 처치 시 추가 백병전 포인트
+@export var boarding_capture_score_reward: int = 25 ## 나포 성공 시 추가 골드
 @export var boarding_capture_xp_reward: int = 35 ## 나포 성공 시 추가 XP
-@export var boarding_capture_merit_reward: int = 20 ## 나포 성공 시 추가 지휘 포인트
+@export var boarding_capture_merit_reward: int = 20 ## 나포 성공 시 추가 백병전 포인트
 @export_group("Boss Arena")
 @export var mid_boss_arena_half_extents: Vector2 = Vector2(112.0, 84.0)
 @export var final_boss_arena_half_extents: Vector2 = Vector2(136.0, 98.0)
@@ -82,7 +82,7 @@ var _victory_result_transition_started: bool = false
 const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
 	"singigeon": "신기전",
-	"janggun": "대장군전",
+	"janggun": "장군전",
 	"crew_numbers": "창병",
 	"fire_pot": "화통",
 	"ballista": "팔우노",
@@ -95,7 +95,7 @@ const DAMAGE_SOURCE_NAME := {
 	"boarding_defense": "방책",
 }
 
-# 공적(Merit) 시스템: 병사(지휘) 업그레이드 전용 트랙
+# 공적(Merit) 시스템: 백병전 업그레이드 전용 트랙
 signal merit_changed(current: int, maximum: int, level: int)
 signal merit_full()
 var merit_points: int = 0
@@ -392,8 +392,11 @@ func _process(delta: float) -> void:
 	else:
 		current_time += delta
 	
-	# 보스 등장 체크 (10분 = 600초)
-	if boss_spawn_time > 0.0 and current_time >= boss_spawn_time and not _boss_triggered:
+	# 보스 등장 체크 (10분 = 600초). 데이터 기반 보스 진행 규칙이 있으면 스포너가 직접 처리한다.
+	var spawner_handles_boss_waves := false
+	if is_instance_valid(enemy_spawner) and enemy_spawner.has_method("has_data_driven_boss_waves"):
+		spawner_handles_boss_waves = bool(enemy_spawner.call("has_data_driven_boss_waves"))
+	if not spawner_handles_boss_waves and boss_spawn_time > 0.0 and current_time >= boss_spawn_time and not _boss_triggered:
 		current_time = boss_spawn_time
 		_boss_triggered = true
 		_boss_phase_active = true
@@ -743,6 +746,16 @@ func _debug_spawn_final_boss() -> void:
 	_boss_phase_active = true
 	current_time = maxf(current_time, boss_spawn_time)
 	enemy_spawner.debug_spawn_final_boss()
+
+
+func notify_data_driven_boss_wave_started(_wave_id: String, wave_time: float, is_final_wave: bool) -> void:
+	if not is_final_wave:
+		return
+	_boss_triggered = true
+	_boss_phase_active = true
+	if wave_time > 0.0:
+		boss_spawn_time = wave_time
+	current_time = maxf(current_time, boss_spawn_time)
 
 
 func _cycle_collision_visualizer_mode() -> void:

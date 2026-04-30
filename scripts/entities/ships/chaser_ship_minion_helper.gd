@@ -10,6 +10,7 @@ const SUPPORT_JOIN_SPACING := 14.0
 const SUPPORT_COLUMN_JOIN_SPACING := 18.0
 const SUPPORT_FLEET_SLOT_INDEX_META := "support_fleet_slot_index"
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
+const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
 const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
 const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
 const SUPPORT_ANCHOR_FWD_META := "support_anchor_forward"
@@ -81,6 +82,8 @@ const SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE := 2.3
 const SUPPORT_ASSIST_BOSS_BREACH_RECALL_DISTANCE := 112.0
 const SUPPORT_ASSIST_BOSS_BREACH_LEASH_DISTANCE := 136.0
 const SUPPORT_ASSIST_SEPARATION_RADIUS := 10.0
+const SUPPORT_ASSIST_SEPARATION_PAD := 3.4
+const SUPPORT_ASSIST_PANOKSEON_SEPARATION_EXTRA_PAD := 1.8
 const SUPPORT_ASSIST_SEPARATION_FORCE := 1.1
 const SUPPORT_ASSIST_ROWING_WIND_FLOOR := 0.78
 const SUPPORT_ASSIST_EMERGENCY_ROWING_WIND_FLOOR := 0.86
@@ -97,6 +100,12 @@ const SUPPORT_ASSIST_SWITCH_MARGIN_BOSS_BREACH := 18.0
 const SUPPORT_ASSIST_EVAL_INTERVAL := 0.12
 const SUPPORT_ASSIST_EVAL_INTERVAL_EMERGENCY := 0.07
 const SUPPORT_ASSIST_EVAL_INTERVAL_BOSS_BREACH := 0.05
+const SUPPORT_ASSIST_TARGET_SHARE_CAPACITY := 1
+const SUPPORT_ASSIST_TARGET_DANGER_CAPACITY := 2
+const SUPPORT_ASSIST_TARGET_BOARDING_CAPACITY := 3
+const SUPPORT_ASSIST_TARGET_SHARE_PENALTY := 16.0
+const SUPPORT_ASSIST_TARGET_SHARE_PENALTY_EMERGENCY := 8.0
+const SUPPORT_ASSIST_TARGET_SHARE_LEASH_PAD := 18.0
 const SUPPORT_BOARDING_CONTACT_PAD := 0.85
 const SUPPORT_RESCUE_BOARDING_START_PAD := SUPPORT_BOARDING_CONTACT_PAD
 const SUPPORT_LIMBO_PILOT_STALE_FRAMES := 8
@@ -107,6 +116,9 @@ const ALLY_GUARD_SEPARATION_RADIUS := 9.0
 const ALLY_GUARD_SEPARATION_FORCE := 0.9
 const ALLY_GUARD_SPEED_RESPONSE := 1.72
 const ALLY_GUARD_ROWING_WIND_FLOOR := 0.78
+
+static var _support_roster_cache_frame: int = -1
+static var _support_roster_cache: Dictionary = {}
 
 static func process_minion_ai(ship, delta: float) -> void:
 	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
@@ -562,6 +574,19 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	var heading_point: Vector3 = ShipMovementIntent.get_heading_point(nav, desired_point)
 	var dist_to_target: float = ShipMovementIntent.get_dist_to_target(nav, ship.global_position.distance_to(assist_target.global_position))
 	var desired_speed_mult: float = ShipMovementIntent.get_desired_speed_mult(nav)
+	var pre_avoidance: Dictionary = _calculate_support_pre_avoidance(
+		ship,
+		minions,
+		assist_target,
+		desired_point,
+		maxf(maxf(ship.current_speed, float(ship._last_ai_speed)), _get_ship_speed(assist_target, 0.0)),
+		_is_panokseon_support(ship)
+	)
+	var pre_avoidance_offset: Vector3 = pre_avoidance.get("position_offset", Vector3.ZERO)
+	if pre_avoidance_offset.length_squared() > 0.001:
+		desired_point += pre_avoidance_offset
+		heading_point = desired_point
+		desired_speed_mult *= float(pre_avoidance.get("brake_mult", 1.0))
 
 	var move_vector: Vector3 = desired_point - ship.global_position
 	move_vector.y = 0.0
@@ -868,17 +893,23 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 
 	var target_id: int = assist_target.get_instance_id()
 	var current_target_id: int = int(ship.get_meta(SUPPORT_ASSIST_TARGET_ID_META, 0))
-	var lane_side: float = float(ship.get_meta(SUPPORT_ASSIST_LANE_SIDE_META, 0.0))
-	if current_target_id != target_id or absf(lane_side) < 0.5:
+	var lane_assignment := _get_support_assist_lane_assignment(ship, my_index)
+	var assigned_lane_side: float = float(lane_assignment.get("side", 0.0))
+	var support_role_name := str(ship.get_meta(SUPPORT_FLEET_SLOT_ROLE_META, "")).strip_edges().to_lower()
+	var screen_assist_role := support_role_name == "screen_lead" or support_role_name == "screen_flank"
+	var lane_side: float = assigned_lane_side
+	if absf(lane_side) < 0.5 and current_target_id == target_id:
+		lane_side = float(ship.get_meta(SUPPORT_ASSIST_LANE_SIDE_META, 0.0))
+	if absf(lane_side) < 0.5:
 		var rel_to_player: Vector3 = ship.global_position - player_ship.global_position if is_instance_valid(player_ship) else ship.global_position - assist_target.global_position
 		rel_to_player.y = 0.0
 		lane_side = signf(rel_to_player.dot(player_right))
 		if absf(lane_side) < 0.5:
 			lane_side = 1.0 if (my_index % 2) == 0 else -1.0
-		ship.set_meta(SUPPORT_ASSIST_LANE_SIDE_META, lane_side)
+	ship.set_meta(SUPPORT_ASSIST_LANE_SIDE_META, lane_side)
 	ship.set_meta(SUPPORT_ASSIST_TARGET_ID_META, target_id)
 
-	var pair_index: int = int(floor(float(my_index) / 2.0))
+	var pair_index: int = int(lane_assignment.get("rank", int(floor(float(my_index) / 2.0))))
 	var collision_distance: float = ship.get_collision_distance_to(assist_target)
 	var lane_distance: float = 0.0
 	var rear_bias: float = 0.0
@@ -889,11 +920,11 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 		lane_distance = maxf(4.8, collision_distance * 0.86) + float(pair_index) * 0.65
 		rear_bias = 0.55 + float(pair_index) * 0.28
 	else:
-		var lane_base: float = 8.0 if emergency_assist else 11.0
-		var lane_step: float = 1.6 if emergency_assist else 2.5
-		var lane_clearance: float = 1.6 if emergency_assist else 3.2
+		var lane_base: float = 8.0 if emergency_assist else (9.0 if screen_assist_role else 11.0)
+		var lane_step: float = 1.6 if emergency_assist else (1.4 if screen_assist_role else 2.5)
+		var lane_clearance: float = 1.6 if emergency_assist else (2.4 if screen_assist_role else 3.2)
 		lane_distance = maxf(lane_base + float(pair_index) * lane_step, collision_distance + lane_clearance)
-		rear_bias = (0.8 + float(pair_index) * 0.8) if emergency_assist else (2.4 + float(pair_index) * 1.2)
+		rear_bias = (0.8 + float(pair_index) * 0.8) if emergency_assist else (0.0 if screen_assist_role else (2.4 + float(pair_index) * 1.2))
 	var desired_point: Vector3 = assist_target.global_position
 	if boss_breach_assist and is_instance_valid(player_ship):
 		var breach_axis: Vector3 = assist_target.global_position - player_ship.global_position
@@ -924,11 +955,11 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 		else:
 			threat_axis = threat_axis.normalized()
 		var flagship_target_distance: float = player_ship.global_position.distance_to(assist_target.global_position)
-		var stand_off: float = maxf(collision_distance + (4.0 if emergency_assist else 6.0), 8.0 if emergency_assist else 11.0)
+		var stand_off: float = maxf(collision_distance + (4.0 if emergency_assist else (5.2 if screen_assist_role else 6.0)), 8.0 if emergency_assist else (10.0 if screen_assist_role else 11.0))
 		var advance: float = clampf(
-			flagship_target_distance * (0.30 if emergency_assist else 0.24),
-			3.8 if emergency_assist else 4.8,
-			9.5 if emergency_assist else 11.5
+			flagship_target_distance * (0.30 if emergency_assist else (0.34 if screen_assist_role else 0.24)),
+			3.8 if emergency_assist else (5.6 if screen_assist_role else 4.8),
+			9.5 if emergency_assist else (13.0 if screen_assist_role else 11.5)
 		)
 		advance = minf(advance, maxf(flagship_target_distance - stand_off, 3.4))
 		desired_point = player_ship.global_position + threat_axis * advance
@@ -970,6 +1001,34 @@ static func _build_support_assist_navigation(ship, assist_target: Node3D, my_ind
 		dir_to_target,
 		"support_assist"
 	)
+
+
+static func _get_support_assist_lane_assignment(ship, my_index: int) -> Dictionary:
+	var slot_index := my_index
+	if is_instance_valid(ship):
+		slot_index = int(ship.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, my_index))
+	var normalized_index := maxi(maxi(slot_index, my_index), 0)
+	var role_name := ""
+	if is_instance_valid(ship):
+		role_name = str(ship.get_meta(SUPPORT_FLEET_SLOT_ROLE_META, "")).strip_edges().to_lower()
+	match role_name:
+		"screen_lead":
+			return {"side": -1.0, "rank": 0}
+		"screen_flank":
+			return {"side": 1.0, "rank": 0}
+		"artillery_screen_left":
+			return {"side": -1.0, "rank": 1}
+		"artillery_screen_right":
+			return {"side": 1.0, "rank": 1}
+		"artillery_lead":
+			return {"side": 1.0 if normalized_index % 2 == 0 else -1.0, "rank": 1}
+		"rescue_rear":
+			return {"side": 1.0 if normalized_index % 2 == 0 else -1.0, "rank": 2}
+		_:
+			return {
+				"side": 1.0 if normalized_index % 2 == 0 else -1.0,
+				"rank": int(floor(float(normalized_index) / 2.0)),
+			}
 
 
 static func _build_captured_guard_navigation(ship, guard_target: Node3D, my_index: int) -> Dictionary:
@@ -1043,21 +1102,36 @@ static func _calculate_support_assist_separation(ship, minions: Array, assist_ta
 		var offset: Vector3 = ship.global_position - other.global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
-		if dist <= 0.1 or dist >= SUPPORT_ASSIST_SEPARATION_RADIUS:
+		var separation_radius := _get_support_assist_separation_radius(ship, other as Node3D)
+		if dist <= 0.1 or dist >= separation_radius:
 			continue
-		var strength: float = pow((SUPPORT_ASSIST_SEPARATION_RADIUS - dist) / SUPPORT_ASSIST_SEPARATION_RADIUS, 2.0)
-		force += offset.normalized() * strength * SUPPORT_ASSIST_SEPARATION_FORCE
+		var radius_scale := clampf(separation_radius / maxf(SUPPORT_ASSIST_SEPARATION_RADIUS, 0.001), 1.0, 1.8)
+		var strength: float = pow((separation_radius - dist) / separation_radius, 2.0)
+		force += offset.normalized() * strength * SUPPORT_ASSIST_SEPARATION_FORCE * radius_scale
 		count += 1
 	if is_instance_valid(assist_target):
 		var target_offset: Vector3 = ship.global_position - assist_target.global_position
 		target_offset.y = 0.0
 		var target_dist: float = target_offset.length()
 		var collision_dist: float = ship.get_collision_distance_to(assist_target)
-		if target_dist > 0.1 and target_dist < collision_dist + 2.0:
-			var strength: float = (collision_dist + 2.0 - target_dist) / maxf(collision_dist + 2.0, 0.001)
+		var target_separation_radius: float = collision_dist + SUPPORT_ASSIST_SEPARATION_PAD
+		if target_dist > 0.1 and target_dist < target_separation_radius:
+			var strength: float = (target_separation_radius - target_dist) / maxf(target_separation_radius, 0.001)
 			force += target_offset.normalized() * strength * SUPPORT_ASSIST_SEPARATION_FORCE
 			count += 1
 	return force / max(count, 1)
+
+
+static func _get_support_assist_separation_radius(ship, other_ship: Node3D) -> float:
+	if not is_instance_valid(ship) or not is_instance_valid(other_ship):
+		return SUPPORT_ASSIST_SEPARATION_RADIUS
+	var separation_radius := maxf(
+		SUPPORT_ASSIST_SEPARATION_RADIUS,
+		ShipContactGeometry.get_collision_distance_between(ship, other_ship) + SUPPORT_ASSIST_SEPARATION_PAD
+	)
+	if _is_panokseon_support(ship) or _is_panokseon_support(other_ship):
+		separation_radius += SUPPORT_ASSIST_PANOKSEON_SEPARATION_EXTRA_PAD
+	return separation_radius
 
 
 static func _calculate_captured_guard_separation(ship, minions: Array, guard_target: Node3D) -> Vector3:
@@ -1086,8 +1160,17 @@ static func _calculate_captured_guard_separation(ship, minions: Array, guard_tar
 	return force / max(count, 1)
 
 static func _get_minion_roster(ship, support_only: bool) -> Array:
-	var roster: Array = []
 	var roster_flagship: Node3D = SupportFleetStateHelper.get_support_owner_flagship(ship) if support_only else null
+	if support_only:
+		var current_frame: int = Engine.get_physics_frames()
+		if current_frame != _support_roster_cache_frame:
+			_support_roster_cache_frame = current_frame
+			_support_roster_cache.clear()
+		var cache_key: int = roster_flagship.get_instance_id() if is_instance_valid(roster_flagship) else 0
+		if _support_roster_cache.has(cache_key):
+			return _support_roster_cache[cache_key]
+
+	var roster: Array = []
 	var all_minions: Array = ship.get_minions_cached(ship.get_tree())
 	for minion in all_minions:
 		if not is_instance_valid(minion):
@@ -1110,6 +1193,8 @@ static func _get_minion_roster(ship, support_only: bool) -> Array:
 				return slot_a < slot_b
 			return order_a < order_b
 		)
+		var support_cache_key: int = roster_flagship.get_instance_id() if is_instance_valid(roster_flagship) else 0
+		_support_roster_cache[support_cache_key] = roster
 	return roster
 
 static func _get_minion_offset(ship, my_index: int, is_support_ship: bool) -> Vector3:
@@ -1265,6 +1350,17 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 			score -= 12.0
 		elif is_close_threat:
 			score -= 4.0
+		score += _get_support_assist_assignment_penalty(
+			ship,
+			player_ship,
+			enemy,
+			leash_distance,
+			deck_emergency,
+			deck_contested,
+			deck_overrun,
+			is_boarding_player,
+			is_close_threat
+		)
 		if enemy.get_instance_id() == locked_target_id:
 			locked_target = enemy
 			locked_score = score
@@ -1296,6 +1392,56 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 		_clear_support_assist_target_lock(ship)
 	ship.set_meta(SUPPORT_ASSIST_EVAL_TIMER_META, eval_interval)
 	return best_target
+
+
+static func _get_support_assist_assignment_penalty(
+	ship,
+	player_ship: Node3D,
+	candidate: Node3D,
+	leash_distance: float,
+	deck_emergency: bool,
+	deck_contested: bool,
+	deck_overrun: bool,
+	is_boarding_player: bool,
+	is_close_threat: bool
+) -> float:
+	if not is_instance_valid(ship) or not is_instance_valid(player_ship) or not is_instance_valid(candidate):
+		return 0.0
+	var candidate_id: int = candidate.get_instance_id()
+	var owner_flagship: Node3D = SupportFleetStateHelper.get_support_owner_flagship(ship)
+	if not is_instance_valid(owner_flagship):
+		owner_flagship = player_ship
+	var assigned_count: int = 0
+	for allied_ship in EntityRegistry.get_ships_by_team("player"):
+		var support_ship := allied_ship as Node3D
+		if not is_instance_valid(support_ship) or support_ship == ship:
+			continue
+		if not ShipAllyRoleHelper.is_support_ship(support_ship):
+			continue
+		if _is_ship_disabled(support_ship):
+			continue
+		if is_instance_valid(owner_flagship) and not SupportFleetStateHelper.is_support_owned_by_flagship(support_ship, owner_flagship):
+			continue
+		if int(support_ship.get_meta(SUPPORT_ASSIST_TARGET_ID_META, 0)) != candidate_id:
+			continue
+		if support_ship.global_position.distance_to(candidate.global_position) > leash_distance + SUPPORT_ASSIST_TARGET_SHARE_LEASH_PAD:
+			continue
+		assigned_count += 1
+	if assigned_count <= 0:
+		return 0.0
+
+	var target_capacity: int = SUPPORT_ASSIST_TARGET_SHARE_CAPACITY
+	if is_boarding_player:
+		target_capacity = SUPPORT_ASSIST_TARGET_BOARDING_CAPACITY
+	elif deck_emergency or deck_overrun or _is_boss_ship(candidate):
+		target_capacity = SUPPORT_ASSIST_TARGET_DANGER_CAPACITY
+	elif deck_contested and is_close_threat:
+		target_capacity = SUPPORT_ASSIST_TARGET_DANGER_CAPACITY
+	var overflow: int = assigned_count - target_capacity + 1
+	if overflow <= 0:
+		return 0.0
+	var penalty_base: float = SUPPORT_ASSIST_TARGET_SHARE_PENALTY_EMERGENCY if deck_emergency or is_boarding_player else SUPPORT_ASSIST_TARGET_SHARE_PENALTY
+	return float(overflow) * penalty_base
 
 
 static func _is_player_deck_emergency(player_ship: Node3D) -> bool:

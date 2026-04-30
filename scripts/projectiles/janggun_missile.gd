@@ -1,17 +1,17 @@
 extends Area3D
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 
-## 장군전 미사일 (Janggun Missile)
-## 느리지만 고데미지 통나무 미사일. 범위 피해.
+## 장군전 투사체
+## 포문에서 느리게 발사되는 중형 화전형 투사체.
 
 @export var speed: float = 18.0
-@export var damage: float = 15.0 # 즉발 데미지 (최강 무기)
+@export var damage: float = 15.0 # 즉발 데미지
 @export var dot_damage: float = 3.0 # 누수 데미지 (초당 3.0)
 @export var speed_debuff: float = 0.7 # 속도 30% 감소
 @export var turn_debuff: float = 0.6 # 선회 40% 감소
 @export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
-@export var arc_height: float = 8.0
+@export var arc_height: float = 4.0
 @export var impact_puff_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
 var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
@@ -93,9 +93,9 @@ func _begin_flight() -> void:
 
 	var distance = start_pos.distance_to(target_pos)
 	duration = distance / maxf(speed, 0.01)
-	if duration < 0.7:
-		duration = 0.7
-	arc_height = clamp(distance * 0.12, 1.5, 8.0)
+	if duration < 0.55:
+		duration = 0.55
+	arc_height = clamp(distance * 0.07, 0.8, 4.0)
 
 	if start_pos.distance_squared_to(target_pos) > 0.1:
 		look_at(target_pos, Vector3.UP)
@@ -112,7 +112,7 @@ func _physics_process(delta: float) -> void:
 	if is_stuck or is_sinking: return
 
 	progress += delta / duration
-	# SLBM 같은 느낌을 주는 비선형 가속(Ease-In) 제거 -> 강력한 초기 추진력 표현을 위해 선형(Linear)으로 변경
+	# 포문에서 밀려나가는 느낌을 위해 탄속 보간은 선형으로 유지한다.
 	var t = minf(progress, 1.0)
 	
 	var current_pos = start_pos.lerp(target_pos, t)
@@ -149,10 +149,10 @@ func _on_hit(target: Node) -> void:
 		_play_impact_vfx() # 임팩트 이펙트 재생
 		_stick_to_ship(ship)
 		
-		# 충돌 화면 흔들림 (강력)
+		# 장군전은 중형 투사체라 흔들림을 대장군전급으로 키우지 않는다.
 		var cam = get_viewport().get_camera_3d()
 		if cam and cam.has_method("shake"):
-			cam.shake(0.5, 0.25)
+			cam.shake(0.32, 0.16)
 
 func _stick_to_ship(ship: Node3D) -> void:
 	is_stuck = true
@@ -273,10 +273,10 @@ func _play_impact_vfx() -> void:
 	# 피격 사운드 (장군전 전용 중타격음)
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("heavy_missle_impact", global_position, randf_range(0.8, 1.0))
+		audio_manager.play_sfx("heavy_missle_impact", global_position, randf_range(0.9, 1.08), -3.0)
 
 func _play_launch_vfx() -> void:
 	# 화면 흔들림
 	var cam = get_viewport().get_camera_3d()
 	if cam and cam.has_method("shake"):
-		cam.shake(0.6, 0.3)
+		cam.shake(0.22, 0.12)

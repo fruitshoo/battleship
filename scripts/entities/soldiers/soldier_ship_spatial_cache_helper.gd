@@ -47,25 +47,50 @@ static func get_ship_enemy_scan_data(soldier) -> Dictionary:
 
 static func _build_ship_enemy_scan_data(soldier, owned_ship: Node3D, current_frame: int) -> Dictionary:
 	var nearby_enemy_ships: Array = []
+	var nearby_ally_distress_ships: Array = []
 	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
 	for other_ship in EntityRegistry.get_ships_by_team(opposing_team):
 		if not is_instance_valid(other_ship) or other_ship == owned_ship:
 			continue
 		if other_ship.has_method("is_sinking_or_dying") and other_ship.is_sinking_or_dying():
 			continue
-		var ship_diff_xz := Vector2(
+		var enemy_ship_diff_xz := Vector2(
 			owned_ship.global_position.x - other_ship.global_position.x,
 			owned_ship.global_position.z - other_ship.global_position.z
 		)
-		if ship_diff_xz.length_squared() > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
+		if enemy_ship_diff_xz.length_squared() > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
 			continue
 		nearby_enemy_ships.append(other_ship)
 
+	var own_team := str(soldier.team).strip_edges().to_lower()
+	for ally_ship in EntityRegistry.get_ships_by_team(own_team):
+		if not is_instance_valid(ally_ship) or ally_ship == owned_ship:
+			continue
+		if ally_ship.has_method("is_sinking_or_dying") and ally_ship.is_sinking_or_dying():
+			continue
+		var ally_ship_diff_xz := Vector2(
+			owned_ship.global_position.x - ally_ship.global_position.x,
+			owned_ship.global_position.z - ally_ship.global_position.z
+		)
+		if ally_ship_diff_xz.length_squared() > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
+			continue
+		var ally_team := NodeContractHelper.get_team_tag(ally_ship, "").strip_edges().to_lower()
+		if not ally_team.is_empty() and ally_team != own_team:
+			continue
+		var hostile_count: int = int(ally_ship.get("deck_hostile_boarder_count")) if ally_ship.get("deck_hostile_boarder_count") != null else 0
+		if ally_ship.get("deck_is_contested") != true and ally_ship.get("deck_is_overrun") != true and hostile_count <= 0:
+			continue
+		nearby_ally_distress_ships.append(ally_ship)
+
+	var nearby_target_ships := nearby_enemy_ships.duplicate()
+	nearby_target_ships.append_array(nearby_ally_distress_ships)
 	return {
 		"frame": current_frame,
 		"ship": owned_ship,
 		"nearby_enemy_ships": nearby_enemy_ships,
-	}
+		"nearby_ally_distress_ships": nearby_ally_distress_ships,
+		"nearby_target_ships": nearby_target_ships,
+}
 
 
 static func _make_ship_enemy_scan_cache_key(ship: Node3D, team_name: String) -> String:

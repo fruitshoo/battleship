@@ -1419,8 +1419,8 @@ static func _validate_spawned_boss(failures: Array[String], spawned_boss: Node3D
 	if actual_crew_count != expected_crew_count:
 		failures.append("%s crew count contract failed: %d != %d" % [label, actual_crew_count, expected_crew_count])
 	var max_hull_hp: float = float(spawned_boss.get("max_hull_hp"))
-	if int(spawned_boss.get("tier")) == 1 and max_hull_hp > 720.0:
-		failures.append("%s mid boss hull contract failed: %.1f > 720.0" % [label, max_hull_hp])
+	if int(spawned_boss.get("tier")) == 1 and max_hull_hp > 520.0:
+		failures.append("%s mid boss hull contract failed: %.1f > 520.0" % [label, max_hull_hp])
 	var preferred_range: float = float(spawned_boss.get("preferred_combat_range"))
 	var range_tolerance: float = float(spawned_boss.get("combat_range_tolerance"))
 	var retreat_distance: float = float(spawned_boss.get("retreat_distance"))

@@ -2,8 +2,16 @@ extends RefCounted
 
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
+const SUPPORT_JOINING_META := "support_joining"
+const SUPPORT_ASSIST_TARGET_ID_META := "support_assist_target_id"
+const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
+const SUPPORT_ASSIST_EVAL_TIMER_META := "support_assist_eval_timer"
+const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 
 static func handle_input(ship, delta: float) -> void:
+	if Input.is_action_just_pressed("toggle_sail_furl") and ship.has_method("toggle_sail_furl"):
+		ship.toggle_sail_furl()
+
 	var sail_turn_speed: float = float(ship.sail_turn_speed)
 	if Input.is_action_pressed("sail_left"):
 		ship.adjust_sail_angle(-sail_turn_speed * delta)
@@ -40,6 +48,22 @@ static func cycle_fleet_formation(ship) -> void:
 		if current_formation == SupportFleetStateHelper.FORMATION_COLUMN \
 		else SupportFleetStateHelper.FORMATION_COLUMN
 	SupportFleetStateHelper.set_flagship_formation(ship, next_formation)
+	if ship.has_method("_get_support_fleet_ships"):
+		var support_ships: Array = ship.call("_get_support_fleet_ships")
+		for support_ship in support_ships:
+			if not is_instance_valid(support_ship):
+				continue
+			if support_ship.get("is_boarding") == true:
+				continue
+			support_ship.set_meta(SUPPORT_JOINING_META, true)
+			for meta_name in [
+				SUPPORT_ASSIST_TARGET_ID_META,
+				SUPPORT_ASSIST_LOCK_TIMER_META,
+				SUPPORT_ASSIST_EVAL_TIMER_META,
+				SUPPORT_ASSIST_LANE_SIDE_META,
+			]:
+				if support_ship.has_meta(meta_name):
+					support_ship.remove_meta(meta_name)
 	if ship._cached_hud and ship._cached_hud.has_method("show_message"):
 		var suffix := "" if SupportFleetStateHelper.is_flagship_hold_enabled(ship) else " (자유 교전 중)"
 		ship._cached_hud.show_message("지원함 진형: %s%s" % [_get_fleet_formation_label(ship), suffix], 2.0)
@@ -47,7 +71,7 @@ static func cycle_fleet_formation(ship) -> void:
 static func _get_fleet_formation_label(ship) -> String:
 	match _get_normalized_fleet_formation(ship):
 		SupportFleetStateHelper.FORMATION_WING:
-			return "양익"
+			return "호위진"
 		_:
 			return "장사진"
 
@@ -90,7 +114,7 @@ static func capture_derelict_ship(ship) -> void:
 		if merit_reward > 0 and ship._cached_level_manager.has_method("add_merit"):
 			ship._cached_level_manager.add_merit(merit_reward)
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-			ship._cached_hud.show_message("나포 성공! XP +%d / 지휘 +%d" % [xp_reward, merit_reward], 2.4)
+			ship._cached_hud.show_message("나포 성공! XP +%d / 백병전 +%d" % [xp_reward, merit_reward], 2.4)
 
 	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if soldiers_node:

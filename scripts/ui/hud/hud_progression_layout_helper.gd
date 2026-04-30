@@ -99,7 +99,7 @@ static func setup_top_xp_bar(hud) -> void:
 	hud.merit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	NavalUiTheme.style_overlay_value(hud.merit_label, 10)
 	hud.merit_label.add_theme_constant_override("outline_size", 3)
-	hud.merit_label.text = "지휘 포인트 (병영 강화 대기)"
+	hud.merit_label.text = "백병전 포인트 (업그레이드 대기)"
 	hud.merit_bar.add_child(hud.merit_label)
 
 

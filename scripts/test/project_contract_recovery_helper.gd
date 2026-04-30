@@ -522,8 +522,11 @@ static func _run_sea_decor_contract(owner: Node, failures: Array[String], smoke_
 		failures.append("recovery sea rock decor should not be a sea_site")
 	if decor.is_in_group("static_reward_site"):
 		failures.append("recovery sea rock decor should not be a reward site")
-	if _has_collision_shape(decor):
-		failures.append("recovery sea rock decor should not add collision")
+	var hazard_area := decor.get_node_or_null("RockHazardArea") as Area3D
+	if not is_instance_valid(hazard_area):
+		failures.append("recovery sea rock decor missing hazard area")
+	elif hazard_area is Area3D and hazard_area.get_node_or_null("RockHazardShape") == null:
+		failures.append("recovery sea rock decor missing hazard collision shape")
 	if not decor.has_method("set_rock_view_fade_alpha"):
 		failures.append("recovery sea rock decor missing view fade hook")
 	var visual := decor.get_node_or_null("Visual") as Node3D

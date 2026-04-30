@@ -68,18 +68,18 @@ var _reward_level_overrides: Dictionary = {}
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
-		return "병사"
+		return LocaleManager.t("upgrade.track.boarding", "백병전")
 	if upgrade_id in UpgradeManager.SHIP_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS or upgrade_id == UpgradeManager.RARE_FLEET_UPGRADE_ID:
-		return "함선"
+		return LocaleManager.t("upgrade.track.ship", "함선")
 	var category_name_map := {
-		UpgradeManager.Category.ANTI_SHIP: "함포",
-		UpgradeManager.Category.ANTI_PERSONNEL: "병사",
-		UpgradeManager.Category.HULL: "선체",
-		UpgradeManager.Category.SEAMANSHIP: "항해",
-		UpgradeManager.Category.SPECIAL: "특수",
-		UpgradeManager.Category.FLEET: "지원함",
+		UpgradeManager.Category.ANTI_SHIP: LocaleManager.t("upgrade.track.cannon", "함포"),
+		UpgradeManager.Category.ANTI_PERSONNEL: LocaleManager.t("upgrade.track.boarding", "백병전"),
+		UpgradeManager.Category.HULL: LocaleManager.t("upgrade.track.hull", "선체"),
+		UpgradeManager.Category.SEAMANSHIP: LocaleManager.t("upgrade.track.sailing", "항해"),
+		UpgradeManager.Category.SPECIAL: LocaleManager.t("upgrade.track.special", "특수"),
+		UpgradeManager.Category.FLEET: LocaleManager.t("upgrade.track.fleet", "지원함"),
 	}
-	return str(category_name_map.get(category, "강화"))
+	return str(category_name_map.get(category, LocaleManager.t("upgrade.track.default", "강화")))
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # 일시정지 중에도 작동
@@ -89,12 +89,22 @@ func _ready() -> void:
 	_apply_layout_density()
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
+	if not LocaleManager.locale_changed.is_connected(_on_locale_changed):
+		LocaleManager.locale_changed.connect(_on_locale_changed)
+
+
+func _on_locale_changed(_locale: String) -> void:
+	_apply_theme()
+	if is_instance_valid(reroll_button) and reroll_button.visible:
+		_update_reroll_button(_current_reroll_count)
+	if is_instance_valid(_display_confirm_button):
+		_display_confirm_button.text = LocaleManager.t("upgrade.confirm", "확인")
 
 func _apply_theme() -> void:
 	if is_instance_valid(background):
 		background.color = Color.WHITE
 	if is_instance_valid(title_label):
-		title_label.text = "보강 선택"
+		title_label.text = LocaleManager.t("upgrade.title", "보강 선택")
 		NavalUiTheme.style_heading(title_label, _title_font_size_px)
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if is_instance_valid(cards_container):
@@ -347,12 +357,12 @@ func _build_reward_title(result: Dictionary) -> String:
 	var applied_count := int(result.get("applied_count", 0))
 	var requested_count := int(result.get("requested_count", applied_count))
 	if applied_count <= 0:
-		return "보물 획득"
+		return LocaleManager.t("upgrade.reward.empty", "보물 획득")
 	if requested_count >= 5:
-		return "보물 대박 강화 +%d" % applied_count
+		return LocaleManager.t("upgrade.reward.jackpot", "보물 대박 강화 +{count}", {"count": applied_count})
 	if requested_count >= 3:
-		return "보물 희귀 강화 +%d" % applied_count
-	return "보물 강화 +%d" % applied_count
+		return LocaleManager.t("upgrade.reward.rare", "보물 희귀 강화 +{count}", {"count": applied_count})
+	return LocaleManager.t("upgrade.reward.normal", "보물 강화 +{count}", {"count": applied_count})
 
 
 func _get_reward_display_duration(card_count: int) -> float:
@@ -402,14 +412,14 @@ func _exit_tree() -> void:
 func _ensure_display_confirm_button() -> Button:
 	if not is_instance_valid(_display_confirm_button):
 		_display_confirm_button = Button.new()
-		_display_confirm_button.text = "확인"
+		_display_confirm_button.text = LocaleManager.t("upgrade.confirm", "확인")
 		_display_confirm_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
 		_display_confirm_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		NavalUiTheme.apply_hud_button(_display_confirm_button, roundi(lerpf(15.0, 16.0, clampf((get_viewport().get_visible_rect().size.y - 700.0) / 220.0, 0.0, 1.0))))
 		UiButtonAudio.wire_button(_display_confirm_button)
 		_display_confirm_button.pressed.connect(_close_display_only)
 		footer_row.add_child(_display_confirm_button)
-	_display_confirm_button.text = "확인"
+	_display_confirm_button.text = LocaleManager.t("upgrade.confirm", "확인")
 	_display_confirm_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
 	return _display_confirm_button
 
@@ -501,7 +511,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	vbox.add_child(meta_row)
 	
 	var name_label = Label.new()
-	name_label.text = data["name"]
+	name_label.text = LocaleManager.data_text(data, upgrade_id, "upgrade", "name", upgrade_id)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.add_theme_font_override("font", NavalUiTheme.FONT_SEMIBOLD)
@@ -519,7 +529,7 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	vbox.add_child(rule)
 
 	var effect_heading := Label.new()
-	effect_heading.text = "강화 결과" if _display_only_mode else "다음 단계"
+	effect_heading.text = LocaleManager.t("upgrade.effect.result", "강화 결과") if _display_only_mode else LocaleManager.t("upgrade.effect.next", "다음 단계")
 	effect_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	NavalUiTheme.style_overlay_caption(effect_heading, _effect_heading_font_size_px, color.lerp(NavalUiTheme.TEXT_ACCENT, 0.35), 1)
 	vbox.add_child(effect_heading)
@@ -735,7 +745,7 @@ func _update_reroll_button(count: int) -> void:
 		
 		footer_row.add_child(reroll_button)
 	
-	reroll_button.text = "다시 고르기 %d회" % count if count > 0 else "다시 고르기"
+	reroll_button.text = LocaleManager.t("upgrade.reroll_count", "다시 고르기 {count}회", {"count": count}) if count > 0 else LocaleManager.t("upgrade.reroll", "다시 고르기")
 	reroll_button.disabled = count <= 0
 	reroll_button.visible = true
 	if reroll_button.disabled:

@@ -18,6 +18,8 @@ max_crew_count = 6
 base_collision_radius = 4.6421156
 width_multiplier = 0.45504529840202923
 floating_offset = 0.85
+fire_pot_ignition_chance = 0.45
+fire_pot_burn_duration = 7.0
 metadata/ally_ship_role = "player_flagship"
 
 [node name="ProximityArea" type="Area3D" parent="." unique_id=244065699 groups=["ship_proximity"]]

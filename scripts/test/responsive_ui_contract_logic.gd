@@ -132,6 +132,11 @@ static func _run_ship_control_check(owner: Node, failures: Array[String], viewpo
 	owner.add_child(ship_control)
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(ship_control.get_node_or_null("WindPanel") as Control, viewport_size, failures, "ship control panel", 6.0)
+	_expect_compass_frame_in_safe_area(
+		ship_control.get_node_or_null("WindPanel/WindIndicator/CompassWheel/CompassFrame") as Sprite2D,
+		viewport_size,
+		failures
+	)
 	ship_control.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -163,6 +168,26 @@ static func _expect_control_within_viewport(control: Control, viewport_size: Vec
 		or rect.end.x > float(viewport_size.x) + padding \
 		or rect.end.y > float(viewport_size.y) + padding:
 		failures.append("%s exceeds viewport %s with rect %s" % [label, viewport_size, rect])
+
+
+static func _expect_compass_frame_in_safe_area(compass_frame: Sprite2D, viewport_size: Vector2, failures: Array[String]) -> void:
+	if not is_instance_valid(compass_frame):
+		failures.append("ship control compass frame missing during responsive contract")
+		return
+	if not is_instance_valid(compass_frame.texture):
+		failures.append("ship control compass frame missing texture during responsive contract")
+		return
+	var texture_size := compass_frame.texture.get_size()
+	var global_scale := compass_frame.global_transform.get_scale().abs()
+	var frame_size := Vector2(texture_size.x * global_scale.x, texture_size.y * global_scale.y)
+	var rect := Rect2(compass_frame.global_position - frame_size * 0.5, frame_size)
+	var top_safe_margin := 40.0
+	var edge_padding := 4.0
+	if rect.position.y < top_safe_margin \
+		or rect.position.x < -edge_padding \
+		or rect.end.x > viewport_size.x + edge_padding \
+		or rect.end.y > viewport_size.y + edge_padding:
+		failures.append("ship control compass frame unsafe viewport %s with rect %s" % [viewport_size, rect])
 
 
 static func _expect_button_audio_wired(root: Node, failures: Array[String], label: String) -> void:

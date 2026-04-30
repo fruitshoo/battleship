@@ -51,7 +51,11 @@ static func apply_sail_shader_parameters(mast: Node3D, mat: ShaderMaterial, burn
 	mat.set_shader_parameter("swap_uv_axes", mast.swap_sail_uv_axes)
 	mat.set_shader_parameter("flip_u", mast.flip_sail_u)
 	mat.set_shader_parameter("flip_v", mast.flip_sail_v)
-	var visual_sail_damage: float = min(clamp(mast.sail_damage, 0.0, 1.0), 0.5)
+	var hull_wear_damage: float = 0.0
+	var hull_wear_value: Variant = mast.get("hull_wear_damage")
+	if hull_wear_value != null:
+		hull_wear_damage = clampf(float(hull_wear_value), 0.0, 1.0)
+	var visual_sail_damage: float = min(maxf(clampf(mast.sail_damage, 0.0, 1.0), hull_wear_damage), 0.5)
 	mat.set_shader_parameter("sail_damage", visual_sail_damage)
 	mat.set_shader_parameter("burn_amount", mast.burn_amount)
 	mat.set_shader_parameter("hole_alpha_strength", mast.hole_alpha_strength)
@@ -59,3 +63,4 @@ static func apply_sail_shader_parameters(mast: Node3D, mat: ShaderMaterial, burn
 	mat.set_shader_parameter("sail_uv_scale", mast.sail_uv_scale)
 	mat.set_shader_parameter("sail_uv_offset", mast.sail_uv_offset)
 	mat.set_shader_parameter("bottom_width_scale", mast.sail_bottom_width_scale)
+	mat.set_shader_parameter("sail_deployed_ratio", clampf(float(mast.get("sail_deployed_ratio")), 0.0, 1.0))
