@@ -1,11 +1,13 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cw2s3qgyw4wmb"]
 
-[ext_resource type="Script" path="res://scripts/effects/wood_splinter.gd" id="1_q41r5"]
+[ext_resource type="Script" uid="uid://blv8hftqjtlqm" path="res://scripts/effects/wood_splinter.gd" id="1_q41r5"]
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_1wkn6"]
-angle_max = 360.0
+angle_min = -181.59999
+angle_max = 178.40001
 direction = Vector3(0, 1, 0)
 spread = 50.0
+initial_velocity_min = 4.0
 initial_velocity_max = 12.0
 angular_velocity_min = -360.0
 angular_velocity_max = 360.0
@@ -26,9 +28,11 @@ size = Vector3(0.4, 0.4, 0.4)
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_mqlsy"]
 particle_flag_align_y = true
-angle_max = 360.0
+angle_min = -177.4
+angle_max = 182.6
 direction = Vector3(0, 1, 0)
 spread = 50.0
+initial_velocity_min = 4.0
 initial_velocity_max = 12.0
 angular_velocity_min = -90.0
 angular_velocity_max = 90.0
@@ -45,7 +49,6 @@ script = ExtResource("1_q41r5")
 
 [node name="Cubes" type="GPUParticles3D" parent="." unique_id=1433277249]
 emitting = false
-amount = 12
 lifetime = 0.9
 one_shot = true
 explosiveness = 0.95
@@ -55,7 +58,7 @@ draw_pass_1 = SubResource("BoxMesh_xwfbq")
 
 [node name="Planks" type="GPUParticles3D" parent="." unique_id=56828740]
 emitting = false
-amount = 4
+amount = 3
 lifetime = 0.9
 one_shot = true
 explosiveness = 0.85

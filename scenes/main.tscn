@@ -84,5 +84,6 @@ mesh = SubResource("BoxMesh_choun")
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
 auto_raid_enabled = true
 floating_offset = 0.5
+boarding_contact_grace_duration = 0.8
 fire_effect_offset = Vector3(0, 1.5, 0)
 wave_sample_interval = 0.0

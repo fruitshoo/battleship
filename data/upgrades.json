@@ -3,7 +3,7 @@
 		"cannon": {
 			"name": "포문",
 			"category": 0,
-			"description": "대포 수 증가. 판옥선 지원함은 최대 5문까지 공유",
+			"description": "대포 수 증가. 판옥선 지원함은 최대 7문까지 공유",
 			"card_art_path": "res://assets/ui/upgrades/cannon_card.png",
 			"max_level": 5,
 			"color": "ff7f33",
@@ -13,7 +13,7 @@
 				"support_base_cannon_count": 1,
 				"support_max_cannon_count": 3,
 				"panokseon_support_base_cannon_count": 3,
-				"panokseon_support_max_cannon_count": 5
+				"panokseon_support_max_cannon_count": 7
 			}
 		},
 		"cannon_damage": {

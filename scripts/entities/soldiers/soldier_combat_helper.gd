@@ -15,6 +15,9 @@ static func perform_special_attack(soldier, target: Node3D) -> void:
 static func perform_attack(soldier) -> void:
 	if not is_instance_valid(soldier.current_target):
 		return
+	if SoldierStateHelper.is_dead_soldier(soldier.current_target):
+		soldier.current_target = null
+		return
 
 	if soldier.current_weapon and soldier.current_weapon.has_method("attack"):
 		soldier.current_weapon.attack(soldier.current_target, soldier)

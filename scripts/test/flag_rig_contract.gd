@@ -14,6 +14,7 @@ func _ready() -> void:
 	await _verify_concrete_flag_scenes()
 	await _verify_mast_kind_swaps_scene()
 	await _verify_mast_texture_swap_keeps_scene_kind()
+	await _verify_mast_swaps_do_not_leave_orphans()
 	_report()
 
 
@@ -109,6 +110,25 @@ func _verify_mast_texture_swap_keeps_scene_kind() -> void:
 	mast.queue_free()
 
 
+func _verify_mast_swaps_do_not_leave_orphans() -> void:
+	await _drain_queued_frees()
+	var orphan_before := _get_orphan_node_count()
+	var mast := MAST_SCENE.instantiate()
+	add_child(mast)
+	await get_tree().process_frame
+	mast.call("set_flag_kind", FlagSceneLibrary.KIND_BOSS)
+	await get_tree().process_frame
+	mast.call("set_flag_kind", FlagSceneLibrary.KIND_PLAYER_SUPPORT)
+	await get_tree().process_frame
+	mast.call("set_flag_kind", FlagSceneLibrary.KIND_ENEMY_SEKIBUNE)
+	await get_tree().process_frame
+	mast.queue_free()
+	await _drain_queued_frees()
+	var orphan_after := _get_orphan_node_count()
+	if orphan_after > orphan_before:
+		_failures.append("mast flag swaps leaked orphan nodes: before=%d after=%d" % [orphan_before, orphan_after])
+
+
 func _instantiate_flag_scene(scene: PackedScene, label: String) -> Node:
 	if scene == null:
 		_failures.append("missing concrete flag scene: %s" % label)
@@ -141,6 +161,15 @@ func _make_test_texture() -> Texture2D:
 func await_ready(_node: Node) -> void:
 	# The helper intentionally exists for readability; the caller awaits the process frame.
 	pass
+
+
+func _drain_queued_frees() -> void:
+	for _i in range(4):
+		await get_tree().process_frame
+
+
+func _get_orphan_node_count() -> int:
+	return int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 
 
 func _report() -> void:

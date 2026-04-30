@@ -1,5 +1,7 @@
 extends Node3D
 const DEBUG_COMBAT_LOGS := false
+const SOLDIER_AIM_VERTICAL_OFFSET := 1.05
+const SHIP_AIM_VERTICAL_OFFSET := 0.65
 
 ## 신기전 발사기 (Singigeon Launcher)
 ## 로켓 화살을 전방으로 발사. 레벨에 따라 발수 증가.
@@ -204,7 +206,7 @@ func _predict_target_position(target: Node3D, from_pos: Vector3) -> Vector3:
 	if not is_instance_valid(target):
 		return from_pos + (-global_transform.basis.z) * 10.0
 
-	var target_pos = NodeContractHelper.get_projectile_aim_point(target, 0.65)
+	var target_pos = _get_singigeon_aim_point(target)
 	var to_target = target_pos - from_pos
 	var dist = maxf(0.1, to_target.length())
 	var t_flight = dist / maxf(1.0, projectile_speed)
@@ -222,6 +224,10 @@ func _predict_target_position(target: Node3D, from_pos: Vector3) -> Vector3:
 
 	# 완전 선행 예측은 빗나감이 커서 70%만 반영
 	return target_pos + target_fwd * target_speed * t_flight * 0.7
+
+func _get_singigeon_aim_point(target: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(target, offset)
 
 func _sanitize_aim_point(pos: Vector3, from_pos: Vector3) -> Vector3:
 	var safe = pos

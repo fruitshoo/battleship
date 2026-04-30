@@ -31,6 +31,8 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	
 	if target.has_method("take_damage"):
 		target.take_damage(final_damage, attacker.global_position, "harpoon")
+		if is_crit:
+			spawn_critical_hit_effect(target, attacker)
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("soldier_hit", hit_pos, randf_range(0.95, 1.15), 3.0 if is_crit else 0.0)
 			

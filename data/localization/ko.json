@@ -79,7 +79,7 @@
 	"upgrade.reward.rare": "보물 희귀 강화 +{count}",
 	"upgrade.reward.normal": "보물 강화 +{count}",
 	"upgrade.cannon.name": "포문",
-	"upgrade.cannon.description": "대포 수 증가. 판옥선 지원함은 최대 5문까지 공유",
+	"upgrade.cannon.description": "대포 수 증가. 판옥선 지원함은 최대 7문까지 공유",
 	"upgrade.cannon_damage.name": "철환",
 	"upgrade.cannon_damage.description": "무거운 철환으로 대포 피해 강화",
 	"upgrade.cannon_reload.name": "화약",

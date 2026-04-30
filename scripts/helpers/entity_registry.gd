@@ -77,6 +77,7 @@ static func get_captured_minions() -> Array:
 
 
 static func count_captured_minions() -> int:
+	_compact_nodes_in_place(_captured_minions)
 	return _captured_minions.size()
 
 
@@ -104,14 +105,21 @@ static func count_soldiers_by_ship(ship: Node) -> int:
 		return 0
 	var ship_id: int = ship.get_instance_id()
 	var bucket: Array = _soldiers_by_ship.get(ship_id, [])
+	_compact_nodes_in_place(bucket)
+	if bucket.is_empty():
+		_soldiers_by_ship.erase(ship_id)
+	else:
+		_soldiers_by_ship[ship_id] = bucket
 	return bucket.size()
 
 
 static func count_ships() -> int:
+	_compact_nodes_in_place(_ships)
 	return _ships.size()
 
 
 static func count_soldiers() -> int:
+	_compact_nodes_in_place(_soldiers)
 	return _soldiers.size()
 
 
@@ -138,14 +146,18 @@ static func count_ships_by_team(team_name: String) -> int:
 	var normalized_team := team_name.strip_edges().to_lower()
 	if normalized_team.is_empty():
 		return count_ships()
-	return _ships_by_team.get(normalized_team, []).size()
+	var bucket: Array = _ships_by_team.get(normalized_team, [])
+	_compact_team_bucket(_ships_by_team, normalized_team, bucket)
+	return bucket.size()
 
 
 static func count_soldiers_by_team(team_name: String) -> int:
 	var normalized_team := team_name.strip_edges().to_lower()
 	if normalized_team.is_empty():
 		return count_soldiers()
-	return _soldiers_by_team.get(normalized_team, []).size()
+	var bucket: Array = _soldiers_by_team.get(normalized_team, [])
+	_compact_team_bucket(_soldiers_by_team, normalized_team, bucket)
+	return bucket.size()
 
 
 static func get_ships_by_team(team_name: String) -> Array:
@@ -173,10 +185,22 @@ static func _unregister_node(collection: Array, node: Node) -> void:
 
 
 static func _compact_nodes(collection: Array) -> Array:
+	_compact_nodes_in_place(collection)
+	return collection.duplicate()
+
+
+static func _compact_nodes_in_place(collection: Array) -> void:
 	for index in range(collection.size() - 1, -1, -1):
 		if not is_instance_valid(collection[index]):
 			collection.remove_at(index)
-	return collection.duplicate()
+
+
+static func _compact_team_bucket(bucket_map: Dictionary, normalized_team: String, bucket: Array) -> void:
+	_compact_nodes_in_place(bucket)
+	if bucket.is_empty():
+		bucket_map.erase(normalized_team)
+	else:
+		bucket_map[normalized_team] = bucket
 
 
 static func _register_soldier_ship_bucket(soldier: Node, ship: Node) -> void:

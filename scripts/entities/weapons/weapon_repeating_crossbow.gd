@@ -56,6 +56,8 @@ func _apply_effective_damage() -> void:
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return
+	if _is_target_dead(target):
+		return
 	
 	# 코루틴으로 연사 처리
 	_fire_burst(target, attacker)
@@ -105,6 +107,9 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		current_target_pos.z += randf_range(-0.12, 0.12)
 
 		var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
+		var crit_chance = attacker.get_crit_chance_value() if attacker.has_method("get_crit_chance_value") else 0.1
+		var crit_multiplier = attacker.get_crit_multiplier_value() if attacker.has_method("get_crit_multiplier_value") else 2.0
+		var is_crit = randf() < crit_chance
 		var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 		var dist = spawn_pos.distance_to(current_target_pos)
 		var final_arc_height: float = clamp(dist * 0.08, 0.15, 1.2)
@@ -119,10 +124,11 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 				current_target_pos,
 				target,
 				team_name,
-				damage * dmg_mult,
+				damage * dmg_mult * (crit_multiplier if is_crit else 1.0),
 				"repeating_crossbow",
 				arrow_speed,
-				final_arc_height
+				final_arc_height,
+				is_crit
 			)
 			
 		arrow.global_position = spawn_pos

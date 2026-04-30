@@ -1,0 +1,23 @@
+[gd_resource type="ParticleProcessMaterial" format=3]
+
+[ext_resource type="Texture2D" path="res://resources/vfx/curves/alpha_soft_fade.tres" id="1_alpha"]
+[ext_resource type="Texture2D" path="res://resources/vfx/curves/scale_puff_out.tres" id="2_scale"]
+
+[resource]
+particle_flag_rotate_y = true
+angle_min = -160.0
+angle_max = 160.0
+direction = Vector3(0, 1, 0)
+spread = 45.0
+initial_velocity_min = 1.2
+initial_velocity_max = 3.0
+gravity = Vector3(0, 0.2, 0)
+damping_min = 1.0
+damping_max = 2.4
+scale_min = 0.8
+scale_max = 1.7
+scale_curve = ExtResource("2_scale")
+color = Color(0.72, 0.72, 0.7, 0.68)
+alpha_curve = ExtResource("1_alpha")
+anim_speed_min = 0.25
+anim_speed_max = 0.42

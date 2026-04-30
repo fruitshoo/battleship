@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://2ryl6h0jvy7x"]
+
+[ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="1_script"]
+[ext_resource type="Material" uid="uid://dny4ik2lm16nj" path="res://resources/vfx/process/soldier_crit_burst_process.tres" id="2_burst_process"]
+[ext_resource type="Material" uid="uid://btpp0vf4txtns" path="res://resources/vfx/materials/billboard_crit_red.tres" id="3_crit_material"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_burst"]
+material = ExtResource("3_crit_material")
+
+[node name="SoldierCritHit" type="GPUParticles3D" unique_id=1368587104]
+emitting = false
+amount = 3
+lifetime = 0.6
+one_shot = true
+explosiveness = 1.0
+process_material = ExtResource("2_burst_process")
+draw_pass_1 = SubResource("QuadMesh_burst")
+script = ExtResource("1_script")

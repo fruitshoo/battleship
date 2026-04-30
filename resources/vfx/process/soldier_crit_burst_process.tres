@@ -1,0 +1,22 @@
+[gd_resource type="ParticleProcessMaterial" format=3 uid="uid://dny4ik2lm16nj"]
+
+[ext_resource type="Texture2D" path="res://resources/vfx/curves/alpha_quick_pop.tres" id="1_alpha"]
+
+[resource]
+particle_flag_rotate_y = true
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 60.0
+initial_velocity_min = 2.0
+initial_velocity_max = 5.0
+gravity = Vector3(0, -0.4, 0)
+damping_min = 3.0000002
+damping_max = 3.0000002
+scale_min = 2.0
+scale_max = 3.0
+scale_curve = ExtResource("1_alpha")
+color = Color(0.9170466, 0.021446798, 0, 1)
+alpha_curve = ExtResource("1_alpha")
+anim_speed_min = 1.0
+anim_speed_max = 1.0

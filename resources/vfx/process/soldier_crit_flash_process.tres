@@ -1,0 +1,16 @@
+[gd_resource type="ParticleProcessMaterial" format=3]
+
+[ext_resource type="Texture2D" path="res://resources/vfx/curves/alpha_quick_pop.tres" id="1_alpha"]
+
+[resource]
+direction = Vector3(0, 1, 0)
+spread = 30.0
+initial_velocity_min = 0.2
+initial_velocity_max = 0.6
+gravity = Vector3(0, 0, 0)
+damping_min = 6.0
+damping_max = 8.0
+scale_min = 0.45
+scale_max = 0.75
+color = Color(1, 0.45, 0.22, 0.72)
+alpha_curve = ExtResource("1_alpha")

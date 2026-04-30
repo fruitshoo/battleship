@@ -45,26 +45,26 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 포문 Lv5 should reach 7 player cannons")
 	if SupportFleetCannonRules.get_support_cannon_count_for_level(5, cannon_stats) != 3:
 		failures.append("upgrade smoke 포문 Lv5 support cannon cap should stay 3")
-	if SupportFleetCannonRules.get_support_cannon_count_for_level(5, cannon_stats, true) != 5:
-		failures.append("upgrade smoke 포문 Lv5 panokseon support cannon cap should reach 5")
+	if SupportFleetCannonRules.get_support_cannon_count_for_level(5, cannon_stats, true) != 7:
+		failures.append("upgrade smoke 포문 Lv5 panokseon support cannon cap should reach 7")
 	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("maengseon_ally", 5).size() != 1:
 		failures.append("upgrade smoke maengseon support should stay front-cannon only at 포문 Lv5")
-	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 5).size() != 5:
-		failures.append("upgrade smoke panokseon support should keep five authored cannons at 포문 Lv5")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 5).size() != 7:
+		failures.append("upgrade smoke panokseon support should keep seven authored cannons at 포문 Lv5")
 	var panokseon_levels := {
 		"fleet_signal": 1,
 		"panokseon_upgrade": 1,
 	}
 	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(panokseon_levels, upgrades) != "맹선 1척 | 판옥선 1척":
 		failures.append("upgrade smoke support slot summary should reflect maengseon plus added panokseon roster")
-	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(5, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 5문":
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(5, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 7문":
 		failures.append("upgrade smoke support cannon summary should reflect ship-authored cannon slots at 포문 Lv5")
 	if int(cannon_stats.get("support_max_cannon_count", 0)) != 3:
 		failures.append("upgrade smoke support cannon cap should be 3")
 	if int(cannon_stats.get("panokseon_support_base_cannon_count", 0)) != 3:
 		failures.append("upgrade smoke panokseon support base cannon count should be 3")
-	if int(cannon_stats.get("panokseon_support_max_cannon_count", 0)) != 5:
-		failures.append("upgrade smoke panokseon support cannon cap should be 5")
+	if int(cannon_stats.get("panokseon_support_max_cannon_count", 0)) != 7:
+		failures.append("upgrade smoke panokseon support cannon cap should be 7")
 
 	var damage_stats: Dictionary = upgrades.get("cannon_damage", {}).get("stats", {})
 	if str(upgrades.get("cannon_damage", {}).get("name", "")) != "철환":

@@ -5,6 +5,9 @@ extends "res://scripts/entities/weapons/weapon.gd"
 @export var max_range: float = 24.0
 @export var projectile_speed: float = 32.0
 
+const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
+const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
+
 var personnel_damage_mult: float = 5.0
 var _cached_spawn_parent: Node = null
 var _upgrade_base_damage: float = 2.5
@@ -25,6 +28,8 @@ func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not rocket_scene:
 		return
+	if target.is_in_group("soldiers") and SoldierStateHelper.is_dead_soldier(target):
+		return
 
 	var rocket = ScenePool.acquire(attacker.get_tree(), rocket_scene) as Node3D
 	if rocket == null:
@@ -33,7 +38,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var spawn_pos: Vector3 = attacker.global_position
 	spawn_pos.y += 1.0
 
-	var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.8)
+	var current_target_pos: Vector3 = _get_singigeon_aim_point(target)
 	var time_to_reach: float = clampf(spawn_pos.distance_to(current_target_pos) / maxf(projectile_speed, 1.0), 0.18, 0.9)
 	var local_velocity: Vector3 = target.get_velocity_value() if target.has_method("get_velocity_value") else (target.get("velocity") if "velocity" in target else Vector3.ZERO)
 	var ship_velocity: Vector3 = Vector3.ZERO
@@ -60,6 +65,10 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		rocket.damage = damage
 	if "personnel_damage_mult" in rocket:
 		rocket.personnel_damage_mult = personnel_damage_mult
+	if "crit_chance" in rocket:
+		rocket.crit_chance = attacker.get_crit_chance_value() if attacker.has_method("get_crit_chance_value") else 0.1
+	if "crit_multiplier" in rocket:
+		rocket.crit_multiplier = attacker.get_crit_multiplier_value() if attacker.has_method("get_crit_multiplier_value") else 2.0
 	if "prefer_personnel_targets" in rocket:
 		rocket.prefer_personnel_targets = true
 	if "lock_on_delay" in rocket:
@@ -110,6 +119,10 @@ func _apply_upgrade_stats() -> void:
 
 func _apply_effective_damage() -> void:
 	damage = _upgrade_base_damage * (1.0 + _owner_damage_bonus_pct)
+
+func _get_singigeon_aim_point(target: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(target, offset)
 
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):

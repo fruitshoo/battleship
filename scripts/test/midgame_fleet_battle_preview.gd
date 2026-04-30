@@ -42,6 +42,7 @@ enum BattleMode {
 @export var support_probe_fleet_crew_level: int = 0
 @export var support_probe_panokseon_upgrade_level: int = 1
 @export var support_probe_lock_survival: bool = true
+var print_orphan_nodes: bool = false
 
 var _overlay_panel: PanelContainer = null
 var _overlay_label: Label = null
@@ -197,6 +198,7 @@ func _apply_env_overrides() -> void:
 	var support_probe_survival_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_LOCK_SURVIVAL").strip_edges()
 	if not support_probe_survival_text.is_empty():
 		support_probe_lock_survival = _env_text_enabled(support_probe_survival_text)
+	print_orphan_nodes = _env_flag_enabled("BATTLESHIP_MIDGAME_PRINT_ORPHANS")
 
 
 func _ensure_stat_panel() -> void:
@@ -512,6 +514,8 @@ func _print_runtime_probe_cycle(phase: String) -> void:
 		int(_runtime_monitor_value(_runtime_monitor_last, "soldiers")),
 		int(_runtime_monitor_value(_runtime_monitor_last, "projectiles")),
 	])
+	if print_orphan_nodes and int(_runtime_monitor_value(_runtime_monitor_last, "orphan_nodes")) > 0:
+		Node.print_orphan_nodes()
 
 
 func _print_runtime_probe_summary() -> void:

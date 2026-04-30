@@ -6,27 +6,27 @@
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dkbhc"]
 render_priority = 4
+transparency = 1
 blend_mode = 1
-no_depth_test = true
 shading_mode = 0
 vertex_color_use_as_albedo = true
 vertex_color_is_srgb = true
 albedo_color = Color(0.74827486, 0.8507737, 0.9940229, 1)
 albedo_texture = ExtResource("1_e1ona")
 albedo_texture_force_srgb = true
-refraction_enabled = true
 billboard_keep_scale = true
 
 [sub_resource type="Curve" id="Curve_e1ona"]
-_data = [Vector2(0, 0.5953608), 0.0, 0.0, 0, 0, Vector2(0.82950675, 0), -1.2544686, 0.0, 0, 0]
+_limits = [0.0, 1.0, 0.0, 1.2565477]
+_data = [Vector2(0, 0.69845355), 0.0, 0.0, 0, 0, Vector2(1.2565477, 0), -1.1041601, 0.0, 0, 0]
 point_count = 2
 
 [sub_resource type="CurveTexture" id="CurveTexture_dkbhc"]
 curve = SubResource("Curve_e1ona")
 
 [sub_resource type="Curve" id="Curve_pbyf8"]
-_limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0), 0.0, 5.2817435, 0, 0, Vector2(0.28486395, 0.8977663), 0.0, 0.0, 0, 0, Vector2(2, 0.1417526), -1.3019428, 0.0, 0, 0]
+_limits = [0.0, 1.0, 0.0, 1.5229591]
+_data = [Vector2(0, 0), 0.0, 5.2817435, 0, 0, Vector2(0.253179, 0.8496564), -0.052030325, -0.052030325, 0, 0, Vector2(1.46015, 0.011168361), -1.8459438, 0.0, 0, 0]
 point_count = 3
 
 [sub_resource type="CurveTexture" id="CurveTexture_e1ona"]
@@ -43,7 +43,7 @@ linear_accel_min = -2.2351742e-06
 linear_accel_max = -2.2351742e-06
 radial_accel_min = -2.2351742e-06
 radial_accel_max = -2.2351742e-06
-scale_min = 2.0
+scale_min = 3.0
 scale_max = 4.0
 scale_curve = SubResource("CurveTexture_e1ona")
 color = Color(1, 1, 1, 0.51500005)
@@ -158,7 +158,8 @@ alpha_curve = SubResource("CurveTexture_yp7ow")
 [node name="floor" type="GPUParticles3D" parent="." unique_id=234455272]
 material_override = SubResource("StandardMaterial3D_dkbhc")
 emitting = false
-amount = 2
+amount = 1
+lifetime = 1.2
 one_shot = true
 explosiveness = 0.9
 randomness = 0.1

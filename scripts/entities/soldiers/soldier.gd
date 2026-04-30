@@ -118,6 +118,8 @@ var _nearest_enemy_cache_timer: float = 0.0
 var _nearest_enemy_cache_interval_runtime: float = 0.2
 var _limbo_ai_update_timer: float = 0.0
 var _limbo_ai_update_interval_runtime: float = 0.08
+var external_knockback_velocity: Vector3 = Vector3.ZERO
+var external_knockback_timer: float = 0.0
 var soldier_level: int = 1
 var soldier_xp: float = 0.0
 
@@ -626,6 +628,17 @@ func get_weapon_damage_bonus_pct_value() -> float:
 func get_velocity_value() -> Vector3:
 	return velocity
 
+func apply_external_knockback(direction: Vector3, speed: float, duration: float = 0.32) -> void:
+	if current_state == State.DEAD or _is_jumping:
+		return
+	direction.y = 0.0
+	if direction.length_squared() <= 0.0001:
+		return
+	external_knockback_velocity = direction.normalized() * maxf(0.0, speed)
+	external_knockback_timer = maxf(external_knockback_timer, maxf(0.05, duration))
+	current_target = null
+	velocity = external_knockback_velocity
+
 func is_combat_disabled() -> bool:
 	return current_state == State.DEAD
 
@@ -776,6 +789,12 @@ func _physics_process(delta: float) -> void:
 
 	SoldierSpeechHelper.update(self, delta)
 	_update_limbo_ai_pilot_runtime(delta)
+
+	if _update_external_knockback(delta):
+		if attack_timer > 0:
+			attack_timer -= delta
+		_update_rest_recovery(delta)
+		return
 		
 	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
 	if not _is_jumping and current_state != State.DEAD:
@@ -898,6 +917,27 @@ func _can_rest_recover() -> bool:
 		return false
 	if is_instance_valid(current_target):
 		return false
+	return true
+
+
+func _update_external_knockback(delta: float) -> bool:
+	if external_knockback_timer <= 0.0:
+		return false
+	if current_state == State.DEAD or _is_jumping:
+		external_knockback_timer = 0.0
+		external_knockback_velocity = Vector3.ZERO
+		return false
+	external_knockback_timer = maxf(0.0, external_knockback_timer - delta)
+	velocity = external_knockback_velocity
+	move_and_slide()
+	_keep_within_owned_ship_bounds()
+	var decay_t := clampf(delta * 7.5, 0.0, 1.0)
+	external_knockback_velocity = external_knockback_velocity.lerp(Vector3.ZERO, decay_t)
+	if external_knockback_timer <= 0.0 or external_knockback_velocity.length_squared() <= 0.01:
+		external_knockback_timer = 0.0
+		external_knockback_velocity = Vector3.ZERO
+		velocity = Vector3.ZERO
+		_change_state(State.IDLE)
 	return true
 
 

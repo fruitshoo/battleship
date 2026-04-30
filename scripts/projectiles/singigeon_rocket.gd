@@ -1,4 +1,5 @@
 extends Area3D
+const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
 
 ## 신기전 로켓 (Singigeon Rocket)
 ## 발키리 스타일: 지향사격 기반 다연장 로켓 (짧은 미세 보정만 적용).
@@ -21,9 +22,15 @@ extends Area3D
 @export var max_homing_distance: float = 14.0
 @export var allow_retarget: bool = false
 @export var prefer_personnel_targets: bool = false
+@export var soldier_knockback_speed: float = 9.0
+@export var crit_chance: float = 0.0
+@export var crit_multiplier: float = 2.0
 @export_range(0.03, 0.3) var retarget_scan_interval: float = 0.08
 @export_range(0.01, 0.12) var collision_check_interval: float = 0.03
 @export_range(0.25, 2.0) var collision_check_distance: float = 0.9
+
+const SOLDIER_AIM_VERTICAL_OFFSET := 1.05
+const SHIP_AIM_VERTICAL_OFFSET := 0.65
 
 var team: String = "player"
 var shooter: Node3D = null # 이 로켓을 쏜 선박 (오사 방지용)
@@ -79,7 +86,7 @@ func pool_reset() -> void:
 	var init_dir = launch_direction
 	if init_dir.length_squared() < 0.001:
 		if _is_valid_target(target_node):
-			init_dir = NodeContractHelper.get_projectile_aim_point(target_node, 0.65) - global_position
+			init_dir = _get_singigeon_aim_point(target_node) - global_position
 		else:
 			target_node = null
 		if init_dir.length_squared() < 0.001 and start_pos.distance_squared_to(target_pos) > 0.01:
@@ -145,7 +152,7 @@ func _physics_process(delta: float) -> void:
 		active_turn_rate = terminal_turn_rate_deg
 		var homing_target = _resolve_homing_target()
 		if is_instance_valid(homing_target):
-			var aim_point = NodeContractHelper.get_projectile_aim_point(homing_target, 0.65)
+			var aim_point = _get_singigeon_aim_point(homing_target)
 			var to_target = aim_point - global_position
 			if to_target.length_squared() > 0.0001 and to_target.length_squared() <= max_homing_distance * max_homing_distance:
 				desired_dir = _apply_wobble(to_target.normalized(), terminal_wobble_deg, _age)
@@ -167,7 +174,7 @@ func _physics_process(delta: float) -> void:
 			return
 
 	if _is_valid_target(target_node) and _lock_on_left <= 0.0:
-		var target_aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.65)
+		var target_aim_point: Vector3 = _get_singigeon_aim_point(target_node)
 		if global_position.distance_squared_to(target_aim_point) <= proximity_hit_radius * proximity_hit_radius:
 			_on_hit(target_node)
 
@@ -225,7 +232,7 @@ func _resolve_homing_target() -> Node3D:
 			var soldier := candidate as Node3D
 			if not _is_valid_soldier_target(soldier):
 				continue
-			var dist_sq: float = global_position.distance_squared_to(NodeContractHelper.get_projectile_aim_point(soldier, 0.5))
+			var dist_sq: float = global_position.distance_squared_to(_get_singigeon_aim_point(soldier))
 			if dist_sq < best_dist_sq:
 				best_dist_sq = dist_sq
 				best_target = soldier
@@ -240,7 +247,7 @@ func _resolve_homing_target() -> Node3D:
 		if not _is_valid_ship_target(ship):
 			continue
 
-		var dist_sq: float = global_position.distance_squared_to(NodeContractHelper.get_projectile_aim_point(ship, 0.65))
+		var dist_sq: float = global_position.distance_squared_to(_get_singigeon_aim_point(ship))
 		if dist_sq < best_dist_sq:
 			best_dist_sq = dist_sq
 			best_target = ship
@@ -280,6 +287,8 @@ func _is_valid_soldier_target(node: Variant) -> bool:
 	if node.is_queued_for_deletion():
 		return false
 	if not (node as Node3D).is_inside_tree():
+		return false
+	if SoldierStateHelper.is_dead_soldier(node):
 		return false
 	if NodeContractHelper.get_team_tag(node) != _target_group:
 		return false
@@ -347,11 +356,18 @@ func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 
 	if target_node.has_method("take_damage"):
 		var final_damage = damage * dmg_mult * scale
-		if target_node is CharacterBody3D or target_node.is_in_group("soldiers"):
+		var is_soldier_target: bool = target_node is CharacterBody3D or target_node.is_in_group("soldiers")
+		var is_crit := false
+		if is_soldier_target:
 			final_damage *= personnel_damage_mult
+			is_crit = crit_chance > 0.0 and randf() < crit_chance
+			if is_crit:
+				final_damage *= maxf(1.0, crit_multiplier)
 
 		var source_id = "singigeon" if team == "player" else ""
 		target_node.take_damage(final_damage, global_position, source_id)
+		if is_crit and target_node is Node3D:
+			_spawn_critical_hit_effect(target_node as Node3D)
 	elif target_node.has_method("die"):
 		target_node.die()
 
@@ -362,6 +378,7 @@ func _finish_flight(primary_target: Node3D = null) -> void:
 
 	if is_instance_valid(primary_target):
 		_apply_damage(primary_target, 1.0)
+		_apply_soldier_knockback(primary_target)
 
 	# 트레일 중단
 	var trail = get_node_or_null("RocketTrail")
@@ -386,6 +403,43 @@ func _debug_hit_label(target: Variant) -> String:
 	if target is Node:
 		return (target as Node).name
 	return "hit"
+
+
+func _apply_soldier_knockback(target: Node3D) -> void:
+	if not _is_valid_soldier_target(target):
+		return
+	var knockback_dir := _velocity.normalized()
+	knockback_dir.y = 0.0
+	if knockback_dir.length_squared() <= 0.0001:
+		knockback_dir = (target.global_position - start_pos)
+		knockback_dir.y = 0.0
+	if knockback_dir.length_squared() <= 0.0001:
+		return
+	if target.has_method("apply_external_knockback"):
+		target.apply_external_knockback(knockback_dir, soldier_knockback_speed, 0.34)
+	else:
+		target.velocity += knockback_dir.normalized() * soldier_knockback_speed
+
+
+func _spawn_critical_hit_effect(target: Node3D) -> void:
+	if not is_inside_tree() or not is_instance_valid(target):
+		return
+	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
+	if not is_instance_valid(effect):
+		return
+	get_tree().root.add_child(effect)
+	effect.global_position = target.global_position + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0)
+	var hit_dir := target.global_position - start_pos
+	hit_dir.y = 0.0
+	if hit_dir.length_squared() > 0.001:
+		effect.global_basis = Basis.looking_at(hit_dir.normalized(), Vector3.UP)
+	if effect.has_method("pool_activate"):
+		effect.pool_activate()
+
+
+func _get_singigeon_aim_point(node: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if node.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(node, offset)
 
 func _configure_team_filters() -> void:
 	if team == "player":

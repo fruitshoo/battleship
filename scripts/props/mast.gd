@@ -221,8 +221,7 @@ func _replace_flag_scene(scene: PackedScene) -> bool:
 	var old_transform := Transform3D.IDENTITY
 	if is_instance_valid(flag):
 		old_transform = flag.transform
-		if flag.get_parent() == sail_visual:
-			sail_visual.remove_child(flag)
+		flag.name = "FlagQueuedForFree"
 		flag.queue_free()
 	var new_flag := scene.instantiate() as Node3D
 	if new_flag == null:

@@ -1,5 +1,6 @@
 extends Area3D
 const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
+const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
 
 ## 화살 (Arrow)
 ## 병사가 쏘는 원거리 투사체
@@ -20,6 +21,7 @@ var target_pos: Vector3 = Vector3.ZERO
 var target_node: Node3D = null # 목표물 참조 (강제 명중 판정용)
 var team: String = "player"
 var damage_source: String = "bow"
+var is_critical_hit: bool = false
 var is_fire_arrow: bool = false
 var fire_damage: float = 0.0
 
@@ -52,7 +54,8 @@ func launch(
 	final_damage: float,
 	final_damage_source: String,
 	arrow_speed: float,
-	final_arc_height: float
+	final_arc_height: float,
+	final_is_critical_hit: bool = false
 ) -> void:
 	start_pos = spawn_position
 	target_pos = final_target_pos
@@ -60,6 +63,7 @@ func launch(
 	team = fire_team
 	damage = final_damage
 	damage_source = final_damage_source
+	is_critical_hit = final_is_critical_hit
 	speed = arrow_speed
 	arc_height = final_arc_height
 	progress = 0.0
@@ -90,6 +94,7 @@ func pool_reset() -> void:
 	target_node = null
 	team = "player"
 	damage_source = "bow"
+	is_critical_hit = false
 	is_fire_arrow = false
 	fire_damage = 0.0
 	_is_releasing = false
@@ -194,13 +199,34 @@ func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
 		return
 	if NodeContractHelper.get_team_tag(target_node) == team:
 		return
+	if SoldierStateHelper.is_dead_soldier(target_node):
+		return
 	var target_aim_point: Vector3 = _get_arrow_target_aim_point(target_node)
 	if hit_check_position.distance_to(target_aim_point) > terminal_hit_radius:
 		return
 	if target_node.has_method("take_damage"):
+		var crit_effect_position := target_node.global_position + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0)
+		var crit_effect_direction := target_node.global_position - start_pos
 		target_node.take_damage(damage, global_position, damage_source)
+		if is_critical_hit:
+			_spawn_critical_hit_effect(crit_effect_position, crit_effect_direction)
 
 
 func _get_arrow_target_aim_point(node: Node) -> Vector3:
 	var offset := SOLDIER_AIM_VERTICAL_OFFSET if node.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
 	return NodeContractHelper.get_projectile_aim_point(node, offset)
+
+
+func _spawn_critical_hit_effect(effect_position: Vector3, hit_direction: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
+	if not is_instance_valid(effect):
+		return
+	get_tree().root.add_child(effect)
+	effect.global_position = effect_position
+	hit_direction.y = 0.0
+	if hit_direction.length_squared() > 0.001:
+		effect.global_basis = Basis.looking_at(hit_direction.normalized(), Vector3.UP)
+	if effect.has_method("pool_activate"):
+		effect.pool_activate()

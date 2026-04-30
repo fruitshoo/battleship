@@ -23,6 +23,8 @@ func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
 
 func attack(target: Node3D, attacker: Node3D) -> void:
 	if not is_instance_valid(target) or not arrow_scene: return
+	if SoldierStateHelper.is_dead_soldier(target):
+		return
 	
 	var arrow = ScenePool.acquire(attacker.get_tree(), arrow_scene) as Node3D
 	# 발사 위치는 활(또는 병사 가슴 위치) 부근으로 약간 보정
@@ -70,6 +72,9 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	current_target_pos.z += randf_range(-0.05, 0.05)
 	
 	var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
+	var crit_chance = attacker.get_crit_chance_value() if attacker.has_method("get_crit_chance_value") else 0.1
+	var crit_multiplier = attacker.get_crit_multiplier_value() if attacker.has_method("get_crit_multiplier_value") else 2.0
+	var is_crit = randf() < crit_chance
 	var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 	var dist = spawn_pos.distance_to(current_target_pos)
 	var final_arc_height: float = clamp(dist * 0.12, 0.28, 1.8)
@@ -83,10 +88,11 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 			current_target_pos,
 			target,
 			team_name,
-			damage * dmg_mult,
+			damage * dmg_mult * (crit_multiplier if is_crit else 1.0),
 			"bow",
 			arrow_speed,
-			final_arc_height
+			final_arc_height,
+			is_crit
 		)
 		
 	# 위치 및 방향 최종 보정

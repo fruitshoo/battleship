@@ -79,7 +79,7 @@
 	"upgrade.reward.rare": "Rare Treasure Upgrade +{count}",
 	"upgrade.reward.normal": "Treasure Upgrade +{count}",
 	"upgrade.cannon.name": "Gun Ports",
-	"upgrade.cannon.description": "Adds cannons. Panokseon support ships share up to 5 guns",
+	"upgrade.cannon.description": "Adds cannons. Panokseon support ships share up to 7 guns",
 	"upgrade.cannon_damage.name": "Iron Shot",
 	"upgrade.cannon_damage.description": "Heavy iron shot increases cannon damage",
 	"upgrade.cannon_reload.name": "Gunpowder",

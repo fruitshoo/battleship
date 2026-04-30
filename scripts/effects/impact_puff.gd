@@ -93,13 +93,13 @@ func _apply_hit_effect() -> void:
 		main_mat.damping_max = 2.0
 		main_mat.scale_min = 0.8 * size_scale
 		main_mat.scale_max = 1.65 * size_scale
-		main_mat.color = Color(0.82, 0.28, 0.14, 0.95)
+		main_mat.color = Color(0.74, 0.74, 0.72, 0.72)
 
 	var main_mesh := _ensure_quad_material(self)
 	if main_mesh:
 		main_mesh.size = Vector2(1.2, 1.2) * size_scale
-		main_mesh.material.emission = Color(0.95, 0.28, 0.2, 1.0)
-		main_mesh.material.emission_energy_multiplier = 0.48 + (0.14 * intensity)
+		main_mesh.material.emission = Color.BLACK
+		main_mesh.material.emission_energy_multiplier = 0.0
 
 	if is_instance_valid(secondary_puff):
 		_emit_secondary = true
@@ -118,12 +118,12 @@ func _apply_hit_effect() -> void:
 			secondary_mat.damping_max = 2.0
 			secondary_mat.scale_min = 0.85 * size_scale
 			secondary_mat.scale_max = 1.7 * size_scale
-			secondary_mat.color = Color(0.5, 0.0, 0.0, 0.7)
+			secondary_mat.color = Color(0.46, 0.46, 0.44, 0.52)
 		var secondary_mesh := _ensure_quad_material(secondary_puff)
 		if secondary_mesh:
 			secondary_mesh.size = Vector2(1.25, 1.25) * size_scale
-			secondary_mesh.material.emission = Color(0.95, 0.28, 0.2, 1.0)
-			secondary_mesh.material.emission_energy_multiplier = 0.48 + (0.14 * intensity)
+			secondary_mesh.material.emission = Color.BLACK
+			secondary_mesh.material.emission_energy_multiplier = 0.0
 
 func _ensure_process_material(particles: GPUParticles3D) -> ParticleProcessMaterial:
 	if not is_instance_valid(particles):

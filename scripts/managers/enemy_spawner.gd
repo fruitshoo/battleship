@@ -1,6 +1,7 @@
 extends Node
 const DEBUG_SPAWNER_LOGS := false
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
+const BOSS_WAVE_SPAWN_STAGGER_SECONDS := 0.75
 
 ## 적 생성 관리자 (Enemy Spawner)
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
@@ -30,6 +31,7 @@ var elite_spawn_wave_counts: Array[int] = [1, 2, 2]
 var elite_spawn_allow_overlap: bool = true
 var boss_waves: Array[Dictionary] = []
 var triggered_boss_wave_ids: Dictionary = {}
+var pending_boss_wave_spawns: Array[Dictionary] = []
 var regular_spawn_stopped: bool = false
 var start_time: int = 0
 var blockade_spacing: float = 15.0
@@ -99,6 +101,7 @@ func _ready() -> void:
 	elite_spawn_count = 0
 	triggered_scenario_ids.clear()
 	triggered_boss_wave_ids.clear()
+	pending_boss_wave_spawns.clear()
 	start_time = Time.get_ticks_msec()
 	_find_player()
 
@@ -109,6 +112,7 @@ func _process(delta: float) -> void:
 
 	_process_scenario_triggers()
 	_process_boss_waves()
+	_process_pending_boss_wave_spawns(delta)
 		
 	# 1. 적 생성 주기 관리
 	var enemies = EntityRegistry.get_ships_by_team("enemy")
@@ -211,6 +215,35 @@ func _process_boss_waves() -> void:
 		_spawn_boss_wave(wave)
 
 
+func _process_pending_boss_wave_spawns(delta: float) -> void:
+	if pending_boss_wave_spawns.is_empty():
+		return
+	if not _can_process_pending_boss_spawns():
+		pending_boss_wave_spawns.clear()
+		return
+	for index in range(pending_boss_wave_spawns.size()):
+		var entry: Dictionary = pending_boss_wave_spawns[index]
+		entry["delay"] = float(entry.get("delay", 0.0)) - delta
+		pending_boss_wave_spawns[index] = entry
+	for index in range(pending_boss_wave_spawns.size()):
+		var entry: Dictionary = pending_boss_wave_spawns[index]
+		if float(entry.get("delay", 0.0)) > 0.0:
+			continue
+		pending_boss_wave_spawns.remove_at(index)
+		_spawn_queued_boss_wave_ship(entry)
+		return
+
+
+func _can_process_pending_boss_spawns() -> bool:
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		return false
+	return player.get("is_sinking") != true \
+		and player.get("is_dying") != true \
+		and player.get("is_dead") != true
+
+
 func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
 	var spawned: Array[Node3D] = []
 	if not boss_scene:
@@ -270,16 +303,48 @@ func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
 			spawn_pos += player_forward * -absf(lateral_offset) * 0.18
 			spawn_pos.y = 0.0
 			var escort_layout := _get_boss_wave_escort_layout(total_ship_count, spawned_index) if bool(ship_info.get("escorts", false)) else []
-			var boss_ship := _spawn_boss_ship(ship_type_name, spawn_pos, not escort_layout.is_empty(), is_final_wave, escort_layout)
-			if is_instance_valid(boss_ship):
-				spawned.append(boss_ship)
+			var spawn_entry := {
+				"ship_type": ship_type_name,
+				"spawn_pos": spawn_pos,
+				"spawn_escorts": not escort_layout.is_empty(),
+				"is_final_wave": is_final_wave,
+				"escort_layout": escort_layout,
+				"wave_id": str(wave.get("id", ""))
+			}
+			if spawned_index == 0:
+				var boss_ship := _spawn_queued_boss_wave_ship(spawn_entry)
+				if is_instance_valid(boss_ship):
+					spawned.append(boss_ship)
+			else:
+				spawn_entry["delay"] = BOSS_WAVE_SPAWN_STAGGER_SECONDS * float(spawned_index)
+				pending_boss_wave_spawns.append(spawn_entry)
 			spawned_index += 1
 
 	if is_final_wave and not spawned.is_empty():
 		_notify_data_driven_boss_wave_started(wave)
-	if not spawned.is_empty():
-		print("[BossWave] %s 출현: %d척" % [str(wave.get("id", "")), spawned.size()])
+	if spawned_index > 0:
+		print("[BossWave] %s 출현: %d척%s" % [
+			str(wave.get("id", "")),
+			spawned_index,
+			" (분산 스폰)" if spawned_index > spawned.size() else ""
+		])
 	return spawned
+
+
+func _spawn_queued_boss_wave_ship(entry: Dictionary) -> Node3D:
+	var ship_type_name := str(entry.get("ship_type", "")).strip_edges()
+	if ship_type_name.is_empty():
+		return null
+	var spawn_pos_variant: Variant = entry.get("spawn_pos", Vector3.ZERO)
+	var spawn_pos: Vector3 = spawn_pos_variant if spawn_pos_variant is Vector3 else Vector3.ZERO
+	var escort_layout: Array = entry.get("escort_layout", []) as Array
+	return _spawn_boss_ship(
+		ship_type_name,
+		spawn_pos,
+		bool(entry.get("spawn_escorts", false)),
+		bool(entry.get("is_final_wave", false)),
+		escort_layout
+	)
 
 
 func _spawn_elite_wave(ship_count: int) -> Array[Node3D]:
