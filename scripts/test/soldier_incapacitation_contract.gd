@@ -134,9 +134,11 @@ func _ready() -> void:
 	var failures: Array[String] = []
 	_verify_player_combat_damage_incapacitates(failures)
 	_verify_defense_reduction_mitigates_player_damage(failures)
+	_verify_rest_recovery_is_slow_player_only(failures)
 	_verify_heal_full_recovers_incapacitated_player(failures)
 	_verify_recovery_uses_ship_medical_upgrade_stats(failures)
 	_verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures)
+	_verify_shipmate_assist_large_delta_does_not_instant_recover(failures)
 	_verify_shipmate_assist_uses_standoff_without_pushing(failures)
 	_verify_player_soldier_level_progression(failures)
 	_verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures)
@@ -200,6 +202,46 @@ func _verify_defense_reduction_mitigates_player_damage(failures: Array[String]) 
 
 	if not is_equal_approx(soldier.current_health, 92.0):
 		failures.append("defense reduction did not mitigate player soldier damage: %.2f" % soldier.current_health)
+
+
+func _verify_rest_recovery_is_slow_player_only(failures: Array[String]) -> void:
+	var player_ship := _make_ship("player")
+	var player := SOLDIER_SCENE.instantiate()
+	if player == null:
+		failures.append("rest recovery player fixture could not instantiate soldier scene")
+		return
+	player.team = "player"
+	player.set("player_visual_scene", null)
+	player.set("enemy_visual_scene", null)
+	player.set("captain_visual_scene", null)
+	add_child(player)
+	player.owned_ship = player_ship
+	player.home_ship = player_ship
+	player.max_health = 70.0
+	player.current_health = 40.0
+	player.rest_recovery_delay_timer = 0.0
+	player._update_rest_recovery(5.0)
+	if not is_equal_approx(player.current_health, 45.0):
+		failures.append("player rest recovery should heal 1 hp/sec: %.2f" % player.current_health)
+
+	var enemy_ship := _make_ship("enemy")
+	var enemy := SOLDIER_SCENE.instantiate()
+	if enemy == null:
+		failures.append("rest recovery enemy fixture could not instantiate soldier scene")
+		return
+	enemy.team = "enemy"
+	enemy.set("player_visual_scene", null)
+	enemy.set("enemy_visual_scene", null)
+	enemy.set("captain_visual_scene", null)
+	add_child(enemy)
+	enemy.owned_ship = enemy_ship
+	enemy.home_ship = enemy_ship
+	enemy.max_health = 70.0
+	enemy.current_health = 40.0
+	enemy.rest_recovery_delay_timer = 0.0
+	enemy._update_rest_recovery(5.0)
+	if not is_equal_approx(enemy.current_health, 40.0):
+		failures.append("enemy rest recovery should stay disabled: %.2f" % enemy.current_health)
 
 
 func _verify_heal_full_recovers_incapacitated_player(failures: Array[String]) -> void:
@@ -281,7 +323,12 @@ func _verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures: 
 	var downed_during_channel: Vector3 = downed.global_position
 	if Vector2(downed_during_channel.x, downed_during_channel.z).distance_to(Vector2.ZERO) > 0.05:
 		failures.append("shipmate assist recovery dragged the downed ally away from the fall position during channel")
-	var assist_finished: bool = helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
+	var assist_finished := false
+	for _step in range(16):
+		helper._try_assist_incapacitated_ally(0.2, 0.72, 7.0)
+		if downed.current_state == SoldierScript.State.IDLE:
+			assist_finished = true
+			break
 
 	if not assist_started or not assist_finished:
 		failures.append("shipmate assist recovery did not engage the incapacitated ally")
@@ -300,6 +347,44 @@ func _verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures: 
 		failures.append("shipmate assist recovery did not settle the recovered ally back onto deck height")
 	if Vector2(downed.global_position.x, downed.global_position.z).distance_to(Vector2.ZERO) > 0.05:
 		failures.append("shipmate assist recovery recovered the ally away from the original fall position")
+
+
+func _verify_shipmate_assist_large_delta_does_not_instant_recover(failures: Array[String]) -> void:
+	var ship := _make_ship("player")
+	ship.set_meta("incapacitated_assist_health_ratio", 0.5)
+	var soldiers := Node3D.new()
+	soldiers.name = "Soldiers"
+	ship.add_child(soldiers)
+	var downed = SOLDIER_SCENE.instantiate()
+	var helper = SOLDIER_SCENE.instantiate()
+	if downed == null or helper == null:
+		failures.append("shipmate assist large-delta fixture could not instantiate soldier scene")
+		return
+	downed.team = "player"
+	helper.team = "player"
+	downed.set("player_visual_scene", null)
+	downed.set("enemy_visual_scene", null)
+	downed.set("captain_visual_scene", null)
+	helper.set("player_visual_scene", null)
+	helper.set("enemy_visual_scene", null)
+	helper.set("captain_visual_scene", null)
+	soldiers.add_child(downed)
+	soldiers.add_child(helper)
+	downed.owned_ship = ship
+	downed.home_ship = ship
+	helper.owned_ship = ship
+	helper.home_ship = ship
+	downed.current_health = 8.0
+	downed.global_position = Vector3.ZERO
+	helper.global_position = Vector3(0.65, 0.0, 0.0)
+
+	SoldierLifecycleHelper.take_damage(downed, 20.0, Vector3.ZERO, "sword")
+	helper._try_assist_incapacitated_ally(5.0, 0.72, 7.0)
+	if downed.current_state != SoldierScript.State.DEAD:
+		failures.append("shipmate assist recovered an incapacitated ally from one large delta tick")
+	var progress := float(helper.get_meta("incapacitated_assist_progress", 0.0))
+	if progress > 0.19:
+		failures.append("shipmate assist large-delta progress was not capped: %.2f" % progress)
 
 
 func _verify_shipmate_assist_uses_standoff_without_pushing(failures: Array[String]) -> void:
@@ -356,7 +441,10 @@ func _verify_shipmate_assist_uses_standoff_without_pushing(failures: Array[Strin
 	helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
 	if downed.global_position.distance_to(downed_before_approach) > 0.05:
 		failures.append("shipmate standoff assist dragged the downed ally while channeling")
-	helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
+	for _step in range(16):
+		helper._try_assist_incapacitated_ally(0.2, 0.72, 7.0)
+		if downed.current_state == SoldierScript.State.IDLE:
+			break
 	if downed.current_state != SoldierScript.State.IDLE:
 		failures.append("shipmate standoff assist did not recover the ally from its stand point")
 	var local_recovered: Vector3 = ship.to_local(downed.global_position)

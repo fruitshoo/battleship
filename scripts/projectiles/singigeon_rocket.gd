@@ -14,8 +14,6 @@ extends Area3D
 @export var damage: float = 2.5 # 함선 데미지 하향 (5.0 -> 2.5)
 @export var personnel_damage_mult: float = 5.0 # 병사 데미지 배수 하향 (25 -> 5)
 @export var lifetime: float = 3.0
-@export var blast_radius: float = 3.5
-@export var splash_damage_mult: float = 0.35
 @export var lock_on_delay: float = 0.12
 @export var retarget_radius: float = 16.0
 @export var proximity_hit_radius: float = 1.2
@@ -122,7 +120,7 @@ func _physics_process(delta: float) -> void:
 	_age += delta
 	_life_left -= delta
 	if _life_left <= 0.0:
-		_explode()
+		_finish_flight()
 		ScenePool.release(self)
 		return
 
@@ -332,10 +330,9 @@ func _on_hit(target: Variant) -> void:
 	if not is_instance_valid(hit_obj) or not _is_valid_target(hit_obj):
 		return
 
-	# 직격 + 주변 스플래시 피해
 	var primary_target: Node3D = hit_obj as Node3D
 	_draw_rocket_impact_debug(primary_target)
-	_explode(primary_target)
+	_finish_flight(primary_target)
 	ScenePool.release(self)
 
 func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
@@ -358,29 +355,21 @@ func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 	elif target_node.has_method("die"):
 		target_node.die()
 
-func _explode(primary_target: Node3D = null) -> void:
+func _finish_flight(primary_target: Node3D = null) -> void:
 	if has_exploded:
 		return
 	has_exploded = true
-	_draw_rocket_blast_debug(primary_target)
 
 	if is_instance_valid(primary_target):
 		_apply_damage(primary_target, 1.0)
-	var splash_targets = _find_splash_targets()
-	for ship in splash_targets:
-		if ship == primary_target:
-			continue
-		_apply_damage(ship, splash_damage_mult)
 
 	# 트레일 중단
 	var trail = get_node_or_null("RocketTrail")
 	if trail:
 		trail.emitting = false
 	
-	# 폭발 VFX(화염/연기) 제거 - 요청에 따라 나무 파편(take_damage 내에 있음)만 남김
-	# 폭발 사운드는 타격감 유지를 위해 남겨둠
 	var audio_manager = get_node_or_null("/root/AudioManager")
-	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+	if is_instance_valid(primary_target) and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))
 
 
@@ -393,43 +382,10 @@ func _draw_rocket_impact_debug(primary_target: Node3D) -> void:
 	DebugDrawBridge.draw_marker(global_position, Color(1.0, 0.22, 0.08, 0.98), label, 1.6, 0.32, 0.45)
 
 
-func _draw_rocket_blast_debug(primary_target: Node3D = null) -> void:
-	if not DebugDrawBridge.projectile_debug_enabled:
-		return
-	var color := Color(1.0, 0.45, 0.12, 0.9)
-	DebugDrawBridge.draw_circle_xz(global_position, blast_radius, color, 0.35, 1.6, 56, 0.035)
-	var label := "blast %.1fm" % blast_radius
-	if is_instance_valid(primary_target):
-		label += " %s" % primary_target.name
-	DebugDrawBridge.draw_text(global_position + Vector3.UP * 1.25, label, color, 1.6, 18)
-
-
 func _debug_hit_label(target: Variant) -> String:
 	if target is Node:
 		return (target as Node).name
 	return "hit"
-
-
-func _find_splash_targets() -> Array[Node3D]:
-	var out: Array[Node3D] = []
-	var radius_sq = blast_radius * blast_radius
-	for node in EntityRegistry.get_ships():
-		if not (node is Node3D):
-			continue
-		var ship := node as Node3D
-		if not _is_valid_ship_target(ship):
-			continue
-		if global_position.distance_squared_to(ship.global_position) <= radius_sq:
-			out.append(ship)
-	for node in EntityRegistry.get_soldiers():
-		if not (node is Node3D):
-			continue
-		var soldier := node as Node3D
-		if not _is_valid_soldier_target(soldier):
-			continue
-		if global_position.distance_squared_to(soldier.global_position) <= radius_sq:
-			out.append(soldier)
-	return out
 
 func _configure_team_filters() -> void:
 	if team == "player":

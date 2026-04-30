@@ -3,6 +3,8 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const DEFAULT_BASE_DAMAGE: float = 7.0
 const ARROW_SPEED: float = 36.0
 const MIN_ARROW_FLIGHT_TIME: float = 0.12
+const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
+const SHIP_AIM_VERTICAL_OFFSET: float = 0.55
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -72,7 +74,7 @@ func _fire_burst(target: Node3D, attacker: Node3D) -> void:
 		var spawn_pos = attacker.global_position
 		spawn_pos.y += 0.8
 		
-		var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
+		var current_target_pos: Vector3 = _get_arrow_aim_point(target)
 
 		# === 예측 샷 (Predictive Aiming) ===
 		var arrow_speed = ARROW_SPEED
@@ -148,6 +150,10 @@ func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 		current = current.get_parent()
 		depth += 1
 	return null
+
+func _get_arrow_aim_point(target: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(target, offset)
 
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):

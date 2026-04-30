@@ -5,7 +5,6 @@ extends "res://scripts/entities/weapons/weapon.gd"
 @export var max_range: float = 24.0
 @export var projectile_speed: float = 32.0
 
-var blast_radius: float = 3.5
 var personnel_damage_mult: float = 5.0
 var _cached_spawn_parent: Node = null
 var _upgrade_base_damage: float = 2.5
@@ -59,8 +58,6 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		rocket.speed = projectile_speed
 	if "damage" in rocket:
 		rocket.damage = damage
-	if "blast_radius" in rocket:
-		rocket.blast_radius = blast_radius
 	if "personnel_damage_mult" in rocket:
 		rocket.personnel_damage_mult = personnel_damage_mult
 	if "prefer_personnel_targets" in rocket:
@@ -107,7 +104,6 @@ func _apply_upgrade_stats() -> void:
 		var stats: Dictionary = um.UPGRADES["singigeon"].get("stats", {})
 		_upgrade_base_damage = float(stats.get("base_damage", 2.5))
 		personnel_damage_mult = float(stats.get("personnel_damage_mult", 5.0))
-		blast_radius = float(stats.get("base_blast_radius", 3.5)) + (float(level - 1) * float(stats.get("blast_radius_per_lv", 0.2)))
 		attack_cooldown = maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 		projectile_speed = float(stats.get("projectile_speed", 32.0))
 	_apply_effective_damage()

@@ -1,8 +1,10 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 const BASE_DAMAGE: float = 18.0
-const ARROW_SPEED: float = 30.0
+const ARROW_SPEED: float = 34.0
 const MIN_ARROW_FLIGHT_TIME: float = 0.12
+const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
+const SHIP_AIM_VERTICAL_OFFSET: float = 0.55
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var shoot_cooldown: float = 2.0
@@ -28,7 +30,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	spawn_pos.y += 0.8
 	
 	# 기본 타겟 위치
-	var current_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target, 0.5)
+	var current_target_pos: Vector3 = _get_arrow_aim_point(target)
 	
 	# === 예측 샷 (Predictive Aiming) ===
 	var arrow_speed = ARROW_SPEED
@@ -56,21 +58,21 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 				
 			ship_vel = s_dir * s_speed
 			
-	var total_vel = local_vel + ship_vel * 0.32
-	var lead_offset: Vector3 = total_vel * time_to_reach * 0.5
-	var max_lead: float = clampf(distance * 0.18, 0.25, 1.8)
+	var total_vel = local_vel + ship_vel * 0.28
+	var lead_offset: Vector3 = total_vel * time_to_reach * 0.42
+	var max_lead: float = clampf(distance * 0.14, 0.2, 1.4)
 	if lead_offset.length() > max_lead:
 		lead_offset = lead_offset.normalized() * max_lead
 	current_target_pos += lead_offset
 
 	
-	current_target_pos.x += randf_range(-0.08, 0.08)
-	current_target_pos.z += randf_range(-0.08, 0.08)
+	current_target_pos.x += randf_range(-0.05, 0.05)
+	current_target_pos.z += randf_range(-0.05, 0.05)
 	
 	var dmg_mult = attacker.get_meta("damage_multiplier") if attacker.has_meta("damage_multiplier") else 1.0
 	var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
 	var dist = spawn_pos.distance_to(current_target_pos)
-	var final_arc_height: float = clamp(dist * 0.16, 0.35, 2.4)
+	var final_arc_height: float = clamp(dist * 0.12, 0.28, 1.8)
 	
 	# 레벨 매니저 또는 부모 트리에 추가 (이 시점에 _ready 실행됨)
 	var spawn_parent = _resolve_spawn_parent(attacker.get_tree())
@@ -105,6 +107,10 @@ func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
 		current = current.get_parent()
 		depth += 1
 	return null
+
+func _get_arrow_aim_point(target: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(target, offset)
 
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):

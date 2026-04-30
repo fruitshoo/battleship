@@ -7,10 +7,13 @@ const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
 @export var damage: float = 15.0
 @export var speed: float = 25.0 # 초당 이동 거리 (이전 20.0 -> 8.0 -> 14.0 -> 16.0 -> 25.0)
 @export var arc_height: float = 2.0 # 포물선 최대 높이
-@export var terminal_hit_radius: float = 3.0
+@export var terminal_hit_radius: float = 2.2
 
 const MIN_FLIGHT_DURATION := 0.12
-const TERMINAL_VISUAL_CONVERGE_START := 0.52
+const TERMINAL_VISUAL_CONVERGE_START := 0.42
+const TERMINAL_VISUAL_TRACK_RADIUS := 8.0
+const SOLDIER_AIM_VERTICAL_OFFSET := 1.05
+const SHIP_AIM_VERTICAL_OFFSET := 0.55
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -119,7 +122,7 @@ func _physics_process(delta: float) -> void:
 	
 	if progress >= 1.0:
 		global_position = _get_visual_target_pos()
-		_resolve_terminal_hit(target_pos)
+		_resolve_terminal_hit(global_position)
 		_release_self()
 		return
 	
@@ -169,17 +172,17 @@ func _get_visual_target_pos() -> Vector3:
 		return target_pos
 	if target_node.is_queued_for_deletion():
 		return target_pos
-	var live_target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.5)
+	var live_target_pos: Vector3 = _get_arrow_target_aim_point(target_node)
 	var planned_to_live := live_target_pos - target_pos
-	if planned_to_live.length() > terminal_hit_radius:
-		return target_pos
+	if planned_to_live.length() > TERMINAL_VISUAL_TRACK_RADIUS:
+		planned_to_live = planned_to_live.normalized() * TERMINAL_VISUAL_TRACK_RADIUS
 	var converge_t := clampf(
 		(progress - TERMINAL_VISUAL_CONVERGE_START) / maxf(1.0 - TERMINAL_VISUAL_CONVERGE_START, 0.001),
 		0.0,
 		1.0
 	)
 	converge_t = converge_t * converge_t * (3.0 - 2.0 * converge_t)
-	return target_pos.lerp(live_target_pos, converge_t)
+	return target_pos + planned_to_live * converge_t
 
 
 func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
@@ -191,8 +194,13 @@ func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
 		return
 	if NodeContractHelper.get_team_tag(target_node) == team:
 		return
-	var target_aim_point: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.5)
+	var target_aim_point: Vector3 = _get_arrow_target_aim_point(target_node)
 	if hit_check_position.distance_to(target_aim_point) > terminal_hit_radius:
 		return
 	if target_node.has_method("take_damage"):
 		target_node.take_damage(damage, global_position, damage_source)
+
+
+func _get_arrow_target_aim_point(node: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if node.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(node, offset)

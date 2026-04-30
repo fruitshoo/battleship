@@ -40,9 +40,10 @@
 			}
 		},
 		"janggun": {
-			"name": "대장군전",
+			"name": "장군전",
 			"category": 0,
-			"description": "명중 시 화염과 둔화",
+			"description": "대포 포문에서 느리게 장전되는 장군전을 추가 발사",
+			"card_art_path": "res://assets/ui/upgrades/janggun_card.png",
 			"max_level": 5,
 			"color": "996633"
 			},
@@ -56,8 +57,6 @@
 				"specialist_levels": [1, 3, 5],
 				"base_damage": 2.2,
 				"personnel_damage_mult": 6.0,
-				"base_blast_radius": 3.5,
-				"blast_radius_per_lv": 0.2,
 				"base_cooldown": 5.0,
 				"cooldown_reduce_per_lv": 0.35,
 				"projectile_speed": 32.0
@@ -77,10 +76,10 @@
 				"radius_per_lv": 0.5,
 				"base_cooldown": 6.0,
 				"cooldown_reduce_per_lv": 1.0,
-				"base_ignition_chance": 0.45,
+				"base_ignition_chance": 0.25,
 				"ignition_chance_per_lv": 0.075,
-				"max_ignition_chance": 0.75,
-				"burn_duration": 7.0
+				"max_ignition_chance": 0.65,
+				"burn_duration": 5.0
 			}
 			},
 			"repeating_crossbow": {
@@ -271,11 +270,11 @@
 		"gold": {
 			"name": "골드",
 			"category": 4,
-			"description": "골드 +20",
+			"description": "골드 +10",
 			"max_level": 99,
 			"color": "ffd84c",
 			"stats": {
-				"score_add": 20
+				"score_add": 10
 			}
 		},
 		"fleet_signal": {
@@ -319,6 +318,7 @@
 			"name": "지원함 재합류",
 			"category": 5,
 			"description": "재합류 시간 감소, Lv5 한계 +1",
+			"disabled": true,
 			"max_level": 5,
 			"color": "33e5ff",
 			"stats": {

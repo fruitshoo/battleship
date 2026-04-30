@@ -4,6 +4,7 @@ const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_help
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
+const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
 const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
 const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
@@ -29,7 +30,7 @@ enum State {
 	BOARDING_JUMP
 }
 
-const REST_RECOVERY_HEALTH_PER_SECOND: float = 3.0
+const REST_RECOVERY_HEALTH_PER_SECOND: float = 1.0
 const REST_RECOVERY_DELAY_AFTER_DAMAGE: float = 3.0
 const NODE_HAND_PIVOT := "HandPivot"
 const NODE_BODY_COLLISION_SHAPE := "CollisionShape3D"
@@ -150,7 +151,8 @@ const INCAPACITATED_ASSIST_USE_RANGE := 1.15
 const INCAPACITATED_ASSIST_STAND_DISTANCE := 1.28
 const INCAPACITATED_ASSIST_STAND_REACHED_RANGE := 0.32
 const INCAPACITATED_ASSIST_DECK_MARGIN := 0.45
-const INCAPACITATED_ASSIST_CHANNEL_DURATION := 1.1
+const INCAPACITATED_ASSIST_CHANNEL_DURATION := 2.0
+const INCAPACITATED_ASSIST_PROGRESS_DELTA_CAP := 0.18
 const INCAPACITATED_ASSIST_PICKUP_MAX_PROGRESS := 0.72
 const INCAPACITATED_ASSIST_PICKUP_FORWARD_OFFSET := 0.06
 const INCAPACITATED_ASSIST_PICKUP_SIDE_OFFSET := 0.04
@@ -1179,7 +1181,7 @@ func _try_assist_incapacitated_ally(delta: float, speed_scale: float, turn_speed
 	SoldierAiHelper.turn_toward_position(self, target_pos, turn_speed, delta)
 	_settle_incapacitated_assist_target_on_deck(assist_target)
 	_begin_incapacitated_assist_action(assist_target)
-	var progress: float = float(get_meta(INCAPACITATED_ASSIST_PROGRESS_META, 0.0)) + delta
+	var progress: float = float(get_meta(INCAPACITATED_ASSIST_PROGRESS_META, 0.0)) + minf(delta, INCAPACITATED_ASSIST_PROGRESS_DELTA_CAP)
 	set_meta(INCAPACITATED_ASSIST_PROGRESS_META, progress)
 	var channel_duration := _get_incapacitated_assist_channel_duration()
 	_apply_incapacitated_assist_pickup_motion(assist_target, progress / channel_duration)
@@ -1518,6 +1520,11 @@ func _allow_cross_ship_enemy_scan() -> bool:
 		return true
 	if ShipAllyRoleHelper.is_player_flagship(owned_ship):
 		return true
+	var scan_data := SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(self)
+	var distress_ships: Array = scan_data.get("nearby_ally_distress_ships", [])
+	for distress_ship in distress_ships:
+		if is_instance_valid(distress_ship):
+			return true
 	return not _is_passive_ally_ship_crew()
 
 func _should_hold_defensive_deck_position_against(target_ship: Node3D) -> bool:
