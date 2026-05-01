@@ -73,11 +73,11 @@ visible = false
 
 [node name="Glow" type="Polygon2D" parent="WindPanel/WindIndicator/CompassWheel/SiteMarker" unique_id=1763371592]
 color = Color(0.35, 0.75, 1, 0.18)
-polygon = PackedVector2Array(0, -8, 5.657, -5.657, 8, 0, 5.657, 5.657, 0, 8, -5.657, 5.657, -8, 0, -5.657, -5.657)
+polygon = PackedVector2Array(0, -8, 3.06147, -7.39104, 5.65685, -5.65685, 7.39104, -3.06147, 8, 0, 7.39104, 3.06147, 5.65685, 5.65685, 3.06147, 7.39104, 0, 8, -3.06147, 7.39104, -5.65685, 5.65685, -7.39104, 3.06147, -8, 0, -7.39104, -3.06147, -5.65685, -5.65685, -3.06147, -7.39104)
 
 [node name="Dot" type="Polygon2D" parent="WindPanel/WindIndicator/CompassWheel/SiteMarker" unique_id=884655868]
 color = Color(1, 0.88, 0.28, 0.95)
-polygon = PackedVector2Array(0, -5, 5, 0, 0, 5, -5, 0)
+polygon = PackedVector2Array(0, -4.5, 1.72208, -4.15746, 3.18198, -3.18198, 4.15746, -1.72208, 4.5, 0, 4.15746, 1.72208, 3.18198, 3.18198, 1.72208, 4.15746, 0, 4.5, -1.72208, 4.15746, -3.18198, 3.18198, -4.15746, 1.72208, -4.5, 0, -4.15746, -1.72208, -3.18198, -3.18198, -1.72208, -4.15746)
 
 [node name="NorthLabel" type="Label" parent="WindPanel/WindIndicator/CompassWheel" unique_id=1269305894]
 anchors_preset = 8

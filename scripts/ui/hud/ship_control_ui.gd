@@ -36,13 +36,13 @@ var _site_marker_alpha: float = 0.0
 var _glow_phase: float = 0.0
 
 const SITE_MARKER_REFRESH_INTERVAL: float = 0.18
-const SITE_MARKER_OUTER_RADIUS: float = 64.0
+const SITE_MARKER_OUTER_RADIUS: float = 58.0
 const SITE_MARKER_DISTANCE_AT_EDGE: float = 62.0
 const SITE_MARKER_FADE_SPEED: float = 5.5
 const MAX_SITE_MARKERS: int = 6
-const BASE_WIND_PANEL_SIZE: float = 220.0
-const MAX_WIND_PANEL_SIZE: float = 184.0
-const MIN_WIND_PANEL_SIZE: float = 156.0
+const BASE_WIND_PANEL_SIZE: float = 180.0
+const MAX_WIND_PANEL_SIZE: float = 204.0
+const MIN_WIND_PANEL_SIZE: float = 170.0
 const SEA_SITE_GROUP := "sea_site"
 const TREASURE_CHEST_GROUP := "treasure_chest"
 const SITE_MARKER_GLOW_COLOR := Color(0.24, 0.64, 1.0, 0.18)
@@ -99,57 +99,48 @@ func _apply_theme() -> void:
 	if is_instance_valid(wind_panel):
 		wind_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if is_instance_valid(compass_background):
-		compass_background.add_theme_stylebox_override(
-			"panel",
-			NavalUiTheme.make_panel_style(
-				Color(0.04, 0.08, 0.12, 0.52),
-				NavalUiTheme.BORDER_GOLD_SOFT,
-				90,
-				1,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			)
-		)
+		compass_background.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if is_instance_valid(compass_frame):
+		compass_frame.visible = false
 	if is_instance_valid(compass_art) and compass_art.has_method("set_palette"):
 		compass_art.call(
 			"set_palette",
-			Color(0.05, 0.08, 0.12, 0.0),
-			Color(0.82, 0.69, 0.42, 0.10),
-			Color(0.55, 0.47, 0.27, 0.08),
-			Color(0.96, 0.89, 0.71, 0.42),
-			Color(0.72, 0.64, 0.47, 0.08),
-			Color(0.76, 0.31, 0.22, 0.82),
-			Color(0.92, 0.84, 0.66, 0.0)
+			Color(0.06, 0.12, 0.15, 0.84),
+			Color(0.78, 0.62, 0.36, 0.98),
+			Color(0.93, 0.80, 0.54, 0.56),
+			Color(0.92, 0.84, 0.65, 0.90),
+			Color(0.70, 0.62, 0.45, 0.36),
+			Color(0.88, 0.22, 0.18, 0.96),
+			Color(0.56, 0.72, 0.75, 0.18)
 		)
 		compass_art.set("draw_swirl", false)
-	NavalUiTheme.style_accent(north_label, 18)
+	NavalUiTheme.style_accent(north_label, 15)
 	north_label.add_theme_color_override("font_color", Color(0.82, 0.40, 0.30, 1.0))
 	for label in [east_label, south_label, west_label]:
-		NavalUiTheme.style_accent(label, 18)
+		NavalUiTheme.style_accent(label, 14)
+		label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.66, 0.90))
 	var arrow_color := Color(0.97, 0.86, 0.62, 1.0)
 	var arrow_tail_color := Color(0.60, 0.54, 0.43, 0.66)
 	var cap_color := Color(0.96, 0.89, 0.72, 0.96)
 	if is_instance_valid(arrow_shaft):
 		arrow_shaft.color = arrow_color
-		arrow_shaft.offset_left = -2.5
-		arrow_shaft.offset_right = 2.5
-		arrow_shaft.offset_top = -46.0
+		arrow_shaft.offset_left = -2.0
+		arrow_shaft.offset_right = 2.0
+		arrow_shaft.offset_top = -43.0
 		arrow_shaft.offset_bottom = 4.0
 	if is_instance_valid(arrow_head):
 		arrow_head.color = arrow_color
 		arrow_head.polygon = PackedVector2Array([
-			Vector2(-9, -46),
-			Vector2(9, -46),
-			Vector2(0, -66),
+			Vector2(-8, -43),
+			Vector2(8, -43),
+			Vector2(0, -63),
 		])
 	if is_instance_valid(arrow_tail):
 		arrow_tail.color = arrow_tail_color
 		arrow_tail.polygon = PackedVector2Array([
-			Vector2(-5, 6),
-			Vector2(5, 6),
-			Vector2(0, 22),
+			Vector2(-4, 6),
+			Vector2(4, 6),
+			Vector2(0, 20),
 		])
 	if is_instance_valid(arrow_glow):
 		arrow_glow.color = Color(0.96, 0.82, 0.42, 0.06)
@@ -173,9 +164,9 @@ func _apply_layout_density() -> void:
 	offset_right = 0.0
 	offset_bottom = 0.0
 
-	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.17, MIN_WIND_PANEL_SIZE, MAX_WIND_PANEL_SIZE)
-	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - 164.0) / (BASE_WIND_PANEL_SIZE - 164.0), 0.0, 1.0)))
-	var top_offset := roundf(clampf(viewport_size.y * 0.08, 64.0, 76.0))
+	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.20, MIN_WIND_PANEL_SIZE, MAX_WIND_PANEL_SIZE)
+	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - MIN_WIND_PANEL_SIZE) / (MAX_WIND_PANEL_SIZE - MIN_WIND_PANEL_SIZE), 0.0, 1.0)))
+	var top_offset := roundf(clampf(viewport_size.y * 0.055, 36.0, 48.0))
 	wind_panel.anchor_left = 0.0
 	wind_panel.anchor_right = 0.0
 	wind_panel.anchor_top = 0.0

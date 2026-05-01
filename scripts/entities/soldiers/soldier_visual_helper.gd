@@ -429,6 +429,42 @@ static func play_boarding_jump_pose(soldier) -> void:
 	tween.tween_property(pose_node, "scale", target_scale, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
+static func play_knockback_pose(soldier, knockback_dir: Vector3, speed: float, allow_overboard: bool) -> void:
+	var pose_node := get_pose_node(soldier)
+	if pose_node == null or not soldier.is_inside_tree():
+		return
+	_cache_pose_node_rest_transform(soldier, pose_node)
+	var rest_rotation: Vector3 = soldier.get_meta(POSE_NODE_REST_ROTATION_META, pose_node.rotation)
+	var rest_position: Vector3 = soldier.get_meta(POSE_NODE_REST_POSITION_META, pose_node.position)
+	var rest_scale: Vector3 = soldier.get_meta(POSE_NODE_REST_SCALE_META, pose_node.scale)
+	var local_dir := knockback_dir
+	if soldier is Node3D:
+		local_dir = (soldier as Node3D).global_basis.inverse() * knockback_dir
+	local_dir.y = 0.0
+	if local_dir.length_squared() <= 0.0001:
+		local_dir = Vector3.FORWARD
+	local_dir = local_dir.normalized()
+	var intensity := clampf(speed / 20.0, 0.45, 1.25)
+	if allow_overboard:
+		intensity = maxf(intensity, 1.0)
+	var target_rotation := rest_rotation + Vector3(
+		deg_to_rad(-18.0 * intensity),
+		0.0,
+		deg_to_rad(-local_dir.x * 20.0 * intensity)
+	)
+	var target_position := rest_position + Vector3(local_dir.x * 0.05, 0.08 if allow_overboard else 0.03, local_dir.z * 0.07)
+	var squash := clampf(1.0 - 0.08 * intensity, 0.82, 0.96)
+	var target_scale := Vector3(rest_scale.x * 1.06, rest_scale.y * squash, rest_scale.z * 1.04)
+	var tween: Tween = soldier.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(pose_node, "rotation", target_rotation, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pose_node, "position", target_position, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pose_node, "scale", target_scale, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_property(pose_node, "rotation", rest_rotation, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(pose_node, "position", rest_position, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(pose_node, "scale", rest_scale, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
 static func play_recovery_pose(soldier) -> void:
 	var mesh := get_body_mesh(soldier)
 	var pose_node := get_pose_node(soldier)

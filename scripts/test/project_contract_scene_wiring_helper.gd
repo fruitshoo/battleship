@@ -325,8 +325,17 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		var open_rowing_speed := float(player_ship.get("current_speed"))
 		if furled_rowing_speed <= open_rowing_speed * 1.1:
 			failures.append("furled sail should improve rowing speed efficiency")
+		player_ship.call("set_rowing", true, -1)
+		player_ship.set("current_speed", 0.0)
+		player_ship.call("_update_movement", 0.1)
+		var reverse_rowing_speed := float(player_ship.get("current_speed"))
+		if reverse_rowing_speed >= -0.1:
+			failures.append("reverse rowing should move the player ship backward")
+		if absf(reverse_rowing_speed) >= open_rowing_speed * 0.65:
+			failures.append("reverse rowing should stay slower than forward rowing")
 
 		player_ship.set("stamina_drain_rate", 10.0)
+		player_ship.call("set_rowing", true, 1)
 		player_ship.call("set_sail_furled", true)
 		player_ship.set("rowing_stamina", 100.0)
 		player_ship.call("_update_rowing_stamina", 1.0)

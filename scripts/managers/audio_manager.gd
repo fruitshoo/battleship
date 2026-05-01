@@ -68,10 +68,19 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_soldier_die_4.ogg",
 		"res://assets/audio/sfx/sfx_soldier_die_5.ogg",
 		"res://assets/audio/sfx/sfx_soldier_die_6.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_7.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_8.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_9.ogg",
+		"res://assets/audio/sfx/sfx_soldier_die_10.ogg",
+	],
+	"ballistic_death": [
+		"res://assets/audio/sfx/sfx_ballistic_death_01.ogg",
+		"res://assets/audio/sfx/sfx_ballistic_death_02.ogg",
 	],
 	"boarding_war_cry": [
-		"res://assets/audio/sfx/sfx_boarding_war_cry_1.wav",
-		"res://assets/audio/sfx/sfx_boarding_war_cry_3.wav",
+		"res://assets/audio/sfx/sfx_boarding_war_cry_1.ogg",
+		"res://assets/audio/sfx/sfx_boarding_war_cry_2.ogg",
+		"res://assets/audio/sfx/sfx_boarding_war_cry_3.ogg",
 	],
 	"water_splash_large": [
 		"res://assets/audio/sfx/sfx_water_splash_large_1.ogg",
@@ -169,6 +178,7 @@ const SFX_PROFILE_BY_KEY := {
 	"sword_swing": SFX_PROFILE_WEAPON_CLOSE,
 	"soldier_hit": SFX_PROFILE_WEAPON_CLOSE,
 	"soldier_die": SFX_PROFILE_CHARACTER_VOICE,
+	"ballistic_death": SFX_PROFILE_CHARACTER_VOICE,
 	"boarding_war_cry": SFX_PROFILE_BOARDING_VOICE,
 	"boss_horn": SFX_PROFILE_BATTLE_ALERT,
 	"support_foghorn": SFX_PROFILE_BATTLE_ALERT,
@@ -200,11 +210,14 @@ const SFX_PROFILE_OVERRIDES := {
 		"rate_limit_msec": 120,
 	},
 	"ship_sink_bubbles": {
-		"volume_db": -2.5,
-		"max_distance": 210.0,
-		"unit_size": 70.0,
+		"volume_db": 8.0,
+		"max_distance": 320.0,
+		"unit_size": 130.0,
 		"pitch_jitter": 0.04,
 		"rate_limit_msec": 300,
+	},
+	"ballistic_death": {
+		"pitch_jitter": 0.08,
 	},
 	"support_foghorn": {
 		"volume_db": 2.0,

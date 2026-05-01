@@ -8,6 +8,7 @@ class MockLevelManager:
 
 	var drowned_soldier_kill_xp_reward: int = 3
 	var drowned_soldier_kill_merit_reward: int = 0
+	var merit_per_soldier_kill: int = 1
 	var current_xp: int = 0
 	var soldiers_killed: int = 0
 	var soldiers_drowned: int = 0
@@ -70,7 +71,7 @@ class MockPlayerShip:
 func _ready() -> void:
 	var failures: Array[String] = []
 	await get_tree().process_frame
-	await _verify_sinking_enemy_soldier_xp_is_deferred_to_pickup(failures)
+	await _verify_sinking_enemy_soldier_merit_is_deferred_to_pickup(failures)
 	_verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures)
 	_verify_enemy_drifter_uses_survivor_like_field_item_tuning(failures)
 	LevelManagerRegistry.unregister_level_manager(LevelManagerRegistry.get_level_manager(get_tree()))
@@ -83,7 +84,7 @@ func _ready() -> void:
 	get_tree().quit(1)
 
 
-func _verify_sinking_enemy_soldier_xp_is_deferred_to_pickup(failures: Array[String]) -> void:
+func _verify_sinking_enemy_soldier_merit_is_deferred_to_pickup(failures: Array[String]) -> void:
 	var lm := MockLevelManager.new()
 	add_child(lm)
 	LevelManagerRegistry.register_level_manager(lm)
@@ -103,7 +104,9 @@ func _verify_sinking_enemy_soldier_xp_is_deferred_to_pickup(failures: Array[Stri
 	if spawned != 2:
 		failures.append("expected 2 drifter pickups for 5 sinking soldiers, got %d" % spawned)
 	if lm.current_xp != 0:
-		failures.append("sinking soldiers granted XP immediately before pickup collection")
+		failures.append("sinking soldiers granted normal XP before pickup collection")
+	if lm.merit_points != 0:
+		failures.append("sinking soldiers granted merit immediately before pickup collection")
 	if lm.soldiers_drowned != 5:
 		failures.append("sinking soldiers did not update drowned combat stats immediately")
 
@@ -111,20 +114,22 @@ func _verify_sinking_enemy_soldier_xp_is_deferred_to_pickup(failures: Array[Stri
 	if pickups.size() != 2:
 		failures.append("expected 2 enemy_drifter_xp nodes, found %d" % pickups.size())
 		return
-	var total_xp := 0
+	var total_merit := 0
 	for pickup_node in pickups:
-		total_xp += int(pickup_node.get("xp_amount"))
-	if total_xp != 15:
-		failures.append("drifter pickups carried %d XP, expected 15" % total_xp)
+		total_merit += int(pickup_node.get("merit_amount"))
+	if total_merit != 5:
+		failures.append("drifter pickups carried %d merit, expected 5" % total_merit)
 
 	var player := MockPlayerShip.new()
 	add_child(player)
 	player.global_position = (pickups[0] as Node3D).global_position
 	(pickups[0] as Node).call("_try_collect", player)
-	if lm.current_xp <= 0:
-		failures.append("collecting an enemy drifter pickup did not grant XP")
-	if lm.current_xp >= total_xp:
-		failures.append("collecting one grouped pickup granted all drifter XP at once")
+	if lm.current_xp != 0:
+		failures.append("collecting an enemy drifter pickup granted normal XP")
+	if lm.merit_points <= 0:
+		failures.append("collecting an enemy drifter pickup did not grant merit")
+	if lm.merit_points >= total_merit:
+		failures.append("collecting one grouped pickup granted all drifter merit at once")
 
 
 func _verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures: Array[String]) -> void:

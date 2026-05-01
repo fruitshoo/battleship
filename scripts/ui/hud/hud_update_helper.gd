@@ -105,7 +105,8 @@ static func update_speed_display(hud) -> void:
 	var max_speed: float = 1.0
 	if hud.player_ship.get("max_speed") != null:
 		max_speed = maxf(float(hud.player_ship.max_speed), 0.01)
-	var speed_ratio: float = clampf(speed / max_speed, 0.0, 1.0)
+	var speed_magnitude := absf(speed)
+	var speed_ratio: float = clampf(speed_magnitude / max_speed, 0.0, 1.0)
 	var is_rowing_active: bool = hud.player_ship.get("is_rowing") == true
 	var is_rowing_locked: bool = hud.player_ship.get("rowing_locked") == true
 	var is_sail_furled: bool = hud.player_ship.get("sail_furled") == true

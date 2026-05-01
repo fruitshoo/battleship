@@ -29,7 +29,7 @@ static func apply_overlay_density(hud) -> void:
 	if is_instance_valid(hud.xp_bar):
 		hud.xp_bar.custom_minimum_size.y = top_bar_height
 	if is_instance_valid(hud.merit_bar):
-		hud.merit_bar.offset_top = top_bar_height + 1.0
+		hud.merit_bar.offset_top = top_bar_height
 		hud.merit_bar.custom_minimum_size.y = merit_bar_height
 	if is_instance_valid(hud.level_label):
 		NavalUiTheme.style_overlay_caption(hud.level_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_MAIN, 4)
@@ -81,7 +81,7 @@ static func setup_top_xp_bar(hud) -> void:
 	hud.add_child(hud.merit_bar)
 
 	hud.merit_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	hud.merit_bar.offset_top = 25.0
+	hud.merit_bar.offset_top = 24.0
 	hud.merit_bar.custom_minimum_size.y = 16.0
 	hud.merit_bar.show_percentage = false
 	hud.merit_bar.z_index = 10

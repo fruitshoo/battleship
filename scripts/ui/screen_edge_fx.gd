@@ -50,11 +50,12 @@ func _compute_target_motion_boost() -> float:
 	var is_rowing: bool = _player_ship.get("is_rowing") == true if _player_ship.get("is_rowing") != null else false
 	var rudder_angle: float = float(_player_ship.get("rudder_angle")) if _player_ship.get("rudder_angle") != null else 0.0
 
-	var speed_ratio := clampf(current_speed / maxf(max_speed, 0.001), 0.0, 1.5)
+	var motion_speed := absf(current_speed)
+	var speed_ratio := clampf(motion_speed / maxf(max_speed, 0.001), 0.0, 1.5)
 	var motion := clampf(remap(speed_ratio, 0.35, 1.05, 0.0, 1.0), 0.0, 1.0) * 0.72
 	if is_rowing:
 		motion = maxf(motion, 0.28 + speed_ratio * 0.26)
-	if absf(rudder_angle) >= 12.0 and current_speed > 2.0:
+	if absf(rudder_angle) >= 12.0 and motion_speed > 2.0:
 		motion = maxf(motion, 0.22 + clampf(absf(rudder_angle) / 45.0, 0.0, 0.35))
 	return clampf(motion * motion_boost_strength, 0.0, 0.42)
 

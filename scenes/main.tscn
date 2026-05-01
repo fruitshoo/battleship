@@ -82,6 +82,10 @@ mesh = SubResource("BoxMesh_choun")
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
+reverse_rowing_speed_ratio = null
+reverse_rowing_acceleration_mult = null
+reverse_rudder_turn_authority_mult = null
+reverse_rowing_stamina_cost_mult = null
 auto_raid_enabled = true
 floating_offset = 0.5
 boarding_contact_grace_duration = 0.8

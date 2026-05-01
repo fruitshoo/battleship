@@ -193,8 +193,8 @@ const SHIP_HP_BAR_OFFSET_Y: float = 34.0
 const PLAYER_STATUS_BAR_WIDTH: float = 136.0
 const PLAYER_STATUS_HP_HEIGHT: float = 10.0
 const PLAYER_STATUS_STAMINA_HEIGHT: float = 3.0
-const PLAYER_STATUS_BAR_GAP: float = 1.0
-const PLAYER_STATUS_STACK_HEIGHT: float = 14.0
+const PLAYER_STATUS_BAR_GAP: float = 0.0
+const PLAYER_STATUS_STACK_HEIGHT: float = 13.0
 
 const SHIP_UPGRADE_IDS := [
 	"cannon", "cannon_damage", "cannon_reload", "janggun",

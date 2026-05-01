@@ -116,13 +116,21 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"cannon_reload":
 			return "대포 재장전 -%d%%" % int(s.get("cd_pct_per_lv", 4))
 		"janggun":
-			return "포문 장군전 재장전 %.1f초 | 화염/둔화 강화" % maxf(6.0, 8.0 - float(next_level - 1) * 0.5)
+			var janggun_cooldown := maxf(
+				float(s.get("min_cooldown", 9.0)),
+				float(s.get("base_cooldown", 12.0)) - float(next_level - 1) * float(s.get("cooldown_reduce_per_lv", 0.6))
+			)
+			return "포문 장군전 재장전 %.1f초 | 화염/둔화 강화" % janggun_cooldown
 		"singigeon":
 			var rocketeers: int = get_specialist_unit_count(upgrades, current_levels, "singigeon", next_level)
 			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
 			var rocket_damage: float = rocket_base_damage * (1.0 + 0.15 * float(next_level))
+			var personnel_damage: float = rocket_damage * float(s.get("personnel_damage_mult", 5.0))
 			var cooldown: float = maxf(2.2, float(s.get("base_cooldown", 5.0)) - (float(next_level - 1) * float(s.get("cooldown_reduce_per_lv", 0.35))))
-			return "신기전 운용 %d명 | 로켓 %.1f | 재사용 %.1f초" % [rocketeers, rocket_damage, cooldown]
+			var knockback: float = float(s.get("base_knockback_speed", 9.0)) + float(next_level - 1) * float(s.get("knockback_speed_per_lv", 0.0))
+			var overboard_level: int = int(s.get("overboard_knockback_level", 4))
+			var knockback_note := "낙수 가능" if next_level >= overboard_level else "밀침 %.0f" % knockback
+			return "신기전 운용 %d명 | 대병 %.0f | %s | 재사용 %.1f초" % [rocketeers, personnel_damage, knockback_note, cooldown]
 		"crew_numbers":
 			var spearmen: int = get_specialist_unit_count(upgrades, current_levels, "crew_numbers", next_level)
 			return "창병 전환 %d명" % spearmen
@@ -133,8 +141,9 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "일으키기 %.2f초 | 복귀 체력 %.0f%% | 구호 반경 %.1fm" % [assist_duration, assist_health_ratio * 100.0, assist_range]
 		"boarding_resist":
 			var defense_damage: float = minf(float(s.get("boarding_defense_max_damage_per_tick", 7.0)), float(next_level) * float(s.get("boarding_defense_damage_per_tick_per_lv", 1.4)))
+			var capture_reduce_pct: int = int(round(float(next_level) * float(s.get("capture_damage_reduction_per_lv", 0.06)) * 100.0))
 			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.1)) * 100.0))
-			return "도선병 피해 %.1f/초 | 갑판 혼란 피해 -%d%%" % [defense_damage, boarding_fire_reduce_pct]
+			return "도선병 피해 %.1f/초 | 장악 피해 -%d%% | 화염 -%d%%" % [defense_damage, capture_reduce_pct, boarding_fire_reduce_pct]
 		"crew_attack":
 			return "무기 피해 +%.0f%%" % [next_level * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0]
 		"crew_defense":
@@ -178,7 +187,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var throwers: int = get_specialist_unit_count(upgrades, current_levels, "fire_pot", next_level)
 			var dmg: float = s.get("base_damage", 15.0) + (next_level - 1) * s.get("damage_per_lv", 5.0)
 			var cd: float = s.get("base_cooldown", 6.0) - (next_level - 1) * s.get("cooldown_reduce_per_lv", 1.0)
-			var ignite_pct: int = int(round(clampf(float(s.get("base_ignition_chance", 0.45)) + float(next_level - 1) * float(s.get("ignition_chance_per_lv", 0.075)), 0.0, float(s.get("max_ignition_chance", 0.75))) * 100.0))
+			var ignite_pct: int = int(round(clampf(float(s.get("base_ignition_chance", 0.25)) + float(next_level - 1) * float(s.get("ignition_chance_per_lv", 0.075)), 0.0, float(s.get("max_ignition_chance", 0.65))) * 100.0))
 			if next_level == 4:
 				cd = 3.5
 			if next_level >= 5:
@@ -189,9 +198,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var burst: int = 3
 			if next_level >= 3:
 				burst = 4
-			if next_level >= 5:
-				burst = 5
-			var repeater_damage: float = s.get("base_damage", 10.0) + (next_level - 1) * s.get("damage_per_lv", 2.0)
+			var repeater_damage: float = s.get("base_damage", 7.0) + (next_level - 1) * s.get("damage_per_lv", 1.0)
 			return "연노 운용 %d명 | %d연발 | 피해 %.0f" % [repeaters, burst, repeater_damage]
 		"supply_bonus":
 			if level_matches(next_level, s.get("radius_levels", [])):
@@ -208,12 +215,12 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"fleet_signal":
 			var signal_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades)
 			var signal_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
-			return "지원함 소집 | 한계 %d척 | 편성 %s" % [signal_limit, signal_summary]
+			return "맹선 소집 | 한계 %d척 | 편성 %s" % [signal_limit, signal_summary]
 		"panokseon_upgrade":
 			var panokseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
 			return "판옥선 포격함 1척 합류 | 편성 %s" % panokseon_summary
 		"supply":
-			return "선체 수리 (즉시 HP +%d 회복)" % int(s.get("max_hp_add", 20))
+			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(s.get("hull_heal", 20)), int(s.get("stamina_recover", 25))]
 		"gold":
 			return "골드 +%d" % int(s.get("score_add", 50))
 

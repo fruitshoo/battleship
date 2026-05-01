@@ -623,6 +623,7 @@ func die() -> void:
 	
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
 	_evacuate_player_soldiers_as_survivors()
+	ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(self)
 	
 	# 침몰 시작 시 타겟 그룹에서 제외
 	if is_in_group("enemy"):
@@ -634,11 +635,9 @@ func die() -> void:
 	if is_instance_valid(cached_lm):
 		if cached_lm.has_method("add_ship_sunk"):
 			cached_lm.add_ship_sunk(1)
-		# 규칙 통일: 함선 격침은 XP/골드 지급
+		# 규칙 통일: 함선 격침 골드는 즉시 지급하고, XP는 침몰 부유물 회수로 지급한다.
 		if cached_lm.has_method("add_score"):
 			cached_lm.add_score(120)
-		if cached_lm.has_method("add_xp"):
-			cached_lm.add_xp(100)
 	
 	# 공적 포인트(Merit) 추가 (보스는 대량의 공적 부여)
 	if not _merit_granted and is_instance_valid(cached_lm) and cached_lm.has_method("add_merit"):
@@ -646,6 +645,7 @@ func die() -> void:
 		_merit_granted = true
 
 	_drop_treasure_chest()
+	_drop_floating_xp_loot()
 	
 	# 침몰 효과 (회전하며 가라앉음)
 	var tween = create_tween()
@@ -761,6 +761,10 @@ func _drop_treasure_chest() -> void:
 	chest.global_position = global_position
 	chest.global_position.y = 0.0
 	print("[Boss] 보스 격침! 보물 상자 드랍.")
+
+
+func _drop_floating_xp_loot() -> void:
+	ChaserShipSupportHelper.drop_floating_loot(self, true, 100)
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:

@@ -254,30 +254,37 @@ static func die(soldier) -> void:
 	if soldier.team == "enemy":
 		_apply_enemy_kill_rewards(soldier)
 
-	_snap_dead_body_to_deck(soldier)
+	var is_offboard_death := _is_offboard_death_context(soldier)
+	if not is_offboard_death:
+		_snap_dead_body_to_deck(soldier)
 	var death_position: Vector3 = soldier.global_position
 	var is_sinking_death := _is_sinking_death_context(soldier)
 	var death_volume_db := SOLDIER_SINKING_DEATH_VOLUME_DB if is_sinking_death else SOLDIER_DEATH_VOLUME_DB
 	var splash_volume_db := SOLDIER_SINKING_SPLASH_VOLUME_DB if is_sinking_death else 0.0
+	var should_play_splash: bool = not is_offboard_death or soldier.get_meta("offboard_splash_played", false) != true
+	var should_play_death_voice: bool = not (
+		is_offboard_death and soldier.get_meta("overboard_knockback_voice_played", false) == true
+	)
 	var tree: SceneTree = soldier.get_tree()
 	var audio_manager = soldier.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		if audio_manager.has_method("play_sfx_random_pitch"):
-			audio_manager.play_sfx_random_pitch(
-				"soldier_die",
-				death_position,
-				SOLDIER_DEATH_PITCH_MIN,
-				SOLDIER_DEATH_PITCH_MAX,
-				death_volume_db
-			)
-		else:
-			audio_manager.play_sfx(
-				"soldier_die",
-				death_position,
-				randf_range(SOLDIER_DEATH_PITCH_MIN, SOLDIER_DEATH_PITCH_MAX),
-				death_volume_db
-			)
-		if is_instance_valid(tree):
+		if should_play_death_voice:
+			if audio_manager.has_method("play_sfx_random_pitch"):
+				audio_manager.play_sfx_random_pitch(
+					"soldier_die",
+					death_position,
+					SOLDIER_DEATH_PITCH_MIN,
+					SOLDIER_DEATH_PITCH_MAX,
+					death_volume_db
+				)
+			else:
+				audio_manager.play_sfx(
+					"soldier_die",
+					death_position,
+					randf_range(SOLDIER_DEATH_PITCH_MIN, SOLDIER_DEATH_PITCH_MAX),
+					death_volume_db
+				)
+		if should_play_splash and is_instance_valid(tree):
 			tree.create_timer(randf_range(0.3, 0.6)).timeout.connect(func():
 				var main_loop := Engine.get_main_loop() as SceneTree
 				if not is_instance_valid(main_loop):
@@ -294,6 +301,10 @@ static func die(soldier) -> void:
 		soldier.remove_from_group("enemy")
 
 	_set_body_collision_disabled(soldier, true)
+	if is_offboard_death:
+		soldier.visible = false
+		soldier.queue_free()
+		return
 
 	var owned_ship_team: String = ""
 	if is_instance_valid(soldier.owned_ship):
@@ -312,6 +323,14 @@ static func _snap_dead_body_to_deck(soldier) -> void:
 		return
 	if soldier.has_method("_keep_within_owned_ship_bounds"):
 		soldier._keep_within_owned_ship_bounds()
+
+
+static func _is_offboard_death_context(soldier) -> bool:
+	var death_cause: String = str(soldier.get_meta("last_death_cause", "combat"))
+	if death_cause == "drowned" or death_cause == "overboard":
+		return true
+	var last_damage_source: String = str(soldier.get_meta("last_damage_source", ""))
+	return last_damage_source == "drowned" or last_damage_source == "overboard"
 
 
 static func _is_sinking_death_context(soldier) -> bool:

@@ -23,6 +23,10 @@ const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.ts
 @export var allow_retarget: bool = false
 @export var prefer_personnel_targets: bool = false
 @export var soldier_knockback_speed: float = 9.0
+@export var soldier_knockback_duration: float = 0.34
+@export var soldier_knockback_allows_overboard: bool = false
+@export var soldier_knockback_upward_speed: float = 0.0
+@export var soldier_knockback_arc_bonus: float = 0.035
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 2.0
 @export_range(0.03, 0.3) var retarget_scan_interval: float = 0.08
@@ -415,10 +419,50 @@ func _apply_soldier_knockback(target: Node3D) -> void:
 		knockback_dir.y = 0.0
 	if knockback_dir.length_squared() <= 0.0001:
 		return
+	var allow_overboard := soldier_knockback_allows_overboard and _should_allow_soldier_overboard(target, knockback_dir)
+	var upward_speed := soldier_knockback_upward_speed
+	if allow_overboard:
+		upward_speed += clampf(soldier_knockback_speed * soldier_knockback_arc_bonus, 0.25, 0.75)
 	if target.has_method("apply_external_knockback"):
-		target.apply_external_knockback(knockback_dir, soldier_knockback_speed, 0.34)
+		target.apply_external_knockback(
+			knockback_dir,
+			soldier_knockback_speed,
+			soldier_knockback_duration,
+			allow_overboard,
+			upward_speed
+		)
 	else:
 		target.velocity += knockback_dir.normalized() * soldier_knockback_speed
+
+
+func _should_allow_soldier_overboard(target: Node3D, knockback_dir: Vector3) -> bool:
+	if not is_instance_valid(target):
+		return false
+	var ship: Node3D = target.get_owned_ship_node() if target.has_method("get_owned_ship_node") else null
+	if not is_instance_valid(ship):
+		return false
+	var half_ext := Vector2(2.0, 3.0)
+	if ship.has_method("get_deck_half_extents"):
+		var extents: Variant = ship.call("get_deck_half_extents")
+		if extents is Vector2:
+			half_ext = extents
+	var local_pos := ship.to_local(target.global_position)
+	var local_dir := ship.to_local(target.global_position + knockback_dir.normalized()) - local_pos
+	local_dir.y = 0.0
+	if local_dir.length_squared() <= 0.0001:
+		return false
+	local_dir = local_dir.normalized()
+	var projected_distance := soldier_knockback_speed * soldier_knockback_duration * 0.45
+	var projected_local := local_pos + local_dir * projected_distance
+	if absf(projected_local.x) > half_ext.x or absf(projected_local.z) > half_ext.y:
+		return _is_knockback_outward(local_pos, local_dir)
+	return false
+
+
+func _is_knockback_outward(local_pos: Vector3, local_dir: Vector3) -> bool:
+	var outward_x := signf(local_pos.x) * local_dir.x
+	var outward_z := signf(local_pos.z) * local_dir.z
+	return maxf(outward_x, outward_z) > 0.12
 
 
 func _spawn_critical_hit_effect(target: Node3D) -> void:

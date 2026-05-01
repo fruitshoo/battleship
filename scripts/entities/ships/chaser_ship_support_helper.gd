@@ -146,22 +146,20 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		return 0
 
 	var lm: Node = ship.get("cached_lm") if ship.get("cached_lm") != null else LevelManagerRegistry.get_level_manager(ship.get_tree())
-	var xp_per_soldier: int = 3
-	var merit_per_soldier: int = 0
+	var merit_per_soldier: int = 1
 	if is_instance_valid(lm):
-		xp_per_soldier = max(0, int(lm.get("drowned_soldier_kill_xp_reward")))
 		merit_per_soldier = max(0, int(lm.get("drowned_soldier_kill_merit_reward")))
+		if merit_per_soldier <= 0:
+			merit_per_soldier = max(0, int(lm.get("merit_per_soldier_kill")))
 		if lm.has_method("add_soldier_kill"):
 			lm.add_soldier_kill(soldier_count, "drowned")
-		if merit_per_soldier > 0 and lm.has_method("add_merit"):
-			lm.add_merit(merit_per_soldier * soldier_count)
 
 	for soldier in sinking_soldiers:
 		soldier.set_meta(ENEMY_SINKING_REWARD_ACCOUNTED_META, true)
 		soldier.set_meta("last_death_cause", "drowned")
 		soldier.set_meta("last_damage_source", "drowned")
 
-	if xp_per_soldier <= 0:
+	if merit_per_soldier <= 0:
 		return 0
 
 	var pickup_count: int = mini(ENEMY_DRIFTER_MAX_PICKUPS, ceili(float(soldier_count) / float(ENEMY_DRIFTER_SOLDIERS_PER_PICKUP)))
@@ -171,14 +169,14 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		var remaining_pickups := pickup_count - index
 		var soldiers_in_pickup: int = ceili(float(remaining_soldiers) / float(remaining_pickups))
 		remaining_soldiers -= soldiers_in_pickup
-		var xp_amount: int = xp_per_soldier * soldiers_in_pickup
-		if xp_amount <= 0:
+		var merit_amount: int = merit_per_soldier * soldiers_in_pickup
+		if merit_amount <= 0:
 			continue
 		var pickup := _instantiate_enemy_drifter_pickup(ship)
 		if not is_instance_valid(pickup):
 			continue
 		if pickup.has_method("configure"):
-			pickup.call("configure", xp_amount, soldiers_in_pickup)
+			pickup.call("configure", merit_amount, soldiers_in_pickup)
 		var angle: float = randf_range(0.0, TAU)
 		var radius: float = randf_range(0.8, 2.4 + float(index) * 0.35)
 		var spawn_pos: Vector3 = Vector3(
@@ -317,7 +315,7 @@ static func sink_derelict(ship) -> void:
 		return
 	ship.is_sinking = true
 	print("[Ship] 폐선 침몰 시작!")
-	drop_floating_loot(ship)
+	drop_floating_loot(ship, true, 30)
 
 	ship._set_fire_emitting(true)
 
@@ -366,16 +364,18 @@ static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, wo
 	return not viewport_rect.has_point(screen_pos)
 
 
-static func drop_floating_loot(ship) -> void:
+static func drop_floating_loot(ship, force_drop: bool = false, xp_amount_override: int = -1) -> void:
 	if not ship.loot_scene:
 		return
 	if ship.get_meta("floating_loot_dropped", false) == true:
 		return
 	ship.set_meta("floating_loot_dropped", true)
-	if randf() > float(ship.floating_loot_drop_chance):
+	if not force_drop and randf() > float(ship.floating_loot_drop_chance):
 		return
 
 	var loot = ScenePool.acquire(ship.get_tree(), ship.loot_scene)
+	if is_instance_valid(loot) and loot.has_method("configure"):
+		loot.call("configure", xp_amount_override, -1)
 	var offset_x = randf_range(-1.2, 1.2)
 	var offset_z = randf_range(-1.2, 1.2)
 	var spawn_pos = Vector3(ship.global_position.x + offset_x, 0.5, ship.global_position.z + offset_z)

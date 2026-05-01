@@ -92,7 +92,7 @@ const DAMAGE_SOURCE_NAME := {
 	"spear": "창",
 	"trident": "삼지창",
 	"harpoon": "작살",
-	"boarding_defense": "방책",
+	"boarding_defense": "창벽",
 }
 
 # 공적(Merit) 시스템: 백병전 업그레이드 전용 트랙

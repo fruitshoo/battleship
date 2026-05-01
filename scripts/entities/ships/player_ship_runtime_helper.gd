@@ -26,9 +26,9 @@ static func handle_input(ship, delta: float) -> void:
 	ship.steer(steer_input, delta)
 
 	if Input.is_action_pressed("row_forward"):
-		ship.set_rowing(true)
+		ship.set_rowing(true, 1)
 	elif Input.is_action_pressed("row_backward"):
-		ship.set_rowing(true)
+		ship.set_rowing(true, -1)
 	else:
 		if ship.is_rowing:
 			ship.set_rowing(false)

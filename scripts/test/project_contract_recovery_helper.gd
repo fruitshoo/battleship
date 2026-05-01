@@ -66,12 +66,14 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		failures.append("recovery loot smoke does not use its shared waterline visual offset")
 
 	var score_before: int = int(level_manager.get("current_score"))
+	var xp_before: int = int(level_manager.get("current_xp"))
 	var hull_before: float = float(player_ship.get("hull_hp")) if player_ship.get("hull_hp") != null else 0.0
 	if player_ship.get("max_hull_hp") != null:
 		player_ship.set("hull_hp", maxf(1.0, float(player_ship.get("max_hull_hp")) * 0.4))
 		hull_before = float(player_ship.get("hull_hp"))
 	if player_ship.get("rowing_stamina") != null:
 		player_ship.set("rowing_stamina", 0.0)
+	loot.set("xp_amount", 12)
 	loot.set("target_player", player_ship)
 	loot.call("_collect_by_proximity")
 	await _wait_frames(owner, 2)
@@ -80,10 +82,10 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		failures.append("recovery loot smoke did not mark loot collected")
 	if int(level_manager.get("current_score")) <= score_before:
 		failures.append("recovery loot smoke did not grant score")
-	if player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) <= hull_before:
-		failures.append("recovery loot smoke did not repair player hull")
-	elif player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) - hull_before < 14.9:
-		failures.append("recovery loot smoke hull repair is below the expected base amount")
+	if int(level_manager.get("current_xp")) <= xp_before:
+		failures.append("recovery loot smoke did not grant XP")
+	if player_ship.get("hull_hp") != null and absf(float(player_ship.get("hull_hp")) - hull_before) > 0.01:
+		failures.append("recovery loot smoke should no longer repair player hull")
 
 
 static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:

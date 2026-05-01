@@ -45,12 +45,17 @@
 			"description": "대포 포문에서 느리게 장전되는 장군전을 추가 발사",
 			"card_art_path": "res://assets/ui/upgrades/janggun_card.png",
 			"max_level": 5,
-			"color": "996633"
+			"color": "996633",
+			"stats": {
+				"base_cooldown": 12.0,
+				"cooldown_reduce_per_lv": 0.6,
+				"min_cooldown": 9.0
+			}
 			},
 			"singigeon": {
 				"name": "신기전",
 				"category": 1,
-				"description": "기존 병사에게 신기전 운용을 맡김",
+				"description": "기존 병사에게 신기전 운용을 맡기고 적 병사를 밀쳐냄. 고레벨에서 낙수 가능",
 				"max_level": 5,
 				"color": "ff4c4c",
 				"stats": {
@@ -59,7 +64,14 @@
 				"personnel_damage_mult": 6.0,
 				"base_cooldown": 5.0,
 				"cooldown_reduce_per_lv": 0.35,
-				"projectile_speed": 32.0
+				"projectile_speed": 32.0,
+				"base_knockback_speed": 9.0,
+				"knockback_speed_per_lv": 4.0,
+				"base_knockback_duration": 0.34,
+				"knockback_duration_per_lv": 0.08,
+				"overboard_knockback_level": 4,
+				"overboard_upward_speed": 1.6,
+				"overboard_upward_speed_per_lv": 0.3
 			}
 			},
 			"fire_pot": {
@@ -144,9 +156,9 @@
 			}
 		},
 		"boarding_resist": {
-			"name": "방책",
+			"name": "창벽",
 			"category": 1,
-			"description": "도선병을 갑판에서 소모시키고 혼란 피해를 줄임",
+			"description": "배 둘레에 장창을 세워 적 도선병에게 피해를 주고 장악/화염 피해를 줄임",
 			"max_level": 5,
 			"color": "4ca6ff",
 			"card_art_path": "res://assets/ui/upgrades/boarding_resist_card.png",
@@ -257,9 +269,9 @@
 			}
 		},
 		"supply": {
-			"name": "응급 보급",
+			"name": "회복",
 			"category": 2,
-			"description": "체력과 스태미나 회복",
+			"description": "선체와 스태미나를 즉시 회복",
 			"max_level": 99,
 			"color": "7fff7f",
 			"stats": {
@@ -278,9 +290,9 @@
 			}
 		},
 		"fleet_signal": {
-			"name": "지원함",
+			"name": "맹선",
 			"category": 4,
-			"description": "지원함 호출 또는 수리, Lv2 지원함 한계 +1",
+			"description": "맹선 호출 또는 수리, Lv2 맹선 한계 +1",
 			"card_art_path": "res://assets/ui/upgrades/fleet_signal_card.png",
 			"max_level": 2,
 			"color": "ffb347",

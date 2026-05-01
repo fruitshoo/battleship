@@ -1,11 +1,10 @@
 extends Area3D
 
 ## 부유물(Floating Loot) 시스템
-## 적을 물리쳤을 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
-
-const DEFAULT_HULL_HEAL: float = 15.0
+## 적 함선이 침몰할 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
 
 @export var gold_amount: int = 5
+@export var xp_amount: int = 30
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도
@@ -46,6 +45,12 @@ func _ready() -> void:
 
 func pool_capacity() -> int:
 	return 80
+
+func configure(next_xp_amount: int = -1, next_gold_amount: int = -1) -> void:
+	if next_xp_amount >= 0:
+		xp_amount = next_xp_amount
+	if next_gold_amount >= 0:
+		gold_amount = next_gold_amount
 
 func pool_reset() -> void:
 	time_alive = 0.0
@@ -240,24 +245,12 @@ func _collect_loot() -> void:
 	if is_instance_valid(_cached_lm):
 		if _cached_lm.has_method("add_score"):
 			_cached_lm.add_score(gold_amount)
-			
-	# 선체 수리 (supply_bonus 업그레이드 수치 반영)
-	if is_instance_valid(target_player) and target_player.is_inside_tree() and "hull_hp" in target_player and "max_hull_hp" in target_player and _can_apply_loot_hull_heal(target_player):
-		var heal_amount: float = DEFAULT_HULL_HEAL
-		var stamina_recover: float = 0.0
-		if is_instance_valid(_cached_um) and _cached_um.has_method("get_supply_bonus_stats"):
-			var supply_stats: Dictionary = _cached_um.get_supply_bonus_stats()
-			heal_amount = float(supply_stats.get("heal_amount", heal_amount + float(supply_stats.get("heal_bonus", 0.0))))
-			stamina_recover = float(supply_stats.get("stamina_recovery", float(supply_stats.get("stamina_recovery_bonus", 0.0))))
-		target_player.hull_hp = minf(target_player.hull_hp + heal_amount, target_player.max_hull_hp)
-		if "rowing_stamina" in target_player and "max_rowing_stamina" in target_player:
-			target_player.rowing_stamina = minf(target_player.max_rowing_stamina, target_player.rowing_stamina + stamina_recover)
-		
-		# HUD 연동
-		if target_player.has_method("_find_hud"):
-			var hud = target_player._find_hud()
-			if hud and hud.has_method("update_hull_hp"):
-				hud.update_hull_hp(target_player.hull_hp, target_player.max_hull_hp)
+		if xp_amount > 0 and _cached_lm.has_method("add_xp"):
+			_cached_lm.add_xp(xp_amount)
+		if _cached_lm.get("hud") != null:
+			var hud: Variant = _cached_lm.get("hud")
+			if is_instance_valid(hud) and hud.has_method("show_message"):
+				hud.call("show_message", "침몰 부유물 회수: XP +%d" % xp_amount, 1.5)
 				
 	# 파티클이나 시각적인 먹는 효과 (크기가 줄어들면서 사라짐)
 	if visual:
@@ -267,13 +260,3 @@ func _collect_loot() -> void:
 		tween.tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 	else:
 		ScenePool.release(self)
-
-
-func _can_apply_loot_hull_heal(player_ship: Node) -> bool:
-	if not is_instance_valid(player_ship):
-		return false
-	if player_ship.get("deck_is_contested") == true or player_ship.get("deck_is_overrun") == true:
-		return false
-	if player_ship.get("deck_hostile_boarder_count") != null and int(player_ship.get("deck_hostile_boarder_count")) > 0:
-		return false
-	return true

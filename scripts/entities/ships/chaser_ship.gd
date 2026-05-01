@@ -529,14 +529,12 @@ func die() -> void:
 		remove_from_group("captured_minion")
 	EntityRegistry.unregister_captured_minion(self)
 	
-	# 골드 및 XP 추가
+	# 격침 통계와 골드는 즉시 처리하고, XP는 침몰 부유물 회수로 지급한다.
 	if is_instance_valid(cached_lm):
 		if team == "enemy" and cached_lm.has_method("add_ship_sunk"):
 			cached_lm.add_ship_sunk(1)
 		if cached_lm.has_method("add_score"):
 			cached_lm.add_score(25)
-		if cached_lm.has_method("add_xp"):
-			cached_lm.add_xp(30)
 			
 		# 공적 포인트(Merit) 추가 (격침 시에도 부여, 중복 방지)
 		if not _merit_granted and cached_lm.has_method("add_merit"):
@@ -577,7 +575,7 @@ func die() -> void:
 
 
 func _drop_floating_loot() -> void:
-	ChaserShipSupportHelper.drop_floating_loot(self)
+	ChaserShipSupportHelper.drop_floating_loot(self, true, 30)
 
 func _spawn_enemy_drifter_xp_pickups() -> void:
 	ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(self)

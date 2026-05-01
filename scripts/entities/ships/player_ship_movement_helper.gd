@@ -61,11 +61,18 @@ static func update_movement(ship, delta: float) -> void:
 	var target_speed: float = calculate_sail_speed(ship)
 	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
 	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
+	var rowing_direction: int = _get_rowing_direction(ship)
+	var is_reverse_rowing: bool = (is_actively_rowing or is_exhausted_rowing) and rowing_direction < 0
 	var rowing_efficiency: float = get_furled_sail_rowing_efficiency_multiplier(ship)
-	if is_actively_rowing:
-		target_speed += ship.rowing_speed * rowing_efficiency
-	elif is_exhausted_rowing:
-		target_speed += ship.rowing_speed * float(ship.exhausted_rowing_speed_ratio) * rowing_efficiency
+	if is_reverse_rowing:
+		var reverse_ratio := float(ship.reverse_rowing_speed_ratio) if "reverse_rowing_speed_ratio" in ship else 0.35
+		var exhausted_ratio := float(ship.exhausted_rowing_speed_ratio) if is_exhausted_rowing else 1.0
+		target_speed = -ship.rowing_speed * reverse_ratio * exhausted_ratio * rowing_efficiency
+	else:
+		if is_actively_rowing:
+			target_speed += ship.rowing_speed * rowing_efficiency
+		elif is_exhausted_rowing:
+			target_speed += ship.rowing_speed * float(ship.exhausted_rowing_speed_ratio) * rowing_efficiency
 	target_speed *= ship.get_shiphandling_multiplier()
 	target_speed *= get_boarding_drag_multiplier(ship)
 	target_speed *= ship.speed_mult
@@ -74,28 +81,38 @@ static func update_movement(ship, delta: float) -> void:
 		var accel: float = ship.acceleration
 		if (is_actively_rowing or is_exhausted_rowing) and "rowing_acceleration_mult" in ship:
 			accel *= float(ship.rowing_acceleration_mult) * rowing_efficiency
+			if is_reverse_rowing and "reverse_rowing_acceleration_mult" in ship:
+				accel *= float(ship.reverse_rowing_acceleration_mult)
 			if is_exhausted_rowing:
 				accel *= 0.75
 		ship.current_speed = move_toward(ship.current_speed, target_speed, accel * delta)
 	else:
-		ship.current_speed = move_toward(ship.current_speed, target_speed, ship.deceleration * delta)
+		var decel: float = ship.deceleration
+		if is_reverse_rowing and "reverse_rowing_acceleration_mult" in ship:
+			decel *= float(ship.reverse_rowing_acceleration_mult)
+		ship.current_speed = move_toward(ship.current_speed, target_speed, decel * delta)
 	var velocity = forward * ship.current_speed
 	var sep = calculate_separation(ship)
 	velocity += sep
 	velocity += ship._calculate_boarding_pull_velocity(delta)
 	velocity += ship._calculate_collision_repulsion() * delta
 	ship.position += velocity * delta
-	var wake_active = ship.current_speed > 0.5 or sep.length() > 0.2
-	var wake_speed_ratio = clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
+	var motion_speed := absf(ship.current_speed)
+	var wake_active = motion_speed > 0.5 or sep.length() > 0.2
+	var wake_speed_ratio = clampf(motion_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 	var wake_turn_ratio = clampf(ship.rudder_angle / 45.0, -1.0, 1.0)
 	ship._set_wake_state(wake_active, wake_speed_ratio, wake_turn_ratio, clampf(sep.length() / 2.0, 0.0, 1.0))
 
 static func update_steering(ship, delta: float) -> void:
-	if ship.current_speed < 0.1:
+	var motion_speed := absf(ship.current_speed)
+	if motion_speed < 0.1:
 		return
-	var speed_ratio = ship.current_speed / ship.max_speed
+	var speed_ratio = motion_speed / ship.max_speed
 	var turn_authority: float = float(ship.player_rudder_turn_authority) if "player_rudder_turn_authority" in ship else 1.0
-	var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority * delta
+	if ship.current_speed < 0.0 and "reverse_rudder_turn_authority_mult" in ship:
+		turn_authority *= float(ship.reverse_rudder_turn_authority_mult)
+	var direction_sign := -1.0 if ship.current_speed < 0.0 else 1.0
+	var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority * direction_sign * delta
 	ship.rotation.y -= deg_to_rad(actual_turn)
 
 static func calculate_sail_speed(ship) -> float:
@@ -152,6 +169,11 @@ static func get_furled_sail_rowing_stamina_cost_multiplier(ship) -> float:
 			return clampf(float(ship.get("furled_sail_rowing_stamina_cost_multiplier")), 0.0, 1.0)
 	return 1.0
 
+static func _get_rowing_direction(ship) -> int:
+	if "rowing_direction" in ship and int(ship.rowing_direction) < 0:
+		return -1
+	return 1
+
 static func update_oar_visual(ship, delta: float) -> void:
 	var left_oars := _get_oar_pivots(ship, true)
 	var right_oars := _get_oar_pivots(ship, false)
@@ -159,9 +181,11 @@ static func update_oar_visual(ship, delta: float) -> void:
 		return
 	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
 	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
-	var is_moving_fast: bool = ship.current_speed > 1.0
+	var is_moving_fast: bool = absf(ship.current_speed) > 1.0
 	if is_actively_rowing or is_exhausted_rowing or is_moving_fast:
 		var row_speed = 2.2 if is_actively_rowing else (1.45 if is_exhausted_rowing else 1.2)
+		if _get_rowing_direction(ship) < 0:
+			row_speed *= -0.72
 		ship._oar_time += delta * row_speed
 		for i in range(left_oars.size()):
 			_apply_sculling_oar_motion(left_oars[i], ship._oar_time + float(i) * 0.24, 1.0)
@@ -201,7 +225,8 @@ static func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
 
 static func update_rowing_stamina(ship, delta: float) -> void:
 	if ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0:
-		ship.rowing_stamina -= ship.stamina_drain_rate * get_furled_sail_rowing_stamina_cost_multiplier(ship) * delta
+		var reverse_cost_mult := float(ship.reverse_rowing_stamina_cost_mult) if _get_rowing_direction(ship) < 0 and "reverse_rowing_stamina_cost_mult" in ship else 1.0
+		ship.rowing_stamina -= ship.stamina_drain_rate * get_furled_sail_rowing_stamina_cost_multiplier(ship) * reverse_cost_mult * delta
 		ship.rowing_stamina = max(0.0, ship.rowing_stamina)
 		if ship.rowing_stamina <= 0:
 			ship.rowing_locked = true

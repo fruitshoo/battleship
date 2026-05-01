@@ -57,6 +57,7 @@ const CORPSE_CLEANUP_THROW_ARC_META := "corpse_cleanup_throw_arc"
 
 # === 노 젓기 ===
 var is_rowing: bool = false
+var rowing_direction: int = 1
 var rowing_locked: bool = false
 @export var sail_turn_speed: float = 60.0
 @export var sail_efficiency_mult: float = 1.0
@@ -73,6 +74,10 @@ var rowing_locked: bool = false
 @export var max_rowing_stamina: float = 100.0
 @export var rowing_stamina: float = 100.0
 @export var rowing_acceleration_mult: float = 1.0
+@export_range(0.1, 0.6, 0.05) var reverse_rowing_speed_ratio: float = 0.35
+@export_range(0.2, 1.2, 0.05) var reverse_rowing_acceleration_mult: float = 0.70
+@export_range(0.2, 1.0, 0.05) var reverse_rudder_turn_authority_mult: float = 0.65
+@export_range(0.5, 2.0, 0.05) var reverse_rowing_stamina_cost_mult: float = 1.05
 @export_range(0.2, 0.9, 0.05) var exhausted_rowing_speed_ratio: float = 0.55
 @export var stamina_recovery_unlock_threshold: float = 25.0
 @export var stamina_drain_rate: float = 10.0 # 노 젓기 시 스태미나 소모 속도 완화
@@ -302,13 +307,14 @@ func _physics_process(delta: float) -> void:
 	if _flap_timer > 0:
 		_flap_timer -= delta
 		
-	if current_speed > 0.5:
+	var motion_speed := absf(current_speed)
+	if motion_speed > 0.5:
 		_wave_timer -= delta
 		if _wave_timer <= 0:
 			if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
 				_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.8, 1.2), 3.0)
 			# 속도가 빠를수록 자주, 느릴수록 드문드문 (최소 1.5초 ~ 최대 4.5초)
-			var speed_mod = clamp(current_speed / 5.0, 0.2, 2.0)
+			var speed_mod = clamp(motion_speed / 5.0, 0.2, 2.0)
 			_wave_timer = randf_range(1.5, 3.5) / speed_mod
 		
 	if is_player_controlled:
@@ -1035,13 +1041,15 @@ func _sync_support_fleet_sail_furl() -> void:
 
 
 ## 노 젓기 활성화/비활성화
-func set_rowing(active: bool) -> void:
+func set_rowing(active: bool, direction: int = 1) -> void:
 	is_rowing = active
+	if active:
+		rowing_direction = -1 if direction < 0 else 1
 
 
 ## 노 젓기 토글
 func toggle_rowing() -> void:
-	is_rowing = not is_rowing
+	set_rowing(not is_rowing, 1)
 
 
 ## === 선체 내구도 시스템 ===

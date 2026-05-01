@@ -522,7 +522,7 @@ func _apply_boarding_resist(ship: Node3D, level: int) -> void:
 	ship.set_meta("boarding_defense_damage_per_tick", defense_damage)
 	ship.set_meta("boarding_capture_damage_reduction", clampf(capture_damage_reduction, 0.0, 0.75))
 	ship.set_meta("boarding_fire_damage_reduction", clampf(boarding_fire_reduction, 0.0, 0.75))
-	print("[BoardingResist] 방책 Lv.%d (도선병 피해 %.1f/s)" % [level, defense_damage])
+	print("[BoardingResist] 창벽 Lv.%d (도선병 피해 %.1f/s)" % [level, defense_damage])
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
 	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")

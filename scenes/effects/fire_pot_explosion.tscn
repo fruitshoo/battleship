@@ -1,6 +1,8 @@
 [gd_scene format=3 uid="uid://7oya787bmntu"]
 
-[ext_resource type="Texture2D" uid="uid://dlg7mj85jaow2" path="res://assets/vfx/flipbooks/explosion_smoke_01_8x8.tga" id="2_smoke"]
+[ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="1_1g06c"]
+[ext_resource type="Curve" path="res://resources/vfx/curves/scale_puff_out_curve.tres" id="2_3k83x"]
+[ext_resource type="Texture2D" uid="uid://ddl3ljm72mfkn" path="res://resources/vfx/curves/alpha_quick_pop.tres" id="2_loal1"]
 [ext_resource type="Script" uid="uid://dw0tidlfwho30" path="res://scripts/effects/one_shot_particle.gd" id="7_script"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3k83x"]
@@ -9,29 +11,16 @@ transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
 vertex_color_is_srgb = true
-albedo_texture = ExtResource("2_smoke")
+albedo_texture = ExtResource("1_1g06c")
 albedo_texture_force_srgb = true
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 5
-particles_anim_v_frames = 5
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
 particles_anim_loop = false
 
-[sub_resource type="Curve" id="Curve_nnqk4"]
-_limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0), 0.0, 5.161916, 0, 0, Vector2(0.22363946, 0.5953608), -0.06588974, -0.06588974, 0, 0, Vector2(1.9991497, 0), -0.96549684, 0.0, 0, 0]
-point_count = 3
-
 [sub_resource type="CurveTexture" id="CurveTexture_0mxcn"]
-curve = SubResource("Curve_nnqk4")
-
-[sub_resource type="Curve" id="Curve_core_scale"]
-_limits = [0.0, 1.0, 0.0, 2.0]
-_data = [Vector2(0, 0.03178692), 0.0, 3.763779, 0, 0, Vector2(0.2372449, 0.863402), 0.0, 0.0, 0, 0, Vector2(1.9923469, 0), -1.1610411, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="CurveTexture" id="CurveTexture_core_scale"]
-curve = SubResource("Curve_core_scale")
+curve = ExtResource("2_3k83x")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_core"]
 lifetime_randomness = 0.2
@@ -39,25 +28,25 @@ particle_flag_rotate_y = true
 angle_min = -180.0
 angle_max = 180.0
 direction = Vector3(0, 1, 0)
-spread = 15.0
+spread = 30.0
 initial_velocity_min = 0.79999995
-initial_velocity_max = 1.0
+initial_velocity_max = 2.0
 gravity = Vector3(0, 0, 0)
 damping_min = 0.4
 damping_max = 0.8
 scale_min = 3.0
 scale_max = 5.0
-scale_curve = SubResource("CurveTexture_core_scale")
+scale_curve = ExtResource("2_loal1")
 alpha_curve = SubResource("CurveTexture_0mxcn")
-anim_speed_min = 1.0
-anim_speed_max = 1.0
+anim_speed_min = 0.5
+anim_speed_max = 0.5
 
 [sub_resource type="QuadMesh" id="QuadMesh_fv44f"]
 
 [node name="FirePotExplosion" type="GPUParticles3D" unique_id=2000374880]
 material_override = SubResource("StandardMaterial3D_3k83x")
 emitting = false
-amount = 6
+amount = 3
 lifetime = 1.2
 one_shot = true
 explosiveness = 0.9

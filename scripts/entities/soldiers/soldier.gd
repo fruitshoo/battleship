@@ -32,6 +32,13 @@ enum State {
 
 const REST_RECOVERY_HEALTH_PER_SECOND: float = 1.0
 const REST_RECOVERY_DELAY_AFTER_DAMAGE: float = 3.0
+const EXTERNAL_KNOCKBACK_GRAVITY: float = 18.0
+const EXTERNAL_KNOCKBACK_OVERBOARD_DECAY: float = 5.6
+const EXTERNAL_KNOCKBACK_DECK_MARGIN: float = 0.18
+const EXTERNAL_KNOCKBACK_SNAP_DURATION: float = 0.07
+const EXTERNAL_KNOCKBACK_SNAP_MULTIPLIER: float = 1.22
+const META_OVERBOARD_KNOCKBACK_VOICE_PLAYED := "overboard_knockback_voice_played"
+const SFX_OVERBOARD_KNOCKBACK_DEATH := "ballistic_death"
 const NODE_HAND_PIVOT := "HandPivot"
 const NODE_BODY_COLLISION_SHAPE := "CollisionShape3D"
 const NODE_FALLBACK_VISUAL_MESH := "MeshInstance3D"
@@ -91,6 +98,7 @@ var combat_timer: float = 0.0 # 전투/사격 체크 스로틀링용
 var rest_recovery_delay_timer: float = 0.0
 var _is_jumping: bool = false # 점프/도선 중인지 여부
 var boarding_status: String = "on_deck"
+var external_knockback_allows_overboard: bool = false
 
 # 성능 최적화: UpgradeManager 캐싱
 var _cached_upgrade_manager: Node = null
@@ -120,6 +128,7 @@ var _limbo_ai_update_timer: float = 0.0
 var _limbo_ai_update_interval_runtime: float = 0.08
 var external_knockback_velocity: Vector3 = Vector3.ZERO
 var external_knockback_timer: float = 0.0
+var external_knockback_snap_timer: float = 0.0
 var soldier_level: int = 1
 var soldier_xp: float = 0.0
 
@@ -628,16 +637,42 @@ func get_weapon_damage_bonus_pct_value() -> float:
 func get_velocity_value() -> Vector3:
 	return velocity
 
-func apply_external_knockback(direction: Vector3, speed: float, duration: float = 0.32) -> void:
+func apply_external_knockback(
+	direction: Vector3,
+	speed: float,
+	duration: float = 0.32,
+	allow_overboard: bool = false,
+	upward_speed: float = 0.0
+) -> void:
 	if current_state == State.DEAD or _is_jumping:
 		return
 	direction.y = 0.0
 	if direction.length_squared() <= 0.0001:
 		return
-	external_knockback_velocity = direction.normalized() * maxf(0.0, speed)
+	var horizontal_velocity := direction.normalized() * maxf(0.0, speed)
+	external_knockback_velocity = horizontal_velocity * EXTERNAL_KNOCKBACK_SNAP_MULTIPLIER
+	external_knockback_allows_overboard = allow_overboard
+	if external_knockback_allows_overboard:
+		external_knockback_velocity.y = maxf(0.0, upward_speed)
+		_play_overboard_knockback_voice_once()
 	external_knockback_timer = maxf(external_knockback_timer, maxf(0.05, duration))
+	external_knockback_snap_timer = maxf(external_knockback_snap_timer, EXTERNAL_KNOCKBACK_SNAP_DURATION)
 	current_target = null
 	velocity = external_knockback_velocity
+	SoldierVisualHelper.play_knockback_pose(self, direction, speed, allow_overboard)
+
+
+func _play_overboard_knockback_voice_once() -> void:
+	if get_meta(META_OVERBOARD_KNOCKBACK_VOICE_PLAYED, false) == true:
+		return
+	set_meta(META_OVERBOARD_KNOCKBACK_VOICE_PLAYED, true)
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		var voice_pitch := randf_range(0.82, 1.18)
+		if randf() < 0.28:
+			voice_pitch *= randf_range(0.88, 1.12)
+		audio_manager.play_sfx(SFX_OVERBOARD_KNOCKBACK_DEATH, global_position, clampf(voice_pitch, 0.76, 1.24), 1.5)
+
 
 func is_combat_disabled() -> bool:
 	return current_state == State.DEAD
@@ -773,6 +808,7 @@ func _physics_process(delta: float) -> void:
 		var audio_manager = get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("water_splash_small", global_position, randf_range(0.9, 1.2))
+		set_meta("offboard_splash_played", true)
 			
 		# [최적화] 사망 시 배의 폐선 여부 체크 이벤트 트리거
 		if is_instance_valid(home_ship) and home_ship.has_method("check_derelict_status"):
@@ -926,19 +962,52 @@ func _update_external_knockback(delta: float) -> bool:
 	if current_state == State.DEAD or _is_jumping:
 		external_knockback_timer = 0.0
 		external_knockback_velocity = Vector3.ZERO
+		external_knockback_snap_timer = 0.0
+		external_knockback_allows_overboard = false
 		return false
 	external_knockback_timer = maxf(0.0, external_knockback_timer - delta)
+	var is_snap_phase := external_knockback_snap_timer > 0.0
+	external_knockback_snap_timer = maxf(0.0, external_knockback_snap_timer - delta)
+	if external_knockback_allows_overboard:
+		external_knockback_velocity.y -= EXTERNAL_KNOCKBACK_GRAVITY * delta
 	velocity = external_knockback_velocity
 	move_and_slide()
-	_keep_within_owned_ship_bounds()
-	var decay_t := clampf(delta * 7.5, 0.0, 1.0)
-	external_knockback_velocity = external_knockback_velocity.lerp(Vector3.ZERO, decay_t)
+	if not external_knockback_allows_overboard:
+		_keep_within_owned_ship_bounds()
+	if is_snap_phase:
+		return true
+	var decay_rate := EXTERNAL_KNOCKBACK_OVERBOARD_DECAY if external_knockback_allows_overboard else 7.5
+	var decay_t := clampf(delta * decay_rate, 0.0, 1.0)
+	if external_knockback_allows_overboard:
+		external_knockback_velocity.x = lerpf(external_knockback_velocity.x, 0.0, decay_t)
+		external_knockback_velocity.z = lerpf(external_knockback_velocity.z, 0.0, decay_t)
+	else:
+		external_knockback_velocity = external_knockback_velocity.lerp(Vector3.ZERO, decay_t)
 	if external_knockback_timer <= 0.0 or external_knockback_velocity.length_squared() <= 0.01:
+		if external_knockback_allows_overboard and _is_outside_owned_ship_deck(EXTERNAL_KNOCKBACK_DECK_MARGIN):
+			external_knockback_timer = 0.18
+			external_knockback_velocity.x = lerpf(external_knockback_velocity.x, 0.0, 0.3)
+			external_knockback_velocity.z = lerpf(external_knockback_velocity.z, 0.0, 0.3)
+			external_knockback_velocity.y = minf(external_knockback_velocity.y, -7.0)
+			return true
 		external_knockback_timer = 0.0
 		external_knockback_velocity = Vector3.ZERO
+		external_knockback_snap_timer = 0.0
+		external_knockback_allows_overboard = false
 		velocity = Vector3.ZERO
 		_change_state(State.IDLE)
 	return true
+
+
+func _is_outside_owned_ship_deck(margin: float = 0.0) -> bool:
+	if not is_instance_valid(owned_ship):
+		return false
+	var local_pos: Vector3 = owned_ship.to_local(global_position)
+	var half_ext := _get_ship_deck_half_extents(owned_ship)
+	var deck_height: float = owned_ship.get("deck_height") if "deck_height" in owned_ship else 0.4
+	return absf(local_pos.x) > half_ext.x + margin \
+		or absf(local_pos.z) > half_ext.y + margin \
+		or local_pos.y < deck_height - 0.9
 
 
 ## IDLE 상태: 잠시 대기하다가 다시 배회

@@ -5,8 +5,9 @@ const DEBUG_COMBAT_LOGS := false
 ## 배 중앙에서 전방위로 쏘지 않고, 활성 대포 포문 중 하나를 빌려 느리게 추가 발사한다.
 
 @export var missile_scene: PackedScene = preload("res://scenes/projectiles/janggun_missile.tscn")
-@export var fire_cooldown: float = 8.0
-@export var min_fire_cooldown: float = 6.0
+@export var fire_cooldown: float = 12.0
+@export var min_fire_cooldown: float = 9.0
+@export var cooldown_reduce_per_level: float = 0.6
 @export var detection_range: float = 28.0
 @export var damage: float = 10.0
 @export_range(0.05, 0.5) var target_scan_interval: float = 0.2
@@ -257,7 +258,18 @@ func _get_janggun_level() -> int:
 
 
 func _get_janggun_cooldown(level: int) -> float:
-	return maxf(min_fire_cooldown, fire_cooldown - max(0, level - 1) * 0.5)
+	var stats := _get_janggun_stats()
+	var base_cooldown := float(stats.get("base_cooldown", fire_cooldown))
+	var cooldown_reduce := float(stats.get("cooldown_reduce_per_lv", cooldown_reduce_per_level))
+	var cooldown_floor := float(stats.get("min_cooldown", min_fire_cooldown))
+	return maxf(cooldown_floor, base_cooldown - max(0, level - 1) * cooldown_reduce)
+
+
+func _get_janggun_stats() -> Dictionary:
+	var um = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(um) and "UPGRADES" in um:
+		return um.UPGRADES.get("janggun", {}).get("stats", {})
+	return {}
 
 
 func _get_cannon_muzzle_position(cannon: Node3D) -> Vector3:

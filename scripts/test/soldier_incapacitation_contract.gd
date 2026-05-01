@@ -73,6 +73,7 @@ class MockSoldier:
 	var _cached_level_manager: Node = null
 	var death_pose_count: int = 0
 	var recovery_pose_count: int = 0
+	var deck_snap_count: int = 0
 	var soldier_level: int = 1
 	var soldier_xp: float = 0.0
 	var xp_awards: int = 0
@@ -97,6 +98,9 @@ class MockSoldier:
 
 	func _play_recovery_pose() -> void:
 		recovery_pose_count += 1
+
+	func _keep_within_owned_ship_bounds() -> void:
+		deck_snap_count += 1
 
 	func add_soldier_xp(amount: float, _reason: String = "") -> void:
 		soldier_xp += amount
@@ -667,3 +671,9 @@ func _verify_player_drowning_still_dies(failures: Array[String]) -> void:
 		failures.append("drowned player soldier did not die")
 	if soldier.get_meta("incapacitated", false) == true:
 		failures.append("drowned player soldier was incorrectly marked incapacitated")
+	if soldier.deck_snap_count > 0:
+		failures.append("drowned player soldier should not snap a corpse back to the deck")
+	if soldier.death_pose_count > 0:
+		failures.append("drowned player soldier should not leave a visible deck death pose")
+	if not soldier.is_queued_for_deletion():
+		failures.append("drowned player soldier should be removed instead of kept as a deck corpse")

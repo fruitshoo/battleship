@@ -306,7 +306,7 @@ static func resolve_emblem_text(token: String) -> String:
 		"speed": "속",
 		"sports_baseball": "포",
 		"star": "별",
-		"supply": "보",
+		"supply": "회",
 		"supply_bonus": "보",
 		"swords": "검",
 		"sync_alt": "선",
