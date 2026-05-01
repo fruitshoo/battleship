@@ -7,9 +7,11 @@ const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 @export var background_texture: Texture2D
+@export var use_3d_background: bool = true
 @export_range(0.0, 1.0, 0.01) var background_dim: float = 0.18
 @export var fallback_version_text: String = "v0.1.0"
 
+@onready var fleet_background: Node = get_node_or_null("MenuFleetBackground")
 @onready var background_image: TextureRect = $BackgroundImage
 @onready var background_overlay: ColorRect = $Background
 @onready var title_block: VBoxContainer = $TitleBlock
@@ -135,10 +137,14 @@ func _is_physical_key_pressed(event: InputEvent, keycode: Key) -> bool:
 func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
 	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode
 
+
 func _apply_background_settings() -> void:
+	var has_3d_background := use_3d_background and is_instance_valid(fleet_background)
+	if is_instance_valid(fleet_background):
+		fleet_background.visible = has_3d_background
 	if is_instance_valid(background_image):
 		background_image.texture = background_texture
-		background_image.visible = background_texture != null
+		background_image.visible = not has_3d_background and background_texture != null
 	if is_instance_valid(background_overlay):
 		background_overlay.color = Color.WHITE
 		background_overlay.material = UiOverlayFx.make_radial_darken_material(

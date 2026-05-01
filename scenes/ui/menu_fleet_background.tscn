@@ -1,0 +1,139 @@
+[gd_scene format=3 uid="uid://c4p5veh7b5efh"]
+
+[ext_resource type="Environment" uid="uid://bav5yq84kal1w" path="res://resources/environment/world_environment_clear_day.tres" id="1_env"]
+[ext_resource type="Script" uid="uid://uyb0udqof1sj" path="res://scripts/ui/menus/menu_fleet_background.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="2_ocean"]
+[ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="3_panokseon"]
+[ext_resource type="PackedScene" uid="uid://o87wm0hgwlmn" path="res://scenes/ships/hulls/maengseon_hull.tscn" id="4_maengseon"]
+[ext_resource type="PackedScene" uid="uid://3oyk8ux82y03" path="res://scenes/props/flags/flag_player_flagship.tscn" id="5_flagship_flag"]
+[ext_resource type="PackedScene" uid="uid://diger5b27yae5" path="res://scenes/props/flags/flag_player_support.tscn" id="6_support_flag"]
+[ext_resource type="Shader" path="res://assets/shaders/menu_sky_clouds.gdshader" id="7_cloud_shader"]
+[ext_resource type="Shader" path="res://assets/shaders/menu_sea_mist.gdshader" id="8_mist_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky_clouds_high"]
+render_priority = 0
+shader = ExtResource("7_cloud_shader")
+shader_parameter/cloud_color = Color(1, 0.96, 0.82, 0.82)
+shader_parameter/cloud_shadow_color = Color(0.5, 0.66, 0.82, 0.48)
+shader_parameter/opacity = 0.62
+shader_parameter/cloud_scale = 1.08
+shader_parameter/detail_scale = 4.6
+shader_parameter/drift_speed = 0.008
+shader_parameter/cutoff = 0.28
+shader_parameter/softness = 0.3
+shader_parameter/veil_strength = 0.18
+shader_parameter/lower_fade = 0.12
+shader_parameter/upper_fade = 0.96
+
+[sub_resource type="QuadMesh" id="QuadMesh_high_clouds"]
+size = Vector2(52, 15)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky_clouds_horizon"]
+render_priority = 0
+shader = ExtResource("7_cloud_shader")
+shader_parameter/cloud_color = Color(1, 0.94, 0.76, 0.74)
+shader_parameter/cloud_shadow_color = Color(0.48, 0.64, 0.82, 0.36)
+shader_parameter/opacity = 0.42
+shader_parameter/cloud_scale = 1.42
+shader_parameter/detail_scale = 5.8
+shader_parameter/drift_speed = 0.006
+shader_parameter/cutoff = 0.3
+shader_parameter/softness = 0.32
+shader_parameter/veil_strength = 0.15
+shader_parameter/lower_fade = 0.08
+shader_parameter/upper_fade = 0.86
+
+[sub_resource type="QuadMesh" id="QuadMesh_horizon_clouds"]
+size = Vector2(54, 7)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_horizon_mist"]
+render_priority = 1
+shader = ExtResource("8_mist_shader")
+shader_parameter/mist_color = Color(0.7, 0.82, 0.9, 0.22)
+shader_parameter/opacity = 0.26
+shader_parameter/noise_scale = 3.2
+shader_parameter/drift_speed = 0.014
+shader_parameter/vertical_center = 0.52
+shader_parameter/vertical_width = 0.46
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_near_mist"]
+render_priority = 2
+shader = ExtResource("8_mist_shader")
+shader_parameter/mist_color = Color(0.78, 0.86, 0.92, 0.2)
+shader_parameter/opacity = 0.18
+shader_parameter/noise_scale = 4.0
+shader_parameter/drift_speed = 0.019
+shader_parameter/vertical_center = 0.46
+shader_parameter/vertical_width = 0.36
+
+[sub_resource type="QuadMesh" id="QuadMesh_horizon_mist"]
+size = Vector2(48, 8)
+
+[sub_resource type="QuadMesh" id="QuadMesh_near_mist"]
+size = Vector2(34, 5)
+
+[node name="MenuFleetBackground" type="Node3D" unique_id=383968476]
+script = ExtResource("1_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=830121315]
+environment = ExtResource("1_env")
+
+[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=1429812147]
+transform = Transform3D(0.6275069, -0.4195708, 0.655662, 0.1116189, 0.8790344, 0.4634371, -0.7707689, -0.2176758, 0.5989861, 0, 18, 0)
+light_color = Color(1, 0.91, 0.76, 1)
+light_energy = 2.4
+shadow_enabled = true
+
+[node name="FillLight" type="DirectionalLight3D" parent="." unique_id=335655857]
+transform = Transform3D(-0.9063078, -0.1573787, -0.3925389, 0, 0.9284767, -0.3713907, 0.4226183, -0.3368241, -0.841988, 0, 0, 0)
+light_color = Color(0.46, 0.68, 1, 1)
+light_energy = 0.55
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=749158608]
+transform = Transform3D(0.95105654, -0.06424825, 0.30226424, 0, 0.9781476, 0.2079117, -0.309017, -0.19773579, 0.9302737, 7, 4.7, 22.5)
+current = true
+fov = 30.0
+
+[node name="OceanPlane" parent="." unique_id=240324481 instance=ExtResource("2_ocean")]
+
+[node name="Atmosphere" type="Node3D" parent="."]
+
+[node name="HorizonMist" type="MeshInstance3D" parent="Atmosphere"]
+transform = Transform3D(1, 0, 0, 0, 0.9848077, -0.1736482, 0, 0.1736482, 0.9848077, 1.0, 4.2, -13.0)
+material_override = SubResource("ShaderMaterial_horizon_mist")
+mesh = SubResource("QuadMesh_horizon_mist")
+
+[node name="NearMist" type="MeshInstance3D" parent="Atmosphere"]
+transform = Transform3D(1, 0, 0, 0, 0.9961947, -0.08715574, 0, 0.08715574, 0.9961947, -1.8, 2.75, 6.0)
+material_override = SubResource("ShaderMaterial_near_mist")
+mesh = SubResource("QuadMesh_near_mist")
+
+[node name="Clouds" type="Node3D" parent="." unique_id=1230329544]
+
+[node name="HighClouds" type="MeshInstance3D" parent="Clouds" unique_id=477810642]
+transform = Transform3D(1, 0, 0, 0, 0.985, -0.1736482, 0, 0.1736482, 0.985, -1.5, 10.2, -16)
+material_override = SubResource("ShaderMaterial_sky_clouds_high")
+mesh = SubResource("QuadMesh_high_clouds")
+
+[node name="HorizonClouds" type="MeshInstance3D" parent="Clouds" unique_id=1789999096]
+transform = Transform3D(1, 0, 0, 0, 0.9961947, -0.08715574, 0, 0.08715574, 0.9961947, 2, 6.15, -22)
+material_override = SubResource("ShaderMaterial_sky_clouds_horizon")
+mesh = SubResource("QuadMesh_horizon_clouds")
+
+[node name="Fleet" type="Node3D" parent="." unique_id=1666966892]
+
+[node name="Flagship" type="Node3D" parent="Fleet" unique_id=2076143075]
+transform = Transform3D(0.99279445, 0, -0.34184653, 0, 1, 0, 0.34184653, 0, 0.99279445, -4.8, 0.43, 0)
+
+[node name="PanokseonHull" parent="Fleet/Flagship" unique_id=909371522 instance=ExtResource("3_panokseon")]
+
+[node name="FlagshipFlag" parent="Fleet/Flagship" unique_id=335836396 instance=ExtResource("5_flagship_flag")]
+transform = Transform3D(-0.034899462, 0, -0.99939084, 0, 1, 0, 0.99939084, 0, -0.034899462, 0.55, 1.06, -0.15)
+
+[node name="EscortNear" type="Node3D" parent="Fleet" unique_id=1308204856]
+transform = Transform3D(0.7702925, 0, -0.2803682, 0, 0.82, 0, 0.2803682, 0, 0.7702925, 3.8, 0.24, -3.2)
+
+[node name="MaengseonHull" parent="Fleet/EscortNear" unique_id=409081921 instance=ExtResource("4_maengseon")]
+
+[node name="SupportFlag" parent="Fleet/EscortNear" unique_id=1975710746 instance=ExtResource("6_support_flag")]
+transform = Transform3D(0.034899496, 0, -0.99939084, 0, 1, 0, 0.99939084, 0, 0.034899496, 0, 1, 1.3)

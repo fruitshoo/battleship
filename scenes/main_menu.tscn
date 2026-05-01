@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bv1ra5tstvtbq" path="res://scripts/ui/menus/main_menu.gd" id="1_script"]
 [ext_resource type="Texture2D" uid="uid://bxyt040k77j8j" path="res://assets/ui/menu/main_menu_background.png" id="2_bg"]
+[ext_resource type="PackedScene" uid="uid://c4p5veh7b5efh" path="res://scenes/ui/menu_fleet_background.tscn" id="3_fleet_bg"]
 
 [node name="MainMenu" type="Control" unique_id=1717124113]
 layout_mode = 3
@@ -12,6 +13,8 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 background_texture = ExtResource("2_bg")
+
+[node name="MenuFleetBackground" parent="." unique_id=1578433137 instance=ExtResource("3_fleet_bg")]
 
 [node name="BackgroundImage" type="TextureRect" parent="." unique_id=200381114]
 layout_mode = 0
