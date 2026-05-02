@@ -191,6 +191,8 @@ func _ready() -> void:
 	_apply_start_marker_transform_from_parent()
 	super._ready()
 	sail_deployed_ratio = 0.0 if sail_furled else clampf(sail_deployed_ratio, 0.0, 1.0)
+	if sail_furled:
+		_sync_mast_fold_with_sail_furl(true)
 	fire_effect_offset = Vector3(0.0, 0.55, -0.25)
 	fire_effect_scale = 1.6
 	print("[Ship] Total masts connected: ", masts.size())
@@ -357,6 +359,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if OS.is_debug_build() and event.keycode == KEY_F2:
 			if is_instance_valid(_cached_level_manager):
 				_cached_level_manager.add_merit(999)
+		if OS.is_debug_build() and event.keycode == KEY_F3:
+			toggle_masts_folded()
+			if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
+				var fold_text := "돛대 접힘" if are_masts_folded() else "돛대 펼침"
+				_cached_hud.show_message("%s (debug)" % fold_text, 1.0)
 				
 		pass
 
@@ -993,8 +1000,11 @@ func adjust_sail_angle(delta_angle: float) -> void:
 func set_sail_furled(furled: bool) -> void:
 	var target_furled := bool(furled)
 	if sail_furled == target_furled:
+		_sync_mast_fold_after_sail_deployment()
 		return
 	sail_furled = target_furled
+	if not sail_furled:
+		_sync_mast_fold_with_sail_furl()
 	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
 		var pitch := 0.92 if sail_furled else 1.08
 		_cached_audio_manager.play_sfx("sail_flap", global_position, pitch, 4.0)
@@ -1019,12 +1029,40 @@ func get_effective_sail_deployment() -> float:
 
 
 func _update_sail_deployment(delta: float) -> void:
-	var target_ratio := 0.0 if sail_furled else 1.0
+	var target_ratio := _get_target_sail_deployment_ratio()
 	sail_deployed_ratio = move_toward(
 		clampf(sail_deployed_ratio, 0.0, 1.0),
 		target_ratio,
 		maxf(sail_furl_rate, 0.01) * delta
 	)
+	_sync_mast_fold_after_sail_deployment()
+
+
+func _sync_mast_fold_with_sail_furl(immediate: bool = false) -> void:
+	if mast_fold_pivots.is_empty():
+		return
+	set_masts_folded(sail_furled, immediate)
+
+
+func _sync_mast_fold_after_sail_deployment() -> void:
+	if mast_fold_pivots.is_empty():
+		return
+	if sail_furled:
+		if sail_deployed_ratio <= 0.001 and not are_masts_folded():
+			set_masts_folded(true)
+		return
+	if are_masts_folded():
+		set_masts_folded(false)
+
+
+func _get_target_sail_deployment_ratio() -> float:
+	if sail_furled:
+		return 0.0
+	if mast_fold_pivots.is_empty():
+		return 1.0
+	if get_mast_fold_ratio() > 0.001:
+		return 0.0
+	return 1.0
 
 
 func _sync_support_fleet_sail_furl() -> void:

@@ -1,17 +1,14 @@
 [gd_scene format=3 uid="uid://betqhloq4wsph"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_2sbaw"]
-size = Vector3(0.2, 1.4, 0.15)
+size = Vector3(0.25, 1.5, 0.15)
 
 [sub_resource type="StandardMaterial3D" id="Material_oar_wood"]
 albedo_color = Color(0.45, 0.27, 0.13, 1)
 roughness = 0.82
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_loom_outer"]
-top_radius = 0.1
-bottom_radius = 0.12
-height = 2.25
-radial_segments = 8
+[sub_resource type="BoxMesh" id="BoxMesh_sj304"]
+size = Vector3(0.25, 2.2, 0.15)
 
 [node name="ScullingOar" type="Node3D" unique_id=228318626]
 
@@ -24,7 +21,7 @@ mesh = SubResource("BoxMesh_2sbaw")
 surface_material_override/0 = SubResource("Material_oar_wood")
 
 [node name="OuterLoom" type="MeshInstance3D" parent="OarPivot" unique_id=1576472625]
-transform = Transform3D(1, 0, 0.08, -0.054787163, 1.1626601, 0.68483967, -0.058295496, -1.0926893, 0.7286937, -2.5331974e-09, -1.337277, 1.3089261)
+transform = Transform3D(1, 0, 0.08, -0.054787163, 1.1626601, 0.68483967, -0.058295496, -1.0926893, 0.7286937, -0.0048436965, -1.3180443, 1.2077621)
 cast_shadow = 0
-mesh = SubResource("CylinderMesh_loom_outer")
+mesh = SubResource("BoxMesh_sj304")
 surface_material_override/0 = SubResource("Material_oar_wood")

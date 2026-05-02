@@ -173,7 +173,7 @@ var _hull_half_extents: Vector2 = Vector2(1.5, 4.0) # X:반폭, Y:반길이
 @export var impact_puff_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 @export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
-@export_range(0.0, 1.0, 0.01) var floating_loot_drop_chance: float = 0.65
+@export_range(0.0, 1.0, 0.01) var floating_loot_drop_chance: float = 1.0
 @export var survivor_scene: PackedScene = preload("res://scenes/effects/survivor.tscn")
 var _fire_instance: Node3D = null
 
@@ -184,6 +184,8 @@ var _fire_instance: Node3D = null
 
 # === 노드 참조 (이제 HullScene 내부를 스캔) ===
 var masts: Array[Node] = []
+var mast_fold_pivots: Array[Node] = []
+var masts_folded: bool = false
 var rudder_visual: Node3D = null
 var wake_trail: Node3D = null
 var deck_light: OmniLight3D = null
@@ -740,6 +742,7 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 	var is_rowing_value: bool = false
 	var sail_furled_value: bool = false
 	var sail_deployed_ratio_value: float = 1.0
+	var mast_fold_ratio_value: float = get_mast_fold_ratio()
 	var crew_respawn_interval_value: float = 0.0
 	var limbo_requested_tree_path: String = ""
 	var limbo_enabled_value: bool = false
@@ -823,6 +826,9 @@ func get_debug_ship_state_snapshot() -> Dictionary:
 		"is_rowing": is_rowing_value,
 		"sail_furled": sail_furled_value,
 		"sail_deployed_ratio": sail_deployed_ratio_value,
+		"masts_folded": masts_folded,
+		"mast_fold_ratio": mast_fold_ratio_value,
+		"mast_fold_pivot_count": mast_fold_pivots.size(),
 		"max_speed": max_speed,
 		"turn_rate": turn_rate,
 		"hull_defense": hull_defense,
@@ -853,6 +859,33 @@ func set_boarding_attacker_ship(attacker: Node3D) -> void:
 func clear_boarding_attacker_ship() -> void:
 	boarding_attacker = null
 
+func set_masts_folded(folded: bool, immediate: bool = false) -> void:
+	masts_folded = bool(folded)
+	for pivot in mast_fold_pivots:
+		if is_instance_valid(pivot) and pivot.has_method("set_folded"):
+			pivot.call("set_folded", masts_folded, immediate)
+	if masts_folded:
+		for mast in masts:
+			if is_instance_valid(mast) and mast.has_method("set_sail_deployed_ratio"):
+				mast.call("set_sail_deployed_ratio", 0.0)
+
+func toggle_masts_folded(immediate: bool = false) -> void:
+	set_masts_folded(not masts_folded, immediate)
+
+func are_masts_folded() -> bool:
+	return masts_folded
+
+func get_mast_fold_ratio() -> float:
+	if mast_fold_pivots.is_empty():
+		return 0.0
+	var total := 0.0
+	var count := 0
+	for pivot in mast_fold_pivots:
+		if is_instance_valid(pivot) and pivot.has_method("get_fold_ratio"):
+			total += float(pivot.call("get_fold_ratio"))
+			count += 1
+	return total / float(count) if count > 0 else 0.0
+
 func _get_team_collision_layer(team_tag: String) -> int:
 	return 2 if team_tag == "player" else 4
 
@@ -878,6 +911,7 @@ func _cache_hull_references(node: Node) -> void:
 	# 루트 노드(self)에서 호출될 때 캐시 초기화
 	if node == self:
 		masts.clear()
+		mast_fold_pivots.clear()
 		rudder_visual = null
 		wake_trail = null
 		oar_pivot_left = null
@@ -889,6 +923,8 @@ func _cache_hull_references(node: Node) -> void:
 	for child in node.get_children():
 		if child.name.begins_with("Mast") and child.has_method("set_sail_angle"):
 			if not masts.has(child): masts.append(child)
+		elif child.name.begins_with("MastPivot") and child.has_method("set_folded"):
+			if not mast_fold_pivots.has(child): mast_fold_pivots.append(child)
 		elif child.name == "RudderVisual":
 			rudder_visual = child
 		elif child.name == "WakeTrail" and child is Node3D:

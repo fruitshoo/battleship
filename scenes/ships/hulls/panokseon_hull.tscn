@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://cnr7kfcyhyssw"]
 
-[ext_resource type="PackedScene" path="res://scenes/props/round_shield.tscn" id="4_77l81"]
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="Script" path="res://scripts/props/mast_fold_pivot.gd" id="mast_fold_script"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="PackedScene" uid="uid://betqhloq4wsph" path="res://scenes/props/sculling_oar.tscn" id="sculling_oar_scene"]
 
@@ -138,14 +138,26 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0.5, 2.75)
 [node name="CrewSternRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1239076716]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.5, 2.75)
 
-[node name="RoundShield" parent="." unique_id=139845430 instance=ExtResource("4_77l81")]
-transform = Transform3D(-1.3113416e-07, 0, 3, 0, 3, 0, -3, 0, -1.3113416e-07, 2.3299522, 0.90132594, 2.2324524)
+[node name="Masts" type="Node3D" parent="." unique_id=1332807744]
 
-[node name="RoundShield2" parent="." unique_id=932462042 instance=ExtResource("4_77l81")]
-transform = Transform3D(2.2649371e-07, 0, -3, 0, 3, 0, 3, 0, 2.2649371e-07, -2.26893, 0.90132594, 2.2324524)
+[node name="MastPivot_01" type="Node3D" parent="Masts" unique_id=1234717001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, -2)
+script = ExtResource("mast_fold_script")
+fold_angle_degrees = 60.0
+fold_duration = 1.35
 
-[node name="Mast" parent="." unique_id=1732171799 instance=ExtResource("mast_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8453069)
+[node name="Mast" parent="Masts/MastPivot_01" unique_id=1732171799 instance=ExtResource("mast_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
-[node name="Mast2" parent="." unique_id=1786866091 instance=ExtResource("mast_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.8253379)
+[node name="MastPivot_02" type="Node3D" parent="Masts" unique_id=402821299]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 2)
+script = ExtResource("mast_fold_script")
+fold_angle_degrees = 60.0
+fold_duration = 1.35
+stow_target_path = NodePath("../MastStowTarget_02")
+
+[node name="Mast2" parent="Masts/MastPivot_02" unique_id=1786866091 instance=ExtResource("mast_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="MastStowTarget_02" type="Marker3D" parent="Masts"]
+transform = Transform3D(1, 0, 0, 0, 0.5, -0.8660254, 0, 0.8660254, 0.5, 0.12, -2, -1.72)

@@ -271,11 +271,16 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		if not sail_shader_source.contains("sail_visibility") or not sail_shader_source.contains("sail_visibility <= 0.01"):
 			failures.append("furled sail shader should hide fully folded sail cloth")
 		player_ship.call("set_sail_furled", true)
+		var mast_fold_pivots: Array = player_ship.get("mast_fold_pivots") if player_ship.get("mast_fold_pivots") != null else []
+		if not mast_fold_pivots.is_empty() and player_ship.has_method("are_masts_folded") and bool(player_ship.call("are_masts_folded")):
+			failures.append("player ship mast pivots should wait until sails are fully furled")
 		player_ship.set("sail_deployed_ratio", 1.0)
 		player_ship.call("_update_sail_deployment", 1.0)
 		var folded_ratio := float(player_ship.get("sail_deployed_ratio"))
 		if folded_ratio >= 0.99:
 			failures.append("player ship sail furl should lower deployed ratio")
+		if not mast_fold_pivots.is_empty() and player_ship.has_method("are_masts_folded") and not bool(player_ship.call("are_masts_folded")):
+			failures.append("player ship sail furl should fold available mast pivots after sails are down")
 		if player_ship.has_method("_update_sail_visual"):
 			player_ship.call("_update_sail_visual")
 		var mast_received_deployment := false
@@ -296,11 +301,26 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 					var furled_y := yardarm.position.y
 					if furled_y >= deployed_y - 0.5:
 						failures.append("furled sail should lower the yardarm with the sail cloth")
+					if yardarm.visible:
+						failures.append("fully furled sail should hide the yardarm visual")
 					mast.call("set_sail_deployed_ratio", mast_ratio)
 				break
-		if not mast_received_deployment:
-			failures.append("player ship masts should expose sail deployment visuals")
-		player_ship.call("set_sail_furled", false)
+			if not mast_received_deployment:
+				failures.append("player ship masts should expose sail deployment visuals")
+			if not mast_fold_pivots.is_empty() and player_ship.has_method("set_masts_folded") and player_ship.has_method("get_mast_fold_ratio"):
+				player_ship.call("set_masts_folded", true, true)
+				player_ship.set("sail_deployed_ratio", 0.0)
+				player_ship.call("set_sail_furled", false)
+				player_ship.call("_update_sail_deployment", 1.0)
+				if float(player_ship.get("sail_deployed_ratio")) > 0.001:
+					failures.append("player ship sail unfurl should wait until mast pivots are raised")
+				player_ship.call("set_masts_folded", false, true)
+				player_ship.call("_update_sail_deployment", 1.0)
+				if float(player_ship.get("sail_deployed_ratio")) <= 0.001:
+					failures.append("player ship sail unfurl should raise sails after mast pivots are upright")
+			player_ship.call("set_sail_furled", false)
+			if not mast_fold_pivots.is_empty() and player_ship.has_method("are_masts_folded") and bool(player_ship.call("are_masts_folded")):
+				failures.append("player ship sail unfurl should raise available mast pivots")
 		player_ship.set("rudder_health", player_ship.get("rudder_max_health"))
 		var open_turn_mult := float(player_ship.call("get_rudder_turn_multiplier"))
 		var open_response_mult := float(player_ship.call("get_rudder_response_multiplier"))

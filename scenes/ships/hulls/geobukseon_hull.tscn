@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="Script" path="res://scripts/props/mast_fold_pivot.gd" id="mast_fold_script"]
 [ext_resource type="Texture2D" path="res://assets/models/props/sail/horizon_sail.png" id="horizon_sail"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="Script" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
@@ -38,7 +39,13 @@ surface_material_override/0 = SubResource("Material_iron")
 # Scale for dragon head placeholder
 scale = Vector3(0.2, 0.2, 0.2)
 
-[node name="Mast" parent="." instance=ExtResource("mast_scene")]
+[node name="Masts" type="Node3D" parent="."]
+
+[node name="MastPivot_01" type="Node3D" parent="Masts"]
+script = ExtResource("mast_fold_script")
+fold_angle_degrees = 60.0
+
+[node name="Mast" parent="Masts/MastPivot_01" instance=ExtResource("mast_scene")]
 visible = false # Geobukseon often lowered mast in battle
 sail_texture = ExtResource("horizon_sail")
 sail_uv_scale = Vector2(1, 2.01)

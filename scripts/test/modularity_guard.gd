@@ -6,7 +6,6 @@ const HELPER_SUFFIX := "_helper.gd"
 const SCENE_CONTRACT_ALLOWED_OWNERS := {
 	"res://scripts/entities/ships/base_ship.gd": true,
 	"res://scripts/helpers/node_contract_helper.gd": true,
-	"res://scripts/props/flag.gd": true,
 	"res://scripts/props/mast.gd": true,
 }
 const SCENE_CONTRACT_TEST_OPT_IN_MARKER := "# @scene_contract_encapsulated"

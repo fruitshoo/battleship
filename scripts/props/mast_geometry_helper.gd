@@ -57,6 +57,7 @@ static func apply_yardarm_furl_geometry(mast: Node3D) -> void:
 	var base_position: Vector3 = mast._base_yardarm_model_position + mast.yardarm_offset
 	mast.yardarm_model_root.position = base_position + Vector3.DOWN * get_yardarm_furl_drop(mast) * furled_ratio
 	mast.yardarm_model_root.scale = mast._base_yardarm_model_scale * mast.yardarm_scale
+	mast.yardarm_model_root.visible = deployed_ratio > 0.001
 
 
 static func get_yardarm_furl_drop(mast: Node3D) -> float:

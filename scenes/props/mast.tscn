@@ -4,10 +4,8 @@
 [ext_resource type="Texture2D" uid="uid://cpd4hpqapp43q" path="res://assets/models/props/sail/horizon_sail.png" id="2_0u7u4"]
 [ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="2_nkkxi"]
 [ext_resource type="Texture2D" uid="uid://dfds5i3xuhjlk" path="res://assets/vfx/masks/sail_burn_mask_c.png" id="3_0u7u4"]
-[ext_resource type="PackedScene" uid="uid://cx6m2u2y1y5n8" path="res://scenes/props/flag.tscn" id="3_flag_scene"]
-[ext_resource type="PackedScene" path="res://scenes/props/flags/flag_player_flagship.tscn" id="8_player_flag"]
+[ext_resource type="PackedScene" path="res://scenes/props/ship_decor_flags/standard_flag.tscn" id="8_player_flag"]
 [ext_resource type="PackedScene" uid="uid://dnk408xuw63p4" path="res://assets/models/props/yardarm/yardarm.glb" id="6_nkkxi"]
-[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="7_dskfr"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_mast"]
 top_radius = 0.1
@@ -52,33 +50,6 @@ subdivide_width = 10
 subdivide_depth = 10
 orientation = 2
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_dskfr"]
-top_radius = 0.05
-bottom_radius = 0.05
-height = 1.505
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8qlef"]
-albedo_color = Color(0.35, 0.2, 0.1, 1)
-roughness = 0.85
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_eoesw"]
-size = Vector2(3, 0.5)
-subdivide_width = 8
-subdivide_depth = 5
-orientation = 2
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_83wu0"]
-render_priority = 0
-shader = ExtResource("7_dskfr")
-shader_parameter/use_flag_texture = false
-shader_parameter/uv_scale = Vector2(1, 1)
-shader_parameter/uv_offset = Vector2(0, 0)
-shader_parameter/flip_u = false
-shader_parameter/flip_v = false
-shader_parameter/wave_speed = 5.0
-shader_parameter/wave_strength = 0.25
-shader_parameter/side_drag = 1.0
-
 [node name="Mast" type="Node3D" unique_id=1732171799]
 script = ExtResource("1_script")
 flag_scene_override = ExtResource("8_player_flag")
@@ -101,19 +72,8 @@ extra_cull_margin = 8.0
 instance_shader_parameters/wind_strength = 0.0
 mesh = SubResource("PlaneMesh_dskfr")
 
-[node name="Flag" parent="SailVisual" unique_id=85230560 instance=ExtResource("3_flag_scene")]
+[node name="Flag" parent="SailVisual" unique_id=85230560 instance=ExtResource("8_player_flag")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.265, 0)
-flag_size = Vector2(3, 0.5)
-
-[node name="Pole" parent="SailVisual/Flag" index="0" unique_id=555265591]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7525, 0)
-mesh = SubResource("CylinderMesh_dskfr")
-surface_material_override/0 = SubResource("StandardMaterial3D_8qlef")
-
-[node name="FlagMesh" parent="SailVisual/Flag" index="1" unique_id=722299975]
-transform = Transform3D(1, 0, 4.371139e-08, 0, 1, 0, -4.371139e-08, 0, 1, 1.5, 1.2550001, 0)
-mesh = SubResource("PlaneMesh_eoesw")
-surface_material_override/0 = SubResource("ShaderMaterial_83wu0")
 
 [node name="yardarm" parent="SailVisual" unique_id=1460797758 instance=ExtResource("6_nkkxi")]
 transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 0, 4.44, -0.301)

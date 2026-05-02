@@ -38,8 +38,8 @@ static func apply_layout_density(hud) -> void:
 	var boss_width := roundf(lerpf(420.0, 560.0, density))
 	var boss_height := roundf(lerpf(16.0, 20.0, density))
 	var boss_gap := roundf(lerpf(5.0, 7.0, density))
-	var boss_label_height := roundf(lerpf(14.0, 16.0, density))
-	var boss_bottom_margin := roundf(lerpf(132.0, 206.0, density))
+	var boss_label_height := roundf(lerpf(20.0, 24.0, density))
+	var boss_bottom_margin := roundf(lerpf(96.0, 152.0, density))
 	var boarding_width := roundf(lerpf(168.0, 200.0, density))
 	var speed_row_width := roundf(lerpf(160.0, 180.0, density))
 	var speed_bar_width := roundf(lerpf(128.0, 148.0, density))
@@ -558,7 +558,7 @@ static func setup_boss_hp_bar(hud) -> void:
 	hud.boss_hp_container.alignment = BoxContainer.ALIGNMENT_END
 	hud.boss_hp_container.z_index = 30
 	hud.add_child(hud.boss_hp_container)
-	_apply_boss_hp_stack_layout(hud, 560.0, 20.0, 206.0, 7.0, 16.0, 0)
+	_apply_boss_hp_stack_layout(hud, 560.0, 20.0, 152.0, 7.0, 24.0, 0)
 
 static func _apply_boss_hp_stack_layout(hud, boss_width: float, boss_height: float, bottom_margin: float, gap: float, label_height: float, stack_count: int) -> void:
 	if hud == null or not is_instance_valid(hud.boss_hp_container):
@@ -592,7 +592,7 @@ static func _apply_boss_hp_stack_layout(hud, boss_width: float, boss_height: flo
 		var label := (entry as Dictionary).get("label", null) as Label
 		if is_instance_valid(label):
 			label.custom_minimum_size = Vector2(boss_width, label_height)
-			NavalUiTheme.style_caption(label, 10, NavalUiTheme.TEXT_MUTED)
+			NavalUiTheme.style_caption(label, 13, NavalUiTheme.TEXT_MUTED)
 
 static func setup_boarding_ui(hud) -> void:
 	if hud == null:

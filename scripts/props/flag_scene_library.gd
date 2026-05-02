@@ -9,22 +9,16 @@ const KIND_ENEMY_ELITE := "enemy_elite_tabs"
 const KIND_BOSS := "boss_swallowtail"
 const KIND_SITE := "site_marker"
 
-const SCENE_PLAYER_FLAGSHIP := "res://scenes/props/flags/flag_player_flagship.tscn"
-const SCENE_PLAYER_SUPPORT := "res://scenes/props/flags/flag_player_support.tscn"
-const SCENE_ENEMY_DEFAULT := "res://scenes/props/flags/flag_enemy_pennant.tscn"
-const SCENE_ENEMY_SEKIBUNE := "res://scenes/props/flags/flag_enemy_sekibune.tscn"
-const SCENE_ENEMY_ELITE := "res://scenes/props/flags/flag_enemy_elite_tabs.tscn"
-const SCENE_BOSS := "res://scenes/props/flags/flag_boss_swallowtail.tscn"
-const SCENE_SITE := "res://scenes/props/flags/flag_site_marker.tscn"
+const SCENE_STANDARD := "res://scenes/props/ship_decor_flags/standard_flag.tscn"
 
 const KIND_SCENE_PATHS := {
-	KIND_PLAYER_FLAGSHIP: SCENE_PLAYER_FLAGSHIP,
-	KIND_PLAYER_SUPPORT: SCENE_PLAYER_SUPPORT,
-	KIND_ENEMY_DEFAULT: SCENE_ENEMY_DEFAULT,
-	KIND_ENEMY_SEKIBUNE: SCENE_ENEMY_SEKIBUNE,
-	KIND_ENEMY_ELITE: SCENE_ENEMY_ELITE,
-	KIND_BOSS: SCENE_BOSS,
-	KIND_SITE: SCENE_SITE,
+	KIND_PLAYER_FLAGSHIP: SCENE_STANDARD,
+	KIND_PLAYER_SUPPORT: SCENE_STANDARD,
+	KIND_ENEMY_DEFAULT: SCENE_STANDARD,
+	KIND_ENEMY_SEKIBUNE: SCENE_STANDARD,
+	KIND_ENEMY_ELITE: SCENE_STANDARD,
+	KIND_BOSS: SCENE_STANDARD,
+	KIND_SITE: SCENE_STANDARD,
 }
 
 

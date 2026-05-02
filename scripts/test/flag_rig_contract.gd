@@ -34,8 +34,8 @@ func _verify_scene_registry() -> void:
 	for kind in _flag_kinds():
 		if not FlagSceneLibrary.has_kind(kind):
 			_failures.append("missing flag scene kind: %s" % kind)
-	if FlagSceneLibrary.get_scene_path(FlagSceneLibrary.KIND_BOSS).find("swallowtail") < 0:
-		_failures.append("boss flag kind should map directly to a swallowtail scene")
+		elif FlagSceneLibrary.get_scene_path(kind) != FlagSceneLibrary.SCENE_STANDARD:
+			_failures.append("runtime flag kind should map to standard flag scene: %s" % kind)
 
 
 func _verify_scene_mapping() -> void:
@@ -54,8 +54,6 @@ func _verify_concrete_flag_scenes() -> void:
 	var boss_flag := _instantiate_flag_scene(boss_scene, "boss")
 	if boss_flag != null:
 		await get_tree().process_frame
-		if boss_flag.call("get_flag_shape_name") != "swallowtail":
-			_failures.append("boss flag scene did not use swallowtail shape")
 		_expect_wind_mode(boss_flag, "boss", "fixed_flutter")
 		boss_flag.queue_free()
 
@@ -70,9 +68,7 @@ func _verify_concrete_flag_scenes() -> void:
 	var support_flag := _instantiate_flag_scene(support_scene, "support")
 	if support_flag != null:
 		await get_tree().process_frame
-		if support_flag.call("get_flag_shape_name") != "triangle":
-			_failures.append("support flag scene should use triangle pennant shape")
-		_expect_wind_mode(support_flag, "support", "free_rotate")
+		_expect_wind_mode(support_flag, "support", "fixed_flutter")
 		support_flag.queue_free()
 
 
@@ -86,8 +82,11 @@ func _verify_mast_kind_swaps_scene() -> void:
 		return
 	mast.call("set_flag_kind", FlagSceneLibrary.KIND_BOSS)
 	await get_tree().process_frame
-	if mast.call("get_flag_shape_name") != "swallowtail":
-		_failures.append("mast kind swap did not install boss swallowtail flag scene")
+	var flag = mast.call("get_flag_node")
+	if not is_instance_valid(flag):
+		_failures.append("mast kind swap did not leave an active flag node")
+	elif not flag.has_method("get_flag_kind") or str(flag.call("get_flag_kind")) != FlagSceneLibrary.KIND_BOSS:
+		_failures.append("mast kind swap did not apply boss kind to the standard flag")
 	mast.queue_free()
 
 

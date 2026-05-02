@@ -38,12 +38,21 @@ func _ready() -> void:
 
 	return_button = Button.new()
 	return_button.process_mode = Node.PROCESS_MODE_ALWAYS
+	return_button.focus_mode = Control.FOCUS_ALL
 	return_button.custom_minimum_size = Vector2(220.0, 42.0)
 	return_button.text = "메인 메뉴로"
 	NavalUiTheme.apply_hud_button(return_button, 15)
 	UiButtonAudio.wire_button(return_button)
 	return_button.pressed.connect(_request_return)
 	vbox.add_child(return_button)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or _emitted:
+		return
+	if _is_confirm_event(event):
+		_request_return()
+		if get_viewport() != null:
+			get_viewport().set_input_as_handled()
 
 func _process(delta: float) -> void:
 	if _countdown < 0.0 or _emitted:
@@ -63,6 +72,7 @@ func show_overlay(subtitle: String, countdown: float) -> void:
 	modulate.a = 0.0
 	var tween = create_tween()
 	tween.tween_property(self, "modulate:a", 1.0, 0.25)
+	call_deferred("_focus_return_button")
 
 func hide_overlay() -> void:
 	_countdown = -1.0
@@ -84,3 +94,14 @@ func _request_return() -> void:
 	_emitted = true
 	_countdown = -1.0
 	emit_signal("return_requested")
+
+func _focus_return_button() -> void:
+	if not visible or not is_instance_valid(return_button):
+		return
+	return_button.grab_focus()
+
+func _is_confirm_event(event: InputEvent) -> bool:
+	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
+
+func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
+	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode

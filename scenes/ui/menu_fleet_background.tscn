@@ -5,8 +5,8 @@
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="2_ocean"]
 [ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="3_panokseon"]
 [ext_resource type="PackedScene" uid="uid://o87wm0hgwlmn" path="res://scenes/ships/hulls/maengseon_hull.tscn" id="4_maengseon"]
-[ext_resource type="PackedScene" uid="uid://3oyk8ux82y03" path="res://scenes/props/flags/flag_player_flagship.tscn" id="5_flagship_flag"]
-[ext_resource type="PackedScene" uid="uid://diger5b27yae5" path="res://scenes/props/flags/flag_player_support.tscn" id="6_support_flag"]
+[ext_resource type="PackedScene" path="res://scenes/props/ship_decor_flags/standard_flag.tscn" id="5_flagship_flag"]
+[ext_resource type="PackedScene" path="res://scenes/props/ship_decor_flags/standard_flag.tscn" id="6_support_flag"]
 [ext_resource type="Shader" path="res://assets/shaders/menu_sky_clouds.gdshader" id="7_cloud_shader"]
 [ext_resource type="Shader" path="res://assets/shaders/menu_sea_mist.gdshader" id="8_mist_shader"]
 

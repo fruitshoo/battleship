@@ -668,10 +668,10 @@ func _play_overboard_knockback_voice_once() -> void:
 	set_meta(META_OVERBOARD_KNOCKBACK_VOICE_PLAYED, true)
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		var voice_pitch := randf_range(0.82, 1.18)
-		if randf() < 0.28:
-			voice_pitch *= randf_range(0.88, 1.12)
-		audio_manager.play_sfx(SFX_OVERBOARD_KNOCKBACK_DEATH, global_position, clampf(voice_pitch, 0.76, 1.24), 1.5)
+		var voice_pitch := randf_range(0.74, 1.28)
+		if randf() < 0.34:
+			voice_pitch *= randf_range(0.86, 1.16)
+		audio_manager.play_sfx(SFX_OVERBOARD_KNOCKBACK_DEATH, global_position, clampf(voice_pitch, 0.68, 1.36), 1.5)
 
 
 func is_combat_disabled() -> bool:

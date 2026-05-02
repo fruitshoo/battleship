@@ -203,7 +203,7 @@ scripts/
 
 대표 파일:
 - [mast.gd](/Users/shk/Godot/battleship/scripts/props/mast.gd)
-- [flag.gd](/Users/shk/Godot/battleship/scripts/props/flag.gd)
+- [ship_decor_flag.gd](/Users/shk/Godot/battleship/scripts/props/ship_decor_flag.gd)
 
 여기는 최근 정리되어서:
 - 상태

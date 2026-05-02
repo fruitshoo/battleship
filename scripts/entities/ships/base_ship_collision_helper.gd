@@ -273,11 +273,6 @@ static func _repair_player_from_derelict_contact(player_ship, source_ship: Node 
 	var heal_amount: float = DERELICT_CONTACT_REPAIR_BASE
 	if is_boss_salvage:
 		heal_amount += BOSS_DERELICT_CONTACT_REPAIR_BONUS
-	if "_cached_um" in player_ship:
-		var cached_um: Variant = player_ship.get("_cached_um")
-		if is_instance_valid(cached_um) and cached_um.has_method("get_supply_bonus_stats"):
-			var supply_stats: Dictionary = cached_um.get_supply_bonus_stats()
-			heal_amount += float(supply_stats.get("heal_bonus", 0.0))
 	var hull_hp_after: float = minf(hull_hp_before + heal_amount, max_hull_hp)
 	player_ship.set("hull_hp", hull_hp_after)
 	var rescued_crew: int = 0

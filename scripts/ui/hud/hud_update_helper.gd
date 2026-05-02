@@ -816,18 +816,18 @@ static func _ensure_boss_hp_entry(hud, boss_id: int) -> Dictionary:
 	var root := VBoxContainer.new()
 	root.name = "BossHPRow_%s" % str(boss_id)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.custom_minimum_size = Vector2(560.0, 38.0)
+	root.custom_minimum_size = Vector2(560.0, 44.0)
 	root.add_theme_constant_override("separation", 2)
 	hud.boss_hp_container.add_child(root)
 
 	var label := Label.new()
 	label.name = "BossName"
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.custom_minimum_size = Vector2(560.0, 16.0)
+	label.custom_minimum_size = Vector2(560.0, 24.0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.visible = false
-	NavalUiTheme.style_caption(label, 10, NavalUiTheme.TEXT_MUTED)
+	NavalUiTheme.style_caption(label, 13, NavalUiTheme.TEXT_MUTED)
 	label.add_theme_color_override("font_outline_color", NavalUiTheme.OUTLINE_DARK)
 	label.add_theme_constant_override("outline_size", 2)
 	root.add_child(label)

@@ -864,8 +864,8 @@ func _build_effect_text(id: String, level: int) -> String:
 		"crew_attack":
 			return _progress_line(
 				LocaleManager.t("meta.effect.crew_attack", "무기 피해"),
-				"+%.0f%%" % (level * MetaManager.CREW_DAMAGE_BONUS_PER_LEVEL * 100.0),
-				"+%.0f%%" % (next_level * MetaManager.CREW_DAMAGE_BONUS_PER_LEVEL * 100.0),
+				"+%.1f%%" % (level * MetaManager.CREW_DAMAGE_BONUS_PER_LEVEL * 100.0),
+				"+%.1f%%" % (next_level * MetaManager.CREW_DAMAGE_BONUS_PER_LEVEL * 100.0),
 				is_max
 			)
 		"crew_defense":

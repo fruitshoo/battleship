@@ -297,6 +297,10 @@ func _auto_adjust_player_sail_for_debug() -> void:
 	HudShipDebugHelper.auto_adjust_player_sail_for_debug(self)
 
 
+func _toggle_player_masts_folded_for_debug() -> void:
+	HudShipDebugHelper.toggle_player_masts_folded_for_debug(self)
+
+
 func _adjust_player_crew_capacity_for_debug(delta_amount: int) -> void:
 	HudShipDebugHelper.adjust_player_crew_capacity_for_debug(self, delta_amount)
 

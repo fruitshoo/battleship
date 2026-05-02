@@ -41,11 +41,16 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 		var combat_ratio_value: float = float(ship_snapshot.get("combat_crew_ratio", 0.0))
 		var handling_ratio_value: float = float(ship_snapshot.get("shiphandling_crew_ratio", 0.0))
 		var gunnery_ratio_value: float = float(ship_snapshot.get("gunnery_crew_ratio", 0.0))
-		hud.debug_ship_config_value.text = "설정: 정원 %d | 장군 %d | 지원한도 %d | 노젓기 %s | 속도 %.1f | 선회 %.0f | 방어 %.0f | 보충 %.0f | 장악 %.1f | 배치 C/H/G %.0f/%.0f/%.0f" % [
+		var mast_fold_text := "접힘 %s %.0f%%" % [
+			"ON" if ship_snapshot.get("masts_folded", false) == true else "OFF",
+			float(ship_snapshot.get("mast_fold_ratio", 0.0)) * 100.0
+		]
+		hud.debug_ship_config_value.text = "설정: 정원 %d | 장군 %d | 지원한도 %d | 노젓기 %s | %s | 속도 %.1f | 선회 %.0f | 방어 %.0f | 보충 %.0f | 장악 %.1f | 배치 C/H/G %.0f/%.0f/%.0f" % [
 			max_crew_count_value,
 			captain_count_value,
 			support_limit,
 			rowing_state,
+			mast_fold_text,
 			max_speed_value,
 			turn_rate_value,
 			hull_defense_value,
@@ -198,6 +203,25 @@ static func auto_adjust_player_sail_for_debug(hud) -> void:
 	if hud.player_ship.has_method("_auto_adjust_sail"):
 		hud.player_ship.call("_auto_adjust_sail", 0.35)
 	hud.show_gust_warning_message("돛 정렬", 0.7)
+static func toggle_player_masts_folded_for_debug(hud) -> void:
+	if not _ensure_player_ship(hud):
+		return
+	if not hud.player_ship.has_method("toggle_masts_folded"):
+		hud.show_gust_warning_message("돛대 접힘 API 없음", 0.8)
+		return
+	var ship_snapshot: Dictionary = hud.player_ship.call("get_debug_ship_state_snapshot") if hud.player_ship.has_method("get_debug_ship_state_snapshot") else {}
+	var pivot_count := int(ship_snapshot.get("mast_fold_pivot_count", 0))
+	if pivot_count <= 0 and "mast_fold_pivots" in hud.player_ship:
+		var pivots = hud.player_ship.get("mast_fold_pivots")
+		if pivots is Array:
+			pivot_count = pivots.size()
+	if pivot_count <= 0:
+		hud.show_gust_warning_message("접힘 돛대 없음", 0.8)
+		return
+	hud.player_ship.call("toggle_masts_folded")
+	var folded: bool = hud.player_ship.has_method("are_masts_folded") and bool(hud.player_ship.call("are_masts_folded"))
+	sync_ship_debug_panel_from_player(hud)
+	hud.show_gust_warning_message("돛대 %s" % ("접힘" if folded else "펼침"), 0.8)
 static func adjust_player_crew_capacity_for_debug(hud, delta_amount: int) -> void:
 	if not _ensure_player_ship(hud):
 		return

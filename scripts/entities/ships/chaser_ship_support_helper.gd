@@ -370,7 +370,8 @@ static func drop_floating_loot(ship, force_drop: bool = false, xp_amount_overrid
 	if ship.get_meta("floating_loot_dropped", false) == true:
 		return
 	ship.set_meta("floating_loot_dropped", true)
-	if not force_drop and randf() > float(ship.floating_loot_drop_chance):
+	var contains_xp_reward := xp_amount_override != 0
+	if not force_drop and not contains_xp_reward and randf() > float(ship.floating_loot_drop_chance):
 		return
 
 	var loot = ScenePool.acquire(ship.get_tree(), ship.loot_scene)

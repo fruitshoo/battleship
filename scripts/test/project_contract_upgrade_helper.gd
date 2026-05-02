@@ -92,6 +92,19 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 화약 missing from ship upgrade pool")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
 		failures.append("upgrade smoke fleet_cannon should not be in support ship pool")
+	var supply_stats: Dictionary = upgrades.get("supply_bonus", {}).get("stats", {})
+	if str(upgrades.get("supply_bonus", {}).get("description", "")).contains("회복"):
+		failures.append("upgrade smoke 보급 description should not mention healing")
+	if supply_stats.has("base_heal") or supply_stats.has("heal_levels") or supply_stats.has("heal_add"):
+		failures.append("upgrade smoke 보급 should not carry hull healing stats")
+	if supply_stats.has("base_stamina_recovery") or supply_stats.has("stamina_recovery_levels") or supply_stats.has("stamina_recovery_add"):
+		failures.append("upgrade smoke 보급 should not carry stamina recovery stats")
+	var computed_supply_stats := UpgradeDataHelper.get_supply_bonus_stats(upgrades, {"supply_bonus": 5})
+	if computed_supply_stats.size() != 1 or not computed_supply_stats.has("radius_bonus"):
+		failures.append("upgrade smoke 보급 stats should expose only radius_bonus")
+	var supply_radius_levels: Array = supply_stats.get("radius_levels", [])
+	if supply_radius_levels.size() != 5:
+		failures.append("upgrade smoke 보급 should increase pickup range at every level")
 
 
 static func _validate_crew_reserve_retired(failures: Array[String]) -> void:

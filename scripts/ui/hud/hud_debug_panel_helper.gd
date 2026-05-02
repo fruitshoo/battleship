@@ -2667,6 +2667,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	section["body"].add_child(row_c)
 	row_c.add_child(create_debug_action_button("노젓기 토글", hud._toggle_player_rowing_for_debug))
 	row_c.add_child(create_debug_action_button("돛 정렬", hud._auto_adjust_player_sail_for_debug))
+	row_c.add_child(create_debug_action_button("돛대 접기", hud._toggle_player_masts_folded_for_debug))
 
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)

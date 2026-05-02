@@ -253,19 +253,13 @@
 		"supply_bonus": {
 			"name": "보급",
 			"category": 2,
-			"description": "보급 범위와 회복 강화",
+			"description": "부유물, 생존자, 표류 적병 획득 범위 증가",
 			"max_level": 5,
 			"color": "4ccc4c",
 			"stats": {
 				"base_radius": 8.0,
-				"base_heal": 15.0,
-				"base_stamina_recovery": 0.0,
-				"radius_levels": [1, 4],
-				"radius_add": 5.0,
-				"heal_levels": [2, 5],
-				"heal_add": 10.0,
-				"stamina_recovery_levels": [3],
-				"stamina_recovery_add": 20.0
+				"radius_levels": [1, 2, 3, 4, 5],
+				"radius_add": 2.0
 			}
 		},
 		"supply": {

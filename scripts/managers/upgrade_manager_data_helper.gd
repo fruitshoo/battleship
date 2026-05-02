@@ -37,25 +37,11 @@ static func get_supply_bonus_stats(upgrades: Dictionary, current_levels: Diction
 	var upgrade_data: Dictionary = upgrades.get("supply_bonus", {})
 	var stats: Dictionary = upgrade_data.get("stats", {})
 	var radius_bonus: float = 0.0
-	var heal_amount: float = float(stats.get("base_heal", 15.0))
-	var stamina_recovery: float = float(stats.get("base_stamina_recovery", 0.0))
-	var heal_bonus: float = 0.0
-	var stamina_recovery_bonus: float = 0.0
 	for current_level in range(1, target_level + 1):
 		if level_matches(current_level, stats.get("radius_levels", [])):
 			radius_bonus += float(stats.get("radius_add", 5.0))
-		if level_matches(current_level, stats.get("heal_levels", [])):
-			heal_bonus += float(stats.get("heal_add", 10.0))
-		if level_matches(current_level, stats.get("stamina_recovery_levels", [])):
-			stamina_recovery_bonus += float(stats.get("stamina_recovery_add", 20.0))
-	heal_amount += heal_bonus
-	stamina_recovery += stamina_recovery_bonus
 	return {
 		"radius_bonus": radius_bonus,
-		"heal_amount": heal_amount,
-		"stamina_recovery": stamina_recovery,
-		"heal_bonus": heal_bonus,
-		"stamina_recovery_bonus": stamina_recovery_bonus,
 	}
 
 static func get_player_crew_roster(upgrades: Dictionary, current_levels: Dictionary, total_crew: int) -> Dictionary:
@@ -202,12 +188,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "연노 운용 %d명 | %d연발 | 피해 %.0f" % [repeaters, burst, repeater_damage]
 		"supply_bonus":
 			if level_matches(next_level, s.get("radius_levels", [])):
-				return "보급 습득 반경 +%.1fm" % float(s.get("radius_add", 5.0))
-			if level_matches(next_level, s.get("heal_levels", [])):
-				return "보급 회복량 +%.0f" % float(s.get("heal_add", 10.0))
-			if level_matches(next_level, s.get("stamina_recovery_levels", [])):
-				return "보급 스태미나 회복 +%d" % int(s.get("stamina_recovery_add", 20.0))
-			return "보급 운용 성능 향상"
+				return "획득 반경 +%.1fm" % float(s.get("radius_add", 2.0))
+			return "획득 반경 강화"
 		"ballista":
 			var ballista_damage: float = s.get("base_damage", 45.0) + (next_level - 1) * s.get("damage_per_lv", 15.0)
 			var pierce: int = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))

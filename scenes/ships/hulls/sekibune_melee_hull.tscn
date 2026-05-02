@@ -1,8 +1,5 @@
 [gd_scene format=3 uid="uid://cj6jy8afqy86t"]
 
-[ext_resource type="Shader" uid="uid://dovmqe8n2vwfl" path="res://assets/shaders/sail.gdshader" id="3_aurjw"]
-[ext_resource type="Texture2D" uid="uid://dfds5i3xuhjlk" path="res://assets/vfx/masks/sail_burn_mask_c.png" id="4_f7r3m"]
-[ext_resource type="Shader" uid="uid://dn8yd24lkewtf" path="res://assets/shaders/flag.gdshader" id="5_ifw3i"]
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
@@ -14,95 +11,19 @@ size = Vector3(2.4, 0.8, 7)
 [sub_resource type="StandardMaterial3D" id="Material_japan_wood"]
 albedo_color = Color(0.45, 0.3, 0.25, 1)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_pe248"]
-render_priority = 20
-shader = ExtResource("3_aurjw")
-shader_parameter/wave_speed = 3.0
-shader_parameter/wave_strength = 0.38
-shader_parameter/use_sail_texture = true
-shader_parameter/sail_texture = ExtResource("vertical_sail")
-shader_parameter/burn_mask_texture_c = ExtResource("4_f7r3m")
-shader_parameter/use_dark_alpha_cutoff = false
-shader_parameter/dark_alpha_cutoff = 0.12
-shader_parameter/dark_alpha_softness = 0.04
-shader_parameter/sail_uv_scale = Vector2(1, 1)
-shader_parameter/sail_uv_offset = Vector2(0, 0)
-shader_parameter/swap_uv_axes = false
-shader_parameter/flip_u = false
-shader_parameter/flip_v = false
-shader_parameter/sail_damage = 0.0
-shader_parameter/burn_amount = 0.0
-shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.9378134403209629
-shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
-shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
-shader_parameter/burn_edge_emission_strength = 0.28
-shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
-shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
-shader_parameter/bottom_width_scale = 1.0
-metadata/mast_owner_id = 1391947612786391
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_wat1d"]
-top_radius = 0.05
-bottom_radius = 0.05
-height = 1.505
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0yt7l"]
-albedo_color = Color(0.35, 0.2, 0.1, 1)
-roughness = 0.85
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_5jw6a"]
-size = Vector2(3, 0.5)
-subdivide_width = 8
-subdivide_depth = 5
-orientation = 2
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_abddr"]
-render_priority = 0
-shader = ExtResource("5_ifw3i")
-shader_parameter/use_flag_texture = false
-shader_parameter/uv_scale = Vector2(1, 1)
-shader_parameter/uv_offset = Vector2(0, 0)
-shader_parameter/flip_u = false
-shader_parameter/flip_v = false
-shader_parameter/wave_speed = 5.0
-shader_parameter/wave_strength = 0.25
-shader_parameter/side_drag = 1.0
-
 [node name="SekibuneMeleeHull" type="Node3D" unique_id=692291800]
 
 [node name="Hull" type="MeshInstance3D" parent="." unique_id=1822968080]
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_japan_wood")
 
-[node name="Mast" parent="." unique_id=569622320 instance=ExtResource("mast_scene")]
+[node name="Masts" type="Node3D" parent="."]
+
+[node name="MastPivot_01" type="Node3D" parent="Masts"]
+
+[node name="Mast" parent="Masts/MastPivot_01" unique_id=569622320 instance=ExtResource("mast_scene")]
 sail_texture = ExtResource("vertical_sail")
 sail_uv_scale = Vector2(1, 1)
-
-[node name="MastMesh" parent="Mast" index="0" unique_id=1409497674]
-transform = Transform3D(1, 0, 0, 0, 1.205, 0, 0, 0, 1, 0, 5, 0)
-
-[node name="SailVisual" parent="Mast" index="1" unique_id=1842287473]
-transform = Transform3D(1.1879622, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.3933, 0)
-
-[node name="SailMesh" parent="Mast/SailVisual" index="0" unique_id=1903760530]
-transform = Transform3D(1.2, 0, 0, 0, 0.8, 0, 0, 0, 1, 0, 0.1557436, -0.3)
-material_override = SubResource("ShaderMaterial_pe248")
-
-[node name="Flag" parent="Mast/SailVisual" index="1" unique_id=85230560]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.411583, 0)
-
-[node name="Pole" parent="Mast/SailVisual/Flag" index="0" unique_id=555265591]
-mesh = SubResource("CylinderMesh_wat1d")
-surface_material_override/0 = SubResource("StandardMaterial3D_0yt7l")
-
-[node name="FlagMesh" parent="Mast/SailVisual/Flag" index="1" unique_id=722299975]
-transform = Transform3D(0.8417776, 0, 3.6795267e-08, 0, 1, 0, -4.371139e-08, 0, 1, 1.2626665, 1.2550001, 0)
-mesh = SubResource("PlaneMesh_5jw6a")
-surface_material_override/0 = SubResource("ShaderMaterial_abddr")
-
-[node name="yardarm" parent="Mast/SailVisual" index="2" unique_id=1460797758]
-transform = Transform3D(0.41443405, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 0, 3.0346785, -0.301)
 
 [node name="RudderVisual" parent="." unique_id=1609682058 instance=ExtResource("rudder_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.5)
@@ -168,6 +89,3 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.55, 1.7)
 
 [node name="CrewRearRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=834151640]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.55, 1.7)
-
-[editable path="Mast"]
-[editable path="Mast/SailVisual/Flag"]

@@ -12,8 +12,6 @@ const PLAYER_SAIL_EFFICIENCY := 1.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const PLAYER_STAMINA_DRAIN_RATE := 10.0
 const PLAYER_STAMINA_RECOVERY_RATE := 6.5
-const SUPPLY_BASE_HEAL := 15.0
-const SUPPLY_BASE_STAMINA_RECOVERY := 0.0
 const SOLDIER_SWORD_BASE_DAMAGE := 13.0
 const SOLDIER_BOW_BASE_DAMAGE := 18.0
 const SUPPORT_FLEET_BASE_RESPAWN_INTERVAL := 30.0
@@ -130,10 +128,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			]
 		"supply_bonus":
 			var supply_stats := _calculate_supply_bonus_stats(level, stats)
-			var supply_parts: Array[String] = ["획득 반경 %.1fm" % supply_stats["pickup_radius"], "보급 회복 %.0f" % supply_stats["heal_amount"]]
-			if float(supply_stats["stamina_recovery"]) > SUPPLY_BASE_STAMINA_RECOVERY:
-				supply_parts.append("스태미나 회복 %.0f" % supply_stats["stamina_recovery"])
-			return " | ".join(supply_parts)
+			return "획득 반경 %.1fm" % supply_stats["pickup_radius"]
 		"fleet_signal":
 			var signal_fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades_data)
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
@@ -318,17 +313,9 @@ static func _calculate_hull_defense_stats(level: int, stats: Dictionary) -> Dict
 
 static func _calculate_supply_bonus_stats(level: int, stats: Dictionary) -> Dictionary:
 	var pickup_radius: float = float(stats.get("base_radius", 8.0))
-	var heal_amount: float = float(stats.get("base_heal", SUPPLY_BASE_HEAL))
-	var stamina_recovery: float = float(stats.get("base_stamina_recovery", SUPPLY_BASE_STAMINA_RECOVERY))
 	for current_level in range(1, level + 1):
 		if _level_matches(current_level, stats.get("radius_levels", [])):
 			pickup_radius += float(stats.get("radius_add", 5.0))
-		if _level_matches(current_level, stats.get("heal_levels", [])):
-			heal_amount += float(stats.get("heal_add", 10.0))
-		if _level_matches(current_level, stats.get("stamina_recovery_levels", [])):
-			stamina_recovery += float(stats.get("stamina_recovery_add", 20.0))
 	return {
 		"pickup_radius": pickup_radius,
-		"heal_amount": heal_amount,
-		"stamina_recovery": stamina_recovery,
 	}

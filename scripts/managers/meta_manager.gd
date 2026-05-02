@@ -5,100 +5,100 @@ extends Node
 
 signal meta_upgraded(id: String, new_level: int)
 
-const HULL_HP_BONUS_PER_LEVEL := 24.0
-const HULL_DEFENSE_BONUS_PER_LEVEL := 0.75
-const SAIL_SPEED_BONUS_PER_LEVEL := 0.05
-const XP_GAIN_BONUS_PER_LEVEL := 0.05
+const HULL_HP_BONUS_PER_LEVEL := 12.0
+const HULL_DEFENSE_BONUS_PER_LEVEL := 0.4
+const SAIL_SPEED_BONUS_PER_LEVEL := 0.02
+const XP_GAIN_BONUS_PER_LEVEL := 0.04
 const COLLECTION_RADIUS_BONUS_PER_LEVEL := 0.8
-const CREW_HEALTH_BONUS_PER_LEVEL := 0.06
-const CREW_DAMAGE_BONUS_PER_LEVEL := 0.02
-const CREW_DEFENSE_BONUS_PER_LEVEL := 0.5
+const CREW_HEALTH_BONUS_PER_LEVEL := 0.02
+const CREW_DAMAGE_BONUS_PER_LEVEL := 0.015
+const CREW_DEFENSE_BONUS_PER_LEVEL := 0.3
 
 # 영구 업그레이드 정의
 var UPGRADES = {
 	"hull_hp": {
 		"name": "최대 체력",
-		"description": "선체 +24",
+		"description": "선체 +12",
 		"category": "ship",
 		"card_art_path": "res://assets/ui/upgrades/panokseon_upgrade_card.png",
-		"base_cost": 260,
-		"cost_multiplier": 1.45,
-		"max_level": 5
+		"base_cost": 180,
+		"cost_multiplier": 1.32,
+		"max_level": 8
 	},
 	"hull_defense": {
 		"name": "방어력",
-		"description": "방어력 +0.75",
+		"description": "방어력 +0.4",
 		"category": "ship",
 		"card_art_path": "res://assets/ui/upgrades/boarding_resist_card.png",
-		"base_cost": 360,
-		"cost_multiplier": 1.55,
-		"max_level": 5
+		"base_cost": 220,
+		"cost_multiplier": 1.34,
+		"max_level": 8
 	},
 	"sail_speed": {
 		"name": "이동 속도",
-		"description": "속도 +5%",
+		"description": "속도 +2%",
 		"category": "ship",
 		"card_art_path": "res://assets/ui/upgrades/sail_card.png",
-		"base_cost": 340,
-		"cost_multiplier": 1.5,
-		"max_level": 5
+		"base_cost": 220,
+		"cost_multiplier": 1.34,
+		"max_level": 8
 	},
 	"xp_gain": {
 		"name": "경험치 증가",
-		"description": "경험치 +5%",
+		"description": "경험치 +4%",
 		"category": "utility",
-		"base_cost": 320,
-		"cost_multiplier": 1.5,
-		"max_level": 5
+		"base_cost": 280,
+		"cost_multiplier": 1.45,
+		"max_level": 4
 	},
 	"pickup_range": {
 		"name": "수집 반경",
 		"description": "반경 +0.8m",
 		"category": "utility",
-		"base_cost": 240,
-		"cost_multiplier": 1.45,
-		"max_level": 5
+		"base_cost": 220,
+		"cost_multiplier": 1.42,
+		"max_level": 4
 	},
 	"reroll_stock": {
 		"name": "재굴림",
 		"description": "재굴림 +1",
 		"category": "utility",
-		"base_cost": 700,
-		"cost_multiplier": 1.75,
-		"max_level": 2
+		"base_cost": 900,
+		"cost_multiplier": 1.0,
+		"max_level": 1
 	},
 	"crew_capacity": {
 		"name": "병사 수",
 		"description": "병사 +1",
 		"category": "crew",
-		"base_cost": 760,
-		"cost_multiplier": 1.7,
-		"max_level": 2
+		"base_cost": 1000,
+		"cost_multiplier": 1.0,
+		"max_level": 1
 	},
 	"crew_health": {
 		"name": "병사 체력",
-		"description": "체력 +6%",
+		"description": "체력 +2%",
 		"category": "crew",
-		"base_cost": 360,
-		"cost_multiplier": 1.5,
-		"max_level": 5
+		"base_cost": 220,
+		"cost_multiplier": 1.34,
+		"max_level": 8
 	},
 	"crew_attack": {
 		"name": "무기",
-		"description": "병사 무기 피해 +2%",
+		"description": "병사 무기 피해 +1.5%",
 		"category": "crew",
-		"base_cost": 360,
-		"cost_multiplier": 1.55,
-		"max_level": 5
+		"base_cost": 220,
+		"cost_multiplier": 1.35,
+		"max_level": 8
 	},
 	"crew_defense": {
 		"name": "병사 방어력",
-		"description": "방어력 +0.5",
+		"description": "방어력 +0.3",
 		"category": "crew",
 		"card_art_path": "res://assets/ui/upgrades/crew_defense_card.png",
-		"base_cost": 380,
-		"cost_multiplier": 1.55,
-		"max_level": 5
+		"base_cost": 230,
+		"cost_multiplier": 1.35,
+		"max_level": 8
 	}
 }
 
@@ -178,10 +178,10 @@ func get_crew_defense_bonus() -> float:
 	return get_upgrade_level("crew_defense") * CREW_DEFENSE_BONUS_PER_LEVEL
 
 func get_reroll_bonus_for_level(level: int) -> int:
-	return clampi(level, 0, 2)
+	return clampi(level, 0, 1)
 
 func get_crew_capacity_bonus_for_level(level: int) -> int:
-	return clampi(level, 0, 2)
+	return clampi(level, 0, 1)
 
 func get_upgrade_ids() -> Array[String]:
 	var ids: Array[String] = []

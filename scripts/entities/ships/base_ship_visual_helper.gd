@@ -143,6 +143,9 @@ static func update_sail_visual(ship) -> void:
 	var sail_deployed_ratio := 1.0
 	if "sail_deployed_ratio" in ship and ship.get("sail_deployed_ratio") != null:
 		sail_deployed_ratio = clampf(float(ship.get("sail_deployed_ratio")), 0.0, 1.0)
+	if ship.has_method("get_mast_fold_ratio"):
+		var mast_fold_ratio := clampf(float(ship.call("get_mast_fold_ratio")), 0.0, 1.0)
+		sail_deployed_ratio *= 1.0 - mast_fold_ratio
 	for mast in ship.masts:
 		if is_instance_valid(mast) and mast.has_method("set_sail_angle"):
 			mast.set_sail_angle(ship.sail_angle)
