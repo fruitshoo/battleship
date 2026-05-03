@@ -12,6 +12,10 @@ const ROLE_RESCUE_REAR := "rescue_rear"
 const ROLE_ARTILLERY_LEAD := "artillery_lead"
 const ROLE_ARTILLERY_SCREEN_LEFT := "artillery_screen_left"
 const ROLE_ARTILLERY_SCREEN_RIGHT := "artillery_screen_right"
+const ROLE_ARTILLERY_SCREEN_FRONT_LEFT := "artillery_screen_front_left"
+const ROLE_ARTILLERY_SCREEN_FRONT_RIGHT := "artillery_screen_front_right"
+const ROLE_ARTILLERY_SCREEN_REAR_LEFT := "artillery_screen_rear_left"
+const ROLE_ARTILLERY_SCREEN_REAR_RIGHT := "artillery_screen_rear_right"
 
 const FORMATION_COLUMN := 0
 const FORMATION_WING := 1
@@ -27,6 +31,11 @@ const GENERATED_WING_FIRST_ROW_TRAIL_SCALE := 0.42
 const GENERATED_WING_ROW_TRAIL_SCALE := 0.36
 const GENERATED_WING_LATERAL_ROW_SCALE := 0.72
 const GENERATED_CENTER_TAIL_TRAIL_PAD := 0.35
+const WING_SCREEN_TURN_CLEAR_START_RUDDER := 10.0
+const WING_SCREEN_TURN_CLEAR_FULL_RUDDER := 34.0
+const WING_SCREEN_TURN_TRAIL_BACK := 0.96
+const WING_SCREEN_TURN_OUTER_WIDEN := 0.30
+const WING_SCREEN_TURN_INNER_WIDEN := 0.55
 
 const ROLE_SPECS := {
 	ROLE_SCREEN_LEAD: {
@@ -53,7 +62,7 @@ const ROLE_SPECS := {
 		"anchor": ROLE_ANCHOR_FLAGSHIP,
 		"wing_side": 0.0,
 		"wing_lateral": 0.0,
-		"wing_spacing": 2.05,
+		"wing_spacing": 1.42,
 		"column_spacing": 1.75,
 		"lateral_pad": GENERIC_LATERAL_PAD,
 		"hold_line": false,
@@ -62,10 +71,10 @@ const ROLE_SPECS := {
 		"anchor": ROLE_ANCHOR_FLAGSHIP,
 		"wing_side": 0.0,
 		"wing_lateral": 0.0,
-		"wing_spacing": 1.36,
+		"wing_spacing": 0.86,
 		"column_spacing": 1.18,
 		"lateral_pad": ARTILLERY_LATERAL_PAD,
-		"extra_trail_pad": ROLE_EXTRA_TRAIL_PAD,
+		"extra_trail_pad": 0.35,
 		"rescue_lane": true,
 		"rescue_lateral": 0.92,
 		"hold_line": true,
@@ -73,19 +82,61 @@ const ROLE_SPECS := {
 	ROLE_ARTILLERY_SCREEN_LEFT: {
 		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
 		"wing_side": -1.0,
-		"wing_lateral": 1.36,
-		"wing_spacing": 1.62,
+		"wing_lateral": 1.18,
+		"wing_spacing": -0.36,
 		"column_spacing": 1.02,
 		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"wing_direct_depth": true,
 		"hold_line": false,
 	},
 	ROLE_ARTILLERY_SCREEN_RIGHT: {
 		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
 		"wing_side": 1.0,
-		"wing_lateral": 1.36,
-		"wing_spacing": 1.62,
+		"wing_lateral": 1.18,
+		"wing_spacing": -0.36,
 		"column_spacing": 1.02,
 		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"wing_direct_depth": true,
+		"hold_line": false,
+	},
+	ROLE_ARTILLERY_SCREEN_FRONT_LEFT: {
+		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
+		"wing_side": -1.0,
+		"wing_lateral": 1.08,
+		"wing_spacing": -0.36,
+		"column_spacing": 1.02,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"wing_direct_depth": true,
+		"hold_line": false,
+	},
+	ROLE_ARTILLERY_SCREEN_FRONT_RIGHT: {
+		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
+		"wing_side": 1.0,
+		"wing_lateral": 1.08,
+		"wing_spacing": -0.36,
+		"column_spacing": 1.02,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"wing_direct_depth": true,
+		"hold_line": false,
+	},
+	ROLE_ARTILLERY_SCREEN_REAR_LEFT: {
+		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
+		"wing_side": -1.0,
+		"wing_lateral": 1.08,
+		"wing_spacing": 0.66,
+		"column_spacing": 1.16,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"wing_direct_depth": true,
+		"hold_line": false,
+	},
+	ROLE_ARTILLERY_SCREEN_REAR_RIGHT: {
+		"anchor": ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN,
+		"wing_side": 1.0,
+		"wing_lateral": 1.08,
+		"wing_spacing": 0.66,
+		"column_spacing": 1.16,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"wing_direct_depth": true,
 		"hold_line": false,
 	},
 }
@@ -108,11 +159,14 @@ static func get_support_join_offset(ship, my_index: int) -> Vector3:
 
 
 static func get_support_lead_ship(ship, minions: Array, my_index: int) -> Node3D:
+	var role_name := _get_support_slot_role(ship)
+	var flagship_anchor := _get_flagship_anchor(ship)
+	if _should_follow_flagship_directly(ship, role_name) and is_instance_valid(flagship_anchor):
+		return flagship_anchor
 	var formation_value := _get_formation_value(ship)
 	if formation_value == FORMATION_COLUMN:
 		return _get_generic_support_lead_ship(ship, minions, my_index)
-	if not _is_named_support_role(_get_support_slot_role(ship)):
-		var flagship_anchor := _get_flagship_anchor(ship)
+	if not _is_named_support_role(role_name):
 		if is_instance_valid(flagship_anchor):
 			return flagship_anchor
 		return _get_generic_support_lead_ship(ship, minions, my_index)
@@ -357,7 +411,7 @@ static func _resolve_role_anchor_ship(ship, minions: Array) -> Node3D:
 	if not _is_named_support_role(role_name):
 		return null
 	var anchor_mode := str(_get_role_spec(role_name).get("anchor", ROLE_ANCHOR_FLAGSHIP))
-	if _get_formation_value(ship) == FORMATION_COLUMN and anchor_mode == ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN:
+	if anchor_mode == ROLE_ANCHOR_SQUADRON_LEAD_IN_COLUMN:
 		var squadron_id := _get_support_squadron_id(ship)
 		var lead_ship := _find_squadron_lead(minions, squadron_id)
 		if is_instance_valid(lead_ship) and lead_ship != ship:
@@ -383,6 +437,8 @@ static func _get_role_follow_distance(ship, anchor_ship: Node3D, trailing_distan
 	var desired_spacing := _get_role_spacing_value(base_spacing, role_name, formation_value)
 	var role_spec := _get_role_spec(role_name)
 	desired_spacing += float(role_spec.get("extra_trail_pad", 0.0))
+	if formation_value == FORMATION_WING and _is_screen_role(role_name):
+		desired_spacing += base_spacing * WING_SCREEN_TURN_TRAIL_BACK * _get_flagship_turn_clearance_blend(ship)
 	if formation_value == FORMATION_WING and role_spec.get("wing_direct_depth", false) == true:
 		return desired_spacing
 	return get_follow_distance(ship, anchor_ship, desired_spacing)
@@ -398,6 +454,12 @@ static func _get_role_lateral_distance(ship, anchor_ship: Node3D, spacing: float
 	var side_sign: float = _get_rescue_lane_side_sign(ship, role_name, my_index) if rescue_lane else _get_role_side_sign(role_name, my_index)
 	var pair_spacing := _get_pair_lateral_spacing(ship, anchor_ship, role_name)
 	var minimum_spacing := maxf(spacing * 0.68, pair_spacing)
+	if formation_value == FORMATION_WING and _is_screen_role(role_name):
+		var turn_clearance_blend := _get_flagship_turn_clearance_blend(ship)
+		if turn_clearance_blend > 0.0:
+			var turn_side := _get_flagship_turn_side(ship)
+			var widen_scale := WING_SCREEN_TURN_INNER_WIDEN if side_sign == turn_side else WING_SCREEN_TURN_OUTER_WIDEN
+			minimum_spacing += spacing * widen_scale * turn_clearance_blend
 	return minimum_spacing * lateral_scale * side_sign
 
 
@@ -455,6 +517,43 @@ static func _get_role_lateral_scale(role_name: String, formation_value: int) -> 
 
 static func _get_role_side_sign(role_name: String, my_index: int) -> float:
 	return float(_get_role_spec(role_name).get("wing_side", 0.0))
+
+
+static func _is_screen_role(role_name: String) -> bool:
+	return role_name == ROLE_SCREEN_LEAD or role_name == ROLE_SCREEN_FLANK
+
+
+static func _get_flagship_turn_clearance_blend(ship) -> float:
+	var flagship := _get_flagship_anchor(ship)
+	if not is_instance_valid(flagship):
+		return 0.0
+	var rudder_abs: float = absf(float(flagship.get("rudder_angle"))) if flagship.get("rudder_angle") != null else 0.0
+	return clampf(
+		(rudder_abs - WING_SCREEN_TURN_CLEAR_START_RUDDER) / maxf(WING_SCREEN_TURN_CLEAR_FULL_RUDDER - WING_SCREEN_TURN_CLEAR_START_RUDDER, 0.001),
+		0.0,
+		1.0
+	)
+
+
+static func _get_flagship_turn_side(ship) -> float:
+	var flagship := _get_flagship_anchor(ship)
+	if not is_instance_valid(flagship) or flagship.get("rudder_angle") == null:
+		return 0.0
+	var rudder_value := float(flagship.get("rudder_angle"))
+	if absf(rudder_value) <= 0.01:
+		return 0.0
+	return 1.0 if rudder_value > 0.0 else -1.0
+
+
+static func _should_follow_flagship_directly(ship, role_name: String) -> bool:
+	return role_name == ROLE_ARTILLERY_LEAD or _is_panokseon_support(ship)
+
+
+static func _is_panokseon_support(ship) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	var ship_type_value: Variant = ship.get("ship_type")
+	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
 
 
 static func _is_named_support_role(role_name: String) -> bool:

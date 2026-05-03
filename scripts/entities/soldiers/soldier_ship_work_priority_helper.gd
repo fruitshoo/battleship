@@ -344,12 +344,7 @@ static func _build_gunnery_station_directive(soldier, ship: Node3D, half_ext: Ve
 
 static func _build_shiphandling_directive(soldier, ship: Node3D, half_ext: Vector2) -> Dictionary:
 	var handling_ratio: float = float(ship.get("shiphandling_crew_ratio")) if ship.get("shiphandling_crew_ratio") != null else 0.0
-	if handling_ratio < 0.45:
-		return _none_directive()
-	var rowing_active: bool = ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
-	var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
-	var current_speed: float = ship.get_current_speed_value() if ship.has_method("get_current_speed_value") else 0.0
-	if not rowing_active and absf(rudder_angle) < 7.5 and current_speed <= 1.2:
+	if not _shiphandling_station_is_needed(ship, handling_ratio):
 		return _none_directive()
 	var bias_sign: float = _get_soldier_bias_sign(soldier)
 	var duty_lane: int = int(soldier.get_instance_id()) % 5
@@ -778,13 +773,18 @@ static func _is_active_work_task_still_valid(soldier, ship: Node3D, task_name: S
 			return false
 		TASK_SHIPHANDLING_STATION:
 			var handling_ratio: float = float(ship.get("shiphandling_crew_ratio")) if ship.get("shiphandling_crew_ratio") != null else 0.0
-			if handling_ratio < 0.45:
-				return false
-			var rowing_active: bool = ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
-			var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
-			var current_speed: float = ship.get_current_speed_value() if ship.has_method("get_current_speed_value") else 0.0
-			return rowing_active or absf(rudder_angle) >= 7.5 or current_speed > 1.2
+			return _shiphandling_station_is_needed(ship, handling_ratio)
 	return false
+
+
+static func _shiphandling_station_is_needed(ship: Node3D, handling_ratio: float) -> bool:
+	if handling_ratio < 0.45:
+		return false
+	var rowing_active: bool = ship.get("is_rowing") == true if ship.get("is_rowing") != null else false
+	if rowing_active:
+		return true
+	var rudder_angle: float = float(ship.get("rudder_angle")) if ship.get("rudder_angle") != null else 0.0
+	return absf(rudder_angle) >= 12.0
 
 
 static func _get_soldier_bias_sign(soldier) -> float:

@@ -95,21 +95,18 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	var current_global_target = soldier.owned_ship.to_global(soldier.wander_target_local)
-	var diff = current_global_target - soldier.global_position
-	var wander_dist = diff.length()
+	var current_local: Vector3 = soldier.owned_ship.to_local(soldier.global_position)
+	var target_local: Vector3 = soldier.wander_target_local
+	var wander_diff := Vector2(current_local.x - target_local.x, current_local.z - target_local.z)
+	var wander_dist = wander_diff.length()
 
 	if wander_dist < 0.2:
+		soldier.velocity = Vector3.ZERO
 		soldier.wander_timer = randf_range(1.0, 3.0)
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	var direction = diff.normalized()
-	soldier.velocity = direction * soldier.move_speed * 0.5
-	soldier.move_and_slide()
-
-	if direction.length_squared() > 0.01:
-		turn_toward_position(soldier, current_global_target, WANDER_TURN_SPEED, delta)
+	_move_toward_owned_ship_local_point(soldier, target_local, 0.5, delta, WANDER_TURN_SPEED)
 
 static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, delta: float, turn_speed: float) -> bool:
 	if not soldier.has_method("_find_ship_duty_target"):
@@ -121,6 +118,15 @@ static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, de
 	var gunnery_ratio: float = float(owned_ship.get("gunnery_crew_ratio")) if owned_ship.get("gunnery_crew_ratio") != null else 0.0
 	if gunnery_ratio < 0.45:
 		return false
+	var enemy = soldier.find_nearest_enemy()
+	if is_instance_valid(enemy):
+		var attack_range: float = soldier.current_weapon.attack_range if soldier.current_weapon and "attack_range" in soldier.current_weapon else 1.2
+		var dist_xz := Vector2(
+			soldier.global_position.x - enemy.global_position.x,
+			soldier.global_position.z - enemy.global_position.z
+		).length()
+		if dist_xz <= attack_range:
+			return false
 	var duty_target: Vector3 = soldier._find_ship_duty_target()
 	if duty_target == Vector3.INF:
 		return false
@@ -287,6 +293,8 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 
 
 static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:
+	if _move_toward_owned_ship_global_point(soldier, target_pos, speed_scale, delta, turn_speed):
+		return
 	var flat_target := Vector3(target_pos.x, soldier.global_position.y, target_pos.z)
 	var diff: Vector3 = flat_target - soldier.global_position
 	diff.y = 0.0
@@ -301,6 +309,34 @@ static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float 
 
 	if direction.length_squared() > 0.01:
 		turn_toward_position(soldier, flat_target, turn_speed, delta)
+
+
+static func _move_toward_owned_ship_global_point(soldier, target_pos: Vector3, speed_scale: float, delta: float, turn_speed: float) -> bool:
+	if not is_instance_valid(soldier.owned_ship):
+		return false
+	var target_local: Vector3 = soldier.owned_ship.to_local(target_pos)
+	return _move_toward_owned_ship_local_point(soldier, target_local, speed_scale, delta, turn_speed)
+
+
+static func _move_toward_owned_ship_local_point(soldier, target_local: Vector3, speed_scale: float, delta: float, turn_speed: float) -> bool:
+	if not is_instance_valid(soldier.owned_ship):
+		return false
+	var ship := soldier.owned_ship as Node3D
+	var current_local: Vector3 = ship.to_local(soldier.global_position)
+	var diff_xz := Vector2(target_local.x - current_local.x, target_local.z - current_local.z)
+	if diff_xz.length_squared() <= 0.04:
+		soldier.velocity = Vector3.ZERO
+		return true
+
+	var step := maxf(0.0, soldier.move_speed * speed_scale * delta)
+	var next_xz := Vector2(current_local.x, current_local.z).move_toward(Vector2(target_local.x, target_local.z), step)
+	var next_local := Vector3(next_xz.x, current_local.y, next_xz.y)
+	soldier.global_position = ship.to_global(next_local)
+	soldier.velocity = Vector3.ZERO
+
+	var look_target := ship.to_global(Vector3(target_local.x, current_local.y, target_local.z))
+	turn_toward_position(soldier, look_target, turn_speed, delta)
+	return true
 
 
 static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> bool:

@@ -204,6 +204,38 @@ static func _run_support_wing_join_geometry_contract(failures: Array[String], sm
 		failures.append("support fleet smoke escort artillery lead should hold the rear center lane")
 	if artillery_lead_offset.z <= screen_lead_offset.z:
 		failures.append("support fleet smoke escort artillery lead should trail behind side screen ships")
+	var artillery_front_left := Node3D.new()
+	artillery_front_left.name = "EscortArtilleryFrontLeftGeometryContract"
+	artillery_front_left.set_meta("support_squadron_slot_role", "artillery_screen_front_left")
+	smoke_root.add_child(artillery_front_left)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(artillery_front_left, player_ship)
+	var artillery_front_right := Node3D.new()
+	artillery_front_right.name = "EscortArtilleryFrontRightGeometryContract"
+	artillery_front_right.set_meta("support_squadron_slot_role", "artillery_screen_front_right")
+	smoke_root.add_child(artillery_front_right)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(artillery_front_right, player_ship)
+	var artillery_rear_left := Node3D.new()
+	artillery_rear_left.name = "EscortArtilleryRearLeftGeometryContract"
+	artillery_rear_left.set_meta("support_squadron_slot_role", "artillery_screen_rear_left")
+	smoke_root.add_child(artillery_rear_left)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(artillery_rear_left, player_ship)
+	var artillery_rear_right := Node3D.new()
+	artillery_rear_right.name = "EscortArtilleryRearRightGeometryContract"
+	artillery_rear_right.set_meta("support_squadron_slot_role", "artillery_screen_rear_right")
+	smoke_root.add_child(artillery_rear_right)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(artillery_rear_right, player_ship)
+	var artillery_front_left_offset := SupportFleetFormationHelper.get_support_fleet_offset(artillery_front_left, 2, 10.0, 6)
+	var artillery_front_right_offset := SupportFleetFormationHelper.get_support_fleet_offset(artillery_front_right, 3, 10.0, 6)
+	var artillery_rear_left_offset := SupportFleetFormationHelper.get_support_fleet_offset(artillery_rear_left, 4, 10.0, 6)
+	var artillery_rear_right_offset := SupportFleetFormationHelper.get_support_fleet_offset(artillery_rear_right, 5, 10.0, 6)
+	if artillery_front_left_offset.x * artillery_front_right_offset.x >= 0.0:
+		failures.append("support fleet smoke panokseon front screens should split to opposite sides")
+	if artillery_rear_left_offset.x * artillery_rear_right_offset.x >= 0.0:
+		failures.append("support fleet smoke panokseon rear screens should split to opposite sides")
+	if artillery_front_left_offset.z >= 0.0 or artillery_front_right_offset.z >= 0.0:
+		failures.append("support fleet smoke panokseon front screens should stage forward of the support panokseon")
+	if artillery_rear_left_offset.z <= 0.0 or artillery_rear_right_offset.z <= 0.0:
+		failures.append("support fleet smoke panokseon rear screens should trail behind the support panokseon")
 
 	var extra_offset := SupportFleetFormationHelper.get_support_fleet_offset(extra_support, 5, 10.0, 7)
 	if absf(extra_offset.x) < 0.1:
@@ -576,6 +608,8 @@ static func _run_support_signal_level_two_limit_smoke(owner: Node, failures: Arr
 				failures.append("support fleet smoke panokseon unlock should insert a new panokseon at slot 1")
 			if not is_instance_valid(slot_two) or int(slot_two.get_meta("support_fleet_slot_index", -1)) != 2 or str(slot_two.get("ship_type")) != "maengseon_ally":
 				failures.append("support fleet smoke panokseon unlock should preserve existing maengseon by shifting it to slot 2")
+			if is_instance_valid(slot_one):
+				await _run_support_panokseon_mast_fold_sync_contract(owner, failures, player_ship, slot_one)
 
 	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
 	UpgradeManager.current_levels["panokseon_upgrade"] = original_panokseon_level
@@ -643,6 +677,43 @@ static func _run_support_shared_hull_upgrade_smoke(failures: Array[String], supp
 
 	UpgradeManager.current_levels["hull_defense"] = original_hull_level
 	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
+
+
+static func _run_support_panokseon_mast_fold_sync_contract(owner: Node, failures: Array[String], flagship: Node3D, support_ship: Node3D) -> void:
+	if not is_instance_valid(flagship) or not is_instance_valid(support_ship):
+		return
+	if not support_ship.has_method("sync_sail_furl_with_flagship"):
+		failures.append("support panokseon mast fold sync missing sail sync method")
+		return
+	if not support_ship.has_method("are_masts_folded") or not support_ship.has_method("get_mast_fold_ratio"):
+		failures.append("support panokseon mast fold sync missing mast fold methods")
+		return
+	var fold_pivots: Array = support_ship.get("mast_fold_pivots") if support_ship.get("mast_fold_pivots") != null else []
+	if fold_pivots.is_empty():
+		failures.append("support panokseon should expose mast fold pivots")
+		return
+
+	flagship.call("set_sail_furled", true)
+	support_ship.call("sync_sail_furl_with_flagship", 999.0)
+	if support_ship.get("sail_furled") != true:
+		failures.append("support panokseon should inherit furled sail state before mast fold")
+	if float(support_ship.get("sail_deployed_ratio")) > 0.001:
+		failures.append("support panokseon should lower sails before folding masts")
+	if not bool(support_ship.call("are_masts_folded")):
+		failures.append("support panokseon should fold masts after sails are lowered")
+
+	await _wait_frames(owner, 4)
+	if float(support_ship.call("get_mast_fold_ratio")) <= 0.001:
+		failures.append("support panokseon mast fold pivots should animate after fold command")
+
+	flagship.call("set_sail_furled", false)
+	support_ship.call("sync_sail_furl_with_flagship", 0.1)
+	if bool(support_ship.call("are_masts_folded")):
+		failures.append("support panokseon should start unfolding masts before raising sails")
+	if float(support_ship.get("sail_deployed_ratio")) > 0.001 and float(support_ship.call("get_mast_fold_ratio")) > 0.001:
+		failures.append("support panokseon should keep sails down while masts are still folding")
+
+	support_ship.call("sync_sail_furl_with_flagship", 0.0, true)
 
 
 static func _count_visible_fleet_cannons(ship: Node) -> int:

@@ -16,6 +16,18 @@ static func bind_upgrade_slot_hover(hud, slot: PanelContainer) -> void:
 	slot.mouse_exited.connect(hud._on_upgrade_slot_mouse_exited.bind(slot))
 
 
+static func bind_text_tooltip_hover(hud, control: Control, text: String, color: Color = Color(0.9, 0.85, 0.6, 1.0), allow_stat_panel: bool = false) -> void:
+	if not is_instance_valid(control) or text.strip_edges().is_empty():
+		return
+	control.tooltip_text = ""
+	control.mouse_filter = Control.MOUSE_FILTER_PASS
+	control.set_meta("tooltip_text", text)
+	control.set_meta("tooltip_color", color)
+	control.set_meta("tooltip_allow_stat_panel", allow_stat_panel)
+	control.mouse_entered.connect(hud._on_text_tooltip_mouse_entered.bind(control))
+	control.mouse_exited.connect(hud._on_text_tooltip_mouse_exited.bind(control))
+
+
 static func on_upgrade_slot_mouse_entered(hud, slot: PanelContainer) -> void:
 	if hud.show_stat_panel:
 		return
@@ -29,6 +41,19 @@ static func on_upgrade_slot_mouse_entered(hud, slot: PanelContainer) -> void:
 		show_slot_tooltip(hud, slot)
 
 
+static func on_text_tooltip_mouse_entered(hud, control: Control) -> void:
+	if not is_instance_valid(hud.upgrade_tooltip_panel):
+		return
+	if not _control_allows_current_context(hud, control):
+		return
+	if get_slot_tooltip_payload(hud, control).is_empty():
+		return
+	hud._tooltip_hover_slot = control
+	hud._tooltip_hover_elapsed = 0.0
+	if hud._tooltip_slot_ref != control and hud.upgrade_tooltip_panel.is_showing():
+		show_slot_tooltip(hud, control)
+
+
 static func on_upgrade_slot_mouse_exited(hud, slot: PanelContainer) -> void:
 	if hud._tooltip_hover_slot == slot:
 		hud._tooltip_hover_slot = null
@@ -39,8 +64,18 @@ static func on_upgrade_slot_mouse_exited(hud, slot: PanelContainer) -> void:
 	hide_upgrade_tooltip(hud)
 
 
+static func on_text_tooltip_mouse_exited(hud, control: Control) -> void:
+	if hud._tooltip_hover_slot == control:
+		hud._tooltip_hover_slot = null
+		hud._tooltip_hover_elapsed = 0.0
+	if hud._tooltip_slot_ref != control:
+		return
+	hud._tooltip_slot_ref = null
+	hide_upgrade_tooltip(hud)
+
+
 static func update_upgrade_tooltip_state(hud, delta: float) -> void:
-	if hud.show_stat_panel:
+	if hud.show_stat_panel and not _control_allows_current_context(hud, hud._tooltip_hover_slot):
 		if is_instance_valid(hud.upgrade_tooltip_panel) and hud.upgrade_tooltip_panel.is_showing():
 			hide_upgrade_tooltip(hud, true)
 		return
@@ -50,8 +85,8 @@ static func update_upgrade_tooltip_state(hud, delta: float) -> void:
 			show_slot_tooltip(hud, hud._tooltip_hover_slot)
 
 
-static func show_slot_tooltip(hud, slot: PanelContainer) -> void:
-	if hud.show_stat_panel:
+static func show_slot_tooltip(hud, slot: Control) -> void:
+	if not _control_allows_current_context(hud, slot):
 		return
 	if not is_instance_valid(hud.upgrade_tooltip_panel):
 		return
@@ -67,11 +102,13 @@ static func show_slot_tooltip(hud, slot: PanelContainer) -> void:
 	)
 
 
-static func slot_has_tooltip(hud, slot: PanelContainer) -> bool:
+static func slot_has_tooltip(hud, slot: Control) -> bool:
 	return not get_slot_tooltip_payload(hud, slot).is_empty()
 
 
-static func get_slot_tooltip_payload(hud, slot: PanelContainer) -> Dictionary:
+static func get_slot_tooltip_payload(hud, slot: Control) -> Dictionary:
+	if not is_instance_valid(slot):
+		return {}
 	var tooltip_text: String = str(slot.get_meta("tooltip_text", ""))
 	if not tooltip_text.is_empty():
 		return {
@@ -86,6 +123,12 @@ static func get_slot_tooltip_payload(hud, slot: PanelContainer) -> Dictionary:
 		"text": HudUpgradeInfoHelper.build_upgrade_tooltip_text(hud, upgrade_id, level),
 		"color": HudUpgradeInfoHelper.get_upgrade_color(upgrade_id)
 	}
+
+
+static func _control_allows_current_context(hud, control: Control) -> bool:
+	if not hud.show_stat_panel:
+		return true
+	return is_instance_valid(control) and bool(control.get_meta("tooltip_allow_stat_panel", false))
 
 
 static func hide_upgrade_tooltip(hud, instant: bool = false) -> void:

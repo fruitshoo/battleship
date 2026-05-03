@@ -10,6 +10,7 @@ const PLAYER_ROWING_BASE_ACCEL := 1.0
 const PLAYER_MAX_ROWING_STAMINA := 100.0
 const PLAYER_SAIL_EFFICIENCY := 1.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
+const PLAYER_SAIL_FURL_RATE := 0.55
 const PLAYER_STAMINA_DRAIN_RATE := 10.0
 const PLAYER_STAMINA_RECOVERY_RATE := 6.5
 const SOLDIER_SWORD_BASE_DAMAGE := 13.0
@@ -111,10 +112,11 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "선체 자동 수리 %.1f/s" % repair_rate
 		"sailing":
 			var sailing_stats := _calculate_sailing_stats(level, stats)
-			return "돛 최고속 +%d%% | 풍력 효율 +%d%% | 돛 회전 +%d%%" % [
+			return "돛 최고속 +%d%% | 풍력 효율 +%d%% | 돛 회전 +%d%% | 전환 +%d%%" % [
 				_percent_delta_from_ratio(float(sailing_stats["max_speed"]) / PLAYER_BASE_MAX_SPEED),
 				_percent_delta_from_ratio(float(sailing_stats["efficiency"]) / PLAYER_SAIL_EFFICIENCY),
 				_percent_delta_from_ratio(float(sailing_stats["turn_speed"]) / PLAYER_SAIL_TURN_SPEED),
+				_percent_delta_from_ratio(float(sailing_stats["furl_rate"]) / PLAYER_SAIL_FURL_RATE),
 			]
 		"rowing":
 			var rowing_stats := _calculate_rowing_stats(level, stats)
@@ -264,6 +266,7 @@ static func _calculate_sailing_stats(level: int, stats: Dictionary) -> Dictionar
 	var max_speed := PLAYER_BASE_MAX_SPEED
 	var efficiency := PLAYER_SAIL_EFFICIENCY
 	var turn_speed := PLAYER_SAIL_TURN_SPEED
+	var furl_rate := PLAYER_SAIL_FURL_RATE
 	for current_level in range(1, level + 1):
 		if _level_matches(current_level, stats.get("speed_levels", [])):
 			max_speed *= float(stats.get("speed_mult", 1.08))
@@ -271,10 +274,13 @@ static func _calculate_sailing_stats(level: int, stats: Dictionary) -> Dictionar
 			efficiency *= float(stats.get("efficiency_mult", 1.08))
 		if _level_matches(current_level, stats.get("turn_levels", [])):
 			turn_speed *= float(stats.get("turn_mult", 1.15))
+		if _level_matches(current_level, stats.get("handling_levels", [])):
+			furl_rate *= float(stats.get("handling_mult", 1.15))
 	return {
 		"max_speed": max_speed,
 		"efficiency": efficiency,
 		"turn_speed": turn_speed,
+		"furl_rate": furl_rate,
 	}
 
 static func _calculate_rowing_stats(level: int, stats: Dictionary) -> Dictionary:

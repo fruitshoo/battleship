@@ -25,10 +25,12 @@ static func update_sail_wind_visual(mast: Node3D) -> void:
 		return
 	sail_fwd_2d = sail_fwd_2d.normalized()
 	mast._current_wind_intake = max(0.0, wind_dir.dot(sail_fwd_2d)) * mast.max_wind_intake
-	apply_wind_strength_to_sails(mast, mast._current_wind_intake)
-	var slip_flutter: float = 1.0 - clampf(mast._current_wind_intake, 0.0, 1.0)
-	var filled_flutter: float = clampf(mast._current_wind_intake, 0.0, 1.0) * 0.42
-	var flutter_strength: float = clampf(raw_wind_strength * (0.22 + slip_flutter * 0.78 + filled_flutter), 0.0, 1.0)
+	var intake_ratio: float = clampf(mast._current_wind_intake, 0.0, 1.0)
+	var visual_wind_strength: float = smoothstep(0.08, 0.82, intake_ratio)
+	apply_wind_strength_to_sails(mast, visual_wind_strength)
+	var slip_flutter: float = pow(1.0 - intake_ratio, 1.25)
+	var filled_flutter: float = intake_ratio * 0.18
+	var flutter_strength: float = clampf(raw_wind_strength * (0.16 + slip_flutter * 0.92 + filled_flutter), 0.0, 1.0)
 	apply_sail_flutter_to_sails(mast, flutter_strength)
 
 

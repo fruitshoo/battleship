@@ -115,20 +115,20 @@ void vertex() {
 	// 1. Billow Effect (Forward bulge)
 	// Local -Z is the front of the ship. We subtract to bulge forward.
 	// We use billow_mask so the bulge is concentrated in the middle.
-	float billow = middle_billow_mask * (0.45 + wind_strength * 1.05) * motion_scale;
+	float billow = middle_billow_mask * (0.18 + wind_strength * 1.36) * motion_scale;
 	VERTEX.z -= billow;
 	
 	// 2. Sag Effect (Hanging down)
 	// Stronger when wind_strength is LOW (close to 0).
 	float sag_factor = clamp(1.0 - wind_strength, 0.0, 1.0);
-	float sag = sag_factor * 0.35 * sin(horizontal * PI) * whole_sail_mask * motion_scale;
+	float sag = sag_factor * 0.48 * sin(horizontal * PI) * whole_sail_mask * motion_scale;
 	VERTEX.y -= sag;
 	
 	// Added a slight Z push back when sagging to look collapsed
-	VERTEX.z += sag * 0.25;
+	VERTEX.z += sag * 0.34;
 	
 	// 3. Waving/Flapping Motion
-	float flap_limit = (0.32 * wind_strength + 0.10) * motion_scale;
+	float flap_limit = (0.18 + flutter_strength * 0.30 + wind_strength * 0.22) * motion_scale;
 	float flap = sin(TIME * wave_speed + vertical * 7.0 + horizontal * 2.0) * wave_strength * flap_limit;
 	
 	// Add some secondary high-frequency ripple
@@ -143,7 +143,7 @@ void vertex() {
 	float flutter_time = TIME * (wave_speed * 2.65 + flutter_strength * 2.0) + flutter_phase;
 	float traveling_ripple = sin(flutter_time + horizontal * 16.0 + vertical * 3.5);
 	traveling_ripple += sin(flutter_time * 1.37 + horizontal * 25.0 - vertical * 6.0) * 0.42;
-	float flutter = traveling_ripple * wave_strength * flutter_strength * 0.18 * flutter_mask * motion_scale;
+	float flutter = traveling_ripple * wave_strength * flutter_strength * 0.24 * flutter_mask * motion_scale;
 	VERTEX.x += flutter * 0.18 * side_edge_mask;
 	VERTEX.y += flutter * 0.10 * lower_edge_mask;
 	flap += flutter;

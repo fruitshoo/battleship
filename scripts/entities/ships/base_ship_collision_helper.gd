@@ -136,6 +136,19 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 					side_sign = 1.0 if ship.get_instance_id() < other.get_instance_id() else -1.0
 				var lateral_escape = my_right * side_sign * compression * 12.0
 				repulsion_force = (repulsion_force * 0.35) + lateral_escape
+			elif is_engagement_pair and head_on_pair:
+				var my_right = my_fwd.cross(Vector3.UP)
+				my_right.y = 0.0
+				if my_right.length_squared() <= 0.0001:
+					my_right = Vector3(dir.z, 0.0, -dir.x)
+				my_right = my_right.normalized()
+				var side_sign = signf(diff.dot(my_right))
+				if absf(side_sign) < 0.5:
+					side_sign = 1.0 if ship.get_instance_id() < other.get_instance_id() else -1.0
+				var lateral_strength := 14.0 if high_speed_head_on else 10.0
+				if penetration_ratio > 0.12:
+					lateral_strength += 8.0
+				repulsion_force += my_right * side_sign * compression * lateral_strength
 			if (is_engagement_pair and head_on_pair) or high_speed_head_on:
 				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
 				if backward_component < 0.0:

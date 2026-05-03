@@ -105,7 +105,7 @@
 	"upgrade.hull_repair.name": "Repairs",
 	"upgrade.hull_repair.description": "Automatically repairs the hull",
 	"upgrade.sailing.name": "Sails",
-	"upgrade.sailing.description": "Improves sail speed and turning",
+	"upgrade.sailing.description": "Improves sail speed, turning, and handling",
 	"upgrade.rowing.name": "Oars",
 	"upgrade.rowing.description": "Improves rowing speed and stamina",
 	"upgrade.supply_bonus.name": "Supply",

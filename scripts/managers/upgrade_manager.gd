@@ -618,6 +618,14 @@ func _apply_sailing(ship: Node3D, level: int) -> void:
 		ship.sail_efficiency_mult *= float(s.get("efficiency_mult", 1.08))
 	if _level_matches(level, s.get("turn_levels", [])) and "sail_turn_speed" in ship:
 		ship.sail_turn_speed *= float(s.get("turn_mult", 1.15))
+	if _level_matches(level, s.get("handling_levels", [])):
+		var handling_mult := float(s.get("handling_mult", 1.15))
+		if "sail_furl_rate" in ship:
+			ship.sail_furl_rate *= handling_mult
+		if "mast_fold_pivots" in ship and ship.get("mast_fold_pivots") is Array:
+			for pivot in ship.get("mast_fold_pivots"):
+				if is_instance_valid(pivot) and "fold_duration" in pivot:
+					pivot.fold_duration = maxf(0.35, float(pivot.fold_duration) / handling_mult)
 	print("[Sailing] 돛 운용 강화 Lv.%d" % level)
 
 func _apply_rowing(ship: Node3D, level: int) -> void:

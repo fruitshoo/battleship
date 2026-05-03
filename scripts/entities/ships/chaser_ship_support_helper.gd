@@ -146,8 +146,10 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		return 0
 
 	var lm: Node = ship.get("cached_lm") if ship.get("cached_lm") != null else LevelManagerRegistry.get_level_manager(ship.get_tree())
+	var xp_per_soldier: int = 1
 	var merit_per_soldier: int = 1
 	if is_instance_valid(lm):
+		xp_per_soldier = max(0, int(lm.get("drowned_soldier_kill_xp_reward")))
 		merit_per_soldier = max(0, int(lm.get("drowned_soldier_kill_merit_reward")))
 		if merit_per_soldier <= 0:
 			merit_per_soldier = max(0, int(lm.get("merit_per_soldier_kill")))
@@ -159,7 +161,7 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		soldier.set_meta("last_death_cause", "drowned")
 		soldier.set_meta("last_damage_source", "drowned")
 
-	if merit_per_soldier <= 0:
+	if xp_per_soldier <= 0 and merit_per_soldier <= 0:
 		return 0
 
 	var pickup_count: int = mini(ENEMY_DRIFTER_MAX_PICKUPS, ceili(float(soldier_count) / float(ENEMY_DRIFTER_SOLDIERS_PER_PICKUP)))
@@ -169,14 +171,15 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		var remaining_pickups := pickup_count - index
 		var soldiers_in_pickup: int = ceili(float(remaining_soldiers) / float(remaining_pickups))
 		remaining_soldiers -= soldiers_in_pickup
+		var xp_amount: int = xp_per_soldier * soldiers_in_pickup
 		var merit_amount: int = merit_per_soldier * soldiers_in_pickup
-		if merit_amount <= 0:
+		if xp_amount <= 0 and merit_amount <= 0:
 			continue
 		var pickup := _instantiate_enemy_drifter_pickup(ship)
 		if not is_instance_valid(pickup):
 			continue
 		if pickup.has_method("configure"):
-			pickup.call("configure", merit_amount, soldiers_in_pickup)
+			pickup.call("configure", xp_amount, soldiers_in_pickup, merit_amount)
 		var angle: float = randf_range(0.0, TAU)
 		var radius: float = randf_range(0.8, 2.4 + float(index) * 0.35)
 		var spawn_pos: Vector3 = Vector3(

@@ -2,9 +2,8 @@
 
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
 [ext_resource type="PackedScene" path="res://scenes/entities/launchers/cannon_enemy_medium.tscn" id="cannon_scene"]
-[ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="PackedScene" uid="uid://ba4vxcs7pc2pt" path="res://scenes/props/japanese_mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
-[ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(4.5, 1.5, 11)
@@ -23,13 +22,12 @@ transform = Transform3D(0.8, 0, 0, 0, 0.5, 0, 0, 0, 0.6, 0, 1.25, 0)
 mesh = SubResource("BoxMesh_hull")
 surface_material_override/0 = SubResource("Material_japan_dark")
 
-[node name="Masts" type="Node3D" parent="."]
+[node name="Masts" type="Node3D" parent="." unique_id=865373935]
 
-[node name="MastPivot_01" type="Node3D" parent="Masts"]
+[node name="MastPivot_01" type="Node3D" parent="Masts" unique_id=40862773]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2)
 
 [node name="Mast" parent="Masts/MastPivot_01" unique_id=1940494656 instance=ExtResource("mast_scene")]
-sail_texture = ExtResource("vertical_sail")
 sail_uv_scale = Vector2(0.995, 1)
 
 [node name="RudderVisual" parent="." unique_id=1421969887 instance=ExtResource("rudder_scene")]

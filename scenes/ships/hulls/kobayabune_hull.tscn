@@ -1,9 +1,8 @@
 [gd_scene format=3 uid="uid://bbrb610a2rv1j"]
 
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
-[ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
+[ext_resource type="PackedScene" uid="uid://ba4vxcs7pc2pt" path="res://scenes/props/japanese_mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
-[ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(1.8, 0.65, 5.6)
@@ -82,10 +81,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0.45, 1.35)
 [node name="CrewRearRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1649866962]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.45, 1.35)
 
-[node name="Masts" type="Node3D" parent="."]
+[node name="Masts" type="Node3D" parent="." unique_id=288836387]
 
-[node name="MastPivot_01" type="Node3D" parent="Masts"]
+[node name="MastPivot_01" type="Node3D" parent="Masts" unique_id=1344951225]
 
 [node name="Mast" parent="Masts/MastPivot_01" unique_id=1732171799 instance=ExtResource("mast_scene")]
-sail_texture = ExtResource("vertical_sail")
-sail_uv_scale = Vector2(1, 1)

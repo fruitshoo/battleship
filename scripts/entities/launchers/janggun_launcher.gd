@@ -5,12 +5,14 @@ const DEBUG_COMBAT_LOGS := false
 ## 배 중앙에서 전방위로 쏘지 않고, 활성 대포 포문 중 하나를 빌려 느리게 추가 발사한다.
 
 @export var missile_scene: PackedScene = preload("res://scenes/projectiles/janggun_missile.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
 @export var fire_cooldown: float = 12.0
 @export var min_fire_cooldown: float = 9.0
 @export var cooldown_reduce_per_level: float = 0.6
 @export var detection_range: float = 28.0
 @export var damage: float = 10.0
 @export_range(0.05, 0.5) var target_scan_interval: float = 0.2
+@export_range(0.0, 0.5, 0.01) var muzzle_smoke_follow_muzzle_time: float = 0.22
 @export_range(0.0, 1.5, 0.05) var cannon_post_fire_delay: float = 0.45
 @export var team: String = "player"
 @export_range(1.0, 6.0) var target_tracking_scan_multiplier: float = 3.0
@@ -225,6 +227,9 @@ func fire(target: Variant) -> void:
 	if lead_offset.length() > max_lead:
 		lead_offset = lead_offset.normalized() * max_lead
 	var predicted_pos: Vector3 = target_aim_pos + lead_offset
+	var fire_direction := (predicted_pos - spawn_pos).normalized()
+	if fire_direction.is_zero_approx():
+		fire_direction = -firing_cannon.global_transform.basis.z
 	var missile_damage: float = damage * (1.0 + janggun_lv * 0.5)
 
 	var missile = ScenePool.acquire(get_tree(), missile_scene)
@@ -242,6 +247,7 @@ func fire(target: Variant) -> void:
 			missile.janggun_lv = janggun_lv
 		missile.global_position = spawn_pos
 
+	_spawn_muzzle_smoke(firing_cannon, fire_direction, clampf(missile_damage / maxf(damage, 0.01), 0.85, 1.45))
 	_apply_cannon_post_fire_delay(firing_cannon)
 	if is_instance_valid(_owner_ship) and _owner_ship.has_method("request_cannon_reload_pose"):
 		_owner_ship.request_cannon_reload_pose(firing_cannon, maxf(0.45, cannon_post_fire_delay + 0.2))
@@ -279,6 +285,102 @@ func _get_cannon_muzzle_position(cannon: Node3D) -> Vector3:
 			return muzzle.global_position
 		return cannon.global_position + Vector3(0.0, 0.9, 0.0)
 	return global_position + Vector3(0.0, 1.0, 0.0)
+
+
+func _spawn_muzzle_smoke(cannon: Node3D, fire_direction: Vector3, muzzle_intensity: float) -> void:
+	if muzzle_smoke_scene == null:
+		return
+	var tree := get_tree()
+	if not is_instance_valid(tree):
+		return
+	var smoke := ScenePool.acquire(tree, muzzle_smoke_scene)
+	if not is_instance_valid(smoke):
+		return
+	if smoke.has_method("configure_as_muzzle"):
+		smoke.configure_as_muzzle()
+	if smoke.has_method("set_intensity"):
+		smoke.set_intensity(muzzle_intensity)
+	var muzzle := _get_cannon_muzzle_node(cannon)
+	var smoke_dir := fire_direction if not fire_direction.is_zero_approx() else Vector3.FORWARD
+	var smoke_position := muzzle.global_position if is_instance_valid(muzzle) else _get_cannon_muzzle_position(cannon)
+	var smoke_parent: Node = muzzle if muzzle_smoke_follow_muzzle_time > 0.0 and is_instance_valid(muzzle) else tree.root
+	smoke_parent.add_child(smoke)
+	if smoke is Node3D:
+		(smoke as Node3D).global_transform = Transform3D(_get_muzzle_smoke_basis(smoke_dir), smoke_position)
+	if smoke_parent == muzzle:
+		_schedule_muzzle_smoke_detach(smoke, muzzle, muzzle_smoke_follow_muzzle_time)
+	if smoke.has_method("pool_activate"):
+		smoke.pool_activate()
+	else:
+		_activate_plain_muzzle_smoke(smoke)
+
+
+func _get_cannon_muzzle_node(cannon: Node3D) -> Node3D:
+	if not is_instance_valid(cannon):
+		return null
+	return cannon.get_node_or_null("Muzzle") as Node3D
+
+
+func _get_muzzle_smoke_basis(smoke_dir: Vector3) -> Basis:
+	var dir := smoke_dir.normalized()
+	if dir.is_zero_approx():
+		dir = Vector3.FORWARD
+	return Basis.looking_at(dir, Vector3.UP)
+
+
+func _schedule_muzzle_smoke_detach(smoke: Node, muzzle: Node3D, delay: float) -> void:
+	var tree := get_tree()
+	if not is_instance_valid(tree) or not is_instance_valid(muzzle) or delay <= 0.0:
+		return
+	var smoke_id := smoke.get_instance_id()
+	var muzzle_id := muzzle.get_instance_id()
+	tree.create_timer(delay).timeout.connect(func() -> void:
+		_detach_muzzle_smoke_to_world(smoke_id, muzzle_id)
+	)
+
+
+func _detach_muzzle_smoke_to_world(smoke_id: int, muzzle_id: int) -> void:
+	var smoke := instance_from_id(smoke_id) as Node
+	var muzzle_node := instance_from_id(muzzle_id) as Node
+	var tree := get_tree()
+	if not is_instance_valid(smoke) or not is_instance_valid(muzzle_node) or not is_instance_valid(tree):
+		return
+	if smoke.get_parent() != muzzle_node:
+		return
+	var saved_transform := Transform3D.IDENTITY
+	if smoke is Node3D:
+		saved_transform = (smoke as Node3D).global_transform
+	muzzle_node.remove_child(smoke)
+	tree.root.add_child(smoke)
+	if smoke is Node3D:
+		(smoke as Node3D).global_transform = saved_transform
+
+
+func _activate_plain_muzzle_smoke(smoke: Node) -> void:
+	var max_lifetime := _restart_plain_muzzle_particles(smoke)
+	if max_lifetime <= 0.0:
+		ScenePool.release(smoke)
+		return
+	var tree := get_tree()
+	if not is_instance_valid(tree):
+		ScenePool.release(smoke)
+		return
+	tree.create_timer(max_lifetime + 0.35).timeout.connect(func() -> void:
+		ScenePool.release(smoke)
+	)
+
+
+func _restart_plain_muzzle_particles(node: Node) -> float:
+	var max_lifetime := 0.0
+	if node is GPUParticles3D:
+		var particles := node as GPUParticles3D
+		particles.visible = true
+		particles.restart()
+		particles.emitting = true
+		max_lifetime = maxf(max_lifetime, particles.lifetime)
+	for child in node.get_children():
+		max_lifetime = maxf(max_lifetime, _restart_plain_muzzle_particles(child))
+	return max_lifetime
 
 
 func _apply_cannon_post_fire_delay(cannon: Node3D) -> void:

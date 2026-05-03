@@ -64,7 +64,7 @@ var rowing_locked: bool = false
 @export_group("Sail Handling")
 @export var sail_furled: bool = false
 @export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
-@export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 2.8
+@export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
 @export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
@@ -114,6 +114,12 @@ var _wave_timer: float = 2.0
 var _current_wind_intake: float = 1.0 # 0.0(쳐짐) ~ 1.0(빵빵함)
 var _oars_timer: float = 0.0
 var _oar_time: float = 0.0
+var _sail_catch_audio_timer: float = 0.0
+var _sail_luff_audio_timer: float = 0.0
+var _sail_handling_audio_timer: float = 0.0
+var _speed_shift_audio_timer: float = 0.0
+var _last_audio_wind_intake: float = 0.0
+var _last_audio_speed: float = 0.0
 
 # 성능 최적화: ships 그룹 캐싱 (프레임당 1회 조회)
 static var _cached_ships: Array = []
@@ -343,6 +349,7 @@ func _physics_process(delta: float) -> void:
 		_process_boarding_common(delta)
 		
 	PlayerShipRuntimeHelper.update_rowing_audio(self, delta)
+	PlayerShipRuntimeHelper.update_sail_wind_audio(self, delta)
 				
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -893,8 +900,6 @@ func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
 				splash.configure_as_splash()
 			elif splash.has_method("configure_as_small"):
 				splash.configure_as_small()
-			if splash.has_method("set_intensity"):
-				splash.set_intensity(0.75)
 			if splash.has_method("pool_activate"):
 				splash.call_deferred("pool_activate")
 	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
@@ -1005,9 +1010,11 @@ func set_sail_furled(furled: bool) -> void:
 	sail_furled = target_furled
 	if not sail_furled:
 		_sync_mast_fold_with_sail_furl()
-	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
-		var pitch := 0.92 if sail_furled else 1.08
-		_cached_audio_manager.play_sfx("sail_flap", global_position, pitch, 4.0)
+	if sail_furled:
+		_play_sail_handling_sound(false, 2.0)
+	else:
+		if mast_fold_pivots.is_empty():
+			_play_sail_handling_sound(true, 2.0)
 	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
 		var message := "돛 접음: 조타·노젓기 강화 / 화재 피해 감소" if sail_furled else "돛 펼침: 항해 속도 회복"
 		_cached_hud.show_message(message, 1.4)
@@ -1030,11 +1037,13 @@ func get_effective_sail_deployment() -> float:
 
 func _update_sail_deployment(delta: float) -> void:
 	var target_ratio := _get_target_sail_deployment_ratio()
+	var previous_ratio := clampf(sail_deployed_ratio, 0.0, 1.0)
 	sail_deployed_ratio = move_toward(
-		clampf(sail_deployed_ratio, 0.0, 1.0),
+		previous_ratio,
 		target_ratio,
 		maxf(sail_furl_rate, 0.01) * delta
 	)
+	_update_sail_deployment_audio(previous_ratio, sail_deployed_ratio, target_ratio, delta)
 	_sync_mast_fold_after_sail_deployment()
 
 
@@ -1063,6 +1072,42 @@ func _get_target_sail_deployment_ratio() -> float:
 	if get_mast_fold_ratio() > 0.001:
 		return 0.0
 	return 1.0
+
+
+func set_masts_folded(folded: bool, immediate: bool = false) -> void:
+	var was_folded := masts_folded
+	super.set_masts_folded(folded, immediate)
+	if immediate or was_folded == masts_folded:
+		return
+	_play_mast_fold_sound(masts_folded)
+
+
+func _update_sail_deployment_audio(previous_ratio: float, current_ratio: float, target_ratio: float, delta: float) -> void:
+	_sail_handling_audio_timer = maxf(0.0, _sail_handling_audio_timer - delta)
+	if absf(current_ratio - previous_ratio) <= 0.0005:
+		return
+	if _sail_handling_audio_timer > 0.0:
+		return
+	var raising := current_ratio > previous_ratio
+	_play_sail_handling_sound(raising)
+	var nearly_done := absf(current_ratio - target_ratio) <= 0.035
+	_sail_handling_audio_timer = randf_range(0.85, 1.18) if nearly_done else randf_range(0.55, 0.82)
+
+
+func _play_sail_handling_sound(raising: bool, volume_db: float = 2.5) -> void:
+	if not is_instance_valid(_cached_audio_manager) or not _cached_audio_manager.has_method("play_sfx"):
+		return
+	var pitch := randf_range(1.02, 1.15) if raising else randf_range(0.82, 0.96)
+	_cached_audio_manager.play_sfx("sail_flap", global_position, pitch, volume_db)
+	_sail_handling_audio_timer = maxf(_sail_handling_audio_timer, randf_range(0.42, 0.65))
+
+
+func _play_mast_fold_sound(folding: bool) -> void:
+	if not is_instance_valid(_cached_audio_manager) or not _cached_audio_manager.has_method("play_sfx"):
+		return
+	var pitch := randf_range(0.72, 0.86) if folding else randf_range(0.88, 1.04)
+	var volume := 2.0 if folding else 0.5
+	_cached_audio_manager.play_sfx("mast_creak", global_position, pitch, volume)
 
 
 func _sync_support_fleet_sail_furl() -> void:

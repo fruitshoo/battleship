@@ -91,12 +91,12 @@ static func add_xp(lm: Node, amount: int) -> void:
 		return
 	lm.current_xp += int(amount * lm.xp_multiplier)
 
-	if lm.hud and lm.hud.has_method("update_xp"):
-		lm.hud.update_xp(lm.current_xp, lm.xp_to_next_level)
-
 	if lm.current_xp >= lm.xp_to_next_level:
 		lm.current_xp -= lm.xp_to_next_level
 		set_level(lm, lm.current_level + 1)
+
+	if lm.hud and lm.hud.has_method("update_xp"):
+		lm.hud.update_xp(lm.current_xp, lm.xp_to_next_level)
 
 static func add_merit(lm: Node, amount: int) -> void:
 	if _env_flag_enabled("BATTLESHIP_DISABLE_RUNTIME_REWARDS"):
@@ -128,6 +128,8 @@ static func set_level(lm: Node, new_level: int) -> void:
 	lm.level_up.emit(lm.current_level)
 	if lm.hud:
 		lm.hud.update_level(lm.current_level)
+		if lm.hud.has_method("update_xp"):
+			lm.hud.update_xp(lm.current_xp, lm.xp_to_next_level)
 
 	print("[LevelUp] Level Up! Lv.%d (Next XP: %d)" % [lm.current_level, lm.xp_to_next_level])
 

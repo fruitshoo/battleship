@@ -13,15 +13,25 @@ const SAIL_BURN_MASK_C = preload("res://assets/vfx/masks/sail_burn_mask_c.png")
 
 @export var max_wind_intake: float = 1.0 # 모델별 바람 허용량 조절 가능
 @export_group("Flag")
+@export var flags_enabled: bool = true:
+	set(value):
+		flags_enabled = value
+		if not is_inside_tree():
+			return
+		if flags_enabled:
+			_apply_flag_scene_override()
+		elif is_instance_valid(flag):
+			flag.queue_free()
+			flag = null
 @export var flag_scene_override: PackedScene:
 	set(value):
 		flag_scene_override = value
-		if is_inside_tree() and value != null:
+		if is_inside_tree() and flags_enabled and value != null:
 			_replace_flag_scene(value)
 @export var flag_texture_override: Texture2D:
 	set(value):
 		flag_texture_override = value
-		if is_inside_tree():
+		if is_inside_tree() and flags_enabled:
 			_apply_flag_texture_override()
 
 @export_group("Sail Material")
@@ -96,7 +106,7 @@ var flag_offset: Vector3 = Vector3.ZERO
 @onready var sail_model_root: Node3D = get_node_or_null("SailVisual/sail_model") as Node3D
 @onready var yardarm_model_root: Node3D = get_node_or_null("SailVisual/yardarm") as Node3D
 @onready var mast_model_root: Node3D = get_node_or_null("mast_model") as Node3D
-@onready var flag: Node3D = $SailVisual/Flag
+@onready var flag: Node3D = get_node_or_null("SailVisual/Flag") as Node3D
 
 var sail_angle: float = 0.0
 const BASE_SAIL_SIZE := Vector2(3.5, 7.0)
@@ -174,6 +184,8 @@ func set_team_color(team: String) -> void:
 	set_flag_kind(FlagSceneLibrary.get_team_kind(team))
 
 func set_flag_kind(kind: String, texture: Texture2D = null) -> void:
+	if not flags_enabled:
+		return
 	var normalized_kind := FlagSceneLibrary.normalize_kind(kind)
 	var scene_path := FlagSceneLibrary.get_scene_path(normalized_kind)
 	if not scene_path.is_empty():
@@ -191,6 +203,8 @@ func set_flag_kind(kind: String, texture: Texture2D = null) -> void:
 			set_flag_texture(texture)
 
 func set_flag_scene(scene: PackedScene, texture: Texture2D = null) -> void:
+	if not flags_enabled:
+		return
 	flag_scene_override = scene
 	if texture != null:
 		set_flag_texture(texture)
@@ -210,6 +224,11 @@ func get_flag_shape_name() -> String:
 	return ""
 
 func _apply_flag_scene_override() -> void:
+	if not flags_enabled:
+		if is_instance_valid(flag):
+			flag.queue_free()
+			flag = null
+		return
 	if flag_scene_override != null:
 		_replace_flag_scene(flag_scene_override)
 	elif not is_instance_valid(flag):

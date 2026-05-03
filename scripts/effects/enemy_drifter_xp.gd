@@ -11,7 +11,8 @@ const DRIFTER_CALL_LINES: Array[String] = [
 	"춥다...",
 ]
 
-@export var merit_amount: int = 1
+@export var xp_amount: int = 1
+@export var merit_amount: int = 0
 @export var soldier_count: int = 1
 @export_range(2.0, 12.0, 0.25) var base_magnet_radius: float = 8.0
 @export_range(0.5, 12.0, 0.25) var magnet_speed: float = 7.5
@@ -67,7 +68,8 @@ func pool_capacity() -> int:
 	return 80
 
 
-func configure(next_merit_amount: int, next_soldier_count: int = 1) -> void:
+func configure(next_xp_amount: int, next_soldier_count: int = 1, next_merit_amount: int = 0) -> void:
+	xp_amount = max(0, next_xp_amount)
 	merit_amount = max(0, next_merit_amount)
 	soldier_count = max(1, next_soldier_count)
 
@@ -266,12 +268,19 @@ func _is_close_enough_to_collect(player_ship: Node3D) -> bool:
 func _grant_reward(player_ship: Node3D) -> void:
 	if not is_instance_valid(_cached_lm):
 		_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
+	if is_instance_valid(_cached_lm) and xp_amount > 0 and _cached_lm.has_method("add_xp"):
+		_cached_lm.add_xp(xp_amount)
 	if is_instance_valid(_cached_lm) and merit_amount > 0 and _cached_lm.has_method("add_merit"):
 		_cached_lm.add_merit(merit_amount)
 	if is_instance_valid(_cached_lm) and _cached_lm.get("hud") != null:
 		var hud: Variant = _cached_lm.get("hud")
 		if is_instance_valid(hud) and hud.has_method("show_message"):
-			hud.call("show_message", "표류 적병 수습: 공적 +%d" % merit_amount, 1.5)
+			var reward_parts: Array[String] = []
+			if xp_amount > 0:
+				reward_parts.append("XP +%d" % xp_amount)
+			if merit_amount > 0:
+				reward_parts.append("공적 +%d" % merit_amount)
+			hud.call("show_message", "표류 적병 수습: %s" % " / ".join(reward_parts), 1.5)
 	var audio_manager := get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("treasure_collect", null, randf_range(0.9, 1.05))

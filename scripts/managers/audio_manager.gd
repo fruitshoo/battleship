@@ -30,7 +30,22 @@ var sfx_streams = {
 	"rocket_launch_03": "res://assets/audio/sfx/sfx_rocket_launch_03.ogg",
 	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.ogg",
 	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.ogg",
-	"sail_flap": "res://assets/audio/sfx/sfx_flag_flapping.ogg",
+	"sail_flap": [
+		"res://assets/audio/sfx/sfx_sail_canvas_01.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_02.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_03.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_04.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_05.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_06.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_07.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_08.wav",
+	],
+	"mast_creak": [
+		"res://assets/audio/sfx/sfx_mast_creak_01.wav",
+		"res://assets/audio/sfx/sfx_mast_creak_02.wav",
+		"res://assets/audio/sfx/sfx_mast_creak_03.wav",
+		"res://assets/audio/sfx/sfx_mast_creak_04.wav",
+	],
 	"sword_swing": [
 		"res://assets/audio/sfx/sfx_sword_swing_1.ogg",
 		"res://assets/audio/sfx/sfx_sword_swing_2.ogg",
@@ -172,6 +187,8 @@ const SFX_PROFILE_PRESETS := {
 const SFX_PROFILE_BY_KEY := {
 	"cannon_fire": SFX_PROFILE_CANNON_BLAST,
 	"wave_splash": SFX_PROFILE_SHIP_AMBIENT,
+	"sail_flap": SFX_PROFILE_SHIP_AMBIENT,
+	"mast_creak": SFX_PROFILE_SHIP_AMBIENT,
 	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
 	"bow_shoot": SFX_PROFILE_LIGHT_PROJECTILE,
@@ -187,6 +204,20 @@ const SFX_PROFILE_OVERRIDES := {
 	"oars_rowing": {
 		"max_distance": 240.0,
 		"unit_size": 70.0,
+	},
+	"sail_flap": {
+		"volume_db": -0.5,
+		"max_distance": 280.0,
+		"unit_size": 95.0,
+		"pitch_jitter": 0.035,
+		"rate_limit_msec": 220,
+	},
+	"mast_creak": {
+		"volume_db": -2.0,
+		"max_distance": 260.0,
+		"unit_size": 90.0,
+		"pitch_jitter": 0.04,
+		"rate_limit_msec": 900,
 	},
 	"sword_swing": {
 		"volume_db": 0.5,
@@ -263,6 +294,8 @@ var _essential_warm_keys: Array[String] = [
 	"bow_shoot",
 	"musket_fire",
 	"level_up",
+	"sail_flap",
+	"mast_creak",
 	"wave_splash",
 	"water_splash_large",
 	"water_splash_small",

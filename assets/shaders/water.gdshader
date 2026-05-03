@@ -56,6 +56,7 @@ uniform float caustics_depth_fade : hint_range(0.0, 1.0, 0.01) = 0.7;
 uniform sampler2D SCREEN_TEXTURE : hint_screen_texture, filter_linear_mipmap;
 uniform vec3 underwater_fog_color : source_color = vec3(0.0, 0.05, 0.1);
 uniform float underwater_fade_start_depth : hint_range(0.0, 50.0, 0.1) = 0.5;
+uniform float underwater_screen_fog_strength : hint_range(0.0, 1.0, 0.01) = 0.68;
 
 // Refraction & Smoothing Settings
 uniform float refraction_strength : hint_range(0.0, 2.0, 0.01) = 1.0;
@@ -265,6 +266,9 @@ void fragment() {
     // 깊이 차이(수심) 기반 블렌딩 계수
 	float depth_blend = clamp(depth_diff / depth_distance, 0.0, 1.0);
 	float beers_blend = exp(-depth_diff * (1.0 / max(beers_law, 0.001)));
+    vec3 water_color = mix(secondary_color.rgb, primary_color.rgb, beers_blend);
+    float fog_fade_range = max(0.001, max_depth - underwater_fade_start_depth);
+    float fog_depth_ratio = clamp((depth_diff - underwater_fade_start_depth) / fog_fade_range, 0.0, 1.0);
 
     // -------------------------------------------------------------------------
     // CAUSTICS (수중 일렁임)
@@ -308,13 +312,14 @@ void fragment() {
         // Blend all projections based on unlit surface normal
         float caustics_value = c_xz * blending.y + c_xy * blending.z + c_zy * blending.x;
         
-        float caustics_fade = 1.0 - clamp(thickness * caustics_depth_fade, 0.0, 1.0);
-        // SCREEN_COLOR에 직접 더하여 바닥 지형이 일렁이게 함
+        float caustics_cutoff_depth = max(underwater_fade_start_depth + 0.5, 1.0 / max(caustics_depth_fade, 0.001));
+        float caustics_fade = 1.0 - smoothstep(underwater_fade_start_depth, caustics_cutoff_depth, thickness);
+        // SCREEN_COLOR에 직접 더하되, 깊은 곳에서는 먼저 사라지게 한다.
         screen_color += caustics_value * caustics_intensity * caustics_fade;
     }
 
-    // 깊이에 따른 물 색조 혼합
-    vec3 water_color = mix(secondary_color.rgb, primary_color.rgb, beers_blend);
+    vec3 underwater_tint = mix(water_color, underwater_fog_color, fog_depth_ratio);
+    screen_color = mix(screen_color, underwater_tint, fog_depth_ratio * underwater_screen_fog_strength);
 	
 	// 월드 UV 기반 물결 이동
 	vec2 world_uv = world_vert.xz / uv_scale;
@@ -344,8 +349,6 @@ void fragment() {
     // -------------------------------------------------------------------------
     // UNDERWATER FOG (수중 안개/탁도)
     // -------------------------------------------------------------------------
-    float fog_fade_range = max(0.001, max_depth - underwater_fade_start_depth);
-    float fog_depth_ratio = clamp((depth_diff - underwater_fade_start_depth) / fog_fade_range, 0.0, 1.0);
     vec3 albedo_with_fog = mix(final_albedo, underwater_fog_color, fog_depth_ratio);
 
     // Apply Refracted Screen Color

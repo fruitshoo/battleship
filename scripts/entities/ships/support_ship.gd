@@ -18,7 +18,7 @@ const SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META := "support_corpse_cleanup_in_prog
 @export_group("Sail Handling")
 @export var sail_furled: bool = false
 @export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
-@export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 2.8
+@export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
 @export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
@@ -48,7 +48,13 @@ func _process(delta: float) -> void:
 
 
 func set_sail_furled(furled: bool) -> void:
-	sail_furled = bool(furled)
+	var target_furled := bool(furled)
+	if sail_furled == target_furled:
+		_sync_mast_fold_after_sail_deployment()
+		return
+	sail_furled = target_furled
+	if not sail_furled:
+		_sync_mast_fold_with_sail_furl()
 
 
 func is_sail_furled() -> bool:
@@ -66,16 +72,46 @@ func sync_sail_furl_with_flagship(delta: float, immediate: bool = false) -> void
 	if not is_instance_valid(flagship) and is_instance_valid(target) and target.get("sail_furled") != null:
 		flagship = target
 	if is_instance_valid(flagship) and flagship.get("sail_furled") != null:
-		sail_furled = flagship.get("sail_furled") == true
-	var target_ratio := 0.0 if sail_furled else 1.0
+		set_sail_furled(flagship.get("sail_furled") == true)
 	if immediate:
+		_sync_mast_fold_with_sail_furl(true)
+		var target_ratio := _get_target_sail_deployment_ratio()
 		sail_deployed_ratio = target_ratio
 		return
+	var target_ratio := _get_target_sail_deployment_ratio()
 	sail_deployed_ratio = move_toward(
 		clampf(sail_deployed_ratio, 0.0, 1.0),
 		target_ratio,
 		maxf(sail_furl_rate, 0.01) * delta
 	)
+	_sync_mast_fold_after_sail_deployment()
+
+
+func _sync_mast_fold_with_sail_furl(immediate: bool = false) -> void:
+	if mast_fold_pivots.is_empty():
+		return
+	set_masts_folded(sail_furled, immediate)
+
+
+func _sync_mast_fold_after_sail_deployment() -> void:
+	if mast_fold_pivots.is_empty():
+		return
+	if sail_furled:
+		if sail_deployed_ratio <= 0.001 and not are_masts_folded():
+			set_masts_folded(true)
+		return
+	if are_masts_folded():
+		set_masts_folded(false)
+
+
+func _get_target_sail_deployment_ratio() -> float:
+	if sail_furled:
+		return 0.0
+	if mast_fold_pivots.is_empty():
+		return 1.0
+	if get_mast_fold_ratio() > 0.001:
+		return 0.0
+	return 1.0
 
 
 func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
@@ -296,8 +332,6 @@ func _play_support_corpse_cleanup_splash(splash_position: Vector3) -> void:
 				splash.configure_as_corpse_cleanup()
 			elif splash.has_method("configure_as_small"):
 				splash.configure_as_small()
-			if splash.has_method("set_intensity"):
-				splash.set_intensity(0.6)
 			if splash.has_method("pool_activate"):
 				splash.pool_activate()
 	var audio_manager = get_node_or_null("/root/AudioManager")

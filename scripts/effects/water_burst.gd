@@ -100,7 +100,7 @@ func configure_as_corpse_cleanup() -> void:
 
 
 func set_intensity(scale_value: float) -> void:
-	_intensity_scale = clampf(scale_value, 0.7, 2.0)
+	_intensity_scale = clampf(scale_value, 0.4, 2.0)
 	if is_node_ready():
 		_apply_preset()
 
@@ -245,11 +245,32 @@ func _apply_small_preset() -> void:
 
 
 func _apply_corpse_cleanup_preset() -> void:
-	_apply_splash_preset()
+	var intensity := _intensity_scale
+	var size_scale := lerpf(0.58, 0.92, inverse_lerp(0.4, 1.2, intensity))
 	_budget_key_value = "corpse_cleanup_splash"
 	_budget_limit_value = 8
 	_budget_distance_value = -1.0
-	_waterline_lift = 0.12
+	_waterline_lift = 0.06
+	_duration = 0.38 + (0.05 * intensity)
+	_blast_scale = size_scale * 0.42
+
+	_foam_enabled = true
+	_foam_start_scale = 0.14 * size_scale
+	_foam_end_scale = 0.82 * size_scale
+	_foam_alpha = 0.46
+
+	_column_enabled = false
+	_splash_cards_enabled = true
+	_splash_card_count = 2
+	_splash_card_start_scale = Vector2(0.08, 0.18) * size_scale
+	_splash_card_end_scale = Vector2(0.30, 0.58) * size_scale
+	_splash_card_alpha = 0.42
+	_splash_card_radius = 0.08 * size_scale
+	_splash_card_rise = 0.11 * size_scale
+
+	_mist_enabled = false
+	_droplets_enabled = true
+	_configure_droplets(5, 0.34, 1.25 * intensity, 3.1 * intensity, 0.022, 0.045 * size_scale)
 
 
 func _apply_sink_preset() -> void:

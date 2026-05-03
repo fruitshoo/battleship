@@ -101,6 +101,7 @@ func _run_boarding_requires_impact_contract(failures: Array[String]) -> void:
 	_verify_body_impact_allows_boarding(failures)
 	_verify_expired_impact_blocks_boarding(failures)
 	_verify_bow_to_side_impact_allows_boarding(failures)
+	_verify_head_to_head_impact_allows_boarding(failures)
 	_verify_bow_to_side_boarding_stores_side_anchor(failures)
 	_verify_guarded_collision_records_contact_anchor(failures)
 	_verify_cancel_boarding_clears_contact_anchor(failures)
@@ -196,6 +197,24 @@ func _verify_bow_to_side_impact_allows_boarding(failures: Array[String]) -> void
 		failures.append("bow-to-side contact did not start boarding after impact")
 	if str(attacker.get_meta("boarding_contact_mode", "")) != "head_on":
 		failures.append("bow-to-side contact did not use head_on boarding contact mode")
+
+
+func _verify_head_to_head_impact_allows_boarding(failures: Array[String]) -> void:
+	var pair := _build_head_to_head_contact_pair()
+	var attacker: Node = pair["attacker"]
+	var target: Node3D = pair["target"]
+	if attacker.call("_is_side_boarding_approach", target) == true:
+		failures.append("head-to-head fixture unexpectedly satisfied side boarding approach")
+		return
+	if attacker.call("_can_force_head_on_boarding", target) != true:
+		failures.append("head-to-head fixture did not satisfy forced boarding")
+		return
+	attacker.call("_mark_boarding_impact", target)
+	attacker.call("_board_ship", target)
+	if attacker.get("is_boarding") != true:
+		failures.append("head-to-head contact did not start boarding after impact")
+	if str(attacker.get_meta("boarding_contact_mode", "")) != "head_on":
+		failures.append("head-to-head contact did not use head_on boarding contact mode")
 
 
 func _verify_bow_to_side_boarding_stores_side_anchor(failures: Array[String]) -> void:
@@ -633,6 +652,30 @@ func _build_bow_to_side_contact_pair() -> Dictionary:
 	target.alive_crew_count = 5
 	target.global_position = Vector3.ZERO
 	target.rotation = Vector3.ZERO
+	attacker.set("target", target)
+
+	return {
+		"attacker": attacker,
+		"target": target,
+	}
+
+
+func _build_head_to_head_contact_pair() -> Dictionary:
+	var attacker: Node3D = AttackerScript.new()
+	add_child(attacker)
+	attacker.set("team", "enemy")
+	attacker.set("allow_boarding", true)
+	attacker.set("current_speed", 1.6)
+	attacker.set("max_boarding_distance", 9.0)
+	attacker.global_position = Vector3(0.0, 0.0, 7.3)
+	attacker.rotation = Vector3.ZERO
+	_add_mock_crew(attacker, "enemy", 4)
+
+	var target := MockTarget.new()
+	add_child(target)
+	target.alive_crew_count = 5
+	target.global_position = Vector3.ZERO
+	target.rotation = Vector3(0.0, PI, 0.0)
 	attacker.set("target", target)
 
 	return {

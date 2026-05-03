@@ -101,6 +101,52 @@ static func update_rowing_audio(ship, delta: float) -> void:
 			if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_gilgunak"):
 				ship._cached_audio_manager.play_gilgunak(false)
 
+
+static func update_sail_wind_audio(ship, delta: float) -> void:
+	if not is_instance_valid(ship._cached_audio_manager) or not ship._cached_audio_manager.has_method("play_sfx"):
+		ship._last_audio_wind_intake = float(ship._current_wind_intake)
+		ship._last_audio_speed = float(ship.current_speed)
+		return
+
+	ship._sail_catch_audio_timer = maxf(0.0, ship._sail_catch_audio_timer - delta)
+	ship._sail_luff_audio_timer = maxf(0.0, ship._sail_luff_audio_timer - delta)
+	ship._speed_shift_audio_timer = maxf(0.0, ship._speed_shift_audio_timer - delta)
+
+	var deployed: float = clampf(float(ship.sail_deployed_ratio), 0.0, 1.0)
+	var wind_intake: float = clampf(float(ship._current_wind_intake), 0.0, 1.0)
+	var previous_intake: float = clampf(float(ship._last_audio_wind_intake), 0.0, 1.0)
+	var current_speed: float = absf(float(ship.current_speed))
+	var previous_speed: float = absf(float(ship._last_audio_speed))
+	var max_speed_value: float = maxf(float(ship.max_speed), 0.1)
+	var speed_ratio: float = clampf(current_speed / max_speed_value, 0.0, 1.0)
+	var speed_delta_rate: float = (current_speed - previous_speed) / maxf(delta, 0.001)
+
+	if deployed > 0.22 and wind_intake >= 0.56 and previous_intake < 0.38 and ship._sail_catch_audio_timer <= 0.0:
+		var catch_pitch := randf_range(0.86, 0.98)
+		var catch_volume := lerpf(-2.5, 2.0, wind_intake)
+		ship._cached_audio_manager.play_sfx("sail_flap", ship.global_position, catch_pitch, catch_volume)
+		if randf() < 0.42:
+			ship._cached_audio_manager.play_sfx("mast_creak", ship.global_position, randf_range(0.78, 0.92), 0.0)
+		ship._sail_catch_audio_timer = randf_range(1.4, 2.2)
+		ship._sail_luff_audio_timer = maxf(ship._sail_luff_audio_timer, 0.85)
+
+	var luffing := deployed > 0.48 and wind_intake < 0.24 and current_speed > 0.45
+	if luffing and ship._sail_luff_audio_timer <= 0.0:
+		var luff_pitch := randf_range(1.08, 1.23)
+		ship._cached_audio_manager.play_sfx("sail_flap", ship.global_position, luff_pitch, -4.5)
+		ship._sail_luff_audio_timer = randf_range(2.0, 3.4)
+
+	if ship._speed_shift_audio_timer <= 0.0 and current_speed > 0.8:
+		if speed_delta_rate > 0.75:
+			ship._cached_audio_manager.play_sfx("wave_splash", ship.global_position, randf_range(1.04, 1.18), lerpf(-4.5, -1.0, speed_ratio))
+			ship._speed_shift_audio_timer = randf_range(1.1, 1.7)
+		elif speed_delta_rate < -0.9:
+			ship._cached_audio_manager.play_sfx("wave_splash", ship.global_position, randf_range(0.78, 0.94), lerpf(-5.5, -2.0, speed_ratio))
+			ship._speed_shift_audio_timer = randf_range(1.2, 1.9)
+
+	ship._last_audio_wind_intake = wind_intake
+	ship._last_audio_speed = current_speed
+
 static func capture_derelict_ship(ship) -> void:
 	print("[Capture] 폐선 나포 성공! 보상을 획득합니다.")
 	if is_instance_valid(ship._cached_level_manager):

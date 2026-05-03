@@ -217,7 +217,7 @@
 		"sailing": {
 			"name": "돛",
 			"category": 3,
-			"description": "돛 속도와 회전 강화",
+			"description": "돛 속도, 회전, 전환 강화",
 			"card_art_path": "res://assets/ui/upgrades/sail_card.png",
 			"max_level": 5,
 			"color": "58cfff",
@@ -227,7 +227,9 @@
 				"efficiency_levels": [2, 4],
 				"efficiency_mult": 1.08,
 				"turn_levels": [2, 4],
-				"turn_mult": 1.15
+				"turn_mult": 1.15,
+				"handling_levels": [1, 2, 3, 4, 5],
+				"handling_mult": 1.15
 			}
 		},
 		"rowing": {

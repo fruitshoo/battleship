@@ -18,7 +18,7 @@ func _ready() -> void:
 
 	_label = Label.new()
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	NavalUiTheme.style_tooltip_body(_label, 12)
+	NavalUiTheme.style_tooltip_body(_label, 11)
 	_label.custom_minimum_size = Vector2(MIN_WIDTH - 24.0, 0.0)
 	add_child(_label)
 

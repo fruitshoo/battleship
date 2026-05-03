@@ -34,7 +34,14 @@ func _tick(_delta: float) -> Status:
 	var reason := "wander"
 	var active_boarding_muster_target: Vector3 = _find_active_boarding_muster_target(soldier) if prefer_active_boarding_muster else Vector3.INF
 
-	var prioritize_ship_duty := active_boarding_muster_target == Vector3.INF and allow_ship_duty and _should_prioritize_ship_duty_before_enemy(soldier)
+	var attack_range: float = _get_attack_range(soldier)
+	var target_is_attackable := is_instance_valid(target) and target_distance <= attack_range
+	var prioritize_ship_duty := (
+		not target_is_attackable
+		and active_boarding_muster_target == Vector3.INF
+		and allow_ship_duty
+		and _should_prioritize_ship_duty_before_enemy(soldier)
+	)
 	if prioritize_ship_duty:
 		var duty_target: Vector3 = SoldierShipDutyHelper.find_ship_duty_target(soldier)
 		if duty_target != Vector3.INF:
@@ -44,7 +51,6 @@ func _tick(_delta: float) -> Status:
 			target = null
 
 	if mode == SoldierAILimboKeysScript.MODE_WANDER and is_instance_valid(target):
-		var attack_range: float = _get_attack_range(soldier)
 		if target_distance <= attack_range:
 			mode = SoldierAILimboKeysScript.MODE_ATTACK_TARGET
 			reason = "target_in_range"

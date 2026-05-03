@@ -1,6 +1,7 @@
 extends RefCounted
 class_name ProjectContractHudHelper
 
+const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
 const AUTHORING_SCENARIO_TRIGGER_USER_PATH := "user://authoring_palette_scenario_trigger.json"
 const AUTHORING_SCENARIO_PRESETS_USER_PATH := "user://authoring_palette_scenario_presets.json"
 const AUTHORING_DATA_PATCH_USER_PATH := "user://authoring_palette_data_patch.json"
@@ -8,7 +9,45 @@ const ASSEMBLED_AUTHORING_PRESET_ID := "midgame_pressure_kobayabune_melee_stand_
 const LIGHT_RAIDERS_PRESET_ID := "light_raiders"
 
 
+class MockXpHud:
+	extends Node
+
+	var xp_updates: Array = []
+	var level_updates: Array[int] = []
+
+	func update_xp(current: int, maximum: int) -> void:
+		xp_updates.append([current, maximum])
+
+	func update_level(level: int) -> void:
+		level_updates.append(level)
+
+	func update_score(_score: int) -> void:
+		pass
+
+
+class MockXpLevelManager:
+	extends Node
+
+	signal level_up(new_level: int)
+	signal score_changed(new_score: int)
+
+	var current_level: int = 1
+	var current_xp: int = 6
+	var xp_to_next_level: int = 7
+	var xp_multiplier: float = 1.0
+	var level_xp_base: float = 7.0
+	var level_xp_exponent: float = 1.1
+	var current_score: int = 0
+	var enemies_killed: int = 0
+	var ship_rerolls_available: int = 0
+	var hud: Node = null
+
+	func _show_upgrade_ui(_choice_count: int) -> void:
+		pass
+
+
 static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
+	_run_level_progression_xp_bar_contract(owner, failures)
 	var packed := load(smoke_scene_path) as PackedScene
 	if packed == null:
 		failures.append("hud smoke scene load failed: %s" % smoke_scene_path)
@@ -98,6 +137,32 @@ static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_s
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
+
+
+static func _run_level_progression_xp_bar_contract(owner: Node, failures: Array[String]) -> void:
+	var lm := MockXpLevelManager.new()
+	var hud := MockXpHud.new()
+	lm.hud = hud
+	owner.add_child(lm)
+	owner.add_child(hud)
+
+	LevelManagerProgressionHelper.add_xp(lm, 5)
+
+	if lm.current_level != 2:
+		failures.append("xp bar contract expected level 2 after overflow XP, got %d" % lm.current_level)
+	if lm.current_xp != 4:
+		failures.append("xp bar contract expected XP remainder 4, got %d" % lm.current_xp)
+	if lm.xp_to_next_level != 15:
+		failures.append("xp bar contract expected next XP 15, got %d" % lm.xp_to_next_level)
+	if hud.xp_updates.is_empty():
+		failures.append("xp bar contract did not receive HUD XP updates")
+	else:
+		var last_update: Array = hud.xp_updates.back()
+		if int(last_update[0]) != 4 or int(last_update[1]) != 15:
+			failures.append("xp bar contract expected final HUD XP update [4, 15], got %s" % str(last_update))
+
+	lm.queue_free()
+	hud.queue_free()
 
 
 static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: Array[String]) -> void:

@@ -28,6 +28,10 @@
 | sfx_heavy_missle_impact.ogg |Attribution 3.0|https://freesound.org/people/EvanBoyerman/sounds/530886/|
 | sfx_levelup.ogg |own|own|
 | sfx_match_sizzle.ogg |CC0|https://freesound.org/people/squareal/sounds/237407/|
+| sfx_mast_creak_01.wav |CC0|https://freesound.org/s/407326/|
+| sfx_mast_creak_02.wav |CC0|https://freesound.org/s/407326/|
+| sfx_mast_creak_03.wav |CC0|https://freesound.org/s/407326/|
+| sfx_mast_creak_04.wav |CC0|https://freesound.org/s/407326/|
 | sfx_metal_drop.mp3 |CC0|https://freesound.org/people/gamer500/sounds/682736/|
 | sfx_musket_fire.ogg |Attribution 4.0|https://freesound.org/people/aaronsiler/sounds/128980/|
 | sfx_musket_fire_02.ogg |Attribution 4.0|https://freesound.org/people/J8054/sounds/648747/|
@@ -38,6 +42,14 @@
 | sfx_rocket_launch_01.ogg |CC0|https://freesound.org/people/LukaCafuka/sounds/750685/|
 | sfx_rocket_launch_02.ogg |CC0|https://freesound.org/people/LukaCafuka/sounds/750684/|
 | sfx_rocket_launch_03.ogg |CC0|https://freesound.org/people/ReadeOnly/sounds/186933/|
+| sfx_sail_canvas_01.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_02.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_03.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_04.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_05.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_06.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_07.wav |CC0|https://freesound.org/s/711122/|
+| sfx_sail_canvas_08.wav |CC0|https://freesound.org/s/711122/|
 | sfx_ship_sink_bubbles_cc0.ogg |CC0|https://freesound.org/people/pillwave/sounds/423959/|
 | sfx_soldier_die_1.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_soldier_die_2.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|

@@ -1122,6 +1122,9 @@ func _find_cross_ship_muster_target() -> Vector3:
 
 
 func _find_ship_duty_target() -> Vector3:
+	var active_target: Vector3 = SoldierShipDutyHelper.get_active_ship_duty_target(self)
+	if active_target != Vector3.INF:
+		return active_target
 	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
 	if limbo_point != Vector3.INF:
 		return limbo_point
@@ -1129,10 +1132,10 @@ func _find_ship_duty_target() -> Vector3:
 
 
 func _get_active_ship_duty_target() -> Vector3:
-	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
-	if limbo_point != Vector3.INF:
-		return limbo_point
-	return SoldierShipDutyHelper.get_active_ship_duty_target(self)
+	var active_target: Vector3 = SoldierShipDutyHelper.get_active_ship_duty_target(self)
+	if active_target != Vector3.INF:
+		return active_target
+	return _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
 
 
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)

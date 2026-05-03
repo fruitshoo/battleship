@@ -54,12 +54,22 @@ const PANOKSEON_ARTILLERY_SLOTS := [
 	{
 		"squadron_id": "panokseon_artillery",
 		"profile_id": PROFILE_MAENGSEON_SCREEN,
-		"slot_role": "artillery_screen_left",
+		"slot_role": "artillery_screen_front_left",
 	},
 	{
 		"squadron_id": "panokseon_artillery",
 		"profile_id": PROFILE_MAENGSEON_SCREEN,
-		"slot_role": "artillery_screen_right",
+		"slot_role": "artillery_screen_front_right",
+	},
+	{
+		"squadron_id": "panokseon_artillery",
+		"profile_id": PROFILE_MAENGSEON_SCREEN,
+		"slot_role": "artillery_screen_rear_left",
+	},
+	{
+		"squadron_id": "panokseon_artillery",
+		"profile_id": PROFILE_MAENGSEON_SCREEN,
+		"slot_role": "artillery_screen_rear_right",
 	},
 ]
 
@@ -82,11 +92,13 @@ static func get_support_slot_plan_for_levels(current_levels: Dictionary, upgrade
 		plan.append(flagship_slots[0])
 	if panokseon_unlocked:
 		plan.append(panokseon_slots[0])
-	for i in range(1, flagship_slots.size()):
-		plan.append(flagship_slots[i])
-	if panokseon_unlocked:
 		for i in range(1, panokseon_slots.size()):
 			plan.append(panokseon_slots[i])
+		for i in range(1, flagship_slots.size()):
+			plan.append(flagship_slots[i])
+		return plan
+	for i in range(1, flagship_slots.size()):
+		plan.append(flagship_slots[i])
 	return plan
 
 

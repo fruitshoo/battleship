@@ -182,6 +182,10 @@ func get_debug_cannon_snapshot() -> Dictionary:
 	var base_damage: float = float(projectile_stats.get("damage", 0.0))
 	if base_damage <= 1.0 and team == "player":
 		base_damage = 22.0
+	var site_damage_bonus := _get_owner_site_bonus_total("cannon_damage_pct")
+	var site_reload_bonus := clampf(_get_owner_site_bonus_total("cannon_reload_pct"), 0.0, 0.45)
+	var reload_crew_cooldown_mult := _get_reload_crew_cooldown_mult()
+	var boarding_reload_cooldown_mult := _get_boarding_reload_cooldown_mult()
 	var cannon_damage: float = base_damage * _cached_dmg_mult * fleet_damage_mult
 	var current_cooldown: float = _get_current_cooldown()
 	var expected_shot_damage: float = cannon_damage * (1.0 + _cached_crit_chance * (_cached_crit_multiplier - 1.0))
@@ -189,13 +193,21 @@ func get_debug_cannon_snapshot() -> Dictionary:
 		"team": team,
 		"count": 1,
 		"range": _get_current_range(),
+		"base_cooldown": fire_cooldown,
 		"cooldown": current_cooldown,
 		"base_damage": base_damage,
 		"damage": cannon_damage,
 		"damage_mult": _cached_dmg_mult,
 		"fleet_damage_mult": fleet_damage_mult,
+		"fleet_cooldown_mult": fleet_cooldown_mult,
+		"cached_cooldown_mult": _cached_cd_mult,
+		"reload_crew_cooldown_mult": reload_crew_cooldown_mult,
 		"reload_crew_power": _reload_crew_power,
 		"reload_crew_speed_mult": get_reload_crew_speed_multiplier(),
+		"boarding_reload_cooldown_mult": boarding_reload_cooldown_mult,
+		"tempo_mult": CANNON_RELOAD_TEMPO_MULT,
+		"site_damage_bonus": site_damage_bonus,
+		"site_reload_bonus": site_reload_bonus,
 		"crit_chance": _cached_crit_chance,
 		"crit_multiplier": _cached_crit_multiplier,
 		"expected_dps": expected_shot_damage / current_cooldown if current_cooldown > 0.0 else 0.0,

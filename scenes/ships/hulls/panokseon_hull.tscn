@@ -141,23 +141,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.5, 2.75)
 [node name="Masts" type="Node3D" parent="." unique_id=1332807744]
 
 [node name="MastPivot_01" type="Node3D" parent="Masts" unique_id=1234717001]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, -2)
+transform = Transform3D(1.05, 0, 0, 0, 1.05, 0, 0, 0, 1.05, 0, -2, -2)
 script = ExtResource("mast_fold_script")
 fold_angle_degrees = 60.0
-fold_duration = 1.35
+fold_duration = 2.2
 
 [node name="Mast" parent="Masts/MastPivot_01" unique_id=1732171799 instance=ExtResource("mast_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
 [node name="MastPivot_02" type="Node3D" parent="Masts" unique_id=402821299]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 2)
+transform = Transform3D(1.05, 0, 0, 0, 1.05, 0, 0, 0, 1.05, 0, -2, 2)
 script = ExtResource("mast_fold_script")
 fold_angle_degrees = 60.0
-fold_duration = 1.35
+fold_duration = 2.2
 stow_target_path = NodePath("../MastStowTarget_02")
 
 [node name="Mast2" parent="Masts/MastPivot_02" unique_id=1786866091 instance=ExtResource("mast_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
 [node name="MastStowTarget_02" type="Marker3D" parent="Masts"]
-transform = Transform3D(1, 0, 0, 0, 0.5, -0.8660254, 0, 0.8660254, 0.5, 0.12, -2, -1.72)
+transform = Transform3D(1.05, 0, 0, 0, 0.525, -0.9093267, 0, 0.9093267, 0.525, 0.12, -2, -1.72)

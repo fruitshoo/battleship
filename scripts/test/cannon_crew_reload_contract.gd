@@ -72,6 +72,9 @@ func _run_contract() -> void:
 	await _run_reload_curve_contract()
 	if _failed:
 		return
+	await _run_no_target_cannon_assignment_contract()
+	if _failed:
+		return
 	await _run_active_cannon_assignment_contract()
 	if _failed:
 		return
@@ -79,6 +82,9 @@ func _run_contract() -> void:
 	if _failed:
 		return
 	await _run_cannon_slot_reservation_contract()
+	if _failed:
+		return
+	await _run_cruise_shiphandling_suppressed_contract()
 	if _failed:
 		return
 	await _run_active_shiphandling_station_hold_contract()
@@ -113,6 +119,26 @@ func _run_reload_curve_contract() -> void:
 	_assert_gt("two_crew_faster_than_one_crew", one_crew_cooldown, two_crew_cooldown)
 	_assert_gt("three_crew_faster_than_two_crew", two_crew_cooldown, three_crew_cooldown)
 	cannon.queue_free()
+
+
+func _run_no_target_cannon_assignment_contract() -> void:
+	var ship := MockShip.new()
+	ship.name = "IdleCrewShip"
+	ship.gunnery_crew_alloc = 3
+	add_child(ship)
+	EntityRegistry.register_ship(ship)
+
+	var cannon := CANNON_SCENE.instantiate()
+	cannon.name = "IdleCannon"
+	ship.add_child(cannon)
+	await get_tree().process_frame
+
+	BaseShipCrewHelper.assign_cannon_reload_crew_power(ship)
+	_assert_close("idle_cannon_receives_no_reload_crew_without_target", float(cannon.call("get_reload_crew_power")), 0.0)
+	_assert_eq("idle_ship_not_in_gunnery_posture", BaseShipCrewHelper.is_in_gunnery_posture(ship), false)
+
+	EntityRegistry.unregister_ship(ship)
+	ship.queue_free()
 
 
 func _run_active_cannon_assignment_contract() -> void:
@@ -242,7 +268,7 @@ func _run_active_shiphandling_station_hold_contract() -> void:
 	var ship := MockShip.new()
 	ship.name = "HandlingShip"
 	ship.shiphandling_crew_ratio = 0.6
-	ship.current_speed = 2.4
+	ship.is_rowing = true
 	add_child(ship)
 
 	var soldier := MockSoldier.new()
@@ -260,6 +286,24 @@ func _run_active_shiphandling_station_hold_contract() -> void:
 
 	_assert_true("shiphandling_station_target_persists_when_arrived", active_target != Vector3.INF)
 	_assert_vec3_close("shiphandling_station_returns_current_slot", active_target, ship.to_global(local_station))
+
+	ship.queue_free()
+
+
+func _run_cruise_shiphandling_suppressed_contract() -> void:
+	var ship := MockShip.new()
+	ship.name = "CruiseSuppressedShip"
+	ship.shiphandling_crew_ratio = 0.6
+	ship.current_speed = 2.4
+	add_child(ship)
+
+	var soldier := MockSoldier.new()
+	soldier.name = "CruiseIdleCrew"
+	soldier.owned_ship = ship
+	ship.add_child(soldier)
+
+	var duty_target: Vector3 = SoldierShipDutyHelper.find_ship_duty_target(soldier)
+	_assert_eq("cruising_alone_should_not_create_shiphandling_station", duty_target, Vector3.INF)
 
 	ship.queue_free()
 

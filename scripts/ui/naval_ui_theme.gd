@@ -220,11 +220,11 @@ static func style_overlay_caption(label: Label, font_size: int = 10, color: Colo
 	label.add_theme_constant_override("outline_size", outline_size)
 
 
-static func style_tooltip_body(label: Label, font_size: int = 12) -> void:
+static func style_tooltip_body(label: Label, font_size: int = 11) -> void:
 	if not is_instance_valid(label):
 		return
 	_apply_control_font(label, FONT_BODY, font_size)
-	label.add_theme_constant_override("line_spacing", 2)
+	label.add_theme_constant_override("line_spacing", 1)
 	label.add_theme_color_override("font_color", TEXT_BODY)
 	label.add_theme_color_override("font_outline_color", OUTLINE_DARK)
 	label.add_theme_constant_override("outline_size", 1)
@@ -377,9 +377,9 @@ static func make_hud_chip_style() -> StyleBoxFlat:
 
 
 static func make_tooltip_panel_style() -> StyleBoxFlat:
-	var style := make_panel_style(PANEL_BG, BORDER_GOLD_SOFT, 8, 1, 12.0, 10.0, 12.0, 10.0)
-	style.shadow_color = Color(0, 0, 0, 0.45)
-	style.shadow_size = 6
+	var style := make_panel_style(Color(0.025, 0.035, 0.05, 0.98), BORDER_GOLD_SOFT, 6, 1, 10.0, 8.0, 10.0, 8.0)
+	style.shadow_color = Color(0, 0, 0, 0.72)
+	style.shadow_size = 8
 	return style
 
 

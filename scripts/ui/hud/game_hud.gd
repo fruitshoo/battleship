@@ -177,8 +177,8 @@ var combat_derelict_value_label: Label = null
 var combat_soldier_value_label: Label = null
 var crew_composition_label: Label = null
 var upgrade_tooltip_panel = null
-var _tooltip_slot_ref: PanelContainer = null
-var _tooltip_hover_slot: PanelContainer = null
+var _tooltip_slot_ref: Control = null
+var _tooltip_hover_slot: Control = null
 var _tooltip_hover_elapsed: float = 0.0
 var game_over_overlay: Control = null
 var _game_over_transitioning: bool = false
@@ -545,11 +545,20 @@ func _setup_upgrade_tooltip() -> void:
 func _bind_upgrade_slot_hover(slot: PanelContainer) -> void:
 	HudUpgradeTooltipHelper.bind_upgrade_slot_hover(self, slot)
 
+func _bind_text_tooltip_hover(control: Control, text: String, color: Color = Color(0.9, 0.85, 0.6, 1.0), allow_stat_panel: bool = false) -> void:
+	HudUpgradeTooltipHelper.bind_text_tooltip_hover(self, control, text, color, allow_stat_panel)
+
 func _on_upgrade_slot_mouse_entered(slot: PanelContainer) -> void:
 	HudUpgradeTooltipHelper.on_upgrade_slot_mouse_entered(self, slot)
 
 func _on_upgrade_slot_mouse_exited(slot: PanelContainer) -> void:
 	HudUpgradeTooltipHelper.on_upgrade_slot_mouse_exited(self, slot)
+
+func _on_text_tooltip_mouse_entered(control: Control) -> void:
+	HudUpgradeTooltipHelper.on_text_tooltip_mouse_entered(self, control)
+
+func _on_text_tooltip_mouse_exited(control: Control) -> void:
+	HudUpgradeTooltipHelper.on_text_tooltip_mouse_exited(self, control)
 
 func _update_upgrade_tooltip_state(delta: float) -> void:
 	HudUpgradeTooltipHelper.update_upgrade_tooltip_state(self, delta)

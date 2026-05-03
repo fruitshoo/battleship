@@ -89,15 +89,10 @@ static func get_ship_reload_crew_cannons(ship) -> Array[Node]:
 static func get_active_reload_crew_cannons(ship, cannons: Array[Node]) -> Array[Node]:
 	var active: Array[Node] = []
 	var target := get_nearest_enemy_ship_for_allocation(ship)
-	if is_instance_valid(target):
-		for cannon in cannons:
-			if is_reload_crew_cannon_available(cannon) and cannon_can_cover_allocation_target(cannon, target):
-				active.append(cannon)
-	if not active.is_empty():
-		return active
-
 	for cannon in cannons:
-		if is_reload_crew_cannon_available(cannon):
+		if not is_reload_crew_cannon_available(cannon):
+			continue
+		if _cannon_has_active_reload_work(cannon) or (is_instance_valid(target) and cannon_can_cover_allocation_target(cannon, target)):
 			active.append(cannon)
 	return active
 
@@ -150,6 +145,16 @@ static func is_reload_crew_cannon_available(cannon: Node) -> bool:
 		if cannon.has_method("is_processing") and not cannon.is_processing():
 			return false
 	return true
+
+
+static func _cannon_has_active_reload_work(cannon: Node) -> bool:
+	if not is_instance_valid(cannon):
+		return false
+	if cannon.get("cooldown_timer") != null and float(cannon.get("cooldown_timer")) > 0.05:
+		return true
+	if cannon.get("is_preparing") == true:
+		return true
+	return false
 
 
 static func cannon_can_cover_allocation_target(cannon: Node, target: Node) -> bool:
@@ -305,13 +310,10 @@ static func _show_survivor_training_message(ship, message: String) -> void:
 
 
 static func is_in_gunnery_posture(ship) -> bool:
-	var cannon_range: float = get_ship_cannon_range_for_allocation(ship)
-	if cannon_range <= 0.01:
+	var cannons := get_ship_reload_crew_cannons(ship)
+	if cannons.is_empty():
 		return false
-	var nearest_enemy_dist: float = get_nearest_enemy_ship_distance_for_allocation(ship)
-	if nearest_enemy_dist <= 0.0:
-		return false
-	return nearest_enemy_dist <= cannon_range * 1.15
+	return not get_active_reload_crew_cannons(ship, cannons).is_empty()
 
 
 static func get_ship_cannon_range_for_allocation(ship) -> float:

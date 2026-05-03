@@ -168,6 +168,7 @@ func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
 	if state.is_empty():
 		return false
 	var my_contact_dot: float = float(state.get("my_contact_dot", -1.0))
+	var target_contact_dot: float = float(state.get("target_contact_dot", 1.0))
 	var target_contact_abs: float = absf(float(state.get("target_contact_dot", 1.0)))
 	var closing_speed: float = float(state.get("closing_speed", 999.0))
 	var center_distance: float = global_position.distance_to(target_ship.global_position)
@@ -183,6 +184,14 @@ func _can_force_head_on_boarding(target_ship: Node3D) -> bool:
 		and closing_speed <= boarding_max_relative_speed * 2.6
 	)
 	if bow_to_side_contact:
+		return true
+	var head_to_head_contact: bool = (
+		my_contact_dot >= 0.70
+		and target_contact_dot >= 0.72
+		and center_distance <= collision_distance + 0.70
+		and closing_speed <= boarding_max_relative_speed * 3.4
+	)
+	if head_to_head_contact:
 		return true
 	if enemy_crew == 1 and center_distance <= collision_distance + 0.45:
 		return true

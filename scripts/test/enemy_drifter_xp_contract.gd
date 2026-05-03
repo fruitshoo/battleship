@@ -72,6 +72,7 @@ func _ready() -> void:
 	var failures: Array[String] = []
 	await get_tree().process_frame
 	await _verify_sinking_enemy_soldier_merit_is_deferred_to_pickup(failures)
+	await _verify_each_sinking_enemy_count_spawns_pickup(failures)
 	_verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures)
 	_verify_enemy_drifter_uses_survivor_like_field_item_tuning(failures)
 	LevelManagerRegistry.unregister_level_manager(LevelManagerRegistry.get_level_manager(get_tree()))
@@ -115,8 +116,12 @@ func _verify_sinking_enemy_soldier_merit_is_deferred_to_pickup(failures: Array[S
 		failures.append("expected 2 enemy_drifter_xp nodes, found %d" % pickups.size())
 		return
 	var total_merit := 0
+	var total_xp := 0
 	for pickup_node in pickups:
 		total_merit += int(pickup_node.get("merit_amount"))
+		total_xp += int(pickup_node.get("xp_amount"))
+	if total_xp != 15:
+		failures.append("drifter pickups carried %d XP, expected 15" % total_xp)
 	if total_merit != 5:
 		failures.append("drifter pickups carried %d merit, expected 5" % total_merit)
 
@@ -124,12 +129,54 @@ func _verify_sinking_enemy_soldier_merit_is_deferred_to_pickup(failures: Array[S
 	add_child(player)
 	player.global_position = (pickups[0] as Node3D).global_position
 	(pickups[0] as Node).call("_try_collect", player)
-	if lm.current_xp != 0:
-		failures.append("collecting an enemy drifter pickup granted normal XP")
+	if lm.current_xp <= 0:
+		failures.append("collecting an enemy drifter pickup did not grant XP")
+	if lm.current_xp >= total_xp:
+		failures.append("collecting one grouped pickup granted all drifter XP at once")
 	if lm.merit_points <= 0:
 		failures.append("collecting an enemy drifter pickup did not grant merit")
 	if lm.merit_points >= total_merit:
 		failures.append("collecting one grouped pickup granted all drifter merit at once")
+	_cleanup_group("enemy_drifter_xp")
+	LevelManagerRegistry.unregister_level_manager(lm)
+	lm.queue_free()
+	ship.queue_free()
+	player.queue_free()
+
+
+func _verify_each_sinking_enemy_count_spawns_pickup(failures: Array[String]) -> void:
+	for soldier_count in range(1, 9):
+		var lm := MockLevelManager.new()
+		add_child(lm)
+		LevelManagerRegistry.register_level_manager(lm)
+		var ship := MockShip.new()
+		ship.cached_lm = lm
+		add_child(ship)
+		var soldiers_node := ship.get_node("Soldiers")
+		for _i in range(soldier_count):
+			var soldier := MockSoldier.new()
+			soldier.home_ship = ship
+			soldier._cached_level_manager = lm
+			soldiers_node.add_child(soldier)
+
+		var spawned := ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(ship)
+		await get_tree().process_frame
+		var expected_pickups: int = mini(4, ceili(float(soldier_count) / 3.0))
+		if spawned != expected_pickups:
+			failures.append("expected %d drifter pickups for %d sinking soldiers, got %d" % [expected_pickups, soldier_count, spawned])
+		var pickup_nodes := get_tree().get_nodes_in_group("enemy_drifter_xp")
+		var total_xp := 0
+		for pickup_node in pickup_nodes:
+			total_xp += int(pickup_node.get("xp_amount"))
+		var expected_xp: int = soldier_count * lm.drowned_soldier_kill_xp_reward
+		if total_xp != expected_xp:
+			failures.append("expected %d total drifter XP for %d sinking soldiers, got %d" % [expected_xp, soldier_count, total_xp])
+
+		_cleanup_group("enemy_drifter_xp")
+		LevelManagerRegistry.unregister_level_manager(lm)
+		lm.queue_free()
+		ship.queue_free()
+		await get_tree().process_frame
 
 
 func _verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures: Array[String]) -> void:
@@ -141,6 +188,12 @@ func _verify_accounted_soldier_does_not_grant_duplicate_drowned_xp(failures: Arr
 	SoldierLifecycleHelper._apply_enemy_kill_rewards(soldier)
 	if lm.current_xp != 0:
 		failures.append("accounted sinking soldier granted duplicate drowned XP")
+
+
+func _cleanup_group(group_name: String) -> void:
+	for node in get_tree().get_nodes_in_group(group_name):
+		if is_instance_valid(node):
+			node.queue_free()
 
 
 func _verify_enemy_drifter_uses_survivor_like_field_item_tuning(failures: Array[String]) -> void:

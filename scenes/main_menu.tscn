@@ -70,12 +70,12 @@ grow_vertical = 2
 [node name="StartButton" type="Button" parent="ButtonBlock" unique_id=2034750384]
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-text = "항해 시작"
+text = "시작"
 
 [node name="MetaButton" type="Button" parent="ButtonBlock" unique_id=1964063712]
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-text = "영구 업그레이드"
+text = "업그레이드"
 
 [node name="OptionsButton" type="Button" parent="ButtonBlock" unique_id=683776601]
 custom_minimum_size = Vector2(0, 46)

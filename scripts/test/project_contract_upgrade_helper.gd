@@ -9,6 +9,7 @@ static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_crew_reserve_retired(failures)
 	_validate_crew_weapon_upgrades_do_not_increase_capacity(failures)
 	_validate_support_hull_upgrade_retired(failures)
+	_validate_sailing_upgrade_improves_handling(failures)
 	_validate_panokseon_upgrade_gate(failures)
 
 
@@ -168,6 +169,25 @@ static func _validate_support_hull_upgrade_retired(failures: Array[String]) -> v
 		failures.append("upgrade smoke fleet_hull should not drive active support upgrades")
 	if upgrades.has("fleet_hull") and upgrades["fleet_hull"].get("disabled", false) != true:
 		failures.append("upgrade smoke fleet_hull data should stay disabled")
+
+
+static func _validate_sailing_upgrade_improves_handling(failures: Array[String]) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("upgrade smoke missing UpgradeManager")
+		return
+	var upgrades: Dictionary = UpgradeManager.UPGRADES
+	var sailing_data: Dictionary = upgrades.get("sailing", {})
+	var sailing_stats: Dictionary = sailing_data.get("stats", {})
+	if not str(sailing_data.get("description", "")).contains("전환"):
+		failures.append("upgrade smoke sailing description should mention sail handling transition")
+	var handling_levels: Array = sailing_stats.get("handling_levels", [])
+	if handling_levels.size() != int(sailing_data.get("max_level", 0)):
+		failures.append("upgrade smoke sailing should improve handling at every level")
+	if float(sailing_stats.get("handling_mult", 1.0)) <= 1.0:
+		failures.append("upgrade smoke sailing handling multiplier should improve furl speed")
+	var source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager.gd")
+	if not source.contains("sail_furl_rate") or not source.contains("fold_duration"):
+		failures.append("upgrade smoke sailing should apply to sail furl and mast fold timing")
 
 
 static func _validate_panokseon_upgrade_gate(failures: Array[String]) -> void:

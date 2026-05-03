@@ -249,31 +249,42 @@ func _finalize_release() -> void:
 	ScenePool.release(self)
 
 func _play_impact_vfx() -> void:
+	var impact_dir := target_pos - start_pos
+	if impact_dir.length_squared() <= 0.001:
+		impact_dir = -global_basis.z
+
 	# 나무 파편 이펙트
 	if wood_splinter_scene:
+		var splinter_damage := damage + 8.0
 		WoodSplinter.spawn_burst(
 			get_tree(),
 			wood_splinter_scene,
-			global_position,
-			damage,
-			target_pos - start_pos
+			global_position + Vector3(0.0, 0.35, 0.0),
+			splinter_damage,
+			impact_dir,
+			"cannon_hit_splinter",
+			6,
+			140.0
 		)
 			
 	# 타격 이펙트
-	if impact_puff_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 8, 55.0):
+	if impact_puff_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 8, 180.0):
 		var smoke = ScenePool.acquire(get_tree(), impact_puff_scene)
-		smoke.position = global_position
+		if smoke.has_method("set_intensity"):
+			smoke.set_intensity(1.18)
+		get_tree().root.add_child(smoke)
+		smoke.global_position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
 		var smoke_dir = Vector3.UP
-		smoke.basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
-		get_tree().root.add_child(smoke)
+		smoke.global_basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
 		if smoke.has_method("pool_activate"):
 			smoke.pool_activate()
 	
-	# 피격 사운드 (장군전 전용 중타격음)
+	# 피격 사운드: 묵직한 장군전 충격음 위에 목재 파열음을 겹친다.
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("heavy_missle_impact", global_position, randf_range(0.9, 1.08), -3.0)
+		audio_manager.play_sfx("heavy_missle_impact", global_position, randf_range(0.94, 1.05), -1.0)
+		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.82, 0.96), 1.5)
 
 func _play_launch_vfx() -> void:
 	# 화면 흔들림

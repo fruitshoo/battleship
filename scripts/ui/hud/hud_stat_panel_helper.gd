@@ -128,13 +128,35 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var hull_hp: float = float(ship_snapshot.get("hull_hp", 0.0))
 	var max_hull_hp: float = float(ship_snapshot.get("max_hull_hp", 0.0))
 	var hull_defense: float = float(ship_snapshot.get("hull_defense", 0.0))
+	var hull_regen_rate: float = _get_float(ship, "hull_regen_rate", 0.0)
+	var max_hull_site_bonus: float = _get_site_bonus_total(ship, "max_hull_add")
+	var hull_defense_site_bonus: float = _get_site_bonus_total(ship, "hull_defense_add")
+	var hull_regen_site_bonus: float = _get_site_bonus_total(ship, "hull_regen_add")
+	var hull_rows: Array[Dictionary] = [
+		{
+			"icon": "favorite",
+			"label": "내구도",
+			"value": "%.0f / %.0f" % [hull_hp, max_hull_hp],
+			"tooltip": _build_flat_bonus_tooltip("선체 내구", "최대 내구도", max_hull_site_bonus),
+		},
+		{
+			"icon": "shield",
+			"label": "방어력",
+			"value": "%.1f" % hull_defense,
+			"tooltip": _build_flat_bonus_tooltip("선체 방어", "선체 방어력", hull_defense_site_bonus),
+		},
+	]
+	if hull_regen_rate > 0.0001 or hull_regen_site_bonus > 0.0001:
+		hull_rows.append({
+			"icon": "construction",
+			"label": "자동 수리",
+			"value": "%.1f/초" % hull_regen_rate,
+			"tooltip": _build_flat_bonus_tooltip("선체 수리", "초당 선체 자동 수리량", hull_regen_site_bonus, "/초"),
+		})
 	sections.append({
 		"title": "선체",
 		"icon": "shield",
-		"rows": [
-			{"icon": "favorite", "label": "내구도", "value": "%.0f / %.0f" % [hull_hp, max_hull_hp]},
-			{"icon": "shield", "label": "방어력", "value": "%.1f" % hull_defense},
-		],
+		"rows": hull_rows,
 	})
 
 	var current_speed: float = float(ship_snapshot.get("current_speed", 0.0))
@@ -172,6 +194,9 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var cannon_crit_chance: float = 0.0
 	var cannon_crit_multiplier: float = 1.0
 	var cannon_expected_dps: float = 0.0
+	var cannon_fleet_damage_mult: float = 1.0
+	var cannon_damage_site_bonus: float = 0.0
+	var cannon_snapshot: Dictionary = {}
 	var primary_cannon: Node = _get_primary_cannon(ship)
 	if is_instance_valid(primary_cannon):
 		var cannons_node := NodeContractHelper.get_cannons_container(ship)
@@ -179,12 +204,14 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			for child in cannons_node.get_children():
 				if is_instance_valid(child):
 					cannon_count += 1
-		var cannon_snapshot: Dictionary = primary_cannon.call("get_debug_cannon_snapshot") if primary_cannon.has_method("get_debug_cannon_snapshot") else {}
+		cannon_snapshot = primary_cannon.call("get_debug_cannon_snapshot") if primary_cannon.has_method("get_debug_cannon_snapshot") else {}
 		cannon_range = float(cannon_snapshot.get("range", 0.0))
 		cannon_cooldown = float(cannon_snapshot.get("cooldown", 0.0))
 		cannon_base_damage = float(cannon_snapshot.get("base_damage", 0.0))
 		cannon_damage = float(cannon_snapshot.get("damage", 0.0))
 		cannon_damage_mult = float(cannon_snapshot.get("damage_mult", 1.0))
+		cannon_fleet_damage_mult = float(cannon_snapshot.get("fleet_damage_mult", 1.0))
+		cannon_damage_site_bonus = float(cannon_snapshot.get("site_damage_bonus", 0.0))
 		cannon_crit_chance = float(cannon_snapshot.get("crit_chance", 0.0))
 		cannon_crit_multiplier = float(cannon_snapshot.get("crit_multiplier", 1.0))
 		cannon_expected_dps = float(cannon_snapshot.get("expected_dps", 0.0))
@@ -193,16 +220,33 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"icon": "sports_baseball",
 		"rows": [
 			{"icon": "apps", "label": "포문 수", "value": str(cannon_count)},
-			{"icon": "adjust", "label": "기본 / 최종 데미지", "value": "%.1f / %.1f" % [cannon_base_damage, cannon_damage]},
-			{"icon": "network_node", "label": "데미지 배율", "value": "철환 x%.2f" % cannon_damage_mult},
+			{
+				"icon": "adjust",
+				"label": "기본 / 최종 데미지",
+				"value": "%.1f / %.1f" % [cannon_base_damage, cannon_damage],
+				"tooltip": _build_cannon_damage_tooltip(cannon_base_damage, cannon_damage, cannon_damage_mult, cannon_fleet_damage_mult, cannon_damage_site_bonus),
+			},
+			{
+				"icon": "network_node",
+				"label": "데미지 배율",
+				"value": "x%.2f" % cannon_damage_mult,
+				"tooltip": _build_cannon_damage_mult_tooltip(cannon_damage_mult, cannon_damage_site_bonus),
+			},
 			{"icon": "radar", "label": "사거리", "value": "%.1fm" % cannon_range},
-			{"icon": "timer", "label": "재장전", "value": "%.2fs" % cannon_cooldown},
+			{
+				"icon": "timer",
+				"label": "재장전",
+				"value": "%.2fs" % cannon_cooldown,
+				"tooltip": _build_cannon_reload_tooltip(cannon_snapshot),
+			},
 			{"icon": "grade", "label": "치명타", "value": "%.1f%% x%.1f" % [cannon_crit_chance * 100.0, cannon_crit_multiplier]},
 			{"icon": "monitoring", "label": "기대 DPS (1문)", "value": "%.1f" % cannon_expected_dps},
 		],
 	})
 
 	var crew_stats: Dictionary = ship.call("get_debug_crew_snapshot") if ship.has_method("get_debug_crew_snapshot") else _collect_crew_stats(ship)
+	var crew_damage_site_bonus: float = _get_site_bonus_total(ship, "crew_damage_pct")
+	var crew_defense_site_bonus: float = _get_site_bonus_total(ship, "crew_defense_add")
 	sections.append({
 		"title": "병사",
 		"icon": "groups",
@@ -221,11 +265,11 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "health_and_safety", "label": "대표 병사 HP / 방어", "value": "%.0f / %.1f" % [
 				float(crew_stats.get("sample_hp", 0.0)),
 				float(crew_stats.get("sample_defense", 0.0)),
-			]},
+			], "tooltip": _build_flat_bonus_tooltip("병사 방어", "병사 방어력", crew_defense_site_bonus)},
 			{"icon": "swords", "label": "검 / 활", "value": "%.1f / %.1f" % [
 				float(crew_stats.get("sword_damage", 0.0)),
 				float(crew_stats.get("bow_damage", 0.0)),
-			]},
+			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "최종 무기 피해 = 기본 무기 피해 x (1 + 병사 공격 업그레이드 + 해역 병사 무기)")},
 			{"icon": "grade", "label": "치명타", "value": "%.0f%% x%.1f" % [
 				float(crew_stats.get("crit_chance", 0.0)) * 100.0,
 				float(crew_stats.get("crit_multiplier", 1.0)),
@@ -280,6 +324,7 @@ static func _build_signature(sections: Array[Dictionary]) -> String:
 		for row in section.get("rows", []):
 			if row is Dictionary:
 				parts.append("%s=%s" % [str(row.get("label", "")), str(row.get("value", ""))])
+				parts.append("tip:%s" % str(row.get("tooltip", "")))
 	return "|".join(parts)
 
 static func _rebuild_stat_content(hud, sections: Array[Dictionary]) -> void:
@@ -291,7 +336,7 @@ static func _rebuild_stat_content(hud, sections: Array[Dictionary]) -> void:
 		columns = 2
 	var section_start_index := 0
 	if not sections.is_empty() and str(sections[0].get("style", "")) == "summary":
-		hud.stat_content.add_child(_create_section(sections[0]))
+		hud.stat_content.add_child(_create_section(sections[0], hud))
 		section_start_index = 1
 	var grid := GridContainer.new()
 	grid.columns = columns
@@ -301,7 +346,7 @@ static func _rebuild_stat_content(hud, sections: Array[Dictionary]) -> void:
 	hud.stat_content.add_child(grid)
 	for section_index in range(section_start_index, sections.size()):
 		var section: Dictionary = sections[section_index]
-		grid.add_child(_create_section(section))
+		grid.add_child(_create_section(section, hud))
 
 
 static func _rebuild_site_bonus_content(hud, sections: Array[Dictionary]) -> void:
@@ -313,9 +358,9 @@ static func _rebuild_site_bonus_content(hud, sections: Array[Dictionary]) -> voi
 		var rows: Array = section.get("rows", [])
 		if rows.is_empty():
 			continue
-		hud.stat_site_bonus_content.add_child(_create_section(section))
+		hud.stat_site_bonus_content.add_child(_create_section(section, hud))
 
-static func _create_section(section: Dictionary) -> Control:
+static func _create_section(section: Dictionary, hud = null) -> Control:
 	var section_root := MarginContainer.new()
 	section_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	section_root.add_theme_constant_override("margin_left", 2)
@@ -363,6 +408,7 @@ static func _create_section(section: Dictionary) -> Control:
 			var cell := VBoxContainer.new()
 			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			cell.add_theme_constant_override("separation", 1)
+			_apply_row_tooltip(cell, row, hud)
 			summary_row.add_child(cell)
 
 			var label_row := HBoxContainer.new()
@@ -385,22 +431,26 @@ static func _create_section(section: Dictionary) -> Control:
 	else:
 		for row in section.get("rows", []):
 			if row is Dictionary:
-				vbox.add_child(_create_stat_row(row))
+				vbox.add_child(_create_stat_row(row, hud))
 
 	return section_root
 
-static func _create_stat_row(row: Dictionary) -> Control:
+static func _create_stat_row(row: Dictionary, hud = null) -> Control:
 	var row_box := HBoxContainer.new()
 	row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row_box.custom_minimum_size.y = 17.0
 	row_box.add_theme_constant_override("separation", 5)
+	_apply_row_tooltip(row_box, row, hud)
 
-	row_box.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 13, NavalUiTheme.TEXT_BLUE))
+	var icon_label := _create_icon_label(str(row.get("icon", "chevron_right")), 13, NavalUiTheme.TEXT_BLUE)
+	_apply_row_tooltip(icon_label, row, hud)
+	row_box.add_child(icon_label)
 
 	var label := Label.new()
 	label.text = str(row.get("label", ""))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	NavalUiTheme.style_body(label, 11)
+	_apply_row_tooltip(label, row, hud)
 	row_box.add_child(label)
 
 	var value := Label.new()
@@ -408,9 +458,21 @@ static func _create_stat_row(row: Dictionary) -> Control:
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	NavalUiTheme.style_overlay_value(value, 11)
 	value.add_theme_constant_override("outline_size", 2)
+	_apply_row_tooltip(value, row, hud)
 	row_box.add_child(value)
 
 	return row_box
+
+static func _apply_row_tooltip(control: Control, row: Dictionary, hud = null) -> void:
+	if not is_instance_valid(control):
+		return
+	var tooltip := str(row.get("tooltip", "")).strip_edges()
+	if tooltip.is_empty():
+		return
+	if hud != null and hud.has_method("_bind_text_tooltip_hover"):
+		hud.call("_bind_text_tooltip_hover", control, tooltip, NavalUiTheme.TEXT_ACCENT, true)
+		return
+	control.tooltip_text = tooltip
 
 static func _create_icon_label(icon_name: String, font_size: int, color: Color) -> Label:
 	var icon_label := Label.new()
@@ -419,6 +481,103 @@ static func _create_icon_label(icon_name: String, font_size: int, color: Color) 
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	NavalUiTheme.apply_emblem(icon_label, icon_name, font_size, color)
 	return icon_label
+
+static func _build_cannon_damage_tooltip(base_damage: float, final_damage: float, damage_mult: float, fleet_damage_mult: float, site_damage_bonus: float) -> String:
+	if base_damage <= 0.0001:
+		return ""
+	var upgrade_bonus := maxf(0.0, damage_mult - 1.0 - site_damage_bonus)
+	return "\n".join([
+		"대포 최종 피해",
+		"기본 포탄 피해: %.1f" % base_damage,
+		"철환 업그레이드: %s" % _format_percent(upgrade_bonus),
+		"해역 포격 피해: %s" % _format_percent(site_damage_bonus),
+		"함대 피해 배율: x%.2f" % fleet_damage_mult,
+		"계산: %.1f x (1 + %.2f + %.2f) x %.2f = %.1f" % [
+			base_damage,
+			upgrade_bonus,
+			site_damage_bonus,
+			fleet_damage_mult,
+			final_damage,
+		],
+	])
+
+
+static func _build_cannon_damage_mult_tooltip(damage_mult: float, site_damage_bonus: float) -> String:
+	var upgrade_bonus := maxf(0.0, damage_mult - 1.0 - site_damage_bonus)
+	return "\n".join([
+		"대포 피해 배율",
+		"철환 업그레이드: %s" % _format_percent(upgrade_bonus),
+		"해역 포격 피해: %s" % _format_percent(site_damage_bonus),
+		"합산 배율: x%.2f" % damage_mult,
+	])
+
+
+static func _build_cannon_reload_tooltip(snapshot: Dictionary) -> String:
+	if snapshot.is_empty():
+		return ""
+	var base_cooldown := float(snapshot.get("base_cooldown", 0.0))
+	var final_cooldown := float(snapshot.get("cooldown", 0.0))
+	if base_cooldown <= 0.0001 or final_cooldown <= 0.0001:
+		return ""
+	var site_reload_bonus := float(snapshot.get("site_reload_bonus", 0.0))
+	var site_reload_factor := maxf(0.55, 1.0 - site_reload_bonus)
+	var cached_cooldown_mult := float(snapshot.get("cached_cooldown_mult", 1.0))
+	var upgrade_cooldown_mult := cached_cooldown_mult / maxf(site_reload_factor, 0.001)
+	var fleet_cooldown_mult := float(snapshot.get("fleet_cooldown_mult", 1.0))
+	var reload_crew_cooldown_mult := float(snapshot.get("reload_crew_cooldown_mult", 1.0))
+	var reload_crew_speed_mult := float(snapshot.get("reload_crew_speed_mult", 1.0))
+	var boarding_cooldown_mult := float(snapshot.get("boarding_reload_cooldown_mult", 1.0))
+	var tempo_mult := float(snapshot.get("tempo_mult", 1.0))
+	return "\n".join([
+		"대포 재장전",
+		"기본 시간: %.2fs" % base_cooldown,
+		"화약 업그레이드: x%.2f" % upgrade_cooldown_mult,
+		"해역 포격 속도: %s -> x%.2f" % [_format_percent(site_reload_bonus), site_reload_factor],
+		"장전 병사: 속도 x%.2f -> 시간 x%.2f" % [reload_crew_speed_mult, reload_crew_cooldown_mult],
+		"함대/상태/템포: x%.2f / x%.2f / x%.2f" % [fleet_cooldown_mult, boarding_cooldown_mult, tempo_mult],
+		"계산: %.2fs x %.2f x %.2f x %.2f x %.2f x %.2f x %.2f = %.2fs" % [
+			base_cooldown,
+			upgrade_cooldown_mult,
+			site_reload_factor,
+			fleet_cooldown_mult,
+			reload_crew_cooldown_mult,
+			boarding_cooldown_mult,
+			tempo_mult,
+			final_cooldown,
+		],
+	])
+
+
+static func _build_percent_bonus_tooltip(bonus_name: String, affected_stat: String, total_value: float, formula: String) -> String:
+	if total_value <= 0.0001:
+		return ""
+	return "\n".join([
+		"해역 보너스: %s %s" % [bonus_name, _format_percent(total_value)],
+		"적용 대상: %s" % affected_stat,
+		formula,
+	])
+
+
+static func _build_flat_bonus_tooltip(bonus_name: String, affected_stat: String, total_value: float, suffix: String = "") -> String:
+	if total_value <= 0.0001:
+		return ""
+	return "\n".join([
+		"해역 보너스: %s %s" % [bonus_name, _format_flat_bonus(total_value, suffix)],
+		"적용 대상: %s" % affected_stat,
+		"계산: 기존 수치 + 해역 보너스",
+	])
+
+
+static func _format_percent(value: float) -> String:
+	var sign := "+" if value >= 0.0 else ""
+	return "%s%d%%" % [sign, int(round(value * 100.0))]
+
+
+static func _format_flat_bonus(value: float, suffix: String = "") -> String:
+	var sign := "+" if value >= 0.0 else ""
+	if absf(value - round(value)) < 0.01:
+		return "%s%d%s" % [sign, int(round(value)), suffix]
+	return "%s%.1f%s" % [sign, value, suffix]
 
 static func _get_primary_cannon(ship) -> Node:
 	var cannons_node := NodeContractHelper.get_cannons_container(ship)
@@ -603,7 +762,40 @@ static func _make_site_bonus_row(bonus_id: String, bonus_name: String, value_for
 		"icon": str(SITE_BONUS_ICON_BY_ID.get(bonus_id, "auto_awesome")),
 		"label": label,
 		"value": _format_site_bonus_value(value_format, total_value),
+		"tooltip": _build_site_bonus_tooltip(bonus_id, bonus_name, value_format, total_value, count),
 	}
+
+
+static func _build_site_bonus_tooltip(bonus_id: String, bonus_name: String, value_format: String, total_value: float, count: int) -> String:
+	var lines: Array[String] = [
+		"해역 보너스: %s" % bonus_name,
+		"누적: %s%s" % [_format_site_bonus_value(value_format, total_value), " (%d회)" % count if count > 0 else ""],
+	]
+	match bonus_id:
+		"cannon_damage_pct":
+			lines.append("적용: 대포 피해 배율에 합산")
+			lines.append("계산: 기본 포탄 피해 x (1 + 철환 업그레이드 + 해역 포격 피해) x 함대 피해")
+		"cannon_reload_pct":
+			lines.append("적용: 대포 재장전 시간을 감소")
+			lines.append("계산: 기본 재장전 x 화약 배율 x (1 - 해역 포격 속도) x 병사/함대/상태 배율")
+		"crew_damage_pct":
+			lines.append("적용: 병사 검/활/무기 피해 배율에 합산")
+			lines.append("계산: 기본 무기 피해 x (1 + 병사 공격 업그레이드 + 해역 병사 무기)")
+		"crew_defense_add":
+			lines.append("적용: 병사 방어력에 더함")
+			lines.append("계산: 기존 병사 방어력 + 해역 보너스")
+		"hull_regen_add":
+			lines.append("적용: 초당 선체 자동 수리량에 더함")
+			lines.append("계산: 기존 자동 수리량 + 해역 보너스")
+		"hull_defense_add":
+			lines.append("적용: 선체 방어력에 더함")
+			lines.append("계산: 기존 선체 방어력 + 해역 보너스")
+		"max_hull_add":
+			lines.append("적용: 최대 내구도에 더함")
+			lines.append("획득 시 현재 내구도도 같은 양만큼 회복")
+		_:
+			lines.append("적용: 해당 수치에 누적 반영")
+	return "\n".join(lines)
 
 
 static func _load_site_bonus_entries() -> Array:
@@ -630,6 +822,15 @@ static func _format_site_bonus_value(value_format: String, value: float) -> Stri
 			if absf(value - round(value)) < 0.01:
 				return "+%d" % int(round(value))
 			return "+%.1f" % value
+
+
+static func _get_site_bonus_total(ship: Node, bonus_id: String) -> float:
+	if not is_instance_valid(ship):
+		return 0.0
+	var totals_variant: Variant = ship.get_meta(SITE_BONUS_TOTALS_META, {})
+	if totals_variant is Dictionary:
+		return maxf(0.0, float((totals_variant as Dictionary).get(bonus_id, 0.0)))
+	return 0.0
 
 static func _get_float(obj, property_name: String, default_value: float) -> float:
 	if obj == null:

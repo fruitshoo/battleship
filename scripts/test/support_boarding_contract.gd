@@ -292,8 +292,10 @@ func _ready() -> void:
 	_verify_support_hold_formation_allows_boarding_attacker(failures)
 	_verify_panokseon_free_assist_holds_line_against_normal_threats(failures)
 	_verify_panokseon_free_assist_allows_flagship_boarding_attacker(failures)
+	_verify_panokseon_limbo_screen_threat_keeps_line_for_normal_threats(failures)
 	_verify_support_limbo_modes_drive_assist_execution(failures)
 	_verify_support_ship_tracks_flagship_manual_boss_breach(failures)
+	_verify_panokseon_column_goal_tracks_flagship_directly(failures)
 	_verify_support_chain_goal_formation_variants(failures)
 	_verify_support_chain_goal_formation_turn_following(failures)
 	_verify_support_chain_goal_prefers_owner_flagship_over_target(failures)
@@ -726,6 +728,40 @@ func _verify_panokseon_free_assist_allows_flagship_boarding_attacker(failures: A
 	support.queue_free()
 
 
+func _verify_panokseon_limbo_screen_threat_keeps_line_for_normal_threats(failures: Array[String]) -> void:
+	var support := MockSupportShip.new()
+	add_child(support)
+	support.global_position = Vector3.ZERO
+	_set_support_hold_enabled(support, false)
+	support.ship_type = "panokseon_ally"
+	support.limbo_ai_pilot_enabled = true
+	support.set_meta("support_squadron_slot_role", "artillery_lead")
+
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.team = "player"
+	player.global_position = Vector3.ZERO
+	support.target = player
+
+	var enemy := MockTargetShip.new()
+	add_child(enemy)
+	enemy.team = "enemy"
+	enemy.global_position = Vector3(11.0, 0.0, 0.0)
+
+	support.set_meta(ShipAILimboKeys.META_SUPPORT_FRAME, Engine.get_physics_frames())
+	support.set_meta(ShipAILimboKeys.META_SUPPORT_MODE, ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT)
+	support.set_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, enemy.get_instance_id())
+	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	if selected != null:
+		failures.append("panokseon free assist limbo screen threat should keep following the flagship for normal threats")
+	if support.has_meta("support_assist_target_id"):
+		failures.append("panokseon free assist limbo screen threat should not keep a normal-threat target lock")
+
+	enemy.queue_free()
+	player.queue_free()
+	support.queue_free()
+
+
 func _verify_support_limbo_modes_drive_assist_execution(failures: Array[String]) -> void:
 	var support := MockSupportShip.new()
 	add_child(support)
@@ -797,6 +833,41 @@ func _verify_support_ship_tracks_flagship_manual_boss_breach(failures: Array[Str
 	boss.queue_free()
 	player.queue_free()
 	support.queue_free()
+
+
+func _verify_panokseon_column_goal_tracks_flagship_directly(failures: Array[String]) -> void:
+	var maengseon := MockSupportShip.new()
+	add_child(maengseon)
+	maengseon.global_position = Vector3(92.0, 0.0, 0.0)
+	maengseon.set_meta("support_squadron_slot_role", "screen_lead")
+	maengseon.set_meta("support_trail_points", [Vector3(92.0, 0.0, -14.0), Vector3(92.0, 0.0, 0.0)])
+
+	var panokseon := MockSupportShip.new()
+	add_child(panokseon)
+	panokseon.ship_type = "panokseon_ally"
+	panokseon.global_position = Vector3(90.0, 0.0, 4.0)
+	panokseon.set_meta("support_squadron_slot_role", "artillery_lead")
+	_set_support_formation(panokseon, 0)
+
+	var player := MockTargetShip.new()
+	add_child(player)
+	player.team = "player"
+	player.global_position = Vector3.ZERO
+	player.set_meta("support_trail_points", [Vector3(0.0, 0.0, -14.0), Vector3.ZERO])
+	maengseon.target = player
+	panokseon.target = player
+
+	var lead_ship := SupportFleetFormationHelper.get_support_lead_ship(panokseon, [maengseon, panokseon], 1)
+	if lead_ship != player:
+		failures.append("panokseon column formation should follow the flagship directly instead of the previous maengseon")
+	var goal := SupportFleetFormationHelper.get_support_chain_goal(panokseon, [maengseon, panokseon], 1, 10.0)
+	var goal_pos: Vector3 = goal.get("position", Vector3.ZERO)
+	if goal_pos.distance_to(player.global_position) >= goal_pos.distance_to(maengseon.global_position):
+		failures.append("panokseon column goal should stay near the flagship line instead of chaining behind maengseon")
+
+	player.queue_free()
+	panokseon.queue_free()
+	maengseon.queue_free()
 
 
 func _verify_support_chain_goal_formation_variants(failures: Array[String]) -> void:
@@ -931,7 +1002,7 @@ func _verify_support_artillery_screen_goal_tracks_flagship_wing_lane(failures: A
 	artillery_screen.width_multiplier = 0.92
 	artillery_screen.length_multiplier = 1.08
 	artillery_screen.set_meta("support_squadron_id", "panokseon_artillery")
-	artillery_screen.set_meta("support_squadron_slot_role", "artillery_screen_right")
+	artillery_screen.set_meta("support_squadron_slot_role", "artillery_screen_front_right")
 
 	var player := MockTargetShip.new()
 	add_child(player)
@@ -948,12 +1019,12 @@ func _verify_support_artillery_screen_goal_tracks_flagship_wing_lane(failures: A
 		10.0
 	)
 	var goal_pos: Vector3 = goal.get("position", Vector3.ZERO)
-	if goal_pos.x <= player.global_position.x + 2.0:
-		failures.append("artillery screen wing goal should occupy the flagship right wing instead of collapsing toward center")
-	if goal_pos.z <= player.global_position.z + 4.0:
-		failures.append("artillery screen wing goal should stay behind the flagship as a rear wing guard")
-	if goal_pos.distance_to(player.global_position) >= goal_pos.distance_to(panokseon.global_position):
-		failures.append("artillery screen wing goal should anchor closer to the flagship than to the support panokseon")
+	if goal_pos.x <= panokseon.global_position.x + 2.0:
+		failures.append("artillery screen wing goal should occupy the panokseon right wing instead of collapsing toward center")
+	if absf(goal_pos.z - panokseon.global_position.z) > 8.0:
+		failures.append("artillery screen wing goal should stay beside the support panokseon instead of becoming a rear flagship guard")
+	if goal_pos.distance_to(panokseon.global_position) >= goal_pos.distance_to(player.global_position):
+		failures.append("artillery screen wing goal should anchor closer to the support panokseon than to the flagship")
 
 	player.queue_free()
 	artillery_screen.queue_free()

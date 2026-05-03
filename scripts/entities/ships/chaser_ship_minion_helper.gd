@@ -1020,6 +1020,14 @@ static func _get_support_assist_lane_assignment(ship, my_index: int) -> Dictiona
 			return {"side": -1.0, "rank": 1}
 		"artillery_screen_right":
 			return {"side": 1.0, "rank": 1}
+		"artillery_screen_front_left":
+			return {"side": -1.0, "rank": 1}
+		"artillery_screen_front_right":
+			return {"side": 1.0, "rank": 1}
+		"artillery_screen_rear_left":
+			return {"side": -1.0, "rank": 2}
+		"artillery_screen_rear_right":
+			return {"side": 1.0, "rank": 2}
 		"artillery_lead":
 			return {"side": 1.0 if normalized_index % 2 == 0 else -1.0, "rank": 1}
 		"rescue_rear":
@@ -1268,6 +1276,9 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 				return null
 			ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT:
 				if formation_hold_enabled and is_instance_valid(player_boarding_attacker) and limbo_target != player_boarding_attacker:
+					_clear_support_assist_target_lock(ship)
+					return null
+				if line_holder_free_assist and limbo_target != player_boarding_attacker:
 					_clear_support_assist_target_lock(ship)
 					return null
 				if is_instance_valid(limbo_target) and not _is_ship_disabled(limbo_target):

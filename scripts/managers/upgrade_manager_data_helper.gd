@@ -151,6 +151,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				sailing_parts.append("풍력 효율 +%d%%" % int(round((float(s.get("efficiency_mult", 1.08)) - 1.0) * 100.0)))
 			if level_matches(next_level, s.get("turn_levels", [])):
 				sailing_parts.append("돛 회전 속도 +%d%%" % int(round((float(s.get("turn_mult", 1.15)) - 1.0) * 100.0)))
+			if level_matches(next_level, s.get("handling_levels", [])):
+				sailing_parts.append("돛 전환 속도 +%d%%" % int(round((float(s.get("handling_mult", 1.15)) - 1.0) * 100.0)))
 			if not sailing_parts.is_empty():
 				return " | ".join(sailing_parts)
 			return "돛 운용 성능 향상"

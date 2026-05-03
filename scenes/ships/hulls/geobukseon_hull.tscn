@@ -42,8 +42,10 @@ scale = Vector3(0.2, 0.2, 0.2)
 [node name="Masts" type="Node3D" parent="."]
 
 [node name="MastPivot_01" type="Node3D" parent="Masts"]
+scale = Vector3(0.9, 0.9, 0.9)
 script = ExtResource("mast_fold_script")
 fold_angle_degrees = 60.0
+fold_duration = 2.2
 
 [node name="Mast" parent="Masts/MastPivot_01" instance=ExtResource("mast_scene")]
 visible = false # Geobukseon often lowered mast in battle

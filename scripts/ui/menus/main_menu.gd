@@ -170,9 +170,9 @@ func _apply_localized_text() -> void:
 	if is_instance_valid(title_label):
 		title_label.text = LocaleManager.t("main_menu.title", "남해 서바이버즈")
 	if is_instance_valid(start_button):
-		start_button.text = LocaleManager.t("main_menu.start", "항해 시작")
+		start_button.text = LocaleManager.t("main_menu.start", "시작")
 	if is_instance_valid(meta_button):
-		meta_button.text = LocaleManager.t("main_menu.meta", "영구 업그레이드")
+		meta_button.text = LocaleManager.t("main_menu.meta", "업그레이드")
 	if is_instance_valid(options_button):
 		options_button.text = LocaleManager.t("main_menu.options", "옵션")
 	if is_instance_valid(quit_button):

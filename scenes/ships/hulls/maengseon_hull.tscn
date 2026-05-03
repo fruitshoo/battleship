@@ -27,6 +27,7 @@ transform = Transform3D(0.46162885, -0.022970818, 0.19071235, 0.028417548, 0.499
 [node name="Masts" type="Node3D" parent="."]
 
 [node name="MastPivot_01" type="Node3D" parent="Masts"]
+scale = Vector3(0.88, 0.88, 0.88)
 
 [node name="Mast" parent="Masts/MastPivot_01" unique_id=1395988195 instance=ExtResource("mast_scene")]
 sail_uv_scale = Vector2(1, 2.01)
