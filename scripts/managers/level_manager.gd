@@ -93,6 +93,11 @@ const DAMAGE_SOURCE_NAME := {
 	"trident": "삼지창",
 	"harpoon": "작살",
 	"boarding_defense": "창벽",
+	"leak": "침수",
+	"ramming": "충각",
+	"ramming_aoe": "충격파",
+	"rock": "암초",
+	"fire": "화재",
 }
 
 # 공적(Merit) 시스템: 백병전 업그레이드 전용 트랙
@@ -958,8 +963,9 @@ func show_victory() -> void:
 	print("[Win] 승리! 현재 판에서 %d 골드 획득" % current_score)
 	
 	if hud:
-		if hud.has_method("show_victory_with_damage"):
-			hud.show_victory_with_damage(get_weapon_damage_rows(8), get_total_weapon_damage())
+		var result_delay := _get_result_transition_delay()
+		if hud.has_method("show_victory_result_transition"):
+			hud.show_victory_result_transition("%s. %.0f초 후 전적을 확인합니다." % [_get_victory_outcome_text(), ceil(result_delay)], result_delay)
 		elif hud.has_method("show_victory"):
 			hud.show_victory()
 	_schedule_result_scene_transition()
@@ -1017,9 +1023,17 @@ func _schedule_result_scene_transition() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	_victory_result_transition_started = true
-	var result_delay := final_boss_victory_result_delay if _boss_triggered else victory_result_delay
+	var result_delay := _get_result_transition_delay()
 	var timer := get_tree().create_timer(maxf(result_delay, 0.1), true, false, true)
 	timer.timeout.connect(_go_to_result_scene)
+
+
+func _get_result_transition_delay() -> float:
+	return final_boss_victory_result_delay if _boss_triggered else victory_result_delay
+
+
+func go_to_result_scene_now() -> void:
+	_go_to_result_scene()
 
 
 func _go_to_result_scene() -> void:

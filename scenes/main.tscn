@@ -82,6 +82,9 @@ mesh = SubResource("BoxMesh_choun")
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
+furled_sail_rowing_stamina_cost_multiplier = 0.85
+stamina_drain_rate = 10.0
+stamina_recovery_rate = 6.5
 auto_raid_enabled = true
 floating_offset = 0.5
 boarding_contact_grace_duration = 0.8

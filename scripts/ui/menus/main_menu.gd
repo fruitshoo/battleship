@@ -6,6 +6,10 @@ const GAME_SCENE_PATH := "res://scenes/main.tscn"
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
+const INTRO_LOGO_DURATION: float = 0.78
+const INTRO_BUTTON_DURATION: float = 0.46
+const INTRO_BUTTON_DELAY: float = 0.36
+const INTRO_BUTTON_STAGGER: float = 0.11
 @export var background_texture: Texture2D
 @export var use_3d_background: bool = true
 @export_range(0.0, 1.0, 0.01) var background_dim: float = 0.18
@@ -16,7 +20,7 @@ const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 @onready var background_overlay: ColorRect = $Background
 @onready var title_block: VBoxContainer = $TitleBlock
 @onready var eyebrow_label: Label = $TitleBlock/Eyebrow
-@onready var title_label: Label = $TitleBlock/Title
+@onready var title_logo: TextureRect = $TitleBlock/Title
 @onready var button_block: VBoxContainer = $ButtonBlock
 @onready var start_button: Button = $ButtonBlock/StartButton
 @onready var meta_button: Button = $ButtonBlock/MetaButton
@@ -27,6 +31,7 @@ const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 var _modal_open: bool = false
 var _menu_buttons: Array[Button] = []
 var _focused_button_index: int = 0
+var _intro_started: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -51,6 +56,7 @@ func _ready() -> void:
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
 	_focus_first_menu_button()
+	call_deferred("_begin_intro")
 
 
 func _exit_tree() -> void:
@@ -148,16 +154,16 @@ func _apply_background_settings() -> void:
 	if is_instance_valid(background_overlay):
 		background_overlay.color = Color.WHITE
 		background_overlay.material = UiOverlayFx.make_radial_darken_material(
-			Color(0.02, 0.04, 0.07, clamp(background_dim, 0.0, 1.0)),
-			0.42,
-			0.72
-		)
+				Color(0.02, 0.04, 0.07, clamp(background_dim, 0.0, 1.0)),
+				0.42,
+				0.84
+			)
 
 
 func _apply_ui_theme() -> void:
 	NavalUiTheme.style_heading(eyebrow_label, 16)
-	if is_instance_valid(title_label):
-		NavalUiTheme.style_display_title(title_label, 68)
+	if is_instance_valid(eyebrow_label):
+		eyebrow_label.visible = false
 	if is_instance_valid(version_label):
 		NavalUiTheme.style_caption(version_label, 13, NavalUiTheme.TEXT_MUTED)
 	for button in [start_button, meta_button, options_button, quit_button]:
@@ -167,8 +173,6 @@ func _apply_ui_theme() -> void:
 func _apply_localized_text() -> void:
 	if is_instance_valid(eyebrow_label):
 		eyebrow_label.text = LocaleManager.t("main_menu.eyebrow", "조선 수군 로그라이트 해전")
-	if is_instance_valid(title_label):
-		title_label.text = LocaleManager.t("main_menu.title", "남해 서바이버즈")
 	if is_instance_valid(start_button):
 		start_button.text = LocaleManager.t("main_menu.start", "시작")
 	if is_instance_valid(meta_button):
@@ -197,12 +201,12 @@ func _apply_layout_density() -> void:
 	var width_fit: float = clampf((viewport_size.x - 900.0) / 420.0, 0.0, 1.0)
 	var height_fit: float = clampf((viewport_size.y - 640.0) / 220.0, 0.0, 1.0)
 	var density: float = min(width_fit, height_fit)
-	var title_half_width := roundi(lerpf(320.0, 430.0, density))
-	var title_top := roundi(lerpf(44.0, 68.0, density))
-	var title_bottom := roundi(lerpf(182.0, 220.0, density))
-	var button_width := roundi(lerpf(252.0, 300.0, density))
-	var button_height := roundi(lerpf(42.0, 46.0, density))
-	var button_separation := roundi(lerpf(8.0, 10.0, density))
+	var title_half_width := roundi(lerpf(390.0, 520.0, density))
+	var title_top := roundi(lerpf(28.0, 54.0, density))
+	var title_bottom := roundi(lerpf(272.0, 420.0, density))
+	var button_width := roundi(lerpf(260.0, 300.0, density))
+	var button_height := roundi(lerpf(42.0, 48.0, density))
+	var button_separation := roundi(lerpf(7.0, 9.0, density))
 
 	if is_instance_valid(title_block):
 		title_block.offset_left = -title_half_width
@@ -214,23 +218,75 @@ func _apply_layout_density() -> void:
 		button_block.custom_minimum_size.x = button_width
 		button_block.offset_left = -button_width * 0.5
 		button_block.offset_right = button_width * 0.5
-		button_block.offset_bottom = roundi(lerpf(214.0, 246.0, density))
+		button_block.anchor_top = lerpf(0.55, 0.535, density)
+		button_block.anchor_bottom = button_block.anchor_top
+		button_block.offset_bottom = roundi(lerpf(178.0, 204.0, density))
 		button_block.add_theme_constant_override("separation", button_separation)
 	if is_instance_valid(eyebrow_label):
 		NavalUiTheme.style_heading(eyebrow_label, roundi(lerpf(13.0, 16.0, density)))
-	if is_instance_valid(title_label):
-		NavalUiTheme.style_display_title(title_label, roundi(lerpf(52.0, 68.0, density)))
+	if is_instance_valid(title_logo):
+		title_logo.custom_minimum_size = Vector2(roundi(lerpf(540.0, 720.0, density)), roundi(lerpf(286.0, 382.0, density)))
 	for button in _menu_buttons:
-		if not is_instance_valid(button):
-			continue
-		button.custom_minimum_size.y = button_height
-		button.add_theme_font_size_override("font_size", roundi(lerpf(16.0, 18.0, density)))
+			if not is_instance_valid(button):
+				continue
+			button.custom_minimum_size.y = button_height
+			button.add_theme_font_size_override("font_size", roundi(lerpf(15.0, 17.0, density)))
 	if is_instance_valid(version_label):
 		version_label.offset_left = roundi(lerpf(-92.0, -116.0, density))
 		version_label.offset_top = roundi(lerpf(-30.0, -34.0, density))
 		version_label.offset_right = -20.0
 		version_label.offset_bottom = -12.0
 		NavalUiTheme.style_caption(version_label, roundi(lerpf(11.0, 13.0, density)), NavalUiTheme.TEXT_MUTED)
+
+
+func _begin_intro() -> void:
+	if _intro_started:
+		return
+	_intro_started = true
+	await get_tree().process_frame
+
+	var title_target_y: float = title_block.position.y if is_instance_valid(title_block) else 0.0
+	var button_target_y: float = button_block.position.y if is_instance_valid(button_block) else 0.0
+	if is_instance_valid(title_block):
+		title_block.modulate.a = 0.0
+		title_block.position.y = title_target_y + 92.0
+		title_block.scale = Vector2(0.92, 0.92)
+		title_block.pivot_offset = title_block.size * 0.5
+	if is_instance_valid(button_block):
+		button_block.modulate.a = 0.0
+		button_block.position.y = button_target_y + 56.0
+		button_block.scale = Vector2(0.96, 0.96)
+		button_block.pivot_offset = button_block.size * 0.5
+	if is_instance_valid(version_label):
+		version_label.modulate.a = 0.0
+
+	for button in _menu_buttons:
+		if not is_instance_valid(button):
+			continue
+		button.modulate.a = 0.0
+		button.scale = Vector2(0.9, 0.9)
+		button.pivot_offset = button.size * 0.5
+
+	var intro := create_tween().set_parallel(true)
+	if is_instance_valid(title_block):
+		intro.tween_property(title_block, "modulate:a", 1.0, INTRO_LOGO_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		intro.tween_property(title_block, "position:y", title_target_y, INTRO_LOGO_DURATION).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		intro.tween_property(title_block, "scale", Vector2.ONE, INTRO_LOGO_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if is_instance_valid(button_block):
+		intro.tween_property(button_block, "modulate:a", 1.0, INTRO_BUTTON_DURATION).set_delay(INTRO_BUTTON_DELAY).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		intro.tween_property(button_block, "position:y", button_target_y, INTRO_BUTTON_DURATION).set_delay(INTRO_BUTTON_DELAY).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		intro.tween_property(button_block, "scale", Vector2.ONE, INTRO_BUTTON_DURATION).set_delay(INTRO_BUTTON_DELAY).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if is_instance_valid(version_label):
+		intro.tween_property(version_label, "modulate:a", 1.0, 0.34).set_delay(0.72).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	for i in range(_menu_buttons.size()):
+		var button: Button = _menu_buttons[i]
+		if not is_instance_valid(button):
+			continue
+		var delay := INTRO_BUTTON_DELAY + float(i) * INTRO_BUTTON_STAGGER
+		intro.tween_property(button, "modulate:a", 1.0, INTRO_BUTTON_DURATION).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		intro.tween_property(button, "scale", Vector2.ONE, INTRO_BUTTON_DURATION).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
 
 func _refresh_version_label() -> void:
 	if not is_instance_valid(version_label):

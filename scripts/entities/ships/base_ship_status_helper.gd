@@ -6,7 +6,7 @@ const FIRE_EFFECT_RANDOM_OFFSET_META := "fire_effect_random_offset"
 const FIRE_EFFECT_RANDOM_SCALE_META := "fire_effect_random_scale"
 
 static func update_fire_effect(ship) -> void:
-	if (ship.is_burning or ship.is_derelict) and not ship.is_sinking and not ship.is_dying:
+	if ship.is_burning and not ship.is_dying:
 		if not is_instance_valid(ship._fire_instance):
 			ship._fire_instance = ship.fire_effect_scene.instantiate() as Node3D
 			ship.add_child(ship._fire_instance)

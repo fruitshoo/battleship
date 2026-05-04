@@ -34,7 +34,7 @@ static func run_recovery_effect_contract_smoke(owner: Node, failures: Array[Stri
 		return
 
 	await _run_floating_loot_smoke(owner, failures, smoke_root, player_ship, level_manager)
-	await _run_survivor_smoke(owner, failures, smoke_root, player_ship)
+	await _run_survivor_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_drifting_supply_site_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_static_reward_site_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_static_sea_site_shape_contract(owner, failures, smoke_root)
@@ -73,7 +73,7 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		hull_before = float(player_ship.get("hull_hp"))
 	if player_ship.get("rowing_stamina") != null:
 		player_ship.set("rowing_stamina", 0.0)
-	loot.set("xp_amount", 12)
+	loot.set("hull_repair_amount", 12.0)
 	loot.set("target_player", player_ship)
 	loot.call("_collect_by_proximity")
 	await _wait_frames(owner, 2)
@@ -82,13 +82,13 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		failures.append("recovery loot smoke did not mark loot collected")
 	if int(level_manager.get("current_score")) <= score_before:
 		failures.append("recovery loot smoke did not grant score")
-	if int(level_manager.get("current_xp")) <= xp_before:
-		failures.append("recovery loot smoke did not grant XP")
-	if player_ship.get("hull_hp") != null and absf(float(player_ship.get("hull_hp")) - hull_before) > 0.01:
-		failures.append("recovery loot smoke should no longer repair player hull")
+	if int(level_manager.get("current_xp")) != xp_before:
+		failures.append("recovery loot smoke should no longer grant XP")
+	if player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) <= hull_before:
+		failures.append("recovery loot smoke did not repair player hull")
 
 
-static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
 	var survivor_scene := load("res://scenes/effects/survivor.tscn") as PackedScene
 	if survivor_scene == null:
 		failures.append("recovery survivor smoke scene load failed")
@@ -110,6 +110,7 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 	var alive_before: int = 0
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var xp_before: int = int(level_manager.get("current_xp")) if is_instance_valid(level_manager) and level_manager.get("current_xp") != null else 0
 	survivor.call("_try_collect", player_ship)
 	await _wait_frames(owner, 2)
 	var alive_after: int = alive_before
@@ -120,6 +121,8 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 		failures.append("recovery survivor smoke did not mark survivor collected")
 	if alive_after <= alive_before:
 		failures.append("recovery survivor smoke did not add crew")
+	if is_instance_valid(level_manager) and level_manager.get("current_xp") != null and int(level_manager.get("current_xp")) <= xp_before:
+		failures.append("recovery survivor smoke did not grant rescue XP")
 
 	await _run_survivor_full_crew_trains_existing_roster(owner, failures, smoke_root, player_ship)
 

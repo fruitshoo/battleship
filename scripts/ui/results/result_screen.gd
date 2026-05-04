@@ -6,6 +6,26 @@ const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
+const WEAPON_ICON_TEXTURE_PATHS := {
+	"cannon": "res://assets/ui/upgrades/cannon_card.png",
+	"janggun": "res://assets/ui/upgrades/janggun_card.png",
+	"singigeon": "res://assets/ui/upgrades/iron_shot_card.png",
+	"bow": "res://assets/ui/support_fleet/support_fleet_bow_icon.png",
+	"repeating_crossbow": "res://assets/ui/upgrades/crew_defense_card.png",
+	"ballista": "res://assets/ui/upgrades/crew_defense_card.png",
+	"sword": "res://assets/ui/upgrades/boarding_resist_card.png",
+	"spear": "res://assets/ui/upgrades/crew_defense_card.png",
+	"trident": "res://assets/ui/upgrades/crew_defense_card.png",
+	"harpoon": "res://assets/ui/upgrades/crew_defense_card.png",
+	"crew_numbers": "res://assets/ui/upgrades/crew_defense_card.png",
+	"boarding_defense": "res://assets/ui/upgrades/boarding_resist_card.png",
+	"fire_pot": "res://assets/ui/upgrades/janggun_card.png",
+	"ramming": "res://assets/ui/support_fleet/support_fleet_maengseon_icon.png",
+	"ramming_aoe": "res://assets/ui/support_fleet/support_fleet_maengseon_icon.png",
+	"leak": "res://assets/ui/upgrades/sail_card.png",
+	"rock": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
+	"fire": "res://assets/ui/upgrades/janggun_card.png",
+}
 
 @export var background_texture: Texture2D
 
@@ -31,9 +51,11 @@ var _subtitle_font_size: int = 18
 var _title_font_size: int = 50
 var _button_font_size: int = 18
 var _weapon_value_width: float = 120.0
+var _weapon_icon_size: int = 42
 var _last_result: Dictionary = {}
 var _action_buttons: Array[Button] = []
 var _focused_button_index: int = 0
+var _weapon_icon_cache: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -159,6 +181,7 @@ func _apply_layout_density() -> void:
 	_title_font_size = roundi(lerpf(38.0, 50.0, density))
 	_button_font_size = roundi(lerpf(16.0, 18.0, density))
 	_weapon_value_width = roundf(lerpf(96.0, 120.0, density))
+	_weapon_icon_size = roundi(lerpf(34.0, 42.0, density))
 	if is_instance_valid(content):
 		var half_width := roundi(clampf(viewport_size.x * 0.36, 320.0, 430.0))
 		content.offset_left = -half_width
@@ -250,8 +273,12 @@ func _add_summary_row(label_text: String, value_text: String) -> void:
 func _add_weapon_row(row_data: Dictionary) -> void:
 	var row := HBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", roundi(maxf(10.0, _weapon_icon_size * 0.34)))
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	weapon_list.add_child(row)
+
+	var source_id := str(row_data.get("id", ""))
+	row.add_child(_create_weapon_icon(source_id))
 
 	var name_label := Label.new()
 	name_label.text = str(row_data.get("name", "?"))
@@ -265,6 +292,59 @@ func _add_weapon_row(row_data: Dictionary) -> void:
 	damage_label.custom_minimum_size = Vector2(_weapon_value_width, 0.0)
 	NavalUiTheme.style_gold(damage_label, _summary_font_size)
 	row.add_child(damage_label)
+
+
+func _create_weapon_icon(source_id: String) -> Control:
+	var frame := PanelContainer.new()
+	frame.custom_minimum_size = Vector2(_weapon_icon_size, _weapon_icon_size)
+	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	frame.add_theme_stylebox_override("panel", _make_weapon_icon_frame_style())
+
+	var texture := _get_weapon_icon_texture(source_id)
+	if texture != null:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(_weapon_icon_size, _weapon_icon_size)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		icon.texture = texture
+		frame.add_child(icon)
+		return frame
+
+	var fallback := Label.new()
+	fallback.custom_minimum_size = Vector2(_weapon_icon_size, _weapon_icon_size)
+	fallback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fallback.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	NavalUiTheme.apply_emblem(fallback, source_id, roundi(_weapon_icon_size * 0.43), NavalUiTheme.TEXT_ACCENT)
+	frame.add_child(fallback)
+	return frame
+
+
+func _get_weapon_icon_texture(source_id: String) -> Texture2D:
+	var normalized := source_id.strip_edges()
+	if normalized.is_empty():
+		return null
+	if _weapon_icon_cache.has(normalized):
+		return _weapon_icon_cache[normalized] as Texture2D
+	var texture: Texture2D = null
+	var path := str(WEAPON_ICON_TEXTURE_PATHS.get(normalized, ""))
+	if not path.is_empty() and ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	_weapon_icon_cache[normalized] = texture
+	return texture
+
+
+func _make_weapon_icon_frame_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.06, 0.08, 0.72)
+	style.border_color = Color(NavalUiTheme.BORDER_GOLD_SOFT.r, NavalUiTheme.BORDER_GOLD_SOFT.g, NavalUiTheme.BORDER_GOLD_SOFT.b, 0.58)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(7)
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
 
 
 func _add_weapon_empty_row() -> void:

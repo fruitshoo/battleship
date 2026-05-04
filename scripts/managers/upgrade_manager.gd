@@ -635,14 +635,14 @@ func _apply_rowing(ship: Node3D, level: int) -> void:
 	if _level_matches(level, s.get("accel_levels", [])) and "rowing_acceleration_mult" in ship:
 		ship.rowing_acceleration_mult *= float(s.get("accel_mult", 1.2))
 	if _level_matches(level, s.get("stamina_add_levels", [])) and "max_rowing_stamina" in ship:
-		var stamina_add := float(s.get("stamina_add", 20.0))
+		var stamina_add := float(s.get("stamina_add", 25.0))
 		ship.max_rowing_stamina += stamina_add
 		if "rowing_stamina" in ship:
 			ship.rowing_stamina = minf(ship.max_rowing_stamina, ship.rowing_stamina + stamina_add)
 	if _level_matches(level, s.get("drain_levels", [])) and "stamina_drain_rate" in ship:
-		ship.stamina_drain_rate *= float(s.get("drain_mult", 0.85))
+		ship.stamina_drain_rate *= float(s.get("drain_mult", 0.8))
 	if _level_matches(level, s.get("recovery_levels", [])) and "stamina_recovery_rate" in ship:
-		ship.stamina_recovery_rate *= float(s.get("recovery_mult", 1.2))
+		ship.stamina_recovery_rate *= float(s.get("recovery_mult", 1.25))
 	print("[Rowing] 노 운용 강화 Lv.%d" % level)
 
 func _apply_supply_bonus(ship: Node3D, level: int) -> void:

@@ -77,7 +77,7 @@
 			"fire_pot": {
 				"name": "화통",
 				"category": 1,
-				"description": "기존 병사에게 화통 투척을 맡기고 착화 확률 강화",
+				"description": "전투 중 기존 병사에게 화통 투척을 맡기고 착화 확률 강화",
 				"max_level": 5,
 				"color": "e54c19",
 				"stats": {
@@ -245,11 +245,11 @@
 				"accel_levels": [1],
 				"accel_mult": 1.25,
 				"stamina_add_levels": [2],
-				"stamina_add": 20.0,
+				"stamina_add": 25.0,
 				"drain_levels": [3],
-				"drain_mult": 0.85,
+				"drain_mult": 0.8,
 				"recovery_levels": [4],
-				"recovery_mult": 1.2
+				"recovery_mult": 1.25
 			}
 		},
 		"supply_bonus": {

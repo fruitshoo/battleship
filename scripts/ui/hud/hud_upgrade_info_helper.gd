@@ -170,7 +170,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			if level >= 5:
 				fp_cd = 3.0
 			var ignite_pct: int = int(round(clampf(float(stats.get("base_ignition_chance", 0.25)) + float(level - 1) * float(stats.get("ignition_chance_per_lv", 0.075)), 0.0, float(stats.get("max_ignition_chance", 0.65))) * 100.0))
-			return "화통 운용 %d명 | 폭발 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, fp_dmg, ignite_pct, fp_cd]
+			return "전투 화통 %d명 | 폭발 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, fp_dmg, ignite_pct, fp_cd]
 		"repeating_crossbow":
 			var repeaters = int(UpgradeManager.get_specialist_unit_count("repeating_crossbow", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
 			var burst = 3

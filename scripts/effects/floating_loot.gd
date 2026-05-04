@@ -4,7 +4,8 @@ extends Area3D
 ## 적 함선이 침몰할 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
 
 @export var gold_amount: int = 5
-@export var xp_amount: int = 30
+@export var xp_amount: int = 0
+@export var hull_repair_amount: float = 20.0
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도
@@ -46,9 +47,9 @@ func _ready() -> void:
 func pool_capacity() -> int:
 	return 80
 
-func configure(next_xp_amount: int = -1, next_gold_amount: int = -1) -> void:
-	if next_xp_amount >= 0:
-		xp_amount = next_xp_amount
+func configure(next_hull_repair_amount: int = -1, next_gold_amount: int = -1) -> void:
+	if next_hull_repair_amount >= 0:
+		hull_repair_amount = float(next_hull_repair_amount)
 	if next_gold_amount >= 0:
 		gold_amount = next_gold_amount
 
@@ -242,15 +243,17 @@ func _collect_loot() -> void:
 		audio_manager.play_sfx("treasure_collect", null, randf_range(1.1, 1.3))
 	
 	# 보상 지급
+	var repaired_amount := _repair_player_hull(target_player)
 	if is_instance_valid(_cached_lm):
 		if _cached_lm.has_method("add_score"):
 			_cached_lm.add_score(gold_amount)
-		if xp_amount > 0 and _cached_lm.has_method("add_xp"):
-			_cached_lm.add_xp(xp_amount)
 		if _cached_lm.get("hud") != null:
 			var hud: Variant = _cached_lm.get("hud")
 			if is_instance_valid(hud) and hud.has_method("show_message"):
-				hud.call("show_message", "침몰 부유물 회수: XP +%d" % xp_amount, 1.5)
+				var message := "침몰 부유물 회수"
+				if repaired_amount > 0.0:
+					message = "침몰 부유물 회수: 선체 +%d" % int(round(repaired_amount))
+				hud.call("show_message", message, 1.5)
 				
 	# 파티클이나 시각적인 먹는 효과 (크기가 줄어들면서 사라짐)
 	if visual:
@@ -260,3 +263,20 @@ func _collect_loot() -> void:
 		tween.tween_callback(func(): ScenePool.release_by_instance_id(self_id))
 	else:
 		ScenePool.release(self)
+
+
+func _repair_player_hull(player_ship: Node3D) -> float:
+	if not is_instance_valid(player_ship):
+		return 0.0
+	if player_ship.get("hull_hp") == null or player_ship.get("max_hull_hp") == null:
+		return 0.0
+	var max_hull: float = maxf(1.0, float(player_ship.get("max_hull_hp")))
+	var before: float = clampf(float(player_ship.get("hull_hp")), 0.0, max_hull)
+	var after: float = minf(max_hull, before + maxf(0.0, hull_repair_amount))
+	player_ship.set("hull_hp", after)
+	var repaired_amount := after - before
+	if repaired_amount > 0.001:
+		var hud: Node = _cached_lm.get("hud") if is_instance_valid(_cached_lm) and _cached_lm.get("hud") != null else null
+		if is_instance_valid(hud) and hud.has_method("update_hull_hp"):
+			hud.call("update_hull_hp", after, max_hull)
+	return repaired_amount

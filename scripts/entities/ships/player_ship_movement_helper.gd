@@ -233,5 +233,5 @@ static func update_rowing_stamina(ship, delta: float) -> void:
 	if ship.rowing_stamina < ship.max_rowing_stamina and (not ship.is_rowing or ship.rowing_locked):
 		ship.rowing_stamina += ship.stamina_recovery_rate * delta
 		ship.rowing_stamina = min(ship.max_rowing_stamina, ship.rowing_stamina)
-		if ship.rowing_locked and ship.rowing_stamina >= ship.stamina_recovery_unlock_threshold:
+		if ship.rowing_locked and ship.rowing_stamina > 0.0:
 			ship.rowing_locked = false

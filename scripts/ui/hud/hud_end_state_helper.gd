@@ -24,6 +24,13 @@ static func show_victory(hud) -> void:
 		tween.tween_property(hud.victory_label, "modulate:a", 1.0, 2.0)
 
 
+static func show_victory_result_transition(hud, subtitle: String, countdown: float) -> void:
+	if hud.victory_label:
+		hud.victory_label.visible = false
+	if is_instance_valid(hud.victory_result_overlay):
+		hud.victory_result_overlay.show_overlay(subtitle, countdown, "전적 보기")
+
+
 static func show_victory_with_damage(hud, rows: Array, total_damage: float) -> void:
 	if not hud.victory_label:
 		return
@@ -63,6 +70,14 @@ static func setup_game_over_overlay(hud) -> void:
 	hud.add_child(hud.game_over_overlay)
 
 
+static func setup_victory_result_overlay(hud) -> void:
+	if is_instance_valid(hud.victory_result_overlay):
+		return
+	hud.victory_result_overlay = hud.HudGameOverOverlay.new()
+	hud.victory_result_overlay.return_requested.connect(hud._go_to_result_scene)
+	hud.add_child(hud.victory_result_overlay)
+
+
 static func return_to_main_menu(hud) -> void:
 	if hud._game_over_transitioning:
 		return
@@ -71,3 +86,18 @@ static func return_to_main_menu(hud) -> void:
 		hud.game_over_overlay.hide_overlay()
 	hud.get_tree().paused = false
 	hud.get_tree().change_scene_to_file(hud.MAIN_MENU_SCENE_PATH)
+
+
+static func go_to_result_scene(hud) -> void:
+	if hud._victory_result_transitioning:
+		return
+	hud._victory_result_transitioning = true
+	if is_instance_valid(hud.victory_result_overlay):
+		hud.victory_result_overlay.hide_overlay()
+	var lm := LevelManagerRegistry.get_level_manager(hud.get_tree())
+	if is_instance_valid(lm) and lm.has_method("go_to_result_scene_now"):
+		lm.go_to_result_scene_now()
+	else:
+		hud.get_tree().paused = false
+		Engine.time_scale = 1.0
+		hud.get_tree().change_scene_to_file("res://scenes/ui/result_screen.tscn")

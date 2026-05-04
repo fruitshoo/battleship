@@ -165,11 +165,11 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			if not rowing_parts.is_empty():
 				return " | ".join(rowing_parts)
 			if level_matches(next_level, s.get("stamina_add_levels", [])):
-				return "최대 스태미나 +%d" % int(s.get("stamina_add", 20.0))
+				return "최대 스태미나 +%d" % int(s.get("stamina_add", 25.0))
 			if level_matches(next_level, s.get("drain_levels", [])):
-				return "스태미나 소모 -%d%%" % int(round((1.0 - float(s.get("drain_mult", 0.85))) * 100.0))
+				return "스태미나 소모 -%d%%" % int(round((1.0 - float(s.get("drain_mult", 0.8))) * 100.0))
 			if level_matches(next_level, s.get("recovery_levels", [])):
-				return "스태미나 회복 +%d%%" % int(round((float(s.get("recovery_mult", 1.2)) - 1.0) * 100.0))
+				return "스태미나 회복 +%d%%" % int(round((float(s.get("recovery_mult", 1.25)) - 1.0) * 100.0))
 			return "노 운용 성능 향상"
 		"fire_pot":
 			var throwers: int = get_specialist_unit_count(upgrades, current_levels, "fire_pot", next_level)
@@ -180,7 +180,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				cd = 3.5
 			if next_level >= 5:
 				cd = 3.0
-			return "화통 운용 %d명 | 화염 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, dmg, ignite_pct, cd]
+			return "전투 화통 %d명 | 화염 %.0f | 착화 %d%% | 재사용 %.1f초" % [throwers, dmg, ignite_pct, cd]
 		"repeating_crossbow":
 			var repeaters: int = get_specialist_unit_count(upgrades, current_levels, "repeating_crossbow", next_level)
 			var burst: int = 3

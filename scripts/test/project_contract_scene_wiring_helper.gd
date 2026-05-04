@@ -2903,9 +2903,19 @@ static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], 
 	if packed == null:
 		failures.append("result scene wiring load failed")
 		return
+	RunResultStore.set_latest_result({
+		"title": "항해 결과",
+		"outcome": "테스트",
+		"weapon_rows": [
+			{"id": "cannon", "name": "대포", "damage": 100.0},
+			{"id": "mystery_source", "name": "미상", "damage": 10.0},
+		],
+		"total_weapon_damage": 110.0,
+	})
 	var result_root := packed.instantiate()
 	if result_root == null:
 		failures.append("result scene wiring instantiate failed")
+		RunResultStore.clear()
 		return
 	owner.add_child(result_root)
 	await _wait_frames(owner, wait_frames_after_attach)
@@ -2916,6 +2926,21 @@ static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], 
 		var button := result_root.get_node_or_null(button_path) as BaseButton
 		if is_instance_valid(button) and not button.has_meta(UiButtonAudio.WIRED_META):
 			failures.append("result scene button missing ui click sound: %s" % button_path)
+	var weapon_list := result_root.get_node_or_null("Content/Body/WeaponPanel/Margin/WeaponList") as VBoxContainer
+	if is_instance_valid(weapon_list):
+		var first_row: HBoxContainer = null
+		if weapon_list.get_child_count() > 0:
+			first_row = weapon_list.get_child(0) as HBoxContainer
+		if not is_instance_valid(first_row):
+			failures.append("result scene weapon damage row should be a horizontal row")
+		else:
+			var icon_frame: PanelContainer = null
+			if first_row.get_child_count() > 0:
+				icon_frame = first_row.get_child(0) as PanelContainer
+			if not is_instance_valid(icon_frame):
+				failures.append("result scene weapon damage row missing icon frame")
+			elif icon_frame.get_child_count() <= 0 or not (icon_frame.get_child(0) is TextureRect):
+				failures.append("result scene weapon damage row should render a texture icon when art exists")
 	var button_block := result_root.get_node_or_null("ButtonBlock") as Control
 	var content := result_root.get_node_or_null("Content") as Control
 	if is_instance_valid(button_block) and is_instance_valid(content):
@@ -2924,6 +2949,7 @@ static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], 
 		if button_block.anchor_top < 0.98 or button_block.offset_bottom > -8.0:
 			failures.append("result scene ButtonBlock should be pinned inside bottom safe area")
 	result_root.queue_free()
+	RunResultStore.clear()
 	await _wait_frames(owner, 1)
 
 

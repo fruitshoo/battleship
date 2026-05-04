@@ -16,6 +16,7 @@ const BOARDING_CONTACT_DEFENSE_RADIUS_MAX := 5.5
 const ENEMY_BOARDING_LATCH_DURATION_BONUS := 0.15
 const ENEMY_BOARDING_LATCH_DISTANCE_BONUS := 0.25
 const ENEMY_BOARDING_LATCH_SPEED_BONUS := 0.15
+const DERELICT_STATUS_CHECK_INTERVAL := 0.35
 
 ## 추적선 (Chaser Ship)
 ## 플레이어를 단순 추적하고, 충돌 시 병사를 도선(Boarding)시키고 자폭
@@ -88,6 +89,7 @@ var formation_spacing: float = 14.0 # 선박 간 간격 축소 (밀집 대형)
 var _wave_timer: float = 0.0 # 물결 소리 타이머
 var _last_ai_speed: float = 0.0 # 속도 평활화를 위한 이전 프레임 속도 저장
 var _oar_time: float = 0.0
+var _derelict_status_check_timer: float = DERELICT_STATUS_CHECK_INTERVAL
 
 # [신규] 스태미나 시스템 (돌격용)
 var stamina: float = 100.0
@@ -213,6 +215,11 @@ func _become_derelict() -> void:
 
 func _sink_derelict() -> void:
 	await ChaserShipSupportHelper.sink_derelict(self)
+
+
+func _ignite_derelict_from_contact(source_ship: Node3D = null) -> void:
+	ChaserShipSupportHelper.ignite_derelict_from_contact(self, source_ship)
+
 
 func _check_offscreen_despawn() -> void:
 	ChaserShipSupportHelper.check_offscreen_despawn(self)
@@ -575,7 +582,7 @@ func die() -> void:
 
 
 func _drop_floating_loot() -> void:
-	ChaserShipSupportHelper.drop_floating_loot(self, true, 30)
+	ChaserShipSupportHelper.drop_floating_loot(self, true, 20)
 
 func _spawn_enemy_drifter_xp_pickups() -> void:
 	ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(self)
@@ -634,17 +641,29 @@ func _process(delta: float) -> void:
 	_update_hull_regeneration(delta)
 	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
+	_update_derelict_status_check(delta)
 	_update_enemy_fire_pot_logic(delta)
-	
+
 	if is_derelict:
-		leaking_rate += 0.2 * delta
 		# 폐선 상태일 때는 타겟 초기화 (공격 중단)
 		target = null
-		
+
 	if team == "player":
 		_update_minion_respawn(delta)
 
 	_update_leaking_damage(delta)
+
+
+func _update_derelict_status_check(delta: float) -> void:
+	if is_derelict or is_sinking or is_dying:
+		return
+	if get_team_tag() != "enemy":
+		return
+	_derelict_status_check_timer -= delta
+	if _derelict_status_check_timer > 0.0:
+		return
+	_derelict_status_check_timer = DERELICT_STATUS_CHECK_INTERVAL
+	check_derelict_status()
 
 
 

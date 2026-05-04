@@ -9,6 +9,7 @@ var subtitle_label: Label = null
 var return_button: Button = null
 var _countdown: float = -1.0
 var _emitted: bool = false
+var _button_text: String = "메인 메뉴로"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -62,9 +63,10 @@ func _process(delta: float) -> void:
 	if _countdown <= 0.0:
 		_request_return()
 
-func show_overlay(subtitle: String, countdown: float) -> void:
+func show_overlay(subtitle: String, countdown: float, button_text: String = "메인 메뉴로") -> void:
 	_emitted = false
 	_countdown = countdown
+	_button_text = button_text
 	if subtitle_label:
 		subtitle_label.text = subtitle
 	_update_button_text()
@@ -84,9 +86,9 @@ func _update_button_text() -> void:
 	if not is_instance_valid(return_button):
 		return
 	if _countdown < 0.0:
-		return_button.text = "메인 메뉴로"
+		return_button.text = _button_text
 		return
-	return_button.text = "메인 메뉴로 (%.0f)" % ceil(_countdown)
+	return_button.text = "%s (%.0f)" % [_button_text, ceil(_countdown)]
 
 func _request_return() -> void:
 	if _emitted:

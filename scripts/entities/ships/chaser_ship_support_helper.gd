@@ -10,9 +10,13 @@ const DERELICT_SETTLE_Y_OFFSET: float = -0.28
 const DERELICT_MIN_ROLL_DEGREES: float = 2.5
 const DERELICT_MAX_ROLL_DEGREES: float = 6.5
 const DERELICT_MAX_PITCH_DEGREES: float = 2.0
+const DERELICT_CONTACT_FIRE_POT_FLIGHT_TIME: float = 0.7
+const DERELICT_CONTACT_FIRE_POT_ARC: float = 2.8
+const DERELICT_CONTACT_SINK_DURATION: float = 2.6
 const DERELICT_SAIL_COLOR := Color(0.52, 0.50, 0.45, 1.0)
 const DERELICT_SAIL_DAMAGE_MIN: float = 0.16
 const DERELICT_SAIL_DAMAGE_MAX: float = 0.30
+const DEFAULT_FIRE_POT_SCENE := preload("res://scenes/projectiles/fire_pot.tscn")
 const ENEMY_FIRE_POT_BASE_COOLDOWN: float = 7.5
 const ENEMY_FIRE_POT_MIN_RANGE: float = 7.0
 const ENEMY_FIRE_POT_MAX_RANGE: float = 18.0
@@ -223,8 +227,6 @@ static func become_derelict(ship) -> void:
 	if ship.DEBUG_CHASER_LOGS:
 		print("[Status] 선원 전멸! 적함이 폐선(Derelict) 상태가 되었습니다.")
 
-	ship.leaking_rate += 1.5
-
 	ship.base_collision_radius *= 0.55
 	ship._sync_profile_from_runtime()
 	ship._set_wake_state(false)
@@ -239,6 +241,88 @@ static func become_derelict(ship) -> void:
 		if is_instance_valid(derelict_ship) and derelict_ship.is_derelict and not derelict_ship.is_sinking:
 			derelict_ship.set_meta("derelict_nonblocking", true)
 	)
+
+
+static func ignite_derelict_from_contact(ship, source_ship: Node3D = null) -> void:
+	if not is_instance_valid(ship) or ship.is_sinking or not ship.is_derelict:
+		return
+	if ship.get_meta("derelict_contact_ignition_started", false) == true:
+		return
+	ship.set_meta("derelict_contact_ignition_started", true)
+	ship.set_meta("derelict_nonblocking", true)
+
+	var launched := _launch_derelict_contact_fire_pot(ship, source_ship)
+	var delay := DERELICT_CONTACT_FIRE_POT_FLIGHT_TIME + 0.08 if launched else 0.25
+	var ship_id: int = ship.get_instance_id()
+	ship.get_tree().create_timer(delay).timeout.connect(func():
+		var derelict_ship = instance_from_id(ship_id)
+		if not is_instance_valid(derelict_ship) or derelict_ship.is_sinking or not derelict_ship.is_derelict:
+			return
+		derelict_ship.set_meta("derelict_burning_down", true)
+		if "is_burning" in derelict_ship:
+			derelict_ship.is_burning = true
+		if "burn_timer" in derelict_ship:
+			derelict_ship.burn_timer = maxf(float(derelict_ship.burn_timer), 4.0)
+		if derelict_ship.has_method("_set_fire_emitting"):
+			derelict_ship._set_fire_emitting(true)
+		if derelict_ship.has_method("_sink_derelict"):
+			derelict_ship.call_deferred("_sink_derelict")
+	)
+
+
+static func _launch_derelict_contact_fire_pot(ship, source_ship: Node3D = null) -> bool:
+	if not is_instance_valid(ship) or not ship.is_inside_tree():
+		return false
+	var fire_pot_scene: PackedScene = DEFAULT_FIRE_POT_SCENE
+	if is_instance_valid(source_ship) and "fire_pot_scene" in source_ship:
+		var source_scene: Variant = source_ship.get("fire_pot_scene")
+		if source_scene is PackedScene:
+			fire_pot_scene = source_scene as PackedScene
+	var pot = ScenePool.acquire(ship.get_tree(), fire_pot_scene)
+	if not is_instance_valid(pot):
+		return false
+
+	var tosser: Node3D = _find_player_derelict_tosser(source_ship)
+	var start_pos: Vector3 = ship.global_position + Vector3(0.0, 1.5, -2.2)
+	if is_instance_valid(tosser):
+		start_pos = tosser.global_position + Vector3(0.0, 1.0, 0.0)
+	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(ship, 0.65)
+	target_pos.x += randf_range(-0.35, 0.35)
+	target_pos.z += randf_range(-0.35, 0.35)
+
+	if "damage" in pot:
+		pot.damage = 4.0
+	if "explosion_radius" in pot:
+		pot.explosion_radius = 2.8
+	if "ignition_chance" in pot:
+		pot.ignition_chance = 1.0
+	if "burn_duration" in pot:
+		pot.burn_duration = 4.0
+	if "team" in pot:
+		pot.team = "player"
+
+	ship.get_tree().root.add_child.call_deferred(pot)
+	pot.set_deferred("global_position", start_pos)
+	pot.call_deferred("setup_flight", start_pos, target_pos, DERELICT_CONTACT_FIRE_POT_FLIGHT_TIME, DERELICT_CONTACT_FIRE_POT_ARC)
+	if is_instance_valid(tosser):
+		tosser.look_at(Vector3(target_pos.x, tosser.global_position.y, target_pos.z), Vector3.UP)
+	return true
+
+
+static func _find_player_derelict_tosser(source_ship: Node3D):
+	if not is_instance_valid(source_ship):
+		return null
+	var fallback = null
+	for child in EntityRegistry.get_soldiers_by_ship(source_ship):
+		if SoldierStateHelper.is_dead_soldier(child):
+			continue
+		if NodeContractHelper.get_team_tag(child) != "player":
+			continue
+		if not is_instance_valid(fallback):
+			fallback = child
+		if child.has_method("get_crew_role_value") and child.get_crew_role_value() == "fire_pot":
+			return child
+	return fallback
 
 
 static func _weather_derelict_sails(ship) -> void:
@@ -317,15 +401,18 @@ static func sink_derelict(ship) -> void:
 	if ship.is_sinking:
 		return
 	ship.is_sinking = true
+	if "is_burning" in ship:
+		ship.is_burning = true
 	print("[Ship] 폐선 침몰 시작!")
-	drop_floating_loot(ship, true, 30)
+	drop_floating_loot(ship, true, 20)
 
 	ship._set_fire_emitting(true)
 
+	var sink_duration: float = DERELICT_CONTACT_SINK_DURATION if ship.get_meta("derelict_burning_down", false) == true or ship.get_meta("derelict_contact_ignition_started", false) == true else 3.4
 	var sink_tween = ship.create_tween()
-	sink_tween.tween_property(ship, "global_position:y", ship.base_y - 15.0, 5.0).set_ease(Tween.EASE_IN)
-	sink_tween.parallel().tween_property(ship, "rotation_degrees:x", randf_range(-20.0, 20.0), 5.0)
-	sink_tween.parallel().tween_property(ship, "rotation_degrees:z", randf_range(20.0, 40.0) * (1 if randf() > 0.5 else -1), 5.0)
+	sink_tween.tween_property(ship, "global_position:y", ship.base_y - 15.0, sink_duration).set_ease(Tween.EASE_IN)
+	sink_tween.parallel().tween_property(ship, "rotation_degrees:x", randf_range(-20.0, 20.0), sink_duration)
+	sink_tween.parallel().tween_property(ship, "rotation_degrees:z", randf_range(20.0, 40.0) * (1 if randf() > 0.5 else -1), sink_duration)
 	if ship.has_method("play_sink_bubbles"):
 		ship.play_sink_bubbles(0.25, -1.5)
 
@@ -367,19 +454,19 @@ static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, wo
 	return not viewport_rect.has_point(screen_pos)
 
 
-static func drop_floating_loot(ship, force_drop: bool = false, xp_amount_override: int = -1) -> void:
+static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_override: int = -1) -> void:
 	if not ship.loot_scene:
 		return
 	if ship.get_meta("floating_loot_dropped", false) == true:
 		return
 	ship.set_meta("floating_loot_dropped", true)
-	var contains_xp_reward := xp_amount_override != 0
-	if not force_drop and not contains_xp_reward and randf() > float(ship.floating_loot_drop_chance):
+	var contains_repair_reward := repair_amount_override != 0
+	if not force_drop and not contains_repair_reward and randf() > float(ship.floating_loot_drop_chance):
 		return
 
 	var loot = ScenePool.acquire(ship.get_tree(), ship.loot_scene)
 	if is_instance_valid(loot) and loot.has_method("configure"):
-		loot.call("configure", xp_amount_override, -1)
+		loot.call("configure", repair_amount_override, -1)
 	var offset_x = randf_range(-1.2, 1.2)
 	var offset_z = randf_range(-1.2, 1.2)
 	var spawn_pos = Vector3(ship.global_position.x + offset_x, 0.5, ship.global_position.z + offset_z)

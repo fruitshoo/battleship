@@ -18,13 +18,17 @@ static func _run_main_menu_typography_check(owner: Node, failures: Array[String]
 	owner.add_child(menu_root)
 	await _wait_typography_frames(owner, 1)
 
-	var title_label := menu_root.get_node_or_null("TitleBlock/Title") as Label
+	var title_logo := menu_root.get_node_or_null("TitleBlock/Title") as TextureRect
 	var version_label := menu_root.get_node_or_null("VersionLabel") as Label
 	var menu_density := _compute_main_menu_density(menu_root)
-	_expect_control_font(title_label, NavalUiTheme.FONT_DISPLAY, roundi(lerpf(52.0, 68.0, menu_density)), failures, "main menu title")
-	_expect_control_color(title_label, "font_color", NavalUiTheme.TEXT_MAIN, failures, "main menu title")
-	_expect_control_constant(title_label, "outline_size", 1, failures, "main menu title")
-	_expect_control_constant(title_label, "shadow_outline_size", 2, failures, "main menu title")
+	if not is_instance_valid(title_logo):
+		failures.append("main menu logo texture rect missing")
+	elif title_logo.texture == null:
+		failures.append("main menu logo texture missing")
+	else:
+		var expected_logo_height := roundi(lerpf(286.0, 382.0, menu_density))
+		if title_logo.custom_minimum_size.y < expected_logo_height - 1:
+			failures.append("main menu logo height too small")
 	_expect_control_font(version_label, NavalUiTheme.FONT_MEDIUM, roundi(lerpf(11.0, 13.0, menu_density)), failures, "main menu version")
 	_expect_control_color(version_label, "font_color", NavalUiTheme.TEXT_MUTED, failures, "main menu version")
 

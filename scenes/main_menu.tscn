@@ -1,8 +1,9 @@
 [gd_scene format=3 uid="uid://b03iq8feraytu"]
 
 [ext_resource type="Script" uid="uid://bv1ra5tstvtbq" path="res://scripts/ui/menus/main_menu.gd" id="1_script"]
-[ext_resource type="Texture2D" uid="uid://bxyt040k77j8j" path="res://assets/ui/menu/main_menu_background.png" id="2_bg"]
 [ext_resource type="PackedScene" uid="uid://c4p5veh7b5efh" path="res://scenes/ui/menu_fleet_background.tscn" id="3_fleet_bg"]
+[ext_resource type="Texture2D" uid="uid://cq4m8n6o5j0ca" path="res://assets/ui/menu/main_menu_logo.png" id="4_logo"]
+[ext_resource type="Texture2D" uid="uid://vs6rmj3yshat" path="res://assets/ui/menu/main_menu_illustration_background.png" id="5_illustration_bg"]
 
 [node name="MainMenu" type="Control" unique_id=1717124113]
 layout_mode = 3
@@ -12,7 +13,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
-background_texture = ExtResource("2_bg")
+background_texture = ExtResource("5_illustration_bg")
+use_3d_background = false
+background_dim = 0.34
 
 [node name="MenuFleetBackground" parent="." unique_id=1578433137 instance=ExtResource("3_fleet_bg")]
 
@@ -44,46 +47,50 @@ grow_horizontal = 2
 alignment = 1
 
 [node name="Eyebrow" type="Label" parent="TitleBlock" unique_id=1679661248]
+visible = false
 layout_mode = 2
 text = "조선 수군 로그라이트 해전"
 horizontal_alignment = 1
 
-[node name="Title" type="Label" parent="TitleBlock" unique_id=942562398]
+[node name="Title" type="TextureRect" parent="TitleBlock" unique_id=942562398]
+custom_minimum_size = Vector2(720, 382)
 layout_mode = 2
-text = "남해 서바이버즈"
-horizontal_alignment = 1
+mouse_filter = 2
+texture = ExtResource("4_logo")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="ButtonBlock" type="VBoxContainer" parent="." unique_id=1038452393]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(340, 0)
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.5
 anchor_top = 0.54
 anchor_right = 0.5
 anchor_bottom = 0.54
-offset_left = -150.0
-offset_right = 150.0
-offset_bottom = 246.0
+offset_left = -170.0
+offset_right = 170.0
+offset_bottom = 230.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="StartButton" type="Button" parent="ButtonBlock" unique_id=2034750384]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 text = "시작"
 
 [node name="MetaButton" type="Button" parent="ButtonBlock" unique_id=1964063712]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 text = "업그레이드"
 
 [node name="OptionsButton" type="Button" parent="ButtonBlock" unique_id=683776601]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 text = "옵션"
 
 [node name="QuitButton" type="Button" parent="ButtonBlock" unique_id=769592080]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 text = "종료"
 

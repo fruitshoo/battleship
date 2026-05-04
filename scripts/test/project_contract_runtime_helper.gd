@@ -907,12 +907,16 @@ static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String
 
 	if derelict_ship.get_meta("derelict_contact_salvaged", false) != true:
 		failures.append("derelict contact smoke did not mark salvage on contact")
+	if derelict_ship.get_meta("derelict_contact_ignition_started", false) != true:
+		failures.append("derelict contact smoke did not start fire-pot disposal")
 	if derelict_ship.get_meta("derelict_nonblocking", false) != true:
 		failures.append("derelict contact smoke did not unlock nonblocking on contact")
-	if not derelict_ship.get("is_sinking"):
-		failures.append("derelict contact smoke did not start sinking derelict ship")
-	if float(player_ship.get("hull_hp")) <= player_hull_before:
-		failures.append("derelict contact smoke did not repair player hull")
+	await _wait_frames(owner, 55)
+	if is_instance_valid(derelict_ship):
+		if not derelict_ship.get("is_sinking"):
+			failures.append("derelict contact smoke did not start sinking after fire-pot disposal")
+		if derelict_ship.get("is_burning") != true:
+			failures.append("derelict contact smoke did not ignite derelict ship")
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)

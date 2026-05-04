@@ -260,9 +260,10 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 	if other.has_method("_set_contact_areas_enabled"):
 		other.call("_set_contact_areas_enabled", false)
 
-	_repair_player_from_derelict_contact(ship, other)
-
-	if other.has_method("_sink_derelict"):
+	if other.has_method("_ignite_derelict_from_contact"):
+		other.call_deferred("_ignite_derelict_from_contact", ship)
+	elif other.has_method("_sink_derelict"):
+		_repair_player_from_derelict_contact(ship, other)
 		other.call_deferred("_sink_derelict")
 	return true
 

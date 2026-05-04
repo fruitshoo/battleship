@@ -12,6 +12,7 @@ const HudProgressionLayoutHelper = preload("res://scripts/ui/hud/hud_progression
 const HudRuntimeHelper = preload("res://scripts/ui/hud/hud_runtime_helper.gd")
 const HudShipHealthOverlayHelper = preload("res://scripts/ui/hud/hud_ship_health_overlay_helper.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
+const RESULT_SCENE_PATH := "res://scenes/ui/result_screen.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
 const CANNON_CLOSE_RANGE_MIN_MULTIPLIER: float = 0.55
 
@@ -181,7 +182,9 @@ var _tooltip_slot_ref: Control = null
 var _tooltip_hover_slot: Control = null
 var _tooltip_hover_elapsed: float = 0.0
 var game_over_overlay: Control = null
+var victory_result_overlay: Control = null
 var _game_over_transitioning: bool = false
+var _victory_result_transitioning: bool = false
 @export_range(0.03, 0.5) var hud_refresh_interval: float = 0.05
 var _hud_refresh_left: float = 0.0
 
@@ -213,6 +216,7 @@ func _ready() -> void:
 	_setup_new_layout()
 	_apply_layout_density()
 	_setup_game_over_overlay()
+	_setup_victory_result_overlay()
 	_setup_ship_hp_overlay()
 	_apply_layout_density()
 	if get_viewport() != null:
@@ -678,8 +682,17 @@ func show_victory() -> void:
 func show_victory_with_damage(rows: Array, total_damage: float) -> void:
 	HudEndStateHelper.show_victory_with_damage(self, rows, total_damage)
 
+func show_victory_result_transition(subtitle: String, countdown: float) -> void:
+	HudEndStateHelper.show_victory_result_transition(self, subtitle, countdown)
+
 func _setup_game_over_overlay() -> void:
 	HudEndStateHelper.setup_game_over_overlay(self)
 
+func _setup_victory_result_overlay() -> void:
+	HudEndStateHelper.setup_victory_result_overlay(self)
+
 func _return_to_main_menu() -> void:
 	HudEndStateHelper.return_to_main_menu(self)
+
+func _go_to_result_scene() -> void:
+	HudEndStateHelper.go_to_result_scene(self)

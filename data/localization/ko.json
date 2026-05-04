@@ -89,7 +89,7 @@
 	"upgrade.singigeon.name": "신기전",
 	"upgrade.singigeon.description": "기존 병사에게 신기전 운용을 맡기고 적 병사를 밀쳐냄. 고레벨에서 낙수 가능",
 	"upgrade.fire_pot.name": "화통",
-	"upgrade.fire_pot.description": "기존 병사에게 화통 투척을 맡기고 착화 확률 강화",
+	"upgrade.fire_pot.description": "전투 중 기존 병사에게 화통 투척을 맡기고 착화 확률 강화",
 	"upgrade.repeating_crossbow.name": "연노",
 	"upgrade.repeating_crossbow.description": "기존 병사에게 연노 운용을 맡김",
 	"upgrade.crew_numbers.name": "창병",

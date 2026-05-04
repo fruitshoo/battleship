@@ -68,7 +68,7 @@ var rowing_locked: bool = false
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
 @export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
-@export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.85
+@export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.78
 @export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
 @export_group("")
 @export var max_rowing_stamina: float = 100.0
@@ -79,9 +79,8 @@ var rowing_locked: bool = false
 @export_range(0.2, 1.0, 0.05) var reverse_rudder_turn_authority_mult: float = 0.65
 @export_range(0.5, 2.0, 0.05) var reverse_rowing_stamina_cost_mult: float = 1.05
 @export_range(0.2, 0.9, 0.05) var exhausted_rowing_speed_ratio: float = 0.55
-@export var stamina_recovery_unlock_threshold: float = 25.0
-@export var stamina_drain_rate: float = 10.0 # 노 젓기 시 스태미나 소모 속도 완화
-@export var stamina_recovery_rate: float = 6.5
+@export var stamina_drain_rate: float = 8.0
+@export var stamina_recovery_rate: float = 8.0
 
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
 @export_range(0, 1, 1) var captain_count: int = 1

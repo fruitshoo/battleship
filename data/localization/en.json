@@ -89,7 +89,7 @@
 	"upgrade.singigeon.name": "Singijeon",
 	"upgrade.singigeon.description": "Assigns soldiers to fire singijeon bolts that knock enemies back. High levels can throw them overboard",
 	"upgrade.fire_pot.name": "Fire Pot",
-	"upgrade.fire_pot.description": "Assigns soldiers to throw fire pots and improves ignition chance",
+	"upgrade.fire_pot.description": "Assigns soldiers to throw fire pots in combat and improves ignition chance",
 	"upgrade.repeating_crossbow.name": "Repeating Crossbow",
 	"upgrade.repeating_crossbow.description": "Assigns existing soldiers to operate repeating crossbows",
 	"upgrade.crew_numbers.name": "Spearmen",

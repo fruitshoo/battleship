@@ -24,12 +24,14 @@ const RESCUE_CALL_LINES: Array[String] = [
 @export_range(0.4, 4.0, 0.1) var rescue_call_duration: float = 2.0
 @export var rescue_contact_margin: float = 0.7
 @export var rescue_finish_duration: float = 0.32
+@export var rescue_xp_amount: int = 5
 
 var target_player: Node3D = null
 var current_magnet_speed: float = 0.0
 var base_y: float = 0.0
 var time_alive: float = 0.0
 var is_collected: bool = false
+var _cached_lm: Node = null
 var _cached_ocean: Node = null
 var _cached_um: Node = null
 var _cached_wave_height: float = 0.0
@@ -93,6 +95,7 @@ func pool_reset() -> void:
 		
 	# OceanPlane 캐싱
 	_cached_ocean = get_tree().get_first_node_in_group("ocean")
+	_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
 	_cached_um = get_node_or_null("/root/UpgradeManager")
 	_player_search_timer = randf_range(0.0, player_search_interval)
 	_ensure_rescue_call_label()
@@ -323,6 +326,7 @@ func _complete_collection(player_ship: Node3D) -> void:
 	# 플레이어 배에 병사 추가 시도
 	if player_ship and player_ship.has_method("add_survivor"):
 		if player_ship.add_survivor(false):
+			_grant_rescue_xp(player_ship)
 			_finish_collection_effect()
 		else:
 			# 정원이 가득 찬 경우: 획득하지 않고 그냥 밀려남 (튕겨나가는 연출)
@@ -332,6 +336,21 @@ func _complete_collection(player_ship: Node3D) -> void:
 			is_collected = false
 			set_deferred("monitoring", true)
 			set_deferred("monitorable", true)
+
+
+func _grant_rescue_xp(player_ship: Node3D) -> void:
+	if rescue_xp_amount <= 0:
+		return
+	if not is_instance_valid(_cached_lm):
+		_cached_lm = LevelManagerRegistry.get_level_manager(get_tree())
+	if not is_instance_valid(_cached_lm) or not _cached_lm.has_method("add_xp"):
+		return
+	_cached_lm.call("add_xp", rescue_xp_amount)
+	if _cached_lm.get("hud") != null:
+		var hud: Variant = _cached_lm.get("hud")
+		if is_instance_valid(hud) and hud.has_method("show_message"):
+			hud.call("show_message", "생존자 구조: XP +%d" % rescue_xp_amount, 1.5)
+	target_player = player_ship
 
 
 func _finish_collection_effect() -> void:

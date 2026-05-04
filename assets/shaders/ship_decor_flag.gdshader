@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_disabled, depth_draw_opaque;
+render_mode cull_disabled, depth_draw_opaque, diffuse_lambert, specular_disabled;
 
 uniform vec4 base_color : source_color = vec4(0.86, 0.72, 0.38, 1.0);
 uniform sampler2D flag_texture : source_color;
@@ -19,6 +19,9 @@ uniform float wave_speed : hint_range(0.0, 8.0) = 4.2;
 uniform float wave_strength : hint_range(0.0, 0.8, 0.01) = 0.13;
 uniform float side_drag : hint_range(0.0, 0.8, 0.01) = 0.08;
 uniform int pin_mode : hint_enum("Left", "Top", "Left and Top") = 0;
+uniform float cloth_roughness : hint_range(0.0, 1.0, 0.01) = 0.96;
+uniform float cloth_weave_strength : hint_range(0.0, 0.12, 0.005) = 0.035;
+uniform float cloth_weave_scale : hint_range(4.0, 96.0, 1.0) = 42.0;
 
 float get_free_edge(vec2 uv) {
 	if (pin_mode == 1) {
@@ -87,7 +90,13 @@ void fragment() {
 		}
 	}
 
+	float warp = sin((UV.y + UV.x * 0.17) * cloth_weave_scale);
+	float weft = sin((UV.x - UV.y * 0.11) * cloth_weave_scale * 0.62);
+	float weave = (warp * 0.55 + weft * 0.45) * cloth_weave_strength;
+	color *= clamp(1.0 + weave, 0.88, 1.10);
+
 	ALBEDO = color;
-	ROUGHNESS = 0.82;
-	SPECULAR = 0.18;
+	METALLIC = 0.0;
+	ROUGHNESS = cloth_roughness;
+	SPECULAR = 0.04;
 }
