@@ -51,10 +51,10 @@ static func update_stat_panel(hud) -> void:
 		return
 	var sections: Array[Dictionary] = build_stat_sections(hud)
 	var site_bonus_sections: Array[Dictionary] = build_site_bonus_sections(hud)
-	var columns := 1
-	var viewport: Viewport = hud.get_viewport()
-	if viewport != null and viewport.get_visible_rect().size.x >= 940.0:
-		columns = 2
+	var site_bonus_has_rows: bool = _sections_have_rows(site_bonus_sections)
+	if is_instance_valid(hud.stat_site_bonus_panel):
+		hud.stat_site_bonus_panel.visible = hud.show_stat_panel and site_bonus_has_rows
+	var columns: int = _get_detail_column_count(hud)
 	var signature: String = "%s||site:%s||cols:%d" % [_build_signature(sections), _build_signature(site_bonus_sections), columns]
 	if hud._last_stat_signature == signature:
 		return
@@ -128,36 +128,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var hull_hp: float = float(ship_snapshot.get("hull_hp", 0.0))
 	var max_hull_hp: float = float(ship_snapshot.get("max_hull_hp", 0.0))
 	var hull_defense: float = float(ship_snapshot.get("hull_defense", 0.0))
-	var hull_regen_rate: float = _get_float(ship, "hull_regen_rate", 0.0)
-	var max_hull_site_bonus: float = _get_site_bonus_total(ship, "max_hull_add")
-	var hull_defense_site_bonus: float = _get_site_bonus_total(ship, "hull_defense_add")
-	var hull_regen_site_bonus: float = _get_site_bonus_total(ship, "hull_regen_add")
-	var hull_rows: Array[Dictionary] = [
-		{
-			"icon": "favorite",
-			"label": "내구도",
-			"value": "%.0f / %.0f" % [hull_hp, max_hull_hp],
-			"tooltip": _build_flat_bonus_tooltip("선체 내구", "최대 내구도", max_hull_site_bonus),
-		},
-		{
-			"icon": "shield",
-			"label": "방어력",
-			"value": "%.1f" % hull_defense,
-			"tooltip": _build_flat_bonus_tooltip("선체 방어", "선체 방어력", hull_defense_site_bonus),
-		},
-	]
-	if hull_regen_rate > 0.0001 or hull_regen_site_bonus > 0.0001:
-		hull_rows.append({
-			"icon": "construction",
-			"label": "자동 수리",
-			"value": "%.1f/초" % hull_regen_rate,
-			"tooltip": _build_flat_bonus_tooltip("선체 수리", "초당 선체 자동 수리량", hull_regen_site_bonus, "/초"),
-		})
-	sections.append({
-		"title": "선체",
-		"icon": "shield",
-		"rows": hull_rows,
-	})
 
 	var current_speed: float = float(ship_snapshot.get("current_speed", 0.0))
 	var max_speed: float = float(ship_snapshot.get("max_speed", 0.0))
@@ -174,7 +144,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"title": "항해",
 		"icon": "air",
 		"rows": [
-			{"icon": "speed", "label": "현재 / 최고속", "value": "%.1f / %.1f" % [current_speed, max_speed]},
+			{"icon": "speed", "label": "현재 / 최고", "value": "%.1f / %.1f" % [current_speed, max_speed]},
 			{"icon": "air", "label": "돛 효율", "value": "x%.2f" % sail_efficiency_mult},
 			{"icon": "sync_alt", "label": "돛 회전", "value": "%.0f°/s" % sail_turn_speed},
 			{"icon": "rowing", "label": "노젓기 속도", "value": "%.1f" % rowing_speed},
@@ -222,7 +192,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "apps", "label": "포문 수", "value": str(cannon_count)},
 			{
 				"icon": "adjust",
-				"label": "기본 / 최종 데미지",
+				"label": "기본 / 최종",
 				"value": "%.1f / %.1f" % [cannon_base_damage, cannon_damage],
 				"tooltip": _build_cannon_damage_tooltip(cannon_base_damage, cannon_damage, cannon_damage_mult, cannon_fleet_damage_mult, cannon_damage_site_bonus),
 			},
@@ -240,7 +210,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 				"tooltip": _build_cannon_reload_tooltip(cannon_snapshot),
 			},
 			{"icon": "grade", "label": "치명타", "value": "%.1f%% x%.1f" % [cannon_crit_chance * 100.0, cannon_crit_multiplier]},
-			{"icon": "monitoring", "label": "기대 DPS (1문)", "value": "%.1f" % cannon_expected_dps},
+			{"icon": "monitoring", "label": "DPS (1문)", "value": "%.1f" % cannon_expected_dps},
 		],
 	})
 
@@ -251,9 +221,9 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"title": "병사",
 		"icon": "groups",
 		"rows": [
-			{"icon": "group", "label": "정원 / 생존", "value": "%d / %d" % [int(crew_stats.get("alive_count", 0)), int(_get_int(ship, "max_crew_count", 0))]},
+			{"icon": "group", "label": "생존 / 정원", "value": "%d / %d" % [int(crew_stats.get("alive_count", 0)), int(_get_int(ship, "max_crew_count", 0))]},
 			{"icon": "schedule", "label": "보충 시간", "value": "%.1fs" % _get_float(ship, "crew_respawn_interval", 0.0)},
-			{"icon": "badge", "label": "편성", "value": "일반 %d | 창 %d | 화통 %d | 연노 %d" % [
+			{"icon": "badge", "label": "편성", "value": "일%d 창%d 화%d 연%d" % [
 				int(crew_stats.get("general_count", 0)),
 				int(crew_stats.get("spearman_count", 0)),
 				int(crew_stats.get("fire_pot_count", 0)),
@@ -290,17 +260,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		],
 	})
 
-	var item_names: Array[String] = _get_item_names()
-	if not item_names.is_empty():
-		var item_rows: Array[Dictionary] = []
-		for item_name in item_names:
-			item_rows.append({"icon": "auto_awesome", "label": "아이템", "value": item_name})
-		sections.append({
-			"title": "아이템",
-			"icon": "diamond",
-			"rows": item_rows,
-		})
-
 	if not combat_record_section.is_empty():
 		sections.append(combat_record_section)
 
@@ -330,10 +289,7 @@ static func _build_signature(sections: Array[Dictionary]) -> String:
 static func _rebuild_stat_content(hud, sections: Array[Dictionary]) -> void:
 	for child in hud.stat_content.get_children():
 		child.queue_free()
-	var columns := 1
-	var viewport: Viewport = hud.get_viewport()
-	if viewport != null and viewport.get_visible_rect().size.x >= 940.0:
-		columns = 2
+	var columns: int = _get_detail_column_count(hud)
 	var section_start_index := 0
 	if not sections.is_empty() and str(sections[0].get("style", "")) == "summary":
 		hud.stat_content.add_child(_create_section(sections[0], hud))
@@ -341,8 +297,8 @@ static func _rebuild_stat_content(hud, sections: Array[Dictionary]) -> void:
 	var grid := GridContainer.new()
 	grid.columns = columns
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.add_theme_constant_override("h_separation", 16)
-	grid.add_theme_constant_override("v_separation", 12)
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 6)
 	hud.stat_content.add_child(grid)
 	for section_index in range(section_start_index, sections.size()):
 		var section: Dictionary = sections[section_index]
@@ -363,26 +319,26 @@ static func _rebuild_site_bonus_content(hud, sections: Array[Dictionary]) -> voi
 static func _create_section(section: Dictionary, hud = null) -> Control:
 	var section_root := MarginContainer.new()
 	section_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	section_root.add_theme_constant_override("margin_left", 2)
-	section_root.add_theme_constant_override("margin_top", 2)
-	section_root.add_theme_constant_override("margin_right", 2)
-	section_root.add_theme_constant_override("margin_bottom", 5)
+	section_root.add_theme_constant_override("margin_left", 1)
+	section_root.add_theme_constant_override("margin_top", 1)
+	section_root.add_theme_constant_override("margin_right", 1)
+	section_root.add_theme_constant_override("margin_bottom", 2)
 
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 3)
 	section_root.add_child(vbox)
 
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
 	vbox.add_child(header)
 
-	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 13, NavalUiTheme.TEXT_ACCENT)
+	var icon_label: Label = _create_icon_label(str(section.get("icon", "analytics")), 12, NavalUiTheme.TEXT_ACCENT)
 	header.add_child(icon_label)
 
 	var title := Label.new()
 	title.text = str(section.get("title", ""))
-	NavalUiTheme.style_heading(title, 12)
+	NavalUiTheme.style_heading(title, 11)
 	header.add_child(title)
 
 	var separator := ColorRect.new()
@@ -403,7 +359,7 @@ static func _create_section(section: Dictionary, hud = null) -> Control:
 			if row_index > 0:
 				var divider := ColorRect.new()
 				divider.color = Color(NavalUiTheme.BORDER_GOLD_DIM.r, NavalUiTheme.BORDER_GOLD_DIM.g, NavalUiTheme.BORDER_GOLD_DIM.b, 0.44)
-				divider.custom_minimum_size = Vector2(1.0, 34.0)
+				divider.custom_minimum_size = Vector2(1.0, 28.0)
 				summary_row.add_child(divider)
 			var cell := VBoxContainer.new()
 			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -414,18 +370,18 @@ static func _create_section(section: Dictionary, hud = null) -> Control:
 			var label_row := HBoxContainer.new()
 			label_row.add_theme_constant_override("separation", 3)
 			cell.add_child(label_row)
-			label_row.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 11, NavalUiTheme.TEXT_BLUE))
+			label_row.add_child(_create_icon_label(str(row.get("icon", "chevron_right")), 10, NavalUiTheme.TEXT_BLUE))
 
 			var summary_label := Label.new()
 			summary_label.text = str(row.get("label", ""))
 			summary_label.clip_text = true
-			NavalUiTheme.style_muted(summary_label, 10)
+			NavalUiTheme.style_muted(summary_label, 9)
 			label_row.add_child(summary_label)
 
 			var summary_value := Label.new()
 			summary_value.text = str(row.get("value", ""))
 			summary_value.clip_text = true
-			NavalUiTheme.style_overlay_value(summary_value, 12)
+			NavalUiTheme.style_overlay_value(summary_value, 11)
 			summary_value.add_theme_constant_override("outline_size", 2)
 			cell.add_child(summary_value)
 	else:
@@ -438,25 +394,29 @@ static func _create_section(section: Dictionary, hud = null) -> Control:
 static func _create_stat_row(row: Dictionary, hud = null) -> Control:
 	var row_box := HBoxContainer.new()
 	row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row_box.custom_minimum_size.y = 17.0
-	row_box.add_theme_constant_override("separation", 5)
+	row_box.custom_minimum_size.y = 15.0
+	row_box.add_theme_constant_override("separation", 4)
 	_apply_row_tooltip(row_box, row, hud)
 
-	var icon_label := _create_icon_label(str(row.get("icon", "chevron_right")), 13, NavalUiTheme.TEXT_BLUE)
+	var icon_label := _create_icon_label(str(row.get("icon", "chevron_right")), 12, NavalUiTheme.TEXT_BLUE)
 	_apply_row_tooltip(icon_label, row, hud)
 	row_box.add_child(icon_label)
 
 	var label := Label.new()
 	label.text = str(row.get("label", ""))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	NavalUiTheme.style_body(label, 11)
+	label.clip_text = true
+	NavalUiTheme.style_body(label, 10)
 	_apply_row_tooltip(label, row, hud)
 	row_box.add_child(label)
 
 	var value := Label.new()
 	value.text = str(row.get("value", ""))
+	value.custom_minimum_size.x = 92.0
+	value.size_flags_horizontal = Control.SIZE_SHRINK_END
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	NavalUiTheme.style_overlay_value(value, 11)
+	value.clip_text = true
+	NavalUiTheme.style_overlay_value(value, 10)
 	value.add_theme_constant_override("outline_size", 2)
 	_apply_row_tooltip(value, row, hud)
 	row_box.add_child(value)
@@ -481,6 +441,22 @@ static func _create_icon_label(icon_name: String, font_size: int, color: Color) 
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	NavalUiTheme.apply_emblem(icon_label, icon_name, font_size, color)
 	return icon_label
+
+static func _get_detail_column_count(hud) -> int:
+	var viewport: Viewport = hud.get_viewport()
+	if viewport == null:
+		return 1
+	var viewport_width: float = viewport.get_visible_rect().size.x
+	if viewport_width >= 720.0:
+		return 2
+	return 1
+
+static func _sections_have_rows(sections: Array[Dictionary]) -> bool:
+	for section in sections:
+		var rows: Array = section.get("rows", [])
+		if not rows.is_empty():
+			return true
+	return false
 
 static func _build_cannon_damage_tooltip(base_damage: float, final_damage: float, damage_mult: float, fleet_damage_mult: float, site_damage_bonus: float) -> String:
 	if base_damage <= 0.0001:
@@ -687,21 +663,6 @@ static func _is_dead_soldier_node(soldier: Node) -> bool:
 	if soldier.has_method("is_state_value_dead"):
 		return soldier.call("is_state_value_dead", state_value) == true
 	return state_value != null and int(state_value) == 4
-
-static func _get_item_names() -> Array[String]:
-	var item_names: Array[String] = []
-	if not is_instance_valid(UpgradeManager):
-		return item_names
-	var acquired = UpgradeManager.get("acquired_items")
-	var items = UpgradeManager.get("ITEMS")
-	if not (acquired is Array) or not (items is Dictionary):
-		return item_names
-	for item_id in acquired:
-		var item_data = items.get(item_id, {})
-		if item_data is Dictionary:
-			item_names.append(str(item_data.get("name", item_id)))
-	return item_names
-
 
 static func _build_site_bonus_rows(player_ship: Node) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []

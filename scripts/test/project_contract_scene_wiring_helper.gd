@@ -168,11 +168,35 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 		},
 		{
 			"path": "res://scenes/ships/support_ship.tscn",
-			"label": "support ship",
+			"label": "support ship fallback",
 			"team": "player",
 			"player_controlled": false,
 			"groups": ["player", "ships", "captured_minion"],
 			"required_nodes": ["ProximityArea", "HitArea", "Soldiers", "CollisionVisualizer"],
+			"forbidden_nodes": [],
+			"require_hull": true,
+			"require_boss_group": false,
+			"allow_boarding": true,
+		},
+		{
+			"path": "res://scenes/ships/support_maengseon_ship.tscn",
+			"label": "support maengseon ship",
+			"team": "player",
+			"player_controlled": false,
+			"groups": ["player", "ships", "captured_minion"],
+			"required_nodes": ["MaengseonHull", "ProximityArea", "HitArea", "Soldiers", "CollisionVisualizer"],
+			"forbidden_nodes": [],
+			"require_hull": true,
+			"require_boss_group": false,
+			"allow_boarding": true,
+		},
+		{
+			"path": "res://scenes/ships/support_panokseon_ship.tscn",
+			"label": "support panokseon ship",
+			"team": "player",
+			"player_controlled": false,
+			"groups": ["player", "ships", "captured_minion"],
+			"required_nodes": ["PanokseonHull", "ProximityArea", "HitArea", "Soldiers", "CollisionVisualizer"],
 			"forbidden_nodes": [],
 			"require_hull": true,
 			"require_boss_group": false,
@@ -613,11 +637,30 @@ static func _run_player_cannon_slot_authoring_contract(owner: Node, failures: Ar
 	wrapper.add_child(player_ship)
 	await _wait_frames(owner, wait_frames_after_attach)
 
-	var cannons_node := player_ship.find_child("Cannons", true, false) as Node3D
-	if not is_instance_valid(cannons_node):
-		failures.append("player cannon slot authoring missing Cannons node")
+	var upgrade_manager := owner.get_node_or_null("/root/UpgradeManager")
+	if not is_instance_valid(upgrade_manager) or not upgrade_manager.has_method("_apply_cannon"):
+		failures.append("player cannon slot authoring missing UpgradeManager._apply_cannon")
 		wrapper.queue_free()
 		return
+	var upgrade_levels: Dictionary = upgrade_manager.get("current_levels") if upgrade_manager.get("current_levels") is Dictionary else {}
+	var previous_cannon_level := int(upgrade_levels.get("cannon", 0))
+	var previous_front_level := int(upgrade_levels.get("front_cannon", 0))
+	if not upgrade_levels.is_empty():
+		upgrade_levels["cannon"] = 1
+		upgrade_levels["front_cannon"] = 0
+	if upgrade_manager.has_method("initialize_default_weapons"):
+		upgrade_manager.call("initialize_default_weapons")
+		await _wait_frames(owner, 1)
+
+	var cannons_node := player_ship.find_child("Cannons", true, false) as Node3D
+	if not is_instance_valid(cannons_node):
+		failures.append("player cannon slot authoring default weapon init did not create Cannons node")
+		wrapper.queue_free()
+		return
+	for default_cannon_name in ["CannonLeft", "CannonRight"]:
+		var default_cannon := cannons_node.get_node_or_null(default_cannon_name) as Node3D
+		if not is_instance_valid(default_cannon) or not default_cannon.visible:
+			failures.append("player cannon slot authoring default weapon init did not show %s" % default_cannon_name)
 
 	var front_marker := _find_cannon_slot_marker(player_ship, "CannonFront")
 	var original_front_pos := Vector3.ZERO
@@ -638,12 +681,9 @@ static func _run_player_cannon_slot_authoring_contract(owner: Node, failures: Ar
 	if int(marker_counts.get("CannonSlots", 0)) < 7:
 		failures.append("player cannon slot authoring summary should count seven cannon markers")
 
-	var upgrade_manager := owner.get_node_or_null("/root/UpgradeManager")
-	if not is_instance_valid(upgrade_manager) or not upgrade_manager.has_method("_apply_cannon"):
-		failures.append("player cannon slot authoring missing UpgradeManager._apply_cannon")
-		wrapper.queue_free()
-		return
-	upgrade_manager.call("_apply_cannon", player_ship, 5)
+	if not upgrade_levels.is_empty():
+		upgrade_levels["front_cannon"] = 1
+	upgrade_manager.call("_apply_cannon", player_ship, 3)
 	await _wait_frames(owner, 1)
 
 	for slot_name in slot_transforms.keys():
@@ -660,6 +700,10 @@ static func _run_player_cannon_slot_authoring_contract(owner: Node, failures: Ar
 		var actual_forward := -cannon.transform.basis.z.normalized()
 		if actual_forward.dot(expected_forward) < 0.99:
 			failures.append("player cannon slot authoring rotation mismatch for %s" % slot_name)
+
+	if not upgrade_levels.is_empty():
+		upgrade_levels["cannon"] = previous_cannon_level
+		upgrade_levels["front_cannon"] = previous_front_level
 
 	wrapper.queue_free()
 	await _wait_frames(owner, 1)
@@ -809,8 +853,8 @@ static func _run_support_ship_spawn_template_contract(owner: Node, failures: Arr
 		failures.append("support ship spawn template did not create support ship child")
 		wrapper.queue_free()
 		return
-	if spawned_support.scene_file_path != "res://scenes/ships/support_ship.tscn":
-		failures.append("support ship spawn should instantiate support_ship.tscn, got %s" % spawned_support.scene_file_path)
+	if spawned_support.scene_file_path != "res://scenes/ships/support_maengseon_ship.tscn":
+		failures.append("support ship spawn should instantiate support_maengseon_ship.tscn, got %s" % spawned_support.scene_file_path)
 	if str(spawned_support.get_script().resource_path) != "res://scripts/entities/ships/support_ship.gd":
 		failures.append("support ship spawn should use support_ship.gd")
 	if spawned_support.get("team") != "player":
@@ -933,7 +977,7 @@ static func _run_ship_ally_role_contract(failures: Array[String]) -> void:
 static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void:
 	var hull_checks := [
 		{
-			"path": "res://scenes/ships/hulls/panokseon_hull.tscn",
+			"path": "res://scenes/ships/hulls/panok_hull.tscn",
 			"label": "panokseon hull",
 			"cannons": 7,
 			"weapon_slots": [],

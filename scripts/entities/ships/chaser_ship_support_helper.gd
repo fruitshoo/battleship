@@ -12,6 +12,7 @@ const DERELICT_MAX_ROLL_DEGREES: float = 6.5
 const DERELICT_MAX_PITCH_DEGREES: float = 2.0
 const DERELICT_CONTACT_FIRE_POT_FLIGHT_TIME: float = 0.7
 const DERELICT_CONTACT_FIRE_POT_ARC: float = 2.8
+const DERELICT_BURN_TO_SINK_DURATION: float = 5.0
 const DERELICT_CONTACT_SINK_DURATION: float = 2.6
 const DERELICT_SAIL_COLOR := Color(0.52, 0.50, 0.45, 1.0)
 const DERELICT_SAIL_DAMAGE_MIN: float = 0.16
@@ -215,10 +216,6 @@ static func become_derelict(ship) -> void:
 	if not is_instance_valid(ship.cached_lm):
 		ship.cached_lm = LevelManagerRegistry.get_level_manager(ship.get_tree())
 
-	if not ship._merit_granted:
-		if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_merit"):
-			ship.cached_lm.add_merit(20)
-			ship._merit_granted = true
 	if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_ship_derelict"):
 		ship.cached_lm.add_ship_derelict(1)
 
@@ -261,12 +258,19 @@ static func ignite_derelict_from_contact(ship, source_ship: Node3D = null) -> vo
 		derelict_ship.set_meta("derelict_burning_down", true)
 		if "is_burning" in derelict_ship:
 			derelict_ship.is_burning = true
+		if "burn_hull_damage_per_second" in derelict_ship:
+			var remaining_hull: float = maxf(float(derelict_ship.get("hull_hp")), 1.0)
+			derelict_ship.burn_hull_damage_per_second = maxf(
+				float(derelict_ship.burn_hull_damage_per_second),
+				remaining_hull / DERELICT_BURN_TO_SINK_DURATION
+			)
 		if "burn_timer" in derelict_ship:
-			derelict_ship.burn_timer = maxf(float(derelict_ship.burn_timer), 4.0)
+			derelict_ship.burn_timer = maxf(
+				float(derelict_ship.burn_timer),
+				DERELICT_BURN_TO_SINK_DURATION + 1.0
+			)
 		if derelict_ship.has_method("_set_fire_emitting"):
 			derelict_ship._set_fire_emitting(true)
-		if derelict_ship.has_method("_sink_derelict"):
-			derelict_ship.call_deferred("_sink_derelict")
 	)
 
 
@@ -404,6 +408,10 @@ static func sink_derelict(ship) -> void:
 	if "is_burning" in ship:
 		ship.is_burning = true
 	print("[Ship] 폐선 침몰 시작!")
+	if is_instance_valid(ship.cached_lm) and str(ship.get("team")) == "enemy" and ship.get_meta("derelict_sink_stat_accounted", false) != true:
+		ship.set_meta("derelict_sink_stat_accounted", true)
+		if ship.cached_lm.has_method("add_ship_sunk"):
+			ship.cached_lm.add_ship_sunk(1)
 	drop_floating_loot(ship, true, 20)
 
 	ship._set_fire_emitting(true)

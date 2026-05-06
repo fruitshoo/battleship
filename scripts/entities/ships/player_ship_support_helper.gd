@@ -36,9 +36,6 @@ static func spawn_or_repair_ally(ship) -> void:
 		if support_ships.size() >= ship.support_fleet_limit:
 			return
 
-	if not SUPPORT_SHIP_SCENE:
-		return
-
 	var occupied_slots: Dictionary = {}
 	for support_ship in support_ships:
 		if not is_instance_valid(support_ship):
@@ -57,7 +54,12 @@ static func spawn_or_repair_ally(ship) -> void:
 	if support_slot < 0:
 		return
 	var support_profile: Dictionary = resolve_support_fleet_profile(ship, support_slot)
-	var ally = SUPPORT_SHIP_SCENE.instantiate()
+	var support_scene := PlayerShipSupportSquadronHelper.get_profile_ship_scene(support_profile)
+	if not support_scene:
+		support_scene = SUPPORT_SHIP_SCENE
+	if not support_scene:
+		return
+	var ally = support_scene.instantiate()
 	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, support_profile)
 	var next_support_order: int = int(ship.get_meta(SUPPORT_FLEET_NEXT_ORDER_META, 0))
 	_configure_support_ship_instance(ally, ship, support_profile, support_slot, next_support_order, true)

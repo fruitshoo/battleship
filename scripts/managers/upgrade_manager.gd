@@ -38,6 +38,7 @@ var ballista_scene: PackedScene = preload("res://scenes/entities/launchers/balli
 
 const SHIP_UPGRADE_IDS: Array[String] = [
 	"cannon",
+	"front_cannon",
 	"cannon_damage",
 	"cannon_reload",
 	"janggun",
@@ -58,6 +59,7 @@ const CREW_UPGRADE_IDS: Array[String] = [
 ]
 const PRIORITY_SHIP_UPGRADE_IDS: Array[String] = [
 	"cannon",
+	"front_cannon",
 	"cannon_damage",
 	"janggun",
 ]
@@ -105,6 +107,9 @@ func _ready() -> void:
 func reset_run_upgrades() -> void:
 	for key in UPGRADES:
 		current_levels[key] = 0
+	# 기본 좌우 포문은 업그레이드 선택 전부터 장착된 시작 무장이다.
+	if current_levels.has("cannon"):
+		current_levels["cannon"] = 1
 
 func _sync_items_from_save() -> void:
 	if Engine.is_editor_hint():
@@ -150,8 +155,7 @@ func initialize_default_weapons() -> void:
 	current_levels["cannon"] = 1
 	var ship = _get_player_ship()
 	if ship:
-		_normalize_player_cannons(ship)
-		_sync_player_cannon_layout(ship, 1)
+		_apply_cannon(ship, 1)
 	upgrade_applied.emit("cannon", 1)
 	var hud = ship._find_hud() if ship != null and ship.has_method("_find_hud") else null
 	if hud and hud.has_method("update_weapon_ui"):
@@ -241,6 +245,8 @@ func _get_priority_ship_upgrade_ids() -> Array[String]:
 	var priority_ids: Array[String] = []
 	if int(current_levels.get("cannon", 0)) < 2:
 		priority_ids.append("cannon")
+	if int(current_levels.get("front_cannon", 0)) < 1:
+		priority_ids.append("front_cannon")
 	if int(current_levels.get("cannon_damage", 0)) < 1:
 		priority_ids.append("cannon_damage")
 	if int(current_levels.get("janggun", 0)) < 2:
@@ -408,7 +414,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	upgrade_applied.emit(upgrade_id, new_level)
 	
 	# 함대 업그레이드인 경우 현재 활성화된 모든 미니언에 즉시 적용
-	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS or upgrade_id in ["cannon", "hull_defense", "hull_repair"]:
+	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS or upgrade_id in ["cannon", "front_cannon", "hull_defense", "hull_repair"]:
 		var minions = EntityRegistry.get_captured_minions()
 		for m in minions:
 			apply_fleet_upgrades_to_ship(m)
@@ -416,7 +422,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [LocaleManager.data_text(UPGRADES[upgrade_id], upgrade_id, "upgrade", "name", upgrade_id), new_level])
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
-	var ship_ui_ids = ["cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "supply", "gold"]
+	var ship_ui_ids = ["cannon", "front_cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "supply", "gold"]
 	var crew_ui_ids = ["crew_numbers", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
@@ -653,8 +659,13 @@ func _apply_cannon(ship: Node3D, level: int) -> void:
 	if not is_instance_valid(cannons_node):
 		return
 	_normalize_player_cannons(ship)
-	_sync_player_cannon_layout(ship, level)
+	_sync_player_cannon_layout(ship, maxi(1, level))
 	print("[Cannon] 포문 배치 적용 (Lv.%d)" % level)
+
+func _apply_front_cannon(ship: Node3D, level: int) -> void:
+	NodeContractHelper.ensure_cannons_container(ship)
+	_sync_player_cannon_layout(ship, maxi(1, int(current_levels.get("cannon", 1))))
+	print("[Cannon] 전면 포문 배치 적용 (Lv.%d)" % level)
 
 func _normalize_player_cannons(ship: Node3D) -> void:
 	var cannons_node = _get_player_cannons_node(ship)
@@ -664,6 +675,7 @@ func _normalize_player_cannons(ship: Node3D) -> void:
 		_configure_player_cannon(child)
 
 func _sync_player_cannon_layout(ship: Node3D, level: int) -> void:
+	var effective_level := maxi(1, level)
 	var cannons_node = _get_player_cannons_node(ship)
 	if not is_instance_valid(cannons_node):
 		return
@@ -713,7 +725,7 @@ func _sync_player_cannon_layout(ship: Node3D, level: int) -> void:
 		var node_name := ShipWeaponLoadoutHelper.get_node_name(slot)
 		var required_level := ShipWeaponLoadoutHelper.get_required_level(slot)
 		var cannon = named_nodes.get(node_name, null)
-		if level < required_level:
+		if effective_level < required_level or not ShipWeaponLoadoutHelper.is_unlocked_for_levels(slot, current_levels):
 			if is_instance_valid(cannon):
 				if cannon is Node3D:
 					(cannon as Node3D).visible = false
@@ -748,7 +760,7 @@ func _sync_player_cannon_layout(ship: Node3D, level: int) -> void:
 		for child in cannons_node.get_children():
 			if is_instance_valid(child):
 				roster.append("%s#%s" % [child.name, str(child.get_instance_id())])
-		print("[CannonSetup] level=%d active_slots=%s" % [level, ", ".join(roster)])
+		print("[CannonSetup] level=%d active_slots=%s" % [effective_level, ", ".join(roster)])
 
 func _get_player_cannon_loadout(ship: Node3D) -> Array[Dictionary]:
 	var fallback := ShipWeaponLoadoutHelper.get_default_player_cannon_loadout()
@@ -1026,7 +1038,7 @@ func apply_fleet_upgrades_to_ship(ship: Node3D) -> void:
 	
 	# 1. 지원함 대포 수는 플레이어 포문 업그레이드를 공유하되 지원함 상한을 둔다.
 	if ship.has_method("apply_fleet_weapon_upgrade"):
-		ship.apply_fleet_weapon_upgrade(int(current_levels.get("cannon", 1)))
+		ship.apply_fleet_weapon_upgrade(maxi(1, int(current_levels.get("cannon", 1))), current_levels)
 			
 	# 2. 지원함 선체는 별도 업그레이드가 아니라 플레이어 선체 업그레이드를 공유한다.
 	_apply_shared_hull_upgrade_to_fleet_ship(ship)

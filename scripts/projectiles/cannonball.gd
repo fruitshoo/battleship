@@ -1,5 +1,6 @@
 extends Area3D
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 const CLOSE_RANGE_HULL_FALLOFF_DISTANCE: float = 8.0
 const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
@@ -210,6 +211,12 @@ func _on_timeout() -> void:
 	_release_self()
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("projectile_cannonball", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if has_hit or _is_releasing: return
 	
 	time_alive += delta

@@ -378,7 +378,8 @@
     "res://scripts/ui/hud/hud_update_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/base_ship_status_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
     "res://scripts/ui/hud/hud_ship_debug_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
-    "res://scripts/world/sea_sites/sea_site_reward_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor."
+    "res://scripts/world/sea_sites/sea_site_reward_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd": "Soldier AI helper still owns the compact idle/wander/move/attack state machine; recent cleanup removed repeated retarget fallback blocks, and a future split should extract movement/target validation deliberately."
   },
   "thin_helper_exceptions": {
     "res://scripts/entities/ships/player_ship_aux_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
@@ -764,14 +765,13 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
-      "count": 9,
+      "count": 8,
       "functions": [
         "calculate_collision_repulsion",
         "_draw_ship_collision_debug",
         "_try_salvage_derelict_contact",
         "_is_derelict_ship",
-        "_repair_player_from_derelict_contact",
-        "_is_boss_salvage_target",
+        "_has_unresolved_affiliated_boarders",
         "_is_player_support_pair",
         "apply_ramming_damage",
         "spawn_ship_collision_effects"
@@ -779,7 +779,7 @@
       "reason": "Collision DebugDraw instrumentation is intentionally owned by the collision helper so contact, compression, and repulsion vectors stay near the physics calculation."
     },
     "res://scripts/entities/ships/base_ship_crew_helper.gd": {
-      "count": 27,
+      "count": 28,
       "functions": [
         "update_crew_allocation_state",
         "get_shiphandling_multiplier",
@@ -790,6 +790,7 @@
         "distribute_cannon_reload_crew_power",
         "is_cannon_reload_crew_target",
         "is_reload_crew_cannon_available",
+        "_cannon_has_active_reload_work",
         "cannon_can_cover_allocation_target",
         "get_combat_effectiveness_multiplier",
         "get_effective_boarding_interval",
@@ -921,7 +922,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
-      "count": 42,
+      "count": 41,
       "functions": [
         "process_minion_ai",
         "_is_ship_disabled",
@@ -960,7 +961,6 @@
         "_get_ally_limbo_color",
         "_set_support_assist_target_lock",
         "_clear_support_assist_target_lock",
-        "_is_panokseon_support",
         "_calculate_support_pre_avoidance",
         "_get_ship_forward_flat",
         "_get_ship_speed",
@@ -1005,7 +1005,7 @@
       "reason": "Boss escort slot-hold navigation deliberately extends the chaser navigation owner because it composes target pursuit, gunner standoff, and boarding engagement rules in the same movement-intent pipeline."
     },
     "res://scripts/entities/ships/chaser_ship_support_helper.gd": {
-      "count": 18,
+      "count": 21,
       "functions": [
         "update_enemy_fire_pot_logic",
         "_find_fire_pot_tosser",
@@ -1014,6 +1014,9 @@
         "spawn_enemy_drifter_xp_pickups",
         "_instantiate_enemy_drifter_pickup",
         "become_derelict",
+        "ignite_derelict_from_contact",
+        "_launch_derelict_contact_fire_pot",
+        "_find_player_derelict_tosser",
         "_weather_derelict_sails",
         "_play_derelict_transition_visuals",
         "_spawn_derelict_smoke",
@@ -1090,7 +1093,7 @@
       "reason": "Player boarding continues to use the auto-raid helper as the single execution owner. Manual boarding intent is intentionally added here so flagship-authored boarding requests reuse the same rope, recall, and boarder-dispatch path instead of creating a second boarding system, including HUD-safe messaging for test doubles."
     },
     "res://scripts/entities/ships/player_ship_movement_helper.gd": {
-      "count": 14,
+      "count": 15,
       "functions": [
         "auto_adjust_sail",
         "calculate_separation",
@@ -1101,6 +1104,7 @@
         "get_sail_drive_ratio",
         "get_furled_sail_rowing_efficiency_multiplier",
         "get_furled_sail_rowing_stamina_cost_multiplier",
+        "_get_rowing_direction",
         "update_oar_visual",
         "_get_oar_pivots",
         "_apply_sculling_oar_motion",
@@ -1110,7 +1114,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
-      "count": 8,
+      "count": 9,
       "functions": [
         "handle_input",
         "toggle_fleet_formation",
@@ -1118,6 +1122,7 @@
         "_get_fleet_formation_label",
         "_get_normalized_fleet_formation",
         "update_rowing_audio",
+        "update_sail_wind_audio",
         "capture_derelict_ship",
         "replenish_crew"
       ],
@@ -1157,7 +1162,7 @@
       "reason": "Support fleet refresh now preserves existing runtime ship profiles while reassigning inserted squadron slots such as newly added panokseon support entries."
     },
     "res://scripts/entities/ships/ship_ally_role_helper.gd": {
-      "count": 20,
+      "count": 21,
       "functions": [
         "set_ally_role",
         "mark_player_flagship",
@@ -1167,6 +1172,7 @@
         "get_ally_role",
         "is_player_flagship",
         "is_support_ship",
+        "is_panokseon_support",
         "is_captured_minion",
         "is_player_owned_ship",
         "ship_consumes_capture_slot",
@@ -1183,11 +1189,14 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/ship_authoring_helper.gd": {
-      "count": 22,
+      "count": 31,
       "functions": [
         "build_summary",
         "validate_ship_authoring",
         "get_authoring_markers",
+        "get_deck_area_half_extents",
+        "get_deck_area_half_width_at_z",
+        "get_deck_area_height",
         "get_boarding_anchor_local",
         "get_nearest_boarding_anchor_global",
         "get_cannon_slot_transforms",
@@ -1205,6 +1214,12 @@
         "_find_child_named",
         "_collect_marker_descendants",
         "_collect_node3d_leaf_descendants",
+        "_is_deck_area_configured",
+        "_get_deck_area_polygon_points",
+        "_get_deck_area_point_markers",
+        "_get_polygon_half_extents",
+        "_get_polygon_half_width_at_z",
+        "_get_transform_relative_to_ancestor",
         "_anchor_matches_side",
         "_is_dead_soldier_node"
       ],
@@ -1308,7 +1323,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/ship_weapon_loadout_helper.gd": {
-      "count": 35,
+      "count": 38,
       "functions": [
         "get_weapon_loadout",
         "get_weapon_loadout_for_type",
@@ -1323,7 +1338,6 @@
         "build_cannon_spec",
         "build_singigeon_spec",
         "apply_authored_weapon_slots",
-        "apply_authored_cannon_slots",
         "get_kind",
         "get_node_name",
         "get_profile_name",
@@ -1335,7 +1349,11 @@
         "has_basis",
         "get_basis",
         "get_rotation_y",
+        "has_scale",
+        "get_scale",
         "get_required_level",
+        "get_unlock_upgrade",
+        "is_unlocked_for_levels",
         "get_detection_range",
         "get_detection_arc",
         "get_upgrade_level",
@@ -1405,7 +1423,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/soldiers/soldier_ai_helper.gd": {
-      "count": 11,
+      "count": 14,
       "functions": [
         "state_idle",
         "state_wander",
@@ -1414,7 +1432,10 @@
         "state_move",
         "state_attack",
         "_move_toward_point",
+        "_move_toward_owned_ship_global_point",
+        "_move_toward_owned_ship_local_point",
         "_try_muster_to_cross_ship_contact",
+        "_clear_target_and_try_muster_or_idle",
         "_try_move_to_active_ship_duty_target",
         "turn_toward_position",
         "_retarget_owned_ship_hostile"
@@ -1461,7 +1482,7 @@
       "reason": "Scene contract encapsulation routes soldier hand-pivot lookup through the Soldier owner contract."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
-      "count": 25,
+      "count": 26,
       "functions": [
         "take_damage",
         "get_ship_ranged_cover_reduction",
@@ -1474,6 +1495,7 @@
         "incapacitate",
         "die",
         "_snap_dead_body_to_deck",
+        "_is_offboard_death_context",
         "_is_sinking_death_context",
         "_is_ship_sinking_or_dying",
         "_should_incapacitate_instead_of_die",
@@ -1540,7 +1562,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
-      "count": 56,
+      "count": 57,
       "functions": [
         "find_ship_work_target",
         "get_active_ship_work_target",
@@ -1590,6 +1612,7 @@
         "_is_local_target_reached",
         "_store_active_ship_work_target",
         "_is_active_work_task_still_valid",
+        "_shiphandling_station_is_needed",
         "_get_soldier_bias_sign",
         "_make_local_slot_key",
         "_get_reservation_slot_key",
@@ -1602,7 +1625,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/soldiers/soldier_speech_helper.gd": {
-      "count": 15,
+      "count": 18,
       "functions": [
         "reset",
         "update",
@@ -1617,7 +1640,10 @@
         "_get_lines_for_context",
         "_get_next_interval",
         "_is_current_weapon_melee",
+        "_get_configured_lines",
+        "_get_speech_lines_data",
         "_is_danger_context",
+        "_is_owned_ship_burning",
         "_is_enemy_boarder_on_player_ship"
       ],
       "reason": "Generated baseline for the current helper public static surface."
@@ -1636,7 +1662,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/soldiers/soldier_visual_helper.gd": {
-      "count": 26,
+      "count": 27,
       "functions": [
         "ensure_visual_root",
         "setup_visual_scene",
@@ -1663,6 +1689,7 @@
         "flash_hit",
         "play_death_pose",
         "play_boarding_jump_pose",
+        "play_knockback_pose",
         "play_recovery_pose"
       ],
       "reason": "Scene contract encapsulation routes soldier visual-part lookups through the Soldier owner contract."
@@ -1948,9 +1975,10 @@
       "reason": "Bootstrap contract owns startup smoke checks, including non-spatial battle-alert routing and bow SFX rate-limit validation."
     },
     "res://scripts/test/project_contract_hud_helper.gd": {
-      "count": 31,
+      "count": 32,
       "functions": [
         "run_hud_contract_smoke",
+        "_run_level_progression_xp_bar_contract",
         "_run_hud_state_baselines",
         "_run_hud_boarding_state_check",
         "_run_hud_support_respawn_slot_check",
@@ -2210,7 +2238,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/test/project_contract_support_helper.gd": {
-      "count": 13,
+      "count": 14,
       "functions": [
         "_reconcile_support_fleet",
         "_request_support_spawn",
@@ -2223,6 +2251,7 @@
         "_run_support_signal_level_two_limit_smoke",
         "_run_support_shared_cannon_cap_smoke",
         "_run_support_shared_hull_upgrade_smoke",
+        "_run_support_panokseon_mast_fold_sync_contract",
         "_count_visible_fleet_cannons",
         "_wait_frames"
       ],
@@ -2249,13 +2278,14 @@
       "reason": "Typography contract smoke owns semantic UI and world-text preset assertions, including responsive size expectations derived from active viewport density."
     },
     "res://scripts/test/project_contract_upgrade_helper.gd": {
-      "count": 6,
+      "count": 7,
       "functions": [
         "run_upgrade_contract_smoke",
         "_validate_cannon_upgrade_split",
         "_validate_crew_reserve_retired",
         "_validate_crew_weapon_upgrades_do_not_increase_capacity",
         "_validate_support_hull_upgrade_retired",
+        "_validate_sailing_upgrade_improves_handling",
         "_validate_panokseon_upgrade_gate"
       ],
       "reason": "Generated baseline for the current helper public static surface."
@@ -2404,13 +2434,16 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/ui/hud/hud_end_state_helper.gd": {
-      "count": 5,
+      "count": 8,
       "functions": [
         "show_game_over",
         "show_victory",
+        "show_victory_result_transition",
         "show_victory_with_damage",
         "setup_game_over_overlay",
-        "return_to_main_menu"
+        "setup_victory_result_overlay",
+        "return_to_main_menu",
+        "go_to_result_scene"
       ],
       "reason": "Generated baseline for the current helper public static surface."
     },
@@ -2475,7 +2508,7 @@
       "reason": "Soldier HUD debug owns Limbo panel formatting plus focused allied/enemy soldier selection for the ship debug panel."
     },
     "res://scripts/ui/hud/hud_ship_debug_helper.gd": {
-      "count": 18,
+      "count": 19,
       "functions": [
         "sync_ship_debug_panel_from_player",
         "on_debug_ship_hull_changed",
@@ -2486,6 +2519,7 @@
         "toggle_player_ship_fire_for_debug",
         "toggle_player_rowing_for_debug",
         "auto_adjust_player_sail_for_debug",
+        "toggle_player_masts_folded_for_debug",
         "adjust_player_crew_capacity_for_debug",
         "adjust_player_captain_count_for_debug",
         "adjust_player_support_limit_for_debug",
@@ -2509,7 +2543,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/ui/hud/hud_stat_panel_helper.gd": {
-      "count": 23,
+      "count": 34,
       "functions": [
         "process_stat_panel",
         "toggle_stat_panel",
@@ -2522,16 +2556,27 @@
         "_rebuild_site_bonus_content",
         "_create_section",
         "_create_stat_row",
+        "_apply_row_tooltip",
         "_create_icon_label",
+        "_get_detail_column_count",
+        "_sections_have_rows",
+        "_build_cannon_damage_tooltip",
+        "_build_cannon_damage_mult_tooltip",
+        "_build_cannon_reload_tooltip",
+        "_build_percent_bonus_tooltip",
+        "_build_flat_bonus_tooltip",
+        "_format_percent",
+        "_format_flat_bonus",
         "_get_primary_cannon",
         "_get_cannon_projectile_stats",
         "_collect_crew_stats",
         "_is_dead_soldier_node",
-        "_get_item_names",
         "_build_site_bonus_rows",
         "_make_site_bonus_row",
+        "_build_site_bonus_tooltip",
         "_load_site_bonus_entries",
         "_format_site_bonus_value",
+        "_get_site_bonus_total",
         "_get_float",
         "_get_int"
       ],
@@ -2649,7 +2694,7 @@
       "reason": "Support fleet cannon helper owns support broadside scaling, slot-aware support summary generation, and authored support cannon activation rules."
     },
     "res://scripts/entities/ships/support_fleet_formation_helper.gd": {
-      "count": 32,
+      "count": 36,
       "functions": [
         "get_support_fleet_offset",
         "get_support_join_offset",
@@ -2677,6 +2722,10 @@
         "_get_role_spacing_value",
         "_get_role_lateral_scale",
         "_get_role_side_sign",
+        "_is_screen_role",
+        "_get_flagship_turn_clearance_blend",
+        "_get_flagship_turn_side",
+        "_should_follow_flagship_directly",
         "_is_named_support_role",
         "_get_role_spec",
         "_get_formation_value",
@@ -2704,16 +2753,20 @@
       "reason": "Support fleet state helper owns flagship-scoped support doctrine state, ownership links, and effective formation or hold lookup."
     },
     "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
-      "count": 15,
+      "count": 19,
       "functions": [
         "setup_upgrade_tooltip",
         "bind_upgrade_slot_hover",
+        "bind_text_tooltip_hover",
         "on_upgrade_slot_mouse_entered",
+        "on_text_tooltip_mouse_entered",
         "on_upgrade_slot_mouse_exited",
+        "on_text_tooltip_mouse_exited",
         "update_upgrade_tooltip_state",
         "show_slot_tooltip",
         "slot_has_tooltip",
         "get_slot_tooltip_payload",
+        "_control_allows_current_context",
         "hide_upgrade_tooltip",
         "update_upgrade_tooltip_position",
         "update_upgrade_track_slot",
@@ -2725,7 +2778,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
-      "count": 15,
+      "count": 16,
       "functions": [
         "resolve_support_fleet_profile_for_levels",
         "get_support_slot_plan_for_levels",
@@ -2736,6 +2789,7 @@
         "get_profile_id",
         "get_profile_ship_type",
         "get_profile_hull_scene",
+        "get_profile_ship_scene",
         "get_profile_cannon_scene",
         "profile_matches_runtime_ship",
         "apply_support_fleet_profile",
@@ -3380,6 +3434,11 @@
       "from": "res://scripts/test/project_contract_upgrade_helper.gd",
       "to": "res://scripts/managers/upgrade_manager_data_helper.gd",
       "reason": "Accepted helper dependency for the current owner boundary; revisit when extracting or consolidating the related subsystem."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd|res://scripts/managers/level_manager_progression_helper.gd": {
+      "from": "res://scripts/test/project_contract_hud_helper.gd",
+      "to": "res://scripts/managers/level_manager_progression_helper.gd",
+      "reason": "HUD contract helper validates XP bar progression through the level progression helper so the stats overlay remains covered by project contracts."
     }
   },
   "hazard_baselines": {
@@ -3937,6 +3996,11 @@
       "reason": "Accepted duplicate helper entrypoint in current owner boundaries; rename or consolidate when touching these modules.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
+    },
+    "large_helper|res://scripts/entities/soldiers/soldier_ai_helper.gd": {
+      "reason": "Soldier AI helper still owns the compact idle/wander/move/attack state machine; recent cleanup removed repeated retarget fallback blocks, and a future split should extract movement/target validation deliberately.",
+      "priority": "baseline",
+      "recommended_action": "Extract movement/target-validation helpers when soldier state-machine behavior is next refactored."
     }
   }
 }

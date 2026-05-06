@@ -1,4 +1,5 @@
 extends Area3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 부유물(Floating Loot) 시스템
 ## 적 함선이 침몰할 때 바다에 스폰되며, 플레이어가 다가가면 자석처럼 끌려와 획득됨
@@ -108,6 +109,12 @@ func _env_flag_enabled(name: String) -> bool:
 	return value == "1" or value == "true" or value == "yes" or value == "on"
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("floating_loot_physics", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if is_collected or not is_inside_tree():
 		return
 	time_alive += delta

@@ -11,6 +11,9 @@ const CANNON_SLOTS := "CannonSlots"
 const WEAPON_SLOTS := "WeaponSlots"
 const CREW_SLOTS := "CrewSlots"
 const DECK_AREA := "DeckArea"
+const DECK_AREA_POINTS := "Points"
+const DECK_AREA_END_WIDTH_RATIO := 0.28
+const DECK_AREA_FULL_WIDTH_Z_RATIO := 0.48
 
 
 static func build_summary(ship: Node) -> Dictionary:
@@ -105,6 +108,58 @@ static func get_authoring_markers(ship: Node, container_name: String) -> Array[N
 		return markers
 	_collect_marker_descendants(container, markers)
 	return markers
+
+
+static func get_deck_area_half_extents(ship: Node) -> Vector2:
+	if not (ship is Node3D):
+		return Vector2.ZERO
+	var deck_area := _get_authoring_container(ship, DECK_AREA) as Node3D
+	if not is_instance_valid(deck_area):
+		return Vector2.ZERO
+	if not _is_deck_area_configured(deck_area):
+		return Vector2.ZERO
+	var point_polygon := _get_deck_area_polygon_points(deck_area, ship as Node3D)
+	if point_polygon.size() >= 3:
+		return _get_polygon_half_extents(point_polygon)
+	var ship_3d := ship as Node3D
+	var transform_to_ship := _get_transform_relative_to_ancestor(deck_area, ship_3d)
+	var x_axis := transform_to_ship.basis.x
+	var z_axis := transform_to_ship.basis.z
+	var half_width := absf(x_axis.x) + absf(z_axis.x)
+	var half_length := absf(x_axis.z) + absf(z_axis.z)
+	if half_width <= 0.01 or half_length <= 0.01:
+		return Vector2.ZERO
+	return Vector2(half_width, half_length)
+
+
+static func get_deck_area_half_width_at_z(ship: Node, local_z: float) -> float:
+	var half_extents := get_deck_area_half_extents(ship)
+	if half_extents.x <= 0.01 or half_extents.y <= 0.01:
+		return -1.0
+	var deck_area := _get_authoring_container(ship, DECK_AREA) as Node3D
+	if not is_instance_valid(deck_area) or not (ship is Node3D):
+		return -1.0
+	var point_polygon := _get_deck_area_polygon_points(deck_area, ship as Node3D)
+	if point_polygon.size() >= 3:
+		return _get_polygon_half_width_at_z(point_polygon, local_z)
+	var transform_to_ship := _get_transform_relative_to_ancestor(deck_area, ship as Node3D)
+	var deck_local := transform_to_ship.affine_inverse() * Vector3(0.0, 0.0, local_z)
+	var normalized_z := clampf(absf(deck_local.z), 0.0, 1.0)
+	var taper_t := clampf((normalized_z - DECK_AREA_FULL_WIDTH_Z_RATIO) / maxf(0.01, 1.0 - DECK_AREA_FULL_WIDTH_Z_RATIO), 0.0, 1.0)
+	var width_factor := lerpf(1.0, DECK_AREA_END_WIDTH_RATIO, taper_t)
+	return maxf(0.08, half_extents.x * width_factor)
+
+
+static func get_deck_area_height(ship: Node) -> float:
+	if not (ship is Node3D):
+		return -1.0
+	var deck_area := _get_authoring_container(ship, DECK_AREA) as Node3D
+	if not is_instance_valid(deck_area):
+		return -1.0
+	if not _is_deck_area_configured(deck_area):
+		return -1.0
+	var transform_to_ship := _get_transform_relative_to_ancestor(deck_area, ship as Node3D)
+	return transform_to_ship.origin.y
 
 
 static func get_boarding_anchor_local(ship: Node3D, side_sign: float, along_offset: float, fallback_local: Vector3) -> Vector3:
@@ -362,6 +417,89 @@ static func _collect_node3d_leaf_descendants(node: Node, out: Array[Node3D]) -> 
 			_collect_node3d_leaf_descendants(child, out)
 		elif child is Node3D:
 			out.append(child as Node3D)
+
+
+static func _is_deck_area_configured(deck_area: Node3D) -> bool:
+	if not is_instance_valid(deck_area):
+		return false
+	if _get_deck_area_point_markers(deck_area).size() >= 3:
+		return true
+	var scale := deck_area.scale
+	if not is_equal_approx(scale.x, 1.0) or not is_equal_approx(scale.z, 1.0):
+		return true
+	return bool(deck_area.get_meta("use_authored_deck_area", false))
+
+
+static func _get_deck_area_polygon_points(deck_area: Node3D, ship: Node3D) -> Array[Vector3]:
+	var points: Array[Vector3] = []
+	if not is_instance_valid(deck_area) or not is_instance_valid(ship):
+		return points
+	var transform_to_ship := _get_transform_relative_to_ancestor(deck_area, ship)
+	for marker in _get_deck_area_point_markers(deck_area):
+		points.append(transform_to_ship * marker.position)
+	return points
+
+
+static func _get_deck_area_point_markers(deck_area: Node3D) -> Array[Marker3D]:
+	var markers: Array[Marker3D] = []
+	if not is_instance_valid(deck_area):
+		return markers
+	var points_root := deck_area.get_node_or_null(DECK_AREA_POINTS)
+	if not is_instance_valid(points_root):
+		return markers
+	for child in points_root.get_children():
+		if child is Marker3D:
+			markers.append(child as Marker3D)
+	return markers
+
+
+static func _get_polygon_half_extents(points: Array[Vector3]) -> Vector2:
+	var half_width := 0.0
+	var half_length := 0.0
+	for point in points:
+		half_width = maxf(half_width, absf(point.x))
+		half_length = maxf(half_length, absf(point.z))
+	if half_width <= 0.01 or half_length <= 0.01:
+		return Vector2.ZERO
+	return Vector2(half_width, half_length)
+
+
+static func _get_polygon_half_width_at_z(points: Array[Vector3], local_z: float) -> float:
+	var intersections: Array[float] = []
+	for index in range(points.size()):
+		var a: Vector3 = points[index]
+		var b: Vector3 = points[(index + 1) % points.size()]
+		var min_z := minf(a.z, b.z)
+		var max_z := maxf(a.z, b.z)
+		if local_z < min_z or local_z > max_z:
+			continue
+		var dz := b.z - a.z
+		if absf(dz) <= 0.0001:
+			continue
+		var t := clampf((local_z - a.z) / dz, 0.0, 1.0)
+		intersections.append(lerpf(a.x, b.x, t))
+	if intersections.size() < 2:
+		return -1.0
+	intersections.sort()
+	var left := float(intersections.front())
+	var right := float(intersections.back())
+	return maxf(0.08, maxf(absf(left), absf(right)))
+
+
+static func _get_transform_relative_to_ancestor(node: Node3D, ancestor: Node3D) -> Transform3D:
+	if not is_instance_valid(node) or not is_instance_valid(ancestor):
+		return Transform3D.IDENTITY
+	if node.is_inside_tree() and ancestor.is_inside_tree():
+		return ancestor.global_transform.affine_inverse() * node.global_transform
+	var transform := Transform3D.IDENTITY
+	var current: Node = node
+	while is_instance_valid(current) and current != ancestor:
+		if current is Node3D:
+			transform = (current as Node3D).transform * transform
+		current = current.get_parent()
+	if current != ancestor:
+		return Transform3D.IDENTITY
+	return transform
 
 
 static func _anchor_matches_side(marker: Node3D, side_sign: float) -> bool:

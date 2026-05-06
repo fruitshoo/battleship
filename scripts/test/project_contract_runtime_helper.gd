@@ -897,7 +897,12 @@ static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String
 
 	derelict_ship.call("_become_derelict")
 	await _wait_frames(owner, 1)
-	derelict_ship.global_position = player_ship.global_position + Vector3(0.0, 0.0, -1.0)
+	derelict_ship.set_meta("derelict_nonblocking", true)
+	derelict_ship.set("hull_hp", 50.0)
+	var approach_dir := Vector3(0.0, 0.0, -1.0)
+	var player_contact_radius: float = float(player_ship.call("get_directional_collision_radius", approach_dir)) if player_ship.has_method("get_directional_collision_radius") else 4.5
+	var derelict_contact_radius: float = float(derelict_ship.call("get_directional_collision_radius", -approach_dir)) if derelict_ship.has_method("get_directional_collision_radius") else 2.5
+	derelict_ship.global_position = player_ship.global_position + approach_dir * (player_contact_radius + derelict_contact_radius + 2.0)
 	var player_max_hull: float = float(player_ship.get("max_hull_hp"))
 	var player_hull_before: float = maxf(1.0, player_max_hull - 20.0)
 	player_ship.set("hull_hp", player_hull_before)
@@ -907,16 +912,26 @@ static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String
 
 	if derelict_ship.get_meta("derelict_contact_salvaged", false) != true:
 		failures.append("derelict contact smoke did not mark salvage on contact")
+	if derelict_ship.get_meta("derelict_contact_disposal_started", false) != true:
+		failures.append("derelict approach smoke did not mark disposal as started")
 	if derelict_ship.get_meta("derelict_contact_ignition_started", false) != true:
-		failures.append("derelict contact smoke did not start fire-pot disposal")
+		failures.append("derelict approach smoke did not start fire-pot disposal before direct contact")
 	if derelict_ship.get_meta("derelict_nonblocking", false) != true:
 		failures.append("derelict contact smoke did not unlock nonblocking on contact")
+	if absf(float(player_ship.get("hull_hp")) - player_hull_before) > 0.01:
+		failures.append("derelict contact smoke should not grant immediate hull repair")
 	await _wait_frames(owner, 55)
 	if is_instance_valid(derelict_ship):
-		if not derelict_ship.get("is_sinking"):
-			failures.append("derelict contact smoke did not start sinking after fire-pot disposal")
 		if derelict_ship.get("is_burning") != true:
 			failures.append("derelict contact smoke did not ignite derelict ship")
+		if derelict_ship.get("is_sinking") == true:
+			failures.append("derelict contact smoke sank immediately instead of burning first")
+	await _wait_frames(owner, 360)
+	if is_instance_valid(derelict_ship):
+		if not derelict_ship.get("is_sinking"):
+			failures.append("derelict contact smoke did not start normal sinking after burning hull to zero")
+		if derelict_ship.get_meta("floating_loot_dropped", false) != true:
+			failures.append("derelict contact smoke should use floating loot reward after sinking")
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)

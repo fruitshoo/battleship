@@ -12,7 +12,7 @@ const SHIP_ARCHETYPE := "ship_archetype"
 const HULL_KOBAYABUNE := "res://scenes/ships/hulls/kobayabune_hull.tscn"
 const HULL_SEKIBUNE := "res://scenes/ships/hulls/sekibune_hull.tscn"
 const HULL_SEKIBUNE_MELEE := "res://scenes/ships/hulls/sekibune_melee_hull.tscn"
-const HULL_PANOKSEON := "res://scenes/ships/hulls/panokseon_hull.tscn"
+const HULL_PANOKSEON := "res://scenes/ships/hulls/panok_hull.tscn"
 const HULL_ATAKEBUNE := "res://scenes/ships/hulls/atakebune_hull.tscn"
 const HULL_MAENGSEON := "res://scenes/ships/hulls/maengseon_hull.tscn"
 

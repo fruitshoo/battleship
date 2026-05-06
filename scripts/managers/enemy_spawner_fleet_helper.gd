@@ -66,6 +66,16 @@ static func apply_enemy_spawn_rules_root(spawner, root: Dictionary) -> void:
 		spawner.max_enemies = int(general.get("max_enemies", spawner.max_enemies))
 		spawner.max_distance_limit = float(general.get("max_distance_limit", spawner.max_distance_limit))
 		spawner.reposition_check_interval = float(general.get("reposition_check_interval", spawner.reposition_check_interval))
+		if "pressure_reposition_min_distance" in spawner:
+			spawner.pressure_reposition_min_distance = float(general.get("pressure_reposition_min_distance", spawner.pressure_reposition_min_distance))
+		if "pressure_reposition_max_distance" in spawner:
+			spawner.pressure_reposition_max_distance = float(general.get("pressure_reposition_max_distance", spawner.pressure_reposition_max_distance))
+		if "boss_reposition_distance_limit" in spawner:
+			spawner.boss_reposition_distance_limit = float(general.get("boss_reposition_distance_limit", spawner.boss_reposition_distance_limit))
+		if "boss_pressure_reposition_min_distance" in spawner:
+			spawner.boss_pressure_reposition_min_distance = float(general.get("boss_pressure_reposition_min_distance", spawner.boss_pressure_reposition_min_distance))
+		if "boss_pressure_reposition_max_distance" in spawner:
+			spawner.boss_pressure_reposition_max_distance = float(general.get("boss_pressure_reposition_max_distance", spawner.boss_pressure_reposition_max_distance))
 
 	var formation_variant: Variant = root.get("formation", {})
 	if typeof(formation_variant) == TYPE_DICTIONARY:

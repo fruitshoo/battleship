@@ -24,6 +24,7 @@ const PlayerShipAuxHelper = preload("res://scripts/entities/ships/player_ship_au
 const PlayerSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
+const PhysicsProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 const PLAYER_MIN_VALID_HULL_HP := 100.0
 const PLAYER_FALLBACK_HULL_HP := 200.0
@@ -52,7 +53,7 @@ const CORPSE_CLEANUP_THROW_ARC_META := "corpse_cleanup_throw_arc"
 		if Engine.is_editor_hint():
 			_update_editor_hull()
 
-@export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/panokseon_hull.tscn")
+@export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/panok_hull.tscn")
 @export var has_sextant: bool = false # Sextant 아이템 소지 여부
 
 # === 노 젓기 ===
@@ -161,20 +162,8 @@ const CREW_ROLE_REPEATING_CROSSBOW := "repeating_crossbow"
 const CREW_ROLE_SINGIGEON := "singigeon"
 
 func _update_editor_hull() -> void:
-	# 에디터 전용: 선체 미리보기 갱신
-	for child in get_children():
-		if child.name.contains("Hull"):
-			child.queue_free()
-			
-	var stats = load_ship_stats(ship_type)
-	if stats.is_empty(): return
-	
-	var new_hull := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
-	if new_hull:
-		var inst = new_hull.instantiate()
-		inst.name = "EditorHull"
-		add_child(inst)
-		_cache_hull_references(self )
+	_ensure_editor_preview_hull(ship_type, hull_scene)
+	_cache_hull_references(self)
 
 func _ready() -> void:
 	set_ally_ship_role("player_flagship")
@@ -242,7 +231,8 @@ func _apply_runtime_scene_safety_defaults() -> void:
 	loot_scene = null
 	deck_light_player_only = true
 	floating_offset = PLAYER_RUNTIME_FLOATING_OFFSET
-	deck_height = PLAYER_RUNTIME_DECK_HEIGHT
+	var authored_deck_height := ShipAuthoringHelper.get_deck_area_height(self)
+	deck_height = authored_deck_height if authored_deck_height > 0.01 else PLAYER_RUNTIME_DECK_HEIGHT
 
 	boarding_contact_grace_duration = 0.5
 	boarding_hook_throw_delay = 0.55
@@ -308,6 +298,7 @@ func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint(): return
 	if is_sinking or is_dying:
 		return
+	var profile_start := PhysicsProfiler.begin()
 	
 	# 기본 물리 프로세스 (둥실거림 등)
 	super._physics_process(delta)
@@ -338,17 +329,20 @@ func _physics_process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
+	var support_profile_start := PhysicsProfiler.begin()
 	_update_support_fleet_respawn(delta)
 	_update_crew_respawn(delta)
 	_update_auto_boarding_raid(delta)
 	_update_fire_pot_logic(delta)
 	_update_corpse_cleanup(delta)
+	PhysicsProfiler.end("player_support_boarding", support_profile_start)
 	
 	if is_boarding:
 		_process_boarding_common(delta)
 		
 	PlayerShipRuntimeHelper.update_rowing_audio(self, delta)
 	PlayerShipRuntimeHelper.update_sail_wind_audio(self, delta)
+	PhysicsProfiler.end("player_ship_physics", profile_start)
 				
 
 func _unhandled_input(event: InputEvent) -> void:

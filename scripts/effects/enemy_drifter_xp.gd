@@ -2,6 +2,7 @@ extends Area3D
 class_name EnemyDrifterXP
 
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 const DRIFTER_CALL_LABEL_NAME := "DrifterCallLabel"
 const DRIFTER_CALL_LINES: Array[String] = [
@@ -104,6 +105,12 @@ func pool_reset() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("enemy_drifter_physics", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if is_collected or not is_inside_tree():
 		return
 	time_alive += delta

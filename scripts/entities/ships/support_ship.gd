@@ -33,6 +33,11 @@ func _ready() -> void:
 	if ship_type.strip_edges().is_empty() or ship_type == "sekibune_melee":
 		ship_type = "maengseon_ally"
 	set_ally_ship_role("support_fleet")
+	if Engine.is_editor_hint():
+		_remove_runtime_generated_hulls()
+		_cache_hull_references(self)
+		_refresh_collision_bounds_from_hull()
+		return
 	limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 	super._ready()
 	set_ally_ship_role("support_fleet")
@@ -163,15 +168,7 @@ func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
 
 
 func _rebuild_runtime_hull(stats: Dictionary) -> void:
-	for child in get_children():
-		if str(child.name).contains("Hull"):
-			remove_child(child)
-			child.queue_free()
-	var runtime_hull_scene: PackedScene = ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
-	if not is_instance_valid(runtime_hull_scene):
-		return
-	var hull_inst = runtime_hull_scene.instantiate()
-	add_child(hull_inst)
+	_ensure_hybrid_runtime_hull(ship_type, hull_scene, stats)
 
 
 func _reconcile_support_crew_count(target_count: int) -> void:

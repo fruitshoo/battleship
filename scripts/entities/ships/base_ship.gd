@@ -3,6 +3,7 @@ extends Node3D
 class_name BaseShip
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const BaseShipSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
 const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35
@@ -21,6 +22,7 @@ const SHIP_SINK_BUBBLES_DEFAULT_DELAY := 0.35
 const SHIP_SINK_BUBBLES_VOLUME_DB := -1.5
 const SHIP_SINK_BUBBLES_PITCH_MIN := 0.94
 const SHIP_SINK_BUBBLES_PITCH_MAX := 1.06
+const RUNTIME_GENERATED_HULL_META := "runtime_generated_hull"
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -42,6 +44,7 @@ const SHIP_SINK_BUBBLES_PITCH_MAX := 1.06
 @export_range(0.75, 1.1) var auto_fit_scale: float = 1.0 ## 선체 자동 충돌 타원 전체 스케일
 @export_range(0.0, 2.0) var collision_padding: float = 0.02 ## 충돌 판정 여유치(반폭/반길이에 추가)
 @export_range(0.6, 1.0) var deck_bounds_ratio: float = 0.88 ## 병사 덱 이동 범위 축소 비율
+@export_range(0, 24, 1) var max_dead_bodies_on_deck: int = 10 ## 갑판에 남겨둘 시체 상한. 초과분은 오래된 것부터 조용히 정리한다.
 
 # === 돛 관련 ===
 @export var sail_angle: float = 0.0 # 돛 각도 (-90 ~ 90도)
@@ -289,6 +292,9 @@ func get_collision_distance_to(other: Node3D) -> float:
 	return ShipContactGeometry.get_collision_distance_between(self, other)
 
 func get_deck_half_extents() -> Vector2:
+	var authored_deck_extents := ShipAuthoringHelper.get_deck_area_half_extents(self)
+	if authored_deck_extents.x > 0.01 and authored_deck_extents.y > 0.01:
+		return authored_deck_extents
 	var hull_ext = _hull_half_extents
 	if hull_ext.x <= 0.01 or hull_ext.y <= 0.01:
 		hull_ext = get_collision_half_extents()
@@ -297,6 +303,12 @@ func get_deck_half_extents() -> Vector2:
 		maxf(0.4, hull_ext.x * ratio),
 		maxf(0.8, hull_ext.y * ratio)
 	)
+
+func get_deck_half_width_at_z(local_z: float) -> float:
+	var authored_width := ShipAuthoringHelper.get_deck_area_half_width_at_z(self, local_z)
+	if authored_width > 0.01:
+		return authored_width
+	return get_deck_half_extents().x
 
 func _refresh_collision_bounds_from_hull() -> void:
 	var hull_ext = _compute_hull_half_extents()
@@ -561,6 +573,86 @@ func get_contact_area(area_name: String) -> Area3D:
 func get_soldiers_container() -> Node:
 	return get_node_or_null(NODE_SOLDIERS)
 
+func get_direct_hull_child(include_runtime_generated: bool = true) -> Node3D:
+	for child in get_children():
+		if not is_instance_valid(child) or not (child is Node3D):
+			continue
+		if not str(child.name).contains("Hull"):
+			continue
+		if not include_runtime_generated and _is_runtime_generated_hull(child):
+			continue
+		return child as Node3D
+	return null
+
+func get_authored_hull_child() -> Node3D:
+	for child in get_children():
+		if not is_instance_valid(child) or not (child is Node3D):
+			continue
+		if not str(child.name).contains("Hull"):
+			continue
+		if _is_runtime_generated_hull(child):
+			continue
+		return child as Node3D
+	return null
+
+func _is_runtime_generated_hull(node: Node) -> bool:
+	if not is_instance_valid(node):
+		return false
+	if bool(node.get_meta(RUNTIME_GENERATED_HULL_META, false)):
+		return true
+	return str(node.name) == "EditorHull"
+
+func _remove_runtime_generated_hulls() -> void:
+	for child in get_children():
+		if not is_instance_valid(child):
+			continue
+		if not str(child.name).contains("Hull"):
+			continue
+		if not _is_runtime_generated_hull(child):
+			continue
+		remove_child(child)
+		child.queue_free()
+
+func _ensure_hybrid_runtime_hull(type_name: String, fallback: PackedScene, stats: Dictionary) -> Node3D:
+	var authored_hull := get_authored_hull_child()
+	if is_instance_valid(authored_hull):
+		_remove_runtime_generated_hulls()
+		return authored_hull
+
+	_remove_runtime_generated_hulls()
+	var runtime_hull_scene: PackedScene = ShipBlueprintHelper.load_hull_scene(type_name, fallback, stats)
+	if not is_instance_valid(runtime_hull_scene):
+		return null
+	var hull_inst := runtime_hull_scene.instantiate() as Node3D
+	if not is_instance_valid(hull_inst):
+		return null
+	hull_inst.set_meta(RUNTIME_GENERATED_HULL_META, true)
+	add_child(hull_inst)
+	return hull_inst
+
+func _ensure_editor_preview_hull(type_name: String, fallback: PackedScene, stats: Dictionary = {}) -> Node3D:
+	var authored_hull := get_authored_hull_child()
+	if is_instance_valid(authored_hull):
+		_remove_runtime_generated_hulls()
+		return authored_hull
+
+	_remove_runtime_generated_hulls()
+	var resolved_stats := stats
+	if resolved_stats.is_empty():
+		resolved_stats = load_ship_stats(type_name)
+	if resolved_stats.is_empty():
+		return null
+	var preview_scene := ShipBlueprintHelper.load_hull_scene(type_name, fallback, resolved_stats)
+	if not is_instance_valid(preview_scene):
+		return null
+	var preview := preview_scene.instantiate() as Node3D
+	if not is_instance_valid(preview):
+		return null
+	preview.name = "EditorHull"
+	preview.set_meta(RUNTIME_GENERATED_HULL_META, true)
+	add_child(preview)
+	return preview
+
 func get_cannons_container() -> Node3D:
 	var preferred_node: Node3D = null
 	for child in get_children():
@@ -587,6 +679,37 @@ func ensure_cannons_container() -> Node3D:
 	cannons_node.name = NODE_CANNONS
 	add_child(cannons_node)
 	return cannons_node
+
+
+func enforce_dead_body_limit() -> void:
+	if max_dead_bodies_on_deck <= 0:
+		return
+	var bodies: Array[Node] = []
+	for soldier in EntityRegistry.get_soldiers_by_ship(self):
+		if not is_instance_valid(soldier):
+			continue
+		if not BaseShipSoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		if BaseShipSoldierStateHelper.is_incapacitated_soldier(soldier):
+			continue
+		if soldier.get_meta("corpse_cleanup_in_progress", false) == true:
+			continue
+		if soldier.get_meta("support_corpse_cleanup_in_progress", false) == true:
+			continue
+		bodies.append(soldier)
+
+	var overflow := bodies.size() - max_dead_bodies_on_deck
+	if overflow <= 0:
+		return
+	bodies.sort_custom(func(a: Node, b: Node) -> bool:
+		var a_frame := int(a.get_meta("dead_body_order", 0)) if is_instance_valid(a) else 0
+		var b_frame := int(b.get_meta("dead_body_order", 0)) if is_instance_valid(b) else 0
+		return a_frame < b_frame
+	)
+	for index in range(mini(overflow, bodies.size())):
+		var body := bodies[index]
+		if is_instance_valid(body):
+			body.queue_free()
 
 func clear_hull_defense_upgrade_nodes() -> void:
 	_queue_scene_contract_child(NODE_SPEAR_RAIL)
@@ -1125,7 +1248,9 @@ func check_derelict_status() -> void:
 
 
 func _update_boarding_state(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
 	BaseShipStatusHelper.update_boarding_state(self, delta)
+	PhysicsFrameProfiler.end("ship_boarding_state", profile_start)
 
 
 func get_hostile_boarder_count() -> int:
@@ -1309,7 +1434,10 @@ func _has_incoming_boarding_rope_link(attacker_node: Node) -> bool:
 
 ## 밧줄 연결 전/후로 배끼리 겹치는(통과하는) 것을 막아주는 강한 물리 반발력
 func _calculate_collision_repulsion() -> Vector3:
-	return BaseShipCollisionHelper.calculate_collision_repulsion(self)
+	var profile_start := PhysicsFrameProfiler.begin()
+	var result := BaseShipCollisionHelper.calculate_collision_repulsion(self)
+	PhysicsFrameProfiler.end("ship_collision_repulsion", profile_start)
+	return result
 
 func _is_engagement_pair(other: Node3D) -> bool:
 	if not is_instance_valid(other):
@@ -1369,7 +1497,8 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 			hull_hp,
 		])
 
-	if is_derelict and not damage_source.is_empty() and damage_source != "leak" and has_method("_sink_derelict"):
+	var is_derelict_disposal_fire_pot: bool = damage_source == "fire_pot" and get_meta("derelict_contact_ignition_started", false) == true
+	if is_derelict and not is_derelict_disposal_fire_pot and not damage_source.is_empty() and damage_source != "leak" and has_method("_sink_derelict"):
 		call_deferred("_sink_derelict")
 	
 	# 플레이어 무기 피해 집계: 적 함선에만 기록
@@ -1799,7 +1928,9 @@ func _is_boarding_contact_stable() -> bool:
 	return closing_speed <= boarding_max_relative_speed * 1.35
 
 func _process_boarding_common(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
 	BaseShipBoardingHelper.process_boarding_common(self, delta)
+	PhysicsFrameProfiler.end("ship_boarding_common", profile_start)
 
 func _cancel_boarding() -> void:
 	BaseShipBoardingHelper.cancel_boarding(self)

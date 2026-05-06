@@ -1,4 +1,5 @@
 extends Area3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 화통 (Fire Pot)
 ## 포물선으로 날아가 착탄 시 폭발하며 범위 데미지(화염)를 줍니다.
@@ -66,6 +67,12 @@ func setup_flight(start: Vector3, target: Vector3, flight_time: float = 1.0, arc
 	look_at(target_pos, up_vec)
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("projectile_fire_pot", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if has_exploded: return
 	_life_left -= delta
 	if _life_left <= 0.0:

@@ -37,6 +37,14 @@ enum FoldAxis { X, Y, Z }
 	set(value):
 		stow_target_path = value
 		_apply_fold_transform()
+@export var stow_target_uses_fold_pose: bool = false:
+	set(value):
+		stow_target_uses_fold_pose = value
+		_apply_fold_transform()
+@export var stow_target_local_offset := Vector3.ZERO:
+	set(value):
+		stow_target_local_offset = value
+		_apply_fold_transform()
 @export_range(0.0, 0.95, 0.01) var stow_start_ratio: float = 0.0:
 	set(value):
 		stow_start_ratio = value
@@ -95,6 +103,12 @@ func capture_current_as_rest() -> void:
 	_target_fold_ratio = 1.0 if folded else 0.0
 
 
+func get_fold_pose_transform_for_stow(raw_ratio: float = 1.0) -> Transform3D:
+	if not _has_rest_transform:
+		_capture_rest_transform()
+	return _get_hinge_fold_transform(_smooth_fold_ratio(raw_ratio))
+
+
 func _capture_rest_transform() -> void:
 	if _has_rest_transform:
 		return
@@ -109,8 +123,12 @@ func _apply_fold_transform() -> void:
 	if _has_stow_target():
 		transform = _get_stowed_fold_transform(eased_ratio)
 		return
+	transform = _get_hinge_fold_transform(eased_ratio)
+
+
+func _get_hinge_fold_transform(eased_ratio: float) -> Transform3D:
 	var fold_basis := Basis(_get_fold_axis_vector(), deg_to_rad(fold_angle_degrees) * eased_ratio)
-	transform = Transform3D(_rest_transform.basis * fold_basis, _rest_transform.origin)
+	return Transform3D(_rest_transform.basis * fold_basis, _rest_transform.origin)
 
 
 func _has_stow_target() -> bool:
@@ -120,15 +138,22 @@ func _has_stow_target() -> bool:
 
 
 func _get_stowed_fold_transform(eased_ratio: float) -> Transform3D:
-	var hinge_basis := Basis(_get_fold_axis_vector(), deg_to_rad(fold_angle_degrees) * eased_ratio)
-	var hinge_transform := Transform3D(_rest_transform.basis * hinge_basis, _rest_transform.origin)
+	var hinge_transform := _get_hinge_fold_transform(eased_ratio)
 	var stow_target := get_node_or_null(stow_target_path) as Node3D
 	if stow_target == null:
 		return hinge_transform
 	var start_ratio := clampf(stow_start_ratio, 0.0, 0.95)
 	var stow_ratio := clampf((eased_ratio - start_ratio) / (1.0 - start_ratio), 0.0, 1.0)
 	var stow_eased := _smooth_fold_ratio(stow_ratio)
-	return hinge_transform.interpolate_with(_get_target_local_transform(stow_target), stow_eased)
+	var target_transform := _get_target_local_transform(stow_target)
+	var stowed_basis := hinge_transform.basis.orthonormalized().slerp(
+		target_transform.basis.orthonormalized(),
+		stow_eased
+	)
+	return Transform3D(
+		_apply_rest_scale_to_basis(stowed_basis),
+		hinge_transform.origin.lerp(target_transform.origin, stow_eased)
+	)
 
 
 func _smooth_fold_ratio(value: float) -> float:
@@ -137,12 +162,42 @@ func _smooth_fold_ratio(value: float) -> float:
 
 
 func _get_target_local_transform(target: Node3D) -> Transform3D:
+	var target_transform := target.transform
+	if stow_target_uses_fold_pose and target.has_method("get_fold_pose_transform_for_stow"):
+		var folded_pose = target.call("get_fold_pose_transform_for_stow", 1.0)
+		if folded_pose is Transform3D:
+			target_transform = folded_pose
 	if target.get_parent() == get_parent():
-		return target.transform
+		target_transform.origin += stow_target_local_offset
+		return target_transform
 	var parent_3d := get_parent() as Node3D
 	if parent_3d == null:
-		return target.transform
-	return parent_3d.global_transform.affine_inverse() * target.global_transform
+		target_transform.origin += stow_target_local_offset
+		return target_transform
+	var target_parent_3d := target.get_parent() as Node3D
+	var target_global := target.global_transform
+	if stow_target_uses_fold_pose and is_instance_valid(target_parent_3d):
+		target_global = target_parent_3d.global_transform * target_transform
+	var local_transform := parent_3d.global_transform.affine_inverse() * target_global
+	local_transform.origin += stow_target_local_offset
+	return local_transform
+
+
+func _apply_rest_scale_to_basis(source_basis: Basis) -> Basis:
+	var result := source_basis.orthonormalized()
+	var rest_scale := _get_rest_basis_scale()
+	result.x *= rest_scale.x
+	result.y *= rest_scale.y
+	result.z *= rest_scale.z
+	return result
+
+
+func _get_rest_basis_scale() -> Vector3:
+	return Vector3(
+		_rest_transform.basis.x.length(),
+		_rest_transform.basis.y.length(),
+		_rest_transform.basis.z.length()
+	)
 
 
 func _get_fold_axis_vector() -> Vector3:

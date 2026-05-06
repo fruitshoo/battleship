@@ -1,0 +1,197 @@
+[gd_scene format=3 uid="uid://c7ydiawbfnx6r"]
+
+[ext_resource type="PackedScene" uid="uid://cm5ss5nsogbji" path="res://assets/models/ships/panok/panok.glb" id="1_panok_model"]
+[ext_resource type="PackedScene" uid="uid://bf8x1gkp3wln5" path="res://scenes/props/rudder.tscn" id="2_rudder_scene"]
+[ext_resource type="Script" uid="uid://dw3xat2vd631j" path="res://scripts/props/mast_fold_pivot.gd" id="3_mast_fold_script"]
+[ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="4_mast_scene"]
+[ext_resource type="PackedScene" uid="uid://betqhloq4wsph" path="res://scenes/props/sculling_oar.tscn" id="5_oar_scene"]
+[ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="6_authoring_visualizer"]
+[ext_resource type="PackedScene" uid="uid://jwpbskmjqpw2" path="res://scenes/props/ship_decor_flags/obang_center_hwangryong.tscn" id="8_7figf"]
+[ext_resource type="PackedScene" uid="uid://dsya706s4y2wn" path="res://scenes/props/ship_decor_flags/obang_front_jujak.tscn" id="9_xmbyd"]
+[ext_resource type="PackedScene" uid="uid://cdb7yamo8j1eg" path="res://scenes/props/ship_decor_flags/obang_rear_hyeonmu.tscn" id="10_7xoef"]
+[ext_resource type="Script" uid="uid://cua6d8e2qoc53" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
+
+[node name="PanokHull" type="Node3D" unique_id=466901266]
+
+[node name="Hull" parent="." unique_id=707038974 instance=ExtResource("1_panok_model")]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, 0, 0, 0)
+
+[node name="RudderVisual" parent="." unique_id=610151601 instance=ExtResource("2_rudder_scene")]
+transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0, 0.65, 4.75)
+
+[node name="Masts" type="Node3D" parent="." unique_id=363547022]
+
+[node name="MastPivot_01" type="Node3D" parent="Masts" unique_id=1207183188]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.71274257)
+script = ExtResource("3_mast_fold_script")
+fold_angle_degrees = 60.0
+fold_duration = 2.2
+
+[node name="Mast" parent="Masts/MastPivot_01" unique_id=304287122 instance=ExtResource("4_mast_scene")]
+transform = Transform3D(0.92, 0, 0, 0, 0.92, 0, 0, 0, 0.92, 0, 0, 0)
+
+[node name="MastPivot_02" type="Node3D" parent="Masts" unique_id=548850923]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 1.85)
+script = ExtResource("3_mast_fold_script")
+fold_angle_degrees = 60.0
+fold_duration = 2.2
+stow_target_path = NodePath("../MastStowTarget_02")
+
+[node name="Mast2" parent="Masts/MastPivot_02" unique_id=733208232 instance=ExtResource("4_mast_scene")]
+transform = Transform3D(0.92, 0, 0, 0, 0.92, 0, 0, 0, 0.92, 0, 0, 0)
+
+[node name="MastStowTarget_02" type="Marker3D" parent="Masts" unique_id=251005344]
+transform = Transform3D(1.02, 0, 0, 0, 0.51, -0.8833459, 0, 0.8833459, 0.51, 0.12, 0.85, -0.43)
+
+[node name="Oars" type="Node3D" parent="." unique_id=576126397]
+
+[node name="OarBaseLeftForward" parent="Oars" unique_id=1752625790 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, 0.027565075, -0.22885478, -0.034101058, 0.59893984, -0.010402305, 0.22797251, 0.022610992, 0.5545424, -1.9784002, 0.9485226, -2.0759258)
+
+[node name="OarBaseLeftMidForward" parent="Oars" unique_id=955503389 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, 0.027565075, -0.22885478, -0.034101058, 0.59893984, -0.010402305, 0.22797251, 0.022610992, 0.5545424, -2.0323703, 0.8990301, -0.93395054)
+
+[node name="OarBaseLeftMidRear" parent="Oars" unique_id=282701361 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, 0.027565075, -0.22885478, -0.034101058, 0.59893984, -0.010402305, 0.22797251, 0.022610992, 0.5545424, -2.0863402, 0.8495376, 0.20802474)
+
+[node name="OarBaseLeftRear" parent="Oars" unique_id=2107702065 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, 0.027565075, -0.22885478, -0.034101058, 0.59893984, -0.010402305, 0.22797251, 0.022610992, 0.5545424, -2.1403103, 0.8000451, 1.35)
+
+[node name="OarBaseRightForward" parent="Oars" unique_id=663352305 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, -0.027565075, 0.22885478, 0.034101058, 0.59893984, -0.010402305, -0.22797251, 0.022610992, 0.5545424, 1.9829645, 0.9472223, -2.2557857)
+
+[node name="OarBaseRightMidForward" parent="Oars" unique_id=1380927736 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, -0.027565075, 0.22885478, 0.034101058, 0.59893984, -0.010402305, -0.22797251, 0.022610992, 0.5545424, 2.0290222, 0.8901725, -1.0881896)
+
+[node name="OarBaseRightMidRear" parent="Oars" unique_id=420870411 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, -0.027565075, 0.22885478, 0.034101058, 0.59893984, -0.010402305, -0.22797251, 0.022610992, 0.5545424, 2.07508, 0.8331227, 0.07960653)
+
+[node name="OarBaseRightRear" parent="Oars" unique_id=1914788392 instance=ExtResource("5_oar_scene")]
+transform = Transform3D(0.5539546, -0.027565075, 0.22885478, 0.034101058, 0.59893984, -0.010402305, -0.22797251, 0.022610992, 0.5545424, 2.1211376, 0.7760728, 1.2470027)
+
+[node name="Authoring" type="Node3D" parent="." unique_id=1615549496]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+script = ExtResource("6_authoring_visualizer")
+
+[node name="DeckArea" type="Node3D" parent="Authoring" unique_id=666787735]
+script = ExtResource("deck_area_authoring")
+editor_alpha = 0.19
+editor_lift = 0.0
+metadata/use_authored_deck_area = true
+
+[node name="Points" type="Node3D" parent="Authoring/DeckArea" unique_id=421455651]
+
+[node name="BowLeft" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=1585573514]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4710133, 0, -4.685213)
+
+[node name="BowRight" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=1810527583]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5994606, 0, -4.685213)
+
+[node name="RightForward" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=1273753477]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2160223, 0, -0.48)
+
+[node name="RightAft" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=1882223951]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2160223, 0, 2.002)
+
+[node name="SternRight" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=170384510]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5994606, 0, 4.3857617)
+
+[node name="SternLeft" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=1362249966]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4710133, 0, 4.3857617)
+
+[node name="LeftAft" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=296171771]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2023578, 0, 2)
+
+[node name="LeftForward" type="Marker3D" parent="Authoring/DeckArea/Points" unique_id=940351984]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2023578, 0, -0.48)
+
+[node name="CannonSlots" type="Node3D" parent="Authoring" unique_id=1187771632]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.485, 0)
+visible = false
+
+[node name="CannonFront" type="Marker3D" parent="Authoring/CannonSlots" unique_id=129805909]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, -3.8605037)
+
+[node name="CannonLeft" type="Marker3D" parent="Authoring/CannonSlots" unique_id=872977]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -1.5658553, 1.1538216, 0)
+
+[node name="CannonRight" type="Marker3D" parent="Authoring/CannonSlots" unique_id=1588424195]
+transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 1.5875049, 1.2275401, 0.60971904)
+
+[node name="CannonLeftExtra" type="Marker3D" parent="Authoring/CannonSlots" unique_id=697247881]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -1.5658553, 1.1538216, -2.1)
+
+[node name="CannonRightExtraForward" type="Marker3D" parent="Authoring/CannonSlots" unique_id=978967565]
+transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 1.5875049, 1.2275401, -1.4902809)
+
+[node name="CannonLeftExtraRear" type="Marker3D" parent="Authoring/CannonSlots" unique_id=1556130986]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -1.5658553, 1.1538216, 2.1)
+
+[node name="CannonRightExtra" type="Marker3D" parent="Authoring/CannonSlots" unique_id=897031132]
+transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 1.5875049, 1.2275401, 2.709719)
+
+[node name="BoardingAnchors" type="Node3D" parent="Authoring" unique_id=729487736]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.76, 0)
+
+[node name="RightForward" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=718285148]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.225, 1.6500001, -4.523097)
+
+[node name="RightMid" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1130781892]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.126842, 1.6500001, 0)
+
+[node name="RightRear" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1910111397]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.225, 1.6500001, 4.260827)
+
+[node name="LeftForward" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1144013050]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.225, 1.6500001, -4.523097)
+
+[node name="LeftMid" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1545649435]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.126842, 1.6500001, 0)
+
+[node name="LeftRear" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1662737766]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.225, 1.6500001, 4.260827)
+
+[node name="Bow" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=2103241243]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6500001, -4.5650706)
+
+[node name="Stern" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1632681369]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6500001, 4.3775425)
+
+[node name="CrewSlots" type="Node3D" parent="Authoring" unique_id=86540202]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.925, 0)
+visible = false
+
+[node name="CrewForwardLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1524886638]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.865239, -3)
+
+[node name="CrewForwardRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=774287980]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.865239, -3)
+
+[node name="CrewMidLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=2057544652]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.865239, -0.45)
+
+[node name="CrewMidRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1681805267]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 1.865239, -0.45)
+
+[node name="CrewRearLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1189378773]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.865239, 2.2)
+
+[node name="CrewRearRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1531842965]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.865239, 2.2)
+
+[node name="CrewSternLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1024107253]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.865239, 3.45)
+
+[node name="CrewSternRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=988245468]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.865239, 3.45)
+
+[node name="flags" type="Node3D" parent="." unique_id=428911056]
+
+[node name="ObangCenterHwangryong" parent="flags" unique_id=478233447 instance=ExtResource("8_7figf")]
+transform = Transform3D(0.60621774, 0, -0.35, 0, 0.7, 0, 0.35, 0, 0.60621774, 1.239, 2, 0.507)
+
+[node name="ObangFrontJujak" parent="flags" unique_id=638418180 instance=ExtResource("9_xmbyd")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -1.5, 2, -4.5)
+
+[node name="ObangRearHyeonmu" parent="flags" unique_id=422666833 instance=ExtResource("10_7xoef")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.5, 2, -4.5)

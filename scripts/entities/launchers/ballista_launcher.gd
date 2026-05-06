@@ -1,4 +1,5 @@
 extends Node3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 팔우노 (Ballista Launcher)
 ## 적 병사를 조준하여 강력한 관통 화살을 발사합니다.
@@ -45,6 +46,12 @@ func _update_cached_stats() -> void:
 		_cached_pierce = int(s.get("base_pierce", 3) + (lv - 1) * s.get("pierce_per_lv", 1))
 
 func _process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_process(delta)
+	PhysicsFrameProfiler.end("launcher_ballista_process", profile_start)
+
+
+func _profiled_process(delta: float) -> void:
 	if not _is_owner_combat_ready():
 		current_target = null
 		return

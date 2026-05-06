@@ -1,5 +1,6 @@
 extends Area3D
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
 const RESCUE_CALL_LINES: Array[String] = [
 	"구해줘!",
@@ -105,6 +106,12 @@ func pool_reset() -> void:
 var is_expiring: bool = false # 소멸 진행 중 여부
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("survivor_physics", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if is_collected or not is_inside_tree():
 		return
 	time_alive += delta

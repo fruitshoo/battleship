@@ -20,6 +20,8 @@ const LIMBO_ACTIVE_SHIP_SCENE_PATHS := {
 	"res://scenes/ships/enemy_firepot_ship.tscn": ENEMY_FIREPOT_PILOT_TREE_PATH,
 	"res://scenes/ships/boss_ship.tscn": BOSS_PILOT_TREE_PATH,
 	"res://scenes/ships/support_ship.tscn": SUPPORT_PILOT_TREE_PATH,
+	"res://scenes/ships/support_maengseon_ship.tscn": SUPPORT_PILOT_TREE_PATH,
+	"res://scenes/ships/support_panokseon_ship.tscn": SUPPORT_PILOT_TREE_PATH,
 }
 
 var _failed := false

@@ -4,8 +4,13 @@
     "min_spawn_distance": 50.0,
     "max_spawn_distance": 70.0,
     "max_enemies": 2,
-    "max_distance_limit": 115.0,
-    "reposition_check_interval": 1.0
+    "max_distance_limit": 102.0,
+    "reposition_check_interval": 1.0,
+    "pressure_reposition_min_distance": 42.0,
+    "pressure_reposition_max_distance": 56.0,
+    "boss_reposition_distance_limit": 86.0,
+    "boss_pressure_reposition_min_distance": 34.0,
+    "boss_pressure_reposition_max_distance": 46.0
   },
   "spawn_recipes": {
     "light_raiders": {

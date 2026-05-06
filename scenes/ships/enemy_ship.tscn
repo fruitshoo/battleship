@@ -9,6 +9,10 @@ size = Vector3(3.12, 2.6000001, 7.92)
 size = Vector3(2.52, 2.4, 7.12)
 
 [node name="EnemyShip" unique_id=2138341481 instance=ExtResource("1_enemy_base")]
+transform = Transform3D(0.99904823, 0.043619372, 0, -0.04360594, 0.99874055, 0.024815997, 0.0010824582, -0.024792379, 0.999692, 0, -0.28, 0)
+base_collision_radius = 1.8392000555992127
+metadata/derelict_nonblocking = true
+metadata/derelict_started_at = 278917.582
 
 [node name="CollisionShape3D" parent="ProximityArea" parent_id_path=PackedInt32Array(694699390) index="0" unique_id=1935515166]
 shape = SubResource("BoxShape3D_pqtbs")

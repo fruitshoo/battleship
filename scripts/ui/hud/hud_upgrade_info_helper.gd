@@ -75,7 +75,12 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"cannon":
 			var player_count: int = SupportFleetCannonRules.get_player_cannon_count_for_level(level, stats)
 			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(level, stats, preview_levels, upgrades_data)
-			return "포문 %d문 | 지원함 %s" % [player_count, support_summary]
+			return "측면 포문 %d문 | 지원함 %s" % [player_count, support_summary]
+		"front_cannon":
+			var cannon_level := int(preview_levels.get("cannon", current_levels.get("cannon", 1)))
+			var cannon_stats: Dictionary = upgrades_data.get("cannon", {}).get("stats", {})
+			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(cannon_level, cannon_stats, preview_levels, upgrades_data)
+			return "전면 대포 1문 | 지원함 %s" % support_summary
 		"cannon_damage":
 			var dmg_mult := 1.0 + (float(stats.get("dmg_pct_per_lv", 8)) / 100.0) * float(level)
 			var shot_damage := PLAYER_CANNON_BASE_DAMAGE * dmg_mult

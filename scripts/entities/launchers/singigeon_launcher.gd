@@ -1,4 +1,5 @@
 extends Node3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_COMBAT_LOGS := false
 const SOLDIER_AIM_VERTICAL_OFFSET := 1.05
 const SHIP_AIM_VERTICAL_OFFSET := 0.65
@@ -47,6 +48,12 @@ func _update_cached_stats() -> void:
 		_cached_cooldown_mult = maxf(0.5, 1.0 - 0.05 * singigeon_lv)
 
 func _process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_process(delta)
+	PhysicsFrameProfiler.end("launcher_singigeon_process", profile_start)
+
+
+func _profiled_process(delta: float) -> void:
 	if not _is_owner_combat_ready():
 		_cached_target = null
 		return

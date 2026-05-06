@@ -5,6 +5,7 @@ const HudUpgradeTrack = preload("res://scripts/ui/hud/hud_upgrade_track.gd")
 const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const SAIL_MODE_ICON = preload("res://assets/ui/hud/sail_mode_icon.svg")
+const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 
 # Entry point
 static func setup_new_layout(hud) -> void:
@@ -43,12 +44,15 @@ static func apply_layout_density(hud) -> void:
 	var boarding_width := roundf(lerpf(168.0, 200.0, density))
 	var speed_row_width := roundf(lerpf(160.0, 180.0, density))
 	var speed_bar_width := roundf(lerpf(128.0, 148.0, density))
-	var stat_site_bonus_width := roundf(clampf(viewport_size.x * 0.26, 260.0, 340.0))
-	var stat_panel_width := roundf(minf(clampf(viewport_size.x * 0.54, 480.0, 680.0), maxf(320.0, viewport_size.x - edge_margin * 3.0 - stat_site_bonus_width)))
-	var stat_panel_height := roundf(clampf(viewport_size.y * 0.78, 420.0, 560.0))
+	var stat_has_site_bonus: bool = _stat_panel_has_site_bonus(hud)
+	var stat_site_bonus_width := roundf(clampf(viewport_size.x * 0.22, 240.0, 300.0)) if stat_has_site_bonus else 0.0
+	var available_stat_width: float = viewport_size.x - edge_margin * (3.0 if stat_has_site_bonus else 2.0) - stat_site_bonus_width
+	var stat_panel_max_width: float = 760.0 if stat_has_site_bonus else 820.0
+	var stat_panel_width := roundf(minf(clampf(viewport_size.x * (0.54 if stat_has_site_bonus else 0.48), 560.0, stat_panel_max_width), maxf(320.0, available_stat_width)))
+	var stat_panel_height := roundf(clampf(viewport_size.y * 0.72, 420.0, 560.0))
 	var stat_site_bonus_height := roundf(lerpf(300.0, 382.0, density))
 	var stat_top := roundf(lerpf(42.0, 48.0, density))
-	var stat_rail_stacked := viewport_size.x < edge_margin * 3.0 + 320.0 + stat_site_bonus_width
+	var stat_rail_stacked := stat_has_site_bonus and viewport_size.x < edge_margin * 3.0 + 320.0 + stat_site_bonus_width
 	if stat_rail_stacked:
 		var stacked_width := roundf(maxf(280.0, viewport_size.x - edge_margin * 2.0))
 		stat_panel_width = stacked_width
@@ -122,6 +126,7 @@ static func apply_layout_density(hud) -> void:
 		if is_instance_valid(stat_box):
 			stat_box.custom_minimum_size = Vector2(stat_panel_width - 24.0, stat_panel_height - 40.0)
 	if is_instance_valid(hud.stat_site_bonus_panel):
+		hud.stat_site_bonus_panel.visible = hud.show_stat_panel and stat_has_site_bonus
 		if stat_rail_stacked:
 			hud.stat_site_bonus_panel.anchor_left = 0.0
 			hud.stat_site_bonus_panel.anchor_right = 0.0
@@ -430,7 +435,7 @@ static func setup_stat_panel(hud) -> void:
 
 	var stat_box = VBoxContainer.new()
 	stat_box.custom_minimum_size = Vector2(352, 300)
-	stat_box.add_theme_constant_override("separation", 8)
+	stat_box.add_theme_constant_override("separation", 6)
 	hud.stat_panel.add_child(stat_box)
 
 	var title = Label.new()
@@ -452,7 +457,7 @@ static func setup_stat_panel(hud) -> void:
 
 	hud.stat_content = VBoxContainer.new()
 	hud.stat_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hud.stat_content.add_theme_constant_override("separation", 10)
+	hud.stat_content.add_theme_constant_override("separation", 6)
 	stat_scroll_gutter.add_child(hud.stat_content)
 
 	hud.stat_site_bonus_panel = MarginContainer.new()
@@ -517,6 +522,17 @@ static func setup_bottom_right_layout(hud) -> void:
 	if hud.item_bar == null:
 		hud.item_bar = HudItemBar.new()
 		hud.bottom_right_container.add_child(hud.item_bar)
+
+static func _stat_panel_has_site_bonus(hud) -> bool:
+	if hud == null or not is_instance_valid(hud.player_ship):
+		return false
+	var totals_variant: Variant = hud.player_ship.get_meta(SITE_BONUS_TOTALS_META, {})
+	if typeof(totals_variant) != TYPE_DICTIONARY:
+		return false
+	for value in (totals_variant as Dictionary).values():
+		if absf(float(value)) > 0.0001:
+			return true
+	return false
 
 static func setup_bottom_left_layout(hud) -> void:
 	if hud == null:

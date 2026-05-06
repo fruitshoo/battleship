@@ -11,6 +11,7 @@ const HudItemDisplayHelper = preload("res://scripts/ui/hud/hud_item_display_help
 const HudProgressionLayoutHelper = preload("res://scripts/ui/hud/hud_progression_layout_helper.gd")
 const HudRuntimeHelper = preload("res://scripts/ui/hud/hud_runtime_helper.gd")
 const HudShipHealthOverlayHelper = preload("res://scripts/ui/hud/hud_ship_health_overlay_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const RESULT_SCENE_PATH := "res://scenes/ui/result_screen.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
@@ -84,6 +85,8 @@ var debug_enemy_ai_value: Label = null
 var debug_ally_ai_value: Label = null
 var debug_player_soldier_ai_value: Label = null
 var debug_enemy_soldier_ai_value: Label = null
+var performance_overlay_panel: PanelContainer = null
+var performance_overlay_label: Label = null
 var debug_ship_hull_slider: HSlider = null
 var debug_ship_hull_value: Label = null
 var debug_ship_stamina_slider: HSlider = null
@@ -146,6 +149,8 @@ var ship_hp_bars: Dictionary = {}
 var player_status_root: Control = null
 @export var show_ship_health_bars: bool = true
 @export var show_stat_panel: bool = false
+@export var show_performance_overlay: bool = false
+@export_range(0.1, 2.0) var performance_overlay_refresh_interval: float = 0.25
 var stat_backdrop: ColorRect = null
 var stat_panel: PanelContainer = null
 var stat_scroll: ScrollContainer = null
@@ -163,6 +168,7 @@ var _debug_modal_active: bool = false
 var _debug_modal_previous_paused: bool = false
 var _debug_modal_previous_layer: int = 0
 var _debug_modal_previous_process_mode: ProcessMode = Node.PROCESS_MODE_INHERIT
+var _performance_overlay_refresh_left: float = 0.0
 
 # Upgrade slot UI
 var weapon_container: Container = null
@@ -226,6 +232,7 @@ func _ready() -> void:
 	update_score(0)
 	update_crew_status(4)
 	_setup_sail_debug_panel()
+	_setup_performance_overlay()
 	if gust_warning:
 		gust_warning.visible = false
 	call_deferred("_refresh_owned_item_icons")
@@ -322,6 +329,7 @@ func _adjust_player_ship_float_for_debug(property_name: String, delta_value: flo
 
 func _process(delta: float) -> void:
 	HudRuntimeHelper.process_hud(self, delta)
+	_update_performance_overlay(delta)
 
 
 func _sync_game_time(delta: float) -> void:
@@ -459,6 +467,11 @@ func toggle_stat_panel() -> void:
 	HudStatPanelHelper.toggle_stat_panel(self)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_performance_overlay_toggle_event(event):
+		_toggle_performance_overlay()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
 	if _is_debug_tools_toggle_event(event):
 		_toggle_debug_tools_panel_from_shortcut()
 		if get_viewport():
@@ -477,6 +490,125 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_stat_panel()
 		if get_viewport():
 			get_viewport().set_input_as_handled()
+
+
+func _is_performance_overlay_toggle_event(event: InputEvent) -> bool:
+	if not OS.is_debug_build():
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.is_echo():
+		return false
+	if key_event.alt_pressed or key_event.meta_pressed:
+		return false
+	if not key_event.ctrl_pressed or not key_event.shift_pressed:
+		return false
+	return key_event.physical_keycode == KEY_P or key_event.keycode == KEY_P
+
+
+func _setup_performance_overlay() -> void:
+	if not OS.is_debug_build():
+		return
+	if OS.has_environment("BATTLESHIP_SHOW_PERF_OVERLAY"):
+		show_performance_overlay = OS.get_environment("BATTLESHIP_SHOW_PERF_OVERLAY") != "0"
+	PhysicsFrameProfiler.set_enabled(show_performance_overlay)
+	if is_instance_valid(performance_overlay_panel):
+		performance_overlay_panel.visible = show_performance_overlay
+		return
+
+	performance_overlay_panel = PanelContainer.new()
+	performance_overlay_panel.name = "PerformanceOverlay"
+	performance_overlay_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	performance_overlay_panel.offset_left = 14.0
+	performance_overlay_panel.offset_top = 158.0
+	performance_overlay_panel.offset_right = 316.0
+	performance_overlay_panel.offset_bottom = 430.0
+	performance_overlay_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	performance_overlay_panel.visible = show_performance_overlay
+
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.02, 0.04, 0.065, 0.82)
+	panel_style.border_color = Color(0.82, 0.65, 0.34, 0.7)
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(4)
+	panel_style.content_margin_left = 9.0
+	panel_style.content_margin_top = 7.0
+	panel_style.content_margin_right = 9.0
+	panel_style.content_margin_bottom = 7.0
+	performance_overlay_panel.add_theme_stylebox_override("panel", panel_style)
+
+	performance_overlay_label = Label.new()
+	performance_overlay_label.name = "PerformanceOverlayLabel"
+	performance_overlay_label.text = "Performance"
+	performance_overlay_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	performance_overlay_label.add_theme_font_size_override("font_size", 11)
+	performance_overlay_label.add_theme_color_override("font_color", Color(0.88, 0.91, 0.9, 1.0))
+	performance_overlay_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
+	performance_overlay_label.add_theme_constant_override("outline_size", 2)
+	performance_overlay_panel.add_child(performance_overlay_label)
+	add_child(performance_overlay_panel)
+	_update_performance_overlay(999.0)
+
+
+func _toggle_performance_overlay() -> void:
+	if not OS.is_debug_build():
+		return
+	if not is_instance_valid(performance_overlay_panel):
+		_setup_performance_overlay()
+	show_performance_overlay = not show_performance_overlay
+	PhysicsFrameProfiler.set_enabled(show_performance_overlay)
+	if is_instance_valid(performance_overlay_panel):
+		performance_overlay_panel.visible = show_performance_overlay
+	_performance_overlay_refresh_left = 0.0
+	_update_performance_overlay(999.0)
+
+
+func _update_performance_overlay(delta: float) -> void:
+	if not show_performance_overlay:
+		return
+	if not is_instance_valid(performance_overlay_panel) or not is_instance_valid(performance_overlay_label):
+		return
+	_performance_overlay_refresh_left = maxf(0.0, _performance_overlay_refresh_left - delta)
+	if _performance_overlay_refresh_left > 0.0:
+		return
+	_performance_overlay_refresh_left = performance_overlay_refresh_interval
+	performance_overlay_label.text = _build_performance_overlay_text()
+
+
+func _build_performance_overlay_text() -> String:
+	var fps := float(Performance.get_monitor(Performance.TIME_FPS))
+	var frame_ms := 0.0 if fps <= 0.0 else 1000.0 / fps
+	var process_ms := float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
+	var physics_ms := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
+	var ship_count := EntityRegistry.count_ships()
+	var enemy_ship_count := EntityRegistry.count_ships_by_team("enemy")
+	var player_ship_count := EntityRegistry.count_ships_by_team("player")
+	var soldier_count := EntityRegistry.count_soldiers()
+	var projectile_count := EntityRegistry.count_projectiles()
+	var node_count := int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	var object_count := int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	var resource_count := int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT))
+	var draw_calls := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	var render_objects := int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
+	var primitives := int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
+	var physics_objects := int(Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS))
+	var collision_pairs := int(Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS))
+	var static_mb := float(Performance.get_monitor(Performance.MEMORY_STATIC)) / 1048576.0
+	var profiler_lines := PhysicsFrameProfiler.build_summary_lines(9)
+	var profiler_text := ""
+	if not profiler_lines.is_empty():
+		profiler_text = "\n" + "\n".join(profiler_lines)
+	return (
+		"PERF [Ctrl+Shift+P]\n"
+		+ "FPS %d  frame %.1fms\n" % [roundi(fps), frame_ms]
+		+ "CPU process %.1fms  physics %.1fms\n" % [process_ms, physics_ms]
+		+ "Ships %d  P/E %d/%d\n" % [ship_count, player_ship_count, enemy_ship_count]
+		+ "Soldiers %d  Projectiles %d\n" % [soldier_count, projectile_count]
+		+ "Nodes %d  Objects %d  Res %d\n" % [node_count, object_count, resource_count]
+		+ "Render draw %d  obj %d  prim %d\n" % [draw_calls, render_objects, primitives]
+		+ "Phys3D obj %d  pairs %d\n" % [physics_objects, collision_pairs]
+		+ "Static mem %.1f MB" % static_mb
+		+ profiler_text
+	)
 
 
 func _is_debug_tools_toggle_event(event: InputEvent) -> bool:

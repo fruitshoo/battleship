@@ -9,6 +9,7 @@ const SPEECH_TIMER_META := "speech_timer"
 const SPEECH_VISIBLE_TIMER_META := "speech_visible_timer"
 const SPEECH_DURATION_META := "speech_duration"
 const SPEECH_LAST_CONTEXT_META := "speech_last_context"
+const SPEECH_LINES_DATA_PATH := "res://data/soldier_speech_lines.json"
 
 const CAPTAIN_GENERAL_LINES: Array[String] = [
 	"대열을 지켜라!",
@@ -34,6 +35,12 @@ const CAPTAIN_DANGER_LINES: Array[String] = [
 	"지원함을 불러라!",
 	"버텨라!",
 ]
+const CAPTAIN_FIRE_LINES: Array[String] = [
+	"불길을 잡아라!",
+	"물동이를 돌려라!",
+	"돛에 불 붙지 않게!",
+	"침착해라, 불부터 꺼라!",
+]
 const CREW_RANGED_LINES: Array[String] = [
 	"쏩니다!",
 	"맞춰라!",
@@ -49,12 +56,21 @@ const CREW_DANGER_LINES: Array[String] = [
 	"위험합니다!",
 	"도와줘!",
 ]
+const CREW_FIRE_LINES: Array[String] = [
+	"불이야!",
+	"물 가져와!",
+	"갑판에 불!",
+	"불길이 번집니다!",
+]
 const ENEMY_BOARDING_LINES: Array[String] = [
 	"갑판을 빼앗아라!",
 	"조선 배에 올랐다!",
 	"몰아붙여!",
 	"물러서지 마라!",
 ]
+
+static var _speech_lines_loaded: bool = false
+static var _speech_lines_data: Dictionary = {}
 
 
 static func reset(soldier) -> void:
@@ -78,9 +94,10 @@ static func update(soldier, delta: float) -> void:
 	var previous_context := str(soldier.get_meta(SPEECH_LAST_CONTEXT_META, ""))
 	if context != previous_context:
 		soldier.set_meta(SPEECH_LAST_CONTEXT_META, context)
-		if context == "enemy_boarding":
+		if context == "enemy_boarding" or context == "fire":
 			var current_timer := float(soldier.get_meta(SPEECH_TIMER_META, 0.0))
-			soldier.set_meta(SPEECH_TIMER_META, minf(current_timer, randf_range(0.7, 1.6)))
+			var reaction_delay := randf_range(0.45, 1.1) if context == "fire" else randf_range(0.7, 1.6)
+			soldier.set_meta(SPEECH_TIMER_META, minf(current_timer, reaction_delay))
 
 	var duration: float = float(soldier.get_meta(SPEECH_DURATION_META, 2.0))
 	var visible_timer: float = float(soldier.get_meta(SPEECH_VISIBLE_TIMER_META, 0.0))
@@ -176,12 +193,16 @@ static func _get_label_color(soldier, alpha: float) -> Color:
 		return Color(1.0, 0.9, 0.45, alpha)
 	if _is_enemy_boarder_on_player_ship(soldier):
 		return Color(1.0, 0.45, 0.35, alpha)
+	if _is_owned_ship_burning(soldier):
+		return Color(1.0, 0.62, 0.28, alpha)
 	return Color(0.88, 0.95, 1.0, alpha)
 
 
 static func _get_context(soldier) -> String:
 	if _is_enemy_boarder_on_player_ship(soldier):
 		return "enemy_boarding"
+	if _is_owned_ship_burning(soldier):
+		return "fire"
 	if _is_danger_context(soldier):
 		return "danger"
 	if int(soldier.get("current_state")) == int(soldier.State.ATTACK):
@@ -193,27 +214,31 @@ static func _get_context(soldier) -> String:
 
 static func _get_lines_for_context(soldier, context: String) -> Array[String]:
 	if _is_enemy_boarder_on_player_ship(soldier):
-		return ENEMY_BOARDING_LINES
+		return _get_configured_lines("enemy", "boarding", ENEMY_BOARDING_LINES)
 
 	var is_captain := bool(soldier.get("is_captain"))
 	if is_captain:
 		match context:
+			"fire":
+				return _get_configured_lines("captain", "fire", CAPTAIN_FIRE_LINES)
 			"danger":
-				return CAPTAIN_DANGER_LINES
+				return _get_configured_lines("captain", "danger", CAPTAIN_DANGER_LINES)
 			"melee":
-				return CAPTAIN_MELEE_LINES
+				return _get_configured_lines("captain", "melee", CAPTAIN_MELEE_LINES)
 			"ranged":
-				return CAPTAIN_RANGED_LINES
+				return _get_configured_lines("captain", "ranged", CAPTAIN_RANGED_LINES)
 			_:
-				return CAPTAIN_GENERAL_LINES
+				return _get_configured_lines("captain", "general", CAPTAIN_GENERAL_LINES)
 
 	match context:
+		"fire":
+			return _get_configured_lines("crew", "fire", CREW_FIRE_LINES)
 		"danger":
-			return CREW_DANGER_LINES
+			return _get_configured_lines("crew", "danger", CREW_DANGER_LINES)
 		"melee":
-			return CREW_MELEE_LINES
+			return _get_configured_lines("crew", "melee", CREW_MELEE_LINES)
 		"ranged":
-			return CREW_RANGED_LINES
+			return _get_configured_lines("crew", "ranged", CREW_RANGED_LINES)
 		_:
 			return []
 
@@ -224,6 +249,8 @@ static func _get_next_interval(soldier, context: String) -> float:
 
 	if bool(soldier.get("is_captain")):
 		match context:
+			"fire":
+				return randf_range(6.0, 10.0)
 			"danger":
 				return randf_range(8.0, 13.0)
 			"melee":
@@ -234,6 +261,8 @@ static func _get_next_interval(soldier, context: String) -> float:
 				return randf_range(13.0, 22.0)
 
 	match context:
+		"fire":
+			return randf_range(9.0, 16.0)
 		"danger":
 			return randf_range(16.0, 26.0)
 		"melee":
@@ -254,6 +283,39 @@ static func _is_current_weapon_melee(soldier) -> bool:
 	return not ("max_range" in weapon)
 
 
+static func _get_configured_lines(group_name: String, context: String, fallback: Array[String]) -> Array[String]:
+	var data: Dictionary = _get_speech_lines_data()
+	var group_variant: Variant = data.get(group_name, {})
+	if typeof(group_variant) != TYPE_DICTIONARY:
+		return fallback
+	var group: Dictionary = group_variant as Dictionary
+	var lines_variant: Variant = group.get(context, [])
+	if typeof(lines_variant) != TYPE_ARRAY:
+		return fallback
+	var lines: Array[String] = []
+	for line_variant in lines_variant as Array:
+		var line: String = str(line_variant).strip_edges()
+		if not line.is_empty():
+			lines.append(line)
+	return lines if not lines.is_empty() else fallback
+
+
+static func _get_speech_lines_data() -> Dictionary:
+	if _speech_lines_loaded:
+		return _speech_lines_data
+	_speech_lines_loaded = true
+	_speech_lines_data = {}
+	if not FileAccess.file_exists(SPEECH_LINES_DATA_PATH):
+		return _speech_lines_data
+	var file: FileAccess = FileAccess.open(SPEECH_LINES_DATA_PATH, FileAccess.READ)
+	if file == null:
+		return _speech_lines_data
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) == TYPE_DICTIONARY:
+		_speech_lines_data = parsed as Dictionary
+	return _speech_lines_data
+
+
 static func _is_danger_context(soldier) -> bool:
 	var owned_ship = soldier.get("owned_ship")
 	if not is_instance_valid(owned_ship):
@@ -262,6 +324,15 @@ static func _is_danger_context(soldier) -> bool:
 		return true
 	var boarder_count_variant: Variant = owned_ship.get("deck_hostile_boarder_count")
 	return boarder_count_variant != null and int(boarder_count_variant) > 0
+
+
+static func _is_owned_ship_burning(soldier) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	var owned_ship = soldier.get("owned_ship")
+	if not is_instance_valid(owned_ship):
+		return false
+	return owned_ship.get("is_burning") == true
 
 
 static func _is_enemy_boarder_on_player_ship(soldier) -> bool:

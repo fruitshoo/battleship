@@ -1,4 +1,5 @@
 extends Node
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_SPAWNER_LOGS := false
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 const BOSS_WAVE_SPAWN_STAGGER_SECONDS := 0.75
@@ -16,6 +17,11 @@ const BOSS_WAVE_SPAWN_STAGGER_SECONDS := 0.75
 @export var max_enemies: int = 3 # 최대 적 수
 @export var max_distance_limit: float = 115.0 # 재배치 거리
 @export var reposition_check_interval: float = 1.0 # 재배치 체크 주기
+@export var pressure_reposition_min_distance: float = 42.0
+@export var pressure_reposition_max_distance: float = 56.0
+@export var boss_reposition_distance_limit: float = 86.0
+@export var boss_pressure_reposition_min_distance: float = 34.0
+@export var boss_pressure_reposition_max_distance: float = 46.0
 
 @export var boss_scene: PackedScene = preload("res://scenes/ships/boss_ship.tscn")
 
@@ -106,6 +112,12 @@ func _ready() -> void:
 	_find_player()
 
 func _process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_process(delta)
+	PhysicsFrameProfiler.end("enemy_spawner_process", profile_start)
+
+
+func _profiled_process(delta: float) -> void:
 	if not is_instance_valid(player):
 		_find_player()
 		return
@@ -143,41 +155,91 @@ func _process(delta: float) -> void:
 			_check_enemy_reposition_incremental(enemies)
 
 func _check_enemy_reposition_incremental(enemies: Array) -> void:
-	# 한 프레임에 최대 5개까지만 체크
-	var check_count = min(5, enemies.size())
-	for i in range(check_count):
-		# 랜덤하게 하나 골라 체크 (순차적으로 하려면 index 관리가 필요하므로 간단히 랜덤 선택)
-		var enemy = enemies.pick_random()
-		if not is_instance_valid(enemy) or enemy.get("is_dying") or enemy.get("is_boarding"): continue
-		
-		# 도선 중이 아닌 배 중에서 거리가 너무 멀어진 배 찾기
-		var dist = enemy.global_position.distance_to(player.global_position)
-		if dist > max_distance_limit:
-			# 앞쪽에 다시 스폰 (거리 리셋, 기차놀이 방지)
-			var spawn_pos = _get_biased_spawn_position()
-			var player_forward = - player.global_transform.basis.z if player else Vector3.FORWARD
-			player_forward.y = 0.0
-			if player_forward.length_squared() <= 0.0001:
-				player_forward = Vector3.FORWARD
-			else:
-				player_forward = player_forward.normalized()
-			
-			# 약간의 위치 오프셋 추가 (다른 배와 겹침 방지)
-			var offset_right = player_forward.cross(Vector3.UP).normalized()
-			spawn_pos += offset_right * randf_range(-15.0, 15.0)
-			
-			enemy.global_position = spawn_pos
-			
-			if enemy.has_method("look_at") and is_instance_valid(player):
-				enemy.look_at(player.global_position, Vector3.UP)
-			
-				if DEBUG_SPAWNER_LOGS:
-					print("[Spawner] 멀어진 적함을 플레이어 전방 차단진으로 재배치(Recycle) 했습니다.")
+	if not is_instance_valid(player):
+		return
+	var candidates: Array[Dictionary] = []
+	for enemy_variant in enemies:
+		var enemy := enemy_variant as Node3D
+		if not is_instance_valid(enemy):
+			continue
+		if enemy.get("is_dying") == true or enemy.get("is_sinking") == true or enemy.get("is_boarding") == true:
+			continue
+		if enemy.get("is_derelict") == true:
+			continue
+		var dist: float = enemy.global_position.distance_to(player.global_position)
+		var limit: float = boss_reposition_distance_limit if _is_boss_pressure_ship(enemy) else max_distance_limit
+		if dist <= limit:
+			continue
+		candidates.append({
+			"enemy": enemy,
+			"dist": dist,
+			"boss": _is_boss_pressure_ship(enemy),
+		})
+	if candidates.is_empty():
+		return
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if bool(a.get("boss", false)) != bool(b.get("boss", false)):
+			return bool(a.get("boss", false))
+		return float(a.get("dist", 0.0)) > float(b.get("dist", 0.0))
+	)
+	var check_count: int = min(5, candidates.size())
+	for index in range(check_count):
+		var entry: Dictionary = candidates[index]
+		var enemy := entry.get("enemy") as Node3D
+		if is_instance_valid(enemy):
+			_reposition_enemy_for_pressure(enemy)
 
 
 func compute_next_interval() -> float:
 	# 약간의 랜덤성 추가 (±20%)
 	return spawn_interval * randf_range(0.8, 1.2)
+
+
+func _reposition_enemy_for_pressure(enemy: Node3D) -> void:
+	var is_boss: bool = _is_boss_pressure_ship(enemy)
+	var spawn_pos: Vector3 = _get_pressure_reposition_position(is_boss)
+	enemy.global_position = spawn_pos
+	if enemy.has_method("look_at"):
+		enemy.look_at(player.global_position, Vector3.UP)
+	if "target" in enemy:
+		enemy.set("target", player)
+	_prime_enemy_momentum(enemy, is_boss)
+	if DEBUG_SPAWNER_LOGS:
+		var label: String = "보스" if is_boss else "적함"
+		print("[Spawner] 화면 밖 %s을 압박 위치로 재배치했습니다." % label)
+
+
+func _get_pressure_reposition_position(is_boss: bool = false) -> Vector3:
+	var player_forward: Vector3 = -player.global_transform.basis.z if is_instance_valid(player) else Vector3.FORWARD
+	player_forward.y = 0.0
+	if player_forward.length_squared() <= 0.0001:
+		player_forward = Vector3.FORWARD
+	else:
+		player_forward = player_forward.normalized()
+	var player_right: Vector3 = player_forward.cross(Vector3.UP)
+	if player_right.length_squared() <= 0.0001:
+		player_right = Vector3.RIGHT
+	else:
+		player_right = player_right.normalized()
+	var min_dist: float = boss_pressure_reposition_min_distance if is_boss else pressure_reposition_min_distance
+	var max_dist: float = boss_pressure_reposition_max_distance if is_boss else pressure_reposition_max_distance
+	var angle_limit: float = deg_to_rad(34.0 if is_boss else 44.0)
+	var distance: float = randf_range(min_dist, max_dist)
+	var angle: float = randf_range(-angle_limit, angle_limit)
+	var pressure_dir: Vector3 = (player_forward * cos(angle) + player_right * sin(angle)).normalized()
+	var best_pos: Vector3 = player.global_position + pressure_dir * distance
+	best_pos.y = 0.0
+	for _attempt in range(5):
+		if _is_position_safe(best_pos, 22.0 if is_boss else 20.0):
+			return best_pos
+		distance += 4.0
+		best_pos = player.global_position + pressure_dir * distance
+		best_pos.y = 0.0
+	return best_pos
+
+
+func _is_boss_pressure_ship(enemy: Node) -> bool:
+	return is_instance_valid(enemy) and enemy.is_in_group("boss")
 
 func _find_player() -> void:
 	player = EntityRegistry.get_first_ship_by_team("player") as Node3D
@@ -789,18 +851,18 @@ func debug_spawn_ship(ship_type_name: String, distance: float = 22.0, lateral_of
 		"ship_type": ship_type_name,
 		"role": _infer_role_for_ship_type(ship_type_name)
 	}
-	var authoring := EnemySpawnerFleetHelper.normalize_authoring_meta(authoring_meta)
+	var authoring: Dictionary = EnemySpawnerFleetHelper.normalize_authoring_meta(authoring_meta)
 	if not authoring.is_empty():
 		slot_info[EnemySpawnerFleetHelper.AUTHORING] = authoring
 	var debug_scene: PackedScene = _pick_enemy_scene_for_slot(slot_info)
 	if not is_instance_valid(debug_scene):
 		debug_scene = enemy_scene
-	var enemy = debug_scene.instantiate()
+	var enemy: Node3D = debug_scene.instantiate() as Node3D
 	_apply_spawn_slot_info(enemy, slot_info)
 
-	var player_forward = -player.global_transform.basis.z
-	var player_right = player_forward.cross(Vector3.UP).normalized()
-	var spawn_pos = player.global_position + player_forward * distance + player_right * lateral_offset
+	var player_forward: Vector3 = -player.global_transform.basis.z
+	var player_right: Vector3 = player_forward.cross(Vector3.UP).normalized()
+	var spawn_pos: Vector3 = player.global_position + player_forward * distance + player_right * lateral_offset
 	spawn_pos.y = 0.0
 
 	get_parent().add_child(enemy)

@@ -246,6 +246,7 @@ static func die(soldier) -> void:
 	soldier.current_target = null
 	soldier.attack_timer = 0.0
 	soldier.is_boarder_on_player_ship = false
+	soldier.set_meta("dead_body_order", Engine.get_physics_frames())
 	soldier.remove_meta("incapacitated_assist_reviver_id")
 
 	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_method("check_derelict_status"):
@@ -314,6 +315,8 @@ static func die(soldier) -> void:
 		soldier._play_death_pose()
 	else:
 		soldier.visible = false
+	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_method("enforce_dead_body_limit"):
+		soldier.owned_ship.call_deferred("enforce_dead_body_limit")
 
 
 static func _snap_dead_body_to_deck(soldier) -> void:

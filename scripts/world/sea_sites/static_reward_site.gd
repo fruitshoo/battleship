@@ -1,6 +1,7 @@
 extends Area3D
 
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 @export var interaction_range: float = 10.0
 @export var hint_range: float = 38.0
@@ -34,6 +35,12 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process()
+	PhysicsFrameProfiler.end("site_static_reward", profile_start)
+
+
+func _profiled_physics_process() -> void:
 	if not is_inside_tree():
 		return
 	_update_hint_visibility()

@@ -14,9 +14,11 @@ const NAME := "name"
 const POSITION := "position"
 const ROTATION_Y := "rotation_y"
 const BASIS := "basis"
+const SCALE := "scale"
 const PROJECTILE_SCENE := "projectile_scene"
 const FIRE_COOLDOWN := "fire_cooldown"
 const REQUIRED_LEVEL := "required_level"
+const UNLOCK_UPGRADE := "unlock_upgrade"
 const DETECTION_RANGE := "detection_range"
 const DETECTION_ARC := "detection_arc"
 const UPGRADE_LEVEL := "upgrade_level"
@@ -97,6 +99,8 @@ static func apply_weapon_config(weapon: Node, spec: Dictionary, fallback_team: S
 	_apply_float_property(weapon, DETECTION_RANGE, spec)
 	_apply_float_property(weapon, DETECTION_ARC, spec)
 	_apply_float_property(weapon, PROJECTILE_SPEED, spec)
+	if weapon is Node3D and has_scale(spec):
+		(weapon as Node3D).scale = Vector3.ONE * get_scale(spec)
 
 	if spec.has(UPGRADE_LEVEL) and weapon.has_method("upgrade_to_level"):
 		weapon.call("upgrade_to_level", get_upgrade_level(spec))
@@ -112,13 +116,13 @@ static func get_default_support_cannon_loadout() -> Array[Dictionary]:
 
 static func get_default_player_cannon_loadout() -> Array[Dictionary]:
 	return [
-		build_cannon_spec("CannonFront", "CannonFront", Vector3(0.0, 0.6, -3.1), 0.0, 1),
+		build_cannon_spec("CannonFront", "CannonFront", Vector3(0.0, 0.6, -3.1), 0.0, 1, 0.0, 0.0, "", "front_cannon"),
 		build_cannon_spec("CannonLeft", "CannonLeft", Vector3(-1.3, 0.6, 0.0), 90.0, 1),
 		build_cannon_spec("CannonRight", "CannonRight", Vector3(1.3, 0.6, 0.0), -90.0, 1),
 		build_cannon_spec("CannonLeftExtra", "CannonLeftExtra", Vector3(-1.3, 0.6, -2.0), 90.0, 2),
+		build_cannon_spec("CannonRightExtraForward", "CannonRightExtraForward", Vector3(1.3, 0.6, -2.0), -90.0, 2),
+		build_cannon_spec("CannonLeftExtraRear", "CannonLeftExtraRear", Vector3(-1.3, 0.6, 2.0), 90.0, 3),
 		build_cannon_spec("CannonRightExtra", "CannonRightExtra", Vector3(1.3, 0.6, 2.0), -90.0, 3),
-		build_cannon_spec("CannonLeftExtraRear", "CannonLeftExtraRear", Vector3(-1.3, 0.6, 2.0), 90.0, 4),
-		build_cannon_spec("CannonRightExtraForward", "CannonRightExtraForward", Vector3(1.3, 0.6, -2.0), -90.0, 5),
 	]
 
 
@@ -141,16 +145,7 @@ static func get_default_boss_loadout(tier: int) -> Array[Dictionary]:
 	]
 
 
-static func build_cannon_spec(
-	node_name: String,
-	slot_name: String,
-	position: Vector3,
-	rotation_y: float,
-	required_level: int = 1,
-	detection_range: float = 0.0,
-	detection_arc: float = 0.0,
-	scene_path: String = ""
-) -> Dictionary:
+static func build_cannon_spec(node_name: String, slot_name: String, position: Vector3, rotation_y: float, required_level: int = 1, detection_range: float = 0.0, detection_arc: float = 0.0, scene_path: String = "", unlock_upgrade: String = "") -> Dictionary:
 	var spec := {
 		KIND: KIND_CANNON,
 		NAME: node_name,
@@ -165,18 +160,12 @@ static func build_cannon_spec(
 		spec[DETECTION_ARC] = detection_arc
 	if not scene_path.strip_edges().is_empty():
 		spec[SCENE] = scene_path.strip_edges()
+	if not unlock_upgrade.strip_edges().is_empty():
+		spec[UNLOCK_UPGRADE] = unlock_upgrade.strip_edges()
 	return spec
 
 
-static func build_singigeon_spec(
-	node_name: String,
-	slot_name: String,
-	position: Vector3,
-	rotation_y: float,
-	detection_range: float,
-	upgrade_level: int,
-	scene_path: String = ""
-) -> Dictionary:
+static func build_singigeon_spec(node_name: String, slot_name: String, position: Vector3, rotation_y: float, detection_range: float, upgrade_level: int, scene_path: String = "") -> Dictionary:
 	var spec := {
 		KIND: KIND_SINGIGEON,
 		NAME: node_name,
@@ -206,10 +195,6 @@ static func apply_authored_weapon_slots(ship: Node3D, relative_to: Node3D, loado
 			next_spec[BASIS] = transform.basis
 		resolved.append(next_spec)
 	return resolved
-
-
-static func apply_authored_cannon_slots(ship: Node3D, relative_to: Node3D, loadout: Array[Dictionary]) -> Array[Dictionary]:
-	return apply_authored_weapon_slots(ship, relative_to, loadout)
 
 
 static func get_kind(spec: Dictionary, fallback: String = KIND_CANNON) -> String:
@@ -263,8 +248,28 @@ static func get_rotation_y(spec: Dictionary, fallback: float = 0.0) -> float:
 	return _get_float(spec, ROTATION_Y, fallback)
 
 
+static func has_scale(spec: Dictionary) -> bool:
+	return spec.has(SCALE)
+
+
+static func get_scale(spec: Dictionary, fallback: float = 1.0) -> float:
+	return maxf(0.01, _get_float(spec, SCALE, fallback))
+
+
 static func get_required_level(spec: Dictionary, fallback: int = 1) -> int:
 	return int(_get_float(spec, REQUIRED_LEVEL, float(fallback)))
+
+
+static func get_unlock_upgrade(spec: Dictionary, fallback: String = "") -> String:
+	var value: Variant = spec.get(UNLOCK_UPGRADE, fallback)
+	return str(value).strip_edges() if value != null else fallback
+
+
+static func is_unlocked_for_levels(spec: Dictionary, current_levels: Dictionary) -> bool:
+	var upgrade_id := get_unlock_upgrade(spec)
+	if upgrade_id.is_empty():
+		return true
+	return int(current_levels.get(upgrade_id, 0)) > 0
 
 
 static func get_detection_range(spec: Dictionary, fallback: float = 0.0) -> float:
@@ -290,8 +295,12 @@ static func _normalize_spec(spec: Dictionary) -> Dictionary:
 		normalized[PROJECTILE_SCENE] = str(normalized[PROJECTILE_SCENE]).strip_edges()
 	if normalized.has(TEAM):
 		normalized[TEAM] = str(normalized[TEAM]).strip_edges()
+	if normalized.has(UNLOCK_UPGRADE):
+		normalized[UNLOCK_UPGRADE] = str(normalized[UNLOCK_UPGRADE]).strip_edges()
 	if normalized.has(ROTATION_Y):
 		normalized[ROTATION_Y] = float(normalized[ROTATION_Y])
+	if normalized.has(SCALE):
+		normalized[SCALE] = maxf(0.01, float(normalized[SCALE]))
 	return normalized
 
 

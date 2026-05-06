@@ -2,8 +2,10 @@ extends RefCounted
 class_name PlayerShipSupportSquadronHelper
 
 const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
-const PANOKSEON_HULL_SCENE = preload("res://scenes/ships/hulls/panokseon_hull.tscn")
+const PANOKSEON_HULL_SCENE = preload("res://scenes/ships/hulls/panok_hull.tscn")
 const JOSEON_CANNON_SCENE = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
+const SUPPORT_MAENGSEON_SCENE_PATH := "res://scenes/ships/support_maengseon_ship.tscn"
+const SUPPORT_PANOKSEON_SCENE_PATH := "res://scenes/ships/support_panokseon_ship.tscn"
 
 const PROFILE_MAENGSEON_SCREEN := "maengseon_screen"
 const PROFILE_PANOKSEON_ESCORT := "panokseon_escort"
@@ -15,6 +17,7 @@ const SUPPORT_PROFILES := {
 		"id": PROFILE_MAENGSEON_SCREEN,
 		"ship_type": "maengseon_ally",
 		"role": "screen_rescue",
+		"ship_scene_path": SUPPORT_MAENGSEON_SCENE_PATH,
 		"hull_scene": MAENGSEON_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
 	},
@@ -22,6 +25,7 @@ const SUPPORT_PROFILES := {
 		"id": PROFILE_PANOKSEON_ESCORT,
 		"ship_type": "panokseon_ally",
 		"role": "artillery_escort",
+		"ship_scene_path": SUPPORT_PANOKSEON_SCENE_PATH,
 		"hull_scene": PANOKSEON_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
 	},
@@ -137,6 +141,15 @@ static func get_profile_ship_type(profile: Dictionary) -> String:
 static func get_profile_hull_scene(profile: Dictionary) -> PackedScene:
 	var hull_scene = profile.get("hull_scene", MAENGSEON_HULL_SCENE)
 	return hull_scene as PackedScene if hull_scene is PackedScene else MAENGSEON_HULL_SCENE
+
+
+static func get_profile_ship_scene(profile: Dictionary) -> PackedScene:
+	var ship_scene = profile.get("ship_scene", null)
+	if ship_scene is PackedScene:
+		return ship_scene
+	var scene_path := str(profile.get("ship_scene_path", SUPPORT_MAENGSEON_SCENE_PATH)).strip_edges()
+	var loaded_scene := load(scene_path)
+	return loaded_scene as PackedScene if loaded_scene is PackedScene else load(SUPPORT_MAENGSEON_SCENE_PATH) as PackedScene
 
 
 static func get_profile_cannon_scene(profile: Dictionary) -> PackedScene:

@@ -95,6 +95,13 @@ static func is_support_ship(ship: Node) -> bool:
 	return get_ally_role(ship) == ROLE_SUPPORT_FLEET
 
 
+static func is_panokseon_support(ship: Node) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	var ship_type_value: Variant = ship.get("ship_type")
+	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
+
+
 static func is_captured_minion(ship: Node) -> bool:
 	return get_ally_role(ship) == ROLE_CAPTURED_MINION
 

@@ -1,5 +1,6 @@
 extends Node
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_LEVEL_LOGS := false
 const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
 const REWARD_RULES_DATA_PATH := "res://data/reward_rules.json"
@@ -392,6 +393,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_process(delta)
+	PhysicsFrameProfiler.end("level_manager_process", profile_start)
+
+
+func _profiled_process(delta: float) -> void:
 	if _boss_phase_active:
 		current_time = boss_spawn_time
 	else:

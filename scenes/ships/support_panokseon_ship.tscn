@@ -1,0 +1,69 @@
+[gd_scene format=3 uid="uid://dixtftbfs2kyr"]
+
+[ext_resource type="Script" uid="uid://bsdykwc0agmyy" path="res://scripts/entities/ships/support_ship.gd" id="1_support"]
+[ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
+[ext_resource type="PackedScene" uid="uid://c7ydiawbfnx6r" path="res://scenes/ships/hulls/panok_hull.tscn" id="hull_scene"]
+[ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
+[ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="collision_visualizer"]
+[ext_resource type="PackedScene" uid="uid://dhmvxxlj2uy8p" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_proximity"]
+size = Vector3(4.9047456, 3.2, 10.164231)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hit"]
+size = Vector3(4.3047457, 3, 9.364231)
+
+[node name="SupportPanokseonShip" type="Node3D" groups=["player"]]
+script = ExtResource("1_support")
+team = "player"
+move_speed = 3.8
+soldier_scene = ExtResource("2_soldier")
+initial_crew_count = 5
+cannon_scene = ExtResource("cannon_scene")
+hull_scene = ExtResource("hull_scene")
+preferred_combat_range = 14.0
+combat_range_tolerance = 2.5
+retreat_distance = 8.5
+limbo_ai_pilot_enabled = true
+limbo_ai_pilot_tree_path = "res://resources/ai/limbo/support_ship_ai_pilot.tres"
+ship_type = "panokseon_ally"
+allow_boarding = false
+max_crew = 7
+max_speed = 3.8
+base_collision_radius = 4.6421156
+width_multiplier = 0.45504529840202923
+auto_fit_scale = 0.9
+floating_offset = 0.85
+max_hull_hp = 240.0
+metadata/ally_ship_role = "support_fleet"
+metadata/support_fleet_ship = true
+metadata/boarding_feedback_contested = false
+metadata/boarding_feedback_overrun = false
+
+[node name="PanokseonHull" parent="." instance=ExtResource("hull_scene")]
+
+[node name="ProximityArea" type="Area3D" parent="." groups=["ship_proximity"]]
+collision_layer = 4
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProximityArea"]
+shape = SubResource("BoxShape3D_proximity")
+
+[node name="HitArea" type="Area3D" parent="." groups=["ship_hitbox"]]
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitArea"]
+shape = SubResource("BoxShape3D_hit")
+
+[node name="Soldiers" type="Node3D" parent="."]
+
+[node name="WakeTrail" parent="." instance=ExtResource("wake_trail_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.407, -1.1577048)
+
+[node name="CollisionVisualizer" type="Node3D" parent="."]
+visible = false
+script = ExtResource("collision_visualizer")
+
+[connection signal="area_entered" from="ProximityArea" to="." method="_on_area_entered"]
+[connection signal="body_entered" from="ProximityArea" to="." method="_on_body_entered"]

@@ -546,14 +546,7 @@ static func _get_flagship_turn_side(ship) -> float:
 
 
 static func _should_follow_flagship_directly(ship, role_name: String) -> bool:
-	return role_name == ROLE_ARTILLERY_LEAD or _is_panokseon_support(ship)
-
-
-static func _is_panokseon_support(ship) -> bool:
-	if not is_instance_valid(ship):
-		return false
-	var ship_type_value: Variant = ship.get("ship_type")
-	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
+	return role_name == ROLE_ARTILLERY_LEAD or ShipAllyRoleHelper.is_panokseon_support(ship)
 
 
 static func _is_named_support_role(role_name: String) -> bool:

@@ -2,9 +2,10 @@
 
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
 [ext_resource type="PackedScene" uid="uid://c6r6r6r6r6r6" path="res://scenes/entities/launchers/cannon_joseon.tscn" id="cannon_scene"]
+[ext_resource type="Script" uid="uid://cua6d8e2qoc53" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
+[ext_resource type="Script" uid="uid://dw3xat2vd631j" path="res://scripts/props/mast_fold_pivot.gd" id="mast_fold_script"]
 [ext_resource type="PackedScene" uid="uid://qbnj3ecpxn6q" path="res://scenes/props/mast.tscn" id="mast_scene"]
-[ext_resource type="Script" path="res://scripts/props/mast_fold_pivot.gd" id="mast_fold_script"]
-[ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+[ext_resource type="PackedScene" uid="uid://bf8x1gkp3wln5" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="PackedScene" uid="uid://betqhloq4wsph" path="res://scenes/props/sculling_oar.tscn" id="sculling_oar_scene"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
@@ -62,6 +63,7 @@ transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 1.2374
 script = ExtResource("authoring_visualizer")
 
 [node name="DeckArea" type="Node3D" parent="Authoring" unique_id=1516772922]
+script = ExtResource("deck_area_authoring")
 
 [node name="CannonSlots" type="Node3D" parent="Authoring" unique_id=600875296]
 
@@ -159,5 +161,5 @@ stow_target_path = NodePath("../MastStowTarget_02")
 [node name="Mast2" parent="Masts/MastPivot_02" unique_id=1786866091 instance=ExtResource("mast_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
-[node name="MastStowTarget_02" type="Marker3D" parent="Masts"]
+[node name="MastStowTarget_02" type="Marker3D" parent="Masts" unique_id=1924082333]
 transform = Transform3D(1.05, 0, 0, 0, 0.525, -0.9093267, 0, 0.9093267, 0.525, 0.12, -2, -1.72)

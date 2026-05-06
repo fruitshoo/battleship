@@ -1,6 +1,7 @@
 extends Area3D
 const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 화살 (Arrow)
 ## 병사가 쏘는 원거리 투사체
@@ -121,6 +122,12 @@ func _finalize_release() -> void:
 	ScenePool.release(self)
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("projectile_arrow", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if _is_releasing:
 		return
 	progress += delta / duration

@@ -175,7 +175,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var support_assist_target: Node3D = null
 	var support_formation_value: int = SupportFleetStateHelper.get_effective_formation(ship) if is_support_ship else 0
 	var is_spread_support_formation: bool = is_support_ship and support_formation_value != 0
-	var is_panokseon_support: bool = is_support_ship and _is_panokseon_support(ship)
+	var is_panokseon_support: bool = is_support_ship and ShipAllyRoleHelper.is_panokseon_support(ship)
 	var support_column_turn_blend: float = 0.0
 	var support_column_turn_angle: float = 0.0
 	var support_column_turn_mode: bool = false
@@ -580,7 +580,7 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 		assist_target,
 		desired_point,
 		maxf(maxf(ship.current_speed, float(ship._last_ai_speed)), _get_ship_speed(assist_target, 0.0)),
-		_is_panokseon_support(ship)
+		ShipAllyRoleHelper.is_panokseon_support(ship)
 	)
 	var pre_avoidance_offset: Vector3 = pre_avoidance.get("position_offset", Vector3.ZERO)
 	if pre_avoidance_offset.length_squared() > 0.001:
@@ -1137,7 +1137,7 @@ static func _get_support_assist_separation_radius(ship, other_ship: Node3D) -> f
 		SUPPORT_ASSIST_SEPARATION_RADIUS,
 		ShipContactGeometry.get_collision_distance_between(ship, other_ship) + SUPPORT_ASSIST_SEPARATION_PAD
 	)
-	if _is_panokseon_support(ship) or _is_panokseon_support(other_ship):
+	if ShipAllyRoleHelper.is_panokseon_support(ship) or ShipAllyRoleHelper.is_panokseon_support(other_ship):
 		separation_radius += SUPPORT_ASSIST_PANOKSEON_SEPARATION_EXTRA_PAD
 	return separation_radius
 
@@ -1640,13 +1640,6 @@ static func _clear_support_assist_target_lock(ship) -> void:
 		ship.remove_meta(SUPPORT_ASSIST_LANE_SIDE_META)
 
 
-static func _is_panokseon_support(ship) -> bool:
-	if not is_instance_valid(ship):
-		return false
-	var ship_type_value: Variant = ship.get("ship_type")
-	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
-
-
 static func _calculate_support_pre_avoidance(
 	ship,
 	minions: Array,
@@ -1693,7 +1686,7 @@ static func _calculate_support_pre_avoidance(
 		predicted_diff.y = 0.0
 		var predicted_dist: float = predicted_diff.length()
 		var safe_distance: float = ShipContactGeometry.get_collision_distance_between(ship, candidate_ship) + SUPPORT_PRE_AVOID_TRIGGER_PAD
-		if is_panokseon_support or _is_panokseon_support(candidate_ship):
+		if is_panokseon_support or ShipAllyRoleHelper.is_panokseon_support(candidate_ship):
 			safe_distance += SUPPORT_PRE_AVOID_PANOKSEON_EXTRA_PAD
 		var trigger_distance: float = safe_distance * 1.12
 		if predicted_dist >= trigger_distance:

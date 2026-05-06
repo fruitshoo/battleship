@@ -1,13 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://rudder_scene"]
+[gd_scene format=3 uid="uid://bf8x1gkp3wln5"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_rudder"]
-size = Vector3(0.2, 1.5, 1)
+[ext_resource type="PackedScene" uid="uid://bm0sch764cnqp" path="res://assets/models/props/rudder/rudder.glb" id="1_rudder_glb"]
 
-[sub_resource type="StandardMaterial3D" id="Material_rudder"]
-albedo_color = Color(0.9, 0.7, 0.2, 1)
+[node name="Rudder" type="Node3D" unique_id=275966258]
 
-[node name="Rudder" type="Node3D"]
-
-[node name="RudderMesh" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_rudder")
-surface_material_override/0 = SubResource("Material_rudder")
+[node name="RudderModel" parent="." unique_id=225978053 instance=ExtResource("1_rudder_glb")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)

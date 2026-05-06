@@ -1,5 +1,6 @@
 @tool
 extends Node3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
 const CANNON_RELOAD_TEMPO_MULT := 1.10
@@ -128,6 +129,12 @@ func set_fleet_bonus(dmg_mult: float, cd_mult: float) -> void:
 
 
 func _process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_process(delta)
+	PhysicsFrameProfiler.end("launcher_cannon_process", profile_start)
+
+
+func _profiled_process(delta: float) -> void:
 	# 0. 소유 배 상태 체크: 배가 침몰/파괴/폐선이거나 갑판을 빼앗기면 발사 불가
 	if not _is_owner_weapon_ready():
 		is_preparing = false

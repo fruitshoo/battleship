@@ -166,7 +166,7 @@ func _apply_layout_density() -> void:
 
 	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.20, MIN_WIND_PANEL_SIZE, MAX_WIND_PANEL_SIZE)
 	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - MIN_WIND_PANEL_SIZE) / (MAX_WIND_PANEL_SIZE - MIN_WIND_PANEL_SIZE), 0.0, 1.0)))
-	var top_offset := roundf(clampf(viewport_size.y * 0.055, 36.0, 48.0))
+	var top_offset := roundf(clampf(viewport_size.y * 0.055, 58.0, 64.0))
 	wind_panel.anchor_left = 0.0
 	wind_panel.anchor_right = 0.0
 	wind_panel.anchor_top = 0.0

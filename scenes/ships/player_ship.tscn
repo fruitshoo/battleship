@@ -2,26 +2,21 @@
 
 [ext_resource type="Script" uid="uid://cy7yako2yokck" path="res://scripts/entities/ships/player_ship.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
-[ext_resource type="PackedScene" uid="uid://jwpbskmjqpw2" path="res://scenes/props/ship_decor_flags/obang_center_hwangryong.tscn" id="9_jn7en"]
-[ext_resource type="PackedScene" uid="uid://4p653pue2pv6" path="res://scenes/props/ship_decor_flags/obang_right_baekho.tscn" id="decor_baekho"]
-[ext_resource type="PackedScene" uid="uid://dcf4di2j0lr01" path="res://scenes/props/ship_decor_flags/obang_left_cheongryong.tscn" id="decor_cheongryong"]
-[ext_resource type="PackedScene" uid="uid://cdb7yamo8j1eg" path="res://scenes/props/ship_decor_flags/obang_rear_hyeonmu.tscn" id="decor_hyeonmu"]
-[ext_resource type="PackedScene" uid="uid://dsya706s4y2wn" path="res://scenes/props/ship_decor_flags/obang_front_jujak.tscn" id="decor_jujak"]
-[ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="hull_scene"]
+[ext_resource type="PackedScene" uid="uid://c7ydiawbfnx6r" path="res://scenes/ships/hulls/panok_hull.tscn" id="5_0dgdr"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
 [ext_resource type="PackedScene" uid="uid://dhmvxxlj2uy8p" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_jn7en"]
-size = Vector3(4.9047456, 3.2, 10.164231)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0dgdr"]
+size = Vector3(4.9634237, 3.2, 12.992475)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_42wut"]
-size = Vector3(4.3047457, 3, 9.364231)
+[sub_resource type="BoxShape3D" id="BoxShape3D_r4bi8"]
+size = Vector3(4.363424, 3, 12.192474)
 
 [node name="PlayerShip" type="Node3D" unique_id=2118299445]
 script = ExtResource("1")
 max_crew_count = 6
-base_collision_radius = 4.6421156
-width_multiplier = 0.45504529840202923
+base_collision_radius = 6.056237
+width_multiplier = 0.3536373943476224
 floating_offset = 0.85
 fire_pot_ignition_chance = 0.45
 fire_pot_burn_duration = 7.0
@@ -33,7 +28,7 @@ collision_layer = 2
 collision_mask = 2
 
 [node name="ProximityShape" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
-shape = SubResource("BoxShape3D_jn7en")
+shape = SubResource("BoxShape3D_0dgdr")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=195625511 groups=["ship_hitbox"]]
 collision_layer = 2
@@ -41,7 +36,7 @@ collision_mask = 0
 
 [node name="HitShape" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-shape = SubResource("BoxShape3D_42wut")
+shape = SubResource("BoxShape3D_r4bi8")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=351081976]
 
@@ -63,25 +58,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.5, 2)
 visible = false
 script = ExtResource("sys_vis_script")
 
-[node name="PanokseonHull" parent="." unique_id=2050703077 instance=ExtResource("hull_scene")]
-
-[node name="DecorFlags" type="Node3D" parent="PanokseonHull" unique_id=1895953049]
-
-[node name="PortForwardJujak" parent="PanokseonHull/DecorFlags" unique_id=960936054 instance=ExtResource("decor_jujak")]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, -2, 0.5, -4.5)
-
-[node name="PortRearHyeonmu" parent="PanokseonHull/DecorFlags" unique_id=2123011747 instance=ExtResource("decor_hyeonmu")]
-transform = Transform3D(0.48, 0, 0, 0, 0.48, 0, 0, 0, 0.48, -2, 0.5, -3.5)
-color = Color(0.2801102, 0.3436522, 0.43902624, 1)
-
-[node name="StarboardForwardCheongryong" parent="PanokseonHull/DecorFlags" unique_id=1411688646 instance=ExtResource("decor_cheongryong")]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 2, 0.5, -4.5)
-
-[node name="StarboardRearBaekho" parent="PanokseonHull/DecorFlags" unique_id=1389267164 instance=ExtResource("decor_baekho")]
-transform = Transform3D(0.48, 0, 0, 0, 0.48, 0, 0, 0, 0.48, 2, 0.5, -3.5)
-
-[node name="ObangCenterHwangryong" parent="PanokseonHull/DecorFlags" unique_id=478233447 instance=ExtResource("9_jn7en")]
-transform = Transform3D(0.8570144, 0, 0.5152924, 0, 1, 0, -0.5152924, 0, 0.8570144, 0, 0, 0)
-
 [node name="WakeTrail" parent="." unique_id=1714901661 instance=ExtResource("wake_trail_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.407, -1.1577048)
+
+[node name="PanokHull" parent="." unique_id=466901266 instance=ExtResource("5_0dgdr")]

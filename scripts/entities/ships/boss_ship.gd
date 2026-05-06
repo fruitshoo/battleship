@@ -2,6 +2,7 @@
 extends "res://scripts/entities/ships/base_ship.gd"
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
+const PhysicsProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -53,19 +54,8 @@ var _base_orbit_inward_bias: float = 0.0
 @export var tier: int = 1 ## 1: 중간 보스 (Front/L/R 1개씩), 2: 최종 보스 (고화력)
 
 func _update_editor_hull() -> void:
-	for child in get_children():
-		if child.name.contains("Hull"):
-			child.queue_free()
-			
-	var stats = load_ship_stats(ship_type)
-	if stats.is_empty(): return
-	
-	var new_hull := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
-	if new_hull:
-		var inst = new_hull.instantiate()
-		inst.name = "EditorHull"
-		add_child(inst)
-		_cache_hull_references(self )
+	_ensure_editor_preview_hull(ship_type, hull_scene)
+	_cache_hull_references(self)
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
@@ -90,12 +80,9 @@ func _ready() -> void:
 		else:
 			orbit_inward_bias = 0.32
 
-	# 선체(Hull) 씬 인스턴스화 및 추가
-	var runtime_hull_scene := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
-	if is_instance_valid(runtime_hull_scene):
-		var hull_inst = runtime_hull_scene.instantiate()
-		add_child(hull_inst)
-	else:
+	# 씬에 직접 배치된 hull이 있으면 그대로 쓰고, 없을 때만 데이터 기반 hull을 생성한다.
+	var hull_inst := _ensure_hybrid_runtime_hull(ship_type, hull_scene, stats)
+	if not is_instance_valid(hull_inst):
 		_update_editor_hull()
 	limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 		
@@ -245,6 +232,7 @@ func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint(): return
 	if is_dying: return
 	
+	var system_profile_start := PhysicsProfiler.begin()
 	_update_fire_effect()
 	_update_sail_visual()
 	_update_burning_status(delta)
@@ -253,6 +241,7 @@ func _physics_process(delta: float) -> void:
 	_update_boarding_state(delta)
 	_update_limbo_ai_pilot(delta)
 	_auto_adjust_sail(delta)
+	PhysicsProfiler.end("boss_ship_systems", system_profile_start)
 	
 	if not is_instance_valid(target) or target.get("is_sinking") == true or target.get("is_dying") == true or target.get("is_dead") == true:
 		target = null
@@ -260,6 +249,7 @@ func _physics_process(delta: float) -> void:
 		_set_wake_state(false)
 		return
 		
+	var profile_start := PhysicsProfiler.begin()
 	# === 선회(Orbiting) AI ===
 	# 플레이어를 중심으로 원을 그리며 이동
 	var to_player = target.global_position - global_position
@@ -357,6 +347,7 @@ func _physics_process(delta: float) -> void:
 		
 	# === 둥실둥실 및 기울기 효과 ===
 	_apply_bobbing_effect()
+	PhysicsProfiler.end("boss_ship_physics", profile_start)
 
 
 func _update_boss_wake_state(world_velocity: Vector3, separation_velocity: Vector3) -> void:
@@ -381,6 +372,7 @@ func _calculate_separation() -> Vector3:
 	if get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
+	var profile_start := PhysicsProfiler.begin()
 	var force = Vector3.ZERO
 	var neighbors = EntityRegistry.get_ships()
 	
@@ -405,6 +397,7 @@ func _calculate_separation() -> Vector3:
 			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
 			force += push_dir * pow(ratio, 2.0) * 1.5
 			
+	PhysicsProfiler.end("boss_separation", profile_start)
 	return force
 
 func _find_player() -> void:

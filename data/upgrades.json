@@ -3,17 +3,28 @@
 		"cannon": {
 			"name": "포문",
 			"category": 0,
-			"description": "대포 수 증가. 판옥선 지원함은 최대 7문까지 공유",
+			"description": "좌우 측면 대포 수 증가. 판옥선 지원함도 공유",
 			"card_art_path": "res://assets/ui/upgrades/cannon_card.png",
-			"max_level": 5,
+			"max_level": 3,
 			"color": "ff7f33",
 			"stats": {
-				"player_base_cannon_count": 3,
-				"player_extra_cannon_levels": [2, 3, 4, 5],
+				"player_base_cannon_count": 2,
+				"player_extra_cannon_levels": [2, 2, 3, 3],
 				"support_base_cannon_count": 1,
 				"support_max_cannon_count": 3,
-				"panokseon_support_base_cannon_count": 3,
-				"panokseon_support_max_cannon_count": 7
+				"panokseon_support_base_cannon_count": 2,
+				"panokseon_support_max_cannon_count": 6
+			}
+		},
+		"front_cannon": {
+			"name": "전면 포문",
+			"category": 0,
+			"description": "판옥선 전면 대포 1문 해금",
+			"card_art_path": "res://assets/ui/upgrades/cannon_card.png",
+			"max_level": 1,
+			"color": "ffb24a",
+			"stats": {
+				"front_cannon_count": 1
 			}
 		},
 		"cannon_damage": {

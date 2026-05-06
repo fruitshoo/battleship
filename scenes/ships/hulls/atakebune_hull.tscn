@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://b5wbjidib2gb0"]
 
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
+[ext_resource type="Script" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
 [ext_resource type="PackedScene" path="res://scenes/entities/launchers/cannon_enemy_medium.tscn" id="cannon_scene"]
 [ext_resource type="PackedScene" uid="uid://ba4vxcs7pc2pt" path="res://scenes/props/japanese_mast.tscn" id="mast_scene"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
@@ -42,6 +43,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -5.8)
 script = ExtResource("authoring_visualizer")
 
 [node name="DeckArea" type="Node3D" parent="Authoring" unique_id=2046384374]
+script = ExtResource("deck_area_authoring")
 
 [node name="CannonSlots" type="Node3D" parent="Authoring" unique_id=323104262]
 

@@ -1,6 +1,7 @@
 extends Node3D
 
 const ROCK_SHADER := preload("res://assets/shaders/sea_rock_procedural.gdshader")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 @export var hazard_enabled: bool = true
 @export_range(2.0, 18.0, 0.25) var hazard_radius: float = 6.4
@@ -30,6 +31,12 @@ func set_rock_view_fade_alpha(_alpha: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("sea_rock_physics", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if not hazard_enabled or not is_instance_valid(_hazard_area):
 		return
 	_tick_damage_cooldowns(delta)

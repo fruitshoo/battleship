@@ -1,8 +1,11 @@
 extends RefCounted
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const WANDER_TURN_SPEED := 7.0
 const MOVE_TURN_SPEED := 10.0
 const ATTACK_TURN_SPEED := 16.0
+const TURN_TARGET_DISTANCE_EPSILON_SQ := 0.09
+const TURN_ANGLE_DEADZONE := PI / 60.0
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
@@ -12,34 +15,46 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 		else:
 			soldier.wander_timer = randf_range(1.5, 3.0)
 		return
+	var support_profile_start := PhysicsFrameProfiler.begin()
 	if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.72, WANDER_TURN_SPEED):
+		PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
 		return
 	if _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
+		PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
 		return
+	PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
 	if run_heavy_logic:
+		var heavy_profile_start := PhysicsFrameProfiler.begin()
 		if _try_priority_ship_duty_before_enemy(soldier, 0.78, delta, WANDER_TURN_SPEED):
+			PhysicsFrameProfiler.end("soldier_idle_heavy", heavy_profile_start)
 			return
 		var enemy = soldier.find_nearest_enemy()
 		if enemy:
 			if soldier.is_stationary:
 				soldier.current_target = enemy
+				PhysicsFrameProfiler.end("soldier_idle_heavy", heavy_profile_start)
 				return
 
 			soldier.current_target = enemy
 			soldier._change_state(soldier.State.MOVE)
+			PhysicsFrameProfiler.end("soldier_idle_heavy", heavy_profile_start)
 			return
 
 		if soldier.has_method("_find_cross_ship_muster_target"):
 			var muster_target: Vector3 = soldier._find_cross_ship_muster_target()
 			if muster_target != Vector3.INF:
 				_move_toward_point(soldier, muster_target, 0.9, delta, WANDER_TURN_SPEED)
+				PhysicsFrameProfiler.end("soldier_idle_heavy", heavy_profile_start)
 				return
 
 		if soldier.has_method("_find_ship_duty_target"):
 			var duty_target: Vector3 = soldier._find_ship_duty_target()
 			if duty_target != Vector3.INF:
 				_move_toward_point(soldier, duty_target, 0.75, delta, WANDER_TURN_SPEED)
+				PhysicsFrameProfiler.end("soldier_idle_heavy", heavy_profile_start)
 				return
+		PhysicsFrameProfiler.end("soldier_idle_heavy", heavy_profile_start)
+	soldier.velocity = Vector3.ZERO
 	if soldier.wander_timer > 0:
 		soldier.wander_timer -= delta
 	else:
@@ -57,14 +72,20 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		soldier.wander_timer = randf_range(1.5, 3.0)
 		soldier._change_state(soldier.State.IDLE)
 		return
+	var support_profile_start := PhysicsFrameProfiler.begin()
 	if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.68, WANDER_TURN_SPEED):
+		PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
 		return
 
 	if _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
+		PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
 		return
+	PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
 
 	if run_heavy_logic:
+		var heavy_profile_start := PhysicsFrameProfiler.begin()
 		if _try_priority_ship_duty_before_enemy(soldier, 0.74, delta, WANDER_TURN_SPEED):
+			PhysicsFrameProfiler.end("soldier_wander_heavy", heavy_profile_start)
 			return
 
 		var enemy = soldier.find_nearest_enemy()
@@ -72,29 +93,43 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 			if soldier.is_stationary:
 				soldier.current_target = enemy
 				soldier._change_state(soldier.State.IDLE)
+				PhysicsFrameProfiler.end("soldier_wander_heavy", heavy_profile_start)
 				return
 
 			var dist = soldier.global_position.distance_to(enemy.global_position)
 			if dist < 8.0:
 				soldier.current_target = enemy
 				soldier._change_state(soldier.State.MOVE)
+				PhysicsFrameProfiler.end("soldier_wander_heavy", heavy_profile_start)
 				return
 
 		if soldier.has_method("_find_cross_ship_muster_target"):
 			var muster_target: Vector3 = soldier._find_cross_ship_muster_target()
 			if muster_target != Vector3.INF:
 				_move_toward_point(soldier, muster_target, 0.85, delta, WANDER_TURN_SPEED)
+				PhysicsFrameProfiler.end("soldier_wander_heavy", heavy_profile_start)
 				return
 
 		if soldier.has_method("_find_ship_duty_target"):
 			var duty_target: Vector3 = soldier._find_ship_duty_target()
 			if duty_target != Vector3.INF:
 				_move_toward_point(soldier, duty_target, 0.7, delta, WANDER_TURN_SPEED)
+				PhysicsFrameProfiler.end("soldier_wander_heavy", heavy_profile_start)
 				return
+		PhysicsFrameProfiler.end("soldier_wander_heavy", heavy_profile_start)
 	if not is_instance_valid(soldier.owned_ship):
 		soldier._change_state(soldier.State.IDLE)
 		return
+	if "_routine_wander_step_timer" in soldier and soldier.has_method("_get_routine_wander_step_interval"):
+		var interval: float = float(soldier.call("_get_routine_wander_step_interval"))
+		if interval > 0.0:
+			soldier._routine_wander_step_timer -= delta
+			if soldier._routine_wander_step_timer > 0.0:
+				soldier.velocity = Vector3.ZERO
+				return
+			soldier._routine_wander_step_timer = interval + randf_range(0.0, interval * 0.18)
 
+	var move_profile_start := PhysicsFrameProfiler.begin()
 	var current_local: Vector3 = soldier.owned_ship.to_local(soldier.global_position)
 	var target_local: Vector3 = soldier.wander_target_local
 	var wander_diff := Vector2(current_local.x - target_local.x, current_local.z - target_local.z)
@@ -104,9 +139,11 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		soldier.velocity = Vector3.ZERO
 		soldier.wander_timer = randf_range(1.0, 3.0)
 		soldier._change_state(soldier.State.IDLE)
+		PhysicsFrameProfiler.end("soldier_wander_move", move_profile_start)
 		return
 
 	_move_toward_owned_ship_local_point(soldier, target_local, 0.5, delta, WANDER_TURN_SPEED)
+	PhysicsFrameProfiler.end("soldier_wander_move", move_profile_start)
 
 static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, delta: float, turn_speed: float) -> bool:
 	if not soldier.has_method("_find_ship_duty_target"):
@@ -151,33 +188,22 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 		return
 
 	if not is_instance_valid(soldier.current_target):
-		if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
-			return
-		soldier._change_state(soldier.State.IDLE)
+		_clear_target_and_try_muster_or_idle(soldier, 1.0, delta, MOVE_TURN_SPEED)
 		return
 
 	if SoldierStateHelper.is_dead_soldier(soldier.current_target):
-		soldier.current_target = null
-		if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
-			return
-		soldier._change_state(soldier.State.IDLE)
+		_clear_target_and_try_muster_or_idle(soldier, 1.0, delta, MOVE_TURN_SPEED)
 		return
 
 	var target_node := soldier.current_target as Node3D
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
-		soldier.current_target = null
-		if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
-			return
-		soldier._change_state(soldier.State.IDLE)
+		_clear_target_and_try_muster_or_idle(soldier, 1.0, delta, MOVE_TURN_SPEED)
 		return
 
 	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
-			soldier.current_target = null
-			if _try_muster_to_cross_ship_contact(soldier, 1.0, delta, MOVE_TURN_SPEED):
-				return
-			soldier._change_state(soldier.State.IDLE)
+			_clear_target_and_try_muster_or_idle(soldier, 1.0, delta, MOVE_TURN_SPEED)
 			return
 
 	var pos_self_2d = Vector2(soldier.global_position.x, soldier.global_position.z)
@@ -225,71 +251,79 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 
 
 static func state_attack(soldier, delta: float = 0.016) -> void:
+	var validate_profile_start := PhysicsFrameProfiler.begin()
 	if _retarget_owned_ship_hostile(soldier):
+		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
 	if not is_instance_valid(soldier.current_target):
 		soldier._change_state(soldier.State.IDLE)
+		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
 	if SoldierStateHelper.is_dead_soldier(soldier.current_target) or soldier.current_target.get_team_tag() == soldier.team:
-		soldier.current_target = null
-		if _try_muster_to_cross_ship_contact(soldier, 0.95, delta, ATTACK_TURN_SPEED):
-			return
-		soldier._change_state(soldier.State.IDLE)
+		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
 	var target_node := soldier.current_target as Node3D
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
-		soldier.current_target = null
-		if _try_muster_to_cross_ship_contact(soldier, 0.95, delta, ATTACK_TURN_SPEED):
-			return
-		soldier._change_state(soldier.State.IDLE)
+		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
 	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
-			soldier.current_target = null
-			if _try_muster_to_cross_ship_contact(soldier, 0.95, delta, ATTACK_TURN_SPEED):
-				return
-			soldier._change_state(soldier.State.IDLE)
+			_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 			return
 
-	var pos_self_2d = Vector2(soldier.global_position.x, soldier.global_position.z)
-	var pos_target_2d = Vector2(target_node.global_position.x, target_node.global_position.z)
-	var distance_xz = pos_self_2d.distance_to(pos_target_2d)
+	var flat_dx: float = soldier.global_position.x - target_node.global_position.x
+	var flat_dz: float = soldier.global_position.z - target_node.global_position.z
+	var distance_xz_sq: float = flat_dx * flat_dx + flat_dz * flat_dz
 
 	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
 		if soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
 			soldier.current_target = null
 			soldier._change_state(soldier.State.IDLE)
+			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 			return
 		if not soldier._is_ship_pair_in_melee_range(target_ship):
 			soldier._change_state(soldier.State.IDLE)
+			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 			return
 		if soldier.has_method("_is_in_cross_ship_contact_zone") and soldier._is_in_cross_ship_contact_zone(target_ship) == false:
 			soldier._change_state(soldier.State.MOVE)
+			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 			return
 
 	var attack_range = soldier.current_weapon.attack_range if soldier.current_weapon and "attack_range" in soldier.current_weapon else 1.2
-	if distance_xz > attack_range * 1.2:
+	var max_attack_distance: float = attack_range * 1.2
+	if distance_xz_sq > max_attack_distance * max_attack_distance:
 		soldier._change_state(soldier.State.MOVE)
+		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
+	PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 
+	soldier.velocity = Vector3.ZERO
+	var turn_profile_start := PhysicsFrameProfiler.begin()
 	turn_toward_position(
 		soldier,
 		Vector3(target_node.global_position.x, soldier.global_position.y, target_node.global_position.z),
 		ATTACK_TURN_SPEED,
 		delta
 	)
+	PhysicsFrameProfiler.end("soldier_attack_turn", turn_profile_start)
 
 	if soldier.attack_timer <= 0:
+		var swing_profile_start := PhysicsFrameProfiler.begin()
 		if soldier.current_target.has_method("get_hull_ratio"):
 			soldier._perform_special_attack(soldier.current_target)
 		else:
 			soldier._perform_attack()
 		soldier.attack_timer = SoldierCombatHelper.get_effective_attack_cooldown(soldier)
+		PhysicsFrameProfiler.end("soldier_attack_swing", swing_profile_start)
 
 
 static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:
@@ -349,6 +383,13 @@ static func _try_muster_to_cross_ship_contact(soldier, speed_scale: float = 1.0,
 	return true
 
 
+static func _clear_target_and_try_muster_or_idle(soldier, speed_scale: float, delta: float, turn_speed: float) -> void:
+	soldier.current_target = null
+	if _try_muster_to_cross_ship_contact(soldier, speed_scale, delta, turn_speed):
+		return
+	soldier._change_state(soldier.State.IDLE)
+
+
 static func _try_move_to_active_ship_duty_target(soldier, speed_scale: float, delta: float, turn_speed: float) -> bool:
 	if not soldier.has_method("_get_active_ship_duty_target"):
 		return false
@@ -365,10 +406,13 @@ static func turn_toward_position(soldier, target_pos: Vector3, turn_speed: float
 	var local_origin: Vector3 = soldier.position if is_instance_valid(parent_node) else soldier.global_position
 	var flat_dir: Vector3 = local_target - local_origin
 	flat_dir.y = 0.0
-	if flat_dir.length_squared() <= 0.0001:
+	if flat_dir.length_squared() <= TURN_TARGET_DISTANCE_EPSILON_SQ:
 		return
 
 	var target_yaw := atan2(-flat_dir.x, -flat_dir.z)
+	var yaw_delta := wrapf(target_yaw - soldier.rotation.y, -PI, PI)
+	if absf(yaw_delta) <= TURN_ANGLE_DEADZONE:
+		return
 	var step := clampf(1.0 - exp(-turn_speed * maxf(delta, 0.0)), 0.0, 1.0)
 	var current_rotation: Vector3 = soldier.rotation
 	current_rotation.x = 0.0

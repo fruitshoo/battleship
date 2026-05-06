@@ -5,6 +5,7 @@ const DEBUG_CHASER_LOGS := false
 const ChaserSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
 const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
+const PhysicsProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEFAULT_SOLDIER_SCENE_PATH := "res://scenes/entities/soldiers/soldier.tscn"
 const DEFAULT_CANNON_SCENE_PATH := "res://scenes/entities/launchers/cannon_enemy_light.tscn"
 const DEFAULT_HULL_SCENE_PATH := "res://scenes/ships/hulls/sekibune_hull.tscn"
@@ -345,19 +346,8 @@ func _apply_formation_role_profile() -> void:
 			separation_pad_scale = 0.96
 
 func _update_editor_hull() -> void:
-	# 에디터 전용: 선체 미리보기 갱신
-	for child in get_children():
-		if child.name.contains("Hull"):
-			child.queue_free()
-	
-	var stats = load_ship_stats(ship_type)
-	if stats.is_empty(): return
-	var new_hull := ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
-	if new_hull:
-		var inst = new_hull.instantiate()
-		inst.name = "EditorHull"
-		add_child(inst)
-		_cache_hull_references(self ) # BaseShip 메서드 호출
+	_ensure_editor_preview_hull(ship_type, hull_scene)
+	_cache_hull_references(self) # BaseShip 메서드 호출
 
 func _ready() -> void:
 	_apply_default_combat_profile_for_ship_type()
@@ -383,12 +373,9 @@ func _ready() -> void:
 		_apply_combat_profile_from_stats(stats)
 	_apply_formation_role_profile()
 		
-	# 선체(Hull) 씬 인스턴스화 및 추가 (런타임)
-	var runtime_hull_scene: PackedScene = ShipBlueprintHelper.load_hull_scene(ship_type, hull_scene, stats)
-	if is_instance_valid(runtime_hull_scene):
-		var hull_inst = runtime_hull_scene.instantiate()
-		add_child(hull_inst)
-	else:
+	# 씬에 직접 배치된 hull이 있으면 그대로 쓰고, 없을 때만 데이터 기반 hull을 생성한다.
+	var hull_inst := _ensure_hybrid_runtime_hull(ship_type, hull_scene, stats)
+	if not is_instance_valid(hull_inst):
 		_update_editor_hull()
 	limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 		
@@ -515,6 +502,7 @@ func _spawn_one_soldier(s_team: String, soldier_type_override: String = "") -> v
 
 func die() -> void:
 	if is_dying: return
+	var was_derelict_disposal: bool = is_derelict or get_meta("derelict_burning_down", false) == true or get_meta("derelict_contact_ignition_started", false) == true
 	is_dying = true
 	
 	# ✅ 배 위의 병사들을 원래 배로 복귀시키고, 복귀 불가 시 생존자로 전환
@@ -538,13 +526,14 @@ func die() -> void:
 	
 	# 격침 통계와 골드는 즉시 처리하고, XP는 침몰 부유물 회수로 지급한다.
 	if is_instance_valid(cached_lm):
-		if team == "enemy" and cached_lm.has_method("add_ship_sunk"):
+		if team == "enemy" and cached_lm.has_method("add_ship_sunk") and get_meta("derelict_sink_stat_accounted", false) != true:
+			set_meta("derelict_sink_stat_accounted", true)
 			cached_lm.add_ship_sunk(1)
-		if cached_lm.has_method("add_score"):
+		if not was_derelict_disposal and cached_lm.has_method("add_score"):
 			cached_lm.add_score(25)
 			
 		# 공적 포인트(Merit) 추가 (격침 시에도 부여, 중복 방지)
-		if not _merit_granted and cached_lm.has_method("add_merit"):
+		if not was_derelict_disposal and not _merit_granted and cached_lm.has_method("add_merit"):
 			cached_lm.add_merit(20)
 			_merit_granted = true
 	
@@ -684,8 +673,10 @@ func _update_enemy_fire_pot_logic(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsProfiler.begin()
 	_update_limbo_ai_pilot(delta)
 	ChaserShipAiHelper.process_physics(self, delta)
+	PhysicsProfiler.end("chaser_ship_physics", profile_start)
 
 func _update_logic_throttled() -> void:
 	ChaserShipAiHelper.update_logic_throttled(self)
@@ -707,10 +698,15 @@ func _calculate_separation() -> Vector3:
 	return ChaserShipAiHelper.calculate_separation(self)
 
 func _process_boarding(delta: float) -> void:
+	var profile_start := PhysicsProfiler.begin()
 	ChaserShipBoardingHelper.process_boarding(self, delta)
+	PhysicsProfiler.end("chaser_boarding", profile_start)
 
 func _apply_neighbor_ship_guards(prev_pos: Vector3, proposed_pos: Vector3, excluded_ship: Node3D = null) -> Vector3:
-	return ChaserShipBoardingHelper.apply_neighbor_ship_guards(self, prev_pos, proposed_pos, excluded_ship)
+	var profile_start := PhysicsProfiler.begin()
+	var result := ChaserShipBoardingHelper.apply_neighbor_ship_guards(self, prev_pos, proposed_pos, excluded_ship)
+	PhysicsProfiler.end("ship_neighbor_guards", profile_start)
+	return result
 
 func _apply_ship_collision_guard(other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = 0.94, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:
 	return ChaserShipBoardingHelper.apply_ship_collision_guard(self, other_ship, prev_pos, proposed_pos, safe_ratio, impact_speed_hint, emit_collision_event)
@@ -729,7 +725,9 @@ func _update_limbo_ai_pilot(delta: float) -> void:
 		and (ShipAllyRoleHelper.is_support_ship(self) or ShipAllyRoleHelper.is_captured_minion(self))
 	):
 		return
+	var profile_start := PhysicsProfiler.begin()
 	ShipLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path)
+	PhysicsProfiler.end("ship_limbo_ai", profile_start)
 
 ## 나포(Capture) 처리
 func capture_ship() -> void:
@@ -843,6 +841,10 @@ func _equip_minion_cannons() -> void:
 	var stats := ShipBlueprintHelper.load_stats(ship_type)
 	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, ShipWeaponLoadoutHelper.get_default_support_cannon_loadout())
 	loadout = ShipWeaponLoadoutHelper.apply_authored_weapon_slots(self, self, loadout)
+	var current_upgrade_levels: Dictionary = {}
+	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and upgrade_manager.get("current_levels") is Dictionary:
+		current_upgrade_levels = upgrade_manager.get("current_levels") as Dictionary
 	
 	var i = 0
 	for spec in loadout:
@@ -864,8 +866,7 @@ func _equip_minion_cannons() -> void:
 		# Loadout-authored runtime tuning.
 		ShipWeaponLoadoutHelper.apply_weapon_config(cannon, spec, "player")
 		
-		# 초기 레벨에선 전방 대포(index 0) 외에는 비활성
-		if ShipWeaponLoadoutHelper.get_required_level(spec, i + 1) > 1:
+		if ShipWeaponLoadoutHelper.get_required_level(spec, i + 1) > 1 or not ShipWeaponLoadoutHelper.is_unlocked_for_levels(spec, current_upgrade_levels):
 			cannon.visible = false
 			cannon.set_process(false)
 			cannon.set_physics_process(false)
@@ -973,7 +974,9 @@ func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
 
 ## 나포함 AI 로직 (플레이어 호위 및 적 탐지)
 func _process_minion_ai(delta: float) -> void:
+	var profile_start := PhysicsProfiler.begin()
 	ChaserShipMinionHelper.process_minion_ai(self, delta)
+	PhysicsProfiler.end("support_minion_ai", profile_start)
 
 func _update_wave_sounds(delta: float) -> void:
 	ChaserShipAiHelper.update_wave_sounds(self, delta)
@@ -1009,14 +1012,14 @@ func _respawn_minion_soldier() -> void:
 
 ## 충돌 감지 (Area3D signal 연결 필요)
 ## 함대 업그레이드 (대포 수량 조절 등)
-func apply_fleet_weapon_upgrade(level: int) -> void:
+func apply_fleet_weapon_upgrade(level: int, current_levels: Dictionary = {}) -> void:
 	var cannons = []
 	for child in get_children():
 		if child.name.begins_with("FleetCannon_"):
 			cannons.append(child)
 
 	var effective_level := maxi(level, 1)
-	var active_cannon_names := SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type(ship_type, effective_level)
+	var active_cannon_names := SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type(ship_type, effective_level, current_levels)
 
 	var active_count := 0
 	for cannon in cannons:

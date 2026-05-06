@@ -31,6 +31,9 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 	if not upgrades.has("cannon_reload"):
 		failures.append("upgrade smoke missing cannon_reload/화약 upgrade")
 		missing_split_upgrade = true
+	if not upgrades.has("front_cannon"):
+		failures.append("upgrade smoke missing front_cannon/전면 포문 upgrade")
+		missing_split_upgrade = true
 	if missing_split_upgrade:
 		return
 
@@ -38,34 +41,46 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 	var cannon_stats: Dictionary = cannon_data.get("stats", {})
 	if str(cannon_data.get("name", "")) != "포문":
 		failures.append("upgrade smoke cannon upgrade should be named 포문")
-	if int(cannon_data.get("max_level", 0)) != 5:
-		failures.append("upgrade smoke 포문 max_level should be 5")
+	if int(cannon_data.get("max_level", 0)) != 3:
+		failures.append("upgrade smoke 포문 max_level should be 3")
 	if cannon_stats.has("dmg_pct_per_lv") or cannon_stats.has("cd_pct_per_lv") or cannon_stats.has("range_pct_per_lv"):
 		failures.append("upgrade smoke 포문 should not carry damage/range/reload stats")
-	if SupportFleetCannonRules.get_player_cannon_count_for_level(5, cannon_stats) != 7:
-		failures.append("upgrade smoke 포문 Lv5 should reach 7 player cannons")
-	if SupportFleetCannonRules.get_support_cannon_count_for_level(5, cannon_stats) != 3:
-		failures.append("upgrade smoke 포문 Lv5 support cannon cap should stay 3")
-	if SupportFleetCannonRules.get_support_cannon_count_for_level(5, cannon_stats, true) != 7:
-		failures.append("upgrade smoke 포문 Lv5 panokseon support cannon cap should reach 7")
-	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("maengseon_ally", 5).size() != 1:
-		failures.append("upgrade smoke maengseon support should stay front-cannon only at 포문 Lv5")
-	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 5).size() != 7:
-		failures.append("upgrade smoke panokseon support should keep seven authored cannons at 포문 Lv5")
+	if SupportFleetCannonRules.get_player_cannon_count_for_level(3, cannon_stats) != 6:
+		failures.append("upgrade smoke 포문 Lv3 should reach 6 player side cannons")
+	if SupportFleetCannonRules.get_support_cannon_count_for_level(3, cannon_stats) != 3:
+		failures.append("upgrade smoke 포문 Lv3 support cannon cap should stay 3")
+	if SupportFleetCannonRules.get_support_cannon_count_for_level(3, cannon_stats, true) != 6:
+		failures.append("upgrade smoke 포문 Lv3 panokseon support side cannon cap should reach 6")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 1).size() != 2:
+		failures.append("upgrade smoke panokseon support should start with two side cannons before 전면 포문")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("maengseon_ally", 3).size() != 1:
+		failures.append("upgrade smoke maengseon support should stay front-cannon only at 포문 Lv3")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 3).size() != 6:
+		failures.append("upgrade smoke panokseon support should keep six side cannons before 전면 포문")
+	var panokseon_front_levels := {
+		"front_cannon": 1,
+	}
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 1, panokseon_front_levels).size() != 3:
+		failures.append("upgrade smoke panokseon support should unlock front cannon without needing 포문 Lv2")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 3, panokseon_front_levels).size() != 7:
+		failures.append("upgrade smoke panokseon support should reach seven cannons with 전면 포문")
 	var panokseon_levels := {
 		"fleet_signal": 1,
 		"panokseon_upgrade": 1,
 	}
 	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(panokseon_levels, upgrades) != "맹선 1척 | 판옥선 1척":
 		failures.append("upgrade smoke support slot summary should reflect maengseon plus added panokseon roster")
-	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(5, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 7문":
-		failures.append("upgrade smoke support cannon summary should reflect ship-authored cannon slots at 포문 Lv5")
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 6문":
+		failures.append("upgrade smoke support cannon summary should reflect side cannon slots at 포문 Lv3")
+	panokseon_levels["front_cannon"] = 1
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 7문":
+		failures.append("upgrade smoke support cannon summary should include 전면 포문 when unlocked")
 	if int(cannon_stats.get("support_max_cannon_count", 0)) != 3:
 		failures.append("upgrade smoke support cannon cap should be 3")
-	if int(cannon_stats.get("panokseon_support_base_cannon_count", 0)) != 3:
-		failures.append("upgrade smoke panokseon support base cannon count should be 3")
-	if int(cannon_stats.get("panokseon_support_max_cannon_count", 0)) != 7:
-		failures.append("upgrade smoke panokseon support cannon cap should be 7")
+	if int(cannon_stats.get("panokseon_support_base_cannon_count", 0)) != 2:
+		failures.append("upgrade smoke panokseon support base cannon count should be 2")
+	if int(cannon_stats.get("panokseon_support_max_cannon_count", 0)) != 6:
+		failures.append("upgrade smoke panokseon support side cannon cap should be 6")
 
 	var damage_stats: Dictionary = upgrades.get("cannon_damage", {}).get("stats", {})
 	if str(upgrades.get("cannon_damage", {}).get("name", "")) != "철환":
@@ -91,6 +106,10 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 철환 missing from ship upgrade pool")
 	if not ("cannon_reload" in UpgradeManager.SHIP_UPGRADE_IDS):
 		failures.append("upgrade smoke 화약 missing from ship upgrade pool")
+	if not ("front_cannon" in UpgradeManager.SHIP_UPGRADE_IDS):
+		failures.append("upgrade smoke 전면 포문 missing from ship upgrade pool")
+	if not UpgradeManager.has_method("_apply_front_cannon"):
+		failures.append("upgrade smoke 전면 포문 missing immediate apply handler")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
 		failures.append("upgrade smoke fleet_cannon should not be in support ship pool")
 	var supply_stats: Dictionary = upgrades.get("supply_bonus", {}).get("stats", {})

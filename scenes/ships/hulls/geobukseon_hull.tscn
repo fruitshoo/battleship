@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://assets/models/props/sail/horizon_sail.png" id="horizon_sail"]
 [ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 [ext_resource type="Script" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
+[ext_resource type="Script" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 size = Vector3(3, 1.2, 8)
@@ -65,6 +66,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -4.5)
 script = ExtResource("authoring_visualizer")
 
 [node name="DeckArea" type="Node3D" parent="Authoring"]
+script = ExtResource("deck_area_authoring")
 
 [node name="CannonSlots" type="Node3D" parent="Authoring"]
 

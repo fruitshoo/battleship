@@ -89,7 +89,7 @@ func _assert_profile_application() -> void:
 	var profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1}, FLEET_UPGRADES, 1)
 	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, profile)
 	_assert_equal("applied_ship_type", ally.get("ship_type"), "panokseon_ally")
-	_assert_equal("applied_hull_scene", _scene_path(ally.get("hull_scene")), "res://scenes/ships/hulls/panokseon_hull.tscn")
+	_assert_equal("applied_hull_scene", _scene_path(ally.get("hull_scene")), "res://scenes/ships/hulls/panok_hull.tscn")
 	_assert_equal("applied_cannon_scene", _scene_path(ally.get("cannon_scene")), "res://scenes/entities/launchers/cannon_joseon.tscn")
 	ally.free()
 

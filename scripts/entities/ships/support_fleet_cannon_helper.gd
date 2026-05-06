@@ -37,7 +37,7 @@ static func get_support_cannon_count_for_level(level: int, stats: Dictionary, pa
 	return mini(count, int(stats.get(support_max_key, stats.get(SUPPORT_MAX_CANNON_COUNT, 3))))
 
 
-static func get_active_support_cannon_names_for_ship_type(ship_type_name: String, level: int) -> Dictionary:
+static func get_active_support_cannon_names_for_ship_type(ship_type_name: String, level: int, current_levels: Dictionary = {}) -> Dictionary:
 	var stats := ShipBlueprintHelper.load_stats(ship_type_name)
 	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, ShipWeaponLoadoutHelper.get_default_support_cannon_loadout())
 	var active_cannon_names: Dictionary = {}
@@ -45,6 +45,8 @@ static func get_active_support_cannon_names_for_ship_type(ship_type_name: String
 		if ShipWeaponLoadoutHelper.get_kind(spec) != ShipWeaponLoadoutHelper.KIND_CANNON:
 			continue
 		if ShipWeaponLoadoutHelper.get_required_level(spec) > level:
+			continue
+		if not ShipWeaponLoadoutHelper.is_unlocked_for_levels(spec, current_levels):
 			continue
 		active_cannon_names[ShipWeaponLoadoutHelper.get_node_name(spec)] = true
 	return active_cannon_names
@@ -115,7 +117,7 @@ static func get_support_slot_cannon_entries_for_current_levels(
 	for profile in profiles:
 		var ship_type_name := PlayerShipSupportSquadronHelper.get_profile_ship_type(profile)
 		var ship_label := _get_support_ship_summary_label(ship_type_name)
-		var cannon_count := get_active_support_cannon_names_for_ship_type(ship_type_name, level).size()
+		var cannon_count := get_active_support_cannon_names_for_ship_type(ship_type_name, level, current_levels).size()
 		var group_key := "%s|%d" % [ship_label, cannon_count]
 		if entry_indices.has(group_key):
 			var entry_index := int(entry_indices[group_key])

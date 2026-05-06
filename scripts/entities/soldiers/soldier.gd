@@ -7,6 +7,7 @@ const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_com
 const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
 const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
 const SWORD_SCENE = preload("res://scenes/entities/weapons/weapon_sword.tscn")
 const SPEARMAN_MELEE_SCENES := [
@@ -82,6 +83,7 @@ const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 @export var player_visual_scene: PackedScene
 @export var enemy_visual_scene: PackedScene
 @export var captain_visual_scene: PackedScene
+@export_range(-0.2, 0.2, 0.005) var visual_deck_offset: float = -0.045
 @export_group("")
 # === 내부 상태 ===
 var current_health: float = 70.0
@@ -126,6 +128,10 @@ var _nearest_enemy_cache_timer: float = 0.0
 var _nearest_enemy_cache_interval_runtime: float = 0.2
 var _limbo_ai_update_timer: float = 0.0
 var _limbo_ai_update_interval_runtime: float = 0.08
+var _deck_bounds_check_timer: float = 0.0
+var _routine_wander_step_timer: float = 0.0
+static var _ai_load_cache_frame: int = -1
+static var _ai_load_multiplier_cache: float = 1.0
 var external_knockback_velocity: Vector3 = Vector3.ZERO
 var external_knockback_timer: float = 0.0
 var external_knockback_snap_timer: float = 0.0
@@ -272,6 +278,8 @@ func _ready() -> void:
 	combat_timer = randf_range(0.0, 0.12)
 	_nearest_enemy_cache_timer = randf_range(0.0, 0.18)
 	_limbo_ai_update_timer = randf_range(0.0, 0.08)
+	_deck_bounds_check_timer = randf_range(0.0, 0.16)
+	_routine_wander_step_timer = randf_range(0.0, 0.06)
 	SoldierSpeechHelper.reset(self)
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
@@ -293,16 +301,18 @@ func _exit_tree() -> void:
 
 func get_visual_root_node() -> Node3D:
 	var visual_root := get_node_or_null(SoldierVisualHelper.VISUAL_ROOT_NAME) as Node3D
+	if visual_root != null:
+		visual_root.position.y = visual_deck_offset
 	return visual_root if visual_root != null else self
 
 
 func ensure_visual_root_node() -> Node3D:
 	var visual_root := get_node_or_null(SoldierVisualHelper.VISUAL_ROOT_NAME) as Node3D
-	if visual_root != null:
-		return visual_root
-	visual_root = Node3D.new()
-	visual_root.name = SoldierVisualHelper.VISUAL_ROOT_NAME
-	add_child(visual_root)
+	if visual_root == null:
+		visual_root = Node3D.new()
+		visual_root.name = SoldierVisualHelper.VISUAL_ROOT_NAME
+		add_child(visual_root)
+	visual_root.position.y = visual_deck_offset
 	return visual_root
 
 
@@ -823,8 +833,12 @@ func _physics_process(delta: float) -> void:
 			attack_timer -= delta
 		return
 
+	var speech_profile_start := PhysicsFrameProfiler.begin()
 	SoldierSpeechHelper.update(self, delta)
+	PhysicsFrameProfiler.end("soldier_speech", speech_profile_start)
+	var limbo_runtime_profile_start := PhysicsFrameProfiler.begin()
 	_update_limbo_ai_pilot_runtime(delta)
+	PhysicsFrameProfiler.end("soldier_limbo_runtime", limbo_runtime_profile_start)
 
 	if _update_external_knockback(delta):
 		if attack_timer > 0:
@@ -844,8 +858,9 @@ func _physics_process(delta: float) -> void:
 	# 고정형(is_stationary) 병사는 AI 로직 실행하지 않음 — 사격만 함
 	if is_stationary:
 		if not _is_jumping and current_state != State.DEAD:
-			move_and_slide()
-			_keep_within_owned_ship_bounds()
+			if velocity.length_squared() > 0.0001:
+				move_and_slide()
+			_run_deck_bounds_check(delta)
 		if attack_timer > 0: attack_timer -= delta
 		_check_ranged_combat()
 		return
@@ -854,6 +869,7 @@ func _physics_process(delta: float) -> void:
 	decision_timer -= delta
 	var run_heavy_logic = false
 	if decision_timer <= 0:
+		var decision_profile_start := PhysicsFrameProfiler.begin()
 		# ✅ 배의 체력이 낮으면 더 민감하게(빨리) 나포 기회 체크 (0.2s -> 0.1s)
 		var ship_hp_ratio = 1.0
 		if is_instance_valid(owned_ship) and owned_ship.has_method("get_hull_ratio"):
@@ -871,7 +887,11 @@ func _physics_process(delta: float) -> void:
 			
 		decision_timer = throttle_time + randf_range(0.0, 0.05)
 		run_heavy_logic = true
-		_refresh_nearest_enemy_cache(true)
+		if _lod_is_combat_priority:
+			var refresh_profile_start := PhysicsFrameProfiler.begin()
+			_refresh_nearest_enemy_cache(false)
+			PhysicsFrameProfiler.end("soldier_decision_enemy_cache", refresh_profile_start)
+		PhysicsFrameProfiler.end("soldier_decision", decision_profile_start)
 
 	_nearest_enemy_cache_timer -= delta
 
@@ -888,6 +908,8 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(owned_ship) and owned_ship.get("team") == "player":
 			_update_boarding_chaos(delta)
 	
+	var state_before_profile := current_state
+	var state_profile_start := PhysicsFrameProfiler.begin()
 	match current_state:
 		State.IDLE:
 			_state_idle(delta, run_heavy_logic)
@@ -903,14 +925,18 @@ func _physics_process(delta: float) -> void:
 			_state_boarding_jump()
 		State.DEAD:
 			pass
+	PhysicsFrameProfiler.end(_get_state_profile_label(state_before_profile), state_profile_start)
 	
 	if not _is_jumping and current_state != State.DEAD:
+		var move_profile_start := PhysicsFrameProfiler.begin()
 		if current_state == State.IDLE:
 			if velocity.length_squared() > 0.0001:
 				move_and_slide()
 		elif current_state == State.ATTACK:
-			move_and_slide()
-		_keep_within_owned_ship_bounds()
+			if velocity.length_squared() > 0.0001:
+				move_and_slide()
+		_run_deck_bounds_check(delta)
+		PhysicsFrameProfiler.end("soldier_move_bounds", move_profile_start)
 			
 	# 탈출(Evacuation) 체크: 소속된 나포함이 가라앉고 있으면 홈으로 복귀
 	if run_heavy_logic and team == "player" and is_instance_valid(owned_ship) and owned_ship.get("is_dying") == true:
@@ -922,12 +948,14 @@ func _physics_process(delta: float) -> void:
 
 	# 원거리 사격 및 무기 스위칭 체크 (전투 스케줄)
 	if current_state != State.DEAD and current_state != State.RELOAD and current_state != State.BOARDING_JUMP and run_combat_logic:
+		var combat_profile_start := PhysicsFrameProfiler.begin()
 		var nearest = find_nearest_enemy()
 		SoldierWeaponHelper.update_combat_weapon_choice(self, nearest)
 
 		if current_state != State.ATTACK:
 			_check_ranged_combat()
 			_check_ship_capture_opportunity()
+		PhysicsFrameProfiler.end("soldier_combat", combat_profile_start)
 
 	_update_rest_recovery(delta)
 
@@ -1004,8 +1032,11 @@ func _is_outside_owned_ship_deck(margin: float = 0.0) -> bool:
 		return false
 	var local_pos: Vector3 = owned_ship.to_local(global_position)
 	var half_ext := _get_ship_deck_half_extents(owned_ship)
+	var half_width := half_ext.x
+	if owned_ship.has_method("get_deck_half_width_at_z"):
+		half_width = maxf(0.08, float(owned_ship.call("get_deck_half_width_at_z", clampf(local_pos.z, -half_ext.y, half_ext.y))))
 	var deck_height: float = owned_ship.get("deck_height") if "deck_height" in owned_ship else 0.4
-	return absf(local_pos.x) > half_ext.x + margin \
+	return absf(local_pos.x) > half_width + margin \
 		or absf(local_pos.z) > half_ext.y + margin \
 		or local_pos.y < deck_height - 0.9
 
@@ -1079,12 +1110,51 @@ func find_nearest_enemy() -> Node3D:
 			if is_instance_valid(local_hostile):
 				_cached_nearest_enemy = local_hostile
 				return local_hostile
+			var fallback_hostile := _find_nearest_owned_ship_hostile_fallback()
+			if is_instance_valid(fallback_hostile):
+				_cached_nearest_enemy = fallback_hostile
+				return fallback_hostile
 	if _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
 		return _cached_nearest_enemy
 	return _refresh_nearest_enemy_cache(true)
 
 func find_nearest_hostile_on_owned_ship() -> Node3D:
 	return SoldierShipHelper.find_nearest_hostile_on_owned_ship(self)
+
+
+func _find_nearest_owned_ship_hostile_fallback() -> Node3D:
+	if not is_instance_valid(owned_ship):
+		return null
+	var candidates: Array = EntityRegistry.get_soldiers_by_ship(owned_ship)
+	if candidates.is_empty() and owned_ship.has_method("get_soldiers_container"):
+		var soldiers_node: Node = owned_ship.call("get_soldiers_container")
+		if is_instance_valid(soldiers_node):
+			candidates = soldiers_node.get_children()
+	var nearest: Node3D = null
+	var nearest_distance_sq: float = INF
+	var detection_range_sq: float = detection_range * detection_range
+	for other in candidates:
+		if other == self or not is_instance_valid(other):
+			continue
+		if SoldierStateHelper.is_dead_soldier(other):
+			continue
+		if other.has_method("get_team_tag"):
+			if other.call("get_team_tag") == team:
+				continue
+		elif str(other.get("team")) == team:
+			continue
+		var other_node := other as Node3D
+		if not is_instance_valid(other_node):
+			continue
+		var dx: float = global_position.x - other_node.global_position.x
+		var dz: float = global_position.z - other_node.global_position.z
+		var dist_sq: float = dx * dx + dz * dz
+		if dist_sq > detection_range_sq:
+			continue
+		if dist_sq < nearest_distance_sq:
+			nearest_distance_sq = dist_sq
+			nearest = other_node
+	return nearest
 
 ## 전이 로직은 통제됨 (개별 나포 기회 체크 삭제)
 func _check_ship_capture_opportunity() -> void:
@@ -1150,6 +1220,82 @@ func _teleport_to_ship(_target_ship: Node3D) -> void:
 
 func _keep_within_owned_ship_bounds() -> void:
 	SoldierShipHelper.keep_within_owned_ship_bounds(self)
+
+
+func _run_deck_bounds_check(delta: float, force: bool = false) -> void:
+	if not force and not _should_run_deck_bounds_check(delta):
+		return
+	if not force and _is_safely_inside_deck_bounds():
+		return
+	var profile_start := PhysicsFrameProfiler.begin()
+	_keep_within_owned_ship_bounds()
+	PhysicsFrameProfiler.end("soldier_bounds_check", profile_start)
+
+
+func _should_run_deck_bounds_check(delta: float) -> bool:
+	if current_state == State.DEAD:
+		return false
+	if not is_instance_valid(owned_ship):
+		return false
+	if external_knockback_timer > 0.0:
+		return true
+	if current_state == State.BOARDING_JUMP:
+		return true
+	var interval := _get_deck_bounds_check_interval()
+	_deck_bounds_check_timer -= delta
+	if _deck_bounds_check_timer > 0.0:
+		return false
+	_deck_bounds_check_timer = interval + randf_range(0.0, interval * 0.15)
+	return true
+
+
+func _get_deck_bounds_check_interval() -> float:
+	var load_mult := _get_ai_load_multiplier()
+	if current_state == State.MOVE or current_state == State.WANDER:
+		return 0.055 * minf(load_mult, 1.5)
+	if is_stationary:
+		return 0.34 * minf(load_mult, 1.7)
+	if current_state == State.ATTACK:
+		return 0.22 * minf(load_mult, 1.55)
+	if current_state == State.RELOAD:
+		return 0.24 * minf(load_mult, 1.6)
+	if _is_passive_ally_ship_crew():
+		return 0.30 * minf(load_mult, 1.7)
+	return 0.20 * minf(load_mult, 1.5)
+
+
+func _is_safely_inside_deck_bounds() -> bool:
+	if not is_instance_valid(owned_ship):
+		return false
+	var local_pos: Vector3 = owned_ship.to_local(global_position)
+	var half_ext := _get_ship_deck_half_extents(owned_ship)
+	if half_ext.x <= 0.01 or half_ext.y <= 0.01:
+		return false
+	var deck_height: float = owned_ship.get("deck_height") if "deck_height" in owned_ship else 0.4
+	if absf(local_pos.y - deck_height) > 0.22:
+		return false
+	return absf(local_pos.x) <= maxf(0.12, half_ext.x * 0.62) \
+		and absf(local_pos.z) <= maxf(0.12, half_ext.y * 0.70)
+
+
+func _get_state_profile_label(state_value: int) -> String:
+	match state_value:
+		State.IDLE:
+			return "soldier_state_idle"
+		State.WANDER:
+			return "soldier_state_wander"
+		State.MOVE:
+			return "soldier_state_move"
+		State.ATTACK:
+			return "soldier_state_attack"
+		State.RELOAD:
+			return "soldier_state_reload"
+		State.BOARDING_JUMP:
+			return "soldier_state_boarding_jump"
+		State.DEAD:
+			return "soldier_state_dead"
+	return "soldier_state_other"
+
 
 func _get_ship_deck_half_extents(ship: Node3D) -> Vector2:
 	return SoldierShipHelper.get_ship_deck_half_extents(self, ship)
@@ -1674,77 +1820,107 @@ func _is_lod_combat_priority() -> bool:
 	return false
 
 func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, combat_priority: bool) -> float:
+	var load_mult := _get_ai_load_multiplier()
 	if _is_passive_ally_ship_crew():
 		if dist_to_player > 40.0:
-			return 1.1
+			return 1.1 * load_mult
 		if dist_to_player > 24.0:
-			return 0.8
-		return 0.55
+			return 0.8 * load_mult
+		return 0.55 * load_mult
 	var throttle_time: float = 0.2 if ship_hp_ratio > 0.2 else 0.1
 	if combat_priority:
 		if dist_to_player > 65.0:
 			throttle_time = maxf(throttle_time, 0.35)
 		elif dist_to_player > 45.0:
 			throttle_time = maxf(throttle_time, 0.25)
-		return throttle_time
+		return throttle_time * minf(load_mult, 1.35)
 
 	if dist_to_player > 80.0:
-		return 1.1
+		return 1.1 * load_mult
 	if dist_to_player > 60.0:
-		return 0.85
+		return 0.85 * load_mult
 	if dist_to_player > 40.0:
-		return 0.55
+		return 0.55 * load_mult
 	if dist_to_player > 28.0:
-		return 0.32
-	return throttle_time
+		return 0.32 * load_mult
+	return throttle_time * minf(load_mult, 1.25)
 
 func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> float:
+	var load_mult := _get_ai_load_multiplier()
 	if _is_passive_ally_ship_crew():
 		if dist_to_player > 40.0:
-			return 0.8
+			return 0.8 * load_mult
 		if dist_to_player > 24.0:
-			return 0.55
-		return 0.35
+			return 0.55 * load_mult
+		return 0.35 * minf(load_mult, 1.35)
 	if combat_priority:
 		if dist_to_player > 65.0:
-			return 0.28
+			return 0.28 * load_mult
 		if dist_to_player > 45.0:
-			return 0.2
+			return 0.2 * load_mult
 		if dist_to_player > 28.0:
-			return 0.14
-		return 0.08
+			return 0.14 * minf(load_mult, 1.45)
+		return 0.08 * minf(load_mult, 1.2)
 
 	if dist_to_player > 80.0:
-		return 0.95
+		return 0.95 * load_mult
 	if dist_to_player > 60.0:
-		return 0.7
+		return 0.7 * load_mult
 	if dist_to_player > 40.0:
-		return 0.46
+		return 0.46 * load_mult
 	if dist_to_player > 28.0:
-		return 0.28
-	return 0.16
+		return 0.28 * load_mult
+	return 0.16 * minf(load_mult, 1.3)
 
 func _get_nearest_enemy_cache_interval() -> float:
 	return _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
 
 func _get_limbo_ai_update_interval() -> float:
+	var load_mult := _get_ai_load_multiplier()
 	if _is_far_lod_sleep_candidate():
-		return 0.12
+		return 0.12 * load_mult
 	if _is_passive_ally_ship_crew():
 		if _lod_dist_to_player > 24.0:
-			return 0.12
-		return 0.10
+			return 0.12 * load_mult
+		return 0.10 * minf(load_mult, 1.35)
 	if _lod_is_combat_priority:
 		if _lod_dist_to_player > 45.0:
-			return 0.10
+			return 0.10 * load_mult
 		if _lod_dist_to_player > 28.0:
-			return 0.08
-		return 0.06
+			return 0.08 * minf(load_mult, 1.35)
+		return 0.06 * minf(load_mult, 1.15)
 	if _lod_dist_to_player > 60.0:
-		return 0.12
+		return 0.12 * load_mult
 	if _lod_dist_to_player > 40.0:
-		return 0.10
-	return 0.08
+		return 0.10 * load_mult
+	return 0.08 * minf(load_mult, 1.3)
+
+func _get_ai_load_multiplier() -> float:
+	var frame := Engine.get_physics_frames()
+	if _ai_load_cache_frame == frame:
+		return _ai_load_multiplier_cache
+	var soldier_count := EntityRegistry.count_soldiers()
+	var ship_count := EntityRegistry.count_ships()
+	var projectile_count := EntityRegistry.count_projectiles()
+	var load_mult := 1.0
+	if soldier_count > 36:
+		load_mult += minf(0.65, float(soldier_count - 36) * 0.018)
+	if ship_count > 10:
+		load_mult += minf(0.28, float(ship_count - 10) * 0.025)
+	if projectile_count > 20:
+		load_mult += minf(0.22, float(projectile_count - 20) * 0.008)
+	_ai_load_cache_frame = frame
+	_ai_load_multiplier_cache = clampf(load_mult, 1.0, 1.85)
+	return _ai_load_multiplier_cache
+
+
+func _get_routine_wander_step_interval() -> float:
+	var load_mult := _get_ai_load_multiplier()
+	if _is_passive_ally_ship_crew():
+		return 0.08 * minf(load_mult, 1.8)
+	if not _lod_is_combat_priority:
+		return 0.055 * minf(load_mult, 1.6)
+	return 0.0
 
 func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
 	var limbo_target: Node3D = _get_recent_limbo_target()
@@ -1817,9 +1993,12 @@ func _update_limbo_ai_pilot(delta: float) -> void:
 		return
 	if current_state == State.DEAD or current_state == State.BOARDING_JUMP:
 		return
+	var profile_start := PhysicsFrameProfiler.begin()
 	if not SoldierLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path):
+		PhysicsFrameProfiler.end("soldier_limbo_ai", profile_start)
 		return
 	_apply_limbo_ai_bridge()
+	PhysicsFrameProfiler.end("soldier_limbo_ai", profile_start)
 
 
 func _apply_limbo_ai_bridge() -> void:

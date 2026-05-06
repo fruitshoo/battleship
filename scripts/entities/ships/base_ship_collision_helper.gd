@@ -2,17 +2,12 @@ extends RefCounted
 class_name BaseShipCollisionHelper
 
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
-const DERELICT_CONTACT_REPAIR_BASE: float = 12.0
-const BOSS_DERELICT_CONTACT_REPAIR_BONUS: float = 18.0
-const BOSS_DERELICT_CONTACT_SCORE_REWARD: int = 120
-const BOSS_DERELICT_CONTACT_XP_REWARD: int = 35
-const BOSS_DERELICT_CONTACT_MERIT_REWARD: int = 18
-const BOSS_DERELICT_CONTACT_SURVIVOR_RESCUES: int = 2
 const COLLISION_REPULSION_CACHE_FRAME_META := "collision_repulsion_cache_frame"
 const COLLISION_REPULSION_CACHE_FORCE_META := "collision_repulsion_cache_force"
 const COLLISION_REPULSION_CACHE_SHIP_COUNT_META := "collision_repulsion_cache_ship_count"
 const COLLISION_REPULSION_CACHE_MIN_SHIP_COUNT := 8
 const COLLISION_REPULSION_CACHE_FRAME_WINDOW := 2
+const DERELICT_FIRE_POT_APPROACH_PADDING: float = 5.5
 
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
@@ -46,8 +41,6 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
 			continue
-		if other.get_meta("derelict_nonblocking", false) == true:
-			continue
 
 		var diff = other.global_position - ship.global_position
 		diff.y = 0.0
@@ -60,7 +53,10 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			other_base_radius * other_width_mult,
 			other_base_radius * other_length_mult
 		)
-		var broad_phase_dist = maxf(my_half.x, my_half.y) + maxf(other_half.x, other_half.y) + ship.broad_phase_padding
+		var derelict_approach_padding := 0.0
+		if NodeContractHelper.get_team_tag(ship) == "player" and NodeContractHelper.get_team_tag(other) == "enemy" and _is_derelict_ship(other):
+			derelict_approach_padding = DERELICT_FIRE_POT_APPROACH_PADDING
+		var broad_phase_dist = maxf(my_half.x, my_half.y) + maxf(other_half.x, other_half.y) + ship.broad_phase_padding + derelict_approach_padding
 
 		if dist_sq > broad_phase_dist * broad_phase_dist:
 			continue
@@ -95,6 +91,8 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			coll_dist *= 0.92
 
 		if _try_salvage_derelict_contact(ship, other, dist, coll_dist):
+			continue
+		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 
 		if dist < coll_dist:
@@ -240,7 +238,7 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 		return false
 	if NodeContractHelper.get_team_tag(other) != "enemy":
 		return false
-	if dist >= coll_dist:
+	if dist >= coll_dist + DERELICT_FIRE_POT_APPROACH_PADDING:
 		return false
 	if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
 		return false
@@ -248,9 +246,15 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 		return false
 	if not _is_derelict_ship(other):
 		return false
-	if other.get_meta("derelict_contact_salvaged", false) == true:
+	if other.get_meta("derelict_contact_disposal_started", false) == true or other.get_meta("derelict_contact_salvaged", false) == true:
+		return false
+	if _has_unresolved_affiliated_boarders(other):
+		other.set_meta("derelict_contact_waiting_for_boarder_cleanup", true)
 		return false
 
+	if other.has_meta("derelict_contact_waiting_for_boarder_cleanup"):
+		other.remove_meta("derelict_contact_waiting_for_boarder_cleanup")
+	other.set_meta("derelict_contact_disposal_started", true)
 	other.set_meta("derelict_contact_salvaged", true)
 	other.set_meta("derelict_nonblocking", true)
 	if "monitoring" in other:
@@ -263,7 +267,6 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 	if other.has_method("_ignite_derelict_from_contact"):
 		other.call_deferred("_ignite_derelict_from_contact", ship)
 	elif other.has_method("_sink_derelict"):
-		_repair_player_from_derelict_contact(ship, other)
 		other.call_deferred("_sink_derelict")
 	return true
 
@@ -278,69 +281,23 @@ static func _is_derelict_ship(node: Node) -> bool:
 	return false
 
 
-static func _repair_player_from_derelict_contact(player_ship, source_ship: Node = null) -> void:
-	if not ("hull_hp" in player_ship and "max_hull_hp" in player_ship):
-		return
-	var is_boss_salvage: bool = _is_boss_salvage_target(source_ship)
-	var hull_hp_before: float = float(player_ship.get("hull_hp"))
-	var max_hull_hp: float = float(player_ship.get("max_hull_hp"))
-	var heal_amount: float = DERELICT_CONTACT_REPAIR_BASE
-	if is_boss_salvage:
-		heal_amount += BOSS_DERELICT_CONTACT_REPAIR_BONUS
-	var hull_hp_after: float = minf(hull_hp_before + heal_amount, max_hull_hp)
-	player_ship.set("hull_hp", hull_hp_after)
-	var rescued_crew: int = 0
-	if is_boss_salvage and player_ship.has_method("add_survivor"):
-		for _i in range(BOSS_DERELICT_CONTACT_SURVIVOR_RESCUES):
-			if player_ship.add_survivor(true):
-				rescued_crew += 1
-
-	var level_manager: Node = null
-	if "_cached_level_manager" in player_ship:
-		var cached_level_manager: Variant = player_ship.get("_cached_level_manager")
-		if is_instance_valid(cached_level_manager):
-			level_manager = cached_level_manager
-	if is_boss_salvage and is_instance_valid(level_manager):
-		if BOSS_DERELICT_CONTACT_SCORE_REWARD > 0 and level_manager.has_method("add_score"):
-			level_manager.add_score(BOSS_DERELICT_CONTACT_SCORE_REWARD)
-		if BOSS_DERELICT_CONTACT_XP_REWARD > 0 and level_manager.has_method("add_xp"):
-			level_manager.add_xp(BOSS_DERELICT_CONTACT_XP_REWARD)
-		if BOSS_DERELICT_CONTACT_MERIT_REWARD > 0 and level_manager.has_method("add_merit"):
-			level_manager.add_merit(BOSS_DERELICT_CONTACT_MERIT_REWARD)
-
-	var hud: Node = null
-	if player_ship.has_method("_find_hud"):
-		hud = player_ship._find_hud()
-	if not is_instance_valid(hud) and "_cached_hud" in player_ship:
-		var cached_hud: Variant = player_ship.get("_cached_hud")
-		if is_instance_valid(cached_hud):
-			hud = cached_hud
-	if is_instance_valid(hud):
-		if hud.has_method("update_hull_hp"):
-			hud.update_hull_hp(hull_hp_after, max_hull_hp)
-		if hull_hp_after > hull_hp_before and hud.has_method("show_message"):
-			var message := "폐선 해체! 선체 +%d" % int(round(hull_hp_after - hull_hp_before))
-			if is_boss_salvage:
-				message = "거함 해체! 선체 +%d / 골드 +%d / XP +%d / 백병전 +%d" % [
-					int(round(hull_hp_after - hull_hp_before)),
-					BOSS_DERELICT_CONTACT_SCORE_REWARD,
-					BOSS_DERELICT_CONTACT_XP_REWARD,
-					BOSS_DERELICT_CONTACT_MERIT_REWARD,
-				]
-				if rescued_crew > 0:
-					message += " / 병사 +%d" % rescued_crew
-			hud.show_message(message, 1.6 if is_boss_salvage else 1.35)
-
-
-static func _is_boss_salvage_target(node: Node) -> bool:
-	if not is_instance_valid(node):
+static func _has_unresolved_affiliated_boarders(derelict_ship: Node) -> bool:
+	if not is_instance_valid(derelict_ship):
 		return false
-	if node.is_in_group("boss"):
+	var ship_team: String = NodeContractHelper.get_team_tag(derelict_ship, "")
+	for soldier in EntityRegistry.get_soldiers():
+		if not is_instance_valid(soldier) or soldier.is_queued_for_deletion():
+			continue
+		var home_ship_variant: Variant = soldier.get("home_ship")
+		if home_ship_variant != derelict_ship:
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if not ship_team.is_empty() and soldier_team != ship_team:
+			continue
+		var owned_ship_variant: Variant = soldier.get("owned_ship")
+		if owned_ship_variant == derelict_ship:
+			continue
 		return true
-	if "ship_type" in node:
-		var ship_type_name: String = str(node.get("ship_type")).to_lower()
-		if ship_type_name.contains("atakebune"):
-			return true
 	return false
 
 

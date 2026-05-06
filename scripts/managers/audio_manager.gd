@@ -299,7 +299,11 @@ var _essential_warm_keys: Array[String] = [
 	"wave_splash",
 	"water_splash_large",
 	"water_splash_small",
-	"ship_sink_bubbles"
+	"ship_sink_bubbles",
+	"boss_horn"
+]
+var _essential_bgm_warm_keys: Array[String] = [
+	BOSS_TAIKO_BGM
 ]
 var _web_essential_warm_keys: Array[String] = [
 	"ui_click"
@@ -377,6 +381,8 @@ func _preload_essential_audio() -> void:
 	var warm_keys = _get_warm_keys()
 	for key in warm_keys:
 		_cache_stream_for_key(key)
+	for bgm_key in _essential_bgm_warm_keys:
+		_load_bgm_stream(bgm_key)
 	
 	# 기본값은 재생 없는 캐시-only 예열: 시작 시 어색한 소리 출력 방지
 	if enable_playback_warmup:

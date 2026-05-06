@@ -1,4 +1,5 @@
 extends Area3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 팔우노 화살 (Ballista Bolt)
 ## 고속으로 비행하며 다수의 대상을 관통하고 강력한 넉백을 줍니다.
@@ -40,6 +41,12 @@ func pool_reset() -> void:
 	_life_left = lifetime
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("projectile_ballista_bolt", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	_life_left -= delta
 	if _life_left <= 0.0:
 		ScenePool.release(self)

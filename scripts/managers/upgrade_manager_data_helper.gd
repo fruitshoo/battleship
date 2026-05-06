@@ -96,7 +96,12 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"cannon":
 			var player_count: int = SupportFleetCannonRules.get_player_cannon_count_for_level(next_level, s)
 			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(next_level, s, preview_levels, upgrades)
-			return "포문 %d문 | 지원함 %s" % [player_count, support_summary]
+			return "측면 포문 %d문 | 지원함 %s" % [player_count, support_summary]
+		"front_cannon":
+			var cannon_level := int(preview_levels.get("cannon", current_levels.get("cannon", 1)))
+			var cannon_stats: Dictionary = upgrades.get("cannon", {}).get("stats", {})
+			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(cannon_level, cannon_stats, preview_levels, upgrades)
+			return "전면 대포 1문 해금 | 지원함 %s" % support_summary
 		"cannon_damage":
 			return "대포 데미지 +%d%%" % int(s.get("dmg_pct_per_lv", 8))
 		"cannon_reload":

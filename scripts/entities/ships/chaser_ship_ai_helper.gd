@@ -1,6 +1,7 @@
 extends RefCounted
 class_name ChaserShipAiHelper
 
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
@@ -100,17 +101,20 @@ static func get_separation_update_interval_for_ship(ship) -> float:
 
 static func get_load_multiplier(ship) -> float:
 	var ship_count: int = EntityRegistry.count_ships()
+	var soldier_count: int = EntityRegistry.count_soldiers()
 	var projectile_count: int = EntityRegistry.count_projectiles()
 	var load_multiplier: float = 1.0
 	if ship_count > 12:
 		load_multiplier += minf(0.45, float(ship_count - 12) * 0.03)
+	if soldier_count > 42:
+		load_multiplier += minf(0.55, float(soldier_count - 42) * 0.014)
 	if projectile_count > 18:
 		load_multiplier += minf(0.25, float(projectile_count - 18) * 0.01)
 	if ship.team == "player":
 		load_multiplier *= 0.9
 	if _is_gunner(ship):
 		load_multiplier *= 1.05
-	return clampf(load_multiplier, 0.75, 1.6)
+	return clampf(load_multiplier, 0.75, 2.0)
 
 
 static func get_separation_update_interval_runtime(ship, seed_value: int) -> float:
@@ -128,6 +132,7 @@ static func calculate_separation(ship) -> Vector3:
 	if _is_true(ship.get_meta("derelict_nonblocking", false)):
 		return Vector3.ZERO
 
+	var profile_start := PhysicsFrameProfiler.begin()
 	var force := Vector3.ZERO
 	var neighbors := get_ships_cached(ship.get_tree())
 	var count := 0
@@ -165,6 +170,7 @@ static func calculate_separation(ship) -> Vector3:
 	if count > 0:
 		force = (force / count) * 1.8
 
+	PhysicsFrameProfiler.end("ship_separation", profile_start)
 	return force
 
 
@@ -222,7 +228,9 @@ static func process_physics(ship, delta: float) -> void:
 	ship.update_crew_allocation_state(delta)
 
 	if do_logic_update:
+		var logic_profile_start := PhysicsFrameProfiler.begin()
 		update_logic_throttled(ship)
+		PhysicsFrameProfiler.end("chaser_logic_update", logic_profile_start)
 
 	if ship.get_team_tag() == "player":
 		if ship.is_boarding:
@@ -243,7 +251,9 @@ static func process_physics(ship, delta: float) -> void:
 		return
 	var current_target: Node3D = _target_ship(ship)
 
+	var nav_profile_start := PhysicsFrameProfiler.begin()
 	var nav := ChaserShipNavigationHelper.build_navigation(ship, current_target)
+	PhysicsFrameProfiler.end("chaser_navigation", nav_profile_start)
 	var target_pos: Vector3 = ShipMovementIntent.get_target_pos(nav, current_target.global_position)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, current_target.global_position)
 	var heading_point: Vector3 = ShipMovementIntent.get_heading_point(nav, desired_point)
@@ -252,6 +262,7 @@ static func process_physics(ship, delta: float) -> void:
 	var permit_sprint: bool = ShipMovementIntent.get_permit_sprint(nav)
 	var dir_to_target: Vector3 = ShipMovementIntent.get_dir_to_target(nav, Vector3.ZERO)
 
+	var boarding_profile_start := PhysicsFrameProfiler.begin()
 	var boarding_attempt_distance: float = ShipContactGeometry.get_boarding_attempt_distance(ship, current_target)
 	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= boarding_attempt_distance:
 		var can_use_limbo_boarding_intent := true
@@ -278,13 +289,16 @@ static func process_physics(ship, delta: float) -> void:
 				if ship.has_method("_board_ship"):
 					ship.call("_board_ship", current_target)
 					if ship.is_boarding:
+						PhysicsFrameProfiler.end("chaser_boarding_attempt", boarding_profile_start)
 						ship._process_boarding(delta)
 						return
 		elif ship.has_method("_decay_boarding_latch"):
 			ship.call("_decay_boarding_latch", current_target, delta)
 	elif ship.has_method("_decay_boarding_latch"):
 		ship.call("_decay_boarding_latch", current_target, delta)
+	PhysicsFrameProfiler.end("chaser_boarding_attempt", boarding_profile_start)
 
+	var motion_profile_start := PhysicsFrameProfiler.begin()
 	var move_vector = desired_point - ship.global_position
 	move_vector.y = 0.0
 	var move_dir = move_vector.normalized() if move_vector.length_squared() > 0.001 else Vector3.ZERO
@@ -361,6 +375,7 @@ static func process_physics(ship, delta: float) -> void:
 			if approach_dot > 0.3:
 				collision_repulsion *= 0.35
 	velocity += collision_repulsion * delta
+	PhysicsFrameProfiler.end("chaser_motion_math", motion_profile_start)
 	_draw_ai_intent_debug(
 		ship,
 		current_target,
@@ -382,13 +397,16 @@ static func process_physics(ship, delta: float) -> void:
 
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + velocity * delta
+	var guard_profile_start := PhysicsFrameProfiler.begin()
 	# Allow visible impact with the target, but stop the AI from tunneling so deep
 	# that ships overlap past the midline before the collision reads as a hit.
 	if is_instance_valid(current_target):
 		next_pos = ship._apply_ship_collision_guard(current_target, prev_pos, next_pos, 0.88, velocity.length())
 	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, current_target)
+	PhysicsFrameProfiler.end("chaser_collision_guards", guard_profile_start)
 	ship.global_position = next_pos
 
+	var visual_profile_start := PhysicsFrameProfiler.begin()
 	ship._update_rudder_visual()
 	if ship.leaking_rate > 0:
 		ship.take_damage(ship.leaking_rate * delta)
@@ -396,6 +414,7 @@ static func process_physics(ship, delta: float) -> void:
 	if not ship.is_dying:
 		ship.rotation.z += ship.tilt_offset
 	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+	PhysicsFrameProfiler.end("chaser_visual_status", visual_profile_start)
 
 
 static func _draw_ai_intent_debug(

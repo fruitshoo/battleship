@@ -1,5 +1,6 @@
 extends Area3D
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 장군전 투사체
 ## 포문에서 느리게 발사되는 중형 화전형 투사체.
@@ -109,6 +110,12 @@ func _update_stats() -> void:
 	turn_debuff = maxf(0.2, 0.6 - janggun_lv * 0.05)
 
 func _physics_process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_physics_process(delta)
+	PhysicsFrameProfiler.end("projectile_janggun", profile_start)
+
+
+func _profiled_physics_process(delta: float) -> void:
 	if is_stuck or is_sinking: return
 
 	progress += delta / duration

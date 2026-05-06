@@ -18,6 +18,7 @@ class MockTargetShip:
 	var ship_type: String = ""
 	var boarding_attacker: Node3D = null
 	var is_derelict: bool = false
+	var is_burning: bool = false
 	var deck_is_contested: bool = false
 	var deck_is_overrun: bool = false
 	var deck_friendly_crew_count: int = 0
@@ -202,6 +203,15 @@ class MockTransferShip:
 		is_derelict = true
 		become_derelict_calls += 1
 
+	func is_derelict_ship() -> bool:
+		return is_derelict
+
+	func _set_contact_areas_enabled(_enabled: bool) -> void:
+		pass
+
+	func _ignite_derelict_from_contact(_source_ship: Node3D = null) -> void:
+		set_meta("derelict_contact_ignition_started", true)
+
 	func check_derelict_status() -> void:
 		BaseShipStatusHelper.check_derelict_status(self)
 
@@ -308,6 +318,7 @@ func _ready() -> void:
 	_verify_support_free_assist_recalls_near_player(failures)
 	_verify_enemy_boarding_transfers_last_available_soldier(failures)
 	_verify_enemy_derelict_waits_for_affiliated_boarders_to_die(failures)
+	_verify_derelict_disposal_waits_for_affiliated_boarder_cleanup(failures)
 	_verify_boarding_transfer_snaps_soldier_to_target_deck(failures)
 	_verify_boarding_transfer_wave_sends_multiple_soldiers(failures)
 	await _verify_boarding_transfer_tracks_moving_target_deck(failures)
@@ -319,6 +330,7 @@ func _ready() -> void:
 	_verify_soldier_retargets_hostile_boarder_on_owned_ship(failures)
 	_verify_soldier_targets_boarder_on_distressed_ally_ship(failures)
 	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
+	_verify_player_crew_speaks_when_ship_is_burning(failures)
 	_verify_support_rescue_boarding_holds_player_capture_progress(failures)
 	_verify_support_rescue_boarders_return_after_deck_safe(failures)
 	_verify_support_attack_boarders_return_after_enemy_deck_safe(failures)
@@ -1362,6 +1374,51 @@ func _verify_enemy_derelict_waits_for_affiliated_boarders_to_die(failures: Array
 	source.queue_free()
 
 
+func _verify_derelict_disposal_waits_for_affiliated_boarder_cleanup(failures: Array[String]) -> void:
+	var player := MockTransferShip.new()
+	add_child(player)
+	player.team = "player"
+	ShipAllyRoleHelper.mark_player_flagship(player)
+	player.global_position = Vector3.ZERO
+
+	var derelict := MockTransferShip.new()
+	add_child(derelict)
+	derelict.team = "enemy"
+	derelict.is_derelict = true
+	derelict.global_position = Vector3(1.0, 0.0, 0.0)
+
+	var corpse := MockTransferSoldier.new()
+	corpse.team = "enemy"
+	corpse.owned_ship = player
+	corpse.home_ship = derelict
+	corpse.dead = true
+	player.get_node("Soldiers").add_child(corpse)
+	EntityRegistry.register_soldier(corpse)
+
+	var blocked := BaseShipCollisionHelper._try_salvage_derelict_contact(player, derelict, 1.0, 1.0)
+	if blocked:
+		failures.append("derelict disposal should wait while affiliated boarder corpses remain on the player deck")
+	if derelict.get_meta("derelict_contact_disposal_started", false) == true:
+		failures.append("derelict disposal should not mark disposal started before affiliated boarder cleanup")
+	if derelict.get_meta("derelict_contact_waiting_for_boarder_cleanup", false) != true:
+		failures.append("derelict disposal should mark that it is waiting for affiliated boarder cleanup")
+
+	EntityRegistry.unregister_soldier(corpse)
+	corpse.queue_free()
+
+	var started := BaseShipCollisionHelper._try_salvage_derelict_contact(player, derelict, 1.0, 1.0)
+	if not started:
+		failures.append("derelict disposal should start once affiliated boarders from that hull are cleaned up")
+	if derelict.get_meta("derelict_contact_disposal_started", false) != true:
+		failures.append("derelict disposal should mark disposal started after affiliated boarder cleanup")
+	if derelict.get_meta("derelict_contact_waiting_for_boarder_cleanup", false) == true:
+		failures.append("derelict disposal should clear waiting meta after affiliated boarder cleanup")
+
+	ShipAllyRoleHelper.clear_ally_role(player)
+	player.queue_free()
+	derelict.queue_free()
+
+
 func _verify_boarding_transfer_snaps_soldier_to_target_deck(failures: Array[String]) -> void:
 	var source := MockTransferShip.new()
 	add_child(source)
@@ -1782,6 +1839,31 @@ func _verify_enemy_boarder_speaks_only_on_player_deck(failures: Array[String]) -
 
 	boarder.queue_free()
 	enemy_ship.queue_free()
+	player_ship.queue_free()
+
+
+func _verify_player_crew_speaks_when_ship_is_burning(failures: Array[String]) -> void:
+	var player_ship := MockTargetShip.new()
+	add_child(player_ship)
+	player_ship.team = "player"
+	player_ship.is_burning = true
+
+	var sailor := MockCombatSoldier.new()
+	add_child(sailor)
+	sailor.team = "player"
+	sailor.owned_ship = player_ship
+
+	SoldierSpeechHelper.reset(sailor)
+	sailor.set_meta("speech_timer", 0.0)
+	SoldierSpeechHelper.update(sailor, 1.0)
+
+	var label := sailor.get_node_or_null("SpeechLabel") as Label3D
+	if label == null:
+		failures.append("player crew did not create a speech label while ship is burning")
+	elif label.visible != true or label.text.is_empty():
+		failures.append("player crew fire speech did not use fire-context lines")
+
+	sailor.queue_free()
 	player_ship.queue_free()
 
 

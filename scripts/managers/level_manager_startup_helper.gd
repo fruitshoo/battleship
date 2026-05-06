@@ -104,7 +104,7 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		preload("res://scenes/ships/hulls/sekibune_hull.tscn"),
 		preload("res://scenes/ships/hulls/sekibune_melee_hull.tscn"),
 		preload("res://scenes/ships/hulls/atakebune_hull.tscn"),
-		preload("res://scenes/ships/hulls/panokseon_hull.tscn"),
+		preload("res://scenes/ships/hulls/panok_hull.tscn"),
 		preload("res://scenes/entities/launchers/cannon.tscn"),
 		preload("res://scenes/entities/launchers/cannon_enemy_light.tscn"),
 		preload("res://scenes/entities/launchers/cannon_enemy_medium.tscn"),

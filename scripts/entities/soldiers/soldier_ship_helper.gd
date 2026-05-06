@@ -317,10 +317,14 @@ static func keep_within_owned_ship_bounds(soldier) -> void:
 static func get_clamped_ship_deck_local(soldier, ship: Node3D, local_position: Vector3) -> Vector3:
 	var d_height: float = ship.get("deck_height") if "deck_height" in ship else 0.4
 	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, ship)
+	var clamped_z := clampf(local_position.z, -half_ext.y, half_ext.y)
+	var half_width := half_ext.x
+	if ship.has_method("get_deck_half_width_at_z"):
+		half_width = maxf(0.08, float(ship.call("get_deck_half_width_at_z", clamped_z)))
 	return Vector3(
-		clampf(local_position.x, -half_ext.x, half_ext.x),
+		clampf(local_position.x, -half_width, half_width),
 		d_height,
-		clampf(local_position.z, -half_ext.y, half_ext.y)
+		clamped_z
 	)
 
 

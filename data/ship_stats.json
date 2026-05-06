@@ -15,7 +15,8 @@
 			"team": "player",
 			"projectile_scene": "res://scenes/projectiles/cannonball_joseon.tscn",
 			"fire_cooldown": 3.2,
-			"detection_range": 24.0
+			"detection_range": 24.0,
+			"scale": 0.7
 		},
 		"boss_singigeon": {
 			"kind": "singigeon",
@@ -169,7 +170,7 @@
 			"deck_height": 0.4
 		},
 		"panokseon_support": {
-			"hull_scene": "res://scenes/ships/hulls/panokseon_hull.tscn",
+			"hull_scene": "res://scenes/ships/hulls/panok_hull.tscn",
 			"hull_hp": 240,
 			"move_speed": 3.8,
 			"has_cannons": true,
@@ -179,30 +180,30 @@
 				"ranged": 1
 			},
 			"weapon_loadout": [
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1, "unlock_upgrade": "front_cannon"},
 				{"profile": "joseon_light_cannon", "name": "FleetCannon_1", "slot": "CannonLeft", "position": [-1.3, 0.6, 0.0], "rotation_y": 90.0, "required_level": 1},
 				{"profile": "joseon_light_cannon", "name": "FleetCannon_2", "slot": "CannonRight", "position": [1.3, 0.6, 0.0], "rotation_y": -90.0, "required_level": 1},
 				{"profile": "joseon_light_cannon", "name": "FleetCannon_3", "slot": "CannonLeftExtra", "position": [-1.3, 0.6, -2.0], "rotation_y": 90.0, "required_level": 2},
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_4", "slot": "CannonRightExtra", "position": [1.3, 0.6, 2.0], "rotation_y": -90.0, "required_level": 3},
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_5", "slot": "CannonLeftExtraRear", "position": [-1.3, 0.6, 2.0], "rotation_y": 90.0, "required_level": 4},
-				{"profile": "joseon_light_cannon", "name": "FleetCannon_6", "slot": "CannonRightExtraForward", "position": [1.3, 0.6, -2.0], "rotation_y": -90.0, "required_level": 5}
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_4", "slot": "CannonRightExtraForward", "position": [1.3, 0.6, -2.0], "rotation_y": -90.0, "required_level": 2},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_5", "slot": "CannonLeftExtraRear", "position": [-1.3, 0.6, 2.0], "rotation_y": 90.0, "required_level": 3},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_6", "slot": "CannonRightExtra", "position": [1.3, 0.6, 2.0], "rotation_y": -90.0, "required_level": 3}
 			],
 			"deck_height": 0.5,
 			"combat_profile": "stand_off_gunner",
 			"separation_pad_scale": 1.12
 		},
 		"panokseon_player_default": {
-			"hull_scene": "res://scenes/ships/hulls/panokseon_hull.tscn",
+			"hull_scene": "res://scenes/ships/hulls/panok_hull.tscn",
 			"hull_hp": 270,
 			"move_speed": 6.0,
 			"weapon_loadout": [
-				{"profile": "joseon_light_cannon", "name": "CannonFront", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "CannonFront", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1, "unlock_upgrade": "front_cannon"},
 				{"profile": "joseon_light_cannon", "name": "CannonLeft", "slot": "CannonLeft", "position": [-1.3, 0.6, 0.0], "rotation_y": 90.0, "required_level": 1},
 				{"profile": "joseon_light_cannon", "name": "CannonRight", "slot": "CannonRight", "position": [1.3, 0.6, 0.0], "rotation_y": -90.0, "required_level": 1},
 				{"profile": "joseon_light_cannon", "name": "CannonLeftExtra", "slot": "CannonLeftExtra", "position": [-1.3, 0.6, -2.0], "rotation_y": 90.0, "required_level": 2},
-				{"profile": "joseon_light_cannon", "name": "CannonRightExtra", "slot": "CannonRightExtra", "position": [1.3, 0.6, 2.0], "rotation_y": -90.0, "required_level": 3},
-				{"profile": "joseon_light_cannon", "name": "CannonLeftExtraRear", "slot": "CannonLeftExtraRear", "position": [-1.3, 0.6, 2.0], "rotation_y": 90.0, "required_level": 4},
-				{"profile": "joseon_light_cannon", "name": "CannonRightExtraForward", "slot": "CannonRightExtraForward", "position": [1.3, 0.6, -2.0], "rotation_y": -90.0, "required_level": 5}
+				{"profile": "joseon_light_cannon", "name": "CannonRightExtraForward", "slot": "CannonRightExtraForward", "position": [1.3, 0.6, -2.0], "rotation_y": -90.0, "required_level": 2},
+				{"profile": "joseon_light_cannon", "name": "CannonLeftExtraRear", "slot": "CannonLeftExtraRear", "position": [-1.3, 0.6, 2.0], "rotation_y": 90.0, "required_level": 3},
+				{"profile": "joseon_light_cannon", "name": "CannonRightExtra", "slot": "CannonRightExtra", "position": [1.3, 0.6, 2.0], "rotation_y": -90.0, "required_level": 3}
 			],
 			"deck_height": 0.5
 		}

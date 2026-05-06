@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
+[ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="14_a8y0u"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
 [ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 [ext_resource type="Script" uid="uid://b3sxf5qk2myeh" path="res://scripts/world/decor/sea_decor_spawner.gd" id="sea_decor_spawner"]
@@ -82,10 +83,12 @@ mesh = SubResource("BoxMesh_choun")
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
+hull_scene = ExtResource("14_a8y0u")
 furled_sail_rowing_stamina_cost_multiplier = 0.85
 stamina_drain_rate = 10.0
 stamina_recovery_rate = 6.5
 auto_raid_enabled = true
+max_dead_bodies_on_deck = null
 floating_offset = 0.5
 boarding_contact_grace_duration = 0.8
 fire_effect_offset = Vector3(0, 1.5, 0)

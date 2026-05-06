@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierShipWorkPriorityHelper
 
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 const TASK_NONE := "none"
 const TASK_DECK_DEFENSE := "deck_defense"
@@ -66,9 +67,16 @@ const DIRECTIVE_CANNON := "cannon"
 const DIRECTIVE_SLOT_INDEX := "slot_index"
 const DIRECTIVE_ANIMATION_KEY := "animation_key"
 
+static var _cannon_reload_slots_cache_frame: int = -1
+static var _cannon_reload_slots_cache: Dictionary = {}
+static var _gunnery_workers_cache_frame: int = -1
+static var _gunnery_workers_cache: Dictionary = {}
+
 
 static func find_ship_work_target(soldier) -> Vector3:
+	var directive_profile_start := PhysicsFrameProfiler.begin()
 	var directive := get_ship_work_directive(soldier)
+	PhysicsFrameProfiler.end("soldier_work_directive", directive_profile_start)
 	var ship := _get_owned_ship(soldier)
 	var target: Variant = directive.get(KEY_TARGET, Vector3.INF)
 	if not (target is Vector3):
@@ -87,19 +95,24 @@ static func find_ship_work_target(soldier) -> Vector3:
 
 
 static func get_active_ship_work_target(soldier) -> Vector3:
+	var profile_start := PhysicsFrameProfiler.begin()
 	if not is_instance_valid(soldier) or not soldier.has_meta(ACTIVE_WORK_TARGET_LOCAL_META):
+		PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 		return Vector3.INF
 	var ship := _get_owned_ship(soldier)
 	if not _can_consider_deck_work(soldier, ship, true):
 		clear_active_ship_work_target(soldier)
+		PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 		return Vector3.INF
 	var task_name := str(soldier.get_meta(ACTIVE_WORK_TASK_META, TASK_NONE))
 	if not _is_active_work_task_still_valid(soldier, ship, task_name):
 		clear_active_ship_work_target(soldier)
+		PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 		return Vector3.INF
 	var local_target_value: Variant = soldier.get_meta(ACTIVE_WORK_TARGET_LOCAL_META, Vector3.INF)
 	if not (local_target_value is Vector3):
 		clear_active_ship_work_target(soldier)
+		PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 		return Vector3.INF
 	var local_target: Vector3 = local_target_value
 	var global_target: Vector3 = ship.to_global(local_target)
@@ -108,9 +121,12 @@ static func get_active_ship_work_target(soldier) -> Vector3:
 		var slot_key := str(soldier.get_meta(ACTIVE_WORK_SLOT_META, ""))
 		if not reserve_work_slot(ship, soldier, task_name, DEFAULT_SLOT_RESERVATION_SECONDS, slot_key):
 			clear_active_ship_work_target(soldier)
+			PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 			return Vector3.INF
 		_sync_cannon_reload_duty_state_from_active(soldier, ship, local_target, global_target)
+		PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 		return global_target
+	PhysicsFrameProfiler.end("soldier_active_work_target", profile_start)
 	return global_target
 
 
@@ -133,6 +149,7 @@ static func get_ship_work_directive(soldier) -> Dictionary:
 	if not _can_consider_deck_work(soldier, ship):
 		return _none_directive()
 
+	var profile_start := PhysicsFrameProfiler.begin()
 	var half_ext: Vector2 = SoldierShipHelper.get_ship_deck_half_extents(soldier, ship)
 	var candidates: Array[Dictionary] = []
 	_append_candidate(candidates, _build_rigging_repair_directive(soldier, ship, half_ext))
@@ -140,6 +157,7 @@ static func get_ship_work_directive(soldier) -> Dictionary:
 	_append_candidate(candidates, _build_shiphandling_directive(soldier, ship, half_ext))
 
 	var best := _choose_highest_priority(candidates, ship, soldier)
+	PhysicsFrameProfiler.end("soldier_work_candidates", profile_start)
 	if int(best.get(KEY_PRIORITY, PRIORITY_NONE)) <= PRIORITY_NONE:
 		return _none_directive()
 	if _is_already_at_directive_target(soldier, ship, best) and str(best.get(KEY_TASK, TASK_NONE)) != TASK_CANNON_RELOAD:
@@ -377,6 +395,16 @@ static func _build_cannon_reload_slot_directive(soldier, ship: Node3D) -> Dictio
 
 
 static func _collect_cannon_reload_slots(ship: Node) -> Array[Dictionary]:
+	if not is_instance_valid(ship):
+		return []
+	var frame := Engine.get_physics_frames()
+	if _cannon_reload_slots_cache_frame != frame:
+		_cannon_reload_slots_cache_frame = frame
+		_cannon_reload_slots_cache.clear()
+	var cache_key := int(ship.get_instance_id())
+	if _cannon_reload_slots_cache.has(cache_key):
+		return _cannon_reload_slots_cache[cache_key]
+	var profile_start := PhysicsFrameProfiler.begin()
 	var slots: Array[Dictionary] = []
 	var stack: Array[Node] = [ship]
 	while not stack.is_empty():
@@ -402,10 +430,22 @@ static func _collect_cannon_reload_slots(ship: Node) -> Array[Dictionary]:
 		var b_key := "%s:%03d" % [str(b.get("cannon_path", "")), int(b.get("slot_index", 0))]
 		return a_key < b_key
 	)
+	PhysicsFrameProfiler.end("soldier_cannon_slots_scan", profile_start)
+	_cannon_reload_slots_cache[cache_key] = slots
 	return slots
 
 
 static func _collect_gunnery_duty_workers(ship: Node, team: String) -> Array[Node]:
+	if not is_instance_valid(ship):
+		return []
+	var frame := Engine.get_physics_frames()
+	if _gunnery_workers_cache_frame != frame:
+		_gunnery_workers_cache_frame = frame
+		_gunnery_workers_cache.clear()
+	var cache_key := "%d:%s" % [int(ship.get_instance_id()), team]
+	if _gunnery_workers_cache.has(cache_key):
+		return _gunnery_workers_cache[cache_key]
+	var profile_start := PhysicsFrameProfiler.begin()
 	var workers: Array[Node] = []
 	var candidates: Array = EntityRegistry.get_soldiers_by_ship(ship)
 	if candidates.is_empty():
@@ -427,6 +467,8 @@ static func _collect_gunnery_duty_workers(ship: Node, team: String) -> Array[Nod
 	workers.sort_custom(func(a: Node, b: Node) -> bool:
 		return int(a.get_instance_id()) < int(b.get_instance_id())
 	)
+	PhysicsFrameProfiler.end("soldier_gunnery_workers_scan", profile_start)
+	_gunnery_workers_cache[cache_key] = workers
 	return workers
 
 

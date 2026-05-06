@@ -498,6 +498,8 @@ static func _run_support_panokseon_upgrade_smoke(owner: Node, failures: Array[St
 				failures.append("support fleet smoke panokseon upgrade should add panokseon in slot 1")
 			elif str(panokseon_support.get("ship_type")) != "panokseon_ally":
 				failures.append("support fleet smoke panokseon upgrade should add a new panokseon support ship")
+			elif panokseon_support.scene_file_path != "res://scenes/ships/support_panokseon_ship.tscn":
+				failures.append("support fleet smoke panokseon upgrade should spawn the dedicated panokseon support scene")
 			elif str(panokseon_support.get_meta("support_fleet_profile", "")) != "panokseon_escort":
 				failures.append("support fleet smoke panokseon upgrade profile mismatch")
 			UpgradeManager.apply_fleet_upgrades_to_ship(panokseon_support)

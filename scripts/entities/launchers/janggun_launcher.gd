@@ -1,4 +1,5 @@
 extends Node3D
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_COMBAT_LOGS := false
 
 ## 장군전 발사 컨트롤러
@@ -30,6 +31,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var profile_start := PhysicsFrameProfiler.begin()
+	_profiled_process(delta)
+	PhysicsFrameProfiler.end("launcher_janggun_process", profile_start)
+
+
+func _profiled_process(delta: float) -> void:
 	if not _is_owner_combat_ready():
 		_cached_target = null
 		_cached_cannon = null
