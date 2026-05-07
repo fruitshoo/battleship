@@ -175,7 +175,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var support_assist_target: Node3D = null
 	var support_formation_value: int = SupportFleetStateHelper.get_effective_formation(ship) if is_support_ship else 0
 	var is_spread_support_formation: bool = is_support_ship and support_formation_value != 0
-	var is_panokseon_support: bool = is_support_ship and ShipAllyRoleHelper.is_panokseon_support(ship)
+	var is_heavy_support: bool = is_support_ship and ShipAllyRoleHelper.is_heavy_support(ship)
 	var support_column_turn_blend: float = 0.0
 	var support_column_turn_angle: float = 0.0
 	var support_column_turn_mode: bool = false
@@ -247,7 +247,7 @@ static func process_minion_ai(ship, delta: float) -> void:
 			movement_target,
 			target_pos,
 			maxf(maxf(ship.current_speed, float(ship._last_ai_speed)), maxf(float(player_speed), support_lead_speed)),
-			is_panokseon_support
+			is_heavy_support
 		)
 		var support_pre_avoid_offset: Vector3 = support_pre_avoidance.get("position_offset", Vector3.ZERO)
 		if support_pre_avoid_offset.length_squared() > 0.0001:
@@ -296,8 +296,8 @@ static func process_minion_ai(ship, delta: float) -> void:
 		var slot_lateral_error: float = absf(to_target_vec.dot(support_lead_fwd.cross(Vector3.UP).normalized()))
 		support_slot_lateral_error = slot_lateral_error
 		var speed_offset: float = 0.0
-		var max_catchup_speed: float = SUPPORT_MAX_CATCHUP_SPEED * (SUPPORT_PANOKSEON_CATCHUP_SPEED_SCALE if is_panokseon_support else 1.0)
-		var max_formup_speed: float = SUPPORT_MAX_FORMUP_SPEED * (SUPPORT_PANOKSEON_FORMUP_SPEED_SCALE if is_panokseon_support else 1.0)
+		var max_catchup_speed: float = SUPPORT_MAX_CATCHUP_SPEED * (SUPPORT_PANOKSEON_CATCHUP_SPEED_SCALE if is_heavy_support else 1.0)
+		var max_formup_speed: float = SUPPORT_MAX_FORMUP_SPEED * (SUPPORT_PANOKSEON_FORMUP_SPEED_SCALE if is_heavy_support else 1.0)
 		if is_spread_support_formation:
 			max_formup_speed *= SUPPORT_WING_FORMUP_SPEED_SCALE
 		if slot_depth_error >= 0.0:
@@ -372,8 +372,8 @@ static func process_minion_ai(ship, delta: float) -> void:
 
 	var support_turn_angle: float = 0.0
 	if is_support_ship:
-		var turn_brake_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_panokseon_support else 1.0)
-		var turn_brake_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_panokseon_support else 1.0)
+		var turn_brake_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_heavy_support else 1.0)
+		var turn_brake_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_heavy_support else 1.0)
 		support_turn_angle = absf(wrapf(target_head_rot - ship.rotation.y, -PI, PI))
 		if support_turn_angle > turn_brake_start_angle:
 			var turn_brake_blend: float = clampf(
@@ -383,12 +383,12 @@ static func process_minion_ai(ship, delta: float) -> void:
 			)
 			var min_turn_speed_mult: float
 			if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN:
-				min_turn_speed_mult = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_panokseon_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
+				min_turn_speed_mult = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
 			else:
-				min_turn_speed_mult = SUPPORT_PANOKSEON_SPREAD_TURN_BRAKE_MIN_MULT if is_panokseon_support else SUPPORT_SPREAD_TURN_BRAKE_MIN_MULT
+				min_turn_speed_mult = SUPPORT_PANOKSEON_SPREAD_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_SPREAD_TURN_BRAKE_MIN_MULT
 			var turn_speed_mult: float = lerpf(1.0, min_turn_speed_mult, turn_brake_blend)
 			if support_column_turn_blend > 0.0:
-				var column_turn_floor: float = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_panokseon_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
+				var column_turn_floor: float = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
 				turn_speed_mult = minf(turn_speed_mult, lerpf(1.0, column_turn_floor, support_column_turn_blend))
 			target_final_speed *= turn_speed_mult
 
@@ -414,9 +414,9 @@ static func process_minion_ai(ship, delta: float) -> void:
 	if final_move_speed > 0.1:
 		var speed_ratio = final_move_speed / ship.max_speed
 		var turn_authority_mult: float = 1.0
-		if is_support_ship and support_turn_angle > (SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_panokseon_support else 1.0)):
-			var turn_boost_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_panokseon_support else 1.0)
-			var turn_boost_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_panokseon_support else 1.0)
+		if is_support_ship and support_turn_angle > (SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_heavy_support else 1.0)):
+			var turn_boost_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_heavy_support else 1.0)
+			var turn_boost_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_heavy_support else 1.0)
 			var turn_boost_blend: float = clampf(
 				(support_turn_angle - turn_boost_start_angle) / maxf(turn_boost_full_angle - turn_boost_start_angle, 0.001),
 				0.0,
@@ -424,12 +424,12 @@ static func process_minion_ai(ship, delta: float) -> void:
 			)
 			var max_turn_bonus: float
 			if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN:
-				max_turn_bonus = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_panokseon_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
+				max_turn_bonus = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_heavy_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
 			else:
-				max_turn_bonus = SUPPORT_PANOKSEON_SPREAD_TURN_AUTHORITY_BONUS if is_panokseon_support else SUPPORT_SPREAD_TURN_AUTHORITY_BONUS
+				max_turn_bonus = SUPPORT_PANOKSEON_SPREAD_TURN_AUTHORITY_BONUS if is_heavy_support else SUPPORT_SPREAD_TURN_AUTHORITY_BONUS
 			turn_authority_mult += max_turn_bonus * turn_boost_blend
 			if support_column_turn_blend > 0.0:
-				var column_turn_bonus: float = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_panokseon_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
+				var column_turn_bonus: float = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_heavy_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
 				turn_authority_mult += column_turn_bonus * 0.35 * support_column_turn_blend
 		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority_mult * delta
 		ship.rotation.y -= deg_to_rad(actual_turn)
@@ -580,7 +580,7 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 		assist_target,
 		desired_point,
 		maxf(maxf(ship.current_speed, float(ship._last_ai_speed)), _get_ship_speed(assist_target, 0.0)),
-		ShipAllyRoleHelper.is_panokseon_support(ship)
+		ShipAllyRoleHelper.is_heavy_support(ship)
 	)
 	var pre_avoidance_offset: Vector3 = pre_avoidance.get("position_offset", Vector3.ZERO)
 	if pre_avoidance_offset.length_squared() > 0.001:
@@ -1137,7 +1137,7 @@ static func _get_support_assist_separation_radius(ship, other_ship: Node3D) -> f
 		SUPPORT_ASSIST_SEPARATION_RADIUS,
 		ShipContactGeometry.get_collision_distance_between(ship, other_ship) + SUPPORT_ASSIST_SEPARATION_PAD
 	)
-	if ShipAllyRoleHelper.is_panokseon_support(ship) or ShipAllyRoleHelper.is_panokseon_support(other_ship):
+	if ShipAllyRoleHelper.is_heavy_support(ship) or ShipAllyRoleHelper.is_heavy_support(other_ship):
 		separation_radius += SUPPORT_ASSIST_PANOKSEON_SEPARATION_EXTRA_PAD
 	return separation_radius
 
@@ -1646,7 +1646,7 @@ static func _calculate_support_pre_avoidance(
 	flagship: Node3D,
 	target_pos: Vector3,
 	planning_speed: float,
-	is_panokseon_support: bool
+	is_heavy_support: bool
 ) -> Dictionary:
 	if not is_instance_valid(ship):
 		return {"position_offset": Vector3.ZERO, "brake_mult": 1.0, "hazard": 0.0, "lateral": 0.0}
@@ -1686,21 +1686,21 @@ static func _calculate_support_pre_avoidance(
 		predicted_diff.y = 0.0
 		var predicted_dist: float = predicted_diff.length()
 		var safe_distance: float = ShipContactGeometry.get_collision_distance_between(ship, candidate_ship) + SUPPORT_PRE_AVOID_TRIGGER_PAD
-		if is_panokseon_support or ShipAllyRoleHelper.is_panokseon_support(candidate_ship):
+		if is_heavy_support or ShipAllyRoleHelper.is_heavy_support(candidate_ship):
 			safe_distance += SUPPORT_PRE_AVOID_PANOKSEON_EXTRA_PAD
 		var trigger_distance: float = safe_distance * 1.12
 		if predicted_dist >= trigger_distance:
 			continue
 		var hazard: float = clampf((trigger_distance - predicted_dist) / maxf(trigger_distance, 0.001), 0.0, 1.0)
 		max_hazard = maxf(max_hazard, hazard)
-		var min_brake_mult: float = SUPPORT_PRE_AVOID_PANOKSEON_BRAKE_MULT if is_panokseon_support else SUPPORT_PRE_AVOID_BASE_BRAKE_MULT
+		var min_brake_mult: float = SUPPORT_PRE_AVOID_PANOKSEON_BRAKE_MULT if is_heavy_support else SUPPORT_PRE_AVOID_BASE_BRAKE_MULT
 		brake_mult = minf(brake_mult, lerpf(1.0, min_brake_mult, hazard))
 		var side_sign: float = signf(predicted_diff.dot(planned_right))
 		if absf(side_sign) < 0.5:
 			side_sign = 1.0 if ship.get_instance_id() < candidate_ship.get_instance_id() else -1.0
 		lateral_offset += planned_right * side_sign * hazard * SUPPORT_PRE_AVOID_MAX_LATERAL_OFFSET
 	if lateral_offset.length_squared() > 0.0001:
-		lateral_offset = lateral_offset.limit_length(SUPPORT_PRE_AVOID_MAX_LATERAL_OFFSET * (1.2 if is_panokseon_support else 1.0))
+		lateral_offset = lateral_offset.limit_length(SUPPORT_PRE_AVOID_MAX_LATERAL_OFFSET * (1.2 if is_heavy_support else 1.0))
 	return {
 		"position_offset": lateral_offset,
 		"brake_mult": brake_mult,

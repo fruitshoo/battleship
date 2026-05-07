@@ -12,7 +12,7 @@ const PLAYER_SAIL_EFFICIENCY := 1.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const PLAYER_SAIL_FURL_RATE := 0.55
 const PLAYER_STAMINA_DRAIN_RATE := 10.0
-const PLAYER_STAMINA_RECOVERY_RATE := 6.5
+const PLAYER_STAMINA_RECOVERY_RATE := 8.5
 const SOLDIER_SWORD_BASE_DAMAGE := 13.0
 const SOLDIER_BOW_BASE_DAMAGE := 18.0
 const SUPPORT_FLEET_BASE_RESPAWN_INTERVAL := 30.0
@@ -143,6 +143,9 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"panokseon_upgrade":
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
 			return "판옥선 포격함 1척 합류 | 편성 %s" % slot_summary
+		"geobukseon_upgrade":
+			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
+			return "거북선 방호함 1척 합류 | 도선 면역 | 편성 %s" % slot_summary
 		"crew_reserve":
 			var assist_duration := maxf(float(stats.get("min_assist_channel_duration", 0.55)), float(stats.get("base_assist_channel_duration", 1.1)) - (float(level) * float(stats.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio := clampf(0.35 + (float(level) * float(stats.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(stats.get("max_assist_recovery_health_ratio", 0.7)))
@@ -204,6 +207,7 @@ static func get_upgrade_icon(upgrade_id: String) -> String:
 		"supply_bonus": "medical_services",
 		"fleet_signal": "groups",
 		"panokseon_upgrade": "fort",
+		"geobukseon_upgrade": "shield",
 		"crew_numbers": "swords",
 		"crew_attack": "swords",
 		"crew_defense": "shield",
@@ -247,6 +251,7 @@ static func get_upgrade_color(upgrade_id: String) -> Color:
 		"supply_bonus": Color(0.35, 0.95, 0.35),
 		"fleet_signal": Color(1.0, 0.75, 0.35),
 		"panokseon_upgrade": Color(0.84, 0.7, 0.35),
+		"geobukseon_upgrade": Color(0.62, 0.78, 0.58),
 		"crew_numbers": Color(0.5, 0.82, 1.0),
 		"crew_attack": Color(1.0, 0.9, 0.35),
 		"crew_defense": Color(0.55, 0.8, 1.0),

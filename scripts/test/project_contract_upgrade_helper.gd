@@ -57,6 +57,8 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke maengseon support should stay front-cannon only at 포문 Lv3")
 	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 3).size() != 6:
 		failures.append("upgrade smoke panokseon support should keep six side cannons before 전면 포문")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("geobukseon_ally", 3).size() != 4:
+		failures.append("upgrade smoke geobukseon support should stay four side cannons at 포문 Lv3")
 	var panokseon_front_levels := {
 		"front_cannon": 1,
 	}
@@ -72,6 +74,14 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke support slot summary should reflect maengseon plus added panokseon roster")
 	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 6문":
 		failures.append("upgrade smoke support cannon summary should reflect side cannon slots at 포문 Lv3")
+	var geobukseon_levels := {
+		"fleet_signal": 1,
+		"geobukseon_upgrade": 1,
+	}
+	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(geobukseon_levels, upgrades) != "맹선 1척 | 거북선 1척":
+		failures.append("upgrade smoke support slot summary should reflect maengseon plus added geobukseon roster")
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, geobukseon_levels, upgrades) != "맹선 1문 | 거북선 4문":
+		failures.append("upgrade smoke support cannon summary should reflect geobukseon four side cannons")
 	panokseon_levels["front_cannon"] = 1
 	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 7문":
 		failures.append("upgrade smoke support cannon summary should include 전면 포문 when unlocked")

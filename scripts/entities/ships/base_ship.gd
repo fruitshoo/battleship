@@ -44,6 +44,7 @@ const RUNTIME_GENERATED_HULL_META := "runtime_generated_hull"
 @export_range(0.75, 1.1) var auto_fit_scale: float = 1.0 ## 선체 자동 충돌 타원 전체 스케일
 @export_range(0.0, 2.0) var collision_padding: float = 0.02 ## 충돌 판정 여유치(반폭/반길이에 추가)
 @export_range(0.6, 1.0) var deck_bounds_ratio: float = 0.88 ## 병사 덱 이동 범위 축소 비율
+@export_range(0.35, 4.0, 0.05) var ship_mass_scale: float = 1.0 ## 충돌/보딩에서 쓰는 상대 질량감
 @export_range(0, 24, 1) var max_dead_bodies_on_deck: int = 10 ## 갑판에 남겨둘 시체 상한. 초과분은 오래된 것부터 조용히 정리한다.
 
 # === 돛 관련 ===
@@ -62,7 +63,7 @@ var rudder_health: float = 100.0
 var _rudder_critical_announced: bool = false
 
 @export_group("Field Repair")
-@export var rigging_field_repair_enabled: bool = true
+@export var rigging_field_repair_enabled: bool = false
 @export_range(0.0, 60.0, 0.5) var rigging_repair_delay: float = 10.0
 @export_range(0.2, 1.0, 0.05) var rigging_repair_target_ratio: float = 0.65
 @export_range(0.0, 0.25, 0.005) var sail_field_repair_rate: float = 0.035
@@ -119,6 +120,7 @@ var _deck_overrun_announced: bool = false
 @export_range(1.0, 100.0, 1.0) var boarding_capture_damage_tick: float = 25.0
 
 # === 도선(Boarding) 상태 및 변수 ===
+@export var blocks_boarding: bool = false ## 거북선처럼 구조적으로 적 도선을 허용하지 않는 선체.
 var is_boarding: bool = false
 var boarding_timer: float = 0.0
 var boarding_interval: float = 1.0
@@ -254,6 +256,7 @@ func _ensure_collision_profile() -> void:
 		collision_profile.deck_bounds_ratio = deck_bounds_ratio
 		collision_profile.min_ramming_speed = min_ramming_speed
 		collision_profile.broad_phase_padding = broad_phase_padding
+		collision_profile.ship_mass_scale = ship_mass_scale
 	_apply_collision_profile()
 
 func _apply_collision_profile() -> void:
@@ -268,6 +271,7 @@ func _apply_collision_profile() -> void:
 	deck_bounds_ratio = collision_profile.deck_bounds_ratio
 	min_ramming_speed = collision_profile.min_ramming_speed
 	broad_phase_padding = collision_profile.broad_phase_padding
+	ship_mass_scale = collision_profile.ship_mass_scale
 
 func _sync_profile_from_runtime() -> void:
 	if collision_profile == null:
@@ -281,6 +285,7 @@ func _sync_profile_from_runtime() -> void:
 	collision_profile.deck_bounds_ratio = deck_bounds_ratio
 	collision_profile.min_ramming_speed = min_ramming_speed
 	collision_profile.broad_phase_padding = broad_phase_padding
+	collision_profile.ship_mass_scale = ship_mass_scale
 
 func get_collision_half_extents() -> Vector2:
 	return ShipContactGeometry.get_soft_collision_half_extents(self)
@@ -497,6 +502,11 @@ func load_ship_stats(type_name: String) -> Dictionary:
 	if stats.has("collision_padding"): collision_padding = float(stats["collision_padding"])
 	if stats.has("collision_length_mult"): length_multiplier = float(stats["collision_length_mult"])
 	if stats.has("collision_width_mult"): width_multiplier = float(stats["collision_width_mult"])
+	if stats.has("ship_mass_scale"):
+		ship_mass_scale = clampf(float(stats["ship_mass_scale"]), 0.35, 4.0)
+		if collision_profile != null:
+			collision_profile.ship_mass_scale = ship_mass_scale
+	if stats.has("blocks_boarding"): blocks_boarding = stats["blocks_boarding"] == true
 	
 	return stats
 
@@ -541,6 +551,9 @@ func is_combat_disabled() -> bool:
 
 func are_weapons_disabled() -> bool:
 	return is_combat_disabled() or deck_is_overrun
+
+func can_be_boarded_by(_attacker_ship: Node = null) -> bool:
+	return not blocks_boarding
 
 func get_hull_hp_value() -> float:
 	return hull_hp
@@ -1406,7 +1419,10 @@ func _get_boarding_pull_role_velocity_multiplier(target_node: Node) -> float:
 	if is_boarding and is_instance_valid(boarding_target) and target_node == boarding_target:
 		return 1.0
 	if is_instance_valid(boarding_attacker) and target_node == boarding_attacker:
-		return BOARDING_PULL_DEFENDER_VELOCITY_MAX_MULT
+		var attacker_mass := BaseShipCollisionHelper.get_ship_mass_scale(target_node)
+		var defender_mass := BaseShipCollisionHelper.get_ship_mass_scale(self)
+		var mass_ratio := clampf(attacker_mass / maxf(defender_mass, 0.001), 0.35, 1.25)
+		return BOARDING_PULL_DEFENDER_VELOCITY_MAX_MULT * mass_ratio
 	return 1.0
 
 func _has_incoming_boarding_rope_link(attacker_node: Node) -> bool:
@@ -1534,45 +1550,8 @@ func _is_contested_hull_damage_source(damage_source: String) -> bool:
 		return true
 	return false
 
-func _apply_sail_damage_from_hit(final_damage: float, damage_source: String) -> void:
-	if masts.is_empty():
-		return
-	if damage_source == "leak":
-		return
-	var source_mult: float = 0.0
-	var is_ramming_hit: bool = damage_source.begins_with("ramming")
-	if damage_source.contains("chain"):
-		source_mult = 1.55
-	elif damage_source.begins_with("cannon") or damage_source == "janggun":
-		source_mult = 1.0
-	elif is_ramming_hit:
-		# 충각은 선체 전반에 큰 충격을 주기 때문에 돛 손상도 대포보다 약간 더 잘 보이게 한다.
-		source_mult = 1.35
-	elif damage_source.contains("ballista") or damage_source.contains("singigeon") or damage_source.contains("fire"):
-		source_mult = 0.75
-	elif damage_source.is_empty() or damage_source == "unknown":
-		source_mult = 0.45
-	else:
-		source_mult = 0.25
-	if source_mult <= 0.0:
-		return
-	var sail_damage_delta: float = clamp((final_damage / 220.0) * source_mult, 0.01, 0.12)
-	if is_ramming_hit:
-		sail_damage_delta = clamp(sail_damage_delta * 1.2, 0.02, 0.18)
-	var intact_masts: Array[Node] = []
-	for mast in masts:
-		if is_instance_valid(mast) and mast.has_method("add_sail_damage"):
-			intact_masts.append(mast)
-	if intact_masts.is_empty():
-		return
-	var chosen_index: int = randi() % intact_masts.size()
-	var chosen_mast: Node = intact_masts[chosen_index]
-	var previous_damage: float = 0.0
-	if chosen_mast.has_method("get_sail_damage"):
-		previous_damage = float(chosen_mast.call("get_sail_damage"))
-	chosen_mast.call("add_sail_damage", sail_damage_delta)
-	if chosen_mast.has_method("get_sail_damage") and float(chosen_mast.call("get_sail_damage")) > previous_damage + 0.001:
-		_mark_rigging_damage_for_repair()
+func _apply_sail_damage_from_hit(_final_damage: float, _damage_source: String) -> void:
+	pass
 
 
 func update_crew_allocation_state(delta: float) -> void:

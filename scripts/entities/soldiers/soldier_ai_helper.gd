@@ -6,6 +6,10 @@ const MOVE_TURN_SPEED := 10.0
 const ATTACK_TURN_SPEED := 16.0
 const TURN_TARGET_DISTANCE_EPSILON_SQ := 0.09
 const TURN_ANGLE_DEADZONE := PI / 60.0
+const ATTACK_VALIDATION_NEAR_INTERVAL := 0.12
+const ATTACK_VALIDATION_CROSS_SHIP_INTERVAL := 0.16
+const ATTACK_VALIDATION_FAR_LOD_INTERVAL := 0.22
+const ATTACK_VALIDATION_JITTER := 0.05
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
@@ -15,14 +19,15 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 		else:
 			soldier.wander_timer = randf_range(1.5, 3.0)
 		return
-	var support_profile_start := PhysicsFrameProfiler.begin()
-	if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.72, WANDER_TURN_SPEED):
+	if _should_run_routine_support_step(soldier, delta, run_heavy_logic):
+		var support_profile_start := PhysicsFrameProfiler.begin()
+		if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.72, WANDER_TURN_SPEED):
+			PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
+			return
+		if _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
+			PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
+			return
 		PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
-		return
-	if _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
-		PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
-		return
-	PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
 	if run_heavy_logic:
 		var heavy_profile_start := PhysicsFrameProfiler.begin()
 		if _try_priority_ship_duty_before_enemy(soldier, 0.78, delta, WANDER_TURN_SPEED):
@@ -72,15 +77,16 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		soldier.wander_timer = randf_range(1.5, 3.0)
 		soldier._change_state(soldier.State.IDLE)
 		return
-	var support_profile_start := PhysicsFrameProfiler.begin()
-	if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.68, WANDER_TURN_SPEED):
-		PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
-		return
+	if _should_run_routine_support_step(soldier, delta, run_heavy_logic):
+		var support_profile_start := PhysicsFrameProfiler.begin()
+		if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.68, WANDER_TURN_SPEED):
+			PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
+			return
 
-	if _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
+		if _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
+			PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
+			return
 		PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
-		return
-	PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
 
 	if run_heavy_logic:
 		var heavy_profile_start := PhysicsFrameProfiler.begin()
@@ -169,6 +175,14 @@ static func _try_priority_ship_duty_before_enemy(soldier, speed_scale: float, de
 		return false
 	_move_toward_point(soldier, duty_target, speed_scale, delta, turn_speed)
 	return true
+
+
+static func _should_run_routine_support_step(soldier, delta: float, run_heavy_logic: bool) -> bool:
+	if soldier.has_method("_should_run_routine_support_step"):
+		return soldier.call("_should_run_routine_support_step", delta, run_heavy_logic) == true
+	return true
+
+
 static func start_wander(soldier) -> void:
 	if not is_instance_valid(soldier.owned_ship):
 		return
@@ -251,60 +265,35 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 
 
 static func state_attack(soldier, delta: float = 0.016) -> void:
-	var validate_profile_start := PhysicsFrameProfiler.begin()
-	if _retarget_owned_ship_hostile(soldier):
-		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
-		return
-
 	if not is_instance_valid(soldier.current_target):
 		soldier._change_state(soldier.State.IDLE)
-		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
 	if SoldierStateHelper.is_dead_soldier(soldier.current_target) or soldier.current_target.get_team_tag() == soldier.team:
 		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
-		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
 	var target_node := soldier.current_target as Node3D
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
 		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
-		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 		return
 
-	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
-	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
-		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
-			_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+	var should_run_full_validation := true
+	if "attack_validation_timer" in soldier:
+		soldier.attack_validation_timer -= delta
+		should_run_full_validation = soldier.attack_validation_timer <= 0.0
+	if should_run_full_validation:
+		var validation_interval := _get_attack_validation_interval(soldier)
+		if "attack_validation_interval_runtime" in soldier:
+			soldier.attack_validation_interval_runtime = validation_interval
+		if "attack_validation_timer" in soldier:
+			soldier.attack_validation_timer = validation_interval + randf_range(0.0, ATTACK_VALIDATION_JITTER)
+		var validate_profile_start := PhysicsFrameProfiler.begin()
+		if _validate_attack_state(soldier, target_node, delta):
+			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
+		else:
 			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 			return
-
-	var flat_dx: float = soldier.global_position.x - target_node.global_position.x
-	var flat_dz: float = soldier.global_position.z - target_node.global_position.z
-	var distance_xz_sq: float = flat_dx * flat_dx + flat_dz * flat_dz
-
-	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
-		if soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
-			soldier.current_target = null
-			soldier._change_state(soldier.State.IDLE)
-			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
-			return
-		if not soldier._is_ship_pair_in_melee_range(target_ship):
-			soldier._change_state(soldier.State.IDLE)
-			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
-			return
-		if soldier.has_method("_is_in_cross_ship_contact_zone") and soldier._is_in_cross_ship_contact_zone(target_ship) == false:
-			soldier._change_state(soldier.State.MOVE)
-			PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
-			return
-
-	var attack_range = soldier.current_weapon.attack_range if soldier.current_weapon and "attack_range" in soldier.current_weapon else 1.2
-	var max_attack_distance: float = attack_range * 1.2
-	if distance_xz_sq > max_attack_distance * max_attack_distance:
-		soldier._change_state(soldier.State.MOVE)
-		PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
-		return
-	PhysicsFrameProfiler.end("soldier_attack_validate", validate_profile_start)
 
 	soldier.velocity = Vector3.ZERO
 	var turn_profile_start := PhysicsFrameProfiler.begin()
@@ -324,6 +313,58 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 			soldier._perform_attack()
 		soldier.attack_timer = SoldierCombatHelper.get_effective_attack_cooldown(soldier)
 		PhysicsFrameProfiler.end("soldier_attack_swing", swing_profile_start)
+
+
+static func _validate_attack_state(soldier, target_node: Node3D, delta: float) -> bool:
+	if _retarget_owned_ship_hostile(soldier):
+		return false
+	if not is_instance_valid(soldier.current_target):
+		soldier._change_state(soldier.State.IDLE)
+		return false
+	if SoldierStateHelper.is_dead_soldier(soldier.current_target) or soldier.current_target.get_team_tag() == soldier.team:
+		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+		return false
+	target_node = soldier.current_target as Node3D
+	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
+		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+		return false
+	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
+	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
+		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
+			_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
+			return false
+
+	var flat_dx: float = soldier.global_position.x - target_node.global_position.x
+	var flat_dz: float = soldier.global_position.z - target_node.global_position.z
+	var distance_xz_sq: float = flat_dx * flat_dx + flat_dz * flat_dz
+
+	if is_instance_valid(soldier.owned_ship) and target_ship != soldier.owned_ship:
+		if soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
+			soldier.current_target = null
+			soldier._change_state(soldier.State.IDLE)
+			return false
+		if not soldier._is_ship_pair_in_melee_range(target_ship):
+			soldier._change_state(soldier.State.IDLE)
+			return false
+		if soldier.has_method("_is_in_cross_ship_contact_zone") and soldier._is_in_cross_ship_contact_zone(target_ship) == false:
+			soldier._change_state(soldier.State.MOVE)
+			return false
+
+	var attack_range = soldier.current_weapon.attack_range if soldier.current_weapon and "attack_range" in soldier.current_weapon else 1.2
+	var max_attack_distance: float = attack_range * 1.2
+	if distance_xz_sq > max_attack_distance * max_attack_distance:
+		soldier._change_state(soldier.State.MOVE)
+		return false
+	return true
+
+
+static func _get_attack_validation_interval(soldier) -> float:
+	if soldier.get("_lod_is_combat_priority") == false:
+		return ATTACK_VALIDATION_FAR_LOD_INTERVAL
+	var target_ship = soldier.current_target.get_owned_ship_node() if is_instance_valid(soldier.current_target) and soldier.current_target.has_method("get_owned_ship_node") else null
+	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
+		return ATTACK_VALIDATION_CROSS_SHIP_INTERVAL
+	return ATTACK_VALIDATION_NEAR_INTERVAL
 
 
 static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:

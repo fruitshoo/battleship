@@ -67,12 +67,15 @@ const PRIORITY_CREW_UPGRADE_IDS: Array[String] = [
 	"boarding_resist",
 ]
 const PANOKSEON_SUPPORT_UPGRADE_ID: String = "panokseon_upgrade"
+const GEOBUKSEON_SUPPORT_UPGRADE_ID: String = "geobukseon_upgrade"
 const SUPPORT_SHIP_UPGRADE_IDS: Array[String] = [
 	PANOKSEON_SUPPORT_UPGRADE_ID,
+	GEOBUKSEON_SUPPORT_UPGRADE_ID,
 ]
 const SUPPORT_CREW_UPGRADE_IDS: Array[String] = []
 const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
 	PANOKSEON_SUPPORT_UPGRADE_ID,
+	GEOBUKSEON_SUPPORT_UPGRADE_ID,
 ]
 const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
 const RARE_FLEET_UPGRADE_ID: String = "fleet_signal"
@@ -208,10 +211,14 @@ func _is_fleet_ship_progress_available() -> bool:
 
 
 func _are_support_ship_choices_available() -> bool:
-	return _is_fleet_ship_progress_available() or _is_panokseon_upgrade_choice_available()
+	return _is_fleet_ship_progress_available() or _is_panokseon_upgrade_choice_available() or _is_geobukseon_upgrade_choice_available()
 
 
 func _is_panokseon_upgrade_choice_available() -> bool:
+	return int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0
+
+
+func _is_geobukseon_upgrade_choice_available() -> bool:
 	return int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0
 
 
@@ -220,6 +227,10 @@ func _get_available_support_ship_upgrade_ids() -> Array[String]:
 	for upgrade_id in SUPPORT_SHIP_UPGRADE_IDS:
 		if upgrade_id == PANOKSEON_SUPPORT_UPGRADE_ID:
 			if _is_panokseon_upgrade_choice_available():
+				support_ids.append(upgrade_id)
+			continue
+		if upgrade_id == GEOBUKSEON_SUPPORT_UPGRADE_ID:
+			if _is_geobukseon_upgrade_choice_available():
 				support_ids.append(upgrade_id)
 			continue
 		if _is_fleet_ship_progress_available():
@@ -422,7 +433,7 @@ func apply_upgrade(upgrade_id: String) -> void:
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [LocaleManager.data_text(UPGRADES[upgrade_id], upgrade_id, "upgrade", "name", upgrade_id), new_level])
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
-	var ship_ui_ids = ["cannon", "front_cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "supply", "gold"]
+	var ship_ui_ids = ["cannon", "front_cannon", "cannon_damage", "cannon_reload", "janggun", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "geobukseon_upgrade", "supply", "gold"]
 	var crew_ui_ids = ["crew_numbers", "boarding_resist", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow"]
 	var hud = player_ship._find_hud() if player_ship.has_method("_find_hud") else null
 	if hud:
@@ -938,6 +949,22 @@ func _apply_panokseon_upgrade(ship: Node3D, _level: int) -> void:
 		return
 	print("[Support] 판옥선은 지원함 해금 후 사용할 수 있습니다.")
 
+func _apply_geobukseon_upgrade(ship: Node3D, _level: int) -> void:
+	if not is_instance_valid(ship):
+		return
+	var reconcile_state := reconcile_support_fleet(ship, "geobukseon_upgrade", {
+		"allow_autospawn": true,
+		"spawn_now": true,
+		"require_signal_unlock": true,
+	})
+	if reconcile_state.get("autospawn_skipped", false):
+		print("[Support] 거북선 자동 보강 건너뜀 (probe)")
+		return
+	if reconcile_state.get("spawn_requested", false):
+		print("[Support] 거북선 방호함이 지원 함대에 합류했습니다!")
+		return
+	print("[Support] 거북선은 지원함 해금 후 사용할 수 있습니다.")
+
 func _apply_fleet_crew(ship: Node3D, level: int) -> void:
 	if not is_instance_valid(ship):
 		return
@@ -1000,10 +1027,7 @@ func _apply_item_choyogi(ship: Node3D) -> void:
 	if ship.has_meta("item_choyogi_applied"):
 		return
 	ship.set_meta("item_choyogi_applied", true)
-	reconcile_support_fleet(ship, "item_choyogi", {
-		"allow_autospawn": true,
-		"spawn_now": true,
-	})
+	apply_upgrade(RARE_FLEET_UPGRADE_ID)
 
 func _apply_item_ilseongjeongsiui(ship: Node3D) -> void:
 	if ship.has_meta("item_ilseongjeongsiui_applied"):
@@ -1130,10 +1154,9 @@ func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 		var base_limit: int = int(ship.get_meta("base_support_fleet_limit", ship.support_fleet_limit))
 		if not ship.has_meta("base_support_fleet_limit"):
 			ship.set_meta("base_support_fleet_limit", base_limit)
-		var item_bonus: int = 1 if ship.get_meta("item_choyogi_applied", false) == true else 0
 		var upgrade_bonus: int = _get_support_fleet_limit_upgrade_bonus()
 		var squadron_bonus: int = PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, UPGRADES)
-		ship.support_fleet_limit = base_limit + item_bonus + upgrade_bonus + squadron_bonus
+		ship.support_fleet_limit = base_limit + upgrade_bonus + squadron_bonus
 	if ShipAllyRoleHelper.is_player_flagship(ship):
 		PlayerShipSupportHelper.refresh_support_fleet_composition(ship)
 	return {

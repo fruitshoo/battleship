@@ -75,6 +75,7 @@
 			"move_speed": 7.0,
 			"has_cannons": false,
 			"soldier_type": "melee",
+			"ship_mass_scale": 0.75,
 			"crew_composition": {
 				"melee": 3,
 				"general": 1
@@ -88,6 +89,7 @@
 			"move_speed": 6.0,
 			"has_cannons": false,
 			"soldier_type": "melee",
+			"ship_mass_scale": 1.0,
 			"crew_composition": {
 				"general": 1,
 				"melee": 4,
@@ -104,6 +106,7 @@
 			"move_speed": 4.5,
 			"has_cannons": true,
 			"soldier_type": "ranged",
+			"ship_mass_scale": 1.05,
 			"crew_composition": {
 				"general": 1,
 				"ranged": 4,
@@ -116,10 +119,11 @@
 		},
 		"atakebune_mid_boss": {
 			"hull_scene": "res://scenes/ships/hulls/atakebune_hull.tscn",
-			"hull_hp": 500,
+			"hull_hp": 475,
 			"move_speed": 3.0,
 			"tier": 1,
 			"soldier_type": "general",
+			"ship_mass_scale": 2.2,
 			"combat_profile": "mid_boss_gunner",
 			"crew_composition": {
 				"general": 2,
@@ -136,10 +140,11 @@
 		},
 		"atakebune_final_boss": {
 			"hull_scene": "res://scenes/ships/hulls/atakebune_hull.tscn",
-			"hull_hp": 2200,
+			"hull_hp": 2100,
 			"move_speed": 2.5,
 			"tier": 2,
 			"soldier_type": "general",
+			"ship_mass_scale": 2.8,
 			"combat_profile": "final_boss_gunner",
 			"crew_composition": {
 				"general": 2,
@@ -164,6 +169,7 @@
 			"move_speed": 4.5,
 			"has_cannons": true,
 			"soldier_type": "general",
+			"ship_mass_scale": 1.0,
 			"weapon_loadout": [
 				{"profile": "joseon_light_cannon", "name": "FleetCannon_0", "slot": "CannonFront", "position": [0.0, 0.8, -3.5], "rotation_y": 0.0, "required_level": 1}
 			],
@@ -175,6 +181,7 @@
 			"move_speed": 3.8,
 			"has_cannons": true,
 			"soldier_type": "general",
+			"ship_mass_scale": 1.65,
 			"crew_composition": {
 				"general": 4,
 				"ranged": 1
@@ -192,10 +199,33 @@
 			"combat_profile": "stand_off_gunner",
 			"separation_pad_scale": 1.12
 		},
+		"geobukseon_support": {
+			"hull_scene": "res://scenes/ships/hulls/geobukseon_hull.tscn",
+			"hull_hp": 300,
+			"move_speed": 3.4,
+			"has_cannons": true,
+			"blocks_boarding": true,
+			"soldier_type": "general",
+			"ship_mass_scale": 2.05,
+			"crew_composition": {
+				"general": 4,
+				"ranged": 1
+			},
+			"weapon_loadout": [
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_1", "slot": "CannonLeft", "position": [-2.2, 1.1, -1.8], "rotation_y": 90.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_2", "slot": "CannonRight", "position": [2.2, 1.1, -1.8], "rotation_y": -90.0, "required_level": 1},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_3", "slot": "CannonLeftExtraRear", "position": [-2.2, 1.1, 1.25], "rotation_y": 90.0, "required_level": 2},
+				{"profile": "joseon_light_cannon", "name": "FleetCannon_4", "slot": "CannonRightExtra", "position": [2.2, 1.1, 1.25], "rotation_y": -90.0, "required_level": 2}
+			],
+			"deck_height": 2.45,
+			"combat_profile": "stand_off_gunner",
+			"separation_pad_scale": 1.18
+		},
 		"panokseon_player_default": {
 			"hull_scene": "res://scenes/ships/hulls/panok_hull.tscn",
 			"hull_hp": 270,
 			"move_speed": 6.0,
+			"ship_mass_scale": 1.75,
 			"weapon_loadout": [
 				{"profile": "joseon_light_cannon", "name": "CannonFront", "slot": "CannonFront", "position": [0.0, 0.6, -3.1], "rotation_y": 0.0, "required_level": 1, "unlock_upgrade": "front_cannon"},
 				{"profile": "joseon_light_cannon", "name": "CannonLeft", "slot": "CannonLeft", "position": [-1.3, 0.6, 0.0], "rotation_y": 90.0, "required_level": 1},
@@ -235,6 +265,10 @@
 	"panokseon_ally": {
 		"name": "Panokseon Ally",
 		"ship_archetype": "panokseon_support"
+	},
+	"geobukseon_ally": {
+		"name": "Geobukseon Ally",
+		"ship_archetype": "geobukseon_support"
 	},
 	"panokseon_player": {
 		"name": "Player Panokseon",

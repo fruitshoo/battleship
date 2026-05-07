@@ -750,7 +750,16 @@ func _drop_treasure_chest() -> void:
 	var chest = chest_scene.instantiate()
 	if chest == null:
 		return
-	get_tree().root.add_child(chest)
+	var tree := get_tree()
+	if tree == null:
+		chest.queue_free()
+		return
+	var chest_parent: Node = tree.current_scene
+	if not is_instance_valid(chest_parent):
+		chest_parent = get_parent()
+	if not is_instance_valid(chest_parent):
+		chest_parent = tree.root
+	chest_parent.add_child(chest)
 	chest.global_position = global_position
 	chest.global_position.y = 0.0
 	print("[Boss] 보스 격침! 보물 상자 드랍.")

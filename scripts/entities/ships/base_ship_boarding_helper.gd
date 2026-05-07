@@ -11,6 +11,9 @@ static func process_boarding_common(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
 		cancel_boarding(ship)
 		return
+	if not _can_target_be_boarded(ship.boarding_target, ship):
+		cancel_boarding(ship)
+		return
 
 	var target_pos = ship.boarding_target.global_position
 	var dist = ship.global_position.distance_to(target_pos)
@@ -82,6 +85,15 @@ static func process_boarding_common(ship, delta: float) -> void:
 static func _uses_limited_rope_visuals(ship) -> bool:
 	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
 	return contact_mode == ShipBoardingMetaHelper.CONTACT_HEAD_ON or contact_mode == ShipBoardingMetaHelper.CONTACT_CLEANUP
+
+
+static func _can_target_be_boarded(target_ship: Node, attacker_ship: Node = null) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if target_ship.has_method("can_be_boarded_by"):
+		return target_ship.call("can_be_boarded_by", attacker_ship) == true
+	var blocks_boarding: Variant = target_ship.get("blocks_boarding")
+	return blocks_boarding != true if blocks_boarding != null else true
 
 
 static func cancel_boarding(ship) -> void:

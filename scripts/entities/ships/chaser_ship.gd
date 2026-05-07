@@ -1105,6 +1105,8 @@ func _board_ship(target_ship: Node3D) -> void:
 	# === 아군 체크 (동일 팀이면 도선 무시) ===
 	if ship_node.get("team") == team:
 		return
+	if not ShipCombatModeHelper.can_be_boarded(ship_node, self):
+		return
 		
 	# === 플레이어 팀 체크 (상대 배에 올라타는 것 제한) ===
 	# 나포(Capture) 상황이 아닌 일반 전투 중에는 아군 병사가 적선으로 넘어가지 않게 함

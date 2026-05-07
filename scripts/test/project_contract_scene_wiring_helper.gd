@@ -238,6 +238,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	_run_authoring_palette_contract(failures)
 	await _run_soldier_common_action_contract(owner, failures, wait_frames_after_attach)
 	_run_soldier_ship_work_priority_contract(owner, failures)
+	_run_soldier_attack_validation_contract(failures)
 	_run_soldier_smooth_turn_contract(owner, failures)
 	await _run_boarding_rope_anchor_height_contract(owner, failures, wait_frames_after_attach)
 	await _run_boarding_landing_contract(owner, failures, wait_frames_after_attach)
@@ -356,6 +357,25 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		if furled_response_mult <= open_response_mult * 1.2:
 			failures.append("furled sail should improve rudder response")
 
+		var wind_manager := player_ship.get_node_or_null("/root/WindManager")
+		if is_instance_valid(wind_manager) and wind_manager.has_method("set_wind_direction") and wind_manager.has_method("set_wind_strength"):
+			var previous_wind_dir: Vector2 = wind_manager.call("get_wind_direction") if wind_manager.has_method("get_wind_direction") else Vector2.RIGHT
+			var previous_wind_strength: float = float(wind_manager.call("get_wind_strength")) if wind_manager.has_method("get_wind_strength") else 0.8
+			wind_manager.call("set_wind_direction", Vector2.RIGHT)
+			wind_manager.call("set_wind_strength", 0.8)
+			player_ship.call("set_sail_furled", false)
+			player_ship.set("sail_deployed_ratio", 1.0)
+			player_ship.set("sail_angle", 90.0)
+			player_ship.rotation.y = 0.0
+			player_ship.set("misaligned_sail_min_thrust_ratio", 0.12)
+			var misaligned_floor_speed := float(player_ship.call("_calculate_sail_speed"))
+			player_ship.set("misaligned_sail_min_thrust_ratio", 0.0)
+			var misaligned_no_floor_speed := float(player_ship.call("_calculate_sail_speed"))
+			if misaligned_floor_speed <= misaligned_no_floor_speed + 0.25:
+				failures.append("misaligned open sails should retain a small minimum speed floor")
+			wind_manager.call("set_wind_direction", previous_wind_dir)
+			wind_manager.call("set_wind_strength", previous_wind_strength)
+
 		player_ship.set("acceleration", 1000.0)
 		player_ship.set("is_rowing", true)
 		player_ship.set("rowing_locked", false)
@@ -377,6 +397,15 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 			failures.append("reverse rowing should move the player ship backward")
 		if absf(reverse_rowing_speed) >= open_rowing_speed * 0.65:
 			failures.append("reverse rowing should stay slower than forward rowing")
+		player_ship.call("set_rowing", true, 1)
+		player_ship.set("rowing_locked", true)
+		player_ship.set("rowing_stamina", 0.0)
+		player_ship.set("current_speed", 0.0)
+		player_ship.call("_update_movement", 0.1)
+		var exhausted_rowing_speed := float(player_ship.get("current_speed"))
+		if exhausted_rowing_speed >= open_rowing_speed * 0.55:
+			failures.append("exhausted rowing should feel clearly slower than stamina rowing")
+		player_ship.set("rowing_locked", false)
 
 		player_ship.set("stamina_drain_rate", 10.0)
 		player_ship.call("set_rowing", true, 1)
@@ -466,6 +495,10 @@ static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]
 		failures.append("player corpse cleanup should capture the throw arc at throw time")
 	if player_ship_source.contains("_apply_corpse_cleanup_throw_arc\").bind(corpse_id, throw_origin"):
 		failures.append("player corpse cleanup should not bind a stale throw origin before rail carry completes")
+	if not player_ship_source.contains("_grant_corpse_cleanup_merit"):
+		failures.append("player corpse cleanup should reward boarding merit only after the corpse is thrown overboard")
+	if not player_ship_source.contains("corpse_cleanup_merit_reward"):
+		failures.append("player corpse cleanup boarding merit reward should be LevelManager-configured")
 	var approach_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", pickup_actor_position")
 	var pickup_index := player_ship_source.find("_apply_corpse_cleanup_payload_pickup")
 	var carry_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", rail_actor_position")
@@ -980,6 +1013,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"path": "res://scenes/ships/hulls/panok_hull.tscn",
 			"label": "panokseon hull",
 			"cannons": 7,
+			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
 			"weapon_slots": [],
 			"anchors": 8,
 			"crew": 8,
@@ -989,6 +1023,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"path": "res://scenes/ships/hulls/maengseon_hull.tscn",
 			"label": "maengseon hull",
 			"cannons": 3,
+			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
 			"weapon_slots": [],
 			"anchors": 8,
 			"crew": 6,
@@ -998,6 +1033,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"path": "res://scenes/ships/hulls/atakebune_hull.tscn",
 			"label": "atakebune hull",
 			"cannons": 7,
+			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
 			"weapon_slots": ["SingigeonFront"],
 			"anchors": 8,
 			"crew": 8,
@@ -1006,7 +1042,8 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 		{
 			"path": "res://scenes/ships/hulls/geobukseon_hull.tscn",
 			"label": "geobukseon hull",
-			"cannons": 7,
+			"cannons": 4,
+			"cannon_names": ["CannonLeft", "CannonRight", "CannonLeftExtraRear", "CannonRightExtra"],
 			"weapon_slots": [],
 			"anchors": 8,
 			"crew": 8,
@@ -1016,6 +1053,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"path": "res://scenes/ships/hulls/kobayabune_hull.tscn",
 			"label": "kobayabune hull",
 			"cannons": 3,
+			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
 			"weapon_slots": [],
 			"anchors": 8,
 			"crew": 6,
@@ -1025,6 +1063,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"path": "res://scenes/ships/hulls/sekibune_hull.tscn",
 			"label": "sekibune hull",
 			"cannons": 3,
+			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
 			"weapon_slots": [],
 			"anchors": 8,
 			"crew": 6,
@@ -1034,6 +1073,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"path": "res://scenes/ships/hulls/sekibune_melee_hull.tscn",
 			"label": "sekibune melee hull",
 			"cannons": 3,
+			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
 			"weapon_slots": [],
 			"anchors": 8,
 			"crew": 6,
@@ -1060,7 +1100,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 		_expect_min_authoring_count(marker_counts, label, "WeaponSlots", weapon_slots.size(), failures)
 		_expect_min_authoring_count(marker_counts, label, "BoardingAnchors", int(check["anchors"]), failures)
 		_expect_min_authoring_count(marker_counts, label, "CrewSlots", int(check["crew"]), failures)
-		_expect_authoring_marker_names(hull_root, label, "CannonSlots", ["CannonFront", "CannonLeft", "CannonRight"], failures)
+		_expect_authoring_marker_names(hull_root, label, "CannonSlots", check.get("cannon_names", ["CannonFront", "CannonLeft", "CannonRight"]), failures)
 		_expect_authoring_marker_names(hull_root, label, "WeaponSlots", weapon_slots, failures)
 		_expect_authoring_marker_names(hull_root, label, "BoardingAnchors", ["RightForward", "RightMid", "RightRear", "LeftForward", "LeftMid", "LeftRear", "Bow", "Stern"], failures)
 		var required_crew_slots := ["CrewForwardLeft", "CrewForwardRight", "CrewMidLeft", "CrewMidRight", "CrewRearLeft", "CrewRearRight"]
@@ -1084,6 +1124,7 @@ static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String])
 	_validate_weapon_profiles(profiles, failures)
 	var ship_archetypes := _load_ship_archetypes(all_stats, failures)
 	_validate_ship_archetypes(ship_archetypes, combat_profiles, profiles, failures)
+	_validate_geobukseon_support_contract(ship_archetypes, failures)
 	_validate_ship_blueprint_crew_contracts(all_stats, ship_archetypes, combat_profiles, failures)
 	for type_name_variant in all_stats.keys():
 		var type_name := str(type_name_variant)
@@ -1107,6 +1148,32 @@ static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String])
 			continue
 		var loadout := loadout_variant as Array
 		_validate_weapon_loadout_entries(type_name, resolved_stats, loadout, profiles, failures)
+
+
+static func _validate_geobukseon_support_contract(ship_archetypes: Dictionary, failures: Array[String]) -> void:
+	var stats_variant: Variant = ship_archetypes.get("geobukseon_support", {})
+	if typeof(stats_variant) != TYPE_DICTIONARY:
+		failures.append("geobukseon_support archetype missing")
+		return
+	var stats := stats_variant as Dictionary
+	if stats.get("blocks_boarding", false) != true:
+		failures.append("geobukseon_support should block boarding")
+	var loadout_variant: Variant = stats.get("weapon_loadout", [])
+	if typeof(loadout_variant) != TYPE_ARRAY:
+		failures.append("geobukseon_support weapon_loadout should be an Array")
+		return
+	var loadout := loadout_variant as Array
+	var cannon_count := 0
+	for spec_variant in loadout:
+		if typeof(spec_variant) != TYPE_DICTIONARY:
+			continue
+		var spec := spec_variant as Dictionary
+		if str(spec.get("slot", "")) == "CannonFront":
+			failures.append("geobukseon_support should not have a front cannon")
+		if str(spec.get("profile", "")) == "joseon_light_cannon":
+			cannon_count += 1
+	if cannon_count != 4:
+		failures.append("geobukseon_support should expose exactly 4 side cannons, got %d" % cannon_count)
 
 
 static func _validate_ship_blueprint_crew_contracts(all_stats: Dictionary, ship_archetypes: Dictionary, combat_profiles: Dictionary, failures: Array[String]) -> void:
@@ -2661,7 +2728,6 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 		"TASK_DECK_DEFENSE",
 		"TASK_CORPSE_CLEANUP",
 		"TASK_CANNON_RELOAD",
-		"TASK_RIGGING_REPAIR",
 		"TASK_SHIPHANDLING_STATION",
 		"static func get_ship_work_directive",
 		"static func score_worker_for_task",
@@ -2682,8 +2748,6 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 			failures.append("soldier ship work priority helper missing token: %s" % token)
 	if not work_priority_source.contains("PRIORITY_CANNON_RELOAD := 70") or not work_priority_source.contains("PRIORITY_SHIPHANDLING_STATION := 42"):
 		failures.append("cannon reload should outrank routine shiphandling station work")
-	if not work_priority_source.contains("PRIORITY_RIGGING_REPAIR := 62"):
-		failures.append("rigging repair should outrank routine shiphandling work")
 	_validate_soldier_ship_work_priority_table(failures)
 
 	var duty_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_ship_duty_helper.gd")
@@ -2743,7 +2807,6 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 		SoldierShipWorkPriorityHelper.TASK_DECK_DEFENSE,
 		SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP,
 		SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD,
-		SoldierShipWorkPriorityHelper.TASK_RIGGING_REPAIR,
 		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_STATION,
 	]
 	for task_name in expected_order:
@@ -2824,6 +2887,19 @@ static func _run_soldier_smooth_turn_contract(owner: Node, failures: Array[Strin
 	if absf(soldier.rotation.x) > 0.001 or absf(soldier.rotation.z) > 0.001:
 		failures.append("soldier smooth turn should keep local x/z upright on tilted deck")
 	deck.queue_free()
+
+
+static func _run_soldier_attack_validation_contract(failures: Array[String]) -> void:
+	var soldier_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier.gd")
+	var ai_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_ai_helper.gd")
+	if not soldier_source.contains("attack_validation_timer"):
+		failures.append("soldier attack validation should keep a staggered per-soldier timer")
+	if not ai_source.contains("ATTACK_VALIDATION_CROSS_SHIP_INTERVAL"):
+		failures.append("soldier attack validation should use cross-ship throttling")
+	if not ai_source.contains("_validate_attack_state"):
+		failures.append("soldier attack validation should separate cheap attack state updates from full validation")
+	if ai_source.contains("static func state_attack") and ai_source.contains("var validate_profile_start := PhysicsFrameProfiler.begin()\n\tif _retarget_owned_ship_hostile"):
+		failures.append("soldier attack validation should not retarget every attack physics frame")
 
 
 static func _run_boarding_rope_anchor_height_contract(owner: Node, failures: Array[String], wait_frames_after_attach: int) -> void:

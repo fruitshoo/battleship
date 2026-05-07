@@ -264,12 +264,6 @@ static func update_burning_status(ship, delta: float) -> void:
 			burn_damage_per_second = maxf(0.0, float(ship.burn_hull_damage_per_second))
 		burn_damage_per_second *= get_furled_sail_fire_damage_multiplier(ship)
 		ship.hull_hp = move_toward(ship.hull_hp, 0, burn_damage_per_second * delta)
-		# Let burning sails visibly deteriorate over time without jumping straight to holes.
-		for mast in ship.masts:
-			if is_instance_valid(mast) and mast.has_method("add_sail_damage"):
-				mast.add_sail_damage(delta * 0.04)
-				if ship.has_method("_mark_rigging_damage_for_repair"):
-					ship.call("_mark_rigging_damage_for_repair")
 		if ship.hull_hp <= 0:
 			ship.die()
 
@@ -300,10 +294,10 @@ static func update_hull_regeneration(ship, delta: float) -> void:
 
 
 static func mark_rigging_damage_for_repair(ship) -> void:
-	if ship == null or not ship.rigging_field_repair_enabled:
+	if ship == null:
 		return
-	ship._rigging_repair_cooldown = maxf(ship._rigging_repair_cooldown, ship.rigging_repair_delay)
-	ship._rigging_repair_feedback_pending = true
+	ship._rigging_repair_cooldown = 0.0
+	ship._rigging_repair_feedback_pending = false
 	ship._rigging_repair_active_feedback_shown = false
 	ship._rigging_repair_complete_feedback_shown = false
 
@@ -311,37 +305,10 @@ static func mark_rigging_damage_for_repair(ship) -> void:
 static func update_rigging_recovery(ship, delta: float) -> void:
 	if ship == null or delta <= 0.0:
 		return
-	if not ship.rigging_field_repair_enabled:
-		return
-	if ship.is_sinking or ship.is_dying or ship.is_derelict:
-		return
-	if ship.is_burning or ship.deck_is_contested or ship.deck_is_overrun:
-		ship._rigging_repair_cooldown = maxf(ship._rigging_repair_cooldown, minf(ship.rigging_repair_delay, 2.0))
-		return
-	if not _has_repairable_rigging_damage(ship):
-		_show_rigging_repair_complete_feedback_if_needed(ship)
-		ship._rigging_repair_cooldown = 0.0
-		return
-	if ship._rigging_repair_cooldown > 0.0:
-		ship._rigging_repair_cooldown = maxf(0.0, ship._rigging_repair_cooldown - delta)
-		return
-	_show_rigging_repair_active_feedback_if_needed(ship)
-	_repair_rudder_to_field_target(ship, delta)
-	_repair_sails_to_field_target(ship, delta)
-	if not _has_repairable_rigging_damage(ship):
-		_show_rigging_repair_complete_feedback_if_needed(ship)
+	mark_rigging_damage_for_repair(ship)
 
 
-static func _has_repairable_rigging_damage(ship) -> bool:
-	var target_ratio: float = clampf(float(ship.rigging_repair_target_ratio), 0.0, 1.0)
-	if ship.rudder_max_health > 0.0 and ship.rudder_health < ship.rudder_max_health * target_ratio - 0.001:
-		return true
-	var max_field_damage: float = 1.0 - target_ratio
-	for mast in ship.masts:
-		if not is_instance_valid(mast) or not mast.has_method("get_sail_damage"):
-			continue
-		if float(mast.call("get_sail_damage")) > max_field_damage + 0.001:
-			return true
+static func _has_repairable_rigging_damage(_ship) -> bool:
 	return false
 
 
@@ -371,21 +338,12 @@ static func _repair_sails_to_field_target(ship, delta: float) -> void:
 
 
 static func _show_rigging_repair_active_feedback_if_needed(ship) -> void:
-	if not ship._rigging_repair_feedback_pending or ship._rigging_repair_active_feedback_shown:
-		return
-	ship._rigging_repair_active_feedback_shown = true
-	_show_rigging_repair_feedback(ship, "응급 수리 중", 1.2)
+	ship._rigging_repair_active_feedback_shown = false
 
 
 static func _show_rigging_repair_complete_feedback_if_needed(ship) -> void:
-	if not ship._rigging_repair_feedback_pending or ship._rigging_repair_complete_feedback_shown:
-		return
-	if not ship._rigging_repair_active_feedback_shown:
-		ship._rigging_repair_feedback_pending = false
-		return
-	ship._rigging_repair_complete_feedback_shown = true
 	ship._rigging_repair_feedback_pending = false
-	_show_rigging_repair_feedback(ship, "응급 수리 완료", 1.2)
+	ship._rigging_repair_complete_feedback_shown = false
 
 
 static func _show_rigging_repair_feedback(ship, message: String, duration: float) -> void:

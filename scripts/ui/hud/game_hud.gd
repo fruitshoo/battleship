@@ -207,7 +207,7 @@ const PLAYER_STATUS_STACK_HEIGHT: float = 13.0
 
 const SHIP_UPGRADE_IDS := [
 	"cannon", "cannon_damage", "cannon_reload", "janggun",
-	"hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade",
+	"hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "geobukseon_upgrade",
 	"supply", "gold"
 ]
 const CREW_UPGRADE_IDS := [

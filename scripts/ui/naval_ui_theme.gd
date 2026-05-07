@@ -271,6 +271,7 @@ static func resolve_emblem_text(token: String) -> String:
 		"flag": "기",
 		"fleet_signal": "선",
 		"fort": "판",
+		"geobukseon_upgrade": "거",
 		"gold": "금",
 		"grade": "치",
 		"group": "병",

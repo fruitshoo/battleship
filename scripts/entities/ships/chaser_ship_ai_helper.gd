@@ -164,7 +164,7 @@ static func calculate_separation(ship) -> Vector3:
 			var push_dir := offset.normalized()
 			var ratio: float = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
 			var strength: float = pow(ratio, 2.0)
-			force += push_dir * strength
+			force += push_dir * strength * BaseShipCollisionHelper.get_collision_movement_share(ship, other)
 			count += 1
 
 	if count > 0:
@@ -264,7 +264,8 @@ static func process_physics(ship, delta: float) -> void:
 
 	var boarding_profile_start := PhysicsFrameProfiler.begin()
 	var boarding_attempt_distance: float = ShipContactGeometry.get_boarding_attempt_distance(ship, current_target)
-	if not _is_gunner(ship) and _can_board(ship) and dist_to_target <= boarding_attempt_distance:
+	var target_can_be_boarded := ShipCombatModeHelper.can_be_boarded(current_target, ship)
+	if not _is_gunner(ship) and _can_board(ship) and target_can_be_boarded and dist_to_target <= boarding_attempt_distance:
 		var can_use_limbo_boarding_intent := true
 		if ship.get("limbo_ai_pilot_enabled") == true:
 			var boarding_frame := int(ship.get_meta(ShipAILimboKeys.META_BOARDING_FRAME, -1000000))
@@ -478,7 +479,7 @@ static func _draw_ai_intent_debug(
 		var velocity_end: Vector3 = origin + velocity.normalized() * clampf(velocity.length(), 1.5, 6.0)
 		DebugDrawBridge.draw_line(origin + Vector3.UP * 0.72, velocity_end + Vector3.UP * 0.72, velocity_color, duration, 0.026)
 
-	if _can_board(ship) and boarding_attempt_distance > 0.1 and dist_to_target <= boarding_attempt_distance + 5.0:
+	if _can_board(ship) and ShipCombatModeHelper.can_be_boarded(current_target, ship) and boarding_attempt_distance > 0.1 and dist_to_target <= boarding_attempt_distance + 5.0:
 		var boarding_color := Color(0.25, 1.0, 0.64, 0.7) if dist_to_target <= boarding_attempt_distance else Color(1.0, 0.58, 0.16, 0.62)
 		DebugDrawBridge.draw_circle_xz(current_target.global_position, boarding_attempt_distance, boarding_color, 1.25, duration, 72, 0.026)
 

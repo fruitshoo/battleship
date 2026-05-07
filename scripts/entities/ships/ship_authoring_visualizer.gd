@@ -288,6 +288,8 @@ func _sync_mirrored_boarding_anchors() -> void:
 
 
 func _sync_mirrored_anchor_pair(left_marker: Marker3D, right_marker: Marker3D) -> void:
+	if not left_marker.is_inside_tree() or not right_marker.is_inside_tree():
+		return
 	var pair_key := "%s|%s" % [left_marker.get_path(), right_marker.get_path()]
 	var left_pos := left_marker.position
 	var right_pos := right_marker.position

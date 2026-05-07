@@ -810,6 +810,11 @@ static func _is_valid_raid_target_ship(ship, target_ship: Node3D) -> bool:
 		return false
 	if target_ship.has_method("is_derelict_ship") and target_ship.is_derelict_ship():
 		return false
+	if target_ship.has_method("can_be_boarded_by") and not target_ship.call("can_be_boarded_by", ship):
+		return false
+	var blocks_boarding: Variant = target_ship.get("blocks_boarding")
+	if blocks_boarding == true:
+		return false
 	return true
 
 

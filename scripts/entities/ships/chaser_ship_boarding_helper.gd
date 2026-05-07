@@ -270,11 +270,14 @@ static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vecto
 					if n2.length_squared() < 0.0001:
 						n2 = Vector2(-sin(ship.rotation.y), -cos(ship.rotation.y))
 					n2 = n2.normalized()
-					hit_pos.x = target_pos.x + n2.x * safe_dist
-					hit_pos.z = target_pos.z + n2.y * safe_dist
+					var target_hit_pos: Vector3 = hit_pos
+					target_hit_pos.x = target_pos.x + n2.x * safe_dist
+					target_hit_pos.z = target_pos.z + n2.y * safe_dist
+					var correction: Vector3 = target_hit_pos - hit_pos
+					hit_pos += correction * _get_guard_correction_share(ship, other_ship, correction.length())
 					if emit_collision_event:
 						emit_guarded_collision(ship, other_ship, impact_speed_hint)
-					soften_collision_speed(ship)
+					soften_collision_speed(ship, other_ship)
 					return hit_pos
 
 	var diff = proposed_pos - target_pos
@@ -282,13 +285,22 @@ static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vecto
 	var dist = diff.length()
 	if dist < safe_dist:
 		var n = diff.normalized() if dist > 0.001 else Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
-		proposed_pos.x = target_pos.x + n.x * safe_dist
-		proposed_pos.z = target_pos.z + n.z * safe_dist
+		var target_proposed_pos: Vector3 = proposed_pos
+		target_proposed_pos.x = target_pos.x + n.x * safe_dist
+		target_proposed_pos.z = target_pos.z + n.z * safe_dist
+		var correction: Vector3 = target_proposed_pos - proposed_pos
+		proposed_pos += correction * _get_guard_correction_share(ship, other_ship, correction.length())
 		if emit_collision_event:
 			emit_guarded_collision(ship, other_ship, impact_speed_hint)
-		soften_collision_speed(ship)
+		soften_collision_speed(ship, other_ship)
 
 	return proposed_pos
+
+
+static func _get_guard_correction_share(ship, other_ship: Node3D, correction_length: float) -> float:
+	if ship.get("boarding_target") == other_ship:
+		return 1.0
+	return BaseShipCollisionHelper.get_guard_correction_share(ship, other_ship, correction_length)
 
 
 static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: float) -> void:
@@ -320,8 +332,13 @@ static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: 
 		other_ship.call("apply_ramming_damage", ship, impact_speed)
 
 
-static func soften_collision_speed(ship) -> void:
-	ship.current_speed = min(ship.current_speed, ship.move_speed * 0.84)
+static func soften_collision_speed(ship, other_ship: Node3D = null) -> void:
+	var max_ratio := 0.84
+	if is_instance_valid(other_ship):
+		var my_mass := BaseShipCollisionHelper.get_ship_mass_scale(ship)
+		var other_mass := BaseShipCollisionHelper.get_ship_mass_scale(other_ship)
+		max_ratio = clampf(0.84 - maxf(other_mass - my_mass, 0.0) * 0.08, 0.55, 0.88)
+	ship.current_speed = min(ship.current_speed, ship.move_speed * max_ratio)
 
 
 static func _is_support_fleet_pair(ship, other_ship: Node3D) -> bool:

@@ -32,6 +32,7 @@ signal merit_full_action_completed() # 백병전 포인트 가득 참 후속 처
 @export var merit_per_soldier_kill: int = 1 ## 적 병사 1명 처치 시 획득 백병전 포인트
 @export var drowned_soldier_kill_xp_reward: int = 3 ## 적 병사를 수장시켰을 때 획득 XP
 @export var drowned_soldier_kill_merit_reward: int = 0 ## 적 병사를 수장시켰을 때 획득 백병전 포인트
+@export var corpse_cleanup_merit_reward: int = 1 ## 갑판 시체 정리 완료 시 획득 백병전 포인트
 @export var melee_kill_xp_bonus: int = 2 ## 백병전(검/창/작살) 처치 시 추가 XP
 @export var melee_kill_merit_bonus: int = 1 ## 백병전(검/창/작살) 처치 시 추가 백병전 포인트
 @export var boarding_capture_score_reward: int = 25 ## 나포 성공 시 추가 골드
@@ -167,6 +168,9 @@ func _clear_root_runtime_pool_residue() -> void:
 		return
 	var root := tree.root
 	var current_scene := tree.current_scene
+	var root_runtime_groups := {
+		"treasure_chest": true,
+	}
 	for child in root.get_children():
 		if not is_instance_valid(child):
 			continue
@@ -174,7 +178,13 @@ func _clear_root_runtime_pool_residue() -> void:
 			continue
 		if child.name == ScenePool.ROOT_NAME:
 			continue
-		if child.has_meta(ScenePool.KEY_META):
+		var is_root_runtime_node: bool = child.has_meta(ScenePool.KEY_META)
+		if not is_root_runtime_node:
+			for group_name in root_runtime_groups.keys():
+				if child.is_in_group(str(group_name)):
+					is_root_runtime_node = true
+					break
+		if is_root_runtime_node:
 			child.queue_free()
 
 	var pool_root := root.get_node_or_null(ScenePool.ROOT_NAME)
@@ -285,6 +295,11 @@ func _apply_reward_rules_root(root: Dictionary) -> void:
 		var soldier_drowned: Dictionary = drowned_variant as Dictionary
 		drowned_soldier_kill_xp_reward = int(soldier_drowned.get("xp", drowned_soldier_kill_xp_reward))
 		drowned_soldier_kill_merit_reward = int(soldier_drowned.get("merit", drowned_soldier_kill_merit_reward))
+
+	var corpse_cleanup_variant: Variant = root.get("corpse_cleanup", {})
+	if typeof(corpse_cleanup_variant) == TYPE_DICTIONARY:
+		var corpse_cleanup: Dictionary = corpse_cleanup_variant as Dictionary
+		corpse_cleanup_merit_reward = int(corpse_cleanup.get("merit", corpse_cleanup_merit_reward))
 
 	var melee_variant: Variant = root.get("melee_bonus", {})
 	if typeof(melee_variant) == TYPE_DICTIONARY:

@@ -44,7 +44,6 @@ const TASK_PRIORITY_TABLE := [
 	{KEY_TASK: TASK_DECK_DEFENSE, KEY_PRIORITY: PRIORITY_DECK_DEFENSE, KEY_PHASE: PHASE_EMERGENCY, KEY_RUNTIME: "combat_ai", KEY_REASON: "hostiles on deck", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_CORPSE_CLEANUP, KEY_PRIORITY: PRIORITY_CORPSE_CLEANUP, KEY_PHASE: PHASE_CLEANUP, KEY_RUNTIME: "player_ship", KEY_REASON: "clear enemy corpse from allied deck", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_CANNON_RELOAD, KEY_PRIORITY: PRIORITY_CANNON_RELOAD, KEY_PHASE: PHASE_WEAPON_SUPPORT, KEY_RUNTIME: "cannon_reload", KEY_REASON: "weapon reload support", KEY_PREEMPTS_ROUTINE: true},
-	{KEY_TASK: TASK_RIGGING_REPAIR, KEY_PRIORITY: PRIORITY_RIGGING_REPAIR, KEY_PHASE: PHASE_REPAIR, KEY_RUNTIME: "ship_duty", KEY_REASON: "damaged rigging", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_SHIPHANDLING_STATION, KEY_PRIORITY: PRIORITY_SHIPHANDLING_STATION, KEY_PHASE: PHASE_SHIPHANDLING, KEY_RUNTIME: "ship_duty", KEY_REASON: "shiphandling station", KEY_PREEMPTS_ROUTINE: false},
 ]
 
@@ -152,7 +151,6 @@ static func get_ship_work_directive(soldier) -> Dictionary:
 	var profile_start := PhysicsFrameProfiler.begin()
 	var half_ext: Vector2 = SoldierShipHelper.get_ship_deck_half_extents(soldier, ship)
 	var candidates: Array[Dictionary] = []
-	_append_candidate(candidates, _build_rigging_repair_directive(soldier, ship, half_ext))
 	_append_candidate(candidates, _build_gunnery_station_directive(soldier, ship, half_ext))
 	_append_candidate(candidates, _build_shiphandling_directive(soldier, ship, half_ext))
 
@@ -334,21 +332,8 @@ static func normalize_task_name(task_name: String) -> String:
 	return normalized
 
 
-static func _build_rigging_repair_directive(soldier, ship: Node3D, half_ext: Vector2) -> Dictionary:
-	if not _has_repairable_rigging_damage(ship):
-		return _none_directive()
-	var bias_sign: float = _get_soldier_bias_sign(soldier)
-	var local_target: Vector3 = Vector3(bias_sign * half_ext.x * 0.24, 0.0, half_ext.y * 0.72)
-	var target_ratio: float = clampf(float(ship.get("rigging_repair_target_ratio")), 0.0, 1.0)
-	var rudder_max_health: float = float(ship.get("rudder_max_health")) if ship.get("rudder_max_health") != null else 0.0
-	var rudder_health: float = float(ship.get("rudder_health")) if ship.get("rudder_health") != null else rudder_max_health
-	if rudder_max_health > 0.0 and rudder_health < rudder_max_health * target_ratio - 0.001:
-		local_target = Vector3(bias_sign * half_ext.x * 0.32, 0.0, half_ext.y * 0.84)
-	else:
-		var mast_target := _get_most_damaged_mast_local(ship, half_ext)
-		if mast_target != Vector3.INF:
-			local_target = mast_target
-	return _build_directive(TASK_RIGGING_REPAIR, local_target, ship, "damaged rigging")
+static func _build_rigging_repair_directive(_soldier, _ship: Node3D, _half_ext: Vector2) -> Dictionary:
+	return _none_directive()
 
 
 static func _build_gunnery_station_directive(soldier, ship: Node3D, half_ext: Vector2) -> Dictionary:
@@ -642,27 +627,7 @@ static func _ship_has_deck_emergency(ship: Node3D) -> bool:
 	return int(ship.get("deck_hostile_boarder_count")) > 0 if ship.get("deck_hostile_boarder_count") != null else false
 
 
-static func _has_repairable_rigging_damage(ship: Node3D) -> bool:
-	if not is_instance_valid(ship):
-		return false
-	if ship.get("rigging_field_repair_enabled") != true:
-		return false
-	if ship.get("is_burning") == true or ship.get("is_sinking") == true or ship.get("is_dying") == true or ship.get("is_derelict") == true:
-		return false
-	var target_ratio: float = clampf(float(ship.get("rigging_repair_target_ratio")), 0.0, 1.0)
-	var rudder_max_health: float = float(ship.get("rudder_max_health")) if ship.get("rudder_max_health") != null else 0.0
-	var rudder_health: float = float(ship.get("rudder_health")) if ship.get("rudder_health") != null else rudder_max_health
-	if rudder_max_health > 0.0 and rudder_health < rudder_max_health * target_ratio - 0.001:
-		return true
-	var max_field_damage: float = 1.0 - target_ratio
-	var masts_value: Variant = ship.get("masts")
-	if not (masts_value is Array):
-		return false
-	for mast in masts_value:
-		if not is_instance_valid(mast) or not mast.has_method("get_sail_damage"):
-			continue
-		if float(mast.call("get_sail_damage")) > max_field_damage + 0.001:
-			return true
+static func _has_repairable_rigging_damage(_ship: Node3D) -> bool:
 	return false
 
 

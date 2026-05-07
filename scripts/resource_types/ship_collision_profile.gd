@@ -14,3 +14,4 @@ extends Resource
 
 @export_range(0.5, 12.0) var min_ramming_speed: float = 6.0
 @export_range(0.0, 6.0) var broad_phase_padding: float = 2.0
+@export_range(0.35, 4.0, 0.05) var ship_mass_scale: float = 1.0

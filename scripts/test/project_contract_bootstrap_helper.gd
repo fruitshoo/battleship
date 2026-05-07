@@ -81,6 +81,17 @@ static func run_bootstrap_contract_smoke(owner: Node, failures: Array[String], s
 					else:
 						root.add_child(survivor)
 						var active_survivor_id: int = survivor.get_instance_id()
+						var root_chest_id: int = 0
+						var chest_scene := load("res://scenes/effects/treasure_chest.tscn") as PackedScene
+						if chest_scene == null:
+							failures.append("bootstrap smoke restart cleanup could not load treasure chest scene")
+						else:
+							var root_chest := chest_scene.instantiate()
+							if not is_instance_valid(root_chest):
+								failures.append("bootstrap smoke restart cleanup could not instantiate treasure chest")
+							else:
+								root.add_child(root_chest)
+								root_chest_id = root_chest.get_instance_id()
 						var pooled_survivor := ScenePool.acquire(tree, survivor_scene)
 						if not is_instance_valid(pooled_survivor):
 							failures.append("bootstrap smoke restart cleanup could not acquire pooled survivor")
@@ -100,6 +111,10 @@ static func run_bootstrap_contract_smoke(owner: Node, failures: Array[String], s
 						var active_survivor := instance_from_id(active_survivor_id) as Node
 						if is_instance_valid(active_survivor):
 							failures.append("bootstrap smoke restart cleanup left active survivor on root")
+						if root_chest_id != 0:
+							var root_chest_after_cleanup := instance_from_id(root_chest_id) as Node
+							if is_instance_valid(root_chest_after_cleanup):
+								failures.append("bootstrap smoke restart cleanup left root treasure chest behind")
 						var pool_root := root.get_node_or_null(ScenePool.ROOT_NAME)
 						if is_instance_valid(pool_root):
 							if pool_root.get_child_count() > 0:

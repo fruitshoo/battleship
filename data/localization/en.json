@@ -120,6 +120,8 @@
 	"upgrade.fleet_signal.description": "Calls or repairs a maengseon. Lv2 maengseon limit +1",
 	"upgrade.panokseon_upgrade.name": "Panokseon",
 	"upgrade.panokseon_upgrade.description": "Adds 1 panokseon gunship to the fleet",
+	"upgrade.geobukseon_upgrade.name": "Geobukseon",
+	"upgrade.geobukseon_upgrade.description": "Adds 1 boarding-proof geobukseon guard ship to the fleet",
 	"meta_upgrade.hull_hp.name": "Max Health",
 	"meta_upgrade.hull_hp.description": "Hull +12",
 	"meta_upgrade.hull_defense.name": "Defense",

@@ -1,7 +1,12 @@
 extends RefCounted
 
+const WIND_VISUAL_RESPONSE_SPEED := 5.5
+const FLUTTER_VISUAL_RESPONSE_SPEED := 3.2
+const FLUTTER_STRENGTH_CAP := 0.62
+const SHADER_UPDATE_EPSILON := 0.006
 
-static func update_sail_wind_visual(mast: Node3D) -> void:
+
+static func update_sail_wind_visual(mast: Node3D, delta: float = 0.0) -> void:
 	if not is_instance_valid(mast.sail_visual):
 		return
 	mast.sail_visual.rotation.y = deg_to_rad(-mast.sail_angle)
@@ -9,8 +14,7 @@ static func update_sail_wind_visual(mast: Node3D) -> void:
 	if not is_instance_valid(mast._cached_wind_manager):
 		mast._cached_wind_manager = mast.get_node_or_null("/root/WindManager")
 	if not is_instance_valid(mast._cached_wind_manager) or not mast._cached_wind_manager.has_method("get_wind_direction"):
-		apply_wind_strength_to_sails(mast, 0.0)
-		apply_sail_flutter_to_sails(mast, 0.0)
+		_apply_smoothed_visuals(mast, 0.0, 0.0, delta)
 		return
 
 	var wind_dir: Vector2 = mast._cached_wind_manager.get_wind_direction()
@@ -20,8 +24,7 @@ static func update_sail_wind_visual(mast: Node3D) -> void:
 	var sail_fwd: Vector3 = -mast.sail_visual.global_transform.basis.z
 	var sail_fwd_2d: Vector2 = Vector2(sail_fwd.x, sail_fwd.z)
 	if sail_fwd_2d.length_squared() <= 0.0001:
-		apply_wind_strength_to_sails(mast, 0.0)
-		apply_sail_flutter_to_sails(mast, 0.0)
+		_apply_smoothed_visuals(mast, 0.0, 0.0, delta)
 		return
 	sail_fwd_2d = sail_fwd_2d.normalized()
 	mast._current_wind_intake = max(0.0, wind_dir.dot(sail_fwd_2d)) * mast.max_wind_intake
@@ -30,12 +33,27 @@ static func update_sail_wind_visual(mast: Node3D) -> void:
 	apply_wind_strength_to_sails(mast, visual_wind_strength)
 	var slip_flutter: float = pow(1.0 - intake_ratio, 1.25)
 	var filled_flutter: float = intake_ratio * 0.18
-	var flutter_strength: float = clampf(raw_wind_strength * (0.16 + slip_flutter * 0.92 + filled_flutter), 0.0, 1.0)
-	apply_sail_flutter_to_sails(mast, flutter_strength)
+	var flutter_strength: float = clampf(raw_wind_strength * (0.12 + slip_flutter * 0.72 + filled_flutter), 0.0, FLUTTER_STRENGTH_CAP)
+	_apply_smoothed_visuals(mast, visual_wind_strength, flutter_strength, delta)
+
+
+static func _apply_smoothed_visuals(mast: Node3D, target_wind_strength: float, target_flutter_strength: float, delta: float) -> void:
+	var wind_alpha := _response_alpha(WIND_VISUAL_RESPONSE_SPEED, delta)
+	var flutter_alpha := _response_alpha(FLUTTER_VISUAL_RESPONSE_SPEED, delta)
+	mast._visual_wind_strength = lerpf(float(mast._visual_wind_strength), target_wind_strength, wind_alpha)
+	mast._visual_flutter_strength = lerpf(float(mast._visual_flutter_strength), target_flutter_strength, flutter_alpha)
+	apply_wind_strength_to_sails(mast, mast._visual_wind_strength)
+	apply_sail_flutter_to_sails(mast, mast._visual_flutter_strength)
+
+
+static func _response_alpha(response_speed: float, delta: float) -> float:
+	if delta <= 0.0:
+		return 1.0
+	return clampf(1.0 - exp(-response_speed * delta), 0.0, 1.0)
 
 
 static func apply_wind_strength_to_sails(mast: Node3D, wind_strength_value: float) -> void:
-	if is_equal_approx(mast._last_applied_wind_strength, wind_strength_value):
+	if absf(float(mast._last_applied_wind_strength) - wind_strength_value) <= SHADER_UPDATE_EPSILON:
 		return
 	mast._last_applied_wind_strength = wind_strength_value
 	for mesh in mast._get_sail_meshes():
@@ -43,7 +61,7 @@ static func apply_wind_strength_to_sails(mast: Node3D, wind_strength_value: floa
 
 
 static func apply_sail_flutter_to_sails(mast: Node3D, flutter_strength_value: float) -> void:
-	if is_equal_approx(mast._last_applied_flutter_strength, flutter_strength_value):
+	if absf(float(mast._last_applied_flutter_strength) - flutter_strength_value) <= SHADER_UPDATE_EPSILON:
 		return
 	mast._last_applied_flutter_strength = flutter_strength_value
 	var flutter_phase: float = float(mast.get_instance_id() % 997) * 0.017

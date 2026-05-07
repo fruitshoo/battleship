@@ -7,6 +7,9 @@
     "xp": 3,
     "merit": 0
   },
+  "corpse_cleanup": {
+    "merit": 1
+  },
   "melee_bonus": {
     "xp": 2,
     "merit": 1

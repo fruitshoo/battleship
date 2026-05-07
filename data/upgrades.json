@@ -321,6 +321,19 @@
 				"panokseon_squadron_limit_add": 1
 			}
 		},
+		"geobukseon_upgrade": {
+			"name": "거북선",
+			"category": 5,
+			"description": "도선을 막는 거북선 방호함 1척 추가 합류",
+			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
+			"max_level": 1,
+			"color": "6f8f7a",
+			"stats": {
+				"geobukseon_upgrade_id": "geobukseon_upgrade",
+				"geobukseon_level": 1,
+				"geobukseon_squadron_limit_add": 1
+			}
+		},
 		"fleet_hull": {
 			"name": "지원함 선체",
 			"category": 5,
@@ -364,7 +377,7 @@
 			},
 			"choyogi": {
 				"name": "초요기",
-				"description": "황색 바탕의 초요기 군기입니다.",
+				"description": "맹선 업그레이드 +1 효과를 부여하는 초요기 군기입니다.",
 				"icon_texture": "res://assets/ui/items/choyogi.png",
 				"icon": "flag",
 				"alert_msg": "!! 아이템 획득: 초요기 !!"

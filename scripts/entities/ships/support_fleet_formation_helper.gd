@@ -16,6 +16,7 @@ const ROLE_ARTILLERY_SCREEN_FRONT_LEFT := "artillery_screen_front_left"
 const ROLE_ARTILLERY_SCREEN_FRONT_RIGHT := "artillery_screen_front_right"
 const ROLE_ARTILLERY_SCREEN_REAR_LEFT := "artillery_screen_rear_left"
 const ROLE_ARTILLERY_SCREEN_REAR_RIGHT := "artillery_screen_rear_right"
+const ROLE_ARMORED_GUARD := "armored_guard"
 
 const FORMATION_COLUMN := 0
 const FORMATION_WING := 1
@@ -77,6 +78,16 @@ const ROLE_SPECS := {
 		"extra_trail_pad": 0.35,
 		"rescue_lane": true,
 		"rescue_lateral": 0.92,
+		"hold_line": true,
+	},
+	ROLE_ARMORED_GUARD: {
+		"anchor": ROLE_ANCHOR_FLAGSHIP,
+		"wing_side": 0.0,
+		"wing_lateral": 0.0,
+		"wing_spacing": 1.16,
+		"column_spacing": 1.38,
+		"lateral_pad": ARTILLERY_LATERAL_PAD,
+		"extra_trail_pad": 0.45,
 		"hold_line": true,
 	},
 	ROLE_ARTILLERY_SCREEN_LEFT: {
@@ -546,7 +557,7 @@ static func _get_flagship_turn_side(ship) -> float:
 
 
 static func _should_follow_flagship_directly(ship, role_name: String) -> bool:
-	return role_name == ROLE_ARTILLERY_LEAD or ShipAllyRoleHelper.is_panokseon_support(ship)
+	return role_name == ROLE_ARTILLERY_LEAD or role_name == ROLE_ARMORED_GUARD or ShipAllyRoleHelper.is_heavy_support(ship)
 
 
 static func _is_named_support_role(role_name: String) -> bool:

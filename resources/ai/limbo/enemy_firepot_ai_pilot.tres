@@ -28,7 +28,7 @@ script = ExtResource("5_nav_hint")
 [sub_resource type="BTAction" id="BTAction_weapon_intent"]
 script = ExtResource("6_weapon_intent")
 fire_pot_min_range = 7.0
-fire_pot_max_range = 18.0
+fire_pot_max_range = 14.0
 
 [sub_resource type="BTAction" id="BTAction_boarding_intent"]
 script = ExtResource("7_boarding_intent")

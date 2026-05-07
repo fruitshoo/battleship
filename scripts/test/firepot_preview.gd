@@ -8,7 +8,7 @@ const ENEMY_FIREPOT_SCENE := preload("res://scenes/ships/enemy_firepot_ship.tscn
 @export var column_spacing: float = 8.5
 @export var too_close_distance: float = 4.5
 @export var in_range_distance: float = 11.0
-@export var too_far_distance: float = 22.0
+@export var too_far_distance: float = 17.0
 
 
 func _ready() -> void:
@@ -112,7 +112,7 @@ func _build_debug_text(enemy: Node3D, player: Node3D) -> String:
 
 	if is_instance_valid(player):
 		var dist: float = enemy.global_position.distance_to(player.global_position)
-		in_range = dist >= 7.0 and dist <= 18.0
+		in_range = dist >= 7.0 and dist <= 14.0
 
 	has_tosser = PreviewHarnessHelper.has_preview_crew_role(enemy, "fire_pot")
 	if not has_tosser:

@@ -208,6 +208,9 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"panokseon_upgrade":
 			var panokseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
 			return "판옥선 포격함 1척 합류 | 편성 %s" % panokseon_summary
+		"geobukseon_upgrade":
+			var geobukseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
+			return "거북선 방호함 1척 합류 | 도선 면역 | 편성 %s" % geobukseon_summary
 		"supply":
 			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(s.get("hull_heal", 20)), int(s.get("stamina_recover", 25))]
 		"gold":

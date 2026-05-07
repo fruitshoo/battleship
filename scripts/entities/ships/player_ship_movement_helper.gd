@@ -44,7 +44,7 @@ static func calculate_separation(ship) -> Vector3:
 			var push_dir = -offset / max(dist, 0.001)
 			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
 			var strength = pow(ratio, 2.0)
-			force += push_dir * strength * 1.8
+			force += push_dir * strength * 1.8 * BaseShipCollisionHelper.get_collision_movement_share(ship, other)
 	return force
 
 static func get_boarding_drag_multiplier(ship) -> float:
@@ -130,6 +130,8 @@ static func calculate_sail_speed(ship) -> float:
 	var forward_component: float = sail_normal.dot(ship_forward)
 	var effective_wind_force: float = wind_force * sail_drive_ratio
 	var thrust: float = effective_wind_force * max(0.0, forward_component)
+	var minimum_thrust: float = get_misaligned_sail_min_thrust(ship, sail_drive_ratio)
+	var effective_thrust: float = maxf(thrust, minimum_thrust)
 	ship._current_wind_intake = effective_wind_force
 	if Input.is_action_just_pressed("ui_accept"):
 		print("=== Physics Debug ===")
@@ -142,9 +144,21 @@ static func calculate_sail_speed(ship) -> float:
 		print("Wind Force: ", wind_force)
 		print("Forward Component: ", forward_component)
 		print("Thrust: ", thrust)
+		print("Minimum Thrust: ", minimum_thrust)
+		print("Effective Thrust: ", effective_thrust)
 		print("Current Speed: ", ship.current_speed)
 		print("=====================")
-	return thrust * ship.max_speed * wind_str * ship.sail_efficiency_mult * ship.get_shiphandling_multiplier()
+	return effective_thrust * ship.max_speed * wind_str * ship.sail_efficiency_mult * ship.get_shiphandling_multiplier()
+
+static func get_misaligned_sail_min_thrust(ship, sail_drive_ratio: float) -> float:
+	if sail_drive_ratio <= 0.001:
+		return 0.0
+	if "sail_furled" in ship and ship.get("sail_furled") == true:
+		return 0.0
+	var minimum_ratio := 0.0
+	if "misaligned_sail_min_thrust_ratio" in ship and ship.get("misaligned_sail_min_thrust_ratio") != null:
+		minimum_ratio = clampf(float(ship.get("misaligned_sail_min_thrust_ratio")), 0.0, 0.35)
+	return minimum_ratio * clampf(sail_drive_ratio, 0.0, 1.0)
 
 static func get_sail_drive_ratio(ship) -> float:
 	if ship.has_method("get_effective_sail_deployment"):

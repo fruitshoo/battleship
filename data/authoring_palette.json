@@ -18,6 +18,8 @@
     { "id": "atakebune_mid_boss", "label": "Atakebune Mid Boss", "tags": ["enemy", "boss", "elite"] },
     { "id": "atakebune_final_boss", "label": "Atakebune Final Boss", "tags": ["enemy", "boss", "final"] },
     { "id": "maengseon_support", "label": "Maengseon Support", "tags": ["player", "support"] },
+    { "id": "panokseon_support", "label": "Panokseon Support", "tags": ["player", "support", "ranged"] },
+    { "id": "geobukseon_support", "label": "Geobukseon Support", "tags": ["player", "support", "boarding-proof"] },
     { "id": "panokseon_player_default", "label": "Panokseon Player Default", "tags": ["player", "starter"] }
   ],
   "ship_types": [
@@ -27,6 +29,8 @@
     { "id": "atakebune_mid", "ship_archetype": "atakebune_mid_boss", "label": "Atakebune Mid", "tags": ["enemy", "boss", "elite"] },
     { "id": "atakebune_final", "ship_archetype": "atakebune_final_boss", "label": "Atakebune Final", "tags": ["enemy", "boss", "final"] },
     { "id": "maengseon_ally", "ship_archetype": "maengseon_support", "label": "Maengseon Ally", "tags": ["player", "support"] },
+    { "id": "panokseon_ally", "ship_archetype": "panokseon_support", "label": "Panokseon Ally", "tags": ["player", "support", "ranged"] },
+    { "id": "geobukseon_ally", "ship_archetype": "geobukseon_support", "label": "Geobukseon Ally", "tags": ["player", "support", "boarding-proof"] },
     { "id": "panokseon_player", "ship_archetype": "panokseon_player_default", "label": "Panokseon Player", "tags": ["player", "starter"] }
   ],
   "weapon_profiles": [

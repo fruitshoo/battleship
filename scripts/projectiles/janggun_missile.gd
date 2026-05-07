@@ -28,6 +28,12 @@ var janggun_lv: int = 0
 var team: String = "player"
 var _is_releasing: bool = false
 
+const MIN_CLOSE_FLIGHT_DURATION := 0.22
+const MIN_LONG_FLIGHT_DURATION := 0.55
+const MIN_FLIGHT_DURATION_FULL_DISTANCE := 14.0
+const MIN_CLOSE_ARC_HEIGHT := 0.25
+const MIN_LONG_ARC_HEIGHT := 0.8
+
 func _ready() -> void:
 	# 시그널은 한 번만 연결
 	area_entered.connect(_on_hit)
@@ -93,10 +99,11 @@ func _begin_flight() -> void:
 	global_position = start_pos
 
 	var distance = start_pos.distance_to(target_pos)
-	duration = distance / maxf(speed, 0.01)
-	if duration < 0.55:
-		duration = 0.55
-	arc_height = clamp(distance * 0.07, 0.8, 4.0)
+	var distance_ratio := clampf(distance / MIN_FLIGHT_DURATION_FULL_DISTANCE, 0.0, 1.0)
+	var min_duration := lerpf(MIN_CLOSE_FLIGHT_DURATION, MIN_LONG_FLIGHT_DURATION, distance_ratio)
+	duration = maxf(distance / maxf(speed, 0.01), min_duration)
+	var min_arc_height := lerpf(MIN_CLOSE_ARC_HEIGHT, MIN_LONG_ARC_HEIGHT, distance_ratio)
+	arc_height = clamp(distance * 0.07, min_arc_height, 4.0)
 
 	if start_pos.distance_squared_to(target_pos) > 0.1:
 		look_at(target_pos, Vector3.UP)

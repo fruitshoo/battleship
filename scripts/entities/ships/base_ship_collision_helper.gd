@@ -9,6 +9,33 @@ const COLLISION_REPULSION_CACHE_MIN_SHIP_COUNT := 8
 const COLLISION_REPULSION_CACHE_FRAME_WINDOW := 2
 const DERELICT_FIRE_POT_APPROACH_PADDING: float = 5.5
 
+static func get_ship_mass_scale(ship: Node) -> float:
+	if not is_instance_valid(ship):
+		return 1.0
+	var explicit_mass: Variant = ship.get("ship_mass_scale")
+	if explicit_mass != null:
+		return clampf(float(explicit_mass), 0.35, 4.0)
+	if ship is Node3D:
+		var half := ShipContactGeometry.get_soft_collision_half_extents(ship as Node3D)
+		return clampf((half.x * half.y) / 18.0, 0.55, 2.8)
+	return 1.0
+
+
+static func get_collision_movement_share(ship: Node, other_ship: Node) -> float:
+	var my_mass := get_ship_mass_scale(ship)
+	var other_mass := get_ship_mass_scale(other_ship)
+	var my_resistance := my_mass * my_mass
+	var other_resistance := other_mass * other_mass
+	return clampf(other_resistance / maxf(my_resistance + other_resistance, 0.001), 0.06, 0.94)
+
+
+static func get_guard_correction_share(ship: Node, other_ship: Node, correction_length: float = 0.0) -> float:
+	var share := clampf(get_collision_movement_share(ship, other_ship), 0.12, 0.86)
+	if correction_length > 1.2:
+		share = maxf(share, 0.42)
+	return share
+
+
 static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
@@ -97,6 +124,10 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 
 		if dist < coll_dist:
 			var compression = coll_dist - dist
+			var movement_share := get_collision_movement_share(ship, other)
+			var my_mass := get_ship_mass_scale(ship)
+			var other_mass := get_ship_mass_scale(other)
+			var heavy_impact_scale := clampf(1.0 + (other_mass - my_mass) * 0.18, 0.6, 1.45)
 			var target_speed = 0.0
 			if "current_speed" in other:
 				target_speed = other.current_speed
@@ -122,7 +153,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 					repulsion_strength = maxf(repulsion_strength, 26.0)
 				else:
 					repulsion_strength = maxf(repulsion_strength, 72.0)
-			var repulsion_force = -dir * (compression * repulsion_strength)
+			var repulsion_force = -dir * (compression * repulsion_strength * movement_share)
 			if is_player_support_pair:
 				var my_right = my_fwd.cross(Vector3.UP)
 				my_right.y = 0.0
@@ -132,7 +163,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				var side_sign = signf(diff.dot(my_right))
 				if absf(side_sign) < 0.5:
 					side_sign = 1.0 if ship.get_instance_id() < other.get_instance_id() else -1.0
-				var lateral_escape = my_right * side_sign * compression * 12.0
+				var lateral_escape = my_right * side_sign * compression * 12.0 * movement_share
 				repulsion_force = (repulsion_force * 0.35) + lateral_escape
 			elif is_engagement_pair and head_on_pair:
 				var my_right = my_fwd.cross(Vector3.UP)
@@ -146,7 +177,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				var lateral_strength := 14.0 if high_speed_head_on else 10.0
 				if penetration_ratio > 0.12:
 					lateral_strength += 8.0
-				repulsion_force += my_right * side_sign * compression * lateral_strength
+				repulsion_force += my_right * side_sign * compression * lateral_strength * movement_share
 			if (is_engagement_pair and head_on_pair) or high_speed_head_on:
 				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
 				if backward_component < 0.0:
@@ -156,8 +187,13 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 
 			if ship.current_speed > 0.5 and not is_player_support_pair:
 				var forward_alignment = absf(my_fwd.dot(dir))
+				var forward_into_contact = maxf(0.0, my_fwd.dot(dir))
+				if other_mass > my_mass and forward_into_contact > 0.35:
+					var mass_brake := clampf((other_mass / maxf(my_mass, 0.001) - 1.0) * 0.18 * forward_into_contact, 0.0, 0.5)
+					ship.current_speed *= 1.0 - mass_brake
 				if forward_alignment < 0.76 and penetration_ratio > 0.05:
 					var slide_brake := lerpf(0.04, 0.16, clampf((penetration_ratio - 0.05) / 0.25, 0.0, 1.0))
+					slide_brake *= heavy_impact_scale
 					if is_engagement_pair:
 						slide_brake *= 0.7
 					elif high_speed_head_on:
@@ -165,12 +201,13 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 					ship.current_speed *= maxf(0.78, 1.0 - slide_brake)
 				if my_fwd.dot(dir) > 0.8:
 					if high_speed_head_on:
-						ship.current_speed = lerp(ship.current_speed, 0.0, 0.72)
+						ship.current_speed = lerp(ship.current_speed, 0.0, clampf(0.72 * heavy_impact_scale, 0.32, 0.9))
 					elif is_engagement_pair:
 						var stop_blend = 0.48 if head_on_pair else 0.24
+						stop_blend *= heavy_impact_scale
 						ship.current_speed = lerp(ship.current_speed, 0.0, stop_blend)
 					else:
-						ship.current_speed = lerp(ship.current_speed, 0.0, 0.1)
+						ship.current_speed = lerp(ship.current_speed, 0.0, clampf(0.1 * heavy_impact_scale, 0.04, 0.18))
 
 			if approach_speed >= ship.min_ramming_speed and not is_player_support_pair:
 				ship.apply_ramming_damage(other, approach_speed)

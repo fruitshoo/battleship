@@ -3,14 +3,19 @@ class_name PlayerShipSupportSquadronHelper
 
 const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
 const PANOKSEON_HULL_SCENE = preload("res://scenes/ships/hulls/panok_hull.tscn")
+const GEOBUKSEON_HULL_SCENE = preload("res://scenes/ships/hulls/geobukseon_hull.tscn")
 const JOSEON_CANNON_SCENE = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
 const SUPPORT_MAENGSEON_SCENE_PATH := "res://scenes/ships/support_maengseon_ship.tscn"
 const SUPPORT_PANOKSEON_SCENE_PATH := "res://scenes/ships/support_panokseon_ship.tscn"
+const SUPPORT_GENERIC_SCENE_PATH := "res://scenes/ships/support_ship.tscn"
 
 const PROFILE_MAENGSEON_SCREEN := "maengseon_screen"
 const PROFILE_PANOKSEON_ESCORT := "panokseon_escort"
+const PROFILE_GEOBUKSEON_GUARD := "geobukseon_guard"
 const DEFAULT_PANOKSEON_UNLOCK_UPGRADE_ID := "panokseon_upgrade"
 const DEFAULT_PANOKSEON_UNLOCK_LEVEL := 1
+const DEFAULT_GEOBUKSEON_UNLOCK_UPGRADE_ID := "geobukseon_upgrade"
+const DEFAULT_GEOBUKSEON_UNLOCK_LEVEL := 1
 
 const SUPPORT_PROFILES := {
 	PROFILE_MAENGSEON_SCREEN: {
@@ -27,6 +32,14 @@ const SUPPORT_PROFILES := {
 		"role": "artillery_escort",
 		"ship_scene_path": SUPPORT_PANOKSEON_SCENE_PATH,
 		"hull_scene": PANOKSEON_HULL_SCENE,
+		"cannon_scene": JOSEON_CANNON_SCENE,
+	},
+	PROFILE_GEOBUKSEON_GUARD: {
+		"id": PROFILE_GEOBUKSEON_GUARD,
+		"ship_type": "geobukseon_ally",
+		"role": "armored_guard",
+		"ship_scene_path": SUPPORT_GENERIC_SCENE_PATH,
+		"hull_scene": GEOBUKSEON_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
 	},
 }
@@ -77,6 +90,14 @@ const PANOKSEON_ARTILLERY_SLOTS := [
 	},
 ]
 
+const GEOBUKSEON_GUARD_SLOTS := [
+	{
+		"squadron_id": "geobukseon_guard",
+		"profile_id": PROFILE_GEOBUKSEON_GUARD,
+		"slot_role": "armored_guard",
+	},
+]
+
 
 static func resolve_support_fleet_profile_for_levels(current_levels: Dictionary, upgrades: Dictionary = {}, support_slot: int = 0) -> Dictionary:
 	var slot_plan := get_support_slot_plan_for_levels(current_levels, upgrades)
@@ -90,12 +111,17 @@ static func get_support_slot_plan_for_levels(current_levels: Dictionary, upgrade
 	var plan: Array = []
 	var flagship_slots := FLAGSHIP_SCREEN_SLOTS.duplicate(true)
 	var panokseon_slots := PANOKSEON_ARTILLERY_SLOTS.duplicate(true)
+	var geobukseon_slots := GEOBUKSEON_GUARD_SLOTS.duplicate(true)
 	var panokseon_unlocked := is_panokseon_squadron_unlocked(current_levels, upgrades)
+	var geobukseon_unlocked := is_geobukseon_squadron_unlocked(current_levels, upgrades)
 
 	if not flagship_slots.is_empty():
 		plan.append(flagship_slots[0])
 	if panokseon_unlocked:
 		plan.append(panokseon_slots[0])
+	if geobukseon_unlocked:
+		plan.append(geobukseon_slots[0])
+	if panokseon_unlocked:
 		for i in range(1, panokseon_slots.size()):
 			plan.append(panokseon_slots[i])
 		for i in range(1, flagship_slots.size()):
@@ -113,6 +139,13 @@ static func is_panokseon_squadron_unlocked(current_levels: Dictionary, upgrades:
 	return int(current_levels.get(unlock_id, 0)) >= get_panokseon_unlock_level(upgrades)
 
 
+static func is_geobukseon_squadron_unlocked(current_levels: Dictionary, upgrades: Dictionary = {}) -> bool:
+	var unlock_id := get_geobukseon_unlock_upgrade_id(upgrades)
+	if unlock_id == DEFAULT_GEOBUKSEON_UNLOCK_UPGRADE_ID and int(current_levels.get("fleet_signal", 0)) <= 0:
+		return false
+	return int(current_levels.get(unlock_id, 0)) >= get_geobukseon_unlock_level(upgrades)
+
+
 static func get_panokseon_unlock_upgrade_id(upgrades: Dictionary = {}) -> String:
 	var stats := _get_support_squadron_stats(upgrades)
 	return str(stats.get("panokseon_upgrade_id", DEFAULT_PANOKSEON_UNLOCK_UPGRADE_ID))
@@ -123,11 +156,25 @@ static func get_panokseon_unlock_level(upgrades: Dictionary = {}) -> int:
 	return int(stats.get("panokseon_level", DEFAULT_PANOKSEON_UNLOCK_LEVEL))
 
 
+static func get_geobukseon_unlock_upgrade_id(upgrades: Dictionary = {}) -> String:
+	var stats := _get_geobukseon_squadron_stats(upgrades)
+	return str(stats.get("geobukseon_upgrade_id", DEFAULT_GEOBUKSEON_UNLOCK_UPGRADE_ID))
+
+
+static func get_geobukseon_unlock_level(upgrades: Dictionary = {}) -> int:
+	var stats := _get_geobukseon_squadron_stats(upgrades)
+	return int(stats.get("geobukseon_level", DEFAULT_GEOBUKSEON_UNLOCK_LEVEL))
+
+
 static func get_support_limit_bonus_for_levels(current_levels: Dictionary, upgrades: Dictionary = {}) -> int:
-	if not is_panokseon_squadron_unlocked(current_levels, upgrades):
-		return 0
-	var stats := _get_support_squadron_stats(upgrades)
-	return int(stats.get("panokseon_squadron_limit_add", 0))
+	var limit_bonus := 0
+	if is_panokseon_squadron_unlocked(current_levels, upgrades):
+		var panokseon_stats := _get_support_squadron_stats(upgrades)
+		limit_bonus += int(panokseon_stats.get("panokseon_squadron_limit_add", 0))
+	if is_geobukseon_squadron_unlocked(current_levels, upgrades):
+		var geobukseon_stats := _get_geobukseon_squadron_stats(upgrades)
+		limit_bonus += int(geobukseon_stats.get("geobukseon_squadron_limit_add", 0))
+	return limit_bonus
 
 
 static func get_profile_id(profile: Dictionary) -> String:
@@ -212,3 +259,10 @@ static func _get_support_squadron_stats(upgrades: Dictionary) -> Dictionary:
 		legacy_stats["panokseon_upgrade_id"] = "fleet_hull"
 		return legacy_stats
 	return signal_stats
+
+
+static func _get_geobukseon_squadron_stats(upgrades: Dictionary) -> Dictionary:
+	var geobukseon_stats: Dictionary = upgrades.get(DEFAULT_GEOBUKSEON_UNLOCK_UPGRADE_ID, {}).get("stats", {})
+	if geobukseon_stats.has("geobukseon_level") or geobukseon_stats.has("geobukseon_upgrade_id"):
+		return geobukseon_stats
+	return {}

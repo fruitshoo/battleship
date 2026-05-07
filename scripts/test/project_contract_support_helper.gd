@@ -204,6 +204,16 @@ static func _run_support_wing_join_geometry_contract(failures: Array[String], sm
 		failures.append("support fleet smoke escort artillery lead should hold the rear center lane")
 	if artillery_lead_offset.z <= screen_lead_offset.z:
 		failures.append("support fleet smoke escort artillery lead should trail behind side screen ships")
+	var armored_guard := Node3D.new()
+	armored_guard.name = "EscortArmoredGuardGeometryContract"
+	armored_guard.set_meta("support_squadron_slot_role", "armored_guard")
+	smoke_root.add_child(armored_guard)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(armored_guard, player_ship)
+	var armored_guard_offset := SupportFleetFormationHelper.get_support_fleet_offset(armored_guard, 2, 10.0, 5)
+	if absf(armored_guard_offset.x) > 0.1:
+		failures.append("support fleet smoke geobukseon guard should hold the rear center lane like panokseon")
+	if armored_guard_offset.z <= artillery_lead_offset.z:
+		failures.append("support fleet smoke geobukseon guard should trail behind the panokseon lane instead of fighting screen ships")
 	var artillery_front_left := Node3D.new()
 	artillery_front_left.name = "EscortArtilleryFrontLeftGeometryContract"
 	artillery_front_left.set_meta("support_squadron_slot_role", "artillery_screen_front_left")
@@ -269,6 +279,7 @@ static func _run_support_wing_join_geometry_contract(failures: Array[String], sm
 	screen_lead.queue_free()
 	screen_flank.queue_free()
 	artillery_lead.queue_free()
+	armored_guard.queue_free()
 	extra_support.queue_free()
 
 

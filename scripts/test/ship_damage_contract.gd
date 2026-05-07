@@ -40,8 +40,8 @@ class MockHud:
 
 func _ready() -> void:
 	var failures: Array[String] = []
-	_verify_rigging_field_repair_waits_then_recovers(failures)
-	_verify_rudder_damage_gameplay_floor(failures)
+	_verify_rigging_field_repair_is_disabled(failures)
+	_verify_rudder_damage_is_disabled(failures)
 	_verify_hull_health_drives_sail_wear_visual_floor(failures)
 	if failures.is_empty():
 		print("[ShipDamageContract] ok")
@@ -52,7 +52,7 @@ func _ready() -> void:
 	get_tree().quit(1)
 
 
-func _verify_rigging_field_repair_waits_then_recovers(failures: Array[String]) -> void:
+func _verify_rigging_field_repair_is_disabled(failures: Array[String]) -> void:
 	var ship: Node = ShipScript.new()
 	add_child(ship)
 	var hud := MockHud.new()
@@ -74,40 +74,29 @@ func _verify_rigging_field_repair_waits_then_recovers(failures: Array[String]) -
 
 	ship.set("_rigging_repair_cooldown", 0.0)
 	ship.call("apply_rudder_damage", 20.0)
-	if float(ship.get("_rigging_repair_cooldown")) <= 0.0:
-		failures.append("rudder damage did not schedule rigging field repair")
+	if float(ship.get("_rigging_repair_cooldown")) > 0.0:
+		failures.append("disabled rudder damage scheduled rigging field repair")
+	if not is_equal_approx(float(ship.get("rudder_health")), 100.0):
+		failures.append("disabled rudder damage should keep full rudder health")
 
 	ship.set("_rigging_repair_cooldown", 0.0)
 	mast.sail_damage = 0.0
 	ship.call("_apply_sail_damage_from_hit", 30.0, "cannon")
-	if mast.get_sail_damage() <= 0.0:
-		failures.append("sail damage fixture did not damage the mock mast")
-	if float(ship.get("_rigging_repair_cooldown")) <= 0.0:
-		failures.append("sail damage did not schedule rigging field repair")
+	if mast.get_sail_damage() > 0.0:
+		failures.append("disabled sail damage mutated the mock mast")
+	if float(ship.get("_rigging_repair_cooldown")) > 0.0:
+		failures.append("disabled sail damage scheduled rigging field repair")
 
 	ship.set("rudder_health", 10.0)
 	mast.sail_damage = 0.9
 	ship.call("_mark_rigging_damage_for_repair")
-	ship.call("_update_rigging_recovery", 1.0)
-	if not is_equal_approx(float(ship.get("rudder_health")), 10.0):
-		failures.append("rigging field repair started before its delay elapsed")
-	if not is_equal_approx(mast.get_sail_damage(), 0.9):
-		failures.append("sail field repair started before its delay elapsed")
-
-	ship.call("_update_rigging_recovery", 1.1)
 	ship.call("_update_rigging_recovery", 30.0)
-	if float(ship.get("rudder_health")) < 64.9:
-		failures.append("rudder field repair did not recover to emergency function")
-	if float(ship.get("rudder_health")) > 65.1:
-		failures.append("rudder field repair exceeded the emergency repair cap")
-	if mast.get_sail_damage() > 0.351:
-		failures.append("sail field repair did not recover to emergency function: %.3f" % mast.get_sail_damage())
-	if mast.get_sail_damage() < 0.349:
-		failures.append("sail field repair exceeded the emergency repair cap: %.3f" % mast.get_sail_damage())
-	if not hud.messages.has("응급 수리 중"):
-		failures.append("rigging field repair did not show active feedback")
-	if not hud.messages.has("응급 수리 완료"):
-		failures.append("rigging field repair did not show completion feedback")
+	if not is_equal_approx(float(ship.get("rudder_health")), 10.0):
+		failures.append("disabled rigging repair changed rudder health")
+	if not is_equal_approx(mast.get_sail_damage(), 0.9):
+		failures.append("disabled rigging repair changed sail damage")
+	if hud.messages.has("응급 수리 중") or hud.messages.has("응급 수리 완료"):
+		failures.append("disabled rigging repair showed emergency repair feedback")
 
 	ship.set("rudder_health", 10.0)
 	mast.sail_damage = 0.9
@@ -147,7 +136,7 @@ func _verify_hull_health_drives_sail_wear_visual_floor(failures: Array[String]) 
 	ship.free()
 
 
-func _verify_rudder_damage_gameplay_floor(failures: Array[String]) -> void:
+func _verify_rudder_damage_is_disabled(failures: Array[String]) -> void:
 	var ship: Node = ShipScript.new()
 	add_child(ship)
 	ship.set("rudder_max_health", 100.0)
@@ -156,18 +145,20 @@ func _verify_rudder_damage_gameplay_floor(failures: Array[String]) -> void:
 	var stern_hit: Vector3 = ship.global_position + Vector3.BACK * 12.0
 	ship.call("_apply_rudder_damage_from_hit", 40.0, stern_hit, "cannon")
 	if not is_equal_approx(float(ship.get("rudder_health")), 100.0):
-		failures.append("standard cannon hits should not damage rudder control anymore")
+		failures.append("standard cannon hits should not damage rudder control")
 
 	ship.call("_apply_rudder_damage_from_hit", 40.0, stern_hit, "chain_shot")
-	if float(ship.get("rudder_health")) >= 99.9:
-		failures.append("chain shot should still be able to damage rudder control")
+	if not is_equal_approx(float(ship.get("rudder_health")), 100.0):
+		failures.append("chain shot should not damage rudder control")
 
+	var baseline_turn_mult: float = float(ship.call("get_rudder_turn_multiplier"))
+	var baseline_response_mult: float = float(ship.call("get_rudder_response_multiplier"))
 	ship.set("rudder_health", 0.0)
 	var turn_mult: float = float(ship.call("get_rudder_turn_multiplier"))
 	var response_mult: float = float(ship.call("get_rudder_response_multiplier"))
-	if turn_mult < 0.60:
-		failures.append("rudder turn multiplier fell too low for playable steering: %.3f" % turn_mult)
-	if response_mult < 0.70:
-		failures.append("rudder response multiplier fell too low for playable steering: %.3f" % response_mult)
+	if absf(turn_mult - baseline_turn_mult) > 0.001:
+		failures.append("disabled rudder damage should not change turn authority: %.3f -> %.3f" % [baseline_turn_mult, turn_mult])
+	if absf(response_mult - baseline_response_mult) > 0.001:
+		failures.append("disabled rudder damage should not change response authority: %.3f -> %.3f" % [baseline_response_mult, response_mult])
 
 	ship.free()

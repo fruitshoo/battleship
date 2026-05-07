@@ -102,6 +102,17 @@ static func is_panokseon_support(ship: Node) -> bool:
 	return str(ship_type_value).strip_edges().to_lower() == "panokseon_ally"
 
 
+static func is_geobukseon_support(ship: Node) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	var ship_type_value: Variant = ship.get("ship_type")
+	return str(ship_type_value).strip_edges().to_lower() == "geobukseon_ally"
+
+
+static func is_heavy_support(ship: Node) -> bool:
+	return is_panokseon_support(ship) or is_geobukseon_support(ship)
+
+
 static func is_captured_minion(ship: Node) -> bool:
 	return get_ally_role(ship) == ROLE_CAPTURED_MINION
 

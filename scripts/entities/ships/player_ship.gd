@@ -66,6 +66,7 @@ var rowing_locked: bool = false
 @export var sail_furled: bool = false
 @export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
 @export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
+@export_range(0.0, 0.35, 0.01) var misaligned_sail_min_thrust_ratio: float = 0.12
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
 @export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
@@ -79,9 +80,9 @@ var rowing_locked: bool = false
 @export_range(0.2, 1.2, 0.05) var reverse_rowing_acceleration_mult: float = 0.70
 @export_range(0.2, 1.0, 0.05) var reverse_rudder_turn_authority_mult: float = 0.65
 @export_range(0.5, 2.0, 0.05) var reverse_rowing_stamina_cost_mult: float = 1.05
-@export_range(0.2, 0.9, 0.05) var exhausted_rowing_speed_ratio: float = 0.55
+@export_range(0.2, 0.9, 0.05) var exhausted_rowing_speed_ratio: float = 0.38
 @export var stamina_drain_rate: float = 8.0
-@export var stamina_recovery_rate: float = 8.0
+@export var stamina_recovery_rate: float = 8.5
 
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
 @export_range(0, 1, 1) var captain_count: int = 1
@@ -182,6 +183,9 @@ func _ready() -> void:
 
 	_apply_soldier_rules_data()
 	_apply_runtime_scene_safety_defaults()
+	var stats := load_ship_stats(ship_type)
+	if stats.has("ship_mass_scale"):
+		ship_mass_scale = clampf(float(stats["ship_mass_scale"]), 0.35, 4.0)
 	_apply_start_marker_transform_from_parent()
 	super._ready()
 	sail_deployed_ratio = 0.0 if sail_furled else clampf(sail_deployed_ratio, 0.0, 1.0)
@@ -871,6 +875,7 @@ func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
 	if is_instance_valid(corpse):
 		if corpse is Node3D:
 			_play_corpse_cleanup_splash((corpse as Node3D).global_position)
+		_grant_corpse_cleanup_merit()
 		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
 		corpse.queue_free()
 	if is_instance_valid(cleaner):
@@ -878,6 +883,15 @@ func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
 			cleaner.call("finish_corpse_cleanup_action")
 		else:
 			SoldierActionHelper.finish_corpse_cleanup_action(cleaner)
+
+
+func _grant_corpse_cleanup_merit() -> void:
+	if not is_instance_valid(_cached_level_manager) or not _cached_level_manager.has_method("add_merit"):
+		return
+	var merit_reward: int = max(0, int(_cached_level_manager.get("corpse_cleanup_merit_reward")))
+	if merit_reward <= 0:
+		return
+	_cached_level_manager.add_merit(merit_reward)
 
 
 func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:

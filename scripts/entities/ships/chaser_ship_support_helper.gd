@@ -20,9 +20,10 @@ const DERELICT_SAIL_DAMAGE_MAX: float = 0.30
 const DEFAULT_FIRE_POT_SCENE := preload("res://scenes/projectiles/fire_pot.tscn")
 const ENEMY_FIRE_POT_BASE_COOLDOWN: float = 7.5
 const ENEMY_FIRE_POT_MIN_RANGE: float = 7.0
-const ENEMY_FIRE_POT_MAX_RANGE: float = 18.0
+const ENEMY_FIRE_POT_MAX_RANGE: float = 14.0
 const ENEMY_FIRE_POT_DAMAGE: float = 11.0
-const ENEMY_FIRE_POT_RADIUS: float = 2.6
+const ENEMY_FIRE_POT_RADIUS: float = 1.75
+const ENEMY_FIRE_POT_TARGET_SPREAD: float = 0.95
 const LIMBO_AI_SPECIAL_ATTACK_INTENT_STALE_FRAMES := 4
 const ENEMY_DRIFTER_XP_ACCOUNTED_META := "enemy_drifter_xp_accounted"
 const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
@@ -105,16 +106,9 @@ static func _is_player_ship(node: Node) -> bool:
 
 
 static func _get_fire_pot_target_pos(target_ship: Node3D) -> Vector3:
-	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_ship, 0.8)
-	var masts_variant: Variant = target_ship.get("masts")
-	if masts_variant is Array:
-		var masts: Array = masts_variant as Array
-		for mast in masts:
-			if is_instance_valid(mast):
-				target_pos = mast.global_position + Vector3(randf_range(-0.4, 0.4), 1.6, randf_range(-0.4, 0.4))
-				break
-	target_pos.x += randf_range(-0.6, 0.6)
-	target_pos.z += randf_range(-0.6, 0.6)
+	var target_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_ship, 0.45)
+	target_pos.x += randf_range(-ENEMY_FIRE_POT_TARGET_SPREAD, ENEMY_FIRE_POT_TARGET_SPREAD)
+	target_pos.z += randf_range(-ENEMY_FIRE_POT_TARGET_SPREAD, ENEMY_FIRE_POT_TARGET_SPREAD)
 	return target_pos
 
 
@@ -336,10 +330,6 @@ static func _weather_derelict_sails(ship) -> void:
 	for mast in masts_variant:
 		if not is_instance_valid(mast):
 			continue
-		if mast.has_method("add_sail_damage"):
-			mast.add_sail_damage(randf_range(DERELICT_SAIL_DAMAGE_MIN, DERELICT_SAIL_DAMAGE_MAX))
-		elif mast.has_method("set_sail_damage"):
-			mast.set_sail_damage(randf_range(DERELICT_SAIL_DAMAGE_MIN, DERELICT_SAIL_DAMAGE_MAX))
 		if mast.has_method("set_sail_color"):
 			mast.set_sail_color(DERELICT_SAIL_COLOR)
 

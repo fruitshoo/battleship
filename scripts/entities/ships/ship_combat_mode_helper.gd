@@ -34,6 +34,15 @@ static func can_board(ship: Node) -> bool:
 	return allow_boarding == true if allow_boarding != null else false
 
 
+static func can_be_boarded(target_ship: Node, attacker_ship: Node = null) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if target_ship.has_method("can_be_boarded_by"):
+		return target_ship.call("can_be_boarded_by", attacker_ship) == true
+	var blocks_boarding: Variant = target_ship.get("blocks_boarding")
+	return blocks_boarding != true if blocks_boarding != null else true
+
+
 static func preferred_range(ship: Node, fallback: float = 14.0) -> float:
 	if not is_instance_valid(ship):
 		return fallback

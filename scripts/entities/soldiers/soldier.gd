@@ -126,10 +126,13 @@ var _lod_is_combat_priority: bool = false
 var _cached_nearest_enemy: Node3D = null
 var _nearest_enemy_cache_timer: float = 0.0
 var _nearest_enemy_cache_interval_runtime: float = 0.2
+var attack_validation_timer: float = 0.0
+var attack_validation_interval_runtime: float = 0.12
 var _limbo_ai_update_timer: float = 0.0
 var _limbo_ai_update_interval_runtime: float = 0.08
 var _deck_bounds_check_timer: float = 0.0
 var _routine_wander_step_timer: float = 0.0
+var _routine_support_step_timer: float = 0.0
 static var _ai_load_cache_frame: int = -1
 static var _ai_load_multiplier_cache: float = 1.0
 var external_knockback_velocity: Vector3 = Vector3.ZERO
@@ -277,9 +280,11 @@ func _ready() -> void:
 	decision_timer = randf_range(0.0, 0.2)
 	combat_timer = randf_range(0.0, 0.12)
 	_nearest_enemy_cache_timer = randf_range(0.0, 0.18)
+	attack_validation_timer = randf_range(0.0, 0.12)
 	_limbo_ai_update_timer = randf_range(0.0, 0.08)
 	_deck_bounds_check_timer = randf_range(0.0, 0.16)
 	_routine_wander_step_timer = randf_range(0.0, 0.06)
+	_routine_support_step_timer = randf_range(0.0, 0.10)
 	SoldierSpeechHelper.reset(self)
 	
 	# 그룹 수동 등록 (검색 정확도 향상)
@@ -836,9 +841,7 @@ func _physics_process(delta: float) -> void:
 	var speech_profile_start := PhysicsFrameProfiler.begin()
 	SoldierSpeechHelper.update(self, delta)
 	PhysicsFrameProfiler.end("soldier_speech", speech_profile_start)
-	var limbo_runtime_profile_start := PhysicsFrameProfiler.begin()
 	_update_limbo_ai_pilot_runtime(delta)
-	PhysicsFrameProfiler.end("soldier_limbo_runtime", limbo_runtime_profile_start)
 
 	if _update_external_knockback(delta):
 		if attack_timer > 0:
@@ -1666,7 +1669,10 @@ func _die() -> void:
 
 ## 상태 변경
 func _change_state(new_state: State) -> void:
+	var previous_state := current_state
 	current_state = new_state
+	if new_state == State.ATTACK and previous_state != State.ATTACK:
+		attack_validation_timer = randf_range(0.0, maxf(attack_validation_interval_runtime, 0.08))
 
 
 ## 특정 목표로 이동 명령
@@ -1815,8 +1821,6 @@ func _is_lod_combat_priority() -> bool:
 	if is_instance_valid(owned_ship):
 		if owned_ship.get("deck_is_contested") == true or owned_ship.get("deck_is_overrun") == true:
 			return true
-		if ShipAllyRoleHelper.is_player_flagship(owned_ship):
-			return true
 	return false
 
 func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, combat_priority: bool) -> float:
@@ -1878,22 +1882,22 @@ func _get_nearest_enemy_cache_interval() -> float:
 func _get_limbo_ai_update_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
 	if _is_far_lod_sleep_candidate():
-		return 0.12 * load_mult
+		return 0.22 * load_mult
 	if _is_passive_ally_ship_crew():
 		if _lod_dist_to_player > 24.0:
-			return 0.12 * load_mult
-		return 0.10 * minf(load_mult, 1.35)
+			return 0.20 * load_mult
+		return 0.16 * minf(load_mult, 1.45)
 	if _lod_is_combat_priority:
 		if _lod_dist_to_player > 45.0:
-			return 0.10 * load_mult
+			return 0.14 * load_mult
 		if _lod_dist_to_player > 28.0:
-			return 0.08 * minf(load_mult, 1.35)
-		return 0.06 * minf(load_mult, 1.15)
+			return 0.10 * minf(load_mult, 1.35)
+		return 0.075 * minf(load_mult, 1.2)
 	if _lod_dist_to_player > 60.0:
-		return 0.12 * load_mult
+		return 0.22 * load_mult
 	if _lod_dist_to_player > 40.0:
-		return 0.10 * load_mult
-	return 0.08 * minf(load_mult, 1.3)
+		return 0.18 * load_mult
+	return 0.13 * minf(load_mult, 1.45)
 
 func _get_ai_load_multiplier() -> float:
 	var frame := Engine.get_physics_frames()
@@ -1917,10 +1921,34 @@ func _get_ai_load_multiplier() -> float:
 func _get_routine_wander_step_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
 	if _is_passive_ally_ship_crew():
-		return 0.08 * minf(load_mult, 1.8)
+		return 0.14 * minf(load_mult, 1.8)
 	if not _lod_is_combat_priority:
-		return 0.055 * minf(load_mult, 1.6)
+		return 0.10 * minf(load_mult, 1.7)
 	return 0.0
+
+
+func _should_run_routine_support_step(delta: float, run_heavy_logic: bool) -> bool:
+	if run_heavy_logic or _lod_is_combat_priority:
+		return true
+	if current_state != State.IDLE and current_state != State.WANDER:
+		return true
+	if has_meta("ship_work_active_target_local"):
+		return true
+	var interval := _get_routine_support_step_interval()
+	if interval <= 0.0:
+		return true
+	_routine_support_step_timer -= delta
+	if _routine_support_step_timer > 0.0:
+		return false
+	_routine_support_step_timer = interval + randf_range(0.0, interval * 0.18)
+	return true
+
+
+func _get_routine_support_step_interval() -> float:
+	var load_mult := _get_ai_load_multiplier()
+	if _is_passive_ally_ship_crew():
+		return 0.24 * minf(load_mult, 1.8)
+	return 0.16 * minf(load_mult, 1.65)
 
 func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
 	var limbo_target: Node3D = _get_recent_limbo_target()

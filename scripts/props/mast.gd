@@ -128,6 +128,8 @@ var _damage_seed: float = 0.0
 var _sail_smoke_instance: Node3D = null
 var _cached_wind_manager: Node = null
 var _current_wind_intake: float = 0.0
+var _visual_wind_strength: float = 0.0
+var _visual_flutter_strength: float = 0.0
 var _last_applied_wind_strength: float = -1.0
 var _last_applied_flutter_strength: float = -1.0
 var _sail_view_fade_alpha: float = 1.0
@@ -177,7 +179,7 @@ func set_sail_angle(angle: float) -> void:
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
-	_update_sail_wind_visual()
+	_update_sail_wind_visual(delta)
 	_update_sail_view_fade(delta)
 
 func set_team_color(team: String) -> void:
@@ -240,6 +242,12 @@ func _replace_flag_scene(scene: PackedScene) -> bool:
 	var old_transform := Transform3D.IDENTITY
 	if is_instance_valid(flag):
 		old_transform = flag.transform
+		if Engine.is_editor_hint():
+			flag.name = "Flag"
+			flag.transform = old_transform
+			if flag_texture_override != null:
+				_apply_flag_texture_override()
+			return true
 		flag.name = "FlagQueuedForFree"
 		flag.queue_free()
 	var new_flag := scene.instantiate() as Node3D
@@ -369,10 +377,10 @@ func _update_sail_smoke() -> void:
 		return
 	MastVisualHelper.update_sail_smoke(self, SAIL_SMOKE_SCENE)
 
-func _update_sail_wind_visual() -> void:
+func _update_sail_wind_visual(delta: float = 0.0) -> void:
 	if Engine.is_editor_hint():
 		return
-	MastWindHelper.update_sail_wind_visual(self)
+	MastWindHelper.update_sail_wind_visual(self, delta)
 
 func _apply_wind_strength_to_sails(wind_strength_value: float) -> void:
 	MastWindHelper.apply_wind_strength_to_sails(self, wind_strength_value)

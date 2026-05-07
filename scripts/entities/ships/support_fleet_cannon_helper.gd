@@ -178,6 +178,8 @@ static func _is_panokseon_ship_type(ship_type_name: String) -> bool:
 
 
 static func _get_support_ship_summary_label(ship_type_name: String) -> String:
+	if ship_type_name.contains("geobukseon") or ship_type_name.contains("turtle"):
+		return "거북선"
 	if _is_panokseon_ship_type(ship_type_name):
 		return "판옥선"
 	if ship_type_name.contains("maengseon"):

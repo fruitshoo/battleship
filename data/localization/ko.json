@@ -120,6 +120,8 @@
 	"upgrade.fleet_signal.description": "맹선 호출 또는 수리, Lv2 맹선 한계 +1",
 	"upgrade.panokseon_upgrade.name": "판옥선",
 	"upgrade.panokseon_upgrade.description": "판옥선 포격함 1척 추가 합류",
+	"upgrade.geobukseon_upgrade.name": "거북선",
+	"upgrade.geobukseon_upgrade.description": "도선을 막는 거북선 방호함 1척 추가 합류",
 	"meta_upgrade.hull_hp.name": "최대 체력",
 	"meta_upgrade.hull_hp.description": "선체 +12",
 	"meta_upgrade.hull_defense.name": "방어력",

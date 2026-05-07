@@ -13,6 +13,7 @@ const HULL_KOBAYABUNE := "res://scenes/ships/hulls/kobayabune_hull.tscn"
 const HULL_SEKIBUNE := "res://scenes/ships/hulls/sekibune_hull.tscn"
 const HULL_SEKIBUNE_MELEE := "res://scenes/ships/hulls/sekibune_melee_hull.tscn"
 const HULL_PANOKSEON := "res://scenes/ships/hulls/panok_hull.tscn"
+const HULL_GEOBUKSEON := "res://scenes/ships/hulls/geobukseon_hull.tscn"
 const HULL_ATAKEBUNE := "res://scenes/ships/hulls/atakebune_hull.tscn"
 const HULL_MAENGSEON := "res://scenes/ships/hulls/maengseon_hull.tscn"
 
@@ -121,6 +122,8 @@ static func get_hull_scene_path(type_name: String, stats: Dictionary = {}) -> St
 		return HULL_KOBAYABUNE
 	if type_lower == "sekibune_melee":
 		return HULL_SEKIBUNE_MELEE
+	if type_lower.contains("geobukseon") or type_lower.contains("turtle"):
+		return HULL_GEOBUKSEON
 	if type_lower.contains("panokseon"):
 		return HULL_PANOKSEON
 	if type_lower.contains("atakebune"):
