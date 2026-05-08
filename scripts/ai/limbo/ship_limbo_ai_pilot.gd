@@ -69,7 +69,7 @@ static func get_pilot_target(ship: Node) -> Node3D:
 	var target_id := int(ship.get_meta(ShipAILimboKeys.META_TARGET_ID, 0))
 	if target_id == 0:
 		return null
-	return instance_from_id(target_id) as Node3D
+	return NodeContractHelper.get_instance_node3d(target_id)
 
 
 static func _ensure_player(ship: Node, behavior_tree_path: String) -> Node:

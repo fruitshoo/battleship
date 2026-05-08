@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cheoasw5yqulk" path="res://assets/models/props/anchor/anchor.glb" id="1_anchor_model"]
+
+[node name="Anchor" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_anchor_model")]
+
+[node name="ChainAttachPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+
+[node name="TipPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.95, 0)

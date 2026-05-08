@@ -11,6 +11,8 @@ static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_support_hull_upgrade_retired(failures)
 	_validate_sailing_upgrade_improves_handling(failures)
 	_validate_panokseon_upgrade_gate(failures)
+	_validate_player_geobukseon_upgrade(failures)
+	_validate_hull_upgrade_split(failures)
 
 
 static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
@@ -78,10 +80,12 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		"fleet_signal": 1,
 		"geobukseon_upgrade": 1,
 	}
-	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(geobukseon_levels, upgrades) != "맹선 1척 | 거북선 1척":
-		failures.append("upgrade smoke support slot summary should reflect maengseon plus added geobukseon roster")
-	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, geobukseon_levels, upgrades) != "맹선 1문 | 거북선 4문":
-		failures.append("upgrade smoke support cannon summary should reflect geobukseon four side cannons")
+	if upgrades.get("geobukseon_upgrade", {}).get("disabled", false) != true:
+		failures.append("upgrade smoke geobukseon support upgrade should stay disabled while player geobukseon is being tested")
+	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(geobukseon_levels, upgrades) != "맹선 1척":
+		failures.append("upgrade smoke disabled geobukseon support should fall back to maengseon screen roster")
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, geobukseon_levels, upgrades) != "맹선 1문":
+		failures.append("upgrade smoke disabled geobukseon support should not add geobukseon cannons")
 	panokseon_levels["front_cannon"] = 1
 	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 7문":
 		failures.append("upgrade smoke support cannon summary should include 전면 포문 when unlocked")
@@ -164,23 +168,36 @@ static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Ar
 	var levels := {
 		"crew_numbers": 5,
 		"fire_pot": 5,
-		"repeating_crossbow": 5,
 		"singigeon": 5,
 	}
 	var roster: Dictionary = UpgradeDataHelper.get_player_crew_roster(upgrades, levels, 5)
 	var specialist_roles := [
-		UpgradeDataHelper.CREW_ROLE_SPEARMAN,
 		UpgradeDataHelper.CREW_ROLE_FIRE_POT,
-		UpgradeDataHelper.CREW_ROLE_REPEATING_CROSSBOW,
-		UpgradeDataHelper.CREW_ROLE_SINGIGEON,
 	]
 	var total_roster := int(roster.get(UpgradeDataHelper.CREW_ROLE_GENERAL, 0))
 	for role in specialist_roles:
 		total_roster += int(roster.get(role, 0))
 		if int(roster.get(role, 0)) <= 0:
 			failures.append("upgrade smoke fixed crew roster should keep at least one %s operator when all crew weapons are active" % role)
+	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_SPEARMAN, 0))
+	if int(roster.get(UpgradeDataHelper.CREW_ROLE_SPEARMAN, 0)) != 0:
+		failures.append("upgrade smoke crew_numbers should equip spears instead of assigning spearman operators")
+	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_SINGIGEON, 0))
+	if int(roster.get(UpgradeDataHelper.CREW_ROLE_SINGIGEON, 0)) != 0:
+		failures.append("upgrade smoke singigeon should proc from bow attacks instead of assigning operators")
+	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_REPEATING_CROSSBOW, 0))
+	if int(roster.get(UpgradeDataHelper.CREW_ROLE_REPEATING_CROSSBOW, 0)) != 0:
+		failures.append("upgrade smoke repeating_crossbow should be retired from command choices")
 	if total_roster != 5:
 		failures.append("upgrade smoke crew weapon roster should not exceed fixed crew capacity")
+	if "crew_attack" in UpgradeManager.CREW_UPGRADE_IDS:
+		failures.append("upgrade smoke crew_attack should be retired from command choices")
+	if upgrades.has("crew_attack") and upgrades["crew_attack"].get("disabled", false) != true:
+		failures.append("upgrade smoke crew_attack data should stay disabled")
+	if "repeating_crossbow" in UpgradeManager.CREW_UPGRADE_IDS:
+		failures.append("upgrade smoke repeating_crossbow should be retired from command choices")
+	if upgrades.has("repeating_crossbow") and upgrades["repeating_crossbow"].get("disabled", false) != true:
+		failures.append("upgrade smoke repeating_crossbow data should stay disabled")
 
 	var source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager.gd")
 	if source.contains("for upgrade_id in [\"crew_numbers\", \"singigeon\", \"fire_pot\", \"repeating_crossbow\"]"):
@@ -240,3 +257,56 @@ static func _validate_panokseon_upgrade_gate(failures: Array[String]) -> void:
 		failures.append("upgrade smoke panokseon_upgrade should unlock at level 1")
 	if int(panokseon_stats.get("panokseon_squadron_limit_add", 0)) != 1:
 		failures.append("upgrade smoke panokseon_upgrade should add exactly one panokseon support slot")
+
+
+static func _validate_player_geobukseon_upgrade(failures: Array[String]) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("upgrade smoke missing UpgradeManager")
+		return
+	var upgrades: Dictionary = UpgradeManager.UPGRADES
+	if not upgrades.has("geobukseon"):
+		failures.append("upgrade smoke missing player geobukseon upgrade")
+		return
+	if not ("geobukseon" in UpgradeManager.SHIP_UPGRADE_IDS):
+		failures.append("upgrade smoke player geobukseon should be in main ship pool")
+	var stats: Dictionary = upgrades.get("geobukseon", {}).get("stats", {})
+	if str(stats.get("ship_type", "")) != "geobukseon_player":
+		failures.append("upgrade smoke player geobukseon should target geobukseon_player ship type")
+	if stats.get("blocks_boarding", false) != true:
+		failures.append("upgrade smoke player geobukseon should block boarding")
+	var player_stats := ShipBlueprintHelper.load_stats("geobukseon_player")
+	if player_stats.get("blocks_boarding", false) != true:
+		failures.append("upgrade smoke geobukseon_player should block boarding")
+	if float(player_stats.get("move_speed", 0.0)) < 6.0:
+		failures.append("upgrade smoke geobukseon_player should not reduce player move speed")
+	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(player_stats, [])
+	var cannon_count := 0
+	for spec in loadout:
+		if ShipWeaponLoadoutHelper.get_kind(spec) != ShipWeaponLoadoutHelper.KIND_CANNON:
+			continue
+		cannon_count += 1
+		if ShipWeaponLoadoutHelper.get_slot_name(spec).contains("Front"):
+			failures.append("upgrade smoke geobukseon_player should not expose front cannon")
+	if cannon_count != 4:
+		failures.append("upgrade smoke geobukseon_player should expose exactly four side cannons, got %d" % cannon_count)
+
+
+static func _validate_hull_upgrade_split(failures: Array[String]) -> void:
+	if not is_instance_valid(UpgradeManager):
+		failures.append("upgrade smoke missing UpgradeManager")
+		return
+	var upgrades: Dictionary = UpgradeManager.UPGRADES
+	if not upgrades.has("hull"):
+		failures.append("upgrade smoke missing hull/선체 upgrade")
+		return
+	if not ("hull" in UpgradeManager.SHIP_UPGRADE_IDS):
+		failures.append("upgrade smoke hull should be in main ship pool")
+	if str(upgrades.get("hull_defense", {}).get("name", "")) != "방어":
+		failures.append("upgrade smoke hull_defense should be renamed to 방어")
+	if str(upgrades.get("hull", {}).get("name", "")) != "선체":
+		failures.append("upgrade smoke hull upgrade should be named 선체")
+	var hull_stats: Dictionary = upgrades.get("hull", {}).get("stats", {})
+	if float(hull_stats.get("hp_add_per_lv", 0.0)) <= 0.0:
+		failures.append("upgrade smoke hull should add max hull hp")
+	if float(hull_stats.get("ramming_damage_pct_per_lv", 0.0)) <= 0.0:
+		failures.append("upgrade smoke hull should improve ramming damage")

@@ -348,8 +348,7 @@ static func finish_carry_payload(soldier, payload: Node3D = null) -> void:
 static func get_carry_payload(soldier) -> Node3D:
 	if not is_instance_valid(soldier) or not soldier.has_meta(CARRY_PAYLOAD_ID_META):
 		return null
-	var payload := instance_from_id(int(soldier.get_meta(CARRY_PAYLOAD_ID_META, 0)))
-	return payload as Node3D if is_instance_valid(payload) and payload is Node3D else null
+	return NodeContractHelper.get_instance_node3d(int(soldier.get_meta(CARRY_PAYLOAD_ID_META, 0)))
 
 
 static func get_carry_payload_kind(soldier) -> String:

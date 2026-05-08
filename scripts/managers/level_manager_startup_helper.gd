@@ -31,7 +31,6 @@ static func initialize(lm: Node) -> void:
 		lm.hud.update_level(lm.current_level)
 		lm.hud.update_score(lm.current_score)
 		lm.hud.update_xp(lm.current_xp, lm.xp_to_next_level)
-		lm.hud.update_merit(lm.merit_points, lm.max_merit_points, lm.merit_level)
 		if lm.hud.has_method("update_combat_stats"):
 			lm.hud.update_combat_stats(lm.ships_sunk, lm.ships_derelicted, lm.soldiers_killed, lm.soldiers_slain, lm.soldiers_drowned)
 		if lm.hud.has_method("update_difficulty_ui"):
@@ -43,7 +42,7 @@ static func initialize(lm: Node) -> void:
 	else:
 		var lm_id: int = lm.get_instance_id()
 		lm.get_tree().create_timer(0.1).timeout.connect(func():
-			var level_manager := instance_from_id(lm_id) as Node
+			var level_manager := NodeContractHelper.get_instance_node(lm_id)
 			if is_instance_valid(level_manager):
 				_apply_startup_default_equipment(level_manager)
 		)
@@ -102,7 +101,6 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 	var visual_scenes_to_warm = [
 		preload("res://scenes/ships/hulls/kobayabune_hull.tscn"),
 		preload("res://scenes/ships/hulls/sekibune_hull.tscn"),
-		preload("res://scenes/ships/hulls/sekibune_melee_hull.tscn"),
 		preload("res://scenes/ships/hulls/atakebune_hull.tscn"),
 		preload("res://scenes/ships/hulls/panok_hull.tscn"),
 		preload("res://scenes/entities/launchers/cannon.tscn"),

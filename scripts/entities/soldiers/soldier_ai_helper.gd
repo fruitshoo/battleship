@@ -10,6 +10,7 @@ const ATTACK_VALIDATION_NEAR_INTERVAL := 0.12
 const ATTACK_VALIDATION_CROSS_SHIP_INTERVAL := 0.16
 const ATTACK_VALIDATION_FAR_LOD_INTERVAL := 0.22
 const ATTACK_VALIDATION_JITTER := 0.05
+const OWNED_SHIP_HOSTILE_SWITCH_RATIO := 0.58
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
@@ -233,8 +234,12 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 			soldier._change_state(soldier.State.IDLE)
 			return
 		if soldier.has_method("_is_in_cross_ship_contact_zone") and soldier._is_in_cross_ship_contact_zone(target_ship) == false:
-			if soldier.has_method("_get_cross_ship_contact_point_global"):
-				var muster_target: Vector3 = soldier._get_cross_ship_contact_point_global(target_ship)
+			if soldier.has_method("_get_stable_cross_ship_contact_point_global") or soldier.has_method("_get_cross_ship_contact_point_global"):
+				var muster_target: Vector3 = Vector3.INF
+				if soldier.has_method("_get_stable_cross_ship_contact_point_global"):
+					muster_target = soldier._get_stable_cross_ship_contact_point_global(target_ship)
+				else:
+					muster_target = soldier._get_cross_ship_contact_point_global(target_ship)
 				if muster_target != Vector3.INF:
 					_move_toward_point(soldier, muster_target, 1.0, delta, MOVE_TURN_SPEED)
 					return
@@ -252,6 +257,10 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 	if distance_xz <= attack_range:
 		soldier._change_state(soldier.State.ATTACK)
 		return
+	if is_instance_valid(soldier.owned_ship) and is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
+		if soldier.has_method("_is_in_cross_ship_contact_zone") and soldier._is_in_cross_ship_contact_zone(target_ship):
+			_hold_cross_ship_contact_edge(soldier, target_node, delta)
+			return
 
 	var target_pos = target_node.global_position
 	var direction = (target_pos - soldier.global_position).normalized()
@@ -367,6 +376,12 @@ static func _get_attack_validation_interval(soldier) -> float:
 	return ATTACK_VALIDATION_NEAR_INTERVAL
 
 
+static func _hold_cross_ship_contact_edge(soldier, target_node: Node3D, delta: float) -> void:
+	soldier.velocity = Vector3.ZERO
+	var look_target := Vector3(target_node.global_position.x, soldier.global_position.y, target_node.global_position.z)
+	turn_toward_position(soldier, look_target, MOVE_TURN_SPEED, delta)
+
+
 static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:
 	if _move_toward_owned_ship_global_point(soldier, target_pos, speed_scale, delta, turn_speed):
 		return
@@ -475,6 +490,41 @@ static func _retarget_owned_ship_hostile(soldier) -> bool:
 		return false
 	if soldier.current_target == boarder:
 		return false
+	if _should_keep_current_owned_ship_hostile_target(soldier, boarder):
+		return false
 	soldier.current_target = boarder
 	soldier._change_state(soldier.State.MOVE)
 	return true
+
+
+static func _should_keep_current_owned_ship_hostile_target(soldier, nearest_boarder: Node3D) -> bool:
+	var current := soldier.current_target as Node3D
+	if not is_instance_valid(current) or not current.is_inside_tree():
+		return false
+	if SoldierStateHelper.is_dead_soldier(current):
+		return false
+	if _get_target_owned_ship(current) != soldier.owned_ship:
+		return false
+	var current_team: String = current.get_team_tag() if current.has_method("get_team_tag") else str(current.get("team"))
+	if current_team == soldier.team:
+		return false
+	var current_dist_sq: float = _get_planar_distance_sq(soldier, current)
+	var nearest_dist_sq: float = _get_planar_distance_sq(soldier, nearest_boarder)
+	return nearest_dist_sq >= current_dist_sq * OWNED_SHIP_HOSTILE_SWITCH_RATIO
+
+
+static func _get_target_owned_ship(target: Node) -> Node3D:
+	if not is_instance_valid(target):
+		return null
+	if target.has_method("get_owned_ship_node"):
+		return target.call("get_owned_ship_node") as Node3D
+	var owned_value: Variant = target.get("owned_ship")
+	return owned_value as Node3D if is_instance_valid(owned_value) else null
+
+
+static func _get_planar_distance_sq(from_node: Node3D, to_node: Node3D) -> float:
+	if not is_instance_valid(from_node) or not is_instance_valid(to_node):
+		return INF
+	var dx: float = from_node.global_position.x - to_node.global_position.x
+	var dz: float = from_node.global_position.z - to_node.global_position.z
+	return dx * dx + dz * dz

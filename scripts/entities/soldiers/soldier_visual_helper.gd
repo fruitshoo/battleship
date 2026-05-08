@@ -354,7 +354,7 @@ static func flash_hit(soldier, flash_color: Color = Color.WHITE) -> void:
 	tween.tween_property(mesh.material_override, "emission_energy_multiplier", 0.0, 0.1)
 	var mesh_id: int = mesh.get_instance_id()
 	tween.finished.connect(func():
-		var flash_mesh := instance_from_id(mesh_id) as MeshInstance3D
+		var flash_mesh := NodeContractHelper.get_instance_mesh_instance_3d(mesh_id)
 		if is_instance_valid(flash_mesh) and flash_mesh.material_override:
 			flash_mesh.material_override.emission_enabled = false
 	)

@@ -49,6 +49,7 @@ func _spawn_role_ship(label_text: String, scene: PackedScene, world_pos: Vector3
 
 	add_child(ship)
 	ship.set_meta("role_preview_spawn", true)
+	PreviewHarnessHelper.unlock_preview_enemy_fire_pot(ship)
 	if ship is Node3D:
 		ship.global_position = world_pos
 		ship.look_at(player.global_position, Vector3.UP)

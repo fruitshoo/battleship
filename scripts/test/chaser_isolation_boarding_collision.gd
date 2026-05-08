@@ -124,38 +124,24 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node != boarding_target:
 		boarding_target = ship_node
 
-	var my_crew = get_alive_crew_count()
-	var enemy_crew = 0
-	if ship_node.has_method("get_alive_crew_count"):
-		enemy_crew = ship_node.get_alive_crew_count()
+	is_boarding = true
+	boarding_target = ship_node
+	set_meta("boarding_contact_mode", "head_on" if can_head_on_board and not can_side_board else "side")
 
-	var contact_defenders: int = _count_boarding_contact_defenders(ship_node)
-	set_meta("boarding_local_defenders_at_contact", contact_defenders)
-	var remote_defenders_engaged: bool = _has_remote_engaged_boarding_defenders(ship_node)
-	set_meta("boarding_remote_defenders_engaged", remote_defenders_engaged)
-	var contact_allows_boarding: bool = remote_defenders_engaged and (contact_defenders <= 0 or my_crew > contact_defenders)
-	if my_crew > enemy_crew or can_head_on_board or contact_allows_boarding:
-		is_boarding = true
-		boarding_target = ship_node
-		set_meta("boarding_contact_mode", "head_on" if can_head_on_board and not can_side_board else "side")
+	if boarding_target.has_method("set_boarding_attacker_ship"):
+		boarding_target.set_boarding_attacker_ship(self)
 
-		if boarding_target.has_method("set_boarding_attacker_ship"):
-			boarding_target.set_boarding_attacker_ship(self)
+	_clear_ropes()
+	boarding_timer = 0.0
+	boarding_prep_timer = 0.0
+	boarding_contact_timer = 0.0
+	boarding_hook_timer = 0.0
+	boarding_secondary_rope_timer = 0.0
+	_initial_rope_deployed = false
+	_full_rope_deployed = false
 
-		_clear_ropes()
-		boarding_timer = 0.0
-		boarding_prep_timer = 0.0
-		boarding_contact_timer = 0.0
-		boarding_hook_timer = 0.0
-		boarding_secondary_rope_timer = 0.0
-		_initial_rope_deployed = false
-		_full_rope_deployed = false
-
-		if DEBUG_COMBAT_LOGS:
-			print("[Boarding] 접점 확보! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
-	else:
-		if DEBUG_COMBAT_LOGS:
-			print("[Skirmish] 접점 방어를 돌파하지 못해 도선하지 않고 대치합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
+	if DEBUG_COMBAT_LOGS:
+		print("[Boarding] 접점 확보! 접현 후 갈고리 투척을 준비합니다.")
 
 
 func _can_force_head_on_boarding(target_ship: Node3D) -> bool:

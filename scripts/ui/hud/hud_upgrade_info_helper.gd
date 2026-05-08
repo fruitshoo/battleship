@@ -25,7 +25,7 @@ static func is_crew_upgrade(hud, upgrade_id: String) -> bool:
 
 static func get_upgrade_track_name(hud, upgrade_id: String) -> String:
 	if is_crew_upgrade(hud, upgrade_id):
-		return LocaleManager.t("upgrade.track.boarding", "백병전")
+		return LocaleManager.t("upgrade.track.boarding", "병사")
 	if is_ship_upgrade(hud, upgrade_id):
 		return LocaleManager.t("upgrade.track.ship", "함선")
 	return LocaleManager.t("upgrade.track.default", "강화")
@@ -74,6 +74,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 	match upgrade_id:
 		"cannon":
 			var player_count: int = SupportFleetCannonRules.get_player_cannon_count_for_level(level, stats)
+			if int(preview_levels.get("geobukseon", 0)) > 0:
+				player_count = mini(player_count, 4)
 			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(level, stats, preview_levels, upgrades_data)
 			return "측면 포문 %d문 | 지원함 %s" % [player_count, support_summary]
 		"front_cannon":
@@ -90,15 +92,14 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var shot_cooldown := PLAYER_CANNON_BASE_COOLDOWN * cd_mult
 			return "재장전 %.2f초 | 재장전 -%d%%" % [shot_cooldown, int(round((1.0 - cd_mult) * 100.0))]
 		"singigeon":
-			var rocketeers = int(UpgradeManager.get_specialist_unit_count("singigeon", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
+			var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(upgrades_data, current_levels, level)
 			var base_damage := float(stats.get("base_damage", 2.5))
 			var personnel_mult := float(stats.get("personnel_damage_mult", 5.0))
-			var cooldown := maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 			var rocket_damage := base_damage * (1.0 + 0.15 * float(level))
 			var knockback := float(stats.get("base_knockback_speed", 9.0)) + float(level - 1) * float(stats.get("knockback_speed_per_lv", 0.0))
 			var overboard_level := int(stats.get("overboard_knockback_level", 4))
 			var knockback_note := "낙수 가능" if level >= overboard_level else "밀침 %.0f" % knockback
-			return "신기전 운용 %d명 | 대병 %.0f | %s | 재사용 %.1f초" % [rocketeers, rocket_damage * personnel_mult, knockback_note, cooldown]
+			return "활 공격 %.0f%% | 대병 %.0f | %s | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, rocket_damage * personnel_mult, knockback_note, float(proc_stats.get("cooldown", 1.0))]
 		"janggun":
 			var janggun_cooldown := maxf(
 				float(stats.get("min_cooldown", 9.0)),
@@ -112,6 +113,10 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"hull_defense":
 			var hull_stats := _calculate_hull_defense_stats(level, stats)
 			return "방어력 %.1f" % hull_stats["defense"]
+		"hull":
+			var hp_add := float(stats.get("hp_add_per_lv", 15.0)) * float(level)
+			var ram_pct := float(stats.get("ramming_damage_pct_per_lv", 0.07)) * float(level) * 100.0
+			return "최대 내구 +%.0f | 충돌 피해 +%.0f%%" % [hp_add, ram_pct]
 		"hull_repair":
 			var repair_rate: float = minf(float(stats.get("max_regen", 1.0)), float(level) * float(stats.get("regen_per_lv", 0.2)))
 			return "선체 자동 수리 %.1f/s" % repair_rate
@@ -136,6 +141,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"supply_bonus":
 			var supply_stats := _calculate_supply_bonus_stats(level, stats)
 			return "획득 반경 %.1fm" % supply_stats["pickup_radius"]
+		"geobukseon":
+			return "기함 거북선화 | 도선 면역 | 좌우 포문 4문 한계 | 전면포 없음"
 		"fleet_signal":
 			var signal_fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades_data)
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
@@ -158,8 +165,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var boarding_fire_reduce_pct := int(round(float(level) * float(stats.get("boarding_fire_reduce_per_lv", 0.1)) * 100.0))
 			return "도선병 피해 %.1f/초 | 장악 피해 -%d%% | 화염 -%d%%" % [defense_damage, capture_reduce_pct, boarding_fire_reduce_pct]
 		"crew_numbers":
-			var spearmen = int(UpgradeManager.get_specialist_unit_count("crew_numbers", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
-			return "창병 전환 %d명 | 근접 방어/난간전 특화" % spearmen
+			var spear_damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
+			return "전 병사 창 장비 | 창 피해 +%.0f%%" % (spear_damage_bonus_pct * 100.0)
 		"crew_attack":
 			var damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
 			var sword_damage := SOLDIER_SWORD_BASE_DAMAGE * (1.0 + damage_bonus_pct)
@@ -201,10 +208,12 @@ static func get_upgrade_icon(upgrade_id: String) -> String:
 		"janggun": "hardware",
 		"ballista": "arrow_selector_tool",
 		"hull_defense": "shield",
+		"hull": "directions_boat",
 		"hull_repair": "healing",
 		"sailing": "air",
 		"rowing": "rowing",
 		"supply_bonus": "medical_services",
+		"geobukseon": "shield",
 		"fleet_signal": "groups",
 		"panokseon_upgrade": "fort",
 		"geobukseon_upgrade": "shield",
@@ -245,10 +254,12 @@ static func get_upgrade_color(upgrade_id: String) -> Color:
 		"janggun": Color(0.8, 0.5, 0.2),
 		"ballista": Color(0.9, 0.6, 0.25),
 		"hull_defense": Color(0.75, 0.45, 0.2),
+		"hull": Color(0.72, 0.48, 0.28),
 		"hull_repair": Color(0.35, 0.85, 0.55),
 		"sailing": Color(0.35, 0.84, 1.0),
 		"rowing": Color(1.0, 0.78, 0.32),
 		"supply_bonus": Color(0.35, 0.95, 0.35),
+		"geobukseon": Color(0.62, 0.78, 0.58),
 		"fleet_signal": Color(1.0, 0.75, 0.35),
 		"panokseon_upgrade": Color(0.84, 0.7, 0.35),
 		"geobukseon_upgrade": Color(0.62, 0.78, 0.58),

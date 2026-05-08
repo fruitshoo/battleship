@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://nlj4rnpcs0qv"
-path="res://.godot/imported/maengseon.glb-83a2b291f83b964cf4c9d7783f9933a8.scn"
+uid="uid://d1lw700sgders"
+path="res://.godot/imported/kobaya.glb-9fcd207456907ee4df92315aac27ba9c.scn"
 
 [deps]
 
-source_file="res://assets/models/ships/mangseon/maengseon.glb"
-dest_files=["res://.godot/imported/maengseon.glb-83a2b291f83b964cf4c9d7783f9933a8.scn"]
+source_file="res://assets/models/ships/kobaya/kobaya.glb"
+dest_files=["res://.godot/imported/kobaya.glb-9fcd207456907ee4df92315aac27ba9c.scn"]
 
 [params]
 

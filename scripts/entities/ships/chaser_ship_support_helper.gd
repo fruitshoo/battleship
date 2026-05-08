@@ -33,6 +33,8 @@ const ENEMY_DRIFTER_MAX_PICKUPS := 4
 static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 	if ship.is_dying or ship.is_sinking or ship.is_derelict:
 		return
+	if not _is_enemy_fire_pot_unlocked(ship):
+		return
 	if ship.fire_pot_cooldown_timer > 0.0:
 		ship.fire_pot_cooldown_timer = maxf(0.0, ship.fire_pot_cooldown_timer - delta)
 	if ship.fire_pot_cooldown_timer > 0.0:
@@ -95,6 +97,18 @@ static func _find_fire_pot_tosser(ship):
 	return null
 
 
+static func _is_enemy_fire_pot_unlocked(ship) -> bool:
+	if is_instance_valid(ship) and ship.get_meta("enemy_fire_pot_unlocked", false) == true:
+		return true
+	if not is_instance_valid(ship) or not ship.has_method("get_tree"):
+		return false
+	var lm: Node = LevelManagerRegistry.get_level_manager(ship.get_tree())
+	if not is_instance_valid(lm):
+		return false
+	var unlocked_variant: Variant = lm.get("enemy_fire_pot_unlocked")
+	return unlocked_variant == true
+
+
 static func _is_player_ship(node: Node) -> bool:
 	if not is_instance_valid(node):
 		return false
@@ -146,12 +160,12 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 
 	var lm: Node = ship.get("cached_lm") if ship.get("cached_lm") != null else LevelManagerRegistry.get_level_manager(ship.get_tree())
 	var xp_per_soldier: int = 1
-	var merit_per_soldier: int = 1
+	var bonus_xp_per_soldier: int = 1
 	if is_instance_valid(lm):
 		xp_per_soldier = max(0, int(lm.get("drowned_soldier_kill_xp_reward")))
-		merit_per_soldier = max(0, int(lm.get("drowned_soldier_kill_merit_reward")))
-		if merit_per_soldier <= 0:
-			merit_per_soldier = max(0, int(lm.get("merit_per_soldier_kill")))
+		bonus_xp_per_soldier = max(0, int(lm.get("drowned_soldier_kill_bonus_xp_reward")))
+		if bonus_xp_per_soldier <= 0:
+			bonus_xp_per_soldier = max(0, int(lm.get("bonus_xp_per_soldier_kill")))
 		if lm.has_method("add_soldier_kill"):
 			lm.add_soldier_kill(soldier_count, "drowned")
 
@@ -160,7 +174,7 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		soldier.set_meta("last_death_cause", "drowned")
 		soldier.set_meta("last_damage_source", "drowned")
 
-	if xp_per_soldier <= 0 and merit_per_soldier <= 0:
+	if xp_per_soldier <= 0 and bonus_xp_per_soldier <= 0:
 		return 0
 
 	var pickup_count: int = mini(ENEMY_DRIFTER_MAX_PICKUPS, ceili(float(soldier_count) / float(ENEMY_DRIFTER_SOLDIERS_PER_PICKUP)))
@@ -171,14 +185,14 @@ static func spawn_enemy_drifter_xp_pickups(ship) -> int:
 		var soldiers_in_pickup: int = ceili(float(remaining_soldiers) / float(remaining_pickups))
 		remaining_soldiers -= soldiers_in_pickup
 		var xp_amount: int = xp_per_soldier * soldiers_in_pickup
-		var merit_amount: int = merit_per_soldier * soldiers_in_pickup
-		if xp_amount <= 0 and merit_amount <= 0:
+		var bonus_xp_amount: int = bonus_xp_per_soldier * soldiers_in_pickup
+		if xp_amount <= 0 and bonus_xp_amount <= 0:
 			continue
 		var pickup := _instantiate_enemy_drifter_pickup(ship)
 		if not is_instance_valid(pickup):
 			continue
 		if pickup.has_method("configure"):
-			pickup.call("configure", xp_amount, soldiers_in_pickup, merit_amount)
+			pickup.call("configure", xp_amount, soldiers_in_pickup, bonus_xp_amount)
 		var angle: float = randf_range(0.0, TAU)
 		var radius: float = randf_range(0.8, 2.4 + float(index) * 0.35)
 		var spawn_pos: Vector3 = Vector3(
@@ -228,7 +242,7 @@ static func become_derelict(ship) -> void:
 
 	var ship_id: int = ship.get_instance_id()
 	ship.get_tree().create_timer(DERELICT_NONBLOCKING_DELAY).timeout.connect(func():
-		var derelict_ship = instance_from_id(ship_id)
+		var derelict_ship := NodeContractHelper.get_instance_node(ship_id)
 		if is_instance_valid(derelict_ship) and derelict_ship.is_derelict and not derelict_ship.is_sinking:
 			derelict_ship.set_meta("derelict_nonblocking", true)
 	)
@@ -246,7 +260,7 @@ static func ignite_derelict_from_contact(ship, source_ship: Node3D = null) -> vo
 	var delay := DERELICT_CONTACT_FIRE_POT_FLIGHT_TIME + 0.08 if launched else 0.25
 	var ship_id: int = ship.get_instance_id()
 	ship.get_tree().create_timer(delay).timeout.connect(func():
-		var derelict_ship = instance_from_id(ship_id)
+		var derelict_ship := NodeContractHelper.get_instance_node(ship_id)
 		if not is_instance_valid(derelict_ship) or derelict_ship.is_sinking or not derelict_ship.is_derelict:
 			return
 		derelict_ship.set_meta("derelict_burning_down", true)
@@ -335,6 +349,8 @@ static func _weather_derelict_sails(ship) -> void:
 
 
 static func _play_derelict_transition_visuals(ship) -> void:
+	if Engine.is_editor_hint():
+		return
 	if not is_instance_valid(ship) or not ship.is_inside_tree():
 		return
 
@@ -346,6 +362,8 @@ static func _play_derelict_transition_visuals(ship) -> void:
 
 
 static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	var scene: PackedScene = ship.get("impact_puff_scene") if "impact_puff_scene" in ship else null
 	if not is_instance_valid(scene):
 		return
@@ -361,6 +379,8 @@ static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float)
 
 
 static func _spawn_derelict_water_burst(ship, local_offset: Vector3, intensity: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	var scene: PackedScene = ship.get("water_splash_scene") if "water_splash_scene" in ship else null
 	if not is_instance_valid(scene):
 		return

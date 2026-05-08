@@ -37,6 +37,11 @@ const WING_SCREEN_TURN_CLEAR_FULL_RUDDER := 34.0
 const WING_SCREEN_TURN_TRAIL_BACK := 0.96
 const WING_SCREEN_TURN_OUTER_WIDEN := 0.30
 const WING_SCREEN_TURN_INNER_WIDEN := 0.55
+const LARGE_SHIP_REFERENCE_HALF_WIDTH := 2.4
+const LARGE_SHIP_REFERENCE_HALF_LENGTH := 4.8
+const LARGE_SHIP_LATERAL_PAD_SCALE := 0.62
+const LARGE_SHIP_TRAIL_PAD_SCALE := 0.42
+const LARGE_SHIP_TURN_WIDEN_SCALE := 0.34
 
 const ROLE_SPECS := {
 	ROLE_SCREEN_LEAD: {
@@ -448,8 +453,11 @@ static func _get_role_follow_distance(ship, anchor_ship: Node3D, trailing_distan
 	var desired_spacing := _get_role_spacing_value(base_spacing, role_name, formation_value)
 	var role_spec := _get_role_spec(role_name)
 	desired_spacing += float(role_spec.get("extra_trail_pad", 0.0))
+	desired_spacing += _get_large_ship_trail_pad(ship, anchor_ship, role_name, formation_value)
 	if formation_value == FORMATION_WING and _is_screen_role(role_name):
 		desired_spacing += base_spacing * WING_SCREEN_TURN_TRAIL_BACK * _get_flagship_turn_clearance_blend(ship)
+	elif formation_value == FORMATION_WING and _is_heavy_center_role(ship, role_name):
+		desired_spacing += base_spacing * 0.32 * _get_flagship_turn_clearance_blend(ship)
 	if formation_value == FORMATION_WING and role_spec.get("wing_direct_depth", false) == true:
 		return desired_spacing
 	return get_follow_distance(ship, anchor_ship, desired_spacing)
@@ -465,12 +473,13 @@ static func _get_role_lateral_distance(ship, anchor_ship: Node3D, spacing: float
 	var side_sign: float = _get_rescue_lane_side_sign(ship, role_name, my_index) if rescue_lane else _get_role_side_sign(role_name, my_index)
 	var pair_spacing := _get_pair_lateral_spacing(ship, anchor_ship, role_name)
 	var minimum_spacing := maxf(spacing * 0.68, pair_spacing)
-	if formation_value == FORMATION_WING and _is_screen_role(role_name):
+	if formation_value == FORMATION_WING and absf(side_sign) > 0.001:
 		var turn_clearance_blend := _get_flagship_turn_clearance_blend(ship)
 		if turn_clearance_blend > 0.0:
 			var turn_side := _get_flagship_turn_side(ship)
 			var widen_scale := WING_SCREEN_TURN_INNER_WIDEN if side_sign == turn_side else WING_SCREEN_TURN_OUTER_WIDEN
 			minimum_spacing += spacing * widen_scale * turn_clearance_blend
+			minimum_spacing += _get_large_ship_turn_widen_pad(ship, anchor_ship) * turn_clearance_blend
 	return minimum_spacing * lateral_scale * side_sign
 
 
@@ -490,7 +499,37 @@ static func _get_pair_lateral_spacing(ship, anchor_ship: Node3D, role_name: Stri
 	var role_spec := _get_role_spec(role_name)
 	var fallback_pad := ARTILLERY_LATERAL_PAD if role_name.begins_with("artillery_") else GENERIC_LATERAL_PAD
 	var pad := float(role_spec.get("lateral_pad", fallback_pad))
+	pad += _get_large_ship_lateral_pad(ship_half, anchor_half)
 	return ship_half.x + anchor_half.x + pad
+
+
+static func _get_large_ship_lateral_pad(ship_half: Vector2, anchor_half: Vector2) -> float:
+	var ship_extra_width := maxf(0.0, ship_half.x - LARGE_SHIP_REFERENCE_HALF_WIDTH)
+	var anchor_extra_width := maxf(0.0, anchor_half.x - LARGE_SHIP_REFERENCE_HALF_WIDTH)
+	return (ship_extra_width + anchor_extra_width * 0.65) * LARGE_SHIP_LATERAL_PAD_SCALE
+
+
+static func _get_large_ship_trail_pad(ship: Node3D, anchor_ship: Node3D, role_name: String, formation_value: int) -> float:
+	if formation_value != FORMATION_WING and formation_value != FORMATION_COLUMN:
+		return 0.0
+	var ship_half := _get_ship_half_extents(ship)
+	var anchor_half := _get_ship_half_extents(anchor_ship)
+	var ship_extra_length := maxf(0.0, ship_half.y - LARGE_SHIP_REFERENCE_HALF_LENGTH)
+	var anchor_extra_length := maxf(0.0, anchor_half.y - LARGE_SHIP_REFERENCE_HALF_LENGTH)
+	var role_mult := 1.0
+	if role_name == ROLE_ARTILLERY_LEAD or role_name == ROLE_ARMORED_GUARD:
+		role_mult = 1.35
+	elif role_name.begins_with("artillery_screen"):
+		role_mult = 1.12
+	return (ship_extra_length + anchor_extra_length * 0.35) * LARGE_SHIP_TRAIL_PAD_SCALE * role_mult
+
+
+static func _get_large_ship_turn_widen_pad(ship: Node3D, anchor_ship: Node3D) -> float:
+	var ship_half := _get_ship_half_extents(ship)
+	var anchor_half := _get_ship_half_extents(anchor_ship)
+	var ship_size_extra := maxf(0.0, ship_half.x - LARGE_SHIP_REFERENCE_HALF_WIDTH) + maxf(0.0, ship_half.y - LARGE_SHIP_REFERENCE_HALF_LENGTH) * 0.35
+	var anchor_size_extra := maxf(0.0, anchor_half.x - LARGE_SHIP_REFERENCE_HALF_WIDTH) * 0.5
+	return (ship_size_extra + anchor_size_extra) * LARGE_SHIP_TURN_WIDEN_SCALE
 
 
 static func _get_ship_half_extents(ship: Node3D) -> Vector2:
@@ -532,6 +571,12 @@ static func _get_role_side_sign(role_name: String, my_index: int) -> float:
 
 static func _is_screen_role(role_name: String) -> bool:
 	return role_name == ROLE_SCREEN_LEAD or role_name == ROLE_SCREEN_FLANK
+
+
+static func _is_heavy_center_role(ship: Node3D, role_name: String) -> bool:
+	if role_name == ROLE_ARTILLERY_LEAD or role_name == ROLE_ARMORED_GUARD:
+		return true
+	return ShipAllyRoleHelper.is_heavy_support(ship)
 
 
 static func _get_flagship_turn_clearance_blend(ship) -> float:

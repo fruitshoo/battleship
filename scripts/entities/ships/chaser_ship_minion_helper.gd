@@ -15,6 +15,11 @@ const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
 const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
 const SUPPORT_ANCHOR_FWD_META := "support_anchor_forward"
 const SUPPORT_IDLE_ORBIT_TIME_META := "support_idle_orbit_time"
+const SUPPORT_JOIN_STAGE_META := "support_join_stage"
+const SUPPORT_JOIN_STAGE_REAR_LANE := 0
+const SUPPORT_JOIN_STAGE_FINAL_SLOT := 1
+const SUPPORT_JOIN_REAR_LANE_SETTLE_DISTANCE := 11.5
+const SUPPORT_JOIN_FINAL_SETTLE_DISTANCE := 8.5
 const SUPPORT_SLOT_SPEED_GAIN := 0.31
 const SUPPORT_SLOT_BRAKE_GAIN := 0.55
 const SUPPORT_MAX_CATCHUP_SPEED := 3.25
@@ -194,53 +199,25 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var is_joining_support: bool = ship.has_meta("support_joining") and ship.get_meta("support_joining") == true
 	if is_support_ship:
 		var support_spacing: float = SUPPORT_COLUMN_FORMATION_SPACING if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_FORMATION_SPACING
-		support_lead_ship = SupportFleetFormationHelper.get_support_lead_ship(ship, minions, my_index)
-		_record_support_trail_point(support_lead_ship)
-		support_lead_speed = _get_ship_speed(support_lead_ship, float(player_speed))
-		var support_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_spacing)
-		target_pos = support_goal.get("position", ship.global_position)
-		support_lead_fwd = support_goal.get("forward", _get_ship_forward_flat(support_lead_ship))
-		if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN and is_instance_valid(support_lead_ship):
-			var flagship_turn_fwd: Vector3 = player_fwd if player_fwd.length_squared() > 0.0001 else _get_ship_forward_flat(movement_target)
-			var trail_head_rot: float = atan2(-support_lead_fwd.x, -support_lead_fwd.z)
-			var flagship_head_rot: float = atan2(-flagship_turn_fwd.x, -flagship_turn_fwd.z)
-			support_column_turn_angle = absf(wrapf(flagship_head_rot - trail_head_rot, -PI, PI))
-			var flagship_rudder_abs: float = absf(float(movement_target.get("rudder_angle"))) if movement_target.get("rudder_angle") != null else 0.0
-			var turn_mode_blend: float = clampf(
-				(flagship_rudder_abs - SUPPORT_COLUMN_TURN_MODE_START_RUDDER) / maxf(SUPPORT_COLUMN_TURN_MODE_FULL_RUDDER - SUPPORT_COLUMN_TURN_MODE_START_RUDDER, 0.001),
-				0.0,
-				1.0
-			)
-			if support_column_turn_angle > SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE:
-				support_column_turn_blend = clampf(
-					(support_column_turn_angle - SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE) / maxf(SUPPORT_COLUMN_TURN_ASSIST_FULL_ANGLE - SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE, 0.001),
-					0.0,
-					1.0
-				)
-				var live_follow_distance: float = SupportFleetFormationHelper.get_follow_distance(ship, support_lead_ship, support_spacing)
-				var direct_goal: Vector3 = support_lead_ship.global_position - flagship_turn_fwd * live_follow_distance
-				direct_goal.y = ship.global_position.y
-				target_pos = target_pos.lerp(direct_goal, support_column_turn_blend * SUPPORT_COLUMN_TURN_POSITION_BLEND)
-				var blended_lead_fwd: Vector3 = support_lead_fwd.lerp(flagship_turn_fwd, support_column_turn_blend * SUPPORT_COLUMN_TURN_FORWARD_BLEND)
-				blended_lead_fwd.y = 0.0
-				if blended_lead_fwd.length_squared() > 0.0001:
-					support_lead_fwd = blended_lead_fwd.normalized()
-			turn_mode_blend = maxf(turn_mode_blend, support_column_turn_blend)
-			support_column_turn_mode = turn_mode_blend >= SUPPORT_COLUMN_TURN_MODE_MIN_BLEND
-			if support_column_turn_mode:
-				var turn_slot_offset: Vector3 = SupportFleetFormationHelper.get_support_fleet_offset(ship, my_index, support_spacing, minions.size())
-				var flagship_follow_distance: float = maxf(turn_slot_offset.z, support_spacing + float(my_index) * support_spacing * 0.9)
-				var flagship_goal: Dictionary = SupportFleetFormationHelper.get_trail_goal(movement_target, flagship_follow_distance, flagship_turn_fwd, SUPPORT_TRAIL_POINTS_META)
-				var flagship_goal_fwd: Vector3 = flagship_goal.get("forward", flagship_turn_fwd)
-				var flagship_goal_right: Vector3 = flagship_goal_fwd.cross(Vector3.UP).normalized()
-				if flagship_goal_right.length_squared() <= 0.0001:
-					flagship_goal_right = player_right
-				var direct_column_goal: Vector3 = flagship_goal.get("position", movement_target.global_position) + flagship_goal_right * turn_slot_offset.x
-				direct_column_goal.y = ship.global_position.y
-				target_pos = target_pos.lerp(direct_column_goal, clampf(turn_mode_blend * 0.92, 0.0, 0.92))
-				support_lead_ship = movement_target
-				support_lead_speed = float(player_speed)
-				support_lead_fwd = flagship_goal_fwd if flagship_goal_fwd.length_squared() > 0.0001 else flagship_turn_fwd
+		var support_formation_step: Dictionary = _build_support_formation_step(
+			ship,
+			movement_target,
+			minions,
+			my_index,
+			support_spacing,
+			player_fwd,
+			player_right,
+			float(player_speed)
+		)
+		target_pos = support_formation_step.get("target_pos", target_pos)
+		support_lead_fwd = support_formation_step.get("lead_fwd", support_lead_fwd)
+		support_lead_speed = float(support_formation_step.get("lead_speed", support_lead_speed))
+		support_column_turn_blend = float(support_formation_step.get("column_turn_blend", support_column_turn_blend))
+		support_column_turn_angle = float(support_formation_step.get("column_turn_angle", support_column_turn_angle))
+		support_column_turn_mode = support_formation_step.get("column_turn_mode", support_column_turn_mode) == true
+		var support_lead_variant: Variant = support_formation_step.get("lead_ship", support_lead_ship)
+		if support_lead_variant is Node3D:
+			support_lead_ship = support_lead_variant as Node3D
 		var support_pre_avoidance: Dictionary = _calculate_support_pre_avoidance(
 			ship,
 			minions,
@@ -262,20 +239,22 @@ static func process_minion_ai(ship, delta: float) -> void:
 		rel_depth = to_target_vec.dot(support_lead_fwd)
 		dist_to_player = ship.global_position.distance_to(movement_target.global_position)
 		if is_joining_support:
-			var support_join_spacing: float = SUPPORT_COLUMN_JOIN_SPACING if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_JOIN_SPACING
-			var join_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_join_spacing)
-			if support_formation_value == SupportFleetFormationHelper.FORMATION_WING:
-				join_goal = SupportFleetFormationHelper.get_support_join_chain_goal(ship, minions, my_index, support_join_spacing)
-			target_pos = join_goal.get("position", ship.global_position)
-			support_lead_fwd = join_goal.get("forward", support_lead_fwd)
+			var join_step: Dictionary = _build_support_join_step(ship, minions, my_index, support_formation_value, support_lead_fwd, support_spacing)
+			target_pos = join_step.get("target_pos", target_pos)
+			support_lead_fwd = join_step.get("lead_fwd", support_lead_fwd)
+			support_column_turn_mode = false
 		target_pos += sep_force * 0.15
 		to_target_vec = target_pos - ship.global_position
 		if to_target_vec.length_squared() > 0.0001:
 			direction = to_target_vec.normalized()
 		var dist_to_join_target: float = ship.global_position.distance_to(target_pos)
 		dist_to_player = ship.global_position.distance_to(movement_target.global_position)
-		if dist_to_join_target <= 14.0 or dist_to_player <= 20.0:
+		var join_stage := int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT))
+		var join_settle_distance := SUPPORT_JOIN_REAR_LANE_SETTLE_DISTANCE if join_stage == SUPPORT_JOIN_STAGE_REAR_LANE else SUPPORT_JOIN_FINAL_SETTLE_DISTANCE
+		if join_stage == SUPPORT_JOIN_STAGE_FINAL_SLOT and dist_to_join_target <= join_settle_distance:
 			ship.set_meta("support_joining", false)
+			if ship.has_meta(SUPPORT_JOIN_STAGE_META):
+				ship.remove_meta(SUPPORT_JOIN_STAGE_META)
 			is_joining_support = false
 	dist_to_target = ship.global_position.distance_to(target_pos)
 	if is_support_ship and not is_joining_support and is_instance_valid(support_assist_target):
@@ -292,37 +271,19 @@ static func process_minion_ai(ship, delta: float) -> void:
 	if is_joining_support:
 		target_final_speed = maxf(player_speed + 3.0, ship.move_speed * 1.9)
 	elif is_support_ship:
-		var slot_depth_error: float = rel_depth
-		var slot_lateral_error: float = absf(to_target_vec.dot(support_lead_fwd.cross(Vector3.UP).normalized()))
-		support_slot_lateral_error = slot_lateral_error
-		var speed_offset: float = 0.0
-		var max_catchup_speed: float = SUPPORT_MAX_CATCHUP_SPEED * (SUPPORT_PANOKSEON_CATCHUP_SPEED_SCALE if is_heavy_support else 1.0)
-		var max_formup_speed: float = SUPPORT_MAX_FORMUP_SPEED * (SUPPORT_PANOKSEON_FORMUP_SPEED_SCALE if is_heavy_support else 1.0)
-		if is_spread_support_formation:
-			max_formup_speed *= SUPPORT_WING_FORMUP_SPEED_SCALE
-		if slot_depth_error >= 0.0:
-			speed_offset = minf(slot_depth_error * SUPPORT_SLOT_SPEED_GAIN, max_catchup_speed)
-		else:
-			if dist_to_target <= SUPPORT_DIRECT_STEER_DISTANCE and slot_lateral_error <= SUPPORT_BRAKE_LATERAL_TOLERANCE:
-				speed_offset = -minf(absf(slot_depth_error) * SUPPORT_SLOT_BRAKE_GAIN, SUPPORT_MAX_BRAKE_SPEED)
-		var formup_speed: float = 0.0
-		if dist_to_target > SUPPORT_FORMUP_DISTANCE:
-			formup_speed = minf((dist_to_target - SUPPORT_FORMUP_DISTANCE) * SUPPORT_FORMUP_SPEED_GAIN, max_formup_speed)
-		if is_spread_support_formation and slot_lateral_error > SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
-			var lateral_formup_speed: float = minf(
-				(slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) * SUPPORT_WING_LATERAL_FORMUP_GAIN,
-				max_formup_speed
-			)
-			formup_speed = maxf(formup_speed, lateral_formup_speed)
-		target_final_speed = maxf(maxf(support_lead_speed + speed_offset, formup_speed), 0.0)
-		if is_spread_support_formation \
-				and dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE \
-				and slot_lateral_error <= SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
-			var settle_cap := maxf(support_lead_speed + minf(dist_to_target * 0.12, 0.9), ship.move_speed * 0.52)
-			target_final_speed = min(target_final_speed, settle_cap)
-		if dist_to_target <= 2.0:
-			target_final_speed = lerp(target_final_speed, support_lead_speed, 0.85)
-		target_final_speed *= support_pre_avoid_brake_mult
+		var speed_step: Dictionary = _compute_support_follow_speed(
+			ship,
+			support_lead_fwd,
+			to_target_vec,
+			rel_depth,
+			dist_to_target,
+			support_lead_speed,
+			support_pre_avoid_brake_mult,
+			is_spread_support_formation,
+			is_heavy_support
+		)
+		target_final_speed = float(speed_step.get("target_speed", target_final_speed))
+		support_slot_lateral_error = float(speed_step.get("slot_lateral_error", support_slot_lateral_error))
 	elif ally_regrouping:
 		target_final_speed = maxf(player_speed + 2.4, ship.move_speed * 1.55)
 	elif dist_to_player < 10.0:
@@ -340,57 +301,35 @@ static func process_minion_ai(ship, delta: float) -> void:
 	if is_instance_valid(movement_target) and "rotation" in movement_target:
 		player_head_rot = movement_target.rotation.y
 	if is_support_ship:
-		var lead_head_rot: float = player_head_rot
-		if support_lead_fwd.length_squared() > 0.0001:
-			lead_head_rot = atan2(-support_lead_fwd.x, -support_lead_fwd.z)
-		elif is_instance_valid(support_lead_ship):
-			lead_head_rot = support_lead_ship.rotation.y
-		var lead_right: Vector3 = support_lead_fwd.cross(Vector3.UP).normalized()
-		var lateral_error: float = to_target_vec.dot(lead_right)
-		var heading_correction: float = clamp(-lateral_error * SUPPORT_HEADING_CORRECTION_GAIN, -SUPPORT_MAX_HEADING_CORRECTION, SUPPORT_MAX_HEADING_CORRECTION)
-		player_head_rot = lead_head_rot
-		var aligned_head_rot: float = lead_head_rot + heading_correction
-		var direct_head_rot: float = atan2(-direction.x, -direction.z)
-		if is_spread_support_formation:
-			var align_weight: float = clampf((dist_to_target - SUPPORT_FORMATION_SETTLE_DISTANCE) / SUPPORT_FORMATION_SETTLE_DISTANCE, 0.0, 1.0)
-			if support_slot_lateral_error > SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
-				var direct_steer_weight := clampf(
-					(support_slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) / maxf(SUPPORT_FORMATION_SETTLE_DISTANCE, 0.001),
-					0.0,
-					1.0
-				)
-				align_weight *= 1.0 - direct_steer_weight * SUPPORT_WING_DIRECT_STEER_GAIN
-			target_head_rot = lerp_angle(direct_head_rot, aligned_head_rot, align_weight)
-			var align_angle_diff: float = absf(wrapf(aligned_head_rot - ship.rotation.y, -PI, PI))
-			if dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE and align_angle_diff > SUPPORT_FORMATION_TURN_COMMIT_ANGLE:
-				target_head_rot = lerp_angle(ship.rotation.y, direct_head_rot, 0.72)
-				target_final_speed = min(target_final_speed, maxf(support_lead_speed * 0.82, ship.move_speed * 0.48))
-		elif dist_to_target > SUPPORT_DIRECT_STEER_DISTANCE:
-			target_head_rot = lerp_angle(aligned_head_rot, direct_head_rot, 0.75)
-		else:
-			target_head_rot = aligned_head_rot
+		var heading_step: Dictionary = _compute_support_heading(
+			ship,
+			support_lead_ship,
+			support_lead_fwd,
+			to_target_vec,
+			direction,
+			dist_to_target,
+			target_final_speed,
+			support_lead_speed,
+			support_slot_lateral_error,
+			is_spread_support_formation,
+			player_head_rot
+		)
+		target_head_rot = float(heading_step.get("target_head_rot", target_head_rot))
+		player_head_rot = float(heading_step.get("player_head_rot", player_head_rot))
+		target_final_speed = float(heading_step.get("target_speed", target_final_speed))
 
 	var support_turn_angle: float = 0.0
 	if is_support_ship:
-		var turn_brake_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_heavy_support else 1.0)
-		var turn_brake_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_heavy_support else 1.0)
-		support_turn_angle = absf(wrapf(target_head_rot - ship.rotation.y, -PI, PI))
-		if support_turn_angle > turn_brake_start_angle:
-			var turn_brake_blend: float = clampf(
-				(support_turn_angle - turn_brake_start_angle) / maxf(turn_brake_full_angle - turn_brake_start_angle, 0.001),
-				0.0,
-				1.0
-			)
-			var min_turn_speed_mult: float
-			if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN:
-				min_turn_speed_mult = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
-			else:
-				min_turn_speed_mult = SUPPORT_PANOKSEON_SPREAD_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_SPREAD_TURN_BRAKE_MIN_MULT
-			var turn_speed_mult: float = lerpf(1.0, min_turn_speed_mult, turn_brake_blend)
-			if support_column_turn_blend > 0.0:
-				var column_turn_floor: float = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
-				turn_speed_mult = minf(turn_speed_mult, lerpf(1.0, column_turn_floor, support_column_turn_blend))
-			target_final_speed *= turn_speed_mult
+		var turn_brake_step: Dictionary = _apply_support_turn_brake(
+			ship,
+			target_head_rot,
+			target_final_speed,
+			support_formation_value,
+			support_column_turn_blend,
+			is_heavy_support
+		)
+		target_final_speed = float(turn_brake_step.get("target_speed", target_final_speed))
+		support_turn_angle = float(turn_brake_step.get("turn_angle", support_turn_angle))
 
 	var speed_response: float = SUPPORT_SPEED_RESPONSE if is_support_ship else (1.55 if ally_regrouping else 1.2)
 	ship._last_ai_speed = lerp(ship._last_ai_speed, target_final_speed, delta * speed_response)
@@ -474,6 +413,289 @@ static func process_minion_ai(ship, delta: float) -> void:
 		_draw_support_limbo_debug(ship)
 	elif is_captured_minion:
 		_draw_ally_limbo_debug(ship)
+
+static func _build_support_formation_step(
+	ship,
+	movement_target: Node3D,
+	minions: Array,
+	my_index: int,
+	support_spacing: float,
+	player_fwd: Vector3,
+	player_right: Vector3,
+	player_speed: float
+) -> Dictionary:
+	var support_lead_ship: Node3D = SupportFleetFormationHelper.get_support_lead_ship(ship, minions, my_index)
+	_record_support_trail_point(support_lead_ship)
+	var support_lead_speed: float = _get_ship_speed(support_lead_ship, player_speed)
+	var support_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_spacing)
+	var target_pos: Vector3 = support_goal.get("position", ship.global_position)
+	var support_lead_fwd: Vector3 = support_goal.get("forward", _get_ship_forward_flat(support_lead_ship))
+	var column_turn_blend := 0.0
+	var column_turn_angle := 0.0
+	var column_turn_mode := false
+
+	if SupportFleetStateHelper.get_effective_formation(ship) == SupportFleetFormationHelper.FORMATION_COLUMN and is_instance_valid(support_lead_ship):
+		var column_turn_step: Dictionary = _apply_support_column_turn_assist(
+			ship,
+			movement_target,
+			support_lead_ship,
+			target_pos,
+			support_lead_fwd,
+			support_spacing,
+			my_index,
+			minions.size(),
+			player_fwd,
+			player_right,
+			player_speed
+		)
+		target_pos = column_turn_step.get("target_pos", target_pos)
+		support_lead_fwd = column_turn_step.get("lead_fwd", support_lead_fwd)
+		support_lead_speed = float(column_turn_step.get("lead_speed", support_lead_speed))
+		column_turn_blend = float(column_turn_step.get("column_turn_blend", column_turn_blend))
+		column_turn_angle = float(column_turn_step.get("column_turn_angle", column_turn_angle))
+		column_turn_mode = column_turn_step.get("column_turn_mode", column_turn_mode) == true
+		var lead_variant: Variant = column_turn_step.get("lead_ship", support_lead_ship)
+		if lead_variant is Node3D:
+			support_lead_ship = lead_variant as Node3D
+
+	return {
+		"target_pos": target_pos,
+		"lead_ship": support_lead_ship,
+		"lead_fwd": support_lead_fwd,
+		"lead_speed": support_lead_speed,
+		"column_turn_blend": column_turn_blend,
+		"column_turn_angle": column_turn_angle,
+		"column_turn_mode": column_turn_mode,
+	}
+
+
+static func _apply_support_column_turn_assist(
+	ship,
+	movement_target: Node3D,
+	support_lead_ship: Node3D,
+	target_pos: Vector3,
+	support_lead_fwd: Vector3,
+	support_spacing: float,
+	my_index: int,
+	roster_size: int,
+	player_fwd: Vector3,
+	player_right: Vector3,
+	player_speed: float
+) -> Dictionary:
+	var flagship_turn_fwd: Vector3 = player_fwd if player_fwd.length_squared() > 0.0001 else _get_ship_forward_flat(movement_target)
+	var trail_head_rot: float = atan2(-support_lead_fwd.x, -support_lead_fwd.z)
+	var flagship_head_rot: float = atan2(-flagship_turn_fwd.x, -flagship_turn_fwd.z)
+	var column_turn_angle: float = absf(wrapf(flagship_head_rot - trail_head_rot, -PI, PI))
+	var flagship_rudder_abs: float = absf(float(movement_target.get("rudder_angle"))) if movement_target.get("rudder_angle") != null else 0.0
+	var turn_mode_blend: float = clampf(
+		(flagship_rudder_abs - SUPPORT_COLUMN_TURN_MODE_START_RUDDER) / maxf(SUPPORT_COLUMN_TURN_MODE_FULL_RUDDER - SUPPORT_COLUMN_TURN_MODE_START_RUDDER, 0.001),
+		0.0,
+		1.0
+	)
+	var column_turn_blend := 0.0
+	var next_target_pos := target_pos
+	var next_lead_fwd := support_lead_fwd
+	var next_lead_ship: Node3D = support_lead_ship
+	var next_lead_speed: float = _get_ship_speed(support_lead_ship, player_speed)
+
+	if column_turn_angle > SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE:
+		column_turn_blend = clampf(
+			(column_turn_angle - SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE) / maxf(SUPPORT_COLUMN_TURN_ASSIST_FULL_ANGLE - SUPPORT_COLUMN_TURN_ASSIST_START_ANGLE, 0.001),
+			0.0,
+			1.0
+		)
+		var live_follow_distance: float = SupportFleetFormationHelper.get_follow_distance(ship, support_lead_ship, support_spacing)
+		var direct_goal: Vector3 = support_lead_ship.global_position - flagship_turn_fwd * live_follow_distance
+		direct_goal.y = ship.global_position.y
+		next_target_pos = next_target_pos.lerp(direct_goal, column_turn_blend * SUPPORT_COLUMN_TURN_POSITION_BLEND)
+		var blended_lead_fwd: Vector3 = next_lead_fwd.lerp(flagship_turn_fwd, column_turn_blend * SUPPORT_COLUMN_TURN_FORWARD_BLEND)
+		blended_lead_fwd.y = 0.0
+		if blended_lead_fwd.length_squared() > 0.0001:
+			next_lead_fwd = blended_lead_fwd.normalized()
+
+	turn_mode_blend = maxf(turn_mode_blend, column_turn_blend)
+	var column_turn_mode: bool = turn_mode_blend >= SUPPORT_COLUMN_TURN_MODE_MIN_BLEND
+	if column_turn_mode:
+		var turn_slot_offset: Vector3 = SupportFleetFormationHelper.get_support_fleet_offset(ship, my_index, support_spacing, roster_size)
+		var flagship_follow_distance: float = maxf(turn_slot_offset.z, support_spacing + float(my_index) * support_spacing * 0.9)
+		var flagship_goal: Dictionary = SupportFleetFormationHelper.get_trail_goal(movement_target, flagship_follow_distance, flagship_turn_fwd, SUPPORT_TRAIL_POINTS_META)
+		var flagship_goal_fwd: Vector3 = flagship_goal.get("forward", flagship_turn_fwd)
+		var flagship_goal_right: Vector3 = flagship_goal_fwd.cross(Vector3.UP).normalized()
+		if flagship_goal_right.length_squared() <= 0.0001:
+			flagship_goal_right = player_right
+		var direct_column_goal: Vector3 = flagship_goal.get("position", movement_target.global_position) + flagship_goal_right * turn_slot_offset.x
+		direct_column_goal.y = ship.global_position.y
+		next_target_pos = next_target_pos.lerp(direct_column_goal, clampf(turn_mode_blend * 0.92, 0.0, 0.92))
+		next_lead_ship = movement_target
+		next_lead_speed = player_speed
+		next_lead_fwd = flagship_goal_fwd if flagship_goal_fwd.length_squared() > 0.0001 else flagship_turn_fwd
+
+	return {
+		"target_pos": next_target_pos,
+		"lead_ship": next_lead_ship,
+		"lead_fwd": next_lead_fwd,
+		"lead_speed": next_lead_speed,
+		"column_turn_blend": column_turn_blend,
+		"column_turn_angle": column_turn_angle,
+		"column_turn_mode": column_turn_mode,
+	}
+
+
+static func _build_support_join_step(ship, minions: Array, my_index: int, support_formation_value: int, fallback_lead_fwd: Vector3, support_spacing: float) -> Dictionary:
+	var support_join_spacing: float = SUPPORT_COLUMN_JOIN_SPACING if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_JOIN_SPACING
+	var join_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_join_spacing)
+	if support_formation_value == SupportFleetFormationHelper.FORMATION_WING:
+		var join_stage := int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_REAR_LANE))
+		if join_stage <= SUPPORT_JOIN_STAGE_REAR_LANE:
+			var rear_lane_goal := SupportFleetFormationHelper.get_support_join_chain_goal(ship, minions, my_index, support_join_spacing)
+			var rear_lane_pos: Vector3 = rear_lane_goal.get("position", ship.global_position)
+			if ship.global_position.distance_to(rear_lane_pos) > SUPPORT_JOIN_REAR_LANE_SETTLE_DISTANCE:
+				ship.set_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_REAR_LANE)
+				return {
+					"target_pos": rear_lane_pos,
+					"lead_fwd": rear_lane_goal.get("forward", fallback_lead_fwd),
+				}
+			ship.set_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT)
+		join_goal = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_spacing)
+	else:
+		ship.set_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT)
+	return {
+		"target_pos": join_goal.get("position", ship.global_position),
+		"lead_fwd": join_goal.get("forward", fallback_lead_fwd),
+	}
+
+
+static func _compute_support_follow_speed(
+	ship,
+	support_lead_fwd: Vector3,
+	to_target_vec: Vector3,
+	rel_depth: float,
+	dist_to_target: float,
+	support_lead_speed: float,
+	support_pre_avoid_brake_mult: float,
+	is_spread_support_formation: bool,
+	is_heavy_support: bool
+) -> Dictionary:
+	var slot_depth_error: float = rel_depth
+	var slot_lateral_error: float = absf(to_target_vec.dot(support_lead_fwd.cross(Vector3.UP).normalized()))
+	var speed_offset := 0.0
+	var max_catchup_speed: float = SUPPORT_MAX_CATCHUP_SPEED * (SUPPORT_PANOKSEON_CATCHUP_SPEED_SCALE if is_heavy_support else 1.0)
+	var max_formup_speed: float = SUPPORT_MAX_FORMUP_SPEED * (SUPPORT_PANOKSEON_FORMUP_SPEED_SCALE if is_heavy_support else 1.0)
+	if is_spread_support_formation:
+		max_formup_speed *= SUPPORT_WING_FORMUP_SPEED_SCALE
+	if slot_depth_error >= 0.0:
+		speed_offset = minf(slot_depth_error * SUPPORT_SLOT_SPEED_GAIN, max_catchup_speed)
+	else:
+		if dist_to_target <= SUPPORT_DIRECT_STEER_DISTANCE and slot_lateral_error <= SUPPORT_BRAKE_LATERAL_TOLERANCE:
+			speed_offset = -minf(absf(slot_depth_error) * SUPPORT_SLOT_BRAKE_GAIN, SUPPORT_MAX_BRAKE_SPEED)
+	var formup_speed := 0.0
+	if dist_to_target > SUPPORT_FORMUP_DISTANCE:
+		formup_speed = minf((dist_to_target - SUPPORT_FORMUP_DISTANCE) * SUPPORT_FORMUP_SPEED_GAIN, max_formup_speed)
+	if is_spread_support_formation and slot_lateral_error > SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
+		var lateral_formup_speed: float = minf(
+			(slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) * SUPPORT_WING_LATERAL_FORMUP_GAIN,
+			max_formup_speed
+		)
+		formup_speed = maxf(formup_speed, lateral_formup_speed)
+	var target_speed: float = maxf(maxf(support_lead_speed + speed_offset, formup_speed), 0.0)
+	if is_spread_support_formation \
+			and dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE \
+			and slot_lateral_error <= SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
+		var settle_cap := maxf(support_lead_speed + minf(dist_to_target * 0.12, 0.9), ship.move_speed * 0.52)
+		target_speed = min(target_speed, settle_cap)
+	if dist_to_target <= 2.0:
+		target_speed = lerp(target_speed, support_lead_speed, 0.85)
+	target_speed *= support_pre_avoid_brake_mult
+	return {
+		"target_speed": target_speed,
+		"slot_lateral_error": slot_lateral_error,
+	}
+
+
+static func _compute_support_heading(
+	ship,
+	support_lead_ship: Node3D,
+	support_lead_fwd: Vector3,
+	to_target_vec: Vector3,
+	direction: Vector3,
+	dist_to_target: float,
+	target_final_speed: float,
+	support_lead_speed: float,
+	support_slot_lateral_error: float,
+	is_spread_support_formation: bool,
+	player_head_rot: float
+) -> Dictionary:
+	var lead_head_rot: float = player_head_rot
+	if support_lead_fwd.length_squared() > 0.0001:
+		lead_head_rot = atan2(-support_lead_fwd.x, -support_lead_fwd.z)
+	elif is_instance_valid(support_lead_ship):
+		lead_head_rot = support_lead_ship.rotation.y
+	var lead_right: Vector3 = support_lead_fwd.cross(Vector3.UP).normalized()
+	var lateral_error: float = to_target_vec.dot(lead_right)
+	var heading_correction: float = clamp(-lateral_error * SUPPORT_HEADING_CORRECTION_GAIN, -SUPPORT_MAX_HEADING_CORRECTION, SUPPORT_MAX_HEADING_CORRECTION)
+	var resolved_player_head_rot := lead_head_rot
+	var aligned_head_rot: float = lead_head_rot + heading_correction
+	var direct_head_rot: float = atan2(-direction.x, -direction.z)
+	var target_head_rot: float
+	var resolved_target_speed := target_final_speed
+	if is_spread_support_formation:
+		var align_weight: float = clampf((dist_to_target - SUPPORT_FORMATION_SETTLE_DISTANCE) / SUPPORT_FORMATION_SETTLE_DISTANCE, 0.0, 1.0)
+		if support_slot_lateral_error > SUPPORT_WING_LATERAL_SETTLE_TOLERANCE:
+			var direct_steer_weight := clampf(
+				(support_slot_lateral_error - SUPPORT_WING_LATERAL_SETTLE_TOLERANCE) / maxf(SUPPORT_FORMATION_SETTLE_DISTANCE, 0.001),
+				0.0,
+				1.0
+			)
+			align_weight *= 1.0 - direct_steer_weight * SUPPORT_WING_DIRECT_STEER_GAIN
+		target_head_rot = lerp_angle(direct_head_rot, aligned_head_rot, align_weight)
+		var align_angle_diff: float = absf(wrapf(aligned_head_rot - ship.rotation.y, -PI, PI))
+		if dist_to_target <= SUPPORT_FORMATION_SETTLE_DISTANCE and align_angle_diff > SUPPORT_FORMATION_TURN_COMMIT_ANGLE:
+			target_head_rot = lerp_angle(ship.rotation.y, direct_head_rot, 0.72)
+			resolved_target_speed = min(resolved_target_speed, maxf(support_lead_speed * 0.82, ship.move_speed * 0.48))
+	elif dist_to_target > SUPPORT_DIRECT_STEER_DISTANCE:
+		target_head_rot = lerp_angle(aligned_head_rot, direct_head_rot, 0.75)
+	else:
+		target_head_rot = aligned_head_rot
+	return {
+		"target_head_rot": target_head_rot,
+		"player_head_rot": resolved_player_head_rot,
+		"target_speed": resolved_target_speed,
+	}
+
+
+static func _apply_support_turn_brake(
+	ship,
+	target_head_rot: float,
+	target_final_speed: float,
+	support_formation_value: int,
+	support_column_turn_blend: float,
+	is_heavy_support: bool
+) -> Dictionary:
+	var turn_brake_start_angle: float = SUPPORT_TURN_BRAKE_START_ANGLE * (SUPPORT_PANOKSEON_BRAKE_START_SCALE if is_heavy_support else 1.0)
+	var turn_brake_full_angle: float = SUPPORT_TURN_BRAKE_FULL_ANGLE * (SUPPORT_PANOKSEON_BRAKE_FULL_SCALE if is_heavy_support else 1.0)
+	var support_turn_angle: float = absf(wrapf(target_head_rot - ship.rotation.y, -PI, PI))
+	var resolved_target_speed := target_final_speed
+	if support_turn_angle > turn_brake_start_angle:
+		var turn_brake_blend: float = clampf(
+			(support_turn_angle - turn_brake_start_angle) / maxf(turn_brake_full_angle - turn_brake_start_angle, 0.001),
+			0.0,
+			1.0
+		)
+		var min_turn_speed_mult: float
+		if support_formation_value == SupportFleetFormationHelper.FORMATION_COLUMN:
+			min_turn_speed_mult = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
+		else:
+			min_turn_speed_mult = SUPPORT_PANOKSEON_SPREAD_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_SPREAD_TURN_BRAKE_MIN_MULT
+		var turn_speed_mult: float = lerpf(1.0, min_turn_speed_mult, turn_brake_blend)
+		if support_column_turn_blend > 0.0:
+			var column_turn_floor: float = SUPPORT_PANOKSEON_COLUMN_TURN_BRAKE_MIN_MULT if is_heavy_support else SUPPORT_COLUMN_TURN_BRAKE_MIN_MULT
+			turn_speed_mult = minf(turn_speed_mult, lerpf(1.0, column_turn_floor, support_column_turn_blend))
+		resolved_target_speed *= turn_speed_mult
+	return {
+		"target_speed": resolved_target_speed,
+		"turn_angle": support_turn_angle,
+	}
+
 
 static func _is_ship_disabled(node: Node3D) -> bool:
 	if not is_instance_valid(node):
@@ -600,15 +822,10 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	if heading_vector.length_squared() <= 0.001:
 		heading_vector = move_dir if move_dir.length_squared() > 0.001 else _get_ship_forward_flat(assist_target)
 	var target_rotation_y: float = atan2(-heading_vector.x, -heading_vector.z)
-	var angle_diff: float = wrapf(target_rotation_y - ship.rotation.y, -PI, PI)
-	var desired_rudder: float = clamp(-rad_to_deg(angle_diff) * ship.ai_rudder_gain, -40.0, 40.0)
 	var close_turn_blend: float = 0.0
 	if ship.ai_close_turn_soft_radius > 0.01:
 		close_turn_blend = clamp(1.0 - (dist_to_target / ship.ai_close_turn_soft_radius), 0.0, 1.0)
 	var close_turn_factor: float = lerp(1.0, ship.ai_close_turn_scale, close_turn_blend)
-	desired_rudder *= close_turn_factor
-	var rudder_speed_adjusted: float = ship.ai_rudder_response_speed * ship.get_rudder_response_multiplier()
-	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
 
 	var leak_speed_mult: float = clamp(1.0 - (ship.leaking_rate * 0.05), 0.3, 1.0)
 	var desired_speed: float = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier()
@@ -619,40 +836,29 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 		desired_speed *= 1.12
 	desired_speed *= rowing_speed_mult
 	var assist_speed_response: float = SUPPORT_ASSIST_EMERGENCY_SPEED_RESPONSE if emergency_assist else SUPPORT_ASSIST_SPEED_RESPONSE
-	ship._last_ai_speed = lerp(float(ship._last_ai_speed), desired_speed, delta * assist_speed_response)
 	var assist_accel_mult: float = 1.65 if rescue_assist else (1.55 if boss_breach_assist else (1.45 if emergency_assist else 1.0))
-	if ship._last_ai_speed > ship.current_speed:
-		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.acceleration * assist_accel_mult * delta)
-	else:
-		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.deceleration * delta)
-
 	var wind_floor := _get_support_assist_rowing_wind_floor(emergency_assist)
-	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor) * ship.get_shiphandling_multiplier()
-	if ship.current_speed > 0.1:
-		var speed_ratio: float = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
-		var turn_scale: float = ship.ai_turn_authority * close_turn_factor
-		var actual_turn: float = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_scale * delta
-		var max_turn_this_frame: float = ship.ai_max_turn_rate * (0.9 if rescue_assist else (0.88 if boss_breach_assist else (0.82 if emergency_assist else 0.68))) * delta
-		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
-		ship.rotation.y -= deg_to_rad(actual_turn)
-
-	var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
-	var velocity: Vector3 = forward_vec * ship.current_speed * wind_mult
-	velocity += local_sep
-	velocity += ship._calculate_collision_repulsion() * 0.45 * delta
-
-	var prev_pos: Vector3 = ship.global_position
-	var next_pos: Vector3 = prev_pos + velocity * delta
-	next_pos = ship._apply_ship_collision_guard(assist_target, prev_pos, next_pos, 0.9, velocity.length(), false)
-	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, assist_target)
-	ship.global_position = next_pos
-	_record_support_trail_point(ship)
-
-	ship._update_rudder_visual()
-	if ship.leaking_rate > 0:
-		ship.take_damage(ship.leaking_rate * delta)
-	ship._apply_bobbing_effect()
-	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
+	var max_turn_rate_mult: float = 0.9 if rescue_assist else (0.88 if boss_breach_assist else (0.82 if emergency_assist else 0.68))
+	_apply_role_navigation_motion(
+		ship,
+		delta,
+		target_rotation_y,
+		desired_speed,
+		assist_speed_response,
+		assist_accel_mult,
+		wind_floor,
+		close_turn_factor,
+		max_turn_rate_mult,
+		local_sep,
+		assist_target,
+		0.9,
+		null,
+		0.0,
+		assist_target,
+		0.45,
+		true,
+		true
+	)
 	ship.set_meta("support_debug_lead_name", assist_target.name)
 	ship.set_meta("support_debug_target_pos", desired_point)
 	ship.set_meta("support_debug_slot_dist", ship.global_position.distance_to(desired_point))
@@ -692,52 +898,100 @@ static func _process_captured_guard_ai(ship, delta: float, guard_target: Node3D,
 	if heading_vector.length_squared() <= 0.001:
 		heading_vector = move_dir if move_dir.length_squared() > 0.001 else _get_ship_forward_flat(guard_target)
 	var target_rotation_y: float = atan2(-heading_vector.x, -heading_vector.z)
-	var angle_diff: float = wrapf(target_rotation_y - ship.rotation.y, -PI, PI)
-	var desired_rudder: float = clamp(-rad_to_deg(angle_diff) * ship.ai_rudder_gain, -40.0, 40.0)
 	var close_turn_blend: float = 0.0
 	if ship.ai_close_turn_soft_radius > 0.01:
 		close_turn_blend = clamp(1.0 - (dist_to_target / ship.ai_close_turn_soft_radius), 0.0, 1.0)
 	var close_turn_factor: float = lerp(1.0, ship.ai_close_turn_scale, close_turn_blend)
-	desired_rudder *= close_turn_factor
-	var rudder_speed_adjusted: float = ship.ai_rudder_response_speed * ship.get_rudder_response_multiplier()
-	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
 
 	var leak_speed_mult: float = clamp(1.0 - (ship.leaking_rate * 0.05), 0.3, 1.0)
 	var desired_speed: float = ship.move_speed * leak_speed_mult * desired_speed_mult * ship.get_shiphandling_multiplier()
 	if emergency_guard:
 		desired_speed *= 1.08
-	ship._last_ai_speed = lerp(float(ship._last_ai_speed), desired_speed, delta * (ALLY_GUARD_SPEED_RESPONSE + (0.18 if emergency_guard else 0.0)))
+	var secondary_guard_target: Node3D = ship.target as Node3D if is_instance_valid(ship.target) else null
+	_apply_role_navigation_motion(
+		ship,
+		delta,
+		target_rotation_y,
+		desired_speed,
+		ALLY_GUARD_SPEED_RESPONSE + (0.18 if emergency_guard else 0.0),
+		1.35 if emergency_guard else 1.2,
+		ALLY_GUARD_ROWING_WIND_FLOOR,
+		close_turn_factor,
+		0.74 if emergency_guard else 0.62,
+		local_sep,
+		guard_target,
+		0.9,
+		secondary_guard_target,
+		0.86,
+		guard_target,
+		0.35
+	)
+	_draw_ally_limbo_debug(ship)
+
+
+static func _apply_role_navigation_motion(
+	ship,
+	delta: float,
+	target_rotation_y: float,
+	desired_speed: float,
+	speed_response: float,
+	accel_mult: float,
+	wind_floor: float,
+	close_turn_factor: float,
+	max_turn_rate_mult: float,
+	local_sep: Vector3,
+	primary_guard_target: Node3D,
+	primary_guard_ratio: float,
+	secondary_guard_target: Node3D = null,
+	secondary_guard_ratio: float = 0.0,
+	neighbor_guard_target: Node3D = null,
+	collision_repulsion_scale: float = 0.0,
+	record_support_trail: bool = false,
+	apply_leak_damage: bool = false
+) -> void:
+	var angle_diff: float = wrapf(target_rotation_y - ship.rotation.y, -PI, PI)
+	var desired_rudder: float = clamp(-rad_to_deg(angle_diff) * ship.ai_rudder_gain, -40.0, 40.0)
+	desired_rudder *= close_turn_factor
+	var rudder_speed_adjusted: float = ship.ai_rudder_response_speed * ship.get_rudder_response_multiplier()
+	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
+
+	ship._last_ai_speed = lerp(float(ship._last_ai_speed), desired_speed, delta * speed_response)
 	if ship._last_ai_speed > ship.current_speed:
-		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.acceleration * (1.35 if emergency_guard else 1.2) * delta)
+		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.acceleration * accel_mult * delta)
 	else:
 		ship.current_speed = move_toward(ship.current_speed, ship._last_ai_speed, ship.deceleration * delta)
 
-	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, ALLY_GUARD_ROWING_WIND_FLOOR) * ship.get_shiphandling_multiplier()
 	if ship.current_speed > 0.1:
 		var speed_ratio: float = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 		var turn_scale: float = ship.ai_turn_authority * close_turn_factor
 		var actual_turn: float = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_scale * delta
-		var max_turn_this_frame: float = ship.ai_max_turn_rate * (0.74 if emergency_guard else 0.62) * delta
+		var max_turn_this_frame: float = ship.ai_max_turn_rate * max_turn_rate_mult * delta
 		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
 		ship.rotation.y -= deg_to_rad(actual_turn)
 
+	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor) * ship.get_shiphandling_multiplier()
 	var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
 	var velocity: Vector3 = forward_vec * ship.current_speed * wind_mult
 	velocity += local_sep
-	velocity += ship._calculate_collision_repulsion() * 0.35 * delta
+	if collision_repulsion_scale > 0.0:
+		velocity += ship._calculate_collision_repulsion() * collision_repulsion_scale * delta
 
 	var prev_pos: Vector3 = ship.global_position
 	var next_pos: Vector3 = prev_pos + velocity * delta
-	next_pos = ship._apply_ship_collision_guard(guard_target, prev_pos, next_pos, 0.9, velocity.length(), false)
-	if is_instance_valid(ship.target):
-		next_pos = ship._apply_ship_collision_guard(ship.target, prev_pos, next_pos, 0.86, velocity.length(), false)
-	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, guard_target)
+	if is_instance_valid(primary_guard_target):
+		next_pos = ship._apply_ship_collision_guard(primary_guard_target, prev_pos, next_pos, primary_guard_ratio, velocity.length(), false)
+	if is_instance_valid(secondary_guard_target):
+		next_pos = ship._apply_ship_collision_guard(secondary_guard_target, prev_pos, next_pos, secondary_guard_ratio, velocity.length(), false)
+	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, neighbor_guard_target)
 	ship.global_position = next_pos
+	if record_support_trail:
+		_record_support_trail_point(ship)
 
 	ship._update_rudder_visual()
+	if apply_leak_damage and ship.leaking_rate > 0:
+		ship.take_damage(ship.leaking_rate * delta)
 	ship._apply_bobbing_effect()
 	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
-	_draw_ally_limbo_debug(ship)
 
 
 static func _get_support_assist_rowing_speed_multiplier(dist_to_target: float, emergency_assist: bool) -> float:
@@ -1323,7 +1577,7 @@ static func _get_support_assist_target(ship, player_ship: Node3D, delta: float) 
 		if pilot_screen_dist <= leash_distance:
 			_set_support_assist_target_lock(ship, limbo_target, lock_duration)
 			return limbo_target
-	var cached_target: Node3D = instance_from_id(locked_target_id) as Node3D if locked_target_id != 0 else null
+	var cached_target: Node3D = NodeContractHelper.get_instance_node3d(locked_target_id) if locked_target_id != 0 else null
 	if eval_timer > 0.0:
 		if is_instance_valid(cached_target) and not _is_ship_disabled(cached_target):
 			if cached_target == player_ship:
@@ -1525,7 +1779,7 @@ static func _get_recent_support_limbo_payload(ship) -> Dictionary:
 	var target_id := int(ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0))
 	var support_target: Node3D = null
 	if target_id != 0:
-		support_target = instance_from_id(target_id) as Node3D
+		support_target = NodeContractHelper.get_instance_node3d(target_id)
 	return {
 		"mode": str(ship.get_meta(ShipAILimboKeys.META_SUPPORT_MODE, "")).strip_edges(),
 		"target": support_target,
@@ -1546,7 +1800,7 @@ static func _get_recent_ally_limbo_payload(ship) -> Dictionary:
 	var target_id := int(ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
 	var ally_target: Node3D = null
 	if target_id != 0:
-		ally_target = instance_from_id(target_id) as Node3D
+		ally_target = NodeContractHelper.get_instance_node3d(target_id)
 	return {
 		"mode": str(ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, "")).strip_edges(),
 		"target": ally_target,

@@ -2,7 +2,7 @@ extends RefCounted
 class_name PlayerShipSupportSquadronHelper
 
 const MAENGSEON_HULL_SCENE = preload("res://scenes/ships/hulls/maengseon_hull.tscn")
-const PANOKSEON_HULL_SCENE = preload("res://scenes/ships/hulls/panok_hull.tscn")
+const PANOK_HULL_SCENE = preload("res://scenes/ships/hulls/panok_hull.tscn")
 const GEOBUKSEON_HULL_SCENE = preload("res://scenes/ships/hulls/geobukseon_hull.tscn")
 const JOSEON_CANNON_SCENE = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
 const SUPPORT_MAENGSEON_SCENE_PATH := "res://scenes/ships/support_maengseon_ship.tscn"
@@ -31,7 +31,7 @@ const SUPPORT_PROFILES := {
 		"ship_type": "panokseon_ally",
 		"role": "artillery_escort",
 		"ship_scene_path": SUPPORT_PANOKSEON_SCENE_PATH,
-		"hull_scene": PANOKSEON_HULL_SCENE,
+		"hull_scene": PANOK_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
 	},
 	PROFILE_GEOBUKSEON_GUARD: {
@@ -141,6 +141,10 @@ static func is_panokseon_squadron_unlocked(current_levels: Dictionary, upgrades:
 
 static func is_geobukseon_squadron_unlocked(current_levels: Dictionary, upgrades: Dictionary = {}) -> bool:
 	var unlock_id := get_geobukseon_unlock_upgrade_id(upgrades)
+	if upgrades.has(unlock_id):
+		var unlock_data: Dictionary = upgrades.get(unlock_id, {})
+		if unlock_data.get("disabled", false) == true:
+			return false
 	if unlock_id == DEFAULT_GEOBUKSEON_UNLOCK_UPGRADE_ID and int(current_levels.get("fleet_signal", 0)) <= 0:
 		return false
 	return int(current_levels.get(unlock_id, 0)) >= get_geobukseon_unlock_level(upgrades)

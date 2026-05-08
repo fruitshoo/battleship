@@ -347,8 +347,8 @@ func _schedule_muzzle_smoke_detach(smoke: Node, muzzle: Node3D, delay: float) ->
 
 
 func _detach_muzzle_smoke_to_world(smoke_id: int, muzzle_id: int) -> void:
-	var smoke := instance_from_id(smoke_id) as Node
-	var muzzle_node := instance_from_id(muzzle_id) as Node
+	var smoke := NodeContractHelper.get_instance_node(smoke_id)
+	var muzzle_node := NodeContractHelper.get_instance_node(muzzle_id)
 	var tree := get_tree()
 	if not is_instance_valid(smoke) or not is_instance_valid(muzzle_node) or not is_instance_valid(tree):
 		return

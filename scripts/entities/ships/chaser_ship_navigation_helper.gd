@@ -13,6 +13,10 @@ const META_BOSS_ESCORT_HOLD_RADIUS := "boss_escort_hold_radius"
 const META_BOSS_ESCORT_BREAK_RADIUS := "boss_escort_break_radius"
 const BOSS_ESCORT_SLOT_TOLERANCE := 7.0
 const BOSS_ESCORT_MELEE_ENGAGE_RANGE := 13.5
+const BOARDING_QUEUE_START_DISTANCE := 22.0
+const BOARDING_QUEUE_RELEASE_DISTANCE := 8.2
+const BOARDING_QUEUE_SIDE_DISTANCE := 9.5
+const BOARDING_QUEUE_BACK_DISTANCE := 13.0
 
 static func _is_true(value: Variant) -> bool:
 	return value == true
@@ -154,8 +158,8 @@ static func _boss_escort_flagship(ship) -> Node3D:
 	if not is_instance_valid(ship) or not ship.has_meta(META_BOSS_ESCORT_TARGET_ID):
 		return null
 	var flagship_id := int(ship.get_meta(META_BOSS_ESCORT_TARGET_ID, 0))
-	var flagship := instance_from_id(flagship_id)
-	if flagship is Node3D and is_instance_valid(flagship) and not _is_sinking_or_dying(flagship) and _team_tag(flagship) == _team_tag(ship):
+	var flagship := NodeContractHelper.get_instance_node3d(flagship_id)
+	if is_instance_valid(flagship) and not _is_sinking_or_dying(flagship) and _team_tag(flagship) == _team_tag(ship):
 		return flagship
 	ship.remove_meta(META_BOSS_ESCORT_TARGET_ID)
 	return null
@@ -389,6 +393,215 @@ static func _has_closer_allied_attacker(ship, target_node: Node3D, dist_to_targe
 	return false
 
 
+static func _get_queue_side_sign(ship) -> float:
+	var seed_value: int = abs(hash("%s:%s" % [str(ship.get_instance_id()), str(ship.get("ship_type"))]))
+	return 1.0 if seed_value % 2 == 0 else -1.0
+
+
+static func _build_boarding_queue_navigation(ship, target_node: Node3D, target_pos: Vector3, dist_to_target: float, dir_to_target: Vector3, movement_mode: String) -> Dictionary:
+	var target_forward := _flat_forward(target_node)
+	var target_right := target_forward.cross(Vector3.UP)
+	if target_right.length_squared() <= 0.001:
+		target_right = Vector3(dir_to_target.z, 0.0, -dir_to_target.x)
+	target_right = target_right.normalized()
+
+	var side_sign := _get_queue_side_sign(ship)
+	var queue_pos: Vector3 = target_pos - target_forward * BOARDING_QUEUE_BACK_DISTANCE + target_right * side_sign * BOARDING_QUEUE_SIDE_DISTANCE
+	queue_pos.y = ship.global_position.y
+	var queue_dist: float = ship.global_position.distance_to(queue_pos)
+	var heading_point: Vector3 = queue_pos if queue_dist > 3.5 else target_pos
+	var speed_mult: float = 0.76 if queue_dist > 4.0 else 0.22
+	if dist_to_target <= BOARDING_QUEUE_RELEASE_DISTANCE:
+		speed_mult = minf(speed_mult, 0.18)
+	return _build_authoring_movement_intent(
+		ship,
+		target_pos,
+		queue_pos,
+		heading_point,
+		dist_to_target,
+		speed_mult,
+		false,
+		dir_to_target,
+		movement_mode if not movement_mode.is_empty() else "boarding_queue"
+	)
+
+
+static func _should_queue_boarding_approach(ship, target_node: Node3D, dist_to_target: float, target_deck_contested: bool, target_deck_overrun: bool) -> bool:
+	return (
+		not _is_gunner(ship)
+		and _can_board(ship)
+		and dist_to_target <= BOARDING_QUEUE_START_DISTANCE
+		and dist_to_target > BOARDING_QUEUE_RELEASE_DISTANCE
+		and not target_deck_contested
+		and not target_deck_overrun
+		and _has_closer_allied_attacker(ship, target_node, dist_to_target)
+	)
+
+
+static func _build_overrun_yield_navigation(ship, target_pos: Vector3, dist_to_target: float, dir_to_target: Vector3, movement_mode: String) -> Dictionary:
+	var standoff_distance: float = maxf(ship.max_boarding_distance + 3.5, 12.0)
+	var desired_point: Vector3 = target_pos - dir_to_target * standoff_distance
+	var heading_point: Vector3 = target_pos
+	var desired_speed_mult := 0.42 if dist_to_target > standoff_distance + 1.5 else 0.16
+	return _build_authoring_movement_intent(
+		ship,
+		target_pos,
+		desired_point,
+		heading_point,
+		dist_to_target,
+		desired_speed_mult,
+		false,
+		dir_to_target,
+		movement_mode if not movement_mode.is_empty() else "yield_overrun"
+	)
+
+
+static func _build_gunner_navigation(ship, target_pos: Vector3, dist_to_target: float, dir_to_target: Vector3, movement_mode: String) -> Dictionary:
+	var desired_point: Vector3 = target_pos
+	var heading_point: Vector3 = target_pos
+	var desired_speed_mult := 1.0
+	var resolved_mode := movement_mode
+	if resolved_mode.is_empty():
+		resolved_mode = "gunner_standoff"
+	var preferred_range: float = _preferred_range(ship)
+	var tolerance: float = _range_tolerance(ship)
+	var retreat_range: float = _retreat_range(ship)
+	if dist_to_target > preferred_range + tolerance:
+		desired_point = target_pos - dir_to_target * preferred_range
+		desired_speed_mult = 0.95
+	elif dist_to_target < retreat_range:
+		desired_point = ship.global_position - dir_to_target * max(retreat_range - dist_to_target + 4.0, 4.0)
+		heading_point = desired_point
+		desired_speed_mult = 0.9
+	else:
+		desired_point = ship.global_position
+		heading_point = target_pos
+		desired_speed_mult = 0.18
+	return ShipMovementIntent.build(
+		target_pos,
+		desired_point,
+		heading_point,
+		dist_to_target,
+		desired_speed_mult,
+		false,
+		dir_to_target,
+		resolved_mode
+	)
+
+
+static func _build_boarding_navigation(ship, target_node: Node3D, target_pos: Vector3, dist_to_target: float, dir_to_target: Vector3, movement_mode: String, target_deck_contested: bool, target_deck_overrun: bool) -> Dictionary:
+	var desired_point: Vector3 = target_pos
+	var heading_point: Vector3 = target_pos
+	var desired_speed_mult := 1.0
+	var permit_sprint := true
+	var target_forward: Vector3 = - target_node.global_transform.basis.z
+	target_forward.y = 0.0
+	if target_forward.length_squared() <= 0.001:
+		return ShipMovementIntent.build(target_pos, desired_point, heading_point, dist_to_target, desired_speed_mult, permit_sprint, dir_to_target, movement_mode)
+
+	target_forward = target_forward.normalized()
+	var target_right: Vector3 = target_forward.cross(Vector3.UP).normalized()
+	var rel_vector: Vector3 = ship.global_position - target_pos
+	rel_vector.y = 0.0
+	var rel_forward: float = rel_vector.dot(target_forward)
+	var rel_side: float = rel_vector.dot(target_right)
+	var approach_mode: String = _classify_boarding_approach_smoothed(ship, rel_forward, rel_side)
+	var collision_dist: float = ship.get_collision_distance_to(target_node)
+	var bow_sector_approach: bool = _is_bow_sector_approach(rel_forward, rel_side, collision_dist)
+	if bow_sector_approach and approach_mode == ShipBoardingMetaHelper.APPROACH_SIDE:
+		approach_mode = ShipBoardingMetaHelper.APPROACH_FRONT
+	ShipBoardingMetaHelper.set_approach_mode(ship, approach_mode)
+	var post_impact_follow_timer: float = ShipBoardingMetaHelper.get_post_impact_follow_timer(ship)
+	var current_side_sign: float = ShipBoardingMetaHelper.get_side_sign(ship)
+	var side_alignment_locked := false
+	if not bow_sector_approach and post_impact_follow_timer <= 0.0 and absf(current_side_sign) > 0.5:
+		if absf(rel_side) >= collision_dist * 0.30 and absf(rel_forward) <= 10.0:
+			approach_mode = ShipBoardingMetaHelper.APPROACH_SIDE
+			ShipBoardingMetaHelper.set_approach_mode(ship, approach_mode)
+	if not bow_sector_approach and ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_node) == true:
+		if dist_to_target <= ship.boarding_break_distance - 0.4:
+			var refreshed_timer: float = maxf(post_impact_follow_timer, 2.0)
+			ShipBoardingMetaHelper.set_post_impact_follow_timer(ship, refreshed_timer)
+			post_impact_follow_timer = refreshed_timer
+			side_alignment_locked = true
+
+	if target_deck_contested and not bow_sector_approach and approach_mode != ShipBoardingMetaHelper.APPROACH_REAR and dist_to_target <= ship.max_boarding_distance + 2.0:
+		approach_mode = ShipBoardingMetaHelper.APPROACH_SIDE
+		ShipBoardingMetaHelper.set_approach_mode(ship, approach_mode)
+		side_alignment_locked = true
+		post_impact_follow_timer = maxf(post_impact_follow_timer, 1.6)
+		ShipBoardingMetaHelper.set_post_impact_follow_timer(ship, post_impact_follow_timer)
+
+	if post_impact_follow_timer > 0.0 and not bow_sector_approach:
+		var follow_nav: Dictionary = ShipBoardingNavigationHelper.build_side_follow(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, true)
+		desired_point = ShipMovementIntent.get_desired_point(follow_nav, desired_point)
+		heading_point = ShipMovementIntent.get_heading_point(follow_nav, heading_point)
+		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(follow_nav, desired_speed_mult)
+		permit_sprint = ShipMovementIntent.get_permit_sprint(follow_nav, permit_sprint)
+		movement_mode = _navigation_mode(follow_nav, movement_mode)
+	elif approach_mode == ShipBoardingMetaHelper.APPROACH_SIDE and dist_to_target <= ship.max_boarding_distance + 1.35:
+		var settle_nav: Dictionary = ShipBoardingNavigationHelper.build_contact_settle(ship, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target)
+		desired_point = ShipMovementIntent.get_desired_point(settle_nav, desired_point)
+		heading_point = ShipMovementIntent.get_heading_point(settle_nav, heading_point)
+		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(settle_nav, desired_speed_mult)
+		permit_sprint = ShipMovementIntent.get_permit_sprint(settle_nav, permit_sprint)
+		movement_mode = _navigation_mode(settle_nav, movement_mode)
+	elif approach_mode == ShipBoardingMetaHelper.APPROACH_REAR:
+		if dist_to_target <= ship.max_boarding_distance + 6.0:
+			var rear_recovery_nav: Dictionary = ShipBoardingNavigationHelper.build_rear_recovery(ship, target_node, target_pos, target_forward, target_right, rel_side, collision_dist, dist_to_target)
+			desired_point = ShipMovementIntent.get_desired_point(rear_recovery_nav, desired_point)
+			heading_point = ShipMovementIntent.get_heading_point(rear_recovery_nav, heading_point)
+			desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(rear_recovery_nav, desired_speed_mult)
+			permit_sprint = ShipMovementIntent.get_permit_sprint(rear_recovery_nav, permit_sprint)
+			movement_mode = _navigation_mode(rear_recovery_nav, movement_mode)
+		else:
+			var slot: Dictionary = _choose_boarding_slot(ship, target_node, target_pos, target_forward, target_right)
+			if not slot.is_empty():
+				ShipBoardingMetaHelper.set_slot_id(ship, ShipBoardingSlot.get_id(slot))
+				ShipBoardingMetaHelper.set_side_sign(ship, ShipBoardingSlot.get_side_sign(slot))
+				desired_point = ShipBoardingSlot.get_point(slot, desired_point)
+				heading_point = ShipBoardingSlot.get_heading(slot, heading_point)
+			desired_speed_mult = 1.04 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.94
+			permit_sprint = dist_to_target > 7.0
+	elif approach_mode == ShipBoardingMetaHelper.APPROACH_SIDE:
+		var side_nav: Dictionary = ShipBoardingNavigationHelper.build_side_follow(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, side_alignment_locked)
+		desired_point = ShipMovementIntent.get_desired_point(side_nav, desired_point)
+		heading_point = ShipMovementIntent.get_heading_point(side_nav, heading_point)
+		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(side_nav, desired_speed_mult)
+		permit_sprint = ShipMovementIntent.get_permit_sprint(side_nav, permit_sprint)
+		movement_mode = _navigation_mode(side_nav, movement_mode)
+	else:
+		var front_impact_offset: float = clampf(collision_dist * 0.55, 3.0, 5.0)
+		ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_SLOT_ID)
+		ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_SIDE_SIGN)
+		desired_point = target_pos + target_forward * front_impact_offset
+		heading_point = desired_point
+		desired_speed_mult = 1.0
+		permit_sprint = dist_to_target > 9.0
+
+	if target_deck_contested:
+		desired_speed_mult = minf(desired_speed_mult, 0.72 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.58)
+		permit_sprint = false
+	elif target_deck_overrun:
+		desired_speed_mult = minf(desired_speed_mult, 0.78)
+		permit_sprint = false
+	elif dist_to_target <= ship.max_boarding_distance + 3.0:
+		var final_approach_blend: float = clampf((ship.max_boarding_distance + 3.0 - dist_to_target) / 3.0, 0.0, 1.0)
+		desired_speed_mult = minf(desired_speed_mult, lerpf(0.88, 0.62, final_approach_blend))
+		permit_sprint = false
+
+	return ShipMovementIntent.build(
+		target_pos,
+		desired_point,
+		heading_point,
+		dist_to_target,
+		desired_speed_mult,
+		permit_sprint,
+		dir_to_target,
+		movement_mode
+	)
+
+
 static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	var target_pos: Vector3 = target_node.global_position
 	var dist_to_target: float = ship.global_position.distance_to(target_pos)
@@ -418,136 +631,26 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	if not boss_escort_nav.is_empty():
 		return boss_escort_nav
 
+	if _should_queue_boarding_approach(ship, target_node, dist_to_target, target_deck_contested, target_deck_overrun):
+		return _build_boarding_queue_navigation(ship, target_node, target_pos, dist_to_target, dir_to_target, movement_mode)
+
 	if yield_overrun_target:
-		var standoff_distance: float = maxf(ship.max_boarding_distance + 3.5, 12.0)
-		desired_point = target_pos - dir_to_target * standoff_distance
-		heading_point = target_pos
-		desired_speed_mult = 0.42 if dist_to_target > standoff_distance + 1.5 else 0.16
-		permit_sprint = false
-		return _build_authoring_movement_intent(
-			ship,
-			target_pos,
-			desired_point,
-			heading_point,
-			dist_to_target,
-			desired_speed_mult,
-			permit_sprint,
-			dir_to_target,
-			movement_mode if not movement_mode.is_empty() else "yield_overrun"
-		)
+		return _build_overrun_yield_navigation(ship, target_pos, dist_to_target, dir_to_target, movement_mode)
 
 	if _is_gunner(ship):
-		if movement_mode.is_empty():
-			movement_mode = "gunner_standoff"
-		permit_sprint = false
-		var preferred_range: float = _preferred_range(ship)
-		var tolerance: float = _range_tolerance(ship)
-		var retreat_range: float = _retreat_range(ship)
-		if dist_to_target > preferred_range + tolerance:
-			desired_point = target_pos - dir_to_target * preferred_range
-			desired_speed_mult = 0.95
-		elif dist_to_target < retreat_range:
-			desired_point = ship.global_position - dir_to_target * max(retreat_range - dist_to_target + 4.0, 4.0)
-			heading_point = desired_point
-			desired_speed_mult = 0.9
-		else:
-			desired_point = ship.global_position
-			heading_point = target_pos
-			desired_speed_mult = 0.18
+		var gunner_nav: Dictionary = _build_gunner_navigation(ship, target_pos, dist_to_target, dir_to_target, movement_mode)
+		desired_point = ShipMovementIntent.get_desired_point(gunner_nav, desired_point)
+		heading_point = ShipMovementIntent.get_heading_point(gunner_nav, heading_point)
+		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(gunner_nav, desired_speed_mult)
+		permit_sprint = ShipMovementIntent.get_permit_sprint(gunner_nav, permit_sprint)
+		movement_mode = _navigation_mode(gunner_nav, movement_mode)
 	elif _can_board(ship) and dist_to_target < 18.0:
-		var target_forward: Vector3 = - target_node.global_transform.basis.z
-		target_forward.y = 0.0
-		if target_forward.length_squared() > 0.001:
-			target_forward = target_forward.normalized()
-			var target_right: Vector3 = target_forward.cross(Vector3.UP).normalized()
-			var rel_vector: Vector3 = ship.global_position - target_pos
-			rel_vector.y = 0.0
-			var rel_forward: float = rel_vector.dot(target_forward)
-			var rel_side: float = rel_vector.dot(target_right)
-			var approach_mode: String = _classify_boarding_approach_smoothed(ship, rel_forward, rel_side)
-			var collision_dist: float = ship.get_collision_distance_to(target_node)
-			var bow_sector_approach: bool = _is_bow_sector_approach(rel_forward, rel_side, collision_dist)
-			if bow_sector_approach and approach_mode == ShipBoardingMetaHelper.APPROACH_SIDE:
-				approach_mode = ShipBoardingMetaHelper.APPROACH_FRONT
-			ShipBoardingMetaHelper.set_approach_mode(ship, approach_mode)
-			var post_impact_follow_timer: float = ShipBoardingMetaHelper.get_post_impact_follow_timer(ship)
-			var current_side_sign: float = ShipBoardingMetaHelper.get_side_sign(ship)
-			var side_alignment_locked: bool = false
-			if not bow_sector_approach and post_impact_follow_timer <= 0.0 and absf(current_side_sign) > 0.5:
-				if absf(rel_side) >= collision_dist * 0.30 and absf(rel_forward) <= 10.0:
-					approach_mode = ShipBoardingMetaHelper.APPROACH_SIDE
-					ShipBoardingMetaHelper.set_approach_mode(ship, approach_mode)
-			if not bow_sector_approach and ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", target_node) == true:
-				if dist_to_target <= ship.boarding_break_distance - 0.4:
-					var refreshed_timer: float = maxf(post_impact_follow_timer, 2.0)
-					ShipBoardingMetaHelper.set_post_impact_follow_timer(ship, refreshed_timer)
-					post_impact_follow_timer = refreshed_timer
-					side_alignment_locked = true
-
-			if target_deck_contested and not bow_sector_approach and approach_mode != ShipBoardingMetaHelper.APPROACH_REAR and dist_to_target <= ship.max_boarding_distance + 2.0:
-				approach_mode = ShipBoardingMetaHelper.APPROACH_SIDE
-				ShipBoardingMetaHelper.set_approach_mode(ship, approach_mode)
-				side_alignment_locked = true
-				post_impact_follow_timer = maxf(post_impact_follow_timer, 1.6)
-				ShipBoardingMetaHelper.set_post_impact_follow_timer(ship, post_impact_follow_timer)
-
-			if post_impact_follow_timer > 0.0 and not bow_sector_approach:
-				var follow_nav: Dictionary = ShipBoardingNavigationHelper.build_side_follow(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, true)
-				desired_point = ShipMovementIntent.get_desired_point(follow_nav, desired_point)
-				heading_point = ShipMovementIntent.get_heading_point(follow_nav, heading_point)
-				desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(follow_nav, desired_speed_mult)
-				permit_sprint = ShipMovementIntent.get_permit_sprint(follow_nav, permit_sprint)
-				movement_mode = _navigation_mode(follow_nav, movement_mode)
-			elif approach_mode == ShipBoardingMetaHelper.APPROACH_SIDE and dist_to_target <= ship.max_boarding_distance + 1.35:
-				var settle_nav: Dictionary = ShipBoardingNavigationHelper.build_contact_settle(ship, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target)
-				desired_point = ShipMovementIntent.get_desired_point(settle_nav, desired_point)
-				heading_point = ShipMovementIntent.get_heading_point(settle_nav, heading_point)
-				desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(settle_nav, desired_speed_mult)
-				permit_sprint = ShipMovementIntent.get_permit_sprint(settle_nav, permit_sprint)
-				movement_mode = _navigation_mode(settle_nav, movement_mode)
-			elif approach_mode == ShipBoardingMetaHelper.APPROACH_REAR:
-				if dist_to_target <= ship.max_boarding_distance + 6.0:
-					var rear_recovery_nav: Dictionary = ShipBoardingNavigationHelper.build_rear_recovery(ship, target_node, target_pos, target_forward, target_right, rel_side, collision_dist, dist_to_target)
-					desired_point = ShipMovementIntent.get_desired_point(rear_recovery_nav, desired_point)
-					heading_point = ShipMovementIntent.get_heading_point(rear_recovery_nav, heading_point)
-					desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(rear_recovery_nav, desired_speed_mult)
-					permit_sprint = ShipMovementIntent.get_permit_sprint(rear_recovery_nav, permit_sprint)
-					movement_mode = _navigation_mode(rear_recovery_nav, movement_mode)
-				else:
-					var slot: Dictionary = _choose_boarding_slot(ship, target_node, target_pos, target_forward, target_right)
-					if not slot.is_empty():
-						ShipBoardingMetaHelper.set_slot_id(ship, ShipBoardingSlot.get_id(slot))
-						ShipBoardingMetaHelper.set_side_sign(ship, ShipBoardingSlot.get_side_sign(slot))
-						desired_point = ShipBoardingSlot.get_point(slot, desired_point)
-						heading_point = ShipBoardingSlot.get_heading(slot, heading_point)
-					desired_speed_mult = 1.04 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.94
-					permit_sprint = dist_to_target > 7.0
-			elif approach_mode == ShipBoardingMetaHelper.APPROACH_SIDE:
-				var side_nav: Dictionary = ShipBoardingNavigationHelper.build_side_follow(ship, target_node, target_pos, target_forward, target_right, rel_forward, rel_side, collision_dist, dist_to_target, side_alignment_locked)
-				desired_point = ShipMovementIntent.get_desired_point(side_nav, desired_point)
-				heading_point = ShipMovementIntent.get_heading_point(side_nav, heading_point)
-				desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(side_nav, desired_speed_mult)
-				permit_sprint = ShipMovementIntent.get_permit_sprint(side_nav, permit_sprint)
-				movement_mode = _navigation_mode(side_nav, movement_mode)
-			else:
-				var front_impact_offset: float = clampf(collision_dist * 0.55, 3.0, 5.0)
-				ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_SLOT_ID)
-				ShipBoardingMetaHelper.remove_meta_key(ship, ShipBoardingMetaHelper.KEY_SIDE_SIGN)
-				desired_point = target_pos + target_forward * front_impact_offset
-				heading_point = desired_point
-				desired_speed_mult = 1.0
-				permit_sprint = dist_to_target > 9.0
-
-			if target_deck_contested:
-				desired_speed_mult = minf(desired_speed_mult, 0.72 if dist_to_target > ship.max_boarding_distance + 1.0 else 0.58)
-				permit_sprint = false
-			elif target_deck_overrun:
-				desired_speed_mult = minf(desired_speed_mult, 0.78)
-				permit_sprint = false
-			elif dist_to_target <= ship.max_boarding_distance + 3.0:
-				var final_approach_blend: float = clampf((ship.max_boarding_distance + 3.0 - dist_to_target) / 3.0, 0.0, 1.0)
-				desired_speed_mult = minf(desired_speed_mult, lerpf(0.88, 0.62, final_approach_blend))
-				permit_sprint = false
+		var boarding_nav: Dictionary = _build_boarding_navigation(ship, target_node, target_pos, dist_to_target, dir_to_target, movement_mode, target_deck_contested, target_deck_overrun)
+		desired_point = ShipMovementIntent.get_desired_point(boarding_nav, desired_point)
+		heading_point = ShipMovementIntent.get_heading_point(boarding_nav, heading_point)
+		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(boarding_nav, desired_speed_mult)
+		permit_sprint = ShipMovementIntent.get_permit_sprint(boarding_nav, permit_sprint)
+		movement_mode = _navigation_mode(boarding_nav, movement_mode)
 	else:
 		ShipBoardingMetaHelper.clear_navigation_meta(ship)
 

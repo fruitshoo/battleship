@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://drghps4ko8fnl"
-path="res://.godot/imported/ship_11_hull.glb-2fd996b936a396f45c67c6c17a610f3a.scn"
+uid="uid://cgoa735tg2m3p"
+path="res://.godot/imported/seki.glb-77952e1992f4d85a4119e8f06a47ed43.scn"
 
 [deps]
 
-source_file="res://assets/models/ships/mangseon/ship_11_hull.glb"
-dest_files=["res://.godot/imported/ship_11_hull.glb-2fd996b936a396f45c67c6c17a610f3a.scn"]
+source_file="res://assets/models/ships/seki/seki.glb"
+dest_files=["res://.godot/imported/seki.glb-77952e1992f4d85a4119e8f06a47ed43.scn"]
 
 [params]
 

@@ -52,6 +52,7 @@ func _spawn_scenario(label_text: String, anchor: Vector3, player: Node3D, distan
 
 	add_child(enemy)
 	enemy.set_meta("firepot_preview_spawn", true)
+	PreviewHarnessHelper.unlock_preview_enemy_fire_pot(enemy)
 
 	var direction := (anchor - player.global_position).normalized()
 	if direction.length_squared() <= 0.001:

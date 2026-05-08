@@ -9,6 +9,7 @@ const SUPPORT_FLEET_PROFILE_META := "support_fleet_profile"
 const SUPPORT_FLEET_ROLE_META := "support_fleet_role"
 const SUPPORT_FLEET_SQUADRON_META := "support_squadron_id"
 const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
+const SUPPORT_JOIN_STAGE_META := "support_join_stage"
 const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 const SITE_BONUS_COUNTS_META := "sea_site_bonus_counts"
 
@@ -32,7 +33,7 @@ static func spawn_or_repair_ally(ship) -> void:
 			_copy_site_bonuses_from_flagship(ship, support_ship)
 			if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
 				upgrade_manager.apply_fleet_upgrades_to_ship(support_ship)
-		print("[Merit] 기존 지원 함대를 수리 및 강화했습니다.")
+		print("[Support] 기존 지원 함대를 수리 및 강화했습니다.")
 		if support_ships.size() >= ship.support_fleet_limit:
 			return
 
@@ -153,6 +154,7 @@ static func refresh_support_fleet_composition(ship) -> void:
 			and support_ship.get("is_boarding") != true
 		):
 			support_ship.set_meta("support_joining", true)
+			support_ship.set_meta(SUPPORT_JOIN_STAGE_META, 0)
 		if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
 			_copy_site_bonuses_from_flagship(ship, support_ship)
 			upgrade_manager.apply_fleet_upgrades_to_ship(support_ship)
@@ -191,9 +193,12 @@ static func _configure_support_ship_instance(ally, flagship, support_profile: Di
 		ally.team = "player"
 	ally.set_meta("support_joining", joining_support)
 	if joining_support:
+		ally.set_meta(SUPPORT_JOIN_STAGE_META, 0)
 		ally.set_meta("defer_initial_crew_setup", true)
 	elif ally.has_meta("defer_initial_crew_setup"):
 		ally.remove_meta("defer_initial_crew_setup")
+		if ally.has_meta(SUPPORT_JOIN_STAGE_META):
+			ally.remove_meta(SUPPORT_JOIN_STAGE_META)
 	ShipAllyRoleHelper.mark_support_ship(ally)
 	SupportFleetStateHelper.assign_support_ship_to_flagship(ally, flagship)
 	_apply_support_profile_meta(ally, support_profile, support_slot, support_order)

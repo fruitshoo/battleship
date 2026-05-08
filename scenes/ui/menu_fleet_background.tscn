@@ -3,7 +3,7 @@
 [ext_resource type="Environment" uid="uid://bav5yq84kal1w" path="res://resources/environment/world_environment_clear_day.tres" id="1_env"]
 [ext_resource type="Script" uid="uid://uyb0udqof1sj" path="res://scripts/ui/menus/menu_fleet_background.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="2_ocean"]
-[ext_resource type="PackedScene" uid="uid://cnr7kfcyhyssw" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="3_panokseon"]
+[ext_resource type="PackedScene" uid="uid://c7ydiawbfnx6r" path="res://scenes/ships/hulls/panok_hull.tscn" id="3_panokseon"]
 [ext_resource type="PackedScene" uid="uid://o87wm0hgwlmn" path="res://scenes/ships/hulls/maengseon_hull.tscn" id="4_maengseon"]
 [ext_resource type="PackedScene" path="res://scenes/props/ship_decor_flags/standard_flag.tscn" id="5_flagship_flag"]
 [ext_resource type="PackedScene" path="res://scenes/props/ship_decor_flags/standard_flag.tscn" id="6_support_flag"]

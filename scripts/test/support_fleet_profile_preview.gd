@@ -19,6 +19,7 @@ const FLEET_UPGRADES := {
 		},
 	},
 	"geobukseon_upgrade": {
+		"disabled": true,
 		"stats": {
 			"geobukseon_upgrade_id": "geobukseon_upgrade",
 			"geobukseon_level": 1,
@@ -84,12 +85,12 @@ func _assert_profile_resolution() -> void:
 	_assert_equal("unlocked_slot1_role", unlocked_profile.get("slot_role", ""), "artillery_lead")
 
 	var geobuk_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "geobukseon_upgrade": 1}, FLEET_UPGRADES, 1)
-	_assert_equal("geobuk_slot1_profile", geobuk_profile.get("ship_type", ""), "geobukseon_ally")
-	_assert_equal("geobuk_slot1_squadron", geobuk_profile.get("squadron_id", ""), "geobukseon_guard")
-	_assert_equal("geobuk_slot1_role", geobuk_profile.get("slot_role", ""), "armored_guard")
+	_assert_equal("disabled_geobuk_slot1_profile", geobuk_profile.get("ship_type", ""), "maengseon_ally")
+	_assert_equal("disabled_geobuk_slot1_squadron", geobuk_profile.get("squadron_id", ""), "flagship_screen")
+	_assert_equal("disabled_geobuk_slot1_role", geobuk_profile.get("slot_role", ""), "screen_flank")
 
 	var mixed_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1, "geobukseon_upgrade": 1}, FLEET_UPGRADES, 2)
-	_assert_equal("mixed_slot2_profile", mixed_profile.get("ship_type", ""), "geobukseon_ally")
+	_assert_equal("mixed_slot2_profile", mixed_profile.get("ship_type", ""), "maengseon_ally")
 
 	var legacy_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_hull": 5}, LEGACY_FLEET_HULL_UPGRADES, 0)
 	_assert_equal("legacy_hull_unlock_slot0_profile", legacy_profile.get("ship_type", ""), "maengseon_ally")
@@ -188,7 +189,7 @@ func _add_preview_labels() -> void:
 		anchor = player.global_position + Vector3(0.0, 8.0, 0.0)
 	var label := PreviewHarnessHelper.add_billboard_label(
 		self,
-		"Support squadron slots\nMaengseon screen + added Panokseon artillery",
+		"Support squadron slots\nMaengseon screen + Panokseon artillery\nGeobukseon disabled fallback",
 		anchor,
 		Color(0.58, 0.9, 1.0, 1.0),
 		32

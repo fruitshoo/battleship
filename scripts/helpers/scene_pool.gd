@@ -67,14 +67,14 @@ static func release(node: Node) -> void:
 	)
 
 static func release_by_instance_id(node_id: int) -> void:
-	var node := instance_from_id(node_id) as Node
+	var node := NodeContractHelper.get_instance_node(node_id)
 	if not is_instance_valid(node):
 		return
 	release(node)
 
 static func _finish_release_deferred(node_id: int, pool_root_id: int, key: String, capacity: int) -> void:
-	var node := instance_from_id(node_id) as Node
-	var pool_root := instance_from_id(pool_root_id) as Node
+	var node := NodeContractHelper.get_instance_node(node_id)
+	var pool_root := NodeContractHelper.get_instance_node(pool_root_id)
 	if not is_instance_valid(node) or not is_instance_valid(pool_root):
 		return
 	node.set_meta(PENDING_RELEASE_META, false)

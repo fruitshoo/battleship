@@ -130,7 +130,7 @@ var _ai_separation_update_interval_runtime: float = 0.12
 
 # 도선 로직 변수 (base_ship.gd에서 상속)
 var has_rammed: bool = false # 중복 데미지 방지
-var _merit_granted: bool = false # 공적 중복 획득 방지
+var _bonus_xp_granted: bool = false
 
 func get_radius() -> float:
 	return 2.5 # 대략적인 선체 반경 (상황에 맞게 조정)
@@ -532,10 +532,9 @@ func die() -> void:
 		if not was_derelict_disposal and cached_lm.has_method("add_score"):
 			cached_lm.add_score(25)
 			
-		# 공적 포인트(Merit) 추가 (격침 시에도 부여, 중복 방지)
-		if not was_derelict_disposal and not _merit_granted and cached_lm.has_method("add_merit"):
-			cached_lm.add_merit(20)
-			_merit_granted = true
+		if not was_derelict_disposal and not _bonus_xp_granted and cached_lm.has_method("add_bonus_xp"):
+			cached_lm.add_bonus_xp(20)
+			_bonus_xp_granted = true
 	
 		# 물리 및 충돌 비활성화 (Area3D 대응)
 		set_deferred("monitoring", false)
@@ -803,13 +802,13 @@ func capture_ship() -> void:
 	if is_instance_valid(cached_lm):
 		var capture_score_reward: int = max(0, int(cached_lm.get("boarding_capture_score_reward")))
 		var capture_xp_reward: int = max(0, int(cached_lm.get("boarding_capture_xp_reward")))
-		var capture_merit_reward: int = max(0, int(cached_lm.get("boarding_capture_merit_reward")))
+		var capture_bonus_xp_reward: int = max(0, int(cached_lm.get("boarding_capture_bonus_xp_reward")))
 		if capture_score_reward > 0 and cached_lm.has_method("add_score"):
 			cached_lm.add_score(capture_score_reward)
 		if capture_xp_reward > 0 and cached_lm.has_method("add_xp"):
 			cached_lm.add_xp(capture_xp_reward)
-		if capture_merit_reward > 0 and cached_lm.has_method("add_merit"):
-			cached_lm.add_merit(capture_merit_reward)
+		if capture_bonus_xp_reward > 0 and cached_lm.has_method("add_bonus_xp"):
+			cached_lm.add_bonus_xp(capture_bonus_xp_reward)
 	
 	if is_instance_valid(cached_lm) and cached_lm.has_method("show_message"):
 		cached_lm.show_message("적군 함선을 나포했습니다!", 3.0)
@@ -1050,7 +1049,7 @@ func _counts_as_minion_roster_soldier_node(soldier: Node) -> bool:
 	return ChaserSoldierStateHelper.is_alive_soldier(soldier) or ChaserSoldierStateHelper.is_incapacitated_soldier(soldier)
 
 
-## 함선 수리 (초요기/공적 보너스)
+## 함선 수리 (초요기 보너스)
 func repair_ship(percent: float) -> void:
 	var amt = max_hull_hp * percent
 	hull_hp = minf(hull_hp + amt, max_hull_hp)
@@ -1139,55 +1138,39 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node != boarding_target:
 		boarding_target = ship_node
 
-	# 2. 도선 상태 진입 (조건부)
-	var my_crew = get_alive_crew_count()
-	var enemy_crew = 0
-	if ship_node.has_method("get_alive_crew_count"):
-		enemy_crew = ship_node.get_alive_crew_count()
-		
 	var active_latch_mode: String = _get_active_boarding_latch_mode(ship_node)
-	var contact_defenders: int = _count_boarding_contact_defenders(ship_node)
-	set_meta("boarding_local_defenders_at_contact", contact_defenders)
-	var remote_defenders_engaged: bool = _has_remote_engaged_boarding_defenders(ship_node)
-	set_meta("boarding_remote_defenders_engaged", remote_defenders_engaged)
-	var contact_allows_boarding: bool = remote_defenders_engaged and (contact_defenders <= 0 or my_crew > contact_defenders)
-	var latch_allows_boarding: bool = not active_latch_mode.is_empty() and (active_latch_mode != ShipBoardingMetaHelper.CONTACT_SIDE or contact_allows_boarding)
-	if my_crew > enemy_crew or can_head_on_board or can_cleanup_board or (can_side_board and contact_allows_boarding) or latch_allows_boarding:
-		is_boarding = true
-		boarding_target = ship_node
-		if can_side_board:
-			ShipBoardingMetaHelper.set_contact_mode(self, ShipBoardingMetaHelper.CONTACT_SIDE)
-		elif can_head_on_board:
-			ShipBoardingMetaHelper.set_contact_mode(self, ShipBoardingMetaHelper.CONTACT_HEAD_ON)
-		else:
-			var contact_mode: String = ShipBoardingMetaHelper.CONTACT_CLEANUP if active_latch_mode.is_empty() else active_latch_mode
-			ShipBoardingMetaHelper.set_contact_mode(self, contact_mode)
-		_store_boarding_contact_anchor(ship_node)
-		var hold_forward: Vector3 = -global_transform.basis.z
-		hold_forward.y = 0.0
-		if hold_forward.length_squared() > 0.001:
-			ShipBoardingMetaHelper.set_hold_forward(self, hold_forward.normalized())
-		
-		# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
-		if boarding_target.has_method("set_boarding_attacker_ship"):
-			boarding_target.set_boarding_attacker_ship(self)
-			
-		_clear_ropes()
-		boarding_timer = 0.0
-		boarding_prep_timer = 0.0
-		boarding_contact_timer = 0.0
-		boarding_hook_timer = 0.0
-		boarding_secondary_rope_timer = 0.0
-		ShipBoardingMetaHelper.set_motion_settle_timer(self, 0.0)
-		_initial_rope_deployed = false
-		_full_rope_deployed = false
-		_clear_boarding_latch()
-		
-		if DEBUG_COMBAT_LOGS:
-			print("[Boarding] 접점 확보! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
+	is_boarding = true
+	boarding_target = ship_node
+	if can_side_board:
+		ShipBoardingMetaHelper.set_contact_mode(self, ShipBoardingMetaHelper.CONTACT_SIDE)
+	elif can_head_on_board:
+		ShipBoardingMetaHelper.set_contact_mode(self, ShipBoardingMetaHelper.CONTACT_HEAD_ON)
 	else:
-		if DEBUG_COMBAT_LOGS:
-			print("[Skirmish] 접점 방어를 돌파하지 못해 도선하지 않고 대치합니다. (아군 %d vs 적군 %d, 접점 방어 %d)" % [my_crew, enemy_crew, contact_defenders])
+		var contact_mode: String = ShipBoardingMetaHelper.CONTACT_CLEANUP if active_latch_mode.is_empty() else active_latch_mode
+		ShipBoardingMetaHelper.set_contact_mode(self, contact_mode)
+	_store_boarding_contact_anchor(ship_node)
+	var hold_forward: Vector3 = -global_transform.basis.z
+	hold_forward.y = 0.0
+	if hold_forward.length_squared() > 0.001:
+		ShipBoardingMetaHelper.set_hold_forward(self, hold_forward.normalized())
+
+	# 도선 대상에게 내가 공격자임을 알림 (사격 중지 규칙용)
+	if boarding_target.has_method("set_boarding_attacker_ship"):
+		boarding_target.set_boarding_attacker_ship(self)
+
+	_clear_ropes()
+	boarding_timer = 0.0
+	boarding_prep_timer = 0.0
+	boarding_contact_timer = 0.0
+	boarding_hook_timer = 0.0
+	boarding_secondary_rope_timer = 0.0
+	ShipBoardingMetaHelper.set_motion_settle_timer(self, 0.0)
+	_initial_rope_deployed = false
+	_full_rope_deployed = false
+	_clear_boarding_latch()
+
+	if DEBUG_COMBAT_LOGS:
+		print("[Boarding] 접점 확보! 접현 후 갈고리 투척을 준비합니다.")
 
 
 func _show_boarding_start_feedback(target_ship: Node) -> void:

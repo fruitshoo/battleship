@@ -68,7 +68,7 @@ var _reward_level_overrides: Dictionary = {}
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
-		return LocaleManager.t("upgrade.track.boarding", "백병전")
+		return LocaleManager.t("upgrade.track.boarding", "병사")
 	if upgrade_id in UpgradeManager.SHIP_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS or upgrade_id == UpgradeManager.RARE_FLEET_UPGRADE_ID:
 		return LocaleManager.t("upgrade.track.ship", "함선")
 	var category_name_map := {
@@ -216,6 +216,8 @@ func _update_focus(immediate: bool = false) -> void:
 		
 	for i in range(card_buttons.size()):
 		var card = card_buttons[i]
+		if not is_instance_valid(card):
+			continue
 		var upgrade_id = card_ids[i]
 		var color = UpgradeManager.UPGRADES[upgrade_id].get("color", Color.WHITE)
 		var is_focused := i == _focused_index
@@ -663,9 +665,10 @@ func _play_choice_selection_animation(chosen_id: String, choice_ids: Array, chos
 	var tween := _create_ui_tween()
 	tween.set_parallel(true)
 	for i in range(card_buttons.size()):
-		var card := card_buttons[i] as PanelContainer
-		if not is_instance_valid(card):
+		var card_value = card_buttons[i]
+		if not is_instance_valid(card_value) or not (card_value is PanelContainer):
 			continue
+		var card := card_value as PanelContainer
 		var selected := i == chosen_index
 		_apply_choice_card_style(card, str(choice_ids[i]), selected)
 		if selected:
@@ -892,12 +895,14 @@ void fragment() {
 func _play_card_focus_sheen(card: PanelContainer, peak_intensity: float = 0.22, duration: float = CARD_SHEEN_DURATION) -> void:
 	if not is_instance_valid(card):
 		return
-	var art_frame := card.get_meta("art_frame", null) as PanelContainer
-	if not is_instance_valid(art_frame):
+	var art_frame_value = card.get_meta("art_frame", null)
+	if not is_instance_valid(art_frame_value) or not (art_frame_value is PanelContainer):
 		return
-	var sheen := art_frame.get_meta("art_sheen", null) as ColorRect
-	if not is_instance_valid(sheen):
+	var art_frame := art_frame_value as PanelContainer
+	var sheen_value = art_frame.get_meta("art_sheen", null)
+	if not is_instance_valid(sheen_value) or not (sheen_value is ColorRect):
 		return
+	var sheen := sheen_value as ColorRect
 	var sheen_material := sheen.material as ShaderMaterial
 	if sheen_material == null:
 		return
@@ -949,7 +954,12 @@ func _animate_cards_in() -> void:
 	if _focused_index >= 0 and _focused_index < card_buttons.size():
 		var sheen_tween := create_tween()
 		sheen_tween.tween_interval(CARD_ENTRY_DELAY * float(_focused_index) + 0.12)
-		sheen_tween.tween_callback(func(): _play_card_focus_sheen(card_buttons[_focused_index]))
+		sheen_tween.tween_callback(func():
+			if _focused_index >= 0 and _focused_index < card_buttons.size():
+				var focused_card = card_buttons[_focused_index]
+				if is_instance_valid(focused_card) and focused_card is PanelContainer:
+					_play_card_focus_sheen(focused_card)
+		)
 
 
 func _get_visible_footer_button() -> Button:
@@ -985,22 +995,25 @@ func _apply_card_focus_visuals(card: PanelContainer, color: Color, focused: bool
 		tween.tween_property(card, "scale", target_scale, 0.12)
 		tween.tween_property(card, "position:y", target_y, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
-	var art_frame := card.get_meta("art_frame", null) as PanelContainer
-	if is_instance_valid(art_frame):
+	var art_frame_value = card.get_meta("art_frame", null)
+	if is_instance_valid(art_frame_value) and art_frame_value is PanelContainer:
+		var art_frame := art_frame_value as PanelContainer
 		art_frame.self_modulate = Color.WHITE
 		var art_style := art_frame.get_theme_stylebox("panel") as StyleBoxFlat
 		if art_style != null:
 			art_style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.52 if focused else 0.34)
 			art_style.shadow_size = 10 if focused else 0
 			art_style.shadow_color = Color(color.r, color.g, color.b, 0.14)
-		var sheen := art_frame.get_meta("art_sheen", null) as ColorRect
-		if is_instance_valid(sheen):
+		var sheen_value = art_frame.get_meta("art_sheen", null)
+		if is_instance_valid(sheen_value) and sheen_value is ColorRect:
+			var sheen := sheen_value as ColorRect
 			var sheen_material := sheen.material as ShaderMaterial
 			if sheen_material != null and not focused:
 				sheen_material.set_shader_parameter("intensity", 0.0)
 
-	var track_badge := card.get_meta("track_badge", null) as PanelContainer
-	if is_instance_valid(track_badge):
+	var track_badge_value = card.get_meta("track_badge", null)
+	if is_instance_valid(track_badge_value) and track_badge_value is PanelContainer:
+		var track_badge := track_badge_value as PanelContainer
 		var badge_style := track_badge.get_theme_stylebox("panel") as StyleBoxFlat
 		if badge_style != null:
 			badge_style.bg_color = Color(color.r, color.g, color.b, 0.16 if focused else 0.10)

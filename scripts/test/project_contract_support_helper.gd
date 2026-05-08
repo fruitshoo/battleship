@@ -664,6 +664,8 @@ static func _run_support_shared_hull_upgrade_smoke(failures: Array[String], supp
 		failures.append("support fleet smoke fleet_hull should not be an active support upgrade")
 
 	var original_hull_level: int = int(UpgradeManager.current_levels.get("hull_defense", 0))
+	var original_hull_structure_level: int = int(UpgradeManager.current_levels.get("hull", 0))
+	UpgradeManager.current_levels["hull"] = 0
 	UpgradeManager.current_levels["hull_defense"] = 0
 	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
 	var base_max_hp: float = float(support_ship.get("max_hull_hp")) if support_ship.get("max_hull_hp") != null else 0.0
@@ -689,6 +691,7 @@ static func _run_support_shared_hull_upgrade_smoke(failures: Array[String], supp
 		failures.append("support fleet smoke shared hull upgrade did not apply regen level")
 
 	UpgradeManager.current_levels["hull_defense"] = original_hull_level
+	UpgradeManager.current_levels["hull"] = original_hull_structure_level
 	UpgradeManager.apply_fleet_upgrades_to_ship(support_ship)
 
 

@@ -29,6 +29,7 @@ var timer: float = 0.0
 var reposition_timer: float = 0.0
 var player: Node3D = null
 var boss_spawned: bool = false
+var defeated_boss_count: int = 0
 var elite_spawn_timer: float = 150.0 # 2분 30초 주기
 var elite_spawn_interval: float = 150.0
 var elite_spawn_count: int = 0
@@ -105,6 +106,7 @@ func _ready() -> void:
 	reposition_timer = reposition_check_interval
 	elite_spawn_timer = elite_spawn_interval
 	elite_spawn_count = 0
+	defeated_boss_count = 0
 	triggered_scenario_ids.clear()
 	triggered_boss_wave_ids.clear()
 	pending_boss_wave_spawns.clear()
@@ -682,6 +684,10 @@ func _start_boss_audio(boss_ship: Node3D) -> void:
 
 
 func _on_boss_died(_boss_id: int) -> void:
+	defeated_boss_count += 1
+	var lm: Node = LevelManagerRegistry.get_level_manager(get_tree())
+	if is_instance_valid(lm) and lm.get("enemy_fire_pot_unlocked") != null:
+		lm.set("enemy_fire_pot_unlocked", true)
 	call_deferred("_stop_boss_audio_if_no_active_boss")
 
 

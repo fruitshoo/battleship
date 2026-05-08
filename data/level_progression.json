@@ -19,9 +19,5 @@
   "xp_curve": {
     "level_xp_base": 7.0,
     "level_xp_exponent": 1.1
-  },
-  "merit_curve": {
-    "merit_base_points": 50,
-    "merit_growth_per_level": 10
   }
 }

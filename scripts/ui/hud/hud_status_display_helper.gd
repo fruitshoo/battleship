@@ -41,30 +41,6 @@ static func update_xp(hud, current: int, maximum: int) -> void:
 		hud.xp_bar.value = current
 
 
-static func update_merit(hud, current: int, maximum: int, level: int = 1) -> void:
-	if hud.merit_bar:
-		hud.merit_bar.max_value = maximum
-
-		var tween: Tween = hud.create_tween()
-		tween.tween_property(hud.merit_bar, "value", current, 0.3).set_trans(Tween.TRANS_SINE)
-
-		if hud.merit_label:
-			if current >= maximum:
-				hud.merit_label.text = "[ 백병전 업그레이드! ]"
-				hud.merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD)
-
-				var style := hud.merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
-				if style:
-					style.bg_color = Color(1.0, 0.94, 0.58, 1.0)
-			else:
-				hud.merit_label.text = "백병전 Lv.%d (%d / %d)" % [level, current, maximum]
-				hud.merit_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_MAIN)
-
-				var style_normal := hud.merit_bar.get_theme_stylebox("fill") as StyleBoxFlat
-				if style_normal:
-					style_normal.bg_color = NavalUiTheme.STATUS_WARN
-
-
 static func update_ammo_mode_display(hud) -> void:
 	if not is_instance_valid(hud.ammo_mode_label):
 		return

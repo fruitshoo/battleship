@@ -104,12 +104,14 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 		var ally_focus_target_id := 0
 		if is_instance_valid(nearest_ally_ai_ship):
 			ally_focus_target_id = int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0)) if not support_mode.is_empty() else int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
-		var ally_focus_target := instance_from_id(ally_focus_target_id) as Node3D if ally_focus_target_id > 0 else null
+		var ally_focus_target := NodeContractHelper.get_instance_node3d(ally_focus_target_id) if ally_focus_target_id > 0 else null
 		if not is_instance_valid(ally_focus_target) and not ally_focus_reason.is_empty() and (ally_focus_reason == "escort flagship" or ally_focus_reason == "rescue run"):
 			ally_focus_target = player_ship
 		if not ally_focus_reason.is_empty() and is_instance_valid(ally_focus_target):
 			ally_focus_reason = "%s -> %s" % [ally_focus_reason, ally_focus_target.name]
 		hud.debug_ally_ai_value.text = _format_limbo_panel_text("아군 AI", nearest_ally_ai_ship, ally_snapshot, ally_focus_reason)
+	if is_instance_valid(hud.debug_support_fleet_value):
+		hud.debug_support_fleet_value.text = _format_support_fleet_panel_text(player_ship)
 	if is_instance_valid(hud.debug_player_soldier_ai_value):
 		var player_focus: Dictionary = HudSoldierDebugHelper.find_focus_player_soldier(player_ship, focused_enemy_ai_ship); var focused_player_soldier: Node3D = player_focus.get("soldier", null) as Node3D
 		var player_soldier_snapshot: Dictionary = focused_player_soldier.call("get_debug_soldier_state_snapshot") if is_instance_valid(focused_player_soldier) and focused_player_soldier.has_method("get_debug_soldier_state_snapshot") else {}
@@ -383,3 +385,135 @@ static func _find_nearest_player_limbo_ship(hud) -> Node3D:
 			nearest_distance_sq = dist_sq
 			nearest_ship = candidate
 	return nearest_ship
+
+
+static func _format_support_fleet_panel_text(player_ship: Node3D) -> String:
+	if not is_instance_valid(player_ship):
+		return "지원함 진형: 플레이어 배 없음"
+	if not player_ship.has_method("_get_support_fleet_ships"):
+		return "지원함 진형: API 없음"
+	var support_ships: Array = player_ship.call("_get_support_fleet_ships")
+	var rows: Array[String] = []
+	for support in support_ships:
+		var support_ship := support as Node3D
+		if not is_instance_valid(support_ship):
+			continue
+		rows.append(_format_support_fleet_row(player_ship, support_ship, rows.size() + 1))
+	var formation_text := _get_support_formation_text(player_ship)
+	var hold_text := "유지 ON" if _get_meta_bool(player_ship, "support_hold_formation", true) else "유지 OFF"
+	if rows.is_empty():
+		return "지원함 진형: 0척 | %s | %s" % [formation_text, hold_text]
+	return "지원함 진형: %d척 | %s | %s\n%s" % [
+		rows.size(),
+		formation_text,
+		hold_text,
+		"\n".join(rows)
+	]
+
+
+static func _format_support_fleet_row(player_ship: Node3D, support_ship: Node3D, row_index: int) -> String:
+	var ship_type_text := _get_ship_type_text(support_ship)
+	var role_text := _get_ship_role_text(support_ship)
+	var mode_text := str(support_ship.get_meta("support_debug_mode", "-")).strip_edges()
+	if mode_text.is_empty():
+		mode_text = "-"
+	var join_text := _get_support_join_stage_text(support_ship)
+	var lead_text := str(support_ship.get_meta("support_debug_lead_name", "-")).strip_edges()
+	if lead_text.is_empty():
+		lead_text = "-"
+	var slot_dist := float(support_ship.get_meta("support_debug_slot_dist", -1.0))
+	var rel_depth := float(support_ship.get_meta("support_debug_rel_depth", 0.0))
+	var lead_speed := float(support_ship.get_meta("support_debug_lead_speed", 0.0))
+	var target_speed := float(support_ship.get_meta("support_debug_target_speed", 0.0))
+	var player_speed := float(support_ship.get_meta("support_debug_player_speed", 0.0))
+	var player_gap := _get_planar_distance(player_ship, support_ship)
+	var parts: Array[String] = [
+		"#%d %s(%s)" % [row_index, support_ship.name, ship_type_text],
+		"role %s" % role_text,
+		"mode %s%s" % [mode_text, join_text],
+		"lead %s" % lead_text,
+		"slot %.1fm" % slot_dist if slot_dist >= 0.0 else "slot -",
+		"depth %.1f" % rel_depth,
+		"spd P%.1f/L%.1f/T%.1f" % [player_speed, lead_speed, target_speed],
+		"gap %.1fm" % player_gap,
+	]
+	var turn_text := _get_support_turn_text(support_ship)
+	if not turn_text.is_empty():
+		parts.append(turn_text)
+	var avoid_text := _get_support_avoid_text(support_ship)
+	if not avoid_text.is_empty():
+		parts.append(avoid_text)
+	var assist_target := str(support_ship.get_meta("support_debug_assist_target", "")).strip_edges()
+	if not assist_target.is_empty():
+		parts.append("assist %s" % assist_target)
+	return " | ".join(parts)
+
+
+static func _get_support_formation_text(player_ship: Node3D) -> String:
+	var formation_value := int(player_ship.get_meta("support_fleet_formation", 0))
+	return "호위진" if formation_value != 0 else "장사진"
+
+
+static func _get_support_join_stage_text(support_ship: Node3D) -> String:
+	if not support_ship.has_meta("support_join_stage"):
+		return ""
+	var stage := int(support_ship.get_meta("support_join_stage", 1))
+	return "/rear" if stage <= 0 else "/slot"
+
+
+static func _get_support_turn_text(support_ship: Node3D) -> String:
+	var turn_mode: bool = _get_meta_bool(support_ship, "support_debug_turn_mode", false)
+	var turn_angle := float(support_ship.get_meta("support_debug_turn_angle", 0.0))
+	var turn_blend := float(support_ship.get_meta("support_debug_turn_blend", 0.0))
+	if not turn_mode and absf(turn_angle) < 0.1 and turn_blend <= 0.01:
+		return ""
+	return "turn %.0f b%.2f%s" % [turn_angle, turn_blend, " ON" if turn_mode else ""]
+
+
+static func _get_support_avoid_text(support_ship: Node3D) -> String:
+	var hazard: bool = _get_meta_bool(support_ship, "support_debug_pre_avoid_hazard", false)
+	var lateral := float(support_ship.get_meta("support_debug_pre_avoid_lateral", 0.0))
+	if not hazard and absf(lateral) < 0.01:
+		return ""
+	return "avoid %s %.1f" % ["H" if hazard else "-", lateral]
+
+
+static func _get_ship_type_text(ship: Node3D) -> String:
+	if ship.has_method("get_ship_type_value"):
+		var method_type := str(ship.call("get_ship_type_value")).strip_edges()
+		if not method_type.is_empty():
+			return method_type
+	var property_type := str(ship.get("ship_type")).strip_edges()
+	return property_type if not property_type.is_empty() else "-"
+
+
+static func _get_ship_role_text(ship: Node3D) -> String:
+	var role_text := str(ship.get("formation_role_name")).strip_edges()
+	return role_text if not role_text.is_empty() else "-"
+
+
+static func _get_planar_distance(a: Node3D, b: Node3D) -> float:
+	if not is_instance_valid(a) or not is_instance_valid(b):
+		return 0.0
+	var delta := Vector2(a.global_position.x - b.global_position.x, a.global_position.z - b.global_position.z)
+	return delta.length()
+
+
+static func _get_meta_bool(node: Node, key: String, fallback: bool) -> bool:
+	if not is_instance_valid(node):
+		return fallback
+	var value: Variant = node.get_meta(key, fallback)
+	match typeof(value):
+		TYPE_BOOL:
+			return bool(value)
+		TYPE_INT:
+			return int(value) != 0
+		TYPE_FLOAT:
+			return not is_zero_approx(float(value))
+		TYPE_STRING:
+			var text := str(value).strip_edges().to_lower()
+			if text == "true" or text == "on" or text == "1":
+				return true
+			if text == "false" or text == "off" or text == "0":
+				return false
+	return fallback

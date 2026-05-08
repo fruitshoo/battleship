@@ -175,6 +175,7 @@ func _spawn_enemy_ship(encounter: Dictionary) -> void:
 		return
 	_current_enemy_ship.name = "GauntletEnemy_%d" % max(_current_index, 0)
 	_current_enemy_ship.set_meta("ship_gauntlet_spawn", true)
+	PreviewHarnessHelper.unlock_preview_enemy_fire_pot(_current_enemy_ship)
 	add_child(_current_enemy_ship)
 
 	var distance: float = float(encounter.get("distance", 12.0))

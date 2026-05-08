@@ -169,6 +169,9 @@ class MockTransferShip:
 	var _initial_rope_deployed: bool = false
 	var _full_rope_deployed: bool = false
 	var boarding_attacker: Node3D = null
+	var deck_is_contested: bool = false
+	var deck_is_overrun: bool = false
+	var deck_hostile_boarder_count: int = 0
 	var is_derelict: bool = false
 	var is_dying: bool = false
 	var is_sinking: bool = false
@@ -318,9 +321,11 @@ func _ready() -> void:
 	_verify_support_free_assist_recalls_near_player(failures)
 	_verify_enemy_boarding_transfers_last_available_soldier(failures)
 	_verify_enemy_derelict_waits_for_affiliated_boarders_to_die(failures)
+	_verify_derelict_disposal_waits_while_player_deck_is_contested(failures)
 	_verify_derelict_disposal_waits_for_affiliated_boarder_cleanup(failures)
 	_verify_boarding_transfer_snaps_soldier_to_target_deck(failures)
 	_verify_boarding_transfer_wave_sends_multiple_soldiers(failures)
+	_verify_boarding_transfer_waits_for_launch_side_boarders(failures)
 	await _verify_boarding_transfer_tracks_moving_target_deck(failures)
 	_verify_soldier_deck_recovery_repairs_parent_and_bounds(failures)
 	_verify_soldier_boarding_status_marks_returning(failures)
@@ -1374,6 +1379,42 @@ func _verify_enemy_derelict_waits_for_affiliated_boarders_to_die(failures: Array
 	source.queue_free()
 
 
+func _verify_derelict_disposal_waits_while_player_deck_is_contested(failures: Array[String]) -> void:
+	var player := MockTransferShip.new()
+	add_child(player)
+	player.team = "player"
+	ShipAllyRoleHelper.mark_player_flagship(player)
+	player.global_position = Vector3.ZERO
+	player.deck_is_contested = true
+	player.deck_hostile_boarder_count = 1
+
+	var derelict := MockTransferShip.new()
+	add_child(derelict)
+	derelict.team = "enemy"
+	derelict.is_derelict = true
+	derelict.global_position = Vector3(1.0, 0.0, 0.0)
+
+	var blocked := BaseShipCollisionHelper._try_salvage_derelict_contact(player, derelict, 1.0, 1.0)
+	if blocked:
+		failures.append("derelict disposal should wait while the player deck is in melee")
+	if derelict.get_meta("derelict_contact_disposal_started", false) == true:
+		failures.append("derelict disposal should not start while player crew is fighting boarders")
+	if derelict.get_meta("derelict_contact_waiting_for_deck_melee", false) != true:
+		failures.append("derelict disposal should mark that it is waiting for player deck melee to end")
+
+	player.deck_is_contested = false
+	player.deck_hostile_boarder_count = 0
+	var started := BaseShipCollisionHelper._try_salvage_derelict_contact(player, derelict, 1.0, 1.0)
+	if not started:
+		failures.append("derelict disposal should start once player deck melee ends")
+	if derelict.get_meta("derelict_contact_waiting_for_deck_melee", false) == true:
+		failures.append("derelict disposal should clear deck melee waiting meta after melee ends")
+
+	ShipAllyRoleHelper.clear_ally_role(player)
+	player.queue_free()
+	derelict.queue_free()
+
+
 func _verify_derelict_disposal_waits_for_affiliated_boarder_cleanup(failures: Array[String]) -> void:
 	var player := MockTransferShip.new()
 	add_child(player)
@@ -1505,6 +1546,51 @@ func _verify_boarding_transfer_wave_sends_multiple_soldiers(failures: Array[Stri
 		failures.append("boarding transfer wave count did not match soldiers moved to target")
 	if source_player_count != 4 - transferred_count:
 		failures.append("boarding transfer wave did not remove moved soldiers from source deck")
+
+	target.queue_free()
+	source.queue_free()
+
+
+func _verify_boarding_transfer_waits_for_launch_side_boarders(failures: Array[String]) -> void:
+	var source := MockTransferShip.new()
+	add_child(source)
+	source.team = "enemy"
+	source.is_boarding = true
+	source.global_position = Vector3.ZERO
+
+	var target := MockTransferShip.new()
+	add_child(target)
+	target.team = "player"
+	target.global_position = Vector3(6.0, 0.0, 0.0)
+	source.boarding_target = target
+
+	var far_boarder := MockTransferSoldier.new()
+	far_boarder.team = "enemy"
+	far_boarder.owned_ship = source
+	far_boarder.position = Vector3(-2.0, 0.4, 0.0)
+	source.get_node("Soldiers").add_child(far_boarder)
+
+	var far_transferred := BaseShipBoardingHelper.transfer_one_soldier(source)
+	if far_transferred:
+		failures.append("boarding transfer should not launch a soldier from the far side of the source deck")
+	if source.is_boarding != true or source.clear_rope_calls != 0:
+		failures.append("boarding transfer should wait for launch-side boarders instead of cancelling the link")
+	if far_boarder.get_parent() != source.get_node("Soldiers"):
+		failures.append("far-side boarder should remain on the source ship while waiting for launch position")
+
+	var near_boarder := MockTransferSoldier.new()
+	near_boarder.team = "enemy"
+	near_boarder.owned_ship = source
+	near_boarder.position = Vector3(1.9, 0.4, 0.0)
+	source.get_node("Soldiers").add_child(near_boarder)
+
+	var near_transferred := BaseShipBoardingHelper.transfer_one_soldier(source)
+	if not near_transferred:
+		failures.append("boarding transfer should launch a soldier already near the contact-side edge")
+	if near_boarder.get_parent() != target.get_node("Soldiers"):
+		failures.append("boarding transfer did not choose the contact-side boarder")
+	if far_boarder.get_parent() != source.get_node("Soldiers"):
+		failures.append("boarding transfer moved the far-side boarder before the contact-side boarder")
 
 	target.queue_free()
 	source.queue_free()

@@ -1,6 +1,8 @@
 extends RefCounted
 class_name BaseShipVisualHelper
 
+const ANCHOR_IMPACT_LOCAL_PITCH_AXIS := Vector3(0.0, 0.0, 1.0)
+
 
 static func cache_common_references(ship) -> void:
 	if ship == null:
@@ -125,6 +127,70 @@ static func apply_bobbing_effect(ship) -> void:
 
 	ship._centrifugal_tilt = lerp(ship._centrifugal_tilt, target_centrifugal, 2.5 * dt)
 	ship.rotation.z = (sin(time * ship.bobbing_speed * 0.8) * ship.rocking_amplitude) + ship.tilt_offset + ship._centrifugal_tilt
+	update_anchor_impact_sway(ship, dt)
+
+
+static func trigger_anchor_impact_sway(ship, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
+	if ship == null:
+		return
+	if not bool(ship.anchor_impact_sway_enabled):
+		return
+	if ship.anchor_visuals.is_empty():
+		return
+	if damage_source == "leak" or damage_source == "fire" or damage_source == "burning":
+		return
+	var impact_scale := clampf(amount / 18.0, 0.18, 1.25)
+	if damage_source == "ramming" or damage_source == "ramming_aoe":
+		impact_scale *= 1.35
+	elif damage_source == "boarding_capture":
+		impact_scale *= 0.45
+	var pitch_sign := -1.0
+	if hit_position != Vector3.ZERO:
+		var local_hit: Vector3 = ship.to_local(hit_position)
+		if absf(local_hit.z) > 0.15:
+			# Forward hits use the opposite kick so the bow anchor snaps with the contact.
+			pitch_sign = 1.0 if local_hit.z < 0.0 else -1.0
+	ship._anchor_impact_pitch_velocity += pitch_sign * float(ship.anchor_impact_impulse) * impact_scale
+	var max_velocity := deg_to_rad(float(ship.anchor_impact_max_pitch_degrees)) * 22.0
+	ship._anchor_impact_pitch_velocity = clampf(ship._anchor_impact_pitch_velocity, -max_velocity, max_velocity)
+
+
+static func update_anchor_impact_sway(ship, delta: float) -> void:
+	if ship == null:
+		return
+	if ship.anchor_visuals.is_empty():
+		return
+	if not bool(ship.anchor_impact_sway_enabled):
+		_restore_anchor_visuals(ship)
+		return
+
+	var stiffness := float(ship.anchor_impact_stiffness)
+	var damping := float(ship.anchor_impact_damping)
+	var acceleration := (-stiffness * float(ship._anchor_impact_pitch)) - (damping * float(ship._anchor_impact_pitch_velocity))
+	ship._anchor_impact_pitch_velocity += acceleration * delta
+	ship._anchor_impact_pitch += ship._anchor_impact_pitch_velocity * delta
+	var max_angle := deg_to_rad(float(ship.anchor_impact_max_pitch_degrees))
+	ship._anchor_impact_pitch = clampf(ship._anchor_impact_pitch, -max_angle, max_angle)
+	if absf(ship._anchor_impact_pitch) < 0.0005 and absf(ship._anchor_impact_pitch_velocity) < 0.002:
+		ship._anchor_impact_pitch = 0.0
+		ship._anchor_impact_pitch_velocity = 0.0
+
+	for anchor in ship.anchor_visuals:
+		if not is_instance_valid(anchor):
+			continue
+		var rest_transform: Transform3D = ship._anchor_visual_rest_transforms.get(anchor.get_instance_id(), anchor.transform)
+		var local_pitch := Basis(ANCHOR_IMPACT_LOCAL_PITCH_AXIS, float(ship._anchor_impact_pitch))
+		anchor.transform = Transform3D(rest_transform.basis * local_pitch, rest_transform.origin)
+
+
+static func _restore_anchor_visuals(ship) -> void:
+	ship._anchor_impact_pitch = 0.0
+	ship._anchor_impact_pitch_velocity = 0.0
+	for anchor in ship.anchor_visuals:
+		if not is_instance_valid(anchor):
+			continue
+		var rest_transform: Transform3D = ship._anchor_visual_rest_transforms.get(anchor.get_instance_id(), anchor.transform)
+		anchor.transform = rest_transform
 
 
 static func update_sail_visual(ship) -> void:

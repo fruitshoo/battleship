@@ -23,7 +23,9 @@ static func get_specialist_unit_count(upgrades: Dictionary, current_levels: Dict
 	if level <= 0:
 		return 0
 	var stats: Dictionary = upgrades[upgrade_id].get("stats", {})
-	var thresholds: Variant = stats.get("specialist_levels", [1, 3, 5])
+	if not stats.has("specialist_levels"):
+		return 0
+	var thresholds: Variant = stats.get("specialist_levels", [])
 	var count: int = 0
 	for threshold in thresholds:
 		if level >= int(threshold):
@@ -44,6 +46,31 @@ static func get_supply_bonus_stats(upgrades: Dictionary, current_levels: Diction
 		"radius_bonus": radius_bonus,
 	}
 
+static func get_singigeon_proc_stats(upgrades: Dictionary, current_levels: Dictionary, level: int = -1) -> Dictionary:
+	var target_level: int = level
+	if target_level < 0:
+		target_level = int(current_levels.get("singigeon", 0))
+	var upgrade_data: Dictionary = upgrades.get("singigeon", {})
+	var stats: Dictionary = upgrade_data.get("stats", {})
+	if target_level <= 0:
+		return {
+			"level": 0,
+			"chance": 0.0,
+			"cooldown": float(stats.get("ship_proc_cooldown", 1.0)),
+			"pity_add": float(stats.get("proc_pity_add_per_miss", 0.0)),
+			"pity_max_bonus": float(stats.get("proc_pity_max_bonus", 0.0)),
+		}
+	var base_chance: float = float(stats.get("base_proc_chance", 0.08))
+	var chance_per_level: float = float(stats.get("proc_chance_per_lv", 0.03))
+	var max_chance: float = float(stats.get("max_proc_chance", 0.2))
+	return {
+		"level": target_level,
+		"chance": clampf(base_chance + float(target_level - 1) * chance_per_level, 0.0, max_chance),
+		"cooldown": float(stats.get("ship_proc_cooldown", 1.0)),
+		"pity_add": float(stats.get("proc_pity_add_per_miss", 0.0)),
+		"pity_max_bonus": float(stats.get("proc_pity_max_bonus", 0.0)),
+	}
+
 static func get_player_crew_roster(upgrades: Dictionary, current_levels: Dictionary, total_crew: int) -> Dictionary:
 	var remaining: int = max(0, total_crew)
 	var roster := {
@@ -54,10 +81,7 @@ static func get_player_crew_roster(upgrades: Dictionary, current_levels: Diction
 		CREW_ROLE_SINGIGEON: 0,
 	}
 	var role_specs: Array[Dictionary] = [
-		{"role": CREW_ROLE_SPEARMAN, "upgrade_id": "crew_numbers"},
 		{"role": CREW_ROLE_FIRE_POT, "upgrade_id": "fire_pot"},
-		{"role": CREW_ROLE_REPEATING_CROSSBOW, "upgrade_id": "repeating_crossbow"},
-		{"role": CREW_ROLE_SINGIGEON, "upgrade_id": "singigeon"},
 	]
 	var desired_caps: Dictionary = {}
 	var max_specialist_cap := 0
@@ -95,6 +119,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 	match upgrade_id:
 		"cannon":
 			var player_count: int = SupportFleetCannonRules.get_player_cannon_count_for_level(next_level, s)
+			if int(preview_levels.get("geobukseon", 0)) > 0:
+				player_count = mini(player_count, 4)
 			var support_summary := SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(next_level, s, preview_levels, upgrades)
 			return "측면 포문 %d문 | 지원함 %s" % [player_count, support_summary]
 		"front_cannon":
@@ -113,18 +139,17 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			)
 			return "포문 장군전 재장전 %.1f초 | 화염/둔화 강화" % janggun_cooldown
 		"singigeon":
-			var rocketeers: int = get_specialist_unit_count(upgrades, current_levels, "singigeon", next_level)
+			var proc_stats := get_singigeon_proc_stats(upgrades, current_levels, next_level)
 			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
 			var rocket_damage: float = rocket_base_damage * (1.0 + 0.15 * float(next_level))
 			var personnel_damage: float = rocket_damage * float(s.get("personnel_damage_mult", 5.0))
-			var cooldown: float = maxf(2.2, float(s.get("base_cooldown", 5.0)) - (float(next_level - 1) * float(s.get("cooldown_reduce_per_lv", 0.35))))
 			var knockback: float = float(s.get("base_knockback_speed", 9.0)) + float(next_level - 1) * float(s.get("knockback_speed_per_lv", 0.0))
 			var overboard_level: int = int(s.get("overboard_knockback_level", 4))
 			var knockback_note := "낙수 가능" if next_level >= overboard_level else "밀침 %.0f" % knockback
-			return "신기전 운용 %d명 | 대병 %.0f | %s | 재사용 %.1f초" % [rocketeers, personnel_damage, knockback_note, cooldown]
+			return "활 공격 %.0f%% | 대병 %.0f | %s | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, knockback_note, float(proc_stats.get("cooldown", 1.0))]
 		"crew_numbers":
-			var spearmen: int = get_specialist_unit_count(upgrades, current_levels, "crew_numbers", next_level)
-			return "창병 전환 %d명" % spearmen
+			var damage_bonus_pct := float(next_level) * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0
+			return "전 병사 창 장비 | 창 피해 +%.0f%%" % damage_bonus_pct
 		"crew_reserve":
 			var assist_duration: float = maxf(float(s.get("min_assist_channel_duration", 0.55)), float(s.get("base_assist_channel_duration", 1.1)) - (float(next_level) * float(s.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio: float = clampf(0.35 + (float(next_level) * float(s.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(s.get("max_assist_recovery_health_ratio", 0.7)))
@@ -143,8 +168,12 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "병사 방어력 +%.0f | 받는 피해 -%.0f%%" % [defense_bonus, damage_reduction * 100.0]
 		"hull_defense":
 			if level_matches(next_level, s.get("def_levels", [])):
-				return "선체 방어력 +%.1f" % float(s.get("def_add", 1.0))
-			return "선체 보강"
+				return "방어력 +%.1f" % float(s.get("def_add", 1.0))
+			return "방어 보강"
+		"hull":
+			var hp_add := float(s.get("hp_add_per_lv", 15.0))
+			var ram_pct := float(s.get("ramming_damage_pct_per_lv", 0.07)) * 100.0
+			return "최대 내구 +%.0f | 충돌 피해 +%.0f%%" % [hp_add, ram_pct]
 		"hull_repair":
 			var regen_rate: float = minf(float(s.get("max_regen", 1.0)), float(next_level) * float(s.get("regen_per_lv", 0.2)))
 			return "선체 자동 수리 %.1f/s" % regen_rate
@@ -197,6 +226,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			if level_matches(next_level, s.get("radius_levels", [])):
 				return "획득 반경 +%.1fm" % float(s.get("radius_add", 2.0))
 			return "획득 반경 강화"
+		"geobukseon":
+			return "기함 거북선화 | 도선 면역 | 좌우 포문 4문 한계 | 전면포 없음"
 		"ballista":
 			var ballista_damage: float = s.get("base_damage", 45.0) + (next_level - 1) * s.get("damage_per_lv", 15.0)
 			var pierce: int = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))

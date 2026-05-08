@@ -77,7 +77,16 @@ var _rigging_repair_complete_feedback_shown: bool = false
 @export var bobbing_speed: float = 1.0
 @export var rocking_amplitude: float = 0.05
 @export var floating_offset: float = 0.55 ## 기본 부력 오프셋 (수면 위로 배를 띄움)
+@export_group("Anchor Impact Sway")
+@export var anchor_impact_sway_enabled: bool = true
+@export_range(0.0, 18.0, 0.5) var anchor_impact_max_pitch_degrees: float = 7.0
+@export_range(0.0, 8.0, 0.1) var anchor_impact_impulse: float = 2.4
+@export_range(1.0, 80.0, 1.0) var anchor_impact_stiffness: float = 36.0
+@export_range(0.0, 24.0, 0.5) var anchor_impact_damping: float = 8.5
+@export_group("")
 var _centrifugal_tilt: float = 0.0 # 원심력에 의한 기울기
+var _anchor_impact_pitch: float = 0.0
+var _anchor_impact_pitch_velocity: float = 0.0
 
 # === 내부 상태 ===
 var current_speed: float = 0.0
@@ -166,6 +175,7 @@ var fire_threshold: float = 100.0
 # === 충돌 및 충각(Ramming) 관련 상태 ===
 var _recent_ram_targets: Dictionary = {}
 var min_ramming_speed: float = 6.0 # 충돌 데미지가 발생하기 위한 최소 상대 속도 상향 (4.0 -> 6.0)
+@export_range(0.25, 3.0, 0.05) var ramming_damage_multiplier: float = 1.0 ## 이 배가 상대에게 주는 충돌 피해 배율.
 var broad_phase_padding: float = 2.0 # 충돌 broad-phase 여유 거리
 var burn_timer: float = 0.0
 
@@ -192,6 +202,8 @@ var masts: Array[Node] = []
 var mast_fold_pivots: Array[Node] = []
 var masts_folded: bool = false
 var rudder_visual: Node3D = null
+var anchor_visuals: Array[Node3D] = []
+var _anchor_visual_rest_transforms: Dictionary = {}
 var wake_trail: Node3D = null
 var deck_light: OmniLight3D = null
 var _cached_environment_preset_manager: Node = null
@@ -229,6 +241,7 @@ func _ready() -> void:
 	
 	# 돛대, 타륜 등의 레퍼런스 캐싱 (에디터/런타임 공통)
 	_cache_hull_references(self )
+	_apply_authored_deck_height_if_available()
 	_refresh_collision_bounds_from_hull()
 	
 	if Engine.is_editor_hint():
@@ -383,6 +396,9 @@ func _fit_contact_area_box_shape(area_name: String, size: Vector3) -> void:
 		box_shape = BoxShape3D.new()
 	box_shape.size = size
 	shape_node.shape = box_shape
+	var shape_position := shape_node.position
+	shape_position.y = maxf(0.0, deck_height * 0.5)
+	shape_node.position = shape_position
 
 func _sync_contact_area_layers(layer_override: int = -1) -> void:
 	var current_layer: int = layer_override
@@ -564,6 +580,13 @@ func get_projectile_aim_point(vertical_offset: float = 0.55) -> Vector3:
 
 func get_ship_authoring_summary() -> Dictionary:
 	return ShipAuthoringHelper.build_summary(self)
+
+func _apply_authored_deck_height_if_available() -> bool:
+	var authored_deck_height := ShipAuthoringHelper.get_deck_area_height(self)
+	if authored_deck_height <= 0.01:
+		return false
+	deck_height = authored_deck_height
+	return true
 
 func get_proximity_area() -> Area3D:
 	var area := get_node_or_null(NODE_PROXIMITY_AREA)
@@ -798,7 +821,7 @@ func play_sink_bubbles(delay_seconds: float = SHIP_SINK_BUBBLES_DEFAULT_DELAY, v
 		return
 	var ship_id := get_instance_id()
 	tree.create_timer(delay_seconds).timeout.connect(func() -> void:
-		var ship := instance_from_id(ship_id)
+		var ship := NodeContractHelper.get_instance_node(ship_id)
 		if not is_instance_valid(ship):
 			return
 		if ship.has_method("_play_sink_bubbles_now"):
@@ -1049,6 +1072,8 @@ func _cache_hull_references(node: Node) -> void:
 		masts.clear()
 		mast_fold_pivots.clear()
 		rudder_visual = null
+		anchor_visuals.clear()
+		_anchor_visual_rest_transforms.clear()
 		wake_trail = null
 		oar_pivot_left = null
 		oar_pivot_right = null
@@ -1063,6 +1088,11 @@ func _cache_hull_references(node: Node) -> void:
 			if not mast_fold_pivots.has(child): mast_fold_pivots.append(child)
 		elif child.name == "RudderVisual":
 			rudder_visual = child
+		elif child.name == "Anchor" and child is Node3D:
+			var anchor_node := child as Node3D
+			if not anchor_visuals.has(anchor_node):
+				anchor_visuals.append(anchor_node)
+				_anchor_visual_rest_transforms[anchor_node.get_instance_id()] = anchor_node.transform
 		elif child.name == "WakeTrail" and child is Node3D:
 			wake_trail = child as Node3D
 		elif child.name.begins_with("OarBaseLeft") and child.has_node("OarPivot"):
@@ -1534,6 +1564,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 		WoodSplinter.spawn_burst(get_tree(), wood_splinter_scene, splinter_position, final_damage, splinter_position - global_position)
 			
 	_flash_damage(final_damage)
+	_trigger_anchor_impact_sway(final_damage, hit_position, damage_source)
 	
 	if hull_hp <= 0:
 		die()
@@ -1631,6 +1662,9 @@ func _flash_damage(amount: float = 10.0) -> void:
 	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * DAMAGE_ROCK_FORWARD_MULT * shake_mult, 0.1)
 	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * DAMAGE_ROCK_BACK_MULT * shake_mult, 0.1)
 	shake_tween.tween_property(self , "rotation:z", 0.0, 0.2)
+
+func _trigger_anchor_impact_sway(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
+	BaseShipVisualHelper.trigger_anchor_impact_sway(self, amount, hit_position, damage_source)
 
 ## 화염 데미지
 func take_fire_damage(dps: float, duration: float) -> void:

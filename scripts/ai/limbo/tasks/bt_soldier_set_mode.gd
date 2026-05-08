@@ -114,7 +114,7 @@ func _find_active_boarding_muster_target(soldier: Node3D) -> Vector3:
 	var target_ship := _get_active_boarding_target_ship(soldier)
 	if not is_instance_valid(target_ship):
 		return Vector3.INF
-	return SoldierShipHelper.get_cross_ship_contact_point_global(soldier, target_ship)
+	return SoldierShipHelper.get_stable_cross_ship_contact_point_global(soldier, target_ship)
 
 
 func _get_active_boarding_target_ship(soldier: Node3D) -> Node3D:

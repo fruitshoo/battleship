@@ -21,6 +21,7 @@ Default quick checks:
   Broad smoke for scripts, scenes, save/load, HUD, support fleet, bootstrap, recovery effects, upgrades, scene wiring, and runtime spawning.
 - `scripts/test/run_boarding_contracts.sh`
   Focused combat regression suite for boarding impact, navigation, chaos, support rescue, auto-raid recall, ship damage, and soldier incapacitation/weapon-state behavior.
+  Runs each scene through the load probe with a boarding-suite leak budget, so contract behavior and shutdown growth stay checked together.
 - `scripts/test/run_modularity_guard_suite.sh`
   Architecture guard suite for helper ownership, runtime scenario registry paths, pooling ownership, and world-space soldier motion.
 - `scripts/test/run_ship_combat_balance_preview.sh`
@@ -38,6 +39,8 @@ Recent regression coverage to keep together:
 - Cross-ship rail standoffs should prefer bow fire until the sword can actually reach; stuck melee attack state should recover back to movement/weapon selection.
 - Sail and rudder field repair should be scheduled by real rigging damage, wait before starting, recover only to emergency function, and pause while burning.
 - Survivors, floating loot, static sea sites, sea decor, compass markers, and overcap crew recovery live under the project recovery contract helper rather than a separate ad hoc scene.
+- Support squadron coverage keeps the active Panokseon artillery unlock, disabled Geobukseon support fallback, heavy-support role labels, and support-limit reconciliation in the same profile/upgrade smoke loop.
+- Helper public-surface growth is intentional only when `module_boundaries.json` gets a matching baseline and exception/debt rationale; otherwise the modularity guard should fail loudly.
 
 Current harness gaps:
 
@@ -86,7 +89,7 @@ When adding a new harness:
   Focused combat contract scenes for impact gating, approach geometry, cleanup/chaos handling, support boarding, raid recall, incapacitation behavior, and rigging field repair.
   Wrapper: `scripts/test/run_boarding_contracts.sh`
 - `support_fleet_profile_preview.tscn`
-  Support-fleet squadron slot assertions for Maengseon screens and Panokseon artillery leads.
+  Support-fleet squadron slot assertions for Maengseon screens, Panokseon artillery leads, disabled Geobukseon fallback, and support-limit reconciliation.
   Script: `scripts/test/support_fleet_profile_preview.gd`
 - `firepot_preview.tscn`
   Fire pot attack gating scenarios such as no target, no tosser, and out of range.
@@ -216,6 +219,7 @@ When adding a new harness:
 - `scripts/test/run_boarding_contracts.sh`
   Shell wrapper for focused combat contracts covering impact gating, ship damage, navigation, chaos, support boarding, auto-raid recall, and soldier incapacitation.
   Runs each contract through the generic scene load probe and fails on common script/runtime log errors.
+  Uses a suite-specific instantiated-scene leak budget of `LEAK_MAX_RID_TOTAL=320`, `LEAK_MAX_RESOURCES=520`, and `LEAK_MAX_PAGED_ALLOCATOR_WARNINGS=2`.
 - `scripts/test/harness_log_gate.sh`
   Shared shell helper for common Godot script/runtime log error gates used by headless test wrappers.
 - `scripts/test/run_modularity_guard_suite.sh`

@@ -36,6 +36,89 @@
           "id": "panokseon_artillery_unlock",
           "label": "Panokseon artillery",
           "coverage": "Fleet signal progression unlocks a Panokseon artillery lead in the second support slot."
+        },
+        {
+          "id": "disabled_geobukseon_fallback",
+          "label": "Disabled Geobukseon fallback",
+          "coverage": "The disabled Geobukseon support upgrade falls back to Maengseon screen slots while the player Geobukseon hull gate is tested separately."
+        }
+      ]
+    },
+    {
+      "id": "project_contract_sweep",
+      "scene": "res://scenes/test/project_contract_sweep.tscn",
+      "script": "res://scripts/test/project_contract_sweep.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_project_contract_sweep.sh",
+      "focus": "Broad project smoke for load, wiring, HUD, support, upgrade, recovery, and runtime contracts.",
+      "scenarios": [
+        {
+          "id": "load_and_legacy_scan",
+          "label": "Load and scan",
+          "coverage": "Scripts and scenes load while legacy Godot 3 patterns stay out of the runtime surface."
+        },
+        {
+          "id": "runtime_scene_wiring",
+          "label": "Runtime wiring",
+          "coverage": "Player, enemy, boss, support, launcher, projectile, HUD, recovery, and scene wiring contracts smoke together."
+        },
+        {
+          "id": "upgrade_progression_smoke",
+          "label": "Upgrade progression",
+          "coverage": "Upgrade data, player Geobukseon hull split, disabled Geobukseon support fallback, and level progression contracts remain coherent."
+        }
+      ]
+    },
+    {
+      "id": "boarding_contracts",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_boarding_contracts.sh",
+      "focus": "Focused boarding, ship damage, support rescue, and soldier incapacitation regressions with scene-load leak budgets.",
+      "leak_budget": {
+        "rid_total": 320,
+        "resources": 520,
+        "paged_allocator_warnings": 2
+      },
+      "scenarios": [
+        {
+          "id": "boarding_impact_and_damage",
+          "label": "Impact and damage",
+          "coverage": "Boarding impact gating and ship damage contracts run through the generic scene load probe."
+        },
+        {
+          "id": "boarding_navigation_and_chaos",
+          "label": "Navigation and chaos",
+          "coverage": "Approach geometry, cleanup handling, and chaotic boarding state transitions keep their success markers."
+        },
+        {
+          "id": "support_rescue_and_recall",
+          "label": "Support and recall",
+          "coverage": "Support boarding rescue, auto-raid recall, and soldier incapacitation behavior stay covered with bounded shutdown resource growth."
+        }
+      ]
+    },
+    {
+      "id": "ship_combat_balance_preview",
+      "scene": "res://scenes/test/ship_combat_balance_preview.tscn",
+      "script": "res://scripts/test/ship_combat_balance_preview.gd",
+      "execution": "standalone_wrapper",
+      "wrapper": "res://scripts/test/run_ship_combat_balance_preview.sh",
+      "focus": "Short ship combat balance sweep for gunner, melee, firepot, mixed, large-ship boarding, and cleanup encounters.",
+      "scenarios": [
+        {
+          "id": "gunner_melee_firepot_pressure",
+          "label": "Role pressure",
+          "coverage": "Gunner duel, melee rush, firepot pressure, and mixed pressure scenarios print hull, crew, boarding, and event summaries."
+        },
+        {
+          "id": "atakebune_boarding",
+          "label": "Atakebune boarding",
+          "coverage": "Large-ship boarding runs with boss guns disabled and close approach so deck-fight behavior can be checked directly."
+        },
+        {
+          "id": "cleanup_encounters",
+          "label": "Cleanup encounters",
+          "coverage": "Head-on cleanup and cleanup drift scenarios report latch, boarder, defender, and raid-state debug lines."
         }
       ]
     },

@@ -359,10 +359,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("cycle_fleet_formation"):
 			_cycle_fleet_formation()
 			return
-		# 치트키: F2 누르면 바로 백병전 업그레이드
+		# 치트키: F2 누르면 바로 메인 경험치를 지급
 		if OS.is_debug_build() and event.keycode == KEY_F2:
 			if is_instance_valid(_cached_level_manager):
-				_cached_level_manager.add_merit(999)
+				_cached_level_manager.add_bonus_xp(999)
 		if OS.is_debug_build() and event.keycode == KEY_F3:
 			toggle_masts_folded()
 			if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
@@ -370,17 +370,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cached_hud.show_message("%s (debug)" % fold_text, 1.0)
 				
 		pass
-
-func _execute_merit_action() -> void:
-	if not is_instance_valid(_cached_level_manager): return
-		
-	if _cached_level_manager.merit_points < _cached_level_manager.max_merit_points:
-		if _cached_hud and _cached_hud.has_method("show_message"):
-			_cached_hud.show_message("백병전 포인트가 부족합니다!", 1.5)
-		return
-		
-	# 백병전 포인트 소비
-	_cached_level_manager.consume_merit()
 
 func _spawn_or_repair_ally() -> void:
 	PlayerShipSupportHelper.spawn_or_repair_ally(self)
@@ -684,43 +673,42 @@ func _face_corpse_cleanup_actor(cleaner: Node3D, look_position: Vector3) -> void
 
 
 func _face_corpse_cleanup_actor_by_id(cleaner_id: int, look_position: Vector3) -> void:
-	var cleaner := instance_from_id(cleaner_id)
-	if is_instance_valid(cleaner) and cleaner is Node3D:
-		_face_corpse_cleanup_actor(cleaner as Node3D, look_position)
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	if is_instance_valid(cleaner):
+		_face_corpse_cleanup_actor(cleaner, look_position)
 
 
 func _face_corpse_cleanup_corpse_by_id(cleaner_id: int, corpse_id: int) -> void:
-	var cleaner := instance_from_id(cleaner_id)
-	var corpse := instance_from_id(corpse_id)
-	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
-		_face_corpse_cleanup_actor(cleaner as Node3D, (corpse as Node3D).global_position)
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
+	if is_instance_valid(cleaner) and is_instance_valid(corpse):
+		_face_corpse_cleanup_actor(cleaner, corpse.global_position)
 
 
 func _face_corpse_cleanup_throw_target_by_id(cleaner_id: int, corpse_id: int) -> void:
-	var cleaner := instance_from_id(cleaner_id)
-	var corpse := instance_from_id(corpse_id)
-	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
-		_face_corpse_cleanup_actor(cleaner as Node3D, _get_corpse_cleanup_throw_target(corpse as Node3D))
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
+	if is_instance_valid(cleaner) and is_instance_valid(corpse):
+		_face_corpse_cleanup_actor(cleaner, _get_corpse_cleanup_throw_target(corpse))
 
 
 func _set_corpse_cleanup_action_by_id(cleaner_id: int, action_name: String) -> void:
-	var cleaner := instance_from_id(cleaner_id)
-	if is_instance_valid(cleaner) and cleaner is Node3D:
-		_set_corpse_cleanup_actor_action(cleaner as Node3D, action_name)
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	if is_instance_valid(cleaner):
+		_set_corpse_cleanup_actor_action(cleaner, action_name)
 
 
 func _begin_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
-	var cleaner := instance_from_id(cleaner_id)
-	var corpse := instance_from_id(corpse_id)
-	if is_instance_valid(cleaner) and cleaner is Node3D and is_instance_valid(corpse) and corpse is Node3D:
-		_begin_corpse_cleanup_carry_payload(cleaner as Node3D, corpse as Node3D)
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
+	if is_instance_valid(cleaner) and is_instance_valid(corpse):
+		_begin_corpse_cleanup_carry_payload(cleaner, corpse)
 
 
 func _capture_corpse_cleanup_pickup_pose_by_id(corpse_id: int) -> void:
-	var corpse := instance_from_id(corpse_id)
-	if not is_instance_valid(corpse) or not (corpse is Node3D):
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
 		return
-	var corpse_node := corpse as Node3D
 	corpse_node.set_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META, corpse_node.global_position)
 	corpse_node.set_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META, corpse_node.rotation)
 
@@ -755,13 +743,13 @@ func _get_corpse_cleanup_carry_payload_offsets() -> Dictionary:
 
 
 func _finish_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
-	var cleaner := instance_from_id(cleaner_id)
-	var corpse := instance_from_id(corpse_id)
-	if is_instance_valid(cleaner) and cleaner is Node3D:
-		if cleaner.has_method("finish_carry_payload") and is_instance_valid(corpse) and corpse is Node3D:
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
+	if is_instance_valid(cleaner):
+		if cleaner.has_method("finish_carry_payload") and is_instance_valid(corpse):
 			cleaner.call("finish_carry_payload", corpse)
 		else:
-			SoldierActionHelper.finish_carry_payload(cleaner, corpse as Node3D if is_instance_valid(corpse) and corpse is Node3D else null)
+			SoldierActionHelper.finish_carry_payload(cleaner, corpse)
 
 
 func _get_corpse_cleanup_throw_origin(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
@@ -783,11 +771,10 @@ func _get_corpse_cleanup_throw_origin_from_actor_position(actor_position: Vector
 
 
 func _apply_corpse_cleanup_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, target_rotation: Vector3) -> void:
-	var corpse := instance_from_id(corpse_id)
-	var cleaner := instance_from_id(cleaner_id)
-	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	if not is_instance_valid(corpse_node) or not is_instance_valid(cleaner):
 		return
-	var corpse_node := corpse as Node3D
 	var start_position: Vector3 = corpse_node.get_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META, corpse_node.global_position)
 	var start_rotation: Vector3 = corpse_node.get_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META, corpse_node.rotation)
 	SoldierActionHelper.apply_carry_payload_pickup(cleaner, corpse_node, progress, start_position, start_rotation, target_rotation)
@@ -799,20 +786,18 @@ func _apply_corpse_cleanup_payload_pickup(progress: float, corpse_id: int, clean
 
 
 func _apply_corpse_cleanup_payload_follow(progress: float, corpse_id: int, cleaner_id: int, start_rotation: Vector3, target_rotation: Vector3) -> void:
-	var corpse := instance_from_id(corpse_id)
-	var cleaner := instance_from_id(cleaner_id)
-	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
+	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
+	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
+	if not is_instance_valid(corpse) or not is_instance_valid(cleaner):
 		return
 	SoldierActionHelper.apply_carry_payload_follow(cleaner, corpse, progress, start_rotation, target_rotation)
 
 
 func _capture_corpse_cleanup_throw_arc_by_id(corpse_id: int, cleaner_id: int) -> void:
-	var corpse := instance_from_id(corpse_id)
-	var cleaner := instance_from_id(cleaner_id)
-	if not is_instance_valid(corpse) or not (corpse is Node3D) or not is_instance_valid(cleaner) or not (cleaner is Node3D):
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	var cleaner_node := NodeContractHelper.get_instance_node3d(cleaner_id)
+	if not is_instance_valid(corpse_node) or not is_instance_valid(cleaner_node):
 		return
-	var corpse_node := corpse as Node3D
-	var cleaner_node := cleaner as Node3D
 	var throw_target: Vector3 = _get_corpse_cleanup_throw_target(corpse_node)
 	var throw_origin: Vector3 = _get_corpse_cleanup_throw_origin(cleaner_node, corpse_node, throw_target)
 	var start_position: Vector3 = corpse_node.global_position
@@ -828,10 +813,9 @@ func _capture_corpse_cleanup_throw_arc_by_id(corpse_id: int, cleaner_id: int) ->
 
 
 func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, cleaner_id: int) -> void:
-	var corpse := instance_from_id(corpse_id)
-	if not is_instance_valid(corpse) or not (corpse is Node3D):
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
 		return
-	var corpse_node := corpse as Node3D
 	if not corpse_node.has_meta(CORPSE_CLEANUP_THROW_ARC_META):
 		_capture_corpse_cleanup_throw_arc_by_id(corpse_id, cleaner_id)
 	var arc_data: Dictionary = corpse_node.get_meta(CORPSE_CLEANUP_THROW_ARC_META, {})
@@ -870,12 +854,12 @@ func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
 
 
 func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
-	var corpse := instance_from_id(corpse_id)
-	var cleaner := instance_from_id(cleaner_id)
+	var corpse := NodeContractHelper.get_instance_node(corpse_id)
+	var cleaner := NodeContractHelper.get_instance_node(cleaner_id)
 	if is_instance_valid(corpse):
 		if corpse is Node3D:
 			_play_corpse_cleanup_splash((corpse as Node3D).global_position)
-		_grant_corpse_cleanup_merit()
+		_grant_corpse_cleanup_xp()
 		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
 		corpse.queue_free()
 	if is_instance_valid(cleaner):
@@ -885,13 +869,13 @@ func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
 			SoldierActionHelper.finish_corpse_cleanup_action(cleaner)
 
 
-func _grant_corpse_cleanup_merit() -> void:
-	if not is_instance_valid(_cached_level_manager) or not _cached_level_manager.has_method("add_merit"):
+func _grant_corpse_cleanup_xp() -> void:
+	if not is_instance_valid(_cached_level_manager) or not _cached_level_manager.has_method("add_bonus_xp"):
 		return
-	var merit_reward: int = max(0, int(_cached_level_manager.get("corpse_cleanup_merit_reward")))
-	if merit_reward <= 0:
+	var xp_reward: int = max(0, int(_cached_level_manager.get("corpse_cleanup_xp_reward")))
+	if xp_reward <= 0:
 		return
-	_cached_level_manager.add_merit(merit_reward)
+	_cached_level_manager.add_bonus_xp(xp_reward)
 
 
 func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:

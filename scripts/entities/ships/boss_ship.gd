@@ -38,7 +38,7 @@ var orbit_angle: float = 0.0
 var leaking_rate: float = 0.0
 var _leak_tick_timer: float = 0.0
 var cached_lm: Node = null
-var _merit_granted: bool = false
+var _bonus_xp_granted: bool = false
 var _victory_reported: bool = false
 var _victory_report_retry_count: int = 0
 var _defeat_flourish_started: bool = false
@@ -632,10 +632,9 @@ func die() -> void:
 		if cached_lm.has_method("add_score"):
 			cached_lm.add_score(120)
 	
-	# 공적 포인트(Merit) 추가 (보스는 대량의 공적 부여)
-	if not _merit_granted and is_instance_valid(cached_lm) and cached_lm.has_method("add_merit"):
-		cached_lm.add_merit(50)
-		_merit_granted = true
+	if not _bonus_xp_granted and is_instance_valid(cached_lm) and cached_lm.has_method("add_bonus_xp"):
+		cached_lm.add_bonus_xp(50)
+		_bonus_xp_granted = true
 
 	_drop_treasure_chest()
 	_drop_floating_xp_loot()
@@ -648,7 +647,7 @@ func die() -> void:
 	
 	var boss_id: int = get_instance_id()
 	tween.chain().tween_callback(func():
-		var boss_ship = instance_from_id(boss_id)
+		var boss_ship := NodeContractHelper.get_instance_node(boss_id)
 		if not is_instance_valid(boss_ship):
 			return
 		boss_ship.call("_try_report_final_boss_victory")

@@ -146,14 +146,6 @@ func _connect_manager_events() -> void:
 			level_manager.score_changed.connect(func(new_score: int) -> void:
 				_mark_event("score_changed:%d" % new_score)
 			)
-		if level_manager.has_signal("merit_full"):
-			level_manager.merit_full.connect(func() -> void:
-				_mark_event("merit_full")
-			)
-		if level_manager.has_signal("merit_changed"):
-			level_manager.merit_changed.connect(func(current: int, maximum: int, level: int) -> void:
-				_mark_event("merit_changed:%d/%d:L%d" % [current, maximum, level])
-			)
 	if is_instance_valid(UpgradeManager) and UpgradeManager.has_signal("upgrade_applied"):
 		UpgradeManager.upgrade_applied.connect(func(upgrade_id: String, new_level: int) -> void:
 			_mark_event("upgrade_applied:%s:%d" % [upgrade_id, new_level])

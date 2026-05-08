@@ -25,17 +25,10 @@ static func apply_overlay_density(hud) -> void:
 	var height_fit: float = clampf((viewport_size.y - 720.0) / 360.0, 0.0, 1.0)
 	var density: float = min(width_fit, height_fit)
 	var top_bar_height := roundf(lerpf(20.0, 24.0, density))
-	var merit_bar_height := roundf(lerpf(14.0, 16.0, density))
 	if is_instance_valid(hud.xp_bar):
 		hud.xp_bar.custom_minimum_size.y = top_bar_height
-	if is_instance_valid(hud.merit_bar):
-		hud.merit_bar.offset_top = top_bar_height
-		hud.merit_bar.custom_minimum_size.y = merit_bar_height
 	if is_instance_valid(hud.level_label):
 		NavalUiTheme.style_overlay_caption(hud.level_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_MAIN, 4)
-	if is_instance_valid(hud.merit_label):
-		NavalUiTheme.style_overlay_value(hud.merit_label, roundi(lerpf(10.0, 11.0, density)))
-		hud.merit_label.add_theme_constant_override("outline_size", 3)
 	if is_instance_valid(hud.gust_warning):
 		hud.gust_warning.offset_left = -roundf(lerpf(220.0, 260.0, density))
 		hud.gust_warning.offset_right = roundf(lerpf(220.0, 260.0, density))
@@ -75,32 +68,6 @@ static func setup_top_xp_bar(hud) -> void:
 		"border_color": Color(0.42, 0.56, 0.68, 0.72),
 		"shine_strength": 0.18,
 	})
-
-	hud.merit_bar = HudGaugeBar.new()
-	hud.merit_bar.name = "TopMeritBar"
-	hud.add_child(hud.merit_bar)
-
-	hud.merit_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	hud.merit_bar.offset_top = 24.0
-	hud.merit_bar.custom_minimum_size.y = 16.0
-	hud.merit_bar.show_percentage = false
-	hud.merit_bar.z_index = 10
-
-	NavalUiTheme.apply_progress_bar(hud.merit_bar, Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0)
-	hud.merit_bar.configure_gauge(Color(0.09, 0.08, 0.06, 0.84), Color(0.92, 0.75, 0.28, 0.94), 0, {
-		"damage_trail": false,
-		"border_color": NavalUiTheme.BORDER_GOLD_SOFT,
-		"shine_strength": 0.22,
-	})
-
-	hud.merit_label = Label.new()
-	hud.merit_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hud.merit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.merit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_overlay_value(hud.merit_label, 10)
-	hud.merit_label.add_theme_constant_override("outline_size", 3)
-	hud.merit_label.text = "백병전 포인트 (업그레이드 대기)"
-	hud.merit_bar.add_child(hud.merit_label)
 
 
 static func attach_level_label_to_xp_bar(hud) -> void:

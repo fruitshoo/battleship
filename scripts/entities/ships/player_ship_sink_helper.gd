@@ -43,7 +43,7 @@ static func die(ship) -> void:
 	sink_tween.set_parallel(false)
 	var ship_id: int = ship.get_instance_id()
 	sink_tween.tween_callback(func():
-		var player_ship = instance_from_id(ship_id)
+		var player_ship := NodeContractHelper.get_instance_node(ship_id)
 		if not is_instance_valid(player_ship):
 			return
 		var hud = find_hud(player_ship)

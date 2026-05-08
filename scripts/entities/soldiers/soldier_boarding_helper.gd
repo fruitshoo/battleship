@@ -60,7 +60,7 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 	y_tween.tween_property(soldier, "position:y", jump_offset.y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	var soldier_id: int = soldier.get_instance_id()
 	y_tween.finished.connect(func():
-		var jumping_soldier = instance_from_id(soldier_id)
+		var jumping_soldier := NodeContractHelper.get_instance_node(soldier_id)
 		if is_instance_valid(jumping_soldier):
 			_finish_boarding_jump_pose(jumping_soldier, "on_deck")
 	)
@@ -72,7 +72,7 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 	if is_capture_attempt:
 		var target_ship_id: int = target_ship.get_instance_id()
 		tween.finished.connect(func():
-			var boarded_ship = instance_from_id(target_ship_id)
+			var boarded_ship := NodeContractHelper.get_instance_node(target_ship_id)
 			if is_instance_valid(boarded_ship):
 				boarded_ship.set_meta("being_boarded", false)
 		)
@@ -179,9 +179,9 @@ static func _play_boarding_war_cry_from_anchor(anchor: Node, cooldown_key: Strin
 	if delay_seconds > 0.0 and anchor.is_inside_tree():
 		var anchor_id: int = anchor.get_instance_id()
 		anchor.get_tree().create_timer(delay_seconds).timeout.connect(func():
-			var delayed_anchor = instance_from_id(anchor_id)
+			var delayed_anchor := NodeContractHelper.get_instance_node(anchor_id)
 			if is_instance_valid(delayed_anchor):
-				SoldierBoardingHelper._play_boarding_war_cry_now(delayed_anchor as Node, cooldown_key, true, volume_db, cooldown_msec)
+				SoldierBoardingHelper._play_boarding_war_cry_now(delayed_anchor, cooldown_key, true, volume_db, cooldown_msec)
 		)
 		return
 	_play_boarding_war_cry_now(anchor, cooldown_key, force, volume_db, cooldown_msec)

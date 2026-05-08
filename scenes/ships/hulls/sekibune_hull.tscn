@@ -1,93 +1,119 @@
 [gd_scene format=3 uid="uid://qv4d3dnh8v4u"]
 
 [ext_resource type="Script" uid="uid://cju5blrb32wwe" path="res://scripts/entities/ships/ship_authoring_visualizer.gd" id="authoring_visualizer"]
-[ext_resource type="Script" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
+[ext_resource type="Script" uid="uid://cua6d8e2qoc53" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
 [ext_resource type="PackedScene" uid="uid://ba4vxcs7pc2pt" path="res://scenes/props/japanese_mast.tscn" id="mast_scene"]
-[ext_resource type="PackedScene" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
-[ext_resource type="Texture2D" uid="uid://ci3fr3sjxkbxw" path="res://assets/models/props/sail/vertical_sail.png" id="vertical_sail"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_hull"]
-size = Vector3(2.4, 0.8, 7)
-
-[sub_resource type="StandardMaterial3D" id="Material_japan_wood"]
-albedo_color = Color(0.45, 0.3, 0.25, 1)
+[ext_resource type="PackedScene" uid="uid://bf8x1gkp3wln5" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
+[ext_resource type="PackedScene" uid="uid://cgoa735tg2m3p" path="res://assets/models/ships/seki/seki.glb" id="seki_model"]
 
 [node name="SekibuneHull" type="Node3D" unique_id=930639546]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=1525302330]
-mesh = SubResource("BoxMesh_hull")
-surface_material_override/0 = SubResource("Material_japan_wood")
+[node name="ScaleRoot" type="Node3D" parent="." unique_id=949713798]
 
-[node name="RudderVisual" parent="." unique_id=1052874943 instance=ExtResource("rudder_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 3.5)
+[node name="Hull" parent="ScaleRoot" unique_id=1525302330 instance=ExtResource("seki_model")]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, 0, 0, 0)
 
-[node name="Authoring" type="Node3D" parent="." unique_id=1257970825]
+[node name="RudderVisual" parent="ScaleRoot" unique_id=1052874943 instance=ExtResource("rudder_scene")]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0.58535725, 4.3133445)
+
+[node name="Authoring" type="Node3D" parent="ScaleRoot" unique_id=1257970825]
 script = ExtResource("authoring_visualizer")
 
-[node name="DeckArea" type="Node3D" parent="Authoring" unique_id=718085575]
+[node name="DeckArea" type="Node3D" parent="ScaleRoot/Authoring" unique_id=718085575]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.531, 0)
 script = ExtResource("deck_area_authoring")
+editor_alpha = 0.19
+metadata/use_authored_deck_area = true
 
-[node name="CannonSlots" type="Node3D" parent="Authoring" unique_id=1220168084]
+[node name="Points" type="Node3D" parent="ScaleRoot/Authoring/DeckArea" unique_id=1254525975]
 
-[node name="CannonFront" type="Marker3D" parent="Authoring/CannonSlots" unique_id=1467997765]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, -3.15)
+[node name="BowLeft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=265014515]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1684861, 0, -2.4631364)
 
-[node name="CannonLeft" type="Marker3D" parent="Authoring/CannonSlots" unique_id=1185412105]
+[node name="BowRight" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1571144922]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0430198, 0, -2.4631364)
+
+[node name="RightForward" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1539064329]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6395429, 0, -1.0196508)
+
+[node name="RightAft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=860426400]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.589543, 0, 2.3315024)
+
+[node name="SternRight" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1321325078]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1615807, 0, 4.003703)
+
+[node name="SternLeft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1551132525]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.147449, 0, 4.003703)
+
+[node name="LeftAft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=211936470]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7268947, 0, 2.3315024)
+
+[node name="LeftForward" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1017960858]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.647449, 0, -1.0196508)
+
+[node name="CannonSlots" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1220168084]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7451019, 0)
+
+[node name="CannonFront" type="Marker3D" parent="ScaleRoot/Authoring/CannonSlots" unique_id=1467997765]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, -1.9880109)
+
+[node name="CannonLeft" type="Marker3D" parent="ScaleRoot/Authoring/CannonSlots" unique_id=1185412105]
 transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -1.05, 0.65, -0.2)
 
-[node name="CannonRight" type="Marker3D" parent="Authoring/CannonSlots" unique_id=851989355]
+[node name="CannonRight" type="Marker3D" parent="ScaleRoot/Authoring/CannonSlots" unique_id=851989355]
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 1.05, 0.65, -0.2)
 
-[node name="BoardingAnchors" type="Node3D" parent="Authoring" unique_id=383886014]
+[node name="BoardingAnchors" type="Node3D" parent="ScaleRoot/Authoring" unique_id=383886014]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6723676, 0)
 
-[node name="RightForward" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1046957176]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 1, -2.35)
+[node name="RightForward" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1046957176]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.95497966, 1, -2.5707188)
 
-[node name="RightMid" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=292360904]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 1, 0)
+[node name="RightMid" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=292360904]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6043154, 1, 0)
 
-[node name="RightRear" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=489634899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 1, 2.35)
+[node name="RightRear" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=489634899]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2097472, 1, 4.0951986)
 
-[node name="LeftForward" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1836107327]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.35, 1, -2.35)
+[node name="LeftForward" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1836107327]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.95497966, 1, -2.5707188)
 
-[node name="LeftMid" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=491604036]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4, 1, 0)
+[node name="LeftMid" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=491604036]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6043154, 1, 0)
 
-[node name="LeftRear" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1128657814]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.35, 1, 2.35)
+[node name="LeftRear" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1128657814]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2097472, 1, 4.0951986)
 
-[node name="Bow" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=1107133994]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -3.55)
+[node name="Bow" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1107133994]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -2.7458003)
 
-[node name="Stern" type="Marker3D" parent="Authoring/BoardingAnchors" unique_id=123430751]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 3.55)
+[node name="Stern" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=123430751]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4.4418106)
 
-[node name="CrewSlots" type="Node3D" parent="Authoring" unique_id=469391249]
+[node name="CrewSlots" type="Node3D" parent="ScaleRoot/Authoring" unique_id=469391249]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6263745, 1.0679617)
 
-[node name="CrewForwardLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1977718397]
+[node name="CrewForwardLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1977718397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.55, -2.2)
 
-[node name="CrewForwardRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1259490887]
+[node name="CrewForwardRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1259490887]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.55, -2.2)
 
-[node name="CrewMidLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1474555364]
+[node name="CrewMidLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1474555364]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0.55, -0.25)
 
-[node name="CrewMidRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=839562690]
+[node name="CrewMidRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=839562690]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.55, -0.25)
 
-[node name="CrewRearLeft" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1305206970]
+[node name="CrewRearLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1305206970]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.55, 1.7)
 
-[node name="CrewRearRight" type="Marker3D" parent="Authoring/CrewSlots" unique_id=1544537119]
+[node name="CrewRearRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1544537119]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.55, 1.7)
 
-[node name="Masts" type="Node3D" parent="."]
+[node name="Masts" type="Node3D" parent="ScaleRoot" unique_id=530884995]
 
-[node name="MastPivot_01" type="Node3D" parent="Masts"]
+[node name="MastPivot_01" type="Node3D" parent="ScaleRoot/Masts" unique_id=689901080]
+transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, 0, 0)
 
-[node name="Mast" parent="Masts/MastPivot_01" unique_id=1732171799 instance=ExtResource("mast_scene")]
-sail_texture = ExtResource("vertical_sail")
-sail_uv_scale = Vector2(1, 1)
+[node name="Mast" parent="ScaleRoot/Masts/MastPivot_01" unique_id=1732171799 instance=ExtResource("mast_scene")]

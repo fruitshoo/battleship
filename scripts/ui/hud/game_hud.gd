@@ -83,6 +83,7 @@ var debug_enemy_fleet_value: Label = null
 var debug_ship_ai_value: Label = null
 var debug_enemy_ai_value: Label = null
 var debug_ally_ai_value: Label = null
+var debug_support_fleet_value: Label = null
 var debug_player_soldier_ai_value: Label = null
 var debug_enemy_soldier_ai_value: Label = null
 var performance_overlay_panel: PanelContainer = null
@@ -123,10 +124,6 @@ var _ship_debug_ui_syncing: bool = false
 var boarding_ui: VBoxContainer = null
 var boarding_bar: ProgressBar = null
 var boarding_label: Label = null
-
-# Merit UI
-var merit_bar: ProgressBar = null
-var merit_label: Label = null
 
 # Cached text/state
 var _last_timer_str: String = ""
@@ -207,11 +204,11 @@ const PLAYER_STATUS_STACK_HEIGHT: float = 13.0
 
 const SHIP_UPGRADE_IDS := [
 	"cannon", "cannon_damage", "cannon_reload", "janggun",
-	"hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "fleet_signal", "panokseon_upgrade", "geobukseon_upgrade",
+	"hull", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "geobukseon", "fleet_signal", "panokseon_upgrade", "geobukseon_upgrade",
 	"supply", "gold"
 ]
 const CREW_UPGRADE_IDS := [
-	"crew_numbers", "crew_attack", "crew_defense", "singigeon", "fire_pot", "repeating_crossbow"
+	"crew_numbers", "crew_defense", "singigeon", "fire_pot"
 ]
 
 
@@ -433,9 +430,6 @@ func update_stamina(current: float, maximum: float) -> void:
 
 func update_xp(current: int, maximum: int) -> void:
 	HudStatusDisplayHelper.update_xp(self, current, maximum)
-
-func update_merit(current: int, maximum: int, level: int = 1) -> void:
-	HudStatusDisplayHelper.update_merit(self, current, maximum, level)
 
 func add_item_icon(icon_data) -> void:
 	HudItemDisplayHelper.add_item_icon(self, icon_data)

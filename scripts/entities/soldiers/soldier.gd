@@ -159,6 +159,8 @@ const RANGED_DAMAGE_SOURCES := {
 	"singigeon": true,
 	"fire_pot": true,
 }
+const TARGET_STICKY_DETECTION_MULTIPLIER := 1.18
+const TARGET_STICKY_LOCAL_SWITCH_RATIO := 0.58
 const SOLDIER_MAX_LEVEL := 5
 const SOLDIER_XP_BASE_REQUIREMENT := 2.0
 const SOLDIER_XP_REQUIREMENT_STEP := 2.0
@@ -449,14 +451,19 @@ func _get_selected_soldier_visual_scene() -> PackedScene:
 	return soldier_visual_scene
 
 func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
-	if upgrade_id in ["crew_attack", "crew_defense"]:
+	if upgrade_id in ["crew_numbers", "crew_attack", "crew_defense"]:
+		if upgrade_id == "crew_numbers":
+			_apply_role_loadout()
 		_update_weapon_stats()
 
 ## 무기 공격력 수치 동기화
 func _update_weapon_stats() -> void:
 	var damage_bonus_pct := _get_total_weapon_damage_bonus_pct()
 
-	_sync_weapon_damage_bonus(weapon_sword, damage_bonus_pct)
+	var melee_damage_bonus_pct := damage_bonus_pct
+	if _get_melee_weapon_id() in ["spearman", "spear", "trident"]:
+		melee_damage_bonus_pct += _get_spear_damage_bonus_pct()
+	_sync_weapon_damage_bonus(weapon_sword, melee_damage_bonus_pct)
 	_sync_weapon_damage_bonus(weapon_bow, damage_bonus_pct)
 
 
@@ -481,6 +488,14 @@ func _get_total_weapon_damage_bonus_pct() -> float:
 	if has_meta("soldier_level_damage_bonus_pct"):
 		damage_bonus_pct += float(get_meta("soldier_level_damage_bonus_pct"))
 	return maxf(0.0, damage_bonus_pct)
+
+
+func _get_spear_damage_bonus_pct() -> float:
+	if team != "player":
+		return 0.0
+	if has_meta("spear_damage_bonus_pct"):
+		return maxf(0.0, float(get_meta("spear_damage_bonus_pct")))
+	return 0.0
 
 
 func _get_soldier_level_damage_bonus_pct() -> float:
@@ -1102,14 +1117,20 @@ func _perform_attack() -> void:
 
 ## 가장 가까운 적 찾기 (탐지 범위 및 동일 함선 우선순위 적용)
 func find_nearest_enemy() -> Node3D:
-	var limbo_target: Node3D = _get_recent_limbo_target()
-	if is_instance_valid(limbo_target):
-		_cached_nearest_enemy = limbo_target
-		return limbo_target
+	var sticky_target: Node3D = _get_sticky_current_enemy()
 	if is_instance_valid(owned_ship):
 		var owned_team: String = owned_ship.get_team_tag() if owned_ship.has_method("get_team_tag") else str(owned_ship.get("team"))
 		if owned_team == team:
 			var local_hostile := find_nearest_hostile_on_owned_ship()
+			if is_instance_valid(sticky_target) and _get_target_owned_ship_node(sticky_target) == owned_ship:
+				if is_instance_valid(local_hostile) and local_hostile != sticky_target:
+					var sticky_dist_sq: float = _get_planar_distance_sq_to(sticky_target)
+					var local_dist_sq: float = _get_planar_distance_sq_to(local_hostile)
+					if local_dist_sq < sticky_dist_sq * TARGET_STICKY_LOCAL_SWITCH_RATIO:
+						_cached_nearest_enemy = local_hostile
+						return local_hostile
+				_cached_nearest_enemy = sticky_target
+				return sticky_target
 			if is_instance_valid(local_hostile):
 				_cached_nearest_enemy = local_hostile
 				return local_hostile
@@ -1117,9 +1138,52 @@ func find_nearest_enemy() -> Node3D:
 			if is_instance_valid(fallback_hostile):
 				_cached_nearest_enemy = fallback_hostile
 				return fallback_hostile
+	var limbo_target: Node3D = _get_recent_limbo_target()
+	if _is_valid_enemy_target(limbo_target):
+		_cached_nearest_enemy = limbo_target
+		return limbo_target
+	if is_instance_valid(sticky_target):
+		_cached_nearest_enemy = sticky_target
+		return sticky_target
 	if _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
 		return _cached_nearest_enemy
 	return _refresh_nearest_enemy_cache(true)
+
+
+func _get_sticky_current_enemy() -> Node3D:
+	var target := current_target as Node3D
+	if not _is_valid_enemy_target(target):
+		return null
+	var max_sticky_distance: float = detection_range * TARGET_STICKY_DETECTION_MULTIPLIER
+	if _get_planar_distance_sq_to(target) > max_sticky_distance * max_sticky_distance:
+		return null
+	return target
+
+
+func _is_valid_enemy_target(target: Node3D) -> bool:
+	if not is_instance_valid(target) or not target.is_inside_tree():
+		return false
+	if SoldierStateHelper.is_dead_soldier(target):
+		return false
+	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
+	return target_team != team
+
+
+func _get_target_owned_ship_node(target: Node) -> Node3D:
+	if not is_instance_valid(target):
+		return null
+	if target.has_method("get_owned_ship_node"):
+		return target.call("get_owned_ship_node") as Node3D
+	var owned_value: Variant = target.get("owned_ship")
+	return owned_value as Node3D if is_instance_valid(owned_value) else null
+
+
+func _get_planar_distance_sq_to(target: Node3D) -> float:
+	if not is_instance_valid(target):
+		return INF
+	var dx: float = global_position.x - target.global_position.x
+	var dz: float = global_position.z - target.global_position.z
+	return dx * dx + dz * dz
 
 func find_nearest_hostile_on_owned_ship() -> Node3D:
 	return SoldierShipHelper.find_nearest_hostile_on_owned_ship(self)
@@ -1181,6 +1245,10 @@ func _get_cross_ship_contact_point_local(other_ship: Node3D) -> Vector3:
 
 func _get_cross_ship_contact_point_global(other_ship: Node3D) -> Vector3:
 	return SoldierShipHelper.get_cross_ship_contact_point_global(self, other_ship)
+
+
+func _get_stable_cross_ship_contact_point_global(other_ship: Node3D) -> Vector3:
+	return SoldierShipHelper.get_stable_cross_ship_contact_point_global(self, other_ship)
 
 
 func _is_in_cross_ship_contact_zone(other_ship: Node3D) -> bool:
@@ -1579,11 +1647,11 @@ func _clamp_incapacitated_assist_position_to_deck(assist_target: Node3D, world_p
 func _resolve_incapacitated_assist_target() -> Node3D:
 	var current_id: int = int(get_meta(INCAPACITATED_ASSIST_TARGET_ID_META, 0))
 	if current_id != 0:
-		var current_target_node := instance_from_id(current_id) as Node3D
+		var current_target_node := NodeContractHelper.get_instance_node3d(current_id)
 		if is_instance_valid(current_target_node) \
 		and current_target_node.get_meta("incapacitated", false) == true \
 		and current_target_node.get("owned_ship") == owned_ship:
-			var claimed_reviver := instance_from_id(int(current_target_node.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0)))
+			var claimed_reviver := NodeContractHelper.get_instance_node(int(current_target_node.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0)))
 			if not is_instance_valid(claimed_reviver) or claimed_reviver == self:
 				current_target_node.set_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, get_instance_id())
 				return current_target_node
@@ -1599,7 +1667,7 @@ func _resolve_incapacitated_assist_target() -> Node3D:
 			continue
 		var claimed_reviver_id: int = int(other.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0))
 		if claimed_reviver_id != 0 and claimed_reviver_id != get_instance_id():
-			var claimed_reviver = instance_from_id(claimed_reviver_id)
+			var claimed_reviver := NodeContractHelper.get_instance_node(claimed_reviver_id)
 			if is_instance_valid(claimed_reviver):
 				continue
 			other.remove_meta(INCAPACITATED_ASSIST_REVIVER_ID_META)
@@ -1654,7 +1722,7 @@ func _get_incapacitated_assist_stat_ship() -> Node:
 
 func _clear_incapacitated_assist_target() -> void:
 	var target_id: int = int(get_meta(INCAPACITATED_ASSIST_TARGET_ID_META, 0))
-	var target := instance_from_id(target_id) as Node3D if target_id != 0 else null
+	var target := NodeContractHelper.get_instance_node3d(target_id) if target_id != 0 else null
 	_finish_incapacitated_assist_action(target)
 	if target_id != 0:
 		if is_instance_valid(target) and int(target.get_meta(INCAPACITATED_ASSIST_REVIVER_ID_META, 0)) == get_instance_id():
@@ -2066,7 +2134,7 @@ func _get_recent_limbo_target() -> Node3D:
 	var target_id: int = int(get_meta(SoldierAILimboKeys.META_TARGET_ID, 0))
 	if target_id == 0:
 		return null
-	return instance_from_id(target_id) as Node3D
+	return NodeContractHelper.get_instance_node3d(target_id)
 
 
 func _get_recent_limbo_mode() -> String:

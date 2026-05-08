@@ -172,6 +172,7 @@ func _spawn_ship(scene: PackedScene, world_pos: Vector3, player: Node3D, meta_na
 		return
 	add_child(ship)
 	ship.set_meta(meta_name, true)
+	PreviewHarnessHelper.unlock_preview_enemy_fire_pot(ship)
 	if ship is Node3D:
 		ship.global_position = world_pos
 		ship.look_at(player.global_position, Vector3.UP)

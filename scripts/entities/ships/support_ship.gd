@@ -142,6 +142,7 @@ func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
 	_apply_formation_role_profile()
 	_rebuild_runtime_hull(stats)
 	_cache_hull_references(self)
+	_apply_authored_deck_height_if_available()
 	_refresh_collision_bounds_from_hull()
 
 	if not has_cannons:
@@ -297,10 +298,9 @@ func _apply_support_corpse_cleanup_throw_arc(
 	start_rotation: Vector3,
 	target_rotation: Vector3
 ) -> void:
-	var corpse := instance_from_id(corpse_id)
-	if not is_instance_valid(corpse) or not (corpse is Node3D):
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
 		return
-	var corpse_node := corpse as Node3D
 	var arc_position := start_position.lerp(target_position, progress)
 	arc_position.y += sin(progress * PI) * support_corpse_cleanup_throw_height
 	corpse_node.global_position = arc_position
@@ -308,11 +308,10 @@ func _apply_support_corpse_cleanup_throw_arc(
 
 
 func _finish_support_corpse_cleanup(corpse_id: int, splash_position: Vector3) -> void:
-	var corpse := instance_from_id(corpse_id)
-	if not is_instance_valid(corpse) or not (corpse is Node):
+	var corpse_node := NodeContractHelper.get_instance_node(corpse_id)
+	if not is_instance_valid(corpse_node):
 		return
 	_play_support_corpse_cleanup_splash(splash_position)
-	var corpse_node := corpse as Node
 	if corpse_node.has_meta(SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META):
 		corpse_node.remove_meta(SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META)
 	corpse_node.queue_free()

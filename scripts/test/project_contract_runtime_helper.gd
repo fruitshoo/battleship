@@ -1341,7 +1341,7 @@ static func _run_fire_effect_pool_reset_contract(owner: Node, failures: Array[St
 	var fire_effect_id := fire_effect.get_instance_id()
 	ScenePool.release(fire_effect)
 	await _wait_frames(owner, 2)
-	var pooled_effect := instance_from_id(fire_effect_id) as Node
+	var pooled_effect := NodeContractHelper.get_instance_node(fire_effect_id)
 	if is_instance_valid(pooled_effect) and _is_fire_effect_active(pooled_effect):
 		failures.append("fire effect pool reset contract left smoke particles active after release")
 

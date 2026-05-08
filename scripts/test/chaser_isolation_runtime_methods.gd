@@ -28,8 +28,6 @@ func _update_editor_hull() -> void:
 	var h_path = "res://scenes/ships/hulls/sekibune_hull.tscn"
 	if type_lower.contains("kobayabune"):
 		h_path = "res://scenes/ships/hulls/kobayabune_hull.tscn"
-	elif type_lower == "sekibune_melee":
-		h_path = "res://scenes/ships/hulls/sekibune_melee_hull.tscn"
 	elif type_lower.contains("panokseon"):
 		h_path = "res://scenes/ships/hulls/panok_hull.tscn"
 	elif type_lower.contains("atakebune"):
@@ -57,8 +55,6 @@ func _ready() -> void:
 	var type_lower := ship_type.to_lower()
 	if type_lower.contains("kobayabune"):
 		runtime_hull_scene = load("res://scenes/ships/hulls/kobayabune_hull.tscn")
-	elif type_lower == "sekibune_melee":
-		runtime_hull_scene = load("res://scenes/ships/hulls/sekibune_melee_hull.tscn")
 	elif type_lower.contains("atakebune"):
 		runtime_hull_scene = load("res://scenes/ships/hulls/atakebune_hull.tscn")
 	elif type_lower.contains("sekibune"):

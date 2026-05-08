@@ -223,23 +223,20 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"rows": [
 			{"icon": "group", "label": "생존 / 정원", "value": "%d / %d" % [int(crew_stats.get("alive_count", 0)), int(_get_int(ship, "max_crew_count", 0))]},
 			{"icon": "schedule", "label": "보충 시간", "value": "%.1fs" % _get_float(ship, "crew_respawn_interval", 0.0)},
-			{"icon": "badge", "label": "편성", "value": "일%d 창%d 화%d 연%d" % [
+			{"icon": "badge", "label": "편성", "value": "일%d 화%d 연%d" % [
 				int(crew_stats.get("general_count", 0)),
-				int(crew_stats.get("spearman_count", 0)),
 				int(crew_stats.get("fire_pot_count", 0)),
 				int(crew_stats.get("repeater_count", 0)),
 			]},
-			{"icon": "rocket_launch", "label": "신기전", "value": "%d명" % [
-				int(crew_stats.get("singigeon_count", 0)),
-			]},
+			{"icon": "rocket_launch", "label": "신기전", "value": _get_singigeon_proc_value(hud)},
 			{"icon": "health_and_safety", "label": "대표 병사 HP / 방어", "value": "%.0f / %.1f" % [
 				float(crew_stats.get("sample_hp", 0.0)),
 				float(crew_stats.get("sample_defense", 0.0)),
 			], "tooltip": _build_flat_bonus_tooltip("병사 방어", "병사 방어력", crew_defense_site_bonus)},
-			{"icon": "swords", "label": "검 / 활", "value": "%.1f / %.1f" % [
+			{"icon": "swords", "label": "근접 / 활", "value": "%.1f / %.1f" % [
 				float(crew_stats.get("sword_damage", 0.0)),
 				float(crew_stats.get("bow_damage", 0.0)),
-			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "최종 무기 피해 = 기본 무기 피해 x (1 + 병사 공격 업그레이드 + 해역 병사 무기)")},
+			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "창 피해 = 기본 창 피해 x (1 + 창병 업그레이드 + 해역 병사 무기)\n활 피해 = 기본 활 피해 x (1 + 해역 병사 무기)")},
 			{"icon": "grade", "label": "치명타", "value": "%.0f%% x%.1f" % [
 				float(crew_stats.get("crit_chance", 0.0)) * 100.0,
 				float(crew_stats.get("crit_multiplier", 1.0)),
@@ -653,6 +650,17 @@ static func _collect_crew_stats(ship) -> Dictionary:
 	result["bow_damage"] = ranged_damage
 	return result
 
+static func _get_singigeon_proc_value(hud) -> String:
+	var um: Node = hud.get_node_or_null("/root/UpgradeManager") if is_instance_valid(hud) else null
+	if not is_instance_valid(um) or not ("current_levels" in um):
+		return "0%"
+	var level := int(um.current_levels.get("singigeon", 0))
+	if level <= 0:
+		return "0%"
+	var upgrades: Dictionary = um.get("UPGRADES") if um.get("UPGRADES") is Dictionary else {}
+	var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(upgrades, um.current_levels, level)
+	return "%.0f%%" % (float(proc_stats.get("chance", 0.0)) * 100.0)
+
 
 static func _is_dead_soldier_node(soldier: Node) -> bool:
 	if not is_instance_valid(soldier):
@@ -741,7 +749,7 @@ static func _build_site_bonus_tooltip(bonus_id: String, bonus_name: String, valu
 			lines.append("계산: 기본 재장전 x 화약 배율 x (1 - 해역 포격 속도) x 병사/함대/상태 배율")
 		"crew_damage_pct":
 			lines.append("적용: 병사 검/활/무기 피해 배율에 합산")
-			lines.append("계산: 기본 무기 피해 x (1 + 병사 공격 업그레이드 + 해역 병사 무기)")
+			lines.append("계산: 창 피해는 창병 업그레이드와 합산, 활 피해는 해역 병사 무기 보너스와 합산")
 		"crew_defense_add":
 			lines.append("적용: 병사 방어력에 더함")
 			lines.append("계산: 기존 병사 방어력 + 해역 보너스")

@@ -84,6 +84,13 @@ static func reset_preview_fire_pot_cooldown(ship: Node) -> bool:
 	return false
 
 
+static func unlock_preview_enemy_fire_pot(ship: Node) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	ship.set_meta("enemy_fire_pot_unlocked", true)
+	return true
+
+
 static func set_preview_fire_pot_enabled(ship: Node, enabled: bool) -> bool:
 	if not is_instance_valid(ship):
 		return false

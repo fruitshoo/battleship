@@ -14,6 +14,30 @@ const SHIP_CONTACT_AREA_NAMES := [
 	SHIP_NODE_PROXIMITY_AREA,
 ]
 
+
+static func get_instance_node(instance_id: int) -> Node:
+	if instance_id == 0 or not is_instance_id_valid(instance_id):
+		return null
+	var instance: Object = instance_from_id(instance_id)
+	if not is_instance_valid(instance) or not (instance is Node):
+		return null
+	return instance as Node
+
+
+static func get_instance_node3d(instance_id: int) -> Node3D:
+	var node := get_instance_node(instance_id)
+	if not is_instance_valid(node) or not (node is Node3D):
+		return null
+	return node as Node3D
+
+
+static func get_instance_mesh_instance_3d(instance_id: int) -> MeshInstance3D:
+	var node := get_instance_node(instance_id)
+	if not is_instance_valid(node) or not (node is MeshInstance3D):
+		return null
+	return node as MeshInstance3D
+
+
 static func get_team_tag(node: Node, fallback: String = "") -> String:
 	if not is_instance_valid(node):
 		return fallback
@@ -131,7 +155,9 @@ static func get_soldiers_container(node: Node) -> Node:
 		return null
 	if node.has_method("get_soldiers_container"):
 		var container: Variant = node.call("get_soldiers_container")
-		return container as Node if container is Node else null
+		if not is_instance_valid(container) or not (container is Node):
+			return null
+		return container as Node
 	return node.get_node_or_null(SHIP_NODE_SOLDIERS)
 
 
@@ -140,9 +166,13 @@ static func get_cannons_container(node: Node) -> Node3D:
 		return null
 	if node.has_method("get_cannons_container"):
 		var container: Variant = node.call("get_cannons_container")
-		return container as Node3D if container is Node3D else null
+		if not is_instance_valid(container) or not (container is Node3D):
+			return null
+		return container as Node3D
 	var fallback := node.find_child(SHIP_NODE_CANNONS, true, false)
-	return fallback as Node3D if fallback is Node3D else null
+	if not is_instance_valid(fallback) or not (fallback is Node3D):
+		return null
+	return fallback as Node3D
 
 
 static func ensure_cannons_container(node: Node) -> Node3D:
@@ -150,9 +180,11 @@ static func ensure_cannons_container(node: Node) -> Node3D:
 		return null
 	if node.has_method("ensure_cannons_container"):
 		var container: Variant = node.call("ensure_cannons_container")
-		return container as Node3D if container is Node3D else null
+		if not is_instance_valid(container) or not (container is Node3D):
+			return null
+		return container as Node3D
 	var existing := get_cannons_container(node)
-	if existing is Node3D:
+	if is_instance_valid(existing):
 		return existing
 	var created := Node3D.new()
 	created.name = SHIP_NODE_CANNONS
@@ -192,9 +224,11 @@ static func install_janggun_launcher(node: Node, launcher_scene: PackedScene, lo
 		return null
 	if node.has_method("install_janggun_launcher"):
 		var mounted: Variant = node.call("install_janggun_launcher", launcher_scene, local_position)
-		return mounted as Node3D if mounted is Node3D else null
+		if not is_instance_valid(mounted) or not (mounted is Node3D):
+			return null
+		return mounted as Node3D
 	var existing := node.get_node_or_null(SHIP_NODE_JANGGUN_LAUNCHER)
-	if existing is Node3D:
+	if is_instance_valid(existing) and existing is Node3D:
 		return existing as Node3D
 	if launcher_scene == null:
 		return null
@@ -215,9 +249,13 @@ static func get_proximity_area(node: Node) -> Area3D:
 		return null
 	if node.has_method("get_proximity_area"):
 		var area: Variant = node.call("get_proximity_area")
-		return area as Area3D if area is Area3D else null
+		if not is_instance_valid(area) or not (area is Area3D):
+			return null
+		return area as Area3D
 	var fallback := node.get_node_or_null(SHIP_NODE_PROXIMITY_AREA)
-	return fallback as Area3D if fallback is Area3D else null
+	if not is_instance_valid(fallback) or not (fallback is Area3D):
+		return null
+	return fallback as Area3D
 
 
 static func get_hit_area(node: Node) -> Area3D:
@@ -225,9 +263,13 @@ static func get_hit_area(node: Node) -> Area3D:
 		return null
 	if node.has_method("get_hit_area"):
 		var area: Variant = node.call("get_hit_area")
-		return area as Area3D if area is Area3D else null
+		if not is_instance_valid(area) or not (area is Area3D):
+			return null
+		return area as Area3D
 	var fallback := node.get_node_or_null(SHIP_NODE_HIT_AREA)
-	return fallback as Area3D if fallback is Area3D else null
+	if not is_instance_valid(fallback) or not (fallback is Area3D):
+		return null
+	return fallback as Area3D
 
 
 static func get_base_collision_radius_value(node: Node) -> float:

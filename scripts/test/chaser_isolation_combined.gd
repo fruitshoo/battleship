@@ -61,4 +61,3 @@ var _ai_logic_update_interval_runtime: float = 0.2
 @export_range(0.05, 0.5, 0.01) var ai_separation_update_interval: float = 0.12
 var _ai_separation_update_interval_runtime: float = 0.12
 var has_rammed: bool = false
-var _merit_granted: bool = false

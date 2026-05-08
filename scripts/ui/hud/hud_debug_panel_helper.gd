@@ -2620,6 +2620,13 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	section["body"].add_child(ally_ai_status)
 	hud.debug_ally_ai_value = ally_ai_status
 
+	var support_fleet_status := Label.new()
+	support_fleet_status.text = "지원함 진형: -"
+	support_fleet_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(support_fleet_status, 10)
+	section["body"].add_child(support_fleet_status)
+	hud.debug_support_fleet_value = support_fleet_status
+
 	var player_soldier_ai_status := Label.new()
 	player_soldier_ai_status.text = "아군 병사 AI: -"
 	player_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

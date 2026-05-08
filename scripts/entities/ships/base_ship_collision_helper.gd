@@ -285,10 +285,15 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 		return false
 	if other.get_meta("derelict_contact_disposal_started", false) == true or other.get_meta("derelict_contact_salvaged", false) == true:
 		return false
+	if _has_active_deck_melee(ship):
+		other.set_meta("derelict_contact_waiting_for_deck_melee", true)
+		return false
 	if _has_unresolved_affiliated_boarders(other):
 		other.set_meta("derelict_contact_waiting_for_boarder_cleanup", true)
 		return false
 
+	if other.has_meta("derelict_contact_waiting_for_deck_melee"):
+		other.remove_meta("derelict_contact_waiting_for_deck_melee")
 	if other.has_meta("derelict_contact_waiting_for_boarder_cleanup"):
 		other.remove_meta("derelict_contact_waiting_for_boarder_cleanup")
 	other.set_meta("derelict_contact_disposal_started", true)
@@ -315,6 +320,33 @@ static func _is_derelict_ship(node: Node) -> bool:
 		return node.is_derelict_ship()
 	if "is_derelict" in node:
 		return node.get("is_derelict") == true
+	return false
+
+
+static func _has_active_deck_melee(ship: Node) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.get("deck_is_contested") == true or ship.get("deck_is_overrun") == true:
+		return true
+	var hostile_count_variant: Variant = ship.get("deck_hostile_boarder_count")
+	if hostile_count_variant != null and int(hostile_count_variant) > 0:
+		return true
+
+	var ship_team: String = NodeContractHelper.get_team_tag(ship, "")
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(soldier) or SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		var soldier_team: String = NodeContractHelper.get_team_tag(soldier, "")
+		if not ship_team.is_empty() and soldier_team != ship_team:
+			return true
+		var target: Variant = soldier.get("current_target")
+		if not is_instance_valid(target):
+			continue
+		if target.get("owned_ship") != ship:
+			continue
+		var target_team: String = NodeContractHelper.get_team_tag(target, "")
+		if not ship_team.is_empty() and not target_team.is_empty() and target_team != ship_team:
+			return true
 	return false
 
 
@@ -371,7 +403,10 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 		other_dot = abs(other_fwd.dot(-dir_to_other))
 
 	var angle_mult = remap(dot, 0.0, 1.0, 1.25, 0.30)
-	var final_ram_damage = impact_speed * 3.2 * angle_mult
+	var attacker_ram_mult := 1.0
+	if is_instance_valid(other) and other.get("ramming_damage_multiplier") != null:
+		attacker_ram_mult = maxf(0.1, float(other.get("ramming_damage_multiplier")))
+	var final_ram_damage = impact_speed * 3.2 * angle_mult * attacker_ram_mult
 
 	var impact_pos = (ship.global_position + other.global_position) * 0.5
 	impact_pos.y = 0.5

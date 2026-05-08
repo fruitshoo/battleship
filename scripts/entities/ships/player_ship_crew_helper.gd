@@ -116,6 +116,14 @@ static func sync_player_crew_roster(ship) -> void:
 			role = ship.CREW_ROLE_GENERAL
 		roster_by_role[role].append(child)
 	roster_captains.sort_custom(func(a, b): return _captain_retention_rank(a) > _captain_retention_rank(b))
+	for role in [ship.CREW_ROLE_SPEARMAN, ship.CREW_ROLE_REPEATING_CROSSBOW, ship.CREW_ROLE_SINGIGEON, ship.CREW_ROLE_FIRE_POT]:
+		while roster_by_role[role].size() > int(desired.get(role, 0)):
+			var surplus = roster_by_role[role].pop_back()
+			if surplus.has_method("apply_crew_role"):
+				surplus.apply_crew_role(ship.CREW_ROLE_GENERAL)
+			else:
+				surplus.set_meta("crew_role", ship.CREW_ROLE_GENERAL)
+			roster_by_role[ship.CREW_ROLE_GENERAL].append(surplus)
 	while roster_captains.size() > desired_captains:
 		var extra_captain = roster_captains.pop_back()
 		set_captain_state(ship, extra_captain, false)

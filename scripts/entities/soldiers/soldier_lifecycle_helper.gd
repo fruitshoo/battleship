@@ -380,7 +380,7 @@ static func _schedule_incapacitated_recovery(soldier) -> void:
 
 
 static func _try_recover_incapacitated_by_id(soldier_id: int) -> void:
-	var soldier = instance_from_id(soldier_id)
+	var soldier := NodeContractHelper.get_instance_node(soldier_id)
 	if not is_instance_valid(soldier):
 		return
 	_try_recover_incapacitated(soldier)
@@ -484,11 +484,11 @@ static func _apply_melee_kill_bonus(soldier) -> void:
 		return
 
 	var xp_bonus: int = max(0, int(lm.get("melee_kill_xp_bonus")))
-	var merit_bonus: int = max(0, int(lm.get("melee_kill_merit_bonus")))
+	var bonus_xp: int = max(0, int(lm.get("melee_kill_bonus_xp")))
 	if xp_bonus > 0 and lm.has_method("add_xp"):
 		lm.add_xp(xp_bonus)
-	if merit_bonus > 0 and lm.has_method("add_merit"):
-		lm.add_merit(merit_bonus)
+	if bonus_xp > 0 and lm.has_method("add_bonus_xp"):
+		lm.add_bonus_xp(bonus_xp)
 
 
 static func _apply_enemy_kill_rewards(soldier) -> void:
@@ -501,11 +501,11 @@ static func _apply_enemy_kill_rewards(soldier) -> void:
 	var death_cause: String = str(soldier.get_meta("last_death_cause", "combat"))
 	if death_cause == "drowned":
 		var drown_xp: int = max(0, int(lm.get("drowned_soldier_kill_xp_reward")))
-		var drown_merit: int = max(0, int(lm.get("drowned_soldier_kill_merit_reward")))
+		var drown_bonus_xp: int = max(0, int(lm.get("drowned_soldier_kill_bonus_xp_reward")))
 		if drown_xp > 0 and lm.has_method("add_xp"):
 			lm.add_xp(drown_xp)
-		if drown_merit > 0 and lm.has_method("add_merit"):
-			lm.add_merit(drown_merit)
+		if drown_bonus_xp > 0 and lm.has_method("add_bonus_xp"):
+			lm.add_bonus_xp(drown_bonus_xp)
 		if lm.has_method("add_soldier_kill"):
 			lm.add_soldier_kill(1, "drowned")
 		return
@@ -515,8 +515,6 @@ static func _apply_enemy_kill_rewards(soldier) -> void:
 		lm.add_xp(combat_xp)
 	if lm.has_method("add_soldier_kill"):
 		lm.add_soldier_kill(1, "combat")
-	if lm.has_method("add_command_xp_from_soldier_kill"):
-		lm.add_command_xp_from_soldier_kill(1)
-	elif lm.has_method("add_merit"):
-		lm.add_merit(max(0, int(lm.get("merit_per_soldier_kill"))))
+	if lm.has_method("add_bonus_xp_from_soldier_kill"):
+		lm.add_bonus_xp_from_soldier_kill(1)
 	_apply_melee_kill_bonus(soldier)

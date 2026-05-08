@@ -260,16 +260,26 @@ Required root children:
 Optional authoring root:
 
 ```text
-Authoring (ShipAuthoringVisualizer)
-  DeckArea
-  BoardingAnchors
-  CannonSlots
-  WeaponSlots
-  CrewSlots
+HullSceneRoot
+  ScaleRoot
+    Hull
+    RudderVisual
+    Masts
+    Oars
+    Anchor
+    Authoring (ShipAuthoringVisualizer)
+      DeckArea
+      BoardingAnchors
+      CannonSlots
+      WeaponSlots
+      CrewSlots
 ```
 
-These optional markers are safe to add now. If they are absent, the game keeps
-using the existing automatic hull/deck calculations.
+Place imported visuals and authoring markers under `ScaleRoot`. This keeps
+model scale changes, mast/rudder/anchor placement, and deck markers in the same
+local space, without nesting authoring data inside a reimported GLB node. These
+optional markers are safe to add now. If they are absent, the game keeps using
+the existing automatic hull/deck calculations.
 
 All current hull scenes expose this authoring root. Large or boss-ready hulls
 provide seven cannon slots and eight crew slots. Smaller raider/support hulls
@@ -341,13 +351,28 @@ The support ship currently uses `maengseon_hull.tscn`, which provides:
 
 The project contract sweep checks authoring markers on these hull scenes:
 
-- `panokseon_hull.tscn`
+- `panok_hull.tscn`
 - `maengseon_hull.tscn`
 - `atakebune_hull.tscn`
 - `geobukseon_hull.tscn`
 - `kobayabune_hull.tscn`
 - `sekibune_hull.tscn`
-- `sekibune_melee_hull.tscn`
+
+Current hull scenes pull their source models from these asset folders:
+
+- `panok_hull.tscn` -> `assets/models/ships/panok/panok.glb`
+- `maengseon_hull.tscn` -> `assets/models/ships/maengseon/maengseon.glb`
+- `atakebune_hull.tscn` -> shared authored geometry in the scene file
+- `geobukseon_hull.tscn` -> `assets/models/ships/geobuk/geobuk.glb`
+- `kobayabune_hull.tscn` -> `assets/models/ships/kobaya/kobaya.glb`
+- `sekibune_hull.tscn` -> `assets/models/ships/seki/seki.glb`
+
+Panok and Geobukseon hulls may instance `res://scenes/props/anchor.tscn`,
+sourced from `assets/models/props/anchor/anchor.glb`.
+
+Retired hull scene names should stay retired: use `panok_hull.tscn`,
+`sekibune_hull.tscn`, and `maengseon_hull.tscn` instead of reintroducing the old
+Panokseon, Sekibune melee, or ship 11 file names.
 
 Every listed hull must keep `DeckArea`, `BoardingAnchors`, `CannonSlots`, and
 `CrewSlots` so ship scenes can be assembled visually instead of relying on

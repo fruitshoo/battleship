@@ -212,6 +212,7 @@ func _spawn_fresh_ships(scenario: Dictionary) -> void:
 	if is_instance_valid(_current_enemy_ship):
 		_current_enemy_ship.name = "CombatPreviewEnemy"
 		_current_enemy_ship.set_meta("ship_combat_preview_spawn", true)
+		PreviewHarnessHelper.unlock_preview_enemy_fire_pot(_current_enemy_ship)
 		add_child(_current_enemy_ship)
 
 		var distance: float = float(scenario.get("distance", 12.0))

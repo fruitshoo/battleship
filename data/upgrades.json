@@ -66,11 +66,16 @@
 			"singigeon": {
 				"name": "신기전",
 				"category": 1,
-				"description": "기존 병사에게 신기전 운용을 맡기고 적 병사를 밀쳐냄. 고레벨에서 낙수 가능",
+				"description": "활 공격 시 일정 확률로 신기전을 발사하고 적 병사를 밀쳐냄. 고레벨에서 낙수 가능",
 				"max_level": 5,
 				"color": "ff4c4c",
 				"stats": {
-				"specialist_levels": [1, 3, 5],
+				"base_proc_chance": 0.08,
+				"proc_chance_per_lv": 0.03,
+				"max_proc_chance": 0.2,
+				"ship_proc_cooldown": 1.0,
+				"proc_pity_add_per_miss": 0.015,
+				"proc_pity_max_bonus": 0.06,
 				"base_damage": 2.2,
 				"personnel_damage_mult": 6.0,
 				"base_cooldown": 5.0,
@@ -109,6 +114,7 @@
 				"name": "연노",
 				"category": 1,
 				"description": "기존 병사에게 연노 운용을 맡김",
+				"disabled": true,
 				"max_level": 5,
 				"color": "99cc33",
 				"stats": {
@@ -139,11 +145,11 @@
 			"crew_numbers": {
 				"name": "창병",
 				"category": 1,
-				"description": "기존 병사를 창병으로 전환",
+				"description": "병사들의 근접 무기를 창으로 바꾸고 창 피해를 강화",
 				"max_level": 5,
 				"color": "66ccff",
 				"stats": {
-				"specialist_levels": [1, 3, 5]
+				"damage_bonus_pct_per_lv": 0.06
 			}
 		},
 		"crew_reserve": {
@@ -184,6 +190,7 @@
 			"name": "무기",
 			"category": 1,
 			"description": "병사 무기 피해 강화",
+			"disabled": true,
 			"max_level": 5,
 			"color": "e3bf3a",
 			"stats": {
@@ -204,7 +211,7 @@
 			}
 		},
 		"hull_defense": {
-			"name": "선체",
+			"name": "방어",
 			"category": 2,
 			"description": "선체 방어력 강화",
 			"max_level": 5,
@@ -212,6 +219,17 @@
 			"stats": {
 				"def_levels": [1, 2, 3, 4, 5],
 				"def_add": 1.0
+			}
+		},
+		"hull": {
+			"name": "선체",
+			"category": 2,
+			"description": "최대 내구도와 충돌 피해 강화",
+			"max_level": 5,
+			"color": "b8753a",
+			"stats": {
+				"hp_add_per_lv": 15.0,
+				"ramming_damage_pct_per_lv": 0.07
 			}
 		},
 		"hull_repair": {
@@ -275,6 +293,20 @@
 				"radius_add": 2.0
 			}
 		},
+		"geobukseon": {
+			"name": "거북선",
+			"category": 2,
+			"description": "기함을 도선을 막는 거북선으로 변경. 전면포 없이 좌우 포문만 운용",
+			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
+			"max_level": 1,
+			"color": "6f8f7a",
+			"stats": {
+				"ship_type": "geobukseon_player",
+				"hull_scene": "res://scenes/ships/hulls/geobukseon_hull.tscn",
+				"blocks_boarding": true,
+				"ship_mass_scale": 2.05
+			}
+		},
 		"supply": {
 			"name": "회복",
 			"category": 2,
@@ -325,6 +357,7 @@
 			"name": "거북선",
 			"category": 5,
 			"description": "도선을 막는 거북선 방호함 1척 추가 합류",
+			"disabled": true,
 			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
 			"max_level": 1,
 			"color": "6f8f7a",

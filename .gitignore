@@ -2,6 +2,10 @@
 .godot/
 /android/
 .DS_Store
+
+# Local runtime/test scratch
+.tmp_userdata/
+
 /build/windows/
 /build/releases/
 *.uid

@@ -44,13 +44,35 @@ static func apply_role_loadout(soldier) -> void:
 			if not soldier.is_melee_only:
 				soldier._set_active_weapon("bow")
 		_:
-			if get_melee_weapon_id(soldier) != "sword":
-				soldier.equip_melee_weapon(SWORD_SCENE, "sword")
+			var melee_id := _get_standard_melee_weapon_id(soldier)
+			if get_melee_weapon_id(soldier) != melee_id:
+				soldier.equip_melee_weapon(_get_standard_melee_scene(soldier), melee_id)
 			if get_ranged_weapon_id(soldier) != "bow":
 				soldier.equip_weapon(BOW_SCENE, "bow")
 			if not soldier.is_melee_only:
 				soldier._set_active_weapon("bow")
 	soldier._update_role_visual()
+
+
+static func _get_standard_melee_weapon_id(soldier) -> String:
+	return "spearman" if _should_use_spear_loadout(soldier) else "sword"
+
+
+static func _get_standard_melee_scene(soldier) -> PackedScene:
+	if _should_use_spear_loadout(soldier):
+		return SPEARMAN_MELEE_SCENES[randi() % SPEARMAN_MELEE_SCENES.size()]
+	return SWORD_SCENE
+
+
+static func _should_use_spear_loadout(soldier) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if soldier.get("team") == null or str(soldier.get("team")) != "player":
+		return false
+	var um: Node = soldier.get_node_or_null("/root/UpgradeManager")
+	if not is_instance_valid(um) or not ("current_levels" in um):
+		return false
+	return int(um.current_levels.get("crew_numbers", 0)) > 0
 
 
 static func update_combat_weapon_choice(soldier, nearest) -> void:

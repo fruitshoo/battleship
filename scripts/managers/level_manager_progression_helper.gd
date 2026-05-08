@@ -36,11 +36,11 @@ static func add_soldier_kill(lm: Node, count: int = 1, cause: String = "combat")
 	if lm.hud and lm.hud.has_method("update_combat_stats"):
 		lm.hud.update_combat_stats(lm.ships_sunk, lm.ships_derelicted, lm.soldiers_killed, lm.soldiers_slain, lm.soldiers_drowned)
 
-static func add_command_xp_from_soldier_kill(lm: Node, kill_count: int = 1) -> void:
+static func add_bonus_xp_from_soldier_kill(lm: Node, kill_count: int = 1) -> void:
 	var k: int = max(0, kill_count)
 	if k <= 0:
 		return
-	add_merit(lm, lm.merit_per_soldier_kill * k)
+	add_xp(lm, lm.bonus_xp_per_soldier_kill * k)
 
 static func add_player_weapon_damage(lm: Node, source_id: String, amount: float) -> void:
 	if source_id.is_empty() or amount <= 0.0:
@@ -98,28 +98,16 @@ static func add_xp(lm: Node, amount: int) -> void:
 	if lm.hud and lm.hud.has_method("update_xp"):
 		lm.hud.update_xp(lm.current_xp, lm.xp_to_next_level)
 
-static func add_merit(lm: Node, amount: int) -> void:
+static func add_bonus_xp(lm: Node, amount: int) -> void:
 	if _env_flag_enabled("BATTLESHIP_DISABLE_RUNTIME_REWARDS"):
 		return
-	if lm.merit_points >= lm.max_merit_points:
+	var xp_amount: int = max(0, amount)
+	if xp_amount <= 0:
 		return
-
-	lm.merit_points = min(lm.merit_points + amount, lm.max_merit_points)
-	lm.merit_changed.emit(lm.merit_points, lm.max_merit_points, lm.merit_level)
-
-	if lm.hud and lm.hud.has_method("update_merit"):
-		lm.hud.update_merit(lm.merit_points, lm.max_merit_points, lm.merit_level)
-
-	if lm.merit_points >= lm.max_merit_points:
-		lm.merit_full.emit()
-		print("[Boarding] 백병전 포인트가 가득 찼습니다! 업그레이드를 시작합니다.")
-		lm.consume_merit()
+	add_xp(lm, xp_amount)
 
 static func calculate_next_level_xp(lm: Node) -> void:
 	lm.xp_to_next_level = max(1, int(lm.level_xp_base * pow(lm.current_level, lm.level_xp_exponent)))
-
-static func get_merit_requirement(lm: Node, level: int) -> int:
-	return max(1, lm.merit_base_points + (level - 1) * lm.merit_growth_per_level)
 
 static func set_level(lm: Node, new_level: int) -> void:
 	lm.current_level = new_level

@@ -412,8 +412,24 @@ static func pick_enemy_scene(spawner, slot_info: Dictionary) -> PackedScene:
 	if role_name == "gunline" or role_name == "pressure_gunner" or ship_type_name.contains("cannon") or ship_type_name.contains("atakebune"):
 		return spawner.enemy_gunner_scene if is_instance_valid(spawner.enemy_gunner_scene) else spawner.enemy_scene
 	if role_name == "firepot" or ship_type_name == "sekibune_melee":
+		if not is_enemy_fire_pot_unlocked(spawner):
+			return spawner.enemy_melee_scene if is_instance_valid(spawner.enemy_melee_scene) else spawner.enemy_scene
 		return spawner.enemy_firepot_scene if is_instance_valid(spawner.enemy_firepot_scene) else spawner.enemy_scene
 	return spawner.enemy_melee_scene if is_instance_valid(spawner.enemy_melee_scene) else spawner.enemy_scene
+
+
+static func is_enemy_fire_pot_unlocked(spawner) -> bool:
+	if not is_instance_valid(spawner):
+		return false
+	var defeated_count_variant: Variant = spawner.get("defeated_boss_count")
+	if defeated_count_variant != null and int(defeated_count_variant) > 0:
+		return true
+	if not spawner.has_method("get_tree"):
+		return false
+	var lm: Node = LevelManagerRegistry.get_level_manager(spawner.get_tree())
+	if not is_instance_valid(lm):
+		return false
+	return lm.get("enemy_fire_pot_unlocked") == true
 
 
 static func pick_fleet_template(spawner, remaining_slots: int) -> Array[Dictionary]:

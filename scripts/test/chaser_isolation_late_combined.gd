@@ -57,13 +57,13 @@ func capture_ship() -> void:
 	if is_instance_valid(cached_lm):
 		var capture_score_reward: int = max(0, int(cached_lm.get("boarding_capture_score_reward")))
 		var capture_xp_reward: int = max(0, int(cached_lm.get("boarding_capture_xp_reward")))
-		var capture_merit_reward: int = max(0, int(cached_lm.get("boarding_capture_merit_reward")))
+		var capture_bonus_xp_reward: int = max(0, int(cached_lm.get("boarding_capture_bonus_xp_reward")))
 		if capture_score_reward > 0 and cached_lm.has_method("add_score"):
 			cached_lm.add_score(capture_score_reward)
 		if capture_xp_reward > 0 and cached_lm.has_method("add_xp"):
 			cached_lm.add_xp(capture_xp_reward)
-		if capture_merit_reward > 0 and cached_lm.has_method("add_merit"):
-			cached_lm.add_merit(capture_merit_reward)
+		if capture_bonus_xp_reward > 0 and cached_lm.has_method("add_bonus_xp"):
+			cached_lm.add_bonus_xp(capture_bonus_xp_reward)
 
 	if is_instance_valid(cached_lm) and cached_lm.has_method("show_message"):
 		cached_lm.show_message("적군 함선을 나포했습니다!", 3.0)
@@ -268,32 +268,23 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node != boarding_target:
 		boarding_target = ship_node
 
-	var my_crew = get_alive_crew_count()
-	var enemy_crew = 0
-	if ship_node.has_method("get_alive_crew_count"):
-		enemy_crew = ship_node.get_alive_crew_count()
+	is_boarding = true
+	boarding_target = ship_node
 
-	if my_crew > enemy_crew:
-		is_boarding = true
-		boarding_target = ship_node
+	if boarding_target.has_method("set_boarding_attacker_ship"):
+		boarding_target.set_boarding_attacker_ship(self)
 
-		if boarding_target.has_method("set_boarding_attacker_ship"):
-			boarding_target.set_boarding_attacker_ship(self)
+	_clear_ropes()
+	boarding_timer = 0.0
+	boarding_prep_timer = 0.0
+	boarding_contact_timer = 0.0
+	boarding_hook_timer = 0.0
+	boarding_secondary_rope_timer = 0.0
+	_initial_rope_deployed = false
+	_full_rope_deployed = false
 
-		_clear_ropes()
-		boarding_timer = 0.0
-		boarding_prep_timer = 0.0
-		boarding_contact_timer = 0.0
-		boarding_hook_timer = 0.0
-		boarding_secondary_rope_timer = 0.0
-		_initial_rope_deployed = false
-		_full_rope_deployed = false
-
-		if DEBUG_COMBAT_LOGS:
-			print("[Boarding] 병력 우위! 접현 후 갈고리 투척을 준비합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
-	else:
-		if DEBUG_COMBAT_LOGS:
-			print("[Skirmish] 병력 우위 부족으로 도선하지 않고 대치합니다. (아군 %d vs 적군 %d)" % [my_crew, enemy_crew])
+	if DEBUG_COMBAT_LOGS:
+		print("[Boarding] 접점 확보! 접현 후 갈고리 투척을 준비합니다.")
 
 
 func add_leak(amount: float) -> void:

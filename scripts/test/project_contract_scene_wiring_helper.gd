@@ -495,10 +495,10 @@ static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]
 		failures.append("player corpse cleanup should capture the throw arc at throw time")
 	if player_ship_source.contains("_apply_corpse_cleanup_throw_arc\").bind(corpse_id, throw_origin"):
 		failures.append("player corpse cleanup should not bind a stale throw origin before rail carry completes")
-	if not player_ship_source.contains("_grant_corpse_cleanup_merit"):
-		failures.append("player corpse cleanup should reward boarding merit only after the corpse is thrown overboard")
-	if not player_ship_source.contains("corpse_cleanup_merit_reward"):
-		failures.append("player corpse cleanup boarding merit reward should be LevelManager-configured")
+	if not player_ship_source.contains("_grant_corpse_cleanup_xp"):
+		failures.append("player corpse cleanup should reward cleanup XP only after the corpse is thrown overboard")
+	if not player_ship_source.contains("corpse_cleanup_xp_reward"):
+		failures.append("player corpse cleanup XP reward should be LevelManager-configured")
 	var approach_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", pickup_actor_position")
 	var pickup_index := player_ship_source.find("_apply_corpse_cleanup_payload_pickup")
 	var carry_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", rail_actor_position")
@@ -1069,16 +1069,6 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"crew": 6,
 			"large_crew": false,
 		},
-		{
-			"path": "res://scenes/ships/hulls/sekibune_melee_hull.tscn",
-			"label": "sekibune melee hull",
-			"cannons": 3,
-			"cannon_names": ["CannonFront", "CannonLeft", "CannonRight"],
-			"weapon_slots": [],
-			"anchors": 8,
-			"crew": 6,
-			"large_crew": false,
-		},
 	]
 
 	for check in hull_checks:
@@ -1096,6 +1086,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 		_expect_no_persisted_authoring_visuals(scene_path, label, failures)
 		var marker_counts: Dictionary = ShipAuthoringHelper.build_summary(hull_root).get("authoring_markers", {})
 		_expect_min_authoring_count(marker_counts, label, "DeckArea", 1, failures)
+		_expect_deck_area_polygon(hull_root, label, failures)
 		_expect_min_authoring_count(marker_counts, label, "CannonSlots", int(check["cannons"]), failures)
 		_expect_min_authoring_count(marker_counts, label, "WeaponSlots", weapon_slots.size(), failures)
 		_expect_min_authoring_count(marker_counts, label, "BoardingAnchors", int(check["anchors"]), failures)
@@ -2514,6 +2505,39 @@ static func _expect_authoring_marker_names(root: Node, label: String, container_
 	for required_name in required_names:
 		if not marker_names.has(str(required_name)):
 			failures.append("%s authoring %s missing marker: %s" % [label, container_name, required_name])
+
+
+static func _expect_deck_area_polygon(root: Node, label: String, failures: Array[String]) -> void:
+	var authoring := root.get_node_or_null("Authoring")
+	if not is_instance_valid(authoring):
+		authoring = root.find_child("Authoring", true, false)
+	if not is_instance_valid(authoring):
+		failures.append("%s authoring missing Authoring node" % label)
+		return
+	var deck_area := authoring.get_node_or_null("DeckArea")
+	if not is_instance_valid(deck_area):
+		failures.append("%s authoring missing DeckArea node" % label)
+		return
+	if not bool(deck_area.get_meta("use_authored_deck_area", false)):
+		failures.append("%s DeckArea should opt into authored polygon metadata" % label)
+	var points_root := deck_area.get_node_or_null("Points")
+	if not is_instance_valid(points_root):
+		failures.append("%s DeckArea missing Points root" % label)
+		return
+	var markers: Array[Marker3D] = []
+	for child in points_root.get_children():
+		if child is Marker3D:
+			markers.append(child as Marker3D)
+	if markers.size() < 3:
+		failures.append("%s DeckArea polygon should have at least 3 points, got %d" % [label, markers.size()])
+		return
+	var half_width := 0.0
+	var half_length := 0.0
+	for marker in markers:
+		half_width = maxf(half_width, absf(marker.position.x))
+		half_length = maxf(half_length, absf(marker.position.z))
+	if half_width <= 0.1 or half_length <= 0.1:
+		failures.append("%s DeckArea polygon has invalid extents: width %.2f length %.2f" % [label, half_width, half_length])
 
 
 static func _expect_authoring_visualizer(root: Node, label: String, failures: Array[String]) -> void:

@@ -594,8 +594,8 @@ func _schedule_muzzle_smoke_detach(smoke: Node, delay: float) -> void:
 
 
 func _detach_muzzle_smoke_to_world(smoke_id: int, muzzle_id: int) -> void:
-	var smoke := instance_from_id(smoke_id) as Node
-	var muzzle_node := instance_from_id(muzzle_id) as Node
+	var smoke := NodeContractHelper.get_instance_node(smoke_id)
+	var muzzle_node := NodeContractHelper.get_instance_node(muzzle_id)
 	var tree := get_tree()
 	if not is_instance_valid(smoke) or not is_instance_valid(muzzle_node) or not is_instance_valid(tree):
 		return
@@ -662,7 +662,9 @@ func _get_ship_speed(ship: Node3D, fallback: float = 0.0) -> float:
 
 
 func _apply_cannon_inaccuracy(base_direction: Vector3, target_node: Node3D, distance_to_target: float) -> Vector3:
-	var shooter_speed: float = _get_ship_speed(_owner_ship as Node3D, 0.0) if _owner_ship is Node3D else 0.0
+	var shooter_speed := 0.0
+	if is_instance_valid(_owner_ship) and _owner_ship is Node3D:
+		shooter_speed = _get_ship_speed(_owner_ship as Node3D, 0.0)
 	var target_speed: float = _get_ship_speed(target_node, 0.0)
 	var movement_spread: float = clampf((shooter_speed + target_speed) / 12.0, 0.0, 1.0) * moving_target_inaccuracy_deg
 	var distance_spread: float = clampf((distance_to_target - 8.0) / 18.0, 0.0, 1.0) * 2.4

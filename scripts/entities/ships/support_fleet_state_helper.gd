@@ -67,9 +67,8 @@ static func get_support_owner_flagship(ship) -> Node3D:
 		return null
 	var owner_id := int(ship.get_meta(SUPPORT_FLEET_OWNER_ID_META, 0))
 	if owner_id != 0:
-		var owner_value: Variant = instance_from_id(owner_id)
-		if is_instance_valid(owner_value) and owner_value is Node3D:
-			var owner_ship := owner_value as Node3D
+		var owner_ship := NodeContractHelper.get_instance_node3d(owner_id)
+		if is_instance_valid(owner_ship):
 			initialize_flagship_state(owner_ship)
 			return owner_ship
 		ship.remove_meta(SUPPORT_FLEET_OWNER_ID_META)

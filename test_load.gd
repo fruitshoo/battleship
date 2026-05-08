@@ -1,7 +1,7 @@
 extends SceneTree
 
 func _init():
-    var scene = ResourceLoader.load("res://scenes/ships/hulls/panokseon_hull.tscn")
+    var scene = ResourceLoader.load("res://scenes/ships/hulls/panok_hull.tscn")
     if scene:
         print("Success! ", scene)
         var inst = scene.instantiate()

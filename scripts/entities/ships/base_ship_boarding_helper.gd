@@ -6,6 +6,9 @@ const BOARDING_LANDING_INSET := 0.45
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85
 const BOARDING_BREAK_DISTANCE_PAD := 2.2
 const BOARDING_WAVE_MAX_SIZE := 3
+const BOARDING_LAUNCH_INSET := 0.18
+const BOARDING_LAUNCH_READY_MIN_RADIUS := 2.35
+const BOARDING_LAUNCH_READY_MAX_RADIUS := 3.55
 
 static func process_boarding_common(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
@@ -225,6 +228,7 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 			return false
 
 	var s = null
+	var has_any_boarder := false
 	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if soldiers_node:
 		var soldiers = soldiers_node.get_children()
@@ -241,11 +245,19 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 				return false
 
 		var nearest_boarder_distance_sq: float = INF
+		var launch_global := _get_boarding_launch_point_global(ship, ship.boarding_target)
+		var ready_radius := _get_boarding_launch_ready_radius(ship)
+		var ready_radius_sq := ready_radius * ready_radius
 		for child in soldiers:
 			if SoldierStateHelper.is_alive_soldier(child) and child.has_method("get_team_tag") and child.get_team_tag() == team_prop:
 				if not (child is Node3D):
 					continue
-				var distance_sq: float = (child as Node3D).global_position.distance_squared_to(ship.boarding_target.global_position)
+				has_any_boarder = true
+				if child.get("_is_jumping") == true:
+					continue
+				var distance_sq: float = (child as Node3D).global_position.distance_squared_to(launch_global)
+				if distance_sq > ready_radius_sq:
+					continue
 				if distance_sq < nearest_boarder_distance_sq:
 					nearest_boarder_distance_sq = distance_sq
 					s = child
@@ -303,6 +315,8 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		print("[Action] 병사 1명 월선! (팀: %s, 대상: %s)" % [team_prop, ship.boarding_target.name])
 		return true
 	else:
+		if has_any_boarder:
+			return false
 		print("[Status] 도선할 병사가 더 이상 없습니다.")
 		cancel_boarding(ship)
 		if ship.has_method("check_derelict_status"):
@@ -352,13 +366,44 @@ static func _get_nearest_deck_landing_local(target_ship: Node3D, approach_global
 	return Vector3(landing_x, target_deck_h, landing_z)
 
 
+static func _get_boarding_launch_point_global(ship: Node3D, target_ship: Node3D) -> Vector3:
+	if not is_instance_valid(ship):
+		return Vector3.ZERO
+	if not is_instance_valid(target_ship):
+		return ship.global_position
+	var half_ext := _get_target_deck_half_extents(ship)
+	var deck_h := _get_target_deck_height(ship)
+	var target_local: Vector3 = ship.to_local(target_ship.global_position)
+	var span_ratio: float = 0.72
+	if half_ext.x >= 3.2 or half_ext.y >= 5.6:
+		span_ratio = 0.84
+	var use_side_edge: bool = absf(target_local.x / maxf(half_ext.x, 0.01)) > absf(target_local.z / maxf(half_ext.y, 0.01))
+	var launch_local := Vector3.ZERO
+	if use_side_edge:
+		var x_sign: float = 1.0 if target_local.x >= 0.0 else -1.0
+		launch_local.x = x_sign * maxf(0.0, half_ext.x - BOARDING_LAUNCH_INSET)
+		launch_local.z = clampf(target_local.z, -half_ext.y * span_ratio, half_ext.y * span_ratio)
+	else:
+		var z_sign: float = 1.0 if target_local.z >= 0.0 else -1.0
+		launch_local.x = clampf(target_local.x, -half_ext.x * span_ratio, half_ext.x * span_ratio)
+		launch_local.z = z_sign * maxf(0.0, half_ext.y - BOARDING_LAUNCH_INSET)
+	launch_local.y = deck_h
+	return ship.to_global(launch_local)
+
+
+static func _get_boarding_launch_ready_radius(ship: Node3D) -> float:
+	var half_ext := _get_target_deck_half_extents(ship)
+	var deck_pressure: float = maxf(half_ext.x, half_ext.y)
+	return clampf(deck_pressure * 0.62, BOARDING_LAUNCH_READY_MIN_RADIUS, BOARDING_LAUNCH_READY_MAX_RADIUS)
+
+
 static func _finish_transfer_landing(soldier_id: int, target_ship_id: int, landing_local: Vector3) -> void:
-	var soldier = instance_from_id(soldier_id)
+	var soldier := NodeContractHelper.get_instance_node(soldier_id)
 	if not is_instance_valid(soldier):
 		return
-	var target_ship = instance_from_id(target_ship_id)
+	var target_ship := NodeContractHelper.get_instance_node3d(target_ship_id)
 	if is_instance_valid(target_ship):
-		soldier.position = _clamp_deck_landing_local(target_ship as Node3D, landing_local)
+		soldier.position = _clamp_deck_landing_local(target_ship, landing_local)
 	_finish_soldier_boarding_jump_pose(soldier, "on_deck")
 
 

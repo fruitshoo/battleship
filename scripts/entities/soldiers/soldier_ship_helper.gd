@@ -3,6 +3,11 @@ class_name SoldierShipHelper
 
 const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 
+const CROSS_SHIP_MUSTER_CACHE_TARGET_ID_META := "cross_ship_muster_cache_target_id"
+const CROSS_SHIP_MUSTER_CACHE_LOCAL_META := "cross_ship_muster_cache_local"
+const CROSS_SHIP_MUSTER_CACHE_EXPIRES_AT_META := "cross_ship_muster_cache_expires_at_msec"
+const CROSS_SHIP_MUSTER_CACHE_TTL_MSEC := 420
+
 
 static func find_nearest_enemy(soldier) -> Node3D:
 	var home_ship: Variant = soldier.get("home_ship")
@@ -225,11 +230,34 @@ static func get_cross_ship_contact_point_global(soldier, other_ship: Node3D) -> 
 	return target_global
 
 
+static func get_stable_cross_ship_contact_point_local(soldier, other_ship: Node3D) -> Vector3:
+	if not is_instance_valid(soldier.owned_ship) or not is_instance_valid(other_ship):
+		return Vector3.INF
+	var cached_local := _get_cached_cross_ship_muster_local(soldier, other_ship)
+	if cached_local != Vector3.INF:
+		return cached_local
+	var contact_local := get_cross_ship_contact_point_local(soldier, other_ship)
+	if contact_local == Vector3.INF:
+		_clear_cross_ship_muster_cache(soldier)
+		return Vector3.INF
+	_store_cross_ship_muster_cache(soldier, other_ship, contact_local)
+	return contact_local
+
+
+static func get_stable_cross_ship_contact_point_global(soldier, other_ship: Node3D) -> Vector3:
+	var contact_local: Vector3 = get_stable_cross_ship_contact_point_local(soldier, other_ship)
+	if contact_local == Vector3.INF:
+		return Vector3.INF
+	var target_global: Vector3 = soldier.owned_ship.to_global(contact_local)
+	target_global.y = soldier.global_position.y
+	return target_global
+
+
 static func is_in_cross_ship_contact_zone(soldier, other_ship: Node3D) -> bool:
 	if not is_instance_valid(soldier.owned_ship) or not is_instance_valid(other_ship):
 		return false
 	var pair_geometry: Dictionary = SoldierShipSpatialCacheHelper.get_ship_pair_geometry(soldier, other_ship)
-	var contact_local: Vector3 = get_cross_ship_contact_point_local(soldier, other_ship)
+	var contact_local: Vector3 = get_stable_cross_ship_contact_point_local(soldier, other_ship)
 	if contact_local == Vector3.INF:
 		return false
 	var soldier_local: Vector3 = soldier.owned_ship.to_local(soldier.global_position)
@@ -295,8 +323,51 @@ static func find_cross_ship_muster_target(soldier) -> Vector3:
 			best_ship = other_ship
 
 	if not is_instance_valid(best_ship):
+		_clear_cross_ship_muster_cache(soldier)
 		return Vector3.INF
-	return get_cross_ship_contact_point_global(soldier, best_ship)
+	var contact_local := get_stable_cross_ship_contact_point_local(soldier, best_ship)
+	if contact_local == Vector3.INF:
+		_clear_cross_ship_muster_cache(soldier)
+		return Vector3.INF
+	var target_global: Vector3 = soldier.owned_ship.to_global(contact_local)
+	target_global.y = soldier.global_position.y
+	return target_global
+
+
+static func _get_cached_cross_ship_muster_local(soldier, target_ship: Node3D) -> Vector3:
+	if not is_instance_valid(soldier) or not is_instance_valid(soldier.owned_ship) or not is_instance_valid(target_ship):
+		return Vector3.INF
+	if int(soldier.get_meta(CROSS_SHIP_MUSTER_CACHE_TARGET_ID_META, 0)) != target_ship.get_instance_id():
+		return Vector3.INF
+	if int(soldier.get_meta(CROSS_SHIP_MUSTER_CACHE_EXPIRES_AT_META, 0)) <= Time.get_ticks_msec():
+		return Vector3.INF
+	var cached_local_variant: Variant = soldier.get_meta(CROSS_SHIP_MUSTER_CACHE_LOCAL_META, Vector3.INF)
+	if not (cached_local_variant is Vector3):
+		return Vector3.INF
+	var cached_local := cached_local_variant as Vector3
+	if cached_local == Vector3.INF:
+		return Vector3.INF
+	return cached_local
+
+
+static func _store_cross_ship_muster_cache(soldier, target_ship: Node3D, contact_local: Vector3) -> void:
+	if not is_instance_valid(soldier) or not is_instance_valid(target_ship):
+		return
+	soldier.set_meta(CROSS_SHIP_MUSTER_CACHE_TARGET_ID_META, target_ship.get_instance_id())
+	soldier.set_meta(CROSS_SHIP_MUSTER_CACHE_LOCAL_META, contact_local)
+	soldier.set_meta(CROSS_SHIP_MUSTER_CACHE_EXPIRES_AT_META, Time.get_ticks_msec() + CROSS_SHIP_MUSTER_CACHE_TTL_MSEC)
+
+
+static func _clear_cross_ship_muster_cache(soldier) -> void:
+	if not is_instance_valid(soldier):
+		return
+	for meta_name in [
+		CROSS_SHIP_MUSTER_CACHE_TARGET_ID_META,
+		CROSS_SHIP_MUSTER_CACHE_LOCAL_META,
+		CROSS_SHIP_MUSTER_CACHE_EXPIRES_AT_META,
+	]:
+		if soldier.has_meta(meta_name):
+			soldier.remove_meta(meta_name)
 
 
 static func keep_within_owned_ship_bounds(soldier) -> void:

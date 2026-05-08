@@ -12,7 +12,6 @@ const RESULT_SCENE_PATH := "res://scenes/ui/result_screen.tscn"
 
 signal level_up(new_level: int)
 signal score_changed(new_score: int)
-signal merit_full_action_completed() # 백병전 포인트 가득 참 후속 처리 완료
 
 
 @export var level_duration: float = 45.0 # 난이도 증가 간격 (초)
@@ -26,18 +25,16 @@ signal merit_full_action_completed() # 백병전 포인트 가득 참 후속 처
 @export_group("Progression Tuning")
 @export var level_xp_base: float = 7.0 ## 플레이어 레벨 1->2 기본 필요 XP
 @export var level_xp_exponent: float = 1.10 ## 레벨업 필요 XP 성장 곡선 지수
-@export var merit_base_points: int = 50 ## 공적 레벨 1 기본 요구치
-@export var merit_growth_per_level: int = 10 ## 공적 레벨당 증가치
 @export var soldier_kill_xp_reward: int = 5 ## 일반 병사 처치 시 획득 XP
-@export var merit_per_soldier_kill: int = 1 ## 적 병사 1명 처치 시 획득 백병전 포인트
+@export var bonus_xp_per_soldier_kill: int = 1 ## 적 병사 처치 시 추가 XP
 @export var drowned_soldier_kill_xp_reward: int = 3 ## 적 병사를 수장시켰을 때 획득 XP
-@export var drowned_soldier_kill_merit_reward: int = 0 ## 적 병사를 수장시켰을 때 획득 백병전 포인트
-@export var corpse_cleanup_merit_reward: int = 1 ## 갑판 시체 정리 완료 시 획득 백병전 포인트
+@export var drowned_soldier_kill_bonus_xp_reward: int = 0 ## 적 병사를 수장시켰을 때 추가 XP
+@export var corpse_cleanup_xp_reward: int = 1 ## 갑판 시체 정리 완료 시 획득 XP
 @export var melee_kill_xp_bonus: int = 2 ## 백병전(검/창/작살) 처치 시 추가 XP
-@export var melee_kill_merit_bonus: int = 1 ## 백병전(검/창/작살) 처치 시 추가 백병전 포인트
+@export var melee_kill_bonus_xp: int = 1 ## 백병전(검/창/작살) 처치 시 추가 보너스 XP
 @export var boarding_capture_score_reward: int = 25 ## 나포 성공 시 추가 골드
 @export var boarding_capture_xp_reward: int = 35 ## 나포 성공 시 추가 XP
-@export var boarding_capture_merit_reward: int = 20 ## 나포 성공 시 추가 백병전 포인트
+@export var boarding_capture_bonus_xp_reward: int = 20 ## 나포 성공 시 추가 보너스 XP
 @export_group("Boss Arena")
 @export var mid_boss_arena_half_extents: Vector2 = Vector2(112.0, 84.0)
 @export var final_boss_arena_half_extents: Vector2 = Vector2(136.0, 98.0)
@@ -65,12 +62,12 @@ var ships_derelicted: int = 0
 var soldiers_killed: int = 0
 var soldiers_slain: int = 0
 var soldiers_drowned: int = 0
+var enemy_fire_pot_unlocked: bool = false
 var weapon_damage_stats: Dictionary = {}
 var _boss_triggered: bool = false
 var _boss_phase_active: bool = false
 var _victory_triggered: bool = false
 var ship_rerolls_available: int = 0
-var crew_rerolls_available: int = 0
 var _debug_collision_visuals_enabled: bool = false
 var _boss_arena_active: bool = false
 var _boss_arena_anchor_boss_id: int = -1
@@ -101,13 +98,6 @@ const DAMAGE_SOURCE_NAME := {
 	"rock": "암초",
 	"fire": "화재",
 }
-
-# 공적(Merit) 시스템: 백병전 업그레이드 전용 트랙
-signal merit_changed(current: int, maximum: int, level: int)
-signal merit_full()
-var merit_points: int = 0
-var max_merit_points: int = 50
-var merit_level: int = 1
 
 # 레벨별 난이도 설정 (밸런스 조정)
 # spawn_interval: 적 생성 간격 (초)
@@ -141,8 +131,6 @@ func _ready() -> void:
 	if is_instance_valid(MetaManager) and MetaManager.has_method("get_xp_gain_multiplier"):
 		xp_multiplier = float(MetaManager.get_xp_gain_multiplier())
 	_calculate_next_level_xp()
-	max_merit_points = _get_merit_requirement(merit_level)
-	merit_points = clamp(merit_points, 0, max_merit_points)
 	LevelManagerStartupHelper.initialize(self)
 
 
@@ -230,12 +218,6 @@ func _apply_level_progression_root(root: Dictionary) -> void:
 		level_xp_base = float(xp_curve.get("level_xp_base", level_xp_base))
 		level_xp_exponent = float(xp_curve.get("level_xp_exponent", level_xp_exponent))
 
-	var merit_curve_variant: Variant = root.get("merit_curve", {})
-	if typeof(merit_curve_variant) == TYPE_DICTIONARY:
-		var merit_curve: Dictionary = merit_curve_variant as Dictionary
-		merit_base_points = int(merit_curve.get("merit_base_points", merit_base_points))
-		merit_growth_per_level = int(merit_curve.get("merit_growth_per_level", merit_growth_per_level))
-
 
 func _parse_level_progression_levels(levels_root: Dictionary) -> Dictionary:
 	var parsed_levels: Dictionary = {}
@@ -288,31 +270,35 @@ func _apply_reward_rules_root(root: Dictionary) -> void:
 	if typeof(soldier_kill_variant) == TYPE_DICTIONARY:
 		var soldier_kill: Dictionary = soldier_kill_variant as Dictionary
 		soldier_kill_xp_reward = int(soldier_kill.get("xp", soldier_kill_xp_reward))
-		merit_per_soldier_kill = int(soldier_kill.get("merit", merit_per_soldier_kill))
+		bonus_xp_per_soldier_kill = _get_bonus_xp_value(soldier_kill, bonus_xp_per_soldier_kill)
 
 	var drowned_variant: Variant = root.get("soldier_drowned", {})
 	if typeof(drowned_variant) == TYPE_DICTIONARY:
 		var soldier_drowned: Dictionary = drowned_variant as Dictionary
 		drowned_soldier_kill_xp_reward = int(soldier_drowned.get("xp", drowned_soldier_kill_xp_reward))
-		drowned_soldier_kill_merit_reward = int(soldier_drowned.get("merit", drowned_soldier_kill_merit_reward))
+		drowned_soldier_kill_bonus_xp_reward = _get_bonus_xp_value(soldier_drowned, drowned_soldier_kill_bonus_xp_reward)
 
 	var corpse_cleanup_variant: Variant = root.get("corpse_cleanup", {})
 	if typeof(corpse_cleanup_variant) == TYPE_DICTIONARY:
 		var corpse_cleanup: Dictionary = corpse_cleanup_variant as Dictionary
-		corpse_cleanup_merit_reward = int(corpse_cleanup.get("merit", corpse_cleanup_merit_reward))
+		corpse_cleanup_xp_reward = _get_bonus_xp_value(corpse_cleanup, corpse_cleanup_xp_reward)
 
 	var melee_variant: Variant = root.get("melee_bonus", {})
 	if typeof(melee_variant) == TYPE_DICTIONARY:
 		var melee_bonus: Dictionary = melee_variant as Dictionary
 		melee_kill_xp_bonus = int(melee_bonus.get("xp", melee_kill_xp_bonus))
-		melee_kill_merit_bonus = int(melee_bonus.get("merit", melee_kill_merit_bonus))
+		melee_kill_bonus_xp = _get_bonus_xp_value(melee_bonus, melee_kill_bonus_xp)
 
 	var capture_variant: Variant = root.get("boarding_capture", {})
 	if typeof(capture_variant) == TYPE_DICTIONARY:
 		var boarding_capture: Dictionary = capture_variant as Dictionary
 		boarding_capture_score_reward = int(boarding_capture.get("score", boarding_capture_score_reward))
 		boarding_capture_xp_reward = int(boarding_capture.get("xp", boarding_capture_xp_reward))
-		boarding_capture_merit_reward = int(boarding_capture.get("merit", boarding_capture_merit_reward))
+		boarding_capture_bonus_xp_reward = _get_bonus_xp_value(boarding_capture, boarding_capture_bonus_xp_reward)
+
+
+func _get_bonus_xp_value(row: Dictionary, fallback: int) -> int:
+	return int(row.get("bonus_xp", fallback))
 
 func _run_startup_prewarm_async() -> void:
 	await LevelManagerStartupHelper.run_startup_prewarm_async(self)
@@ -596,8 +582,8 @@ func add_ship_derelict(count: int = 1) -> void:
 func add_soldier_kill(count: int = 1, cause: String = "combat") -> void:
 	LevelManagerProgressionHelper.add_soldier_kill(self, count, cause)
 
-func add_command_xp_from_soldier_kill(kill_count: int = 1) -> void:
-	LevelManagerProgressionHelper.add_command_xp_from_soldier_kill(self, kill_count)
+func add_bonus_xp_from_soldier_kill(kill_count: int = 1) -> void:
+	LevelManagerProgressionHelper.add_bonus_xp_from_soldier_kill(self, kill_count)
 
 func add_player_weapon_damage(source_id: String, amount: float) -> void:
 	LevelManagerProgressionHelper.add_player_weapon_damage(self, source_id, amount)
@@ -613,45 +599,13 @@ func get_weapon_damage_rows(max_rows: int = 8) -> Array:
 func add_xp(amount: int) -> void:
 	LevelManagerProgressionHelper.add_xp(self, amount)
 
-## 공적 (Merit) 획득
-func add_merit(amount: int) -> void:
-	LevelManagerProgressionHelper.add_merit(self, amount)
-		
-func consume_merit() -> void:
-	# 공적 소비 시 병사 업그레이드 UI를 띄움
-	var reroll_bonus: int = 0
-	if is_instance_valid(MetaManager) and MetaManager.has_method("get_reroll_bonus"):
-		reroll_bonus = int(MetaManager.get_reroll_bonus())
-	crew_rerolls_available = 1 + reroll_bonus
-	_show_fleet_upgrade_ui()
-	
-	merit_points = 0
-	merit_changed.emit(merit_points, max_merit_points, merit_level)
-	if hud and hud.has_method("update_merit"):
-		hud.update_merit(merit_points, max_merit_points, merit_level)
-
-
-func _show_fleet_upgrade_ui() -> void:
-	LevelManagerUpgradeFlowHelper.show_fleet_upgrade_ui(self)
-
-
-func _on_fleet_upgrade_chosen(upgrade_id: String) -> void:
-	LevelManagerUpgradeFlowHelper.on_fleet_upgrade_chosen(self, upgrade_id)
-
-func _on_fleet_reroll_requested() -> void:
-	LevelManagerUpgradeFlowHelper.on_fleet_reroll_requested(self)
-
-
-func _finalize_merit_levelup(upgrade_id: String) -> void:
-	LevelManagerUpgradeFlowHelper.finalize_merit_levelup(self, upgrade_id)
+func add_bonus_xp(amount: int) -> void:
+	LevelManagerProgressionHelper.add_bonus_xp(self, amount)
 
 
 func _calculate_next_level_xp() -> void:
 	LevelManagerProgressionHelper.calculate_next_level_xp(self)
 
-
-func _get_merit_requirement(level: int) -> int:
-	return LevelManagerProgressionHelper.get_merit_requirement(self, level)
 
 var upgrade_ui_scene: PackedScene = preload("res://scenes/ui/upgrade_ui.tscn")
 var meta_upgrade_ui_scene: PackedScene = preload("res://scenes/ui/meta_upgrade_ui.tscn")
@@ -661,7 +615,7 @@ func _set_level(new_level: int) -> void:
 	LevelManagerProgressionHelper.set_level(self, new_level)
 
 func _debug_force_fleet_level_up() -> void:
-	LevelManagerUpgradeFlowHelper.show_fleet_upgrade_ui(self)
+	_show_upgrade_ui(3)
 
 
 func _show_upgrade_ui(choice_count: int = 3) -> void:
@@ -1076,7 +1030,7 @@ func show_meta_shop() -> void:
 	add_child(shop)
 	var level_manager_id: int = get_instance_id()
 	shop.closed.connect(func():
-		var level_manager := instance_from_id(level_manager_id) as Node
+		var level_manager := NodeContractHelper.get_instance_node(level_manager_id)
 		if is_instance_valid(level_manager):
 			level_manager.get_tree().paused = false
 	)

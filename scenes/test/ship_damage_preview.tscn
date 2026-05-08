@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://c6r7m7j4h5rlg"]
 
 [ext_resource type="Environment" path="res://resources/environment/world_environment_clear_day.tres" id="1_env"]
-[ext_resource type="PackedScene" path="res://scenes/ships/hulls/panokseon_hull.tscn" id="2_hull"]
+[ext_resource type="PackedScene" path="res://scenes/ships/hulls/panok_hull.tscn" id="2_hull"]
 [ext_resource type="Script" path="res://scripts/test/ship_damage_preview.gd" id="3_script"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]

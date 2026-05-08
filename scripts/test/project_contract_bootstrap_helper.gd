@@ -108,11 +108,11 @@ static func run_bootstrap_contract_smoke(owner: Node, failures: Array[String], s
 
 						if str(AudioManager.get("current_bgm_name")).strip_edges() == "boss_taiko":
 							failures.append("bootstrap smoke restart cleanup left boss taiko BGM running")
-						var active_survivor := instance_from_id(active_survivor_id) as Node
+						var active_survivor := NodeContractHelper.get_instance_node(active_survivor_id)
 						if is_instance_valid(active_survivor):
 							failures.append("bootstrap smoke restart cleanup left active survivor on root")
 						if root_chest_id != 0:
-							var root_chest_after_cleanup := instance_from_id(root_chest_id) as Node
+							var root_chest_after_cleanup := NodeContractHelper.get_instance_node(root_chest_id)
 							if is_instance_valid(root_chest_after_cleanup):
 								failures.append("bootstrap smoke restart cleanup left root treasure chest behind")
 						var pool_root := root.get_node_or_null(ScenePool.ROOT_NAME)
