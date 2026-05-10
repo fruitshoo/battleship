@@ -2,6 +2,7 @@ extends Node
 
 const AttackerScript = preload("res://scripts/test/chaser_isolation_boarding_collision.gd")
 const ChaserShipScript = preload("res://scripts/entities/ships/chaser_ship.gd")
+const PlayerShipMovementHelper = preload("res://scripts/entities/ships/player_ship_movement_helper.gd")
 
 
 class MockTarget:
@@ -59,6 +60,41 @@ class MockGuardedAttacker:
 		return int(get_meta("boarding_impact_target_id", 0)) == target_ship.get_instance_id()
 
 
+class MockSeparationShip:
+	extends Node3D
+
+	var target: Node3D = null
+	var boarding_target: Node3D = null
+	var ship_mass_scale: float = 1.0
+	var collision_distance: float = 8.0
+	var neighbors: Array = []
+	var allow_boarding: bool = true
+	var gunner_role: bool = false
+	var min_ramming_speed: float = 6.0
+	var team: String = "player"
+
+	func _get_ships_cached(_tree: SceneTree) -> Array:
+		return neighbors
+
+	func get_team_tag() -> String:
+		return team
+
+	func can_board_targets() -> bool:
+		return allow_boarding
+
+	func is_gunner_role() -> bool:
+		return gunner_role
+
+	func is_boarding_ship() -> bool:
+		return is_instance_valid(boarding_target)
+
+	func get_boarding_target_ship() -> Node3D:
+		return boarding_target if is_instance_valid(boarding_target) else null
+
+	func get_collision_distance_to(_other: Node3D) -> float:
+		return collision_distance
+
+
 class MockSoldier:
 	extends Node
 
@@ -109,12 +145,48 @@ func _run_boarding_requires_impact_contract(failures: Array[String]) -> void:
 	_verify_enemy_boarding_latch_bonus_is_scoped(failures)
 	_verify_enemy_boarding_pull_bonus_is_scoped(failures)
 	_verify_boarding_pull_requires_active_rope_visual(failures)
+	_verify_boarding_rope_does_not_push_when_slack(failures)
 	_verify_boarding_pull_is_attacker_biased(failures)
 	_verify_boarding_pull_uses_collision_scaled_rest_length(failures)
+	_verify_hostile_support_contact_uses_collision_feedback(failures)
 	_verify_boarding_pull_velocity_accumulates_and_clears(failures)
 	_verify_boarding_pull_velocity_is_integrated_once(failures)
 	_verify_hook_timer_uses_collision_scaled_contact_distance(failures)
+	_verify_hooked_boarding_progresses_through_minor_distance_jitter(failures)
 	_verify_lost_contact_without_rope_does_not_drive_boarding_motion(failures)
+	_verify_boarding_approach_suppresses_pre_latch_separation(failures)
+
+
+func _verify_boarding_approach_suppresses_pre_latch_separation(failures: Array[String]) -> void:
+	var attacker := MockSeparationShip.new()
+	var target := MockTarget.new()
+	add_child(attacker)
+	add_child(target)
+	attacker.global_position = Vector3.ZERO
+	target.global_position = Vector3(0.0, 0.0, -7.7)
+	attacker.target = target
+	attacker.neighbors = [attacker, target]
+	var boarding_force := PlayerShipMovementHelper.calculate_separation(attacker)
+	if boarding_force.length() > 0.001:
+		failures.append("boarding approach should not be pushed off before latch: %.3f" % boarding_force.length())
+
+	var gunner := MockSeparationShip.new()
+	var gunner_target := MockTarget.new()
+	add_child(gunner)
+	add_child(gunner_target)
+	gunner.global_position = Vector3.ZERO
+	gunner_target.global_position = Vector3(0.0, 0.0, -7.7)
+	gunner.target = gunner_target
+	gunner.neighbors = [gunner, gunner_target]
+	gunner.gunner_role = true
+	var gunner_force := PlayerShipMovementHelper.calculate_separation(gunner)
+	if gunner_force.length() <= 0.001:
+		failures.append("non-boarding gunner should still receive close-range separation")
+
+	attacker.queue_free()
+	target.queue_free()
+	gunner.queue_free()
+	gunner_target.queue_free()
 
 
 func _verify_proximity_does_not_board(failures: Array[String]) -> void:
@@ -393,6 +465,39 @@ func _verify_boarding_pull_requires_active_rope_visual(failures: Array[String]) 
 	defender.free()
 
 
+func _verify_boarding_rope_does_not_push_when_slack(failures: Array[String]) -> void:
+	var attacker: Node = AttackerScript.new()
+	add_child(attacker)
+	attacker.set("team", "enemy")
+	attacker.set("is_boarding", true)
+	attacker.set("current_speed", 0.0)
+	attacker.set("base_collision_radius", 2.0)
+	attacker.set("width_multiplier", 1.0)
+	attacker.set("length_multiplier", 1.0)
+	attacker.global_position = Vector3.ZERO
+
+	var defender: Node = AttackerScript.new()
+	add_child(defender)
+	defender.set("team", "player")
+	defender.set("current_speed", 0.0)
+	defender.set("base_collision_radius", 2.0)
+	defender.set("width_multiplier", 1.0)
+	defender.set("length_multiplier", 1.0)
+	defender.global_position = Vector3(3.0, 0.0, 0.0)
+
+	attacker.set("boarding_target", defender)
+	defender.set("boarding_attacker", attacker)
+	attacker.call("_spawn_ropes", 1)
+	attacker.set("_initial_rope_deployed", true)
+
+	var pull: Vector3 = attacker.call("_calculate_boarding_pull")
+	if pull.length() > 0.001:
+		failures.append("slack boarding rope should not push ships apart: %s" % pull)
+
+	attacker.free()
+	defender.free()
+
+
 func _verify_boarding_pull_is_attacker_biased(failures: Array[String]) -> void:
 	var attacker: Node = AttackerScript.new()
 	add_child(attacker)
@@ -464,6 +569,30 @@ func _verify_boarding_pull_uses_collision_scaled_rest_length(failures: Array[Str
 
 	attacker.free()
 	defender.free()
+
+
+func _verify_hostile_support_contact_uses_collision_feedback(failures: Array[String]) -> void:
+	var enemy := MockSeparationShip.new()
+	var support := MockSeparationShip.new()
+	add_child(enemy)
+	add_child(support)
+	enemy.team = "enemy"
+	support.team = "player"
+	ShipAllyRoleHelper.mark_support_ship(support)
+
+	if not BaseShipCollisionHelper._is_hostile_support_contact(enemy, support):
+		failures.append("enemy-to-support contact should be classified as hostile support contact")
+	var normal_threshold: float = BaseShipCollisionHelper._get_contact_vfx_threshold(enemy, false, false)
+	var support_threshold: float = BaseShipCollisionHelper._get_contact_vfx_threshold(enemy, false, true)
+	if support_threshold >= normal_threshold * 0.8:
+		failures.append("hostile support contact should lower visible impact threshold")
+	var normal_intensity: float = BaseShipCollisionHelper._get_contact_vfx_intensity(0.0, 0.2, 4.2, 0.0, false)
+	var support_intensity: float = BaseShipCollisionHelper._get_contact_vfx_intensity(0.0, 0.2, 4.2, 0.0, true)
+	if support_intensity <= normal_intensity:
+		failures.append("hostile support contact should read side shoves as stronger impacts")
+
+	enemy.free()
+	support.free()
 
 
 func _verify_boarding_pull_velocity_accumulates_and_clears(failures: Array[String]) -> void:
@@ -579,6 +708,48 @@ func _verify_hook_timer_uses_collision_scaled_contact_distance(failures: Array[S
 
 	if attacker.get("_initial_rope_deployed") != true:
 		failures.append("boarding hook should deploy at collision-scaled contact distance")
+
+	attacker.free()
+	defender.free()
+
+
+func _verify_hooked_boarding_progresses_through_minor_distance_jitter(failures: Array[String]) -> void:
+	var attacker: Node = AttackerScript.new()
+	add_child(attacker)
+	attacker.set("team", "enemy")
+	attacker.set("is_boarding", true)
+	attacker.set("current_speed", 0.0)
+	attacker.set("max_boarding_distance", 4.0)
+	attacker.set("boarding_break_distance", 8.0)
+	attacker.set("boarding_contact_grace_duration", 0.0)
+	attacker.set("boarding_prep_duration", 1.0)
+	attacker.set("boarding_prep_timer", 0.0)
+	attacker.set("boarding_contact_timer", 2.0)
+	attacker.set("boarding_hook_timer", 2.0)
+	attacker.set("_initial_rope_deployed", true)
+	attacker.set("_full_rope_deployed", true)
+	attacker.set("base_collision_radius", 2.0)
+	attacker.set("width_multiplier", 1.0)
+	attacker.set("length_multiplier", 1.0)
+	attacker.global_position = Vector3.ZERO
+	attacker.set_meta("boarding_contact_mode", "head_on")
+
+	var defender: Node = AttackerScript.new()
+	add_child(defender)
+	defender.set("team", "player")
+	defender.set("current_speed", 0.0)
+	defender.set("base_collision_radius", 2.0)
+	defender.set("width_multiplier", 1.0)
+	defender.set("length_multiplier", 1.0)
+	defender.global_position = Vector3(5.3, 0.0, 0.0)
+	attacker.set("boarding_target", defender)
+	defender.set("boarding_attacker", attacker)
+
+	BaseShipBoardingHelper.process_boarding_common(attacker, 0.2)
+	if float(attacker.get("boarding_prep_timer")) <= 0.0:
+		failures.append("hooked boarding should keep progressing through small distance jitter")
+	if attacker.get("_initial_rope_deployed") != true:
+		failures.append("hooked boarding should not clear ropes on minor distance jitter")
 
 	attacker.free()
 	defender.free()

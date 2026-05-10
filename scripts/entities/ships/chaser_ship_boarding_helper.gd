@@ -326,6 +326,7 @@ static func emit_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: 
 		if ship.has_method("_mark_boarding_impact"):
 			ship.call("_mark_boarding_impact", other_ship)
 	var impact_speed = maxf(impact_speed_hint, ship.min_ramming_speed * 0.72)
+	BaseShipCollisionHelper.try_spawn_strong_collision_effects(ship, other_ship, impact_speed)
 	if ship.has_method("apply_ramming_damage"):
 		ship.apply_ramming_damage(other_ship, impact_speed)
 	if other_ship.has_method("apply_ramming_damage"):

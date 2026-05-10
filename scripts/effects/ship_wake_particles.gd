@@ -40,7 +40,12 @@ var _last_amount_ratio: float = -1.0
 var _last_speed_scale: float = -1.0
 
 
+func _enter_tree() -> void:
+	_stop_wake_immediately()
+
+
 func _ready() -> void:
+	_stop_wake_immediately()
 	_cache_base_values()
 	_refresh_auto_fit(true)
 	_refresh_distance_lod(true)
@@ -50,7 +55,8 @@ func _ready() -> void:
 func set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float = 0.0, turbulence: float = 0.0) -> void:
 	_refresh_auto_fit(false)
 	_refresh_distance_lod(false)
-	var effective_active := active and not _lod_hidden
+	var ship := _find_parent_ship()
+	var effective_active := active and not _lod_hidden and is_instance_valid(ship)
 	if emitting != effective_active:
 		emitting = effective_active
 	var intensity := clampf(maxf(speed_ratio, turbulence * 0.65), 0.0, 1.0)
@@ -61,6 +67,11 @@ func set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float = 
 	_apply_amount_ratio(next_amount_ratio)
 	_apply_speed_scale(next_speed_scale)
 	position = _base_position + Vector3(clampf(turn_ratio, -1.0, 1.0) * turn_offset * _current_width_scale, 0.0, 0.0)
+
+
+func _stop_wake_immediately() -> void:
+	emitting = false
+	_apply_amount_ratio(0.0)
 
 
 func _cache_base_values() -> void:

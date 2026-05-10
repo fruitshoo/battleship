@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://c6r6r6r6r6r6"]
 
 [ext_resource type="Script" uid="uid://wbf6ywtwubid" path="res://scripts/entities/launchers/cannon.gd" id="1"]
-[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball_joseon.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball.tscn" id="2"]
 [ext_resource type="PackedScene" uid="uid://blknmmdm7x4ch" path="res://assets/models/props/cannon/cannon.glb" id="3_model"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_detection"]
@@ -10,6 +10,8 @@ size = Vector3(10, 5, 30)
 [node name="CannonJoseon" type="Node3D" unique_id=333789260]
 script = ExtResource("1")
 cannonball_scene = ExtResource("2")
+projectile_damage = 22.0
+projectile_speed = 55.0
 fire_cooldown = 3.2
 detection_range = 24.0
 

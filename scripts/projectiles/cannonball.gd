@@ -19,7 +19,7 @@ const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
 @export_range(4.0, 48.0, 0.5) var min_miss_travel_distance: float = 12.0
 @export var impact_smoke_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
+var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_blast.tscn")
 
 var team: String = "player"
 var direction: Vector3 = Vector3.FORWARD

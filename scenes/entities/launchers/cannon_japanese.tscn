@@ -1,39 +1,42 @@
-[gd_scene format=3 uid="uid://j6r6r6r6r6r6"]
+[gd_scene load_steps=6 format=3 uid="uid://j6r6r6r6r6r6"]
 
-[ext_resource type="Script" path="res://scripts/entities/launchers/cannon.gd" id="1"]
-[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball_japanese.tscn" id="2"]
+[ext_resource type="Script" uid="uid://wbf6ywtwubid" path="res://scripts/entities/launchers/cannon.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/cannonball.tscn" id="2"]
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_japanese"]
-top_radius = 0.15
-bottom_radius = 0.22
-height = 0.9
+[sub_resource type="BoxMesh" id="BoxMesh_barrel"]
+size = Vector3(0.18, 0.18, 1.0)
 
-[sub_resource type="StandardMaterial3D" id="Material_japanese"]
-albedo_color = Color(0.12, 0.12, 0.15, 1)
-metallic = 0.7
-roughness = 0.5
+[sub_resource type="StandardMaterial3D" id="Material_barrel"]
+albedo_color = Color(0.11, 0.11, 0.12, 1)
+metallic = 0.5
+roughness = 0.45
 
 [sub_resource type="BoxShape3D" id="BoxShape_detection"]
 size = Vector3(10, 5, 30)
 
-[node name="CannonJapanese" type="Node3D"]
+[node name="CannonJapanese" type="Node3D" unique_id=1470338117]
 script = ExtResource("1")
 cannonball_scene = ExtResource("2")
+projectile_damage = 7.0
+projectile_speed = 65.0
 fire_cooldown = 3.25
 detection_range = 15.0
 
-[node name="Barrel" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, -0.3)
-mesh = SubResource("CylinderMesh_japanese")
-surface_material_override/0 = SubResource("Material_japanese")
+[node name="Visual" type="Node3D" parent="." unique_id=2047022879]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
 
-[node name="Muzzle" type="Marker3D" parent="."]
+[node name="Barrel" type="MeshInstance3D" parent="Visual" unique_id=1418087732]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.38)
+mesh = SubResource("BoxMesh_barrel")
+surface_material_override/0 = SubResource("Material_barrel")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=1641677360]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.9)
 
-[node name="DetectionArea" type="Area3D" parent="."]
+[node name="DetectionArea" type="Area3D" parent="." unique_id=1115724834]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -15)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea" unique_id=2022761837]
 shape = SubResource("BoxShape_detection")

@@ -101,8 +101,8 @@ static func _run_upgrade_ui_check(owner: Node, failures: Array[String], viewport
 	}, 8.0)
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(reward_ui.get_node_or_null("VBox") as Control, viewport_size, failures, "treasure reward root")
-	if reward_ui.get_node_or_null("TreasureShimmer") != null:
-		failures.append("treasure reward UI should not create background shimmer layer")
+	if reward_ui.get_node_or_null("TreasureShimmer") == null:
+		failures.append("treasure reward UI should create a background shimmer layer")
 	var reward_cards := reward_ui.get_node_or_null("VBox/CardsContainer") as HBoxContainer
 	if is_instance_valid(reward_cards):
 		for child in reward_cards.get_children():
@@ -110,8 +110,8 @@ static func _run_upgrade_ui_check(owner: Node, failures: Array[String], viewport
 			if not is_instance_valid(reward_card):
 				continue
 			var reward_style := reward_card.get_theme_stylebox("panel") as StyleBoxFlat
-			if reward_card.has_meta("reward_highlight") or reward_style == null or reward_style.border_width_top > 2 or reward_style.shadow_size > 12:
-				failures.append("treasure reward card should keep the plain non-halo reward style")
+			if not reward_card.has_meta("reward_highlight") or reward_style == null or reward_style.border_width_top < 3 or reward_style.shadow_size < 16:
+				failures.append("treasure reward card should use the highlighted reward style")
 	_expect_button_audio_wired(reward_ui, failures, "treasure reward UI")
 	reward_ui.queue_free()
 	await _wait_frames(owner, 1)

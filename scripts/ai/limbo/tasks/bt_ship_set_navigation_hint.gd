@@ -34,7 +34,7 @@ func _tick(_delta: float) -> Status:
 	var stance := str(blackboard.get_var(stance_var, "")).strip_edges()
 	if stance.is_empty():
 		return SUCCESS
-	if _can_board(agent_3d) and not _is_gunner(agent_3d):
+	if _can_board(agent_3d) and not _is_gunner(agent_3d) and ShipCombatModeHelper.can_be_boarded(target, agent_3d):
 		return SUCCESS
 
 	var target_pos := _get_led_target_position(agent_3d, target)

@@ -275,6 +275,13 @@ static func update_role_visual(soldier) -> void:
 			material.albedo_color = Color(1.0, 0.42, 0.32, 1.0)
 			material.emission = Color(1.0, 0.46, 0.28, 1.0)
 			material.emission_energy_multiplier = 0.42
+		"daecheolpo":
+			marker.visible = true
+			marker.scale = Vector3(0.55, 0.45, 2.4)
+			marker.rotation_degrees = Vector3(0.0, 0.0, -12.0)
+			material.albedo_color = Color(0.32, 0.34, 0.38, 1.0)
+			material.emission = Color(0.68, 0.38, 0.22, 1.0)
+			material.emission_energy_multiplier = 0.34
 		"spearman":
 			marker.visible = true
 			marker.scale = Vector3(0.45, 2.1, 0.45)

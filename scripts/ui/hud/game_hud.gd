@@ -132,6 +132,9 @@ var _last_ammo_mode_text: String = ""
 var _last_speed_str: String = ""
 var _last_speed_ratio: float = -1.0
 var _last_speed_mode: String = ""
+var _last_level_value: int = 1
+var _last_xp_current: int = 0
+var _last_xp_max: int = 0
 var _speed_visual_value: float = 0.0
 var _last_difficulty_text: String = ""
 var _last_combat_stats_text: String = ""
@@ -472,6 +475,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 	if is_instance_valid(sail_debug_panel) and sail_debug_panel.visible:
+		if HudDebugPanelHelper.handle_debug_panel_keyboard_input(self, event):
+			if get_viewport():
+				get_viewport().set_input_as_handled()
+			return
 		if event.is_action_pressed("ui_cancel"):
 			_set_debug_modal_active(false)
 			_update_sail_debug_toggle_button_text()
@@ -654,8 +661,10 @@ func _set_debug_modal_active(active: bool) -> void:
 			debug_backdrop.visible = true
 		if is_instance_valid(sail_debug_panel):
 			sail_debug_panel.visible = true
+			HudDebugPanelHelper.grab_initial_debug_focus(self)
 		return
 
+	HudDebugPanelHelper.clear_debug_focus(self)
 	if is_instance_valid(debug_backdrop):
 		debug_backdrop.visible = false
 	if is_instance_valid(sail_debug_panel):

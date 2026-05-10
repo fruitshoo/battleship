@@ -25,6 +25,7 @@ const ScreenEdgeFxContractLogic = preload("res://scripts/test/screen_edge_fx_con
 ]
 @export var smoke_spawn_projectile_scenes: Array[String] = [
 	"res://scenes/projectiles/cannonball.tscn",
+	"res://scenes/projectiles/small_cannonball.tscn",
 	"res://scenes/projectiles/arrow.tscn",
 	"res://scenes/projectiles/fire_pot.tscn",
 	"res://scenes/projectiles/ballista_bolt.tscn",

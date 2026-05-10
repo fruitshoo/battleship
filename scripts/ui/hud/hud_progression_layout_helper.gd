@@ -24,17 +24,17 @@ static func apply_overlay_density(hud) -> void:
 	var width_fit: float = clampf((viewport_size.x - 1280.0) / 640.0, 0.0, 1.0)
 	var height_fit: float = clampf((viewport_size.y - 720.0) / 360.0, 0.0, 1.0)
 	var density: float = min(width_fit, height_fit)
-	var top_bar_height := roundf(lerpf(20.0, 24.0, density))
+	var top_bar_height := roundf(lerpf(16.0, 18.0, density))
 	if is_instance_valid(hud.xp_bar):
 		hud.xp_bar.custom_minimum_size.y = top_bar_height
 	if is_instance_valid(hud.level_label):
-		NavalUiTheme.style_overlay_caption(hud.level_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_MAIN, 4)
+		NavalUiTheme.style_overlay_caption(hud.level_label, roundi(lerpf(10.0, 11.0, density)), NavalUiTheme.TEXT_MAIN, 3)
 	if is_instance_valid(hud.gust_warning):
 		hud.gust_warning.offset_left = -roundf(lerpf(220.0, 260.0, density))
 		hud.gust_warning.offset_right = roundf(lerpf(220.0, 260.0, density))
-		hud.gust_warning.offset_top = roundf(lerpf(90.0, 104.0, density))
-		hud.gust_warning.offset_bottom = hud.gust_warning.offset_top + roundf(lerpf(26.0, 30.0, density))
-		NavalUiTheme.style_status_banner(hud.gust_warning, roundi(lerpf(18.0, 22.0, density)), Color(1.0, 0.7, 0.2, 1.0), 4)
+		hud.gust_warning.offset_top = roundf(lerpf(70.0, 82.0, density))
+		hud.gust_warning.offset_bottom = hud.gust_warning.offset_top + roundf(lerpf(24.0, 28.0, density))
+		NavalUiTheme.style_status_banner(hud.gust_warning, roundi(lerpf(16.0, 20.0, density)), Color(1.0, 0.7, 0.2, 1.0), 4)
 	if is_instance_valid(hud.game_over_label):
 		NavalUiTheme.style_status_banner(hud.game_over_label, roundi(lerpf(30.0, 36.0, density)), Color(0.84, 0.34, 0.28, 1.0), 4)
 	if is_instance_valid(hud.victory_label):
@@ -52,13 +52,13 @@ static func ensure_hud_label(hud, existing: Label, node_name: String, default_te
 
 
 static func setup_top_xp_bar(hud) -> void:
-	hud.level_label = ensure_hud_label(hud, hud.level_label, "LevelLabel", "[Lv] 1")
+	hud.level_label = ensure_hud_label(hud, hud.level_label, "LevelLabel", "Lv 1")
 	hud.xp_bar = HudGaugeBar.new()
 	hud.xp_bar.name = "TopXPBar"
 	hud.add_child(hud.xp_bar)
 
 	hud.xp_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	hud.xp_bar.custom_minimum_size.y = 24.0
+	hud.xp_bar.custom_minimum_size.y = 18.0
 	hud.xp_bar.show_percentage = false
 	hud.xp_bar.z_index = 10
 
@@ -81,4 +81,4 @@ static func attach_level_label_to_xp_bar(hud) -> void:
 	hud.level_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hud.level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	NavalUiTheme.style_overlay_caption(hud.level_label, 14, NavalUiTheme.TEXT_MAIN, 4)
+	NavalUiTheme.style_overlay_caption(hud.level_label, 11, NavalUiTheme.TEXT_MAIN, 3)

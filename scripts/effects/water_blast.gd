@@ -1,7 +1,7 @@
 extends Node3D
 
 
-@export_enum("splash", "small", "sink", "corpse_cleanup") var preset: String = "splash"
+@export_enum("splash", "small", "sink", "corpse_cleanup", "ship_collision") var preset: String = "splash"
 @export var lock_to_waterline: bool = true
 @export_range(-1.0, 1.0, 0.01) var waterline_y: float = 0.05
 
@@ -19,6 +19,7 @@ var _budget_limit_value: int = 4
 var _budget_distance_value: float = 70.0
 var _active: bool = false
 var _activate_when_ready: bool = false
+var _activation_request_id: int = 0
 var _elapsed: float = 0.0
 var _duration: float = 0.75
 var _intensity_scale: float = 1.0
@@ -59,24 +60,30 @@ var _mist_material: StandardMaterial3D
 
 func _enter_tree() -> void:
 	if _activate_when_ready and is_node_ready():
-		_activate_when_ready = false
-		call_deferred("pool_activate")
+		_defer_pool_activate()
 
 
 func _ready() -> void:
+	var activate_after_ready := _activate_when_ready
 	_cache_nodes()
 	_prepare_local_materials()
 	_apply_preset()
 	pool_reset()
 	if _is_prewarm_mode():
 		return
-	if _activate_when_ready:
-		_activate_when_ready = false
+	if activate_after_ready:
+		_activate_when_ready = true
 		pool_activate()
 
 
 func configure_as_splash() -> void:
 	preset = "splash"
+	if is_node_ready():
+		_apply_preset()
+
+
+func configure_as_ship_collision() -> void:
+	preset = "ship_collision"
 	if is_node_ready():
 		_apply_preset()
 
@@ -100,7 +107,7 @@ func configure_as_corpse_cleanup() -> void:
 
 
 func set_intensity(scale_value: float) -> void:
-	_intensity_scale = clampf(scale_value, 0.4, 2.0)
+	_intensity_scale = clampf(scale_value, 0.4, 4.0)
 	if is_node_ready():
 		_apply_preset()
 
@@ -113,6 +120,10 @@ func pool_activate() -> void:
 	if not is_inside_tree():
 		_activate_when_ready = true
 		return
+	if _is_parked_in_scene_pool():
+		_activate_when_ready = false
+		return
+	_activate_when_ready = false
 	_cache_nodes()
 	_prepare_local_materials()
 	_apply_preset()
@@ -133,6 +144,8 @@ func pool_activate() -> void:
 
 
 func pool_reset() -> void:
+	_activation_request_id += 1
+	_activate_when_ready = false
 	_cache_nodes()
 	_active = false
 	_elapsed = 0.0
@@ -147,6 +160,23 @@ func pool_reset() -> void:
 		droplet_particles.emitting = false
 		droplet_particles.visible = false
 	_stop_blast_particles()
+
+
+func _defer_pool_activate() -> void:
+	_activation_request_id += 1
+	var request_id := _activation_request_id
+	call_deferred("_pool_activate_deferred", request_id)
+
+
+func _pool_activate_deferred(request_id: int) -> void:
+	if request_id != _activation_request_id:
+		return
+	pool_activate()
+
+
+func _is_parked_in_scene_pool() -> bool:
+	var parent_node := get_parent()
+	return is_instance_valid(parent_node) and parent_node.name == "__ScenePoolRoot"
 
 
 func _process(delta: float) -> void:
@@ -168,13 +198,17 @@ func _apply_preset() -> void:
 			_apply_sink_preset()
 		"corpse_cleanup":
 			_apply_corpse_cleanup_preset()
+		"ship_collision":
+			_apply_ship_collision_preset()
 		_:
 			_apply_splash_preset()
 
 
 func _apply_splash_preset() -> void:
 	var intensity := _intensity_scale
-	var size_scale := lerpf(0.9, 1.45, inverse_lerp(0.7, 2.0, intensity))
+	var base_size_scale := lerpf(0.9, 1.45, clampf(inverse_lerp(0.7, 2.0, intensity), 0.0, 1.0))
+	var high_speed_scale := lerpf(1.0, 2.0, clampf(inverse_lerp(2.0, 4.0, intensity), 0.0, 1.0))
+	var size_scale := base_size_scale * high_speed_scale
 	_budget_key_value = "water_explosion"
 	_budget_limit_value = 4
 	_budget_distance_value = 70.0
@@ -213,6 +247,50 @@ func _apply_splash_preset() -> void:
 		6.6 * intensity,
 		0.03,
 		0.09 * size_scale
+	)
+
+
+func _apply_ship_collision_preset() -> void:
+	var intensity := _intensity_scale
+	var size_scale := lerpf(2.55, 3.25, clampf(inverse_lerp(2.2, 4.0, intensity), 0.0, 1.0))
+	_budget_key_value = "ship_collision_water_blast"
+	_budget_limit_value = 3
+	_budget_distance_value = 85.0
+	_waterline_lift = 0.0
+	_duration = 0.86 + (0.06 * clampf(intensity, 0.0, 4.0))
+	_blast_scale = size_scale
+
+	_foam_enabled = true
+	_foam_start_scale = 0.42 * size_scale
+	_foam_end_scale = 2.95 * size_scale
+	_foam_alpha = 0.76
+
+	_column_enabled = true
+	_column_start_scale = Vector2(0.7, 0.95) * size_scale
+	_column_end_scale = Vector2(1.55, 2.35) * size_scale
+	_column_alpha = 0.76
+
+	_splash_cards_enabled = true
+	_splash_card_count = 5
+	_splash_card_start_scale = Vector2(0.22, 0.5) * size_scale
+	_splash_card_end_scale = Vector2(0.95, 1.95) * size_scale
+	_splash_card_alpha = 0.78
+	_splash_card_radius = 0.34 * size_scale
+	_splash_card_rise = 0.43 * size_scale
+
+	_mist_enabled = true
+	_mist_start_scale = Vector2(0.85, 0.62) * size_scale
+	_mist_end_scale = Vector2(2.35, 1.55) * size_scale
+	_mist_alpha = 0.3
+
+	_droplets_enabled = true
+	_configure_droplets(
+		clampi(int(round(18.0 + intensity * 4.0)), 18, 34),
+		0.76 + (0.06 * intensity),
+		4.6 + (1.1 * intensity),
+		9.0 + (1.8 * intensity),
+		0.04,
+		0.13 * size_scale
 	)
 
 

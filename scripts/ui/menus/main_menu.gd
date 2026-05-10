@@ -13,7 +13,7 @@ const INTRO_BUTTON_STAGGER: float = 0.11
 @export var background_texture: Texture2D
 @export var use_3d_background: bool = true
 @export_range(0.0, 1.0, 0.01) var background_dim: float = 0.18
-@export var fallback_version_text: String = "v0.1.0"
+@export var fallback_version_text: String = "v0.4.0-alpha"
 
 @onready var fleet_background: Node = get_node_or_null("MenuFleetBackground")
 @onready var background_image: TextureRect = $BackgroundImage

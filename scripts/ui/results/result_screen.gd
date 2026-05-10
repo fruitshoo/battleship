@@ -6,18 +6,19 @@ const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
+const ShipDefeatIllustration = preload("res://scripts/ui/results/ship_defeat_illustration.gd")
 const WEAPON_ICON_TEXTURE_PATHS := {
 	"cannon": "res://assets/ui/upgrades/cannon_card.png",
 	"janggun": "res://assets/ui/upgrades/janggun_card.png",
-	"singigeon": "res://assets/ui/upgrades/iron_shot_card.png",
+	"singigeon": "res://assets/ui/upgrades/singigeon_card.png",
 	"bow": "res://assets/ui/support_fleet/support_fleet_bow_icon.png",
 	"repeating_crossbow": "res://assets/ui/upgrades/crew_defense_card.png",
 	"ballista": "res://assets/ui/upgrades/crew_defense_card.png",
 	"sword": "res://assets/ui/upgrades/boarding_resist_card.png",
-	"spear": "res://assets/ui/upgrades/crew_defense_card.png",
-	"trident": "res://assets/ui/upgrades/crew_defense_card.png",
-	"harpoon": "res://assets/ui/upgrades/crew_defense_card.png",
-	"crew_numbers": "res://assets/ui/upgrades/crew_defense_card.png",
+	"spear": "res://assets/ui/upgrades/jangchang_card.png",
+	"trident": "res://assets/ui/upgrades/jangchang_card.png",
+	"harpoon": "res://assets/ui/upgrades/jangchang_card.png",
+	"crew_numbers": "res://assets/ui/upgrades/jangchang_card.png",
 	"boarding_defense": "res://assets/ui/upgrades/boarding_resist_card.png",
 	"fire_pot": "res://assets/ui/upgrades/janggun_card.png",
 	"ramming": "res://assets/ui/support_fleet/support_fleet_maengseon_icon.png",
@@ -25,6 +26,13 @@ const WEAPON_ICON_TEXTURE_PATHS := {
 	"leak": "res://assets/ui/upgrades/sail_card.png",
 	"rock": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
 	"fire": "res://assets/ui/upgrades/janggun_card.png",
+}
+const SHIP_DEFEAT_TEXTURE_PATHS := {
+	"kobayabune": "res://assets/ui/results/ships/kobayabune.png",
+	"sekibune": "res://assets/ui/results/ships/sekibune.png",
+	"sekibune_cannon": "res://assets/ui/results/ships/sekibune.png",
+	"atakebune": "res://assets/ui/results/ships/atakebune.png",
+	"atakebune_final": "res://assets/ui/results/ships/atakebune.png",
 }
 
 @export var background_texture: Texture2D
@@ -52,10 +60,13 @@ var _title_font_size: int = 50
 var _button_font_size: int = 18
 var _weapon_value_width: float = 120.0
 var _weapon_icon_size: int = 42
+var _ship_card_height: int = 72
+var _ship_illustration_width: int = 94
 var _last_result: Dictionary = {}
 var _action_buttons: Array[Button] = []
 var _focused_button_index: int = 0
 var _weapon_icon_cache: Dictionary = {}
+var _ship_defeat_texture_cache: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -101,13 +112,13 @@ func _apply_background() -> void:
 	if is_instance_valid(background_tint):
 		background_tint.color = Color.WHITE
 		background_tint.material = UiOverlayFx.make_vignette_material(
-			Color(0.02, 0.04, 0.07, 0.62),
+			Color(0.02, 0.035, 0.055, 0.56),
 			Vector2(0.5, 0.42),
-			0.88,
-			0.44,
+			0.82,
+			0.38,
+			0.14,
 			0.18,
-			0.12,
-			Vector3.ZERO
+			Vector3(0.035, 0.03, 0.015)
 		)
 
 
@@ -182,6 +193,8 @@ func _apply_layout_density() -> void:
 	_button_font_size = roundi(lerpf(16.0, 18.0, density))
 	_weapon_value_width = roundf(lerpf(96.0, 120.0, density))
 	_weapon_icon_size = roundi(lerpf(34.0, 42.0, density))
+	_ship_card_height = roundi(lerpf(74.0, 94.0, density))
+	_ship_illustration_width = roundi(lerpf(118.0, 158.0, density))
 	if is_instance_valid(content):
 		var half_width := roundi(clampf(viewport_size.x * 0.36, 320.0, 430.0))
 		content.offset_left = -half_width
@@ -226,8 +239,10 @@ func _on_viewport_size_changed() -> void:
 
 func _render_result(result: Dictionary) -> void:
 	_last_result = result.duplicate(true)
-	title_label.text = str(result.get("title", "항해 결과"))
-	subtitle_label.text = str(result.get("outcome", "항해 종료"))
+	title_label.text = str(result.get("title", "결과"))
+	var outcome_text := str(result.get("outcome", "")).strip_edges()
+	subtitle_label.text = outcome_text
+	subtitle_label.visible = not outcome_text.is_empty()
 
 	_clear_children(summary_list)
 	_clear_children(weapon_list)
@@ -240,14 +255,15 @@ func _render_result(result: Dictionary) -> void:
 	_add_summary_row("나포", "%d척" % int(result.get("ships_derelicted", 0)))
 	_add_summary_row("적 병사", "%d명" % int(result.get("soldiers_killed", 0)))
 	_add_summary_row("아군 생존", "%d / %d" % [int(result.get("crew_alive", 0)), int(result.get("crew_capacity", 0))])
-	_add_summary_row("총 무기 피해", "%.0f" % float(result.get("total_weapon_damage", 0.0)))
 
-	var weapon_rows: Array = result.get("weapon_rows", [])
-	if weapon_rows.is_empty():
-		_add_weapon_empty_row()
+	_add_ship_defeat_header()
+	var ship_rows: Array = result.get("defeated_ship_rows", [])
+	if ship_rows.is_empty():
+		_add_ship_defeat_empty_row()
 	else:
-		for row in weapon_rows:
-			_add_weapon_row(row)
+		for row in ship_rows:
+			if row is Dictionary:
+				_add_ship_defeat_row(row)
 
 
 func _add_summary_row(label_text: String, value_text: String) -> void:
@@ -352,6 +368,188 @@ func _add_weapon_empty_row() -> void:
 	label.text = "기록된 무기 피해 없음"
 	NavalUiTheme.style_muted(label, _summary_font_size)
 	weapon_list.add_child(label)
+
+
+func _add_ship_defeat_header() -> void:
+	var header := HBoxContainer.new()
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_constant_override("separation", 10)
+	weapon_list.add_child(header)
+
+	var title := Label.new()
+	title.text = "격파 함선"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	NavalUiTheme.style_body(title, _summary_font_size + 1)
+	header.add_child(title)
+
+	var caption := Label.new()
+	caption.text = "일본 함선별 전과"
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	NavalUiTheme.style_muted(caption, max(12, _summary_font_size - 3))
+	header.add_child(caption)
+
+
+func _add_ship_defeat_row(row_data: Dictionary) -> void:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(0.0, _ship_card_height)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", _make_ship_defeat_card_style(str(row_data.get("id", ""))))
+	weapon_list.add_child(card)
+
+	var margin := MarginContainer.new()
+	var pad := roundi(maxf(8.0, _ship_card_height * 0.14))
+	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
+		margin.add_theme_constant_override(side, pad)
+	card.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", roundi(maxf(9.0, _ship_card_height * 0.16)))
+	margin.add_child(row)
+
+	var type_id := str(row_data.get("id", "kobayabune"))
+	row.add_child(_create_ship_defeat_art(type_id, max(48, _ship_card_height - pad * 2)))
+
+	var text_stack := VBoxContainer.new()
+	text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_stack.add_theme_constant_override("separation", 2)
+	row.add_child(text_stack)
+
+	var name_label := Label.new()
+	name_label.text = str(row_data.get("name", _get_ship_type_label(type_id)))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	NavalUiTheme.style_body(name_label, _summary_font_size)
+	text_stack.add_child(name_label)
+
+	var detail_label := Label.new()
+	var sunk := int(row_data.get("sunk", 0))
+	var derelicted := int(row_data.get("derelicted", 0))
+	detail_label.text = "격침 %d / 나포 %d" % [sunk, derelicted]
+	NavalUiTheme.style_muted(detail_label, max(12, _summary_font_size - 3))
+	text_stack.add_child(detail_label)
+
+	var count_label := Label.new()
+	count_label.text = "x%d" % int(row_data.get("defeated", max(sunk, derelicted)))
+	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	count_label.custom_minimum_size = Vector2(maxf(42.0, _weapon_value_width * 0.48), 0.0)
+	NavalUiTheme.style_gold(count_label, _summary_font_size + 4)
+	row.add_child(count_label)
+
+
+func _create_ship_defeat_art(type_id: String, art_height: int) -> Control:
+	var texture := _get_ship_defeat_texture(type_id)
+	if texture != null:
+		var frame := PanelContainer.new()
+		frame.custom_minimum_size = Vector2(_ship_illustration_width, art_height)
+		frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		frame.add_theme_stylebox_override("panel", _make_ship_defeat_art_frame_style(type_id))
+
+		var art := TextureRect.new()
+		art.name = "ShipDefeatTexture"
+		art.custom_minimum_size = Vector2(_ship_illustration_width, art_height)
+		art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		art.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		art.texture = texture
+		frame.add_child(art)
+		return frame
+
+	var fallback := ShipDefeatIllustration.new()
+	fallback.name = "ShipDefeatIllustration"
+	fallback.custom_minimum_size = Vector2(_ship_illustration_width, art_height)
+	fallback.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	fallback.setup(type_id)
+	return fallback
+
+
+func _get_ship_defeat_texture(type_id: String) -> Texture2D:
+	var normalized := _normalize_ship_defeat_texture_id(type_id)
+	if normalized.is_empty():
+		return null
+	if _ship_defeat_texture_cache.has(normalized):
+		return _ship_defeat_texture_cache[normalized] as Texture2D
+	var texture: Texture2D = null
+	var path := str(SHIP_DEFEAT_TEXTURE_PATHS.get(normalized, ""))
+	if not path.is_empty() and ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	_ship_defeat_texture_cache[normalized] = texture
+	return texture
+
+
+func _normalize_ship_defeat_texture_id(type_id: String) -> String:
+	var normalized := type_id.strip_edges().to_lower()
+	if normalized.contains("atake"):
+		return "atakebune_final" if normalized.contains("final") else "atakebune"
+	if normalized.contains("seki"):
+		return "sekibune_cannon" if normalized.contains("cannon") or normalized.contains("gunner") else "sekibune"
+	if normalized.contains("kobaya"):
+		return "kobayabune"
+	return normalized
+
+
+func _add_ship_defeat_empty_row() -> void:
+	var label := Label.new()
+	label.text = "격파한 함선 없음"
+	NavalUiTheme.style_muted(label, _summary_font_size)
+	weapon_list.add_child(label)
+
+
+func _make_ship_defeat_card_style(type_id: String) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	var accent := _get_ship_type_accent(type_id)
+	style.bg_color = Color(0.035, 0.048, 0.055, 0.72)
+	style.border_color = Color(accent.r, accent.g, accent.b, 0.55)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(7)
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
+
+func _make_ship_defeat_art_frame_style(type_id: String) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	var accent := _get_ship_type_accent(type_id)
+	style.bg_color = Color(0.02, 0.022, 0.024, 0.74)
+	style.border_color = Color(accent.r, accent.g, accent.b, 0.36)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
+
+func _get_ship_type_accent(type_id: String) -> Color:
+	var normalized := type_id.strip_edges().to_lower()
+	if normalized.contains("atake"):
+		return Color(0.86, 0.56, 0.28, 1.0)
+	if normalized.contains("cannon") or normalized.contains("gunner"):
+		return Color(0.72, 0.28, 0.24, 1.0)
+	if normalized.contains("seki"):
+		return Color(0.58, 0.34, 0.24, 1.0)
+	return Color(0.72, 0.55, 0.28, 1.0)
+
+
+func _get_ship_type_label(type_id: String) -> String:
+	match type_id.strip_edges().to_lower():
+		"kobayabune":
+			return "고바야부네"
+		"sekibune":
+			return "세키부네"
+		"sekibune_cannon":
+			return "대철포 세키부네"
+		"atakebune":
+			return "아타케부네"
+		"atakebune_final":
+			return "대장선 아타케부네"
+		_:
+			return type_id.capitalize()
 
 
 func _clear_children(node: Node) -> void:

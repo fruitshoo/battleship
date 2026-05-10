@@ -28,14 +28,10 @@ static func process_boarding_common(ship, delta: float) -> void:
 		cancel_boarding(ship)
 		return
 
-	if dist > effective_boarding_distance:
+	if dist > effective_boarding_distance and not ship._initial_rope_deployed:
 		ship.boarding_contact_timer = maxf(0.0, ship.boarding_contact_timer - delta * 2.0)
 		ship.boarding_hook_timer = 0.0
 		ship.boarding_secondary_rope_timer = 0.0
-		if ship._initial_rope_deployed and dist > (effective_boarding_distance + 0.8):
-			ship._clear_ropes()
-			ship._initial_rope_deployed = false
-			ship._full_rope_deployed = false
 		return
 
 	ship.boarding_contact_timer += delta

@@ -66,6 +66,7 @@ class MockTarget:
 	var deck_is_contested: bool = false
 	var deck_is_overrun: bool = false
 	var is_derelict: bool = false
+	var blocks_boarding: bool = false
 
 	func get_team_tag() -> String:
 		return team
@@ -76,15 +77,28 @@ class MockTarget:
 	func get_deck_half_extents() -> Vector2:
 		return Vector2(2.8, 4.2)
 
+	func can_be_boarded_by(_attacker_ship: Node = null) -> bool:
+		return not blocks_boarding
+
+
+class MockAuthoredCollisionShip:
+	extends Node3D
+
+	var base_collision_radius: float = 12.0
+	var width_multiplier: float = 1.0
+	var length_multiplier: float = 1.0
+
 
 func _ready() -> void:
 	var failures: Array[String] = []
+	_verify_deck_area_limits_soft_collision_extents(failures)
 	_verify_bow_sector_keeps_front_navigation(failures)
 	_verify_true_side_still_uses_side_navigation(failures)
 	_verify_head_on_boarding_holds_contact_anchor(failures)
 	_verify_limbo_navigation_hint_offsets_gunner(failures)
 	_verify_limbo_navigation_hint_speeds_gunner(failures)
 	_verify_limbo_navigation_hint_does_not_break_close_boarding(failures)
+	_verify_unboardable_target_uses_standoff_navigation(failures)
 	if failures.is_empty():
 		print("[BoardingNavigationContract] ok")
 		return
@@ -156,6 +170,15 @@ func _verify_head_on_boarding_holds_contact_anchor(failures: Array[String]) -> v
 		failures.append("head-on boarding did not settle back toward contact anchor: %.2f" % end_local.z)
 
 
+func _verify_deck_area_limits_soft_collision_extents(failures: Array[String]) -> void:
+	var ship := _build_authored_collision_ship(Vector2(2.0, 4.0))
+	var half_extents := ShipContactGeometry.get_soft_collision_half_extents(ship)
+	var expected := Vector2(2.0, 4.0) + Vector2.ONE * ShipContactGeometry.AUTHORED_DECK_COLLISION_PAD
+	if half_extents.distance_to(expected) > 0.01:
+		failures.append("authored DeckArea should limit soft collision extents, got %s expected %s" % [half_extents, expected])
+	ship.free()
+
+
 func _verify_limbo_navigation_hint_offsets_gunner(failures: Array[String]) -> void:
 	var pair := _build_pair()
 	var ship: MockShip = pair["ship"]
@@ -214,6 +237,25 @@ func _verify_limbo_navigation_hint_does_not_break_close_boarding(failures: Array
 		failures.append("Limbo navigation hint should not override close boarding navigation: %.2f" % desired_distance)
 
 
+func _verify_unboardable_target_uses_standoff_navigation(failures: Array[String]) -> void:
+	var pair := _build_pair()
+	var ship: MockShip = pair["ship"]
+	var target: MockTarget = pair["target"]
+	target.blocks_boarding = true
+	ship.global_position = Vector3(8.0, 0.0, 0.0)
+	target.global_position = Vector3.ZERO
+	ship.set_meta("boarding_approach_mode", "side")
+	ship.set_meta("boarding_side_sign", 1.0)
+
+	var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, target)
+	if ship.has_meta("boarding_approach_mode") or ship.has_meta("boarding_side_sign"):
+		failures.append("unboardable target should clear stale boarding navigation meta")
+	if ShipMovementIntent.get_mode(nav) != "unboardable_standoff":
+		failures.append("unboardable target should use standoff navigation, got %s" % ShipMovementIntent.get_mode(nav))
+	if ShipMovementIntent.get_desired_speed_mult(nav) > 0.35:
+		failures.append("unboardable target standoff should avoid full boarding charge")
+
+
 func _set_limbo_nav_hint(
 	ship: MockShip,
 	target: MockTarget,
@@ -247,3 +289,32 @@ func _build_pair() -> Dictionary:
 		"ship": ship,
 		"target": target,
 	}
+
+
+func _build_authored_collision_ship(deck_half_extents: Vector2) -> MockAuthoredCollisionShip:
+	var ship := MockAuthoredCollisionShip.new()
+	var authoring := Node3D.new()
+	authoring.name = ShipAuthoringHelper.AUTHORING_ROOT
+	ship.add_child(authoring)
+
+	var deck_area := Node3D.new()
+	deck_area.name = ShipAuthoringHelper.DECK_AREA
+	deck_area.set_meta("use_authored_deck_area", true)
+	authoring.add_child(deck_area)
+
+	var points := Node3D.new()
+	points.name = ShipAuthoringHelper.DECK_AREA_POINTS
+	deck_area.add_child(points)
+
+	var corners := [
+		Vector3(-deck_half_extents.x, 0.0, -deck_half_extents.y),
+		Vector3(deck_half_extents.x, 0.0, -deck_half_extents.y),
+		Vector3(deck_half_extents.x, 0.0, deck_half_extents.y),
+		Vector3(-deck_half_extents.x, 0.0, deck_half_extents.y),
+	]
+	for index in range(corners.size()):
+		var marker := Marker3D.new()
+		marker.name = "Point_%02d" % index
+		marker.position = corners[index]
+		points.add_child(marker)
+	return ship

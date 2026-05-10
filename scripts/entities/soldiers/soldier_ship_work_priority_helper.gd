@@ -308,7 +308,7 @@ static func get_role_affinity_for_task(soldier, task_name: String) -> float:
 	if normalized_task == TASK_CANNON_RELOAD:
 		if _is_ranged_only(soldier):
 			return 1.0
-		if role == "general" or role == "fire_pot" or role == "repeating_crossbow" or role == "singigeon":
+		if role == "general" or role == "fire_pot" or role == "repeating_crossbow" or role == "singigeon" or role == "daecheolpo":
 			return 0.9
 		if role == "spearman":
 			return 0.55
@@ -658,7 +658,7 @@ static func _get_most_damaged_mast_local(ship: Node3D, half_ext: Vector2) -> Vec
 
 static func _can_work_gunnery(soldier) -> bool:
 	var role := _get_soldier_role(soldier)
-	return _is_ranged_only(soldier) or role == "general" or role == "fire_pot" or role == "repeating_crossbow" or role == "singigeon"
+	return _is_ranged_only(soldier) or role == "general" or role == "fire_pot" or role == "repeating_crossbow" or role == "singigeon" or role == "daecheolpo"
 
 
 static func _get_soldier_role(soldier) -> String:
@@ -839,9 +839,10 @@ static func _get_owned_ship(soldier) -> Node3D:
 	if not is_instance_valid(soldier):
 		return null
 	if soldier.has_method("get_owned_ship_node"):
-		return soldier.call("get_owned_ship_node") as Node3D
+		var owned_node: Variant = soldier.call("get_owned_ship_node")
+		return owned_node if is_instance_valid(owned_node) and owned_node is Node3D else null
 	var owned_ship_value: Variant = soldier.get("owned_ship")
-	return owned_ship_value as Node3D if owned_ship_value is Node3D else null
+	return owned_ship_value if is_instance_valid(owned_ship_value) and owned_ship_value is Node3D else null
 
 
 static func _get_node_team_tag(node: Node) -> String:

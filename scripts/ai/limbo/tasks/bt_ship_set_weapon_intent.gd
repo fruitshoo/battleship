@@ -33,7 +33,7 @@ func _tick(_delta: float) -> Status:
 	var pressure := clampf(float(blackboard.get_var(pressure_var, 0.0)), 0.0, 1.0)
 	var target_distance := agent_3d.global_position.distance_to(target.global_position)
 	_publish_special_attack_intent(agent_3d, target, target_distance)
-	if not _should_publish_weapon_intent(agent_3d):
+	if not _should_publish_weapon_intent(agent_3d, target):
 		return SUCCESS
 
 	var weapon_intent := _get_weapon_intent(stance, range_intent, pressure)
@@ -94,10 +94,10 @@ func _get_fire_pot_intent(target_distance: float) -> String:
 	return ShipAILimboKeys.SPECIAL_FIRE_POT_READY
 
 
-func _should_publish_weapon_intent(agent_3d: Node3D) -> bool:
+func _should_publish_weapon_intent(agent_3d: Node3D, target: Node3D) -> bool:
 	if not _is_enemy_team(agent_3d):
 		return false
-	if _can_board(agent_3d) and not _is_gunner(agent_3d):
+	if _can_board(agent_3d) and not _is_gunner(agent_3d) and ShipCombatModeHelper.can_be_boarded(target, agent_3d):
 		return false
 	return true
 

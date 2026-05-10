@@ -5,6 +5,7 @@ const LevelManagerProgressionHelper = preload("res://scripts/managers/level_mana
 const AUTHORING_SCENARIO_TRIGGER_USER_PATH := "user://authoring_palette_scenario_trigger.json"
 const AUTHORING_SCENARIO_PRESETS_USER_PATH := "user://authoring_palette_scenario_presets.json"
 const AUTHORING_DATA_PATCH_USER_PATH := "user://authoring_palette_data_patch.json"
+const SHOW_AUTHORING_PALETTE_TAB_SETTING := "battleship/debug/show_authoring_palette_tab"
 const ASSEMBLED_AUTHORING_PRESET_ID := "midgame_pressure_kobayabune_melee_stand_off_gunner_boarding_side_follow"
 const LIGHT_RAIDERS_PRESET_ID := "light_raiders"
 
@@ -48,6 +49,7 @@ class MockXpLevelManager:
 
 static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
 	_run_level_progression_xp_bar_contract(owner, failures)
+	ProjectSettings.set_setting(SHOW_AUTHORING_PALETTE_TAB_SETTING, true)
 	var packed := load(smoke_scene_path) as PackedScene
 	if packed == null:
 		failures.append("hud smoke scene load failed: %s" % smoke_scene_path)
@@ -214,8 +216,8 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 	if not is_instance_valid(random_site_bonus_button):
 		failures.append("hud smoke debug tools should include random sea-site bonus button")
 	else:
-		if random_site_bonus_button.focus_mode != Control.FOCUS_NONE:
-			failures.append("hud smoke random sea-site bonus debug button should not keep keyboard focus")
+		if random_site_bonus_button.focus_mode != Control.FOCUS_ALL:
+			failures.append("hud smoke random sea-site bonus debug button should be keyboard focusable")
 		var previous_hull_hp := float(player_ship.get("hull_hp"))
 		var previous_max_hull_hp := float(player_ship.get("max_hull_hp"))
 		random_site_bonus_button.pressed.emit()
@@ -579,8 +581,8 @@ static func _run_hud_authoring_palette_harness(owner: Node, hud: Node, smoke_roo
 	if not is_instance_valid(debug_tabs):
 		failures.append("hud authoring palette harness missing debug tools tabs")
 	else:
-		if debug_tabs.focus_mode != Control.FOCUS_NONE:
-			failures.append("hud authoring palette harness debug tabs should not keep keyboard focus")
+		if debug_tabs.focus_mode != Control.FOCUS_ALL:
+			failures.append("hud authoring palette harness debug tabs should be keyboard focusable")
 		if debug_tabs.get_tab_count() < 6:
 			failures.append("hud authoring palette harness expected debug tools to be split into tabs")
 		var previous_tab: int = debug_tabs.current_tab

@@ -59,8 +59,8 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke maengseon support should stay front-cannon only at 포문 Lv3")
 	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("panokseon_ally", 3).size() != 6:
 		failures.append("upgrade smoke panokseon support should keep six side cannons before 전면 포문")
-	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("geobukseon_ally", 3).size() != 4:
-		failures.append("upgrade smoke geobukseon support should stay four side cannons at 포문 Lv3")
+	if SupportFleetCannonRules.get_active_support_cannon_names_for_ship_type("geobukseon_ally", 3).size() != 6:
+		failures.append("upgrade smoke geobukseon support should expose two forward cannons plus four side cannons at 포문 Lv3")
 	var panokseon_front_levels := {
 		"front_cannon": 1,
 	}
@@ -281,14 +281,20 @@ static func _validate_player_geobukseon_upgrade(failures: Array[String]) -> void
 		failures.append("upgrade smoke geobukseon_player should not reduce player move speed")
 	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(player_stats, [])
 	var cannon_count := 0
+	var front_cannon_count := 0
 	for spec in loadout:
 		if ShipWeaponLoadoutHelper.get_kind(spec) != ShipWeaponLoadoutHelper.KIND_CANNON:
 			continue
 		cannon_count += 1
-		if ShipWeaponLoadoutHelper.get_slot_name(spec).contains("Front"):
-			failures.append("upgrade smoke geobukseon_player should not expose front cannon")
-	if cannon_count != 4:
-		failures.append("upgrade smoke geobukseon_player should expose exactly four side cannons, got %d" % cannon_count)
+		var slot_name := ShipWeaponLoadoutHelper.get_slot_name(spec)
+		if slot_name == "CannonFront":
+			failures.append("upgrade smoke geobukseon_player should not expose central front cannon")
+		if slot_name.begins_with("CannonFront"):
+			front_cannon_count += 1
+	if front_cannon_count != 2:
+		failures.append("upgrade smoke geobukseon_player should expose exactly two split forward cannons, got %d" % front_cannon_count)
+	if cannon_count != 6:
+		failures.append("upgrade smoke geobukseon_player should expose exactly six cannons, got %d" % cannon_count)
 
 
 static func _validate_hull_upgrade_split(failures: Array[String]) -> void:

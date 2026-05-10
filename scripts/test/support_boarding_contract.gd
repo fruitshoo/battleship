@@ -56,6 +56,7 @@ class MockSupportShip:
 	var team: String = "player"
 	var ship_type: String = ""
 	var fleet_formation: int = 0
+	var move_speed: float = 4.0
 	var base_collision_radius: float = 4.5
 	var width_multiplier: float = 1.0
 	var length_multiplier: float = 1.0
@@ -314,6 +315,7 @@ func _ready() -> void:
 	_verify_support_chain_goal_prefers_owner_flagship_over_target(failures)
 	_verify_support_artillery_screen_goal_tracks_flagship_wing_lane(failures)
 	_verify_panokseon_rescue_goal_opens_center_lane(failures)
+	_verify_heavy_support_join_speed_slows_near_final_slot(failures)
 	_verify_support_assist_navigation_prefers_owner_flagship_lane(failures)
 	_verify_support_free_assist_uses_stable_role_lanes(failures)
 	_verify_support_free_assist_softly_distributes_targets(failures)
@@ -927,6 +929,21 @@ func _verify_support_chain_goal_formation_variants(failures: Array[String]) -> v
 	if role_column_offset.z <= role_wing_offset.z + 2.5:
 		failures.append("support column offset should trail more deeply than the wing offset")
 
+	support_a.global_position = player.global_position + Vector3(12.0, 0.0, -6.0)
+	support_b.global_position = player.global_position + Vector3(13.0, 0.0, -8.0)
+	support_a.set_meta("support_squadron_slot_role", "screen_lead")
+	support_b.set_meta("support_squadron_slot_role", "screen_flank")
+	_set_support_formation(support_a, 1)
+	_set_support_formation(support_b, 1)
+	var fixed_left_goal := SupportFleetFormationHelper.get_support_chain_goal(support_a, [support_a, support_b], 0, 10.0)
+	var fixed_right_goal := SupportFleetFormationHelper.get_support_chain_goal(support_b, [support_a, support_b], 1, 10.0)
+	var fixed_left_pos: Vector3 = fixed_left_goal.get("position", Vector3.ZERO)
+	var fixed_right_pos: Vector3 = fixed_right_goal.get("position", Vector3.ZERO)
+	if fixed_left_pos.x >= -0.25:
+		failures.append("support wing fixed left role should recover its left lane instead of staying on the current right side")
+	if fixed_right_pos.x <= 0.25:
+		failures.append("support wing fixed right role should keep the opposite lane when nearby supports drift together")
+
 	player.queue_free()
 	support_b.queue_free()
 	support_a.queue_free()
@@ -1079,6 +1096,35 @@ func _verify_panokseon_rescue_goal_opens_center_lane(failures: Array[String]) ->
 		failures.append("panokseon rescue goal should widen its lateral offset to vacate more center lane for rescue ships")
 
 	player.queue_free()
+	panokseon.queue_free()
+
+
+func _verify_heavy_support_join_speed_slows_near_final_slot(failures: Array[String]) -> void:
+	var panokseon := MockSupportShip.new()
+	add_child(panokseon)
+	panokseon.ship_type = "panokseon_ally"
+	panokseon.move_speed = 3.8
+
+	var player_speed := 4.0
+	var far_speed := ChaserShipMinionHelper._calculate_support_join_speed(
+		panokseon,
+		player_speed,
+		44.0,
+		ChaserShipMinionHelper.SUPPORT_JOIN_STAGE_FINAL_SLOT,
+		true
+	)
+	var near_speed := ChaserShipMinionHelper._calculate_support_join_speed(
+		panokseon,
+		player_speed,
+		7.0,
+		ChaserShipMinionHelper.SUPPORT_JOIN_STAGE_FINAL_SLOT,
+		true
+	)
+	if far_speed <= near_speed + 1.5:
+		failures.append("heavy support join should slow meaningfully near its final formation slot")
+	if near_speed > player_speed + 0.8:
+		failures.append("heavy support join should avoid overshooting the final slot at catch-up speed")
+
 	panokseon.queue_free()
 
 

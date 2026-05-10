@@ -8,6 +8,39 @@ const COLLISION_REPULSION_CACHE_SHIP_COUNT_META := "collision_repulsion_cache_sh
 const COLLISION_REPULSION_CACHE_MIN_SHIP_COUNT := 8
 const COLLISION_REPULSION_CACHE_FRAME_WINDOW := 2
 const DERELICT_FIRE_POT_APPROACH_PADDING: float = 5.5
+const CONTACT_SFX_LIGHT_COOLDOWN_MSEC := 1300
+const CONTACT_SFX_MEDIUM_COOLDOWN_MSEC := 850
+const CONTACT_SFX_HEAVY_COOLDOWN_MSEC := 700
+const CONTACT_SFX_CACHE_PRUNE_SIZE := 96
+const CONTACT_VFX_COOLDOWN_MSEC := 1050
+const CONTACT_VFX_CACHE_PRUNE_SIZE := 96
+const CONTACT_VFX_HEAD_ON_SPEED_RATIO := 0.92
+const CONTACT_VFX_GENERAL_SPEED_RATIO := 1.0
+const CONTACT_VFX_HOSTILE_SUPPORT_SPEED_RATIO := 0.65
+const HULL_FRONT_VFX_ALIGNMENT_DOT := 0.62
+const HULL_FRONT_VFX_PAD := 0.22
+const HULL_FRONT_VFX_HEIGHT_RATIO := 0.26
+const HULL_FRONT_VFX_MIN_HEIGHT := 0.42
+const HULL_FRONT_VFX_MAX_HEIGHT := 0.78
+const PLAYER_CONTACT_VFX_HEIGHT_RATIO := 0.34
+const PLAYER_CONTACT_VFX_MIN_HEIGHT := 0.58
+const PLAYER_CONTACT_VFX_MAX_HEIGHT := 0.92
+const FRONT_TO_SIDE_CONTACT_EDGE_BIAS := 0.38
+const SHIP_COLLISION_WATERLINE_Y := 0.05
+const SHIP_COLLISION_WATER_SPLASH_Y_OFFSET := 0.0
+const SHIP_COLLISION_WATER_SPLASH_INTENSITY_MIN := 2.8
+const SHIP_COLLISION_WATER_SPLASH_INTENSITY_MAX := 4.0
+const SHIP_COLLISION_WATER_SPLASH_SPEED_SCALE := 8.0
+const SHIP_COLLISION_WATER_SPLASH_INTENSITY_BASE := 2.7
+const RAMMING_KNOCKBACK_MIN_FORWARD_DOT := 0.55
+const RAMMING_KNOCKBACK_BASE_SPEED := 2.6
+const RAMMING_KNOCKBACK_SPEED_SCALE := 0.42
+const RAMMING_KNOCKBACK_MAX_SPEED := 7.2
+const HEAD_ON_ESCAPE_RUDDER_DEADZONE := 5.0
+const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
+
+static var _last_contact_sfx_msec_by_pair: Dictionary = {}
+static var _last_contact_vfx_msec_by_pair: Dictionary = {}
 
 static func get_ship_mass_scale(ship: Node) -> float:
 	if not is_instance_valid(ship):
@@ -112,6 +145,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		var coll_dist = my_radius + other_radius
 		var is_engagement_pair = ship._is_engagement_pair(other)
 		var is_player_support_pair = _is_player_support_pair(ship, other)
+		var is_hostile_support_contact = _is_hostile_support_contact(ship, other)
 		if is_engagement_pair:
 			coll_dist *= 0.90
 		elif is_player_support_pair:
@@ -138,6 +172,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 
 			var repulsion_strength = 24.0 if is_engagement_pair else 40.0
 			var head_on_pair = my_fwd.dot(dir) > 0.72 and other_fwd.dot(-dir) > 0.72
+			var backing_out := _is_backing_out_of_head_on(ship)
 			var high_speed_head_on = head_on_pair and approach_speed >= ship.min_ramming_speed * 0.85
 			if is_engagement_pair and head_on_pair:
 				repulsion_strength *= 0.18
@@ -171,23 +206,35 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				if my_right.length_squared() <= 0.0001:
 					my_right = Vector3(dir.z, 0.0, -dir.x)
 				my_right = my_right.normalized()
-				var side_sign = signf(diff.dot(my_right))
+				var side_sign = _get_head_on_escape_side(ship, diff, my_right, other)
 				if absf(side_sign) < 0.5:
 					side_sign = 1.0 if ship.get_instance_id() < other.get_instance_id() else -1.0
-				var lateral_strength := 14.0 if high_speed_head_on else 10.0
+				var lateral_strength := 16.0 if high_speed_head_on else 12.0
+				if backing_out:
+					lateral_strength *= 1.25
 				if penetration_ratio > 0.12:
-					lateral_strength += 8.0
+					lateral_strength += 10.0
 				repulsion_force += my_right * side_sign * compression * lateral_strength * movement_share
-			if (is_engagement_pair and head_on_pair) or high_speed_head_on:
+			if ((is_engagement_pair and head_on_pair) or high_speed_head_on) and not backing_out:
 				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
 				if backward_component < 0.0:
 					repulsion_force -= my_fwd * backward_component
 			_draw_ship_collision_debug(ship, other, dir, my_radius, other_radius, dist, coll_dist, compression, repulsion_force, is_player_support_pair, high_speed_head_on)
 			force += repulsion_force
+			if approach_speed < ship.min_ramming_speed:
+				_play_ship_contact_sfx(ship, other, approach_speed, compression, coll_dist, pre_collision_speed, target_speed, is_player_support_pair, is_hostile_support_contact)
+				_spawn_ship_contact_vfx(ship, other, approach_speed, compression, coll_dist, pre_collision_speed, target_speed, head_on_pair, is_player_support_pair, is_hostile_support_contact)
+			elif not is_player_support_pair:
+				try_spawn_strong_collision_effects(ship, other, approach_speed)
 
 			if ship.current_speed > 0.5 and not is_player_support_pair:
 				var forward_alignment = absf(my_fwd.dot(dir))
 				var forward_into_contact = maxf(0.0, my_fwd.dot(dir))
+				if is_hostile_support_contact and forward_into_contact > 0.25:
+					var contact_intensity := _get_contact_vfx_intensity(approach_speed, compression, pre_collision_speed, target_speed, true)
+					if contact_intensity >= float(ship.min_ramming_speed) * CONTACT_VFX_HOSTILE_SUPPORT_SPEED_RATIO:
+						var contact_brake := clampf(0.24 + penetration_ratio * 1.8, 0.24, 0.62)
+						ship.current_speed = lerp(ship.current_speed, 0.0, contact_brake)
 				if other_mass > my_mass and forward_into_contact > 0.35:
 					var mass_brake := clampf((other_mass / maxf(my_mass, 0.001) - 1.0) * 0.18 * forward_into_contact, 0.0, 0.5)
 					ship.current_speed *= 1.0 - mass_brake
@@ -216,6 +263,268 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	ship.set_meta(COLLISION_REPULSION_CACHE_SHIP_COUNT_META, ship_count)
 	ship.set_meta(COLLISION_REPULSION_CACHE_FORCE_META, force)
 	return force
+
+static func _is_backing_out_of_head_on(ship) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	var speed_value: Variant = ship.get("current_speed")
+	if speed_value != null and float(speed_value) <= HEAD_ON_ESCAPE_REVERSE_SPEED:
+		return true
+	var rowing_value: Variant = ship.get("is_rowing")
+	var rowing_direction_value: Variant = ship.get("rowing_direction")
+	return rowing_value == true and rowing_direction_value != null and int(rowing_direction_value) < 0
+
+
+static func _get_head_on_escape_side(ship, diff: Vector3, my_right: Vector3, other: Node) -> float:
+	var rudder_value: Variant = ship.get("rudder_angle")
+	if rudder_value != null and absf(float(rudder_value)) >= HEAD_ON_ESCAPE_RUDDER_DEADZONE:
+		return signf(float(rudder_value))
+	var side_sign := signf(diff.dot(my_right))
+	if absf(side_sign) >= 0.5:
+		return side_sign
+	return 1.0 if ship.get_instance_id() < other.get_instance_id() else -1.0
+
+
+static func _spawn_ship_contact_vfx(
+	ship,
+	other: Node3D,
+	approach_speed: float,
+	compression: float,
+	coll_dist: float,
+	pre_collision_speed: float,
+	target_speed: float,
+	head_on_pair: bool,
+	is_player_support_pair: bool,
+	is_hostile_support_contact: bool = false
+) -> void:
+	if is_player_support_pair:
+		return
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return
+	var contact_intensity := _get_contact_vfx_intensity(approach_speed, compression, pre_collision_speed, target_speed, is_hostile_support_contact)
+	var strong_threshold := _get_contact_vfx_threshold(ship, head_on_pair, is_hostile_support_contact)
+	if contact_intensity < strong_threshold:
+		return
+	var threshold_ratio := CONTACT_VFX_HOSTILE_SUPPORT_SPEED_RATIO if is_hostile_support_contact else CONTACT_VFX_HEAD_ON_SPEED_RATIO
+	try_spawn_strong_collision_effects(ship, other, maxf(contact_intensity, strong_threshold), threshold_ratio)
+
+
+static func _get_contact_vfx_intensity(approach_speed: float, compression: float, pre_collision_speed: float, target_speed: float, is_hostile_support_contact: bool = false) -> float:
+	var moving_scale := 1.0 if is_hostile_support_contact else 0.42
+	var compression_scale := 2.35 if is_hostile_support_contact else 1.8
+	var moving_intensity := maxf(absf(pre_collision_speed), absf(target_speed)) * moving_scale
+	return maxf(maxf(approach_speed, moving_intensity), compression * compression_scale)
+
+
+static func _get_contact_vfx_threshold(ship, head_on_pair: bool, is_hostile_support_contact: bool = false) -> float:
+	var speed_ratio := CONTACT_VFX_HEAD_ON_SPEED_RATIO if head_on_pair else CONTACT_VFX_GENERAL_SPEED_RATIO
+	if is_hostile_support_contact:
+		speed_ratio = CONTACT_VFX_HOSTILE_SUPPORT_SPEED_RATIO
+	return float(ship.min_ramming_speed) * speed_ratio
+
+
+static func try_spawn_strong_collision_effects(ship, other: Node3D, impact_speed: float, min_speed_ratio: float = CONTACT_VFX_HEAD_ON_SPEED_RATIO) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return
+	if not ship.is_inside_tree():
+		return
+	if impact_speed < float(ship.min_ramming_speed) * min_speed_ratio:
+		return
+	if not _can_play_contact_vfx(ship, other):
+		return
+	spawn_ship_collision_effects(ship, _get_ship_contact_point(ship, other), maxf(impact_speed, float(ship.min_ramming_speed)))
+
+
+static func _get_ship_contact_point(ship, other: Node3D) -> Vector3:
+	var diff: Vector3 = other.global_position - ship.global_position
+	diff.y = 0.0
+	if diff.length_squared() <= 0.0001:
+		var ship_fwd: Vector3 = -ship.global_transform.basis.z
+		ship_fwd.y = 0.0
+		diff = ship_fwd if ship_fwd.length_squared() > 0.0001 else Vector3.FORWARD
+	var dir := diff.normalized()
+	var ship_radius := _get_visual_contact_radius(ship, dir, float(ship.call("get_directional_collision_radius", dir)) if ship.has_method("get_directional_collision_radius") else ShipContactGeometry.get_directional_collision_radius(ship, dir))
+	var other_radius := _get_visual_contact_radius(other, -dir, float(other.call("get_directional_collision_radius", -dir)) if other.has_method("get_directional_collision_radius") else ShipContactGeometry.get_directional_collision_radius(other, -dir))
+	var ship_edge: Vector3 = ship.global_position + dir * ship_radius
+	var other_edge: Vector3 = other.global_position - dir * other_radius
+	var impact_pos: Vector3 = (ship_edge + other_edge) * 0.5
+	var ship_front_contact := _is_authored_hull_front_contact(ship, dir)
+	var other_front_contact := _is_authored_hull_front_contact(other, -dir)
+	if ship_front_contact != other_front_contact:
+		var edge_bias := 1.0 - FRONT_TO_SIDE_CONTACT_EDGE_BIAS if ship_front_contact else FRONT_TO_SIDE_CONTACT_EDGE_BIAS
+		impact_pos = ship_edge.lerp(other_edge, edge_bias)
+	if impact_pos.distance_squared_to((ship.global_position + other.global_position) * 0.5) < 0.04:
+		impact_pos = ship.global_position.lerp(other.global_position, ship_radius / maxf(ship_radius + other_radius, 0.001))
+	impact_pos.y = maxf(ship.global_position.y, other.global_position.y) + _get_visual_contact_height(ship, other, dir)
+	return impact_pos
+
+
+static func _get_visual_contact_radius(ship: Node3D, world_dir: Vector3, fallback_radius: float) -> float:
+	if not _is_authored_hull_front_contact(ship, world_dir):
+		return fallback_radius
+	var deck_half := _get_visual_hull_half_extents(ship)
+	if deck_half.y <= 0.01:
+		return fallback_radius
+	return minf(fallback_radius, deck_half.y + HULL_FRONT_VFX_PAD)
+
+
+static func _get_visual_contact_height(ship: Node3D, other: Node3D, dir: Vector3) -> float:
+	var height := 0.12
+	if _is_authored_hull_front_contact(ship, dir):
+		height = maxf(height, _get_authored_hull_front_contact_height(ship))
+	if _is_authored_hull_front_contact(other, -dir):
+		height = maxf(height, _get_authored_hull_front_contact_height(other))
+	if _is_player_team_ship(ship):
+		height = maxf(height, _get_player_contact_height(ship))
+	if _is_player_team_ship(other):
+		height = maxf(height, _get_player_contact_height(other))
+	return height
+
+
+static func _get_player_contact_height(ship: Node3D) -> float:
+	var deck_height_value: Variant = ship.get("deck_height")
+	if deck_height_value == null:
+		return PLAYER_CONTACT_VFX_MIN_HEIGHT
+	return clampf(float(deck_height_value) * PLAYER_CONTACT_VFX_HEIGHT_RATIO, PLAYER_CONTACT_VFX_MIN_HEIGHT, PLAYER_CONTACT_VFX_MAX_HEIGHT)
+
+
+static func _get_authored_hull_front_contact_height(ship: Node3D) -> float:
+	var deck_height_value: Variant = ship.get("deck_height")
+	if deck_height_value == null:
+		return HULL_FRONT_VFX_MIN_HEIGHT
+	return clampf(float(deck_height_value) * HULL_FRONT_VFX_HEIGHT_RATIO, HULL_FRONT_VFX_MIN_HEIGHT, HULL_FRONT_VFX_MAX_HEIGHT)
+
+
+static func _is_authored_hull_front_contact(ship: Node3D, world_dir: Vector3) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if not _has_visual_hull_front_bounds(ship):
+		return false
+	var dir := world_dir
+	dir.y = 0.0
+	if dir.length_squared() <= 0.0001:
+		return false
+	dir = dir.normalized()
+	var fwd: Vector3 = -ship.global_transform.basis.z
+	fwd.y = 0.0
+	if fwd.length_squared() <= 0.0001:
+		return false
+	return fwd.normalized().dot(dir) >= HULL_FRONT_VFX_ALIGNMENT_DOT
+
+
+static func _has_visual_hull_front_bounds(ship: Node3D) -> bool:
+	if not is_instance_valid(ship) or not ship.has_method("get_deck_half_extents"):
+		return false
+	var deck_half: Variant = ship.call("get_deck_half_extents")
+	return deck_half is Vector2 and (deck_half as Vector2).y > 0.01
+
+
+static func _is_player_team_ship(ship: Node) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	return NodeContractHelper.get_team_tag(ship, "") == "player"
+
+
+static func _get_visual_hull_half_extents(ship: Node3D) -> Vector2:
+	if is_instance_valid(ship) and ship.has_method("get_deck_half_extents"):
+		var deck_half: Variant = ship.call("get_deck_half_extents")
+		if deck_half is Vector2:
+			return deck_half as Vector2
+	return ShipContactGeometry.get_soft_collision_half_extents(ship)
+
+
+static func _can_play_contact_vfx(ship: Node, other: Node) -> bool:
+	var pair_key := _get_contact_sfx_pair_key(ship, other)
+	var now_msec := Time.get_ticks_msec()
+	var last_msec := int(_last_contact_vfx_msec_by_pair.get(pair_key, -1000000))
+	if now_msec - last_msec < CONTACT_VFX_COOLDOWN_MSEC:
+		return false
+	_last_contact_vfx_msec_by_pair[pair_key] = now_msec
+	if _last_contact_vfx_msec_by_pair.size() > CONTACT_VFX_CACHE_PRUNE_SIZE:
+		_prune_contact_vfx_cache(now_msec)
+	return true
+
+
+static func _prune_contact_vfx_cache(now_msec: int) -> void:
+	for key in _last_contact_vfx_msec_by_pair.keys():
+		if now_msec - int(_last_contact_vfx_msec_by_pair.get(key, 0)) > 5000:
+			_last_contact_vfx_msec_by_pair.erase(key)
+
+
+static func _play_ship_contact_sfx(
+	ship,
+	other: Node3D,
+	approach_speed: float,
+	compression: float,
+	coll_dist: float,
+	pre_collision_speed: float,
+	target_speed: float,
+	is_player_support_pair: bool,
+	is_hostile_support_contact: bool = false
+) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return
+	if not is_instance_valid(ship._cached_audio_manager) or not ship._cached_audio_manager.has_method("play_sfx"):
+		return
+	var penetration_ratio := compression / maxf(coll_dist, 0.001)
+	var moving_scale := 0.95 if is_hostile_support_contact else (0.32 if is_player_support_pair else 0.45)
+	var compression_scale := 2.35 if is_hostile_support_contact else 2.0
+	var moving_intensity := maxf(absf(pre_collision_speed), absf(target_speed)) * moving_scale
+	var contact_intensity := maxf(maxf(approach_speed, moving_intensity), compression * compression_scale)
+	if contact_intensity < 0.45 and penetration_ratio < 0.025:
+		return
+
+	var sfx_key := "mast_creak"
+	var pitch_min := 0.82
+	var pitch_max := 1.05
+	var volume_db := -9.0
+	var cooldown_msec := CONTACT_SFX_LIGHT_COOLDOWN_MSEC
+	if contact_intensity >= 3.0 or penetration_ratio >= 0.11:
+		sfx_key = "impact_wood"
+		pitch_min = 0.74
+		pitch_max = 0.92
+		volume_db = -2.5
+		cooldown_msec = CONTACT_SFX_HEAVY_COOLDOWN_MSEC
+	elif contact_intensity >= 1.35 or penetration_ratio >= 0.055:
+		sfx_key = "impact_wood"
+		pitch_min = 0.88
+		pitch_max = 1.04
+		volume_db = -6.5
+		cooldown_msec = CONTACT_SFX_MEDIUM_COOLDOWN_MSEC
+
+	if not _can_play_contact_sfx(ship, other, cooldown_msec):
+		return
+	var impact_pos: Vector3 = (ship.global_position + other.global_position) * 0.5
+	impact_pos.y = maxf(ship.global_position.y, other.global_position.y) + 0.35
+	ship._cached_audio_manager.play_sfx(sfx_key, impact_pos, randf_range(pitch_min, pitch_max), volume_db)
+
+
+static func _can_play_contact_sfx(ship: Node, other: Node, cooldown_msec: int) -> bool:
+	var pair_key := _get_contact_sfx_pair_key(ship, other)
+	var now_msec := Time.get_ticks_msec()
+	var last_msec := int(_last_contact_sfx_msec_by_pair.get(pair_key, -1000000))
+	if now_msec - last_msec < cooldown_msec:
+		return false
+	_last_contact_sfx_msec_by_pair[pair_key] = now_msec
+	if _last_contact_sfx_msec_by_pair.size() > CONTACT_SFX_CACHE_PRUNE_SIZE:
+		_prune_contact_sfx_cache(now_msec)
+	return true
+
+
+static func _get_contact_sfx_pair_key(ship: Node, other: Node) -> String:
+	var a := ship.get_instance_id()
+	var b := other.get_instance_id()
+	if a > b:
+		var tmp := a
+		a = b
+		b = tmp
+	return "%d:%d" % [a, b]
+
+
+static func _prune_contact_sfx_cache(now_msec: int) -> void:
+	for key in _last_contact_sfx_msec_by_pair.keys():
+		if now_msec - int(_last_contact_sfx_msec_by_pair.get(key, 0)) > 5000:
+			_last_contact_sfx_msec_by_pair.erase(key)
 
 
 static func _draw_ship_collision_debug(
@@ -382,6 +691,16 @@ static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
 	return (ship_is_support and other_is_player) or (other_is_support and ship_is_player)
 
 
+static func _is_hostile_support_contact(ship, other_ship: Node3D) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(other_ship):
+		return false
+	var ship_team := NodeContractHelper.get_team_tag(ship, "")
+	var other_team := NodeContractHelper.get_team_tag(other_ship, "")
+	if ship_team.is_empty() or other_team.is_empty() or ship_team == other_team:
+		return false
+	return ShipAllyRoleHelper.is_support_ship(ship) or ShipAllyRoleHelper.is_support_ship(other_ship)
+
+
 static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> void:
 	if ship.is_sinking or ship.is_dying:
 		return
@@ -418,19 +737,60 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	if cam and cam.has_method("shake"):
 		cam.shake(clamp(impact_speed * 0.05, 0.2, 0.6), 0.3)
 
-	# 이펙트 중복 생성 방지: 두 배가 동시에 충돌을 감지하므로 instance_id가 낮은 쪽에서만 이펙트 생성
-	if ship.get_instance_id() < other.get_instance_id():
-		spawn_ship_collision_effects(ship, impact_pos, impact_speed)
+	try_spawn_strong_collision_effects(ship, other, impact_speed)
 	ship.apply_ramming_aoe(clamp(impact_speed * 1.5, 5.0, 20.0), impact_pos)
 
 	if ship.DEBUG_COMBAT_LOGS:
 		print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, final_ram_damage])
 	ship.take_damage(final_ram_damage, (ship.global_position + other.global_position) * 0.5, "ramming")
+	_apply_ramming_knockback(ship, other, impact_speed, dir_to_other)
+
+
+static func _apply_ramming_knockback(victim, attacker: Node3D, impact_speed: float, dir_to_attacker: Vector3) -> void:
+	if not is_instance_valid(victim) or not is_instance_valid(attacker):
+		return
+	if not victim.has_method("apply_collision_impulse"):
+		return
+	if NodeContractHelper.get_team_tag(victim) == NodeContractHelper.get_team_tag(attacker):
+		return
+	var knockback_mult_variant: Variant = attacker.get("ramming_knockback_multiplier")
+	if knockback_mult_variant == null:
+		return
+	var knockback_mult := clampf(float(knockback_mult_variant), 0.0, 3.0)
+	if knockback_mult <= 0.0:
+		return
+	dir_to_attacker.y = 0.0
+	if dir_to_attacker.length_squared() <= 0.0001:
+		return
+	dir_to_attacker = dir_to_attacker.normalized()
+	var attacker_fwd := -attacker.global_transform.basis.z
+	attacker_fwd.y = 0.0
+	if attacker_fwd.length_squared() <= 0.0001:
+		return
+	attacker_fwd = attacker_fwd.normalized()
+	if attacker_fwd.dot(-dir_to_attacker) < RAMMING_KNOCKBACK_MIN_FORWARD_DOT:
+		return
+	var attacker_mass := get_ship_mass_scale(attacker)
+	var victim_mass := get_ship_mass_scale(victim)
+	var mass_scale := clampf(sqrt(attacker_mass / maxf(victim_mass, 0.1)), 0.65, 1.55)
+	var threshold_variant: Variant = victim.get("min_ramming_speed")
+	var threshold := maxf(float(threshold_variant) if threshold_variant != null else 6.0, 0.1)
+	var extra_speed := maxf(0.0, impact_speed - threshold)
+	var push_speed := clampf(
+		(RAMMING_KNOCKBACK_BASE_SPEED + extra_speed * RAMMING_KNOCKBACK_SPEED_SCALE) * knockback_mult * mass_scale,
+		0.0,
+		RAMMING_KNOCKBACK_MAX_SPEED
+	)
+	if push_speed <= 0.05:
+		return
+	victim.apply_collision_impulse(-dir_to_attacker * push_speed)
 
 
 static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed: float) -> void:
 	if not ship.is_inside_tree():
 		return
+
+	_spawn_ship_collision_water_splash(ship, impact_pos, impact_speed)
 
 	# 우드 스플린터 (파편) - 충격 시 수면 효과 대신 나무 파편이 튀도록 함
 	if ship.wood_splinter_scene:
@@ -455,3 +815,31 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 			smoke.set_intensity(clampf(impact_speed / 6.5, 0.9, 1.6))
 		if smoke.has_method("pool_activate"):
 			smoke.pool_activate()
+
+
+static func _spawn_ship_collision_water_splash(ship, impact_pos: Vector3, impact_speed: float) -> void:
+	var water_scene: PackedScene = ship.get("water_splash_scene") if ship.get("water_splash_scene") != null else null
+	if water_scene == null:
+		return
+	var splash = ScenePool.acquire(ship.get_tree(), water_scene)
+	if not is_instance_valid(splash):
+		return
+	ship.get_tree().root.add_child(splash)
+	var splash_pos := impact_pos
+	splash_pos.y = SHIP_COLLISION_WATERLINE_Y + SHIP_COLLISION_WATER_SPLASH_Y_OFFSET
+	if splash is Node3D:
+		(splash as Node3D).global_position = splash_pos
+	if splash.has_method("configure_as_ship_collision"):
+		splash.configure_as_ship_collision()
+	elif splash.has_method("configure_as_splash"):
+		splash.configure_as_splash()
+	if splash.has_method("set_intensity"):
+		splash.set_intensity(clampf(
+			SHIP_COLLISION_WATER_SPLASH_INTENSITY_BASE + (impact_speed / SHIP_COLLISION_WATER_SPLASH_SPEED_SCALE),
+			SHIP_COLLISION_WATER_SPLASH_INTENSITY_MIN,
+			SHIP_COLLISION_WATER_SPLASH_INTENSITY_MAX
+		))
+	if splash.get("waterline_y") != null:
+		splash.set("waterline_y", SHIP_COLLISION_WATERLINE_Y)
+	if splash.has_method("pool_activate"):
+		splash.pool_activate()

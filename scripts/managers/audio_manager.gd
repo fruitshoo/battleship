@@ -57,8 +57,10 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_bow_02.ogg"
 	],
 	"musket_fire": [
-		"res://assets/audio/sfx/sfx_musket_fire.ogg",
-		"res://assets/audio/sfx/sfx_musket_fire_02.ogg"
+		{
+			"path": "res://assets/audio/sfx/sfx_musket_fire_02.ogg",
+			"volume_db": -4.0,
+		}
 	],
 	"soldier_hit": [
 		"res://assets/audio/sfx/sfx_sword_ting_1.ogg",
@@ -110,6 +112,7 @@ var sfx_streams = {
 	"ship_sink_bubbles": "res://assets/audio/sfx/sfx_ship_sink_bubbles_cc0.ogg",
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
+	"rowing_drum": "res://assets/audio/sfx/sfx_epic_drum_cc0.wav",
 	"boss_horn": "res://assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg",
 	"support_foghorn": "res://assets/audio/sfx/sfx_support_foghorn_cc0.ogg",
 }
@@ -190,8 +193,10 @@ const SFX_PROFILE_BY_KEY := {
 	"sail_flap": SFX_PROFILE_SHIP_AMBIENT,
 	"mast_creak": SFX_PROFILE_SHIP_AMBIENT,
 	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
+	"rowing_drum": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
 	"bow_shoot": SFX_PROFILE_LIGHT_PROJECTILE,
+	"musket_fire": SFX_PROFILE_LIGHT_PROJECTILE,
 	"sword_swing": SFX_PROFILE_WEAPON_CLOSE,
 	"soldier_hit": SFX_PROFILE_WEAPON_CLOSE,
 	"soldier_die": SFX_PROFILE_CHARACTER_VOICE,
@@ -204,6 +209,13 @@ const SFX_PROFILE_OVERRIDES := {
 	"oars_rowing": {
 		"max_distance": 240.0,
 		"unit_size": 70.0,
+	},
+	"rowing_drum": {
+		"volume_db": -8.5,
+		"max_distance": 260.0,
+		"unit_size": 90.0,
+		"pitch_jitter": 0.025,
+		"rate_limit_msec": 3000,
 	},
 	"sail_flap": {
 		"volume_db": -0.5,
@@ -239,6 +251,13 @@ const SFX_PROFILE_OVERRIDES := {
 		"unit_size": 28.0,
 		"pitch_jitter": 0.02,
 		"rate_limit_msec": 120,
+	},
+	"musket_fire": {
+		"volume_db": -6.0,
+		"max_distance": 190.0,
+		"unit_size": 52.0,
+		"pitch_jitter": 0.025,
+		"rate_limit_msec": 110,
 	},
 	"ship_sink_bubbles": {
 		"volume_db": 8.0,
@@ -414,7 +433,8 @@ func _preload_essential_audio() -> void:
 
 func _warm_playback_for_streams(warm_up_player: AudioStreamPlayer, streams) -> void:
 	if streams is Array:
-		for stream in streams:
+		for entry in streams:
+			var stream := _get_sfx_entry_stream(entry)
 			if stream is AudioStream:
 				warm_up_player.stream = stream
 				warm_up_player.play()
@@ -451,8 +471,9 @@ func _cache_stream_for_key(key: String) -> void:
 	if path is Array:
 		var loaded_arr = []
 		for p in path:
-			if p is String and ResourceLoader.exists(p):
-				loaded_arr.append(_load_audio_resource(p, true))
+			var loaded_entry = _load_sfx_entry(p, true)
+			if loaded_entry != null:
+				loaded_arr.append(loaded_entry)
 		if loaded_arr.size() > 0:
 			_cached_streams[resolved_key] = loaded_arr
 	elif path is String and ResourceLoader.exists(path):
@@ -495,8 +516,9 @@ func _load_stream_for_playback(stream_name: String):
 	if path is Array:
 		var loaded_arr = []
 		for p in path:
-			if p is String and ResourceLoader.exists(p):
-				loaded_arr.append(_load_audio_resource(p, _should_persist_cache(resolved_name)))
+			var loaded_entry = _load_sfx_entry(p, _should_persist_cache(resolved_name))
+			if loaded_entry != null:
+				loaded_arr.append(loaded_entry)
 		if loaded_arr.is_empty():
 			return null
 		if _should_persist_cache(resolved_name):
@@ -515,6 +537,38 @@ func _load_stream_for_playback(stream_name: String):
 		return path
 	
 	return null
+
+func _load_sfx_entry(entry, persist_cache: bool):
+	if entry is String:
+		if ResourceLoader.exists(entry):
+			return _load_audio_resource(entry, persist_cache)
+		return null
+	if entry is Dictionary:
+		var path := str(entry.get("path", ""))
+		if path.is_empty() or not ResourceLoader.exists(path):
+			return null
+		var stream := _load_audio_resource(path, persist_cache)
+		if not stream:
+			return null
+		return {
+			"stream": stream,
+			"volume_db": float(entry.get("volume_db", 0.0)),
+		}
+	if entry is AudioStream:
+		return entry
+	return null
+
+func _get_sfx_entry_stream(entry) -> AudioStream:
+	if entry is AudioStream:
+		return entry
+	if entry is Dictionary:
+		return entry.get("stream") as AudioStream
+	return null
+
+func _get_sfx_entry_volume_db(entry) -> float:
+	if entry is Dictionary:
+		return float(entry.get("volume_db", 0.0))
+	return 0.0
 
 func _load_bgm_stream(stream_name: String) -> AudioStream:
 	if _cached_bgm_streams.has(stream_name):
@@ -609,7 +663,9 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 	if _should_skip_sfx_for_rate_limit(resolved_name, profile):
 		return
 	# 1. 리소스 확인 및 동적 로드
-	var stream = _load_stream_for_playback(stream_name)
+	var stream_entry = _load_stream_for_playback(stream_name)
+	var stream := _get_sfx_entry_stream(stream_entry)
+	var variant_volume_db := _get_sfx_entry_volume_db(stream_entry)
 	
 	# 2. 리소스가 없으면 디버그용 비프음 재생 (선택사항)
 	if not stream:
@@ -625,7 +681,7 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 		player.global_position = position
 		var pitch_jitter := float(profile.get("pitch_jitter", 0.1))
 		player.pitch_scale = pitch_scale + randf_range(-pitch_jitter, pitch_jitter)
-		player.volume_db = volume_db + DEFAULT_3D_SFX_VOLUME_DB + float(profile.get("volume_db", 0.0))
+		player.volume_db = volume_db + variant_volume_db + DEFAULT_3D_SFX_VOLUME_DB + float(profile.get("volume_db", 0.0))
 		player.max_distance = float(profile.get("max_distance", DEFAULT_3D_SFX_MAX_DISTANCE))
 		player.unit_size = float(profile.get("unit_size", DEFAULT_3D_SFX_UNIT_SIZE))
 		player.play()
@@ -644,7 +700,7 @@ func play_sfx(stream_name: String, position = null, pitch_scale: float = 1.0, vo
 		player.stream = stream
 		player.pitch_scale = pitch_scale
 		player.bus = "SFX" if non_spatial else "UI"
-		player.volume_db = volume_db + float(profile.get("volume_db", 0.0))
+		player.volume_db = volume_db + variant_volume_db + float(profile.get("volume_db", 0.0))
 		player.play()
 
 func play_sfx_random_pitch(

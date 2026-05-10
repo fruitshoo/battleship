@@ -8,8 +8,14 @@ extends Camera3D
 @export_range(0.5, 12.0) var smooth_speed: float = 3.5
 @export_range(-80.0, -20.0) var pitch_degrees: float = -45.0
 @export_range(0.0, 30.0) var lead_distance: float = 7.5
-@export_range(0.0, 10.0) var lead_smooth_speed: float = 4.5
+@export_range(0.0, 10.0) var lead_smooth_speed: float = 3.0
 @export var offset: Vector3 = Vector3(0, 15, 20)
+
+@export_group("Motion Comfort")
+@export var motion_comfort_enabled: bool = true
+@export_range(0.0, 20.0, 0.1) var max_lead_shift_per_second: float = 7.5
+@export_range(0.0, 1.0, 0.01) var camera_shake_scale: float = 0.65
+@export_range(0.0, 0.5, 0.01) var max_shake_intensity: float = 0.24
 
 @export_group("Control Settings")
 @export var zoom_speed: float = 2.0
@@ -42,6 +48,7 @@ var current_zoom: float = 0.0
 var target_zoom: float = 0.0
 var _cam_rotation: Vector2 = Vector2.ZERO
 var _smoothed_look_target: Vector3 = Vector3.ZERO
+var _smoothed_lead_offset: Vector3 = Vector3.ZERO
 
 var shake_intensity: float = 0.0
 var shake_timer: float = 0.0
@@ -101,7 +108,7 @@ func _physics_process(delta: float) -> void:
 	current_zoom = move_toward(current_zoom, target_zoom, zoom_smooth_speed * delta)
 	
 	# 1. 타겟 위치 + 진행 방향 리드
-	var target_pos = _get_desired_look_target()
+	var target_pos = _get_desired_look_target(delta)
 	_smoothed_look_target = _smoothed_look_target.lerp(target_pos, clampf(lead_smooth_speed * delta, 0.0, 1.0))
 	
 	# 2. 쿼터뷰 고정 각도 (45도 위에서, 약간 뒤에서)
@@ -411,12 +418,26 @@ func _aabb_corners(aabb: AABB) -> Array[Vector3]:
 	]
 
 func shake(intensity: float, duration: float) -> void:
-	shake_intensity = intensity
+	var scaled_intensity := intensity
+	if motion_comfort_enabled:
+		scaled_intensity = minf(intensity * camera_shake_scale, max_shake_intensity)
+	shake_intensity = scaled_intensity
 	shake_duration = duration
 	shake_timer = duration
 
-func _get_desired_look_target() -> Vector3:
+func _get_desired_look_target(delta: float) -> Vector3:
 	var base_target := target.global_position
+	var desired_lead_offset := _get_desired_lead_offset()
+	if motion_comfort_enabled and max_lead_shift_per_second > 0.0:
+		_smoothed_lead_offset = _smoothed_lead_offset.move_toward(
+			desired_lead_offset,
+			max_lead_shift_per_second * delta
+		)
+	else:
+		_smoothed_lead_offset = desired_lead_offset
+	return base_target + _smoothed_lead_offset
+
+func _get_desired_lead_offset() -> Vector3:
 	var speed_ratio := 0.0
 	var current_speed_value := 0.0
 	var max_speed_value := 0.0
@@ -429,11 +450,11 @@ func _get_desired_look_target() -> Vector3:
 		speed_ratio = clampf(current_speed_value / max_speed_value, 0.0, 1.0)
 	
 	if speed_ratio <= 0.01 or lead_distance <= 0.0:
-		return base_target
+		return Vector3.ZERO
 	
 	var forward := Vector3(-sin(target.rotation.y), 0.0, -cos(target.rotation.y)).normalized()
 	var lead_strength := speed_ratio * speed_ratio
-	return base_target + forward * lead_distance * lead_strength
+	return forward * lead_distance * lead_strength
 
 ## 줌 레벨에 따라 안개 시작/끝 거리를 동적으로 조절합니다.
 func _update_dynamic_fog() -> void:

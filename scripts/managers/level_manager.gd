@@ -64,6 +64,7 @@ var soldiers_slain: int = 0
 var soldiers_drowned: int = 0
 var enemy_fire_pot_unlocked: bool = false
 var weapon_damage_stats: Dictionary = {}
+var defeated_ship_stats: Dictionary = {}
 var _boss_triggered: bool = false
 var _boss_phase_active: bool = false
 var _victory_triggered: bool = false
@@ -355,6 +356,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				KEY_R:
 					_debug_reset_player_sail_state()
 					return
+				KEY_T:
+					_debug_collect_treasure_reward()
+					return
 		match event.keycode:
 			KEY_F1: # 강제 레벨업
 				print("[DEBUG] 강제 레벨업!")
@@ -573,11 +577,11 @@ func _disable_boundary_processing_recursive(node: Node) -> void:
 func add_score(points: int) -> void:
 	LevelManagerProgressionHelper.add_score(self, points)
 
-func add_ship_sunk(count: int = 1) -> void:
-	LevelManagerProgressionHelper.add_ship_sunk(self, count)
+func add_ship_sunk(count: int = 1, ship: Variant = null) -> void:
+	LevelManagerProgressionHelper.add_ship_sunk(self, count, ship)
 
-func add_ship_derelict(count: int = 1) -> void:
-	LevelManagerProgressionHelper.add_ship_derelict(self, count)
+func add_ship_derelict(count: int = 1, ship: Variant = null) -> void:
+	LevelManagerProgressionHelper.add_ship_derelict(self, count, ship)
 
 func add_soldier_kill(count: int = 1, cause: String = "combat") -> void:
 	LevelManagerProgressionHelper.add_soldier_kill(self, count, cause)
@@ -593,6 +597,9 @@ func get_total_weapon_damage() -> float:
 
 func get_weapon_damage_rows(max_rows: int = 8) -> Array:
 	return LevelManagerProgressionHelper.get_weapon_damage_rows(self, max_rows)
+
+func get_defeated_ship_rows(max_rows: int = 8) -> Array:
+	return LevelManagerProgressionHelper.get_defeated_ship_rows(self, max_rows)
 
 
 ## XP 획득 및 레벨업 처리
@@ -616,6 +623,42 @@ func _set_level(new_level: int) -> void:
 
 func _debug_force_fleet_level_up() -> void:
 	_show_upgrade_ui(3)
+
+
+func _debug_show_victory_result() -> void:
+	RunResultStore.set_latest_result(_build_victory_result())
+	_victory_triggered = true
+	_victory_result_transition_started = true
+	_go_to_result_scene()
+
+
+func _debug_show_defeat_result() -> void:
+	RunResultStore.set_latest_result(_build_defeat_result())
+	_victory_result_transition_started = true
+	_go_to_result_scene()
+
+
+func _debug_collect_treasure_reward(forced_upgrade_count: int = 3) -> void:
+	if not is_instance_valid(UpgradeManager) or not UpgradeManager.has_method("apply_treasure_upgrade_reward"):
+		_show_debug_hud_message("보물 보상 디버그 대상 없음")
+		return
+	var result: Dictionary = UpgradeManager.call("apply_treasure_upgrade_reward", forced_upgrade_count)
+	if not bool(result.get("success", false)):
+		_show_debug_hud_message("보물 보상 후보 없음")
+		return
+	print("[DEBUG] 보물 상자 보상 강제 획득: +%d" % int(result.get("applied_count", 0)))
+	if is_instance_valid(AudioManager):
+		AudioManager.play_sfx("treasure_collect", null, randf_range(1.0, 1.15))
+	var popup := upgrade_ui_scene.instantiate()
+	if not is_instance_valid(popup):
+		_show_debug_hud_message("보물 보상 UI 생성 실패")
+		return
+	get_tree().root.add_child(popup)
+	if popup.has_method("show_reward_results"):
+		popup.call("show_reward_results", result)
+	else:
+		popup.queue_free()
+		_show_debug_hud_message("보물 보상 +%d" % int(result.get("applied_count", 0)))
 
 
 func _show_upgrade_ui(choice_count: int = 3) -> void:
@@ -794,8 +837,9 @@ func _debug_dump_support_fleet_state() -> void:
 		var lead_speed: float = float(support_ship.get_meta("support_debug_lead_speed", 0.0))
 		var target_speed: float = float(support_ship.get_meta("support_debug_target_speed", 0.0))
 		var join_state: bool = support_ship.get_meta("support_joining", false) == true
+		var join_stage: int = int(support_ship.get_meta("support_join_stage", -1))
 		_draw_support_fleet_debug(support_ship, lead_name, slot_dist, rel_depth, join_state)
-		print("[DEBUG] %s pos=%s speed=%.2f lead=%s slot_dist=%.2f rel_depth=%.2f lead_speed=%.2f target_speed=%.2f joining=%s" % [
+		print("[DEBUG] %s pos=%s speed=%.2f lead=%s slot_dist=%.2f rel_depth=%.2f lead_speed=%.2f target_speed=%.2f joining=%s stage=%d" % [
 			support_ship.name,
 			support_ship.global_position,
 			float(support_ship.get("current_speed")),
@@ -804,7 +848,8 @@ func _debug_dump_support_fleet_state() -> void:
 			rel_depth,
 			lead_speed,
 			target_speed,
-			join_state
+			join_state,
+			join_stage
 		])
 	print("[DEBUG] ===============================")
 
@@ -941,13 +986,25 @@ func show_victory() -> void:
 	if hud:
 		var result_delay := _get_result_transition_delay()
 		if hud.has_method("show_victory_result_transition"):
-			hud.show_victory_result_transition("%s. %.0f초 후 전적을 확인합니다." % [_get_victory_outcome_text(), ceil(result_delay)], result_delay)
+			var transition_outcome_text := _get_victory_outcome_text()
+			var transition_message := "%.0f초 후 전적을 확인합니다." % ceil(result_delay)
+			if not transition_outcome_text.is_empty():
+				transition_message = "%s. %s" % [transition_outcome_text, transition_message]
+			hud.show_victory_result_transition(transition_message, result_delay)
 		elif hud.has_method("show_victory"):
 			hud.show_victory()
 	_schedule_result_scene_transition()
 
 
 func _build_victory_result() -> Dictionary:
+	return _build_run_result(_get_victory_outcome_text())
+
+
+func _build_defeat_result() -> Dictionary:
+	return _build_run_result("기함 침몰")
+
+
+func _build_run_result(outcome_text: String) -> Dictionary:
 	var player_ship: Node = EntityRegistry.get_first_ship_by_team("player")
 	var crew_alive: int = 0
 	var crew_capacity: int = 0
@@ -965,8 +1022,8 @@ func _build_victory_result() -> Dictionary:
 		if player_ship.get("max_hull_hp") != null:
 			hull_hp_max = float(player_ship.get("max_hull_hp"))
 	var result: Dictionary = {
-		"title": "항해 결과",
-		"outcome": _get_victory_outcome_text(),
+		"title": "결과",
+		"outcome": outcome_text,
 		"survived_seconds": current_time,
 		"gold": current_score,
 		"level": current_level,
@@ -983,6 +1040,7 @@ func _build_victory_result() -> Dictionary:
 		"hull_hp_max": hull_hp_max,
 		"total_weapon_damage": get_total_weapon_damage(),
 		"weapon_rows": get_weapon_damage_rows(12),
+		"defeated_ship_rows": get_defeated_ship_rows(8),
 	}
 	return result
 
@@ -990,7 +1048,7 @@ func _build_victory_result() -> Dictionary:
 func _get_victory_outcome_text() -> String:
 	if _boss_triggered:
 		return "최종 보스 격침"
-	return "항해 생존"
+	return ""
 
 
 func _schedule_result_scene_transition() -> void:

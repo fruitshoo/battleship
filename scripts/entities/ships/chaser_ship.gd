@@ -296,6 +296,9 @@ func _configure_spawned_soldier(soldier, soldier_type_name: String) -> void:
 			soldier.is_melee_only = true
 		"ranged":
 			soldier.is_ranged_only = true
+		"daecheolpo":
+			soldier.crew_role = "daecheolpo"
+			soldier.is_ranged_only = true
 		"fire_pot":
 			soldier.crew_role = "fire_pot"
 
@@ -403,7 +406,7 @@ func _ready() -> void:
 		add_to_group("captured_minion")
 		EntityRegistry.register_captured_minion(self)
 		_apply_minion_visuals()
-		_equip_minion_cannons()
+		_equip_ship_weapons("player", true)
 		var upgrade_manager = get_node_or_null("/root/UpgradeManager")
 		if is_instance_valid(upgrade_manager):
 			upgrade_manager.apply_fleet_upgrades_to_ship(self )
@@ -411,6 +414,8 @@ func _ready() -> void:
 		if is_in_group("captured_minion"):
 			remove_from_group("captured_minion")
 		EntityRegistry.unregister_captured_minion(self)
+		if has_cannons:
+			_equip_ship_weapons("enemy", false)
 	
 	if get_meta(DEFER_INITIAL_CREW_SETUP_META, false) == true:
 		remove_meta(DEFER_INITIAL_CREW_SETUP_META)
@@ -528,7 +533,7 @@ func die() -> void:
 	if is_instance_valid(cached_lm):
 		if team == "enemy" and cached_lm.has_method("add_ship_sunk") and get_meta("derelict_sink_stat_accounted", false) != true:
 			set_meta("derelict_sink_stat_accounted", true)
-			cached_lm.add_ship_sunk(1)
+			cached_lm.add_ship_sunk(1, self)
 		if not was_derelict_disposal and cached_lm.has_method("add_score"):
 			cached_lm.add_score(25)
 			
@@ -822,8 +827,8 @@ func capture_ship() -> void:
 	target = null
 	_find_player()
 	
-	# ✅ 나포함 무장 자동 장착 및 현재 함대 업그레이드 적용
-	_equip_minion_cannons()
+	# 나포함 무장 자동 장착 및 현재 함대 업그레이드 적용
+	_equip_ship_weapons("player", true)
 	upgrade_manager = get_node_or_null("/root/UpgradeManager")
 	if is_instance_valid(upgrade_manager):
 		upgrade_manager.apply_fleet_upgrades_to_ship(self )
@@ -834,11 +839,19 @@ func _store_boarding_contact_anchor(target_ship: Node3D) -> void:
 	ChaserShipBoardingHelper.store_boarding_contact_anchor(self, target_ship)
 
 func _equip_minion_cannons() -> void:
-	# 중복 방지: 선체에 미리 달려있는 대포가 있다면 제거 후 FleetCannon으로 통일
+	_equip_ship_weapons("player", true)
+
+func _equip_ship_weapons(fallback_team: String = "", gate_by_fleet_upgrades: bool = false) -> void:
 	_remove_all_cannons()
-	
+
+	var weapon_team := fallback_team.strip_edges()
+	if weapon_team.is_empty():
+		weapon_team = team
+	var fallback_loadout: Array[Dictionary] = []
+	if weapon_team == "player":
+		fallback_loadout = ShipWeaponLoadoutHelper.get_default_support_cannon_loadout()
 	var stats := ShipBlueprintHelper.load_stats(ship_type)
-	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, ShipWeaponLoadoutHelper.get_default_support_cannon_loadout())
+	var loadout := ShipWeaponLoadoutHelper.get_weapon_loadout(stats, fallback_loadout)
 	loadout = ShipWeaponLoadoutHelper.apply_authored_weapon_slots(self, self, loadout)
 	var current_upgrade_levels: Dictionary = {}
 	var upgrade_manager = get_node_or_null("/root/UpgradeManager")
@@ -852,7 +865,8 @@ func _equip_minion_cannons() -> void:
 		var cannon = ShipWeaponLoadoutHelper.instantiate_weapon(spec, cannon_scene)
 		if not is_instance_valid(cannon):
 			continue
-		cannon.name = ShipWeaponLoadoutHelper.get_node_name(spec, "FleetCannon_" + str(i))
+		var fallback_name := "FleetCannon_" + str(i) if weapon_team == "player" else "EnemyCannon_" + str(i)
+		cannon.name = ShipWeaponLoadoutHelper.get_node_name(spec, fallback_name)
 		add_child(cannon)
 		if cannon is Node3D:
 			var cannon_node := cannon as Node3D
@@ -863,9 +877,9 @@ func _equip_minion_cannons() -> void:
 			else:
 				cannon_node.rotation_degrees.y = ShipWeaponLoadoutHelper.get_rotation_y(spec)
 		# Loadout-authored runtime tuning.
-		ShipWeaponLoadoutHelper.apply_weapon_config(cannon, spec, "player")
+		ShipWeaponLoadoutHelper.apply_weapon_config(cannon, spec, weapon_team)
 		
-		if ShipWeaponLoadoutHelper.get_required_level(spec, i + 1) > 1 or not ShipWeaponLoadoutHelper.is_unlocked_for_levels(spec, current_upgrade_levels):
+		if gate_by_fleet_upgrades and (ShipWeaponLoadoutHelper.get_required_level(spec, i + 1) > 1 or not ShipWeaponLoadoutHelper.is_unlocked_for_levels(spec, current_upgrade_levels)):
 			cannon.visible = false
 			cannon.set_process(false)
 			cannon.set_physics_process(false)

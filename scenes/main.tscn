@@ -9,9 +9,9 @@
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
-[ext_resource type="PackedScene" uid="uid://cw2s3qgyw4wmb" path="res://scenes/effects/wood_splinter.tscn" id="15_dp3eg"]
-[ext_resource type="PackedScene" uid="uid://cm4c0u30p0035" path="res://scenes/effects/water_burst.tscn" id="16_0ld40"]
+[ext_resource type="PackedScene" uid="uid://dtwfm6fynapr" path="res://scenes/effects/water_blast.tscn" id="16_0ld40"]
 [ext_resource type="PackedScene" uid="uid://sdp4lml0kdip" path="res://scenes/effects/impact_puff.tscn" id="17_gqmmt"]
+[ext_resource type="PackedScene" uid="uid://cn32xp1401yfh" path="res://scenes/effects/floating_loot.tscn" id="17_muem4"]
 [ext_resource type="PackedScene" uid="uid://bilro8ijftry1" path="res://scenes/effects/fire_effect.tscn" id="18_yc10j"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
 [ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
@@ -70,6 +70,7 @@ theme = ExtResource("4_1bvp3")
 controlled_ship = NodePath("")
 
 [node name="OceanPlane" parent="." unique_id=1629146247 instance=ExtResource("10_ocean")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0006620884, 0.024617195, -0.0119075775)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1808775112]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.673962, 0.9558134, 0)
@@ -91,10 +92,10 @@ stamina_drain_rate = 10.0
 auto_raid_enabled = true
 floating_offset = 0.5
 boarding_contact_grace_duration = 0.8
-water_splash_scene = ExtResource("15_dp3eg")
 impact_puff_scene = ExtResource("16_0ld40")
 fire_effect_scene = ExtResource("17_gqmmt")
 loot_scene = ExtResource("18_yc10j")
+survivor_scene = ExtResource("17_muem4")
 fire_effect_offset = Vector3(0, 1.5, 0)
 fire_effect_offset_randomness = Vector3(0, 0.55, -0.25)
 fire_effect_scale_randomness = 1.6

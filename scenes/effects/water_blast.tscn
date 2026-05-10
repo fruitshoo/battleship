@@ -3,6 +3,7 @@
 [ext_resource type="Texture2D" uid="uid://ok1ihome6xv1" path="res://assets/vfx/particles/alpha/scorch_03_a.png" id="1_e1ona"]
 [ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_pbyf8"]
 [ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="2_dkbhc"]
+[ext_resource type="Script" path="res://scripts/effects/water_blast.gd" id="4_script"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dkbhc"]
 render_priority = 4
@@ -154,6 +155,7 @@ alpha_curve = SubResource("CurveTexture_yp7ow")
 [sub_resource type="QuadMesh" id="QuadMesh_j1ybx"]
 
 [node name="WaterBlast" type="Node3D" unique_id=1446057324]
+script = ExtResource("4_script")
 
 [node name="floor" type="GPUParticles3D" parent="." unique_id=234455272]
 material_override = SubResource("StandardMaterial3D_dkbhc")

@@ -10,11 +10,18 @@ const BOARDING_ATTEMPT_DISTANCE_PAD := 2.2
 const SEPARATION_BASE_PAD := 0.18
 const SEPARATION_PLAYER_PAD := 0.12
 const SEPARATION_BOSS_PAD := 0.20
+const AUTHORED_DECK_COLLISION_PAD := 0.35
 
 
 static func get_soft_collision_half_extents(ship: Node) -> Vector2:
 	if not is_instance_valid(ship):
 		return Vector2(DEFAULT_BASE_COLLISION_RADIUS, DEFAULT_BASE_COLLISION_RADIUS)
+	var authored_deck_extents := ShipAuthoringHelper.get_deck_area_half_extents(ship)
+	if authored_deck_extents.x > 0.01 and authored_deck_extents.y > 0.01:
+		return Vector2(
+			authored_deck_extents.x + AUTHORED_DECK_COLLISION_PAD,
+			authored_deck_extents.y + AUTHORED_DECK_COLLISION_PAD
+		)
 	var base_radius := NodeContractHelper.get_base_collision_radius_value(ship)
 	var width_mult := NodeContractHelper.get_collision_width_multiplier_value(ship)
 	var length_mult := NodeContractHelper.get_collision_length_multiplier_value(ship)

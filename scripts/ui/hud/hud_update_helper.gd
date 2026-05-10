@@ -28,8 +28,12 @@ static var _support_icon_cache: Dictionary = {}
 
 # Top-line HUD text
 static func update_level(hud, val: int) -> void:
+	hud._last_level_value = val
 	if hud.level_label:
-		hud.level_label.text = "[Lv] %d" % val
+		if hud._last_xp_max > 0:
+			hud.level_label.text = "Lv %d · XP %d/%d" % [val, hud._last_xp_current, hud._last_xp_max]
+		else:
+			hud.level_label.text = "Lv %d" % val
 
 static func update_score(hud, val: int) -> void:
 	if hud.score_label:

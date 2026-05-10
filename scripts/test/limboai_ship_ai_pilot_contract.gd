@@ -57,6 +57,7 @@ class MockShip:
 	var deck_is_contested := false
 	var deck_is_overrun := false
 	var deck_hostile_boarder_count := 0
+	var blocks_boarding := false
 	var support_hold_formation := false
 
 	func is_combat_disabled() -> bool:
@@ -82,6 +83,9 @@ class MockShip:
 
 	func can_board_targets() -> bool:
 		return allow_boarding
+
+	func can_be_boarded_by(_attacker_ship: Node = null) -> bool:
+		return not blocks_boarding
 
 	func can_use_fire_pot_attack() -> bool:
 		return use_fire_pot_attack
@@ -193,6 +197,7 @@ func _run_contract() -> void:
 	await _verify_fire_pot_special_state(enemy_ship, player_ship, 22.0, ShipAILimboKeys.SPECIAL_CLOSE_DISTANCE)
 	await _verify_boarding_intent_state(enemy_ship, player_ship, 14.5, ShipAILimboKeys.BOARDING_APPROACH)
 	await _verify_boarding_intent_state(enemy_ship, player_ship, 9.5, ShipAILimboKeys.BOARDING_READY)
+	await _verify_unboardable_target_suppresses_boarding_intent(enemy_ship, player_ship)
 
 	var support_ship := MockShip.new()
 	support_ship.name = "LimboPilotSupportShip"
@@ -659,6 +664,32 @@ func _verify_boarding_intent_state(
 	if enemy_ship.has_meta(ShipAILimboKeys.META_WEAPON_INTENT):
 		_fail("boarding pilot should not publish launcher weapon intent")
 
+	enemy_ship.gunner_role = true
+	enemy_ship.allow_boarding = false
+
+
+func _verify_unboardable_target_suppresses_boarding_intent(enemy_ship: MockShip, player_ship: MockShip) -> void:
+	enemy_ship.team = "enemy"
+	enemy_ship.gunner_role = false
+	enemy_ship.allow_boarding = true
+	enemy_ship.use_fire_pot_attack = false
+	enemy_ship.limbo_ai_pilot_enabled = true
+	player_ship.blocks_boarding = true
+	player_ship.position = Vector3(9.5, 0.0, 0.0)
+
+	ShipLimboAIPilot.tick(enemy_ship, 0.016, PILOT_TREE_PATH)
+	await get_tree().process_frame
+	ShipLimboAIPilot.tick(enemy_ship, 0.016, PILOT_TREE_PATH)
+	await get_tree().process_frame
+
+	if enemy_ship.has_meta(ShipAILimboKeys.META_BOARDING_INTENT):
+		_fail("pilot should not publish boarding intent against unboardable target")
+	if not enemy_ship.has_meta(ShipAILimboKeys.META_NAV_DESIRED_POINT):
+		_fail("pilot should publish navigation hint against unboardable target")
+	if not enemy_ship.has_meta(ShipAILimboKeys.META_WEAPON_INTENT):
+		_fail("pilot should fall back to weapon pressure against unboardable target")
+
+	player_ship.blocks_boarding = false
 	enemy_ship.gunner_role = true
 	enemy_ship.allow_boarding = false
 

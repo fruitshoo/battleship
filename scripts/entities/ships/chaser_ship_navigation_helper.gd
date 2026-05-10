@@ -426,10 +426,11 @@ static func _build_boarding_queue_navigation(ship, target_node: Node3D, target_p
 	)
 
 
-static func _should_queue_boarding_approach(ship, target_node: Node3D, dist_to_target: float, target_deck_contested: bool, target_deck_overrun: bool) -> bool:
+static func _should_queue_boarding_approach(ship, target_node: Node3D, dist_to_target: float, target_deck_contested: bool, target_deck_overrun: bool, target_can_be_boarded: bool) -> bool:
 	return (
 		not _is_gunner(ship)
 		and _can_board(ship)
+		and target_can_be_boarded
 		and dist_to_target <= BOARDING_QUEUE_START_DISTANCE
 		and dist_to_target > BOARDING_QUEUE_RELEASE_DISTANCE
 		and not target_deck_contested
@@ -607,6 +608,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	var dist_to_target: float = ship.global_position.distance_to(target_pos)
 	var target_deck_contested: bool = _is_target_deck_contested(target_node)
 	var target_deck_overrun: bool = _is_target_deck_overrun(target_node)
+	var target_can_be_boarded: bool = ShipCombatModeHelper.can_be_boarded(target_node, ship)
 	var yield_overrun_target: bool = target_deck_overrun and _has_closer_allied_attacker(ship, target_node, dist_to_target)
 
 	if dist_to_target >= 25.0:
@@ -631,7 +633,7 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 	if not boss_escort_nav.is_empty():
 		return boss_escort_nav
 
-	if _should_queue_boarding_approach(ship, target_node, dist_to_target, target_deck_contested, target_deck_overrun):
+	if _should_queue_boarding_approach(ship, target_node, dist_to_target, target_deck_contested, target_deck_overrun, target_can_be_boarded):
 		return _build_boarding_queue_navigation(ship, target_node, target_pos, dist_to_target, dir_to_target, movement_mode)
 
 	if yield_overrun_target:
@@ -644,18 +646,27 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(gunner_nav, desired_speed_mult)
 		permit_sprint = ShipMovementIntent.get_permit_sprint(gunner_nav, permit_sprint)
 		movement_mode = _navigation_mode(gunner_nav, movement_mode)
-	elif _can_board(ship) and dist_to_target < 18.0:
+	elif _can_board(ship) and target_can_be_boarded and dist_to_target < 18.0:
 		var boarding_nav: Dictionary = _build_boarding_navigation(ship, target_node, target_pos, dist_to_target, dir_to_target, movement_mode, target_deck_contested, target_deck_overrun)
 		desired_point = ShipMovementIntent.get_desired_point(boarding_nav, desired_point)
 		heading_point = ShipMovementIntent.get_heading_point(boarding_nav, heading_point)
 		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(boarding_nav, desired_speed_mult)
 		permit_sprint = ShipMovementIntent.get_permit_sprint(boarding_nav, permit_sprint)
 		movement_mode = _navigation_mode(boarding_nav, movement_mode)
+	elif _can_board(ship) and not target_can_be_boarded:
+		ShipBoardingMetaHelper.clear_navigation_meta(ship)
+		var pressure_mode := movement_mode if not movement_mode.is_empty() else "unboardable_standoff"
+		var pressure_nav: Dictionary = _build_gunner_navigation(ship, target_pos, dist_to_target, dir_to_target, pressure_mode)
+		desired_point = ShipMovementIntent.get_desired_point(pressure_nav, desired_point)
+		heading_point = ShipMovementIntent.get_heading_point(pressure_nav, heading_point)
+		desired_speed_mult = ShipMovementIntent.get_desired_speed_mult(pressure_nav, desired_speed_mult)
+		permit_sprint = ShipMovementIntent.get_permit_sprint(pressure_nav, permit_sprint)
+		movement_mode = _navigation_mode(pressure_nav, movement_mode)
 	else:
 		ShipBoardingMetaHelper.clear_navigation_meta(ship)
 
 	if ship.get("limbo_ai_pilot_enabled") == true:
-		var boarding_nav_locked: bool = _can_board(ship) and dist_to_target <= ship.boarding_break_distance + 1.5
+		var boarding_nav_locked: bool = _can_board(ship) and target_can_be_boarded and dist_to_target <= ship.boarding_break_distance + 1.5
 		var nav_hint_target_id := int(ship.get_meta(ShipAILimboKeys.META_NAV_TARGET_ID, 0))
 		var nav_hint_frame := int(ship.get_meta(ShipAILimboKeys.META_NAV_FRAME, -1000000))
 		var nav_hint_is_current := Engine.get_physics_frames() - nav_hint_frame <= 4

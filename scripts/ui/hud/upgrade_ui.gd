@@ -14,6 +14,11 @@ const CARD_FOCUS_SCALE := 1.042
 const CARD_ENTRY_DELAY := 0.055
 const CARD_ENTRY_DURATION := 0.22
 const CARD_ENTRY_Y_OFFSET := 16.0
+const REWARD_CARD_ENTRY_DELAY := 0.075
+const REWARD_CARD_ENTRY_DURATION := 0.34
+const REWARD_CARD_ENTRY_SCALE := 0.82
+const REWARD_CARD_POP_SCALE := 1.075
+const REWARD_CARD_ENTRY_Y_OFFSET := 30.0
 const REROLL_ENTRY_DELAY := 0.08
 const CARD_SHEEN_DURATION := 0.46
 const CARD_FOCUS_LIFT_Y := -5.0
@@ -65,6 +70,7 @@ var _display_pause_active: bool = false
 var _display_previous_paused: bool = false
 var _display_confirm_button: Button = null
 var _reward_level_overrides: Dictionary = {}
+var _treasure_shimmer: ColorRect = null
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
@@ -298,6 +304,7 @@ func show_reward_results(result: Dictionary, duration: float = -1.0) -> void:
 	_display_closing = false
 	_reward_level_overrides.clear()
 	_apply_background_fx()
+	_prepare_treasure_reward_fx()
 	_apply_layout_density()
 	card_ids = []
 	_current_reroll_count = 0
@@ -350,9 +357,10 @@ func show_reward_results(result: Dictionary, duration: float = -1.0) -> void:
 	background.modulate.a = 0.0
 	$VBox.modulate.a = 0.0
 	var tween := create_tween().set_parallel(true)
-	tween.tween_property(background, "modulate:a", 1.0, 0.3)
-	tween.tween_property($VBox, "modulate:a", 1.0, 0.3)
+	tween.tween_property(background, "modulate:a", 1.0, 0.26)
+	tween.tween_property($VBox, "modulate:a", 1.0, 0.24)
 	_animate_cards_in()
+	_play_reward_title_pulse()
 
 
 func _build_reward_title(result: Dictionary) -> String:
@@ -382,6 +390,8 @@ func _close_display_only(play_sound: bool = false) -> void:
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(background, "modulate:a", 0.0, 0.2)
 	tween.tween_property($VBox, "modulate:a", 0.0, 0.2)
+	if is_instance_valid(_treasure_shimmer):
+		tween.tween_property(_treasure_shimmer, "modulate:a", 0.0, 0.2)
 	tween.chain().tween_callback(func():
 		_restore_display_pause()
 		queue_free()
@@ -485,6 +495,8 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
 	style.shadow_size = 10
 	card.add_theme_stylebox_override("panel", style)
+	if _display_only_mode:
+		_apply_reward_card_style(card, style, color)
 	
 	var vbox = VBoxContainer.new()
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -842,6 +854,71 @@ func _apply_background_fx() -> void:
 	)
 
 
+func _prepare_treasure_reward_fx() -> void:
+	var shimmer := _ensure_treasure_shimmer()
+	if not is_instance_valid(shimmer):
+		return
+	shimmer.visible = true
+	shimmer.modulate.a = 0.0
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(shimmer, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(shimmer, "scale", Vector2.ONE, 0.28).from(Vector2(1.08, 1.08)).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+func _ensure_treasure_shimmer() -> ColorRect:
+	if is_instance_valid(_treasure_shimmer):
+		return _treasure_shimmer
+	_treasure_shimmer = ColorRect.new()
+	_treasure_shimmer.name = "TreasureShimmer"
+	_treasure_shimmer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_treasure_shimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_treasure_shimmer.color = Color.WHITE
+	_treasure_shimmer.material = _make_treasure_shimmer_material()
+	add_child(_treasure_shimmer)
+	move_child(_treasure_shimmer, mini(background.get_index() + 1, get_child_count() - 1))
+	return _treasure_shimmer
+
+
+func _make_treasure_shimmer_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+render_mode unshaded, blend_add;
+
+void fragment() {
+	vec2 centered = UV - vec2(0.5, 0.46);
+	float dist = length(centered);
+	float pulse = 0.92 + sin(TIME * 1.6) * 0.08;
+	float halo = smoothstep(0.62, 0.08, dist) * 0.13 * pulse;
+	float ring = smoothstep(0.055, 0.0, abs(dist - 0.29)) * 0.038;
+	float angle = atan(centered.y, centered.x);
+	float ray_a = pow(max(0.0, sin(angle * 8.0 + TIME * 0.7)), 12.0);
+	float ray_b = pow(max(0.0, sin(angle * 5.0 - TIME * 0.45)), 10.0);
+	float rays = (ray_a * 0.026 + ray_b * 0.018) * smoothstep(0.58, 0.16, dist);
+	float sweep = smoothstep(0.02, 0.0, abs((UV.x + UV.y * 0.35) - (0.28 + sin(TIME * 0.9) * 0.035))) * 0.026;
+	float alpha = halo + ring + rays + sweep;
+	vec3 color = mix(vec3(1.0, 0.68, 0.20), vec3(1.0, 0.95, 0.64), smoothstep(0.0, 0.18, alpha));
+	COLOR = vec4(color * alpha, alpha);
+}
+"""
+	material.shader = shader
+	return material
+
+
+func _apply_reward_card_style(card: PanelContainer, style: StyleBoxFlat, color: Color) -> void:
+	card.set_meta("reward_highlight", true)
+	style.bg_color = Color(0.075, 0.105, 0.135, 0.98)
+	style.border_color = color.lerp(NavalUiTheme.BORDER_GOLD, 0.72).lightened(0.08)
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.shadow_size = 20
+	style.shadow_color = Color(color.r, color.g, color.b, 0.22)
+
+
 func _attach_art_sheen(art_frame: PanelContainer) -> void:
 	if not is_instance_valid(art_frame) or art_frame.has_meta("art_sheen"):
 		return
@@ -917,13 +994,19 @@ func _play_card_focus_sheen(card: PanelContainer, peak_intensity: float = 0.22, 
 
 
 func _prepare_entry_animation() -> void:
-	for card in card_buttons:
+	for i in range(card_buttons.size()):
+		var card = card_buttons[i]
 		if not is_instance_valid(card):
 			continue
 		card.pivot_offset = card.custom_minimum_size * 0.5
 		card.modulate = Color(1.0, 1.0, 1.0, 0.0)
-		card.scale = Vector2(CARD_ENTRY_SCALE, CARD_ENTRY_SCALE)
-		card.position.y = CARD_ENTRY_Y_OFFSET
+		if _display_only_mode:
+			card.scale = Vector2(REWARD_CARD_ENTRY_SCALE, REWARD_CARD_ENTRY_SCALE)
+			card.position.y = REWARD_CARD_ENTRY_Y_OFFSET
+			card.rotation = deg_to_rad(lerpf(-2.4, 2.4, float(i) / maxf(float(card_buttons.size() - 1), 1.0)))
+		else:
+			card.scale = Vector2(CARD_ENTRY_SCALE, CARD_ENTRY_SCALE)
+			card.position.y = CARD_ENTRY_Y_OFFSET
 	var footer_button := _get_visible_footer_button()
 	if footer_button:
 		footer_button.pivot_offset = footer_button.custom_minimum_size * 0.5
@@ -932,6 +1015,9 @@ func _prepare_entry_animation() -> void:
 
 
 func _animate_cards_in() -> void:
+	if _display_only_mode:
+		_animate_reward_cards_in()
+		return
 	for i in range(card_buttons.size()):
 		var card = card_buttons[i]
 		if not is_instance_valid(card):
@@ -960,6 +1046,49 @@ func _animate_cards_in() -> void:
 				if is_instance_valid(focused_card) and focused_card is PanelContainer:
 					_play_card_focus_sheen(focused_card)
 		)
+
+
+func _animate_reward_cards_in() -> void:
+	for i in range(card_buttons.size()):
+		var card = card_buttons[i]
+		if not is_instance_valid(card):
+			continue
+		var tween := create_tween()
+		tween.tween_interval(REWARD_CARD_ENTRY_DELAY * float(i))
+		tween.set_parallel(true)
+		tween.tween_property(card, "modulate:a", 1.0, REWARD_CARD_ENTRY_DURATION * 0.72)
+		tween.tween_property(card, "scale", Vector2(REWARD_CARD_POP_SCALE, REWARD_CARD_POP_SCALE), REWARD_CARD_ENTRY_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(card, "position:y", -4.0, REWARD_CARD_ENTRY_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(card, "rotation", 0.0, REWARD_CARD_ENTRY_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.chain()
+		tween.tween_property(card, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(card, "position:y", 0.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		var sheen_tween := create_tween()
+		sheen_tween.tween_interval(REWARD_CARD_ENTRY_DELAY * float(i) + 0.16)
+		sheen_tween.tween_callback(func():
+			if is_instance_valid(card) and card is PanelContainer:
+				_play_card_focus_sheen(card, 0.34, 0.58)
+		)
+	var footer_button := _get_visible_footer_button()
+	if footer_button:
+		var footer_tween := create_tween()
+		footer_tween.tween_interval(REWARD_CARD_ENTRY_DELAY * float(card_buttons.size()) + 0.12)
+		footer_tween.set_parallel(true)
+		footer_tween.tween_property(footer_button, "modulate:a", 1.0, 0.18)
+		footer_tween.tween_property(footer_button, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _play_reward_title_pulse() -> void:
+	if not is_instance_valid(title_label):
+		return
+	title_label.pivot_offset = title_label.size * 0.5
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(title_label, "scale", Vector2(1.08, 1.08), 0.18).from(Vector2(0.95, 0.95)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(title_label, "modulate", Color(1.25, 1.12, 0.78, 1.0), 0.16).from(Color(1.0, 1.0, 1.0, 0.0))
+	tween.chain()
+	tween.tween_property(title_label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(title_label, "modulate", Color.WHITE, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _get_visible_footer_button() -> Button:

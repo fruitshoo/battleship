@@ -1,5 +1,5 @@
 extends Area3D
-const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
+const WATER_BLAST_SCENE = preload("res://scenes/effects/water_blast.tscn")
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
@@ -163,9 +163,9 @@ func _profiled_physics_process(delta: float) -> void:
 
 func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
-	if WATER_BURST_SCENE and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
+	if WATER_BLAST_SCENE and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
 		var pos = global_position
-		var explosion = ScenePool.acquire(get_tree(), WATER_BURST_SCENE)
+		var explosion = ScenePool.acquire(get_tree(), WATER_BLAST_SCENE)
 		if explosion.has_method("configure_as_small"):
 			explosion.configure_as_small()
 		explosion.position = Vector3(pos.x, 0.05, pos.z)

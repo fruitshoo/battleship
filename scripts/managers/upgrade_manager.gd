@@ -32,7 +32,7 @@ var acquired_items: Array[String] = []
 # 프리로드
 var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
 var cannon_scene: PackedScene = preload("res://scenes/entities/launchers/cannon_joseon.tscn")
-var cannonball_joseon_scene: PackedScene = preload("res://scenes/projectiles/cannonball_joseon.tscn")
+var default_cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 var janggun_scene: PackedScene = preload("res://scenes/entities/launchers/janggun_launcher.tscn")
 var ballista_scene: PackedScene = preload("res://scenes/entities/launchers/ballista_launcher.tscn")
 var geobukseon_hull_scene: PackedScene = preload("res://scenes/ships/hulls/geobukseon_hull.tscn")
@@ -744,6 +744,14 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 		ship.ship_mass_scale = clampf(float(stats.get("ship_mass_scale", 2.05)), 0.35, 4.0)
 		if "collision_profile" in ship and ship.collision_profile != null:
 			ship.collision_profile.ship_mass_scale = ship.ship_mass_scale
+	if "ramming_damage_multiplier" in ship:
+		var geobuk_ram_mult := maxf(0.1, float(stats.get("ramming_damage_multiplier", 1.2)))
+		ship.set_meta("base_player_hull_upgrade_ram_mult", geobuk_ram_mult)
+		var hull_stats: Dictionary = UPGRADES.get("hull", {}).get("stats", {})
+		var hull_level := int(current_levels.get("hull", 0))
+		ship.ramming_damage_multiplier = geobuk_ram_mult * (1.0 + float(hull_stats.get("ramming_damage_pct_per_lv", 0.07)) * float(hull_level))
+	if "ramming_knockback_multiplier" in ship:
+		ship.ramming_knockback_multiplier = clampf(float(stats.get("ramming_knockback_multiplier", 1.0)), 0.0, 3.0)
 
 	_swap_player_hull_scene(ship, hull_scene_to_apply, "GeobukseonHull")
 	if ship.has_method("_cache_hull_references"):
@@ -756,7 +764,15 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 		ship.call("_sync_player_crew_roster")
 
 	_sync_player_cannon_layout(ship, maxi(1, int(current_levels.get("cannon", 1))))
+	_play_geobukseon_transform_sfx(ship)
 	print("[Geobukseon] 기함을 거북선으로 변경했습니다. 도선 면역, 측면 포문 전용")
+
+func _play_geobukseon_transform_sfx(ship: Node3D) -> void:
+	if not is_instance_valid(ship):
+		return
+	if not is_instance_valid(AudioManager) or not AudioManager.has_method("play_sfx"):
+		return
+	AudioManager.play_sfx("support_foghorn", ship.global_position)
 
 func _swap_player_hull_scene(ship: Node3D, hull_scene_to_apply: PackedScene, hull_name: String) -> void:
 	if not is_instance_valid(ship) or not is_instance_valid(hull_scene_to_apply):
@@ -952,8 +968,8 @@ func _configure_player_cannon(cannon: Node, spec: Dictionary = {}) -> void:
 	if not is_instance_valid(cannon):
 		return
 	ShipWeaponLoadoutHelper.apply_weapon_config(cannon, spec, "player")
-	if "cannonball_scene" in cannon and cannonball_joseon_scene != null and not spec.has(ShipWeaponLoadoutHelper.PROJECTILE_SCENE):
-		cannon.cannonball_scene = cannonball_joseon_scene
+	if "cannonball_scene" in cannon and default_cannonball_scene != null and not spec.has(ShipWeaponLoadoutHelper.PROJECTILE_SCENE):
+		cannon.cannonball_scene = default_cannonball_scene
 	if "fire_cooldown" in cannon and not spec.has(ShipWeaponLoadoutHelper.FIRE_COOLDOWN):
 		cannon.fire_cooldown = 3.2
 	if "detection_range" in cannon and not spec.has(ShipWeaponLoadoutHelper.DETECTION_RANGE):

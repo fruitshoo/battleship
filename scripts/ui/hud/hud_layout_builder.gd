@@ -30,7 +30,7 @@ static func apply_layout_density(hud) -> void:
 	var height_fit: float = clampf((viewport_size.y - 720.0) / 360.0, 0.0, 1.0)
 	var density: float = min(width_fit, height_fit)
 	var edge_margin := roundf(lerpf(16.0, 24.0, density))
-	var top_margin := roundf(lerpf(44.0, 56.0, density))
+	var top_margin := roundf(lerpf(30.0, 38.0, density))
 	var lower_margin := roundf(lerpf(18.0, 24.0, density))
 	var panel_gap := roundi(lerpf(8.0, 10.0, density))
 	var player_status_width := roundf(lerpf(124.0, 136.0, density))
@@ -84,22 +84,22 @@ static func apply_layout_density(hud) -> void:
 		var timer_half_width := roundf(lerpf(74.0, 90.0, density))
 		timer_only.offset_left = -timer_half_width
 		timer_only.offset_right = timer_half_width
-		timer_only.offset_top = roundf(lerpf(52.0, 60.0, density))
-		timer_only.offset_bottom = timer_only.offset_top + roundf(lerpf(30.0, 34.0, density))
+		timer_only.offset_top = roundf(lerpf(34.0, 42.0, density))
+		timer_only.offset_bottom = timer_only.offset_top + roundf(lerpf(28.0, 32.0, density))
 	if is_instance_valid(hud.timer_label):
 		NavalUiTheme.style_timer_value(hud.timer_label, roundi(lerpf(22.0, 26.0, density)))
 	if is_instance_valid(hud.capture_opportunity_label):
 		var capture_half_width := roundf(lerpf(150.0, 180.0, density))
 		hud.capture_opportunity_label.offset_left = -capture_half_width
 		hud.capture_opportunity_label.offset_right = capture_half_width
-		hud.capture_opportunity_label.offset_top = roundf(lerpf(88.0, 96.0, density))
+		hud.capture_opportunity_label.offset_top = roundf(lerpf(66.0, 76.0, density))
 		hud.capture_opportunity_label.offset_bottom = hud.capture_opportunity_label.offset_top + 22.0
 		NavalUiTheme.style_caption(hud.capture_opportunity_label, roundi(lerpf(10.0, 11.0, density)), NavalUiTheme.TEXT_GOLD)
 	if is_instance_valid(hud.debug_distance_label):
 		var debug_half_width := roundf(lerpf(150.0, 180.0, density))
 		hud.debug_distance_label.offset_left = -debug_half_width
 		hud.debug_distance_label.offset_right = debug_half_width
-		hud.debug_distance_label.offset_top = roundf(lerpf(92.0, 100.0, density))
+		hud.debug_distance_label.offset_top = roundf(lerpf(70.0, 80.0, density))
 		hud.debug_distance_label.offset_bottom = hud.debug_distance_label.offset_top + 22.0
 		NavalUiTheme.style_caption(hud.debug_distance_label, roundi(lerpf(9.0, 10.0, density)), NavalUiTheme.TEXT_MUTED)
 

@@ -225,7 +225,7 @@ static func become_derelict(ship) -> void:
 		ship.cached_lm = LevelManagerRegistry.get_level_manager(ship.get_tree())
 
 	if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_ship_derelict"):
-		ship.cached_lm.add_ship_derelict(1)
+		ship.cached_lm.add_ship_derelict(1, ship)
 
 	ship._set_wake_state(false)
 
@@ -357,8 +357,8 @@ static func _play_derelict_transition_visuals(ship) -> void:
 	_spawn_derelict_smoke(ship, Vector3(-0.7, 0.9, -1.6), 0.95)
 	_spawn_derelict_smoke(ship, Vector3(0.8, 0.85, 0.3), 0.85)
 	_spawn_derelict_smoke(ship, Vector3(0.1, 1.0, 1.7), 0.75)
-	_spawn_derelict_water_burst(ship, Vector3(-1.1, 0.0, -2.1), 0.82)
-	_spawn_derelict_water_burst(ship, Vector3(1.0, 0.0, 1.8), 0.72)
+	_spawn_derelict_water_blast(ship, Vector3(-1.1, 0.0, -2.1), 0.82)
+	_spawn_derelict_water_blast(ship, Vector3(1.0, 0.0, 1.8), 0.72)
 
 
 static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float) -> void:
@@ -378,7 +378,7 @@ static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float)
 		smoke.pool_activate()
 
 
-static func _spawn_derelict_water_burst(ship, local_offset: Vector3, intensity: float) -> void:
+static func _spawn_derelict_water_blast(ship, local_offset: Vector3, intensity: float) -> void:
 	if Engine.is_editor_hint():
 		return
 	var scene: PackedScene = ship.get("water_splash_scene") if "water_splash_scene" in ship else null
@@ -421,7 +421,7 @@ static func sink_derelict(ship) -> void:
 	if is_instance_valid(ship.cached_lm) and str(ship.get("team")) == "enemy" and ship.get_meta("derelict_sink_stat_accounted", false) != true:
 		ship.set_meta("derelict_sink_stat_accounted", true)
 		if ship.cached_lm.has_method("add_ship_sunk"):
-			ship.cached_lm.add_ship_sunk(1)
+			ship.cached_lm.add_ship_sunk(1, ship)
 	drop_floating_loot(ship, true, 20)
 
 	ship._set_fire_emitting(true)

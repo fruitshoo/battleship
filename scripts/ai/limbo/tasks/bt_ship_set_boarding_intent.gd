@@ -22,6 +22,8 @@ func _tick(_delta: float) -> Status:
 	var target := blackboard.get_var(target_var, null) as Node3D
 	if not is_instance_valid(target):
 		return FAILURE
+	if not ShipCombatModeHelper.can_be_boarded(target, agent_3d):
+		return SUCCESS
 	if not _should_publish_boarding_intent(agent_3d):
 		return SUCCESS
 

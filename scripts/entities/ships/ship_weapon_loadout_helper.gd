@@ -127,22 +127,7 @@ static func get_default_player_cannon_loadout() -> Array[Dictionary]:
 
 
 static func get_default_boss_loadout(tier: int) -> Array[Dictionary]:
-	if tier == 1:
-		return [
-			build_cannon_spec("BossCannonFront", "CannonFront", Vector3(0.0, 0.8, -5.0), 0.0, 1, 23.0, 50.0),
-			build_cannon_spec("BossCannonLeft", "CannonLeft", Vector3(-2.8, 0.8, 0.0), 90.0, 1, 23.0, 50.0),
-			build_cannon_spec("BossCannonRight", "CannonRight", Vector3(2.8, 0.8, 0.0), -90.0, 1, 23.0, 50.0),
-		]
-
-	return [
-		build_cannon_spec("BossCannonLeftForward", "CannonLeftExtra", Vector3(-2.8, 0.8, -2.0), 90.0, 1, 23.0, 50.0),
-		build_cannon_spec("BossCannonRightForward", "CannonRightExtraForward", Vector3(2.8, 0.8, -2.0), -90.0, 1, 23.0, 50.0),
-		build_cannon_spec("BossCannonLeftMid", "CannonLeft", Vector3(-2.8, 0.8, 0.0), 90.0, 1, 23.0, 50.0),
-		build_cannon_spec("BossCannonRightMid", "CannonRight", Vector3(2.8, 0.8, 0.0), -90.0, 1, 23.0, 50.0),
-		build_cannon_spec("BossCannonLeftRear", "CannonLeftExtraRear", Vector3(-2.8, 0.8, 2.0), 90.0, 1, 23.0, 50.0),
-		build_cannon_spec("BossCannonRightRear", "CannonRightExtra", Vector3(2.8, 0.8, 2.0), -90.0, 1, 23.0, 50.0),
-		build_singigeon_spec("BossSingigeonFront", "SingigeonFront", Vector3(0.0, 1.0, -5.0), 0.0, 36.0, 3),
-	]
+	return []
 
 
 static func build_cannon_spec(node_name: String, slot_name: String, position: Vector3, rotation_y: float, required_level: int = 1, detection_range: float = 0.0, detection_arc: float = 0.0, scene_path: String = "", unlock_upgrade: String = "") -> Dictionary:

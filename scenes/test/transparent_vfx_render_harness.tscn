@@ -87,13 +87,13 @@ surface_material_override/0 = SubResource("Material_hull")
 [node name="FireOverWater" type="Marker3D" parent="Slots"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.18, 0)
 
-[node name="WaterBurst" type="Marker3D" parent="Slots"]
+[node name="WaterBlast" type="Marker3D" parent="Slots"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.08, 1.15)
 
 [node name="FireOverDeck" type="Marker3D" parent="Slots"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0.38, -0.15)
 
-[node name="DeckWaterBurst" type="Marker3D" parent="Slots"]
+[node name="DeckWaterBlast" type="Marker3D" parent="Slots"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.38, 1.0)
 
 [node name="FireBehindSail" type="Marker3D" parent="Slots"]

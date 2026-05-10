@@ -69,6 +69,7 @@
 				"description": "활 공격 시 일정 확률로 신기전을 발사하고 적 병사를 밀쳐냄. 고레벨에서 낙수 가능",
 				"max_level": 5,
 				"color": "ff4c4c",
+				"card_art_path": "res://assets/ui/upgrades/singigeon_card.png",
 				"stats": {
 				"base_proc_chance": 0.08,
 				"proc_chance_per_lv": 0.03,
@@ -148,6 +149,7 @@
 				"description": "병사들의 근접 무기를 창으로 바꾸고 창 피해를 강화",
 				"max_level": 5,
 				"color": "66ccff",
+				"card_art_path": "res://assets/ui/upgrades/jangchang_card.png",
 				"stats": {
 				"damage_bonus_pct_per_lv": 0.06
 			}
@@ -216,6 +218,7 @@
 			"description": "선체 방어력 강화",
 			"max_level": 5,
 			"color": "994c19",
+			"card_art_path": "res://assets/ui/upgrades/hull_defense_card.png",
 			"stats": {
 				"def_levels": [1, 2, 3, 4, 5],
 				"def_add": 1.0
@@ -227,6 +230,7 @@
 			"description": "최대 내구도와 충돌 피해 강화",
 			"max_level": 5,
 			"color": "b8753a",
+			"card_art_path": "res://assets/ui/upgrades/hull_card.png",
 			"stats": {
 				"hp_add_per_lv": 15.0,
 				"ramming_damage_pct_per_lv": 0.07
@@ -296,7 +300,7 @@
 		"geobukseon": {
 			"name": "거북선",
 			"category": 2,
-			"description": "기함을 도선을 막는 거북선으로 변경. 전면포 없이 좌우 포문만 운용",
+			"description": "기함을 도선을 막는 거북선으로 변경. 정면 포문 2문, 측면 포문 4문, 충각 피해 +20%",
 			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
 			"max_level": 1,
 			"color": "6f8f7a",
@@ -304,7 +308,9 @@
 				"ship_type": "geobukseon_player",
 				"hull_scene": "res://scenes/ships/hulls/geobukseon_hull.tscn",
 				"blocks_boarding": true,
-				"ship_mass_scale": 2.05
+				"ship_mass_scale": 2.05,
+				"ramming_damage_multiplier": 1.2,
+				"ramming_knockback_multiplier": 1.0
 			}
 		},
 		"supply": {
@@ -356,7 +362,7 @@
 		"geobukseon_upgrade": {
 			"name": "거북선",
 			"category": 5,
-			"description": "도선을 막는 거북선 방호함 1척 추가 합류",
+			"description": "도선 면역, 충각 피해 +12%, 밀어냄 강도 72%의 거북선 방호함 1척 추가 합류",
 			"disabled": true,
 			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
 			"max_level": 1,
@@ -364,7 +370,9 @@
 			"stats": {
 				"geobukseon_upgrade_id": "geobukseon_upgrade",
 				"geobukseon_level": 1,
-				"geobukseon_squadron_limit_add": 1
+				"geobukseon_squadron_limit_add": 1,
+				"ramming_damage_multiplier": 1.12,
+				"ramming_knockback_multiplier": 0.72
 			}
 		},
 		"fleet_hull": {
@@ -416,11 +424,11 @@
 				"alert_msg": "!! 아이템 획득: 초요기 !!"
 			},
 			"ilseongjeongsiui": {
-				"name": "일성정시",
-				"description": "천체 관측기 일성정시의 권위를 담은 전리품입니다.",
+				"name": "일성정시의",
+				"description": "천체와 바람을 읽어 돛이 바람 방향에 맞춰 자동으로 조절됩니다.",
 				"icon_texture": "res://assets/ui/items/ilseongjeongsiui.png",
 				"icon": "explore",
-				"alert_msg": "!! 전리품 획득: 일성정시 !!"
+				"alert_msg": "!! 전리품 획득: 일성정시의 !!\n(자동 돛 조절 활성화)"
 			}
 		}
 	}

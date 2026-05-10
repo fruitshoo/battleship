@@ -36,9 +36,16 @@ static func update_stamina(hud, current: float, maximum: float) -> void:
 
 
 static func update_xp(hud, current: int, maximum: int) -> void:
+	hud._last_xp_current = current
+	hud._last_xp_max = maximum
 	if hud.xp_bar:
 		hud.xp_bar.max_value = maximum
 		hud.xp_bar.value = current
+	if hud.level_label:
+		if maximum > 0:
+			hud.level_label.text = "Lv %d · XP %d/%d" % [hud._last_level_value, current, maximum]
+		else:
+			hud.level_label.text = "Lv %d" % hud._last_level_value
 
 
 static func update_ammo_mode_display(hud) -> void:

@@ -15,6 +15,13 @@ static func level_matches(level: int, level_list: Variant) -> bool:
 				return true
 	return false
 
+static func format_ramming_stat_text(stats: Dictionary, fallback_damage_mult: float, fallback_knockback_mult: float) -> String:
+	var damage_mult := float(stats.get("ramming_damage_multiplier", fallback_damage_mult))
+	var knockback_mult := float(stats.get("ramming_knockback_multiplier", fallback_knockback_mult))
+	var damage_pct := int(round((damage_mult - 1.0) * 100.0))
+	var knockback_pct := int(round(knockback_mult * 100.0))
+	return "충각 피해 +%d%% | 밀어냄 강도 %d%%" % [damage_pct, knockback_pct]
+
 static func get_specialist_unit_count(upgrades: Dictionary, current_levels: Dictionary, upgrade_id: String, level: int = -1) -> int:
 	if upgrade_id not in upgrades:
 		return 0
@@ -227,7 +234,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				return "획득 반경 +%.1fm" % float(s.get("radius_add", 2.0))
 			return "획득 반경 강화"
 		"geobukseon":
-			return "기함 거북선화 | 도선 면역 | 좌우 포문 4문 한계 | 전면포 없음"
+			return "기함 거북선화 | 도선 면역 | 정면 포문 2문 | 측면 포문 4문 | %s" % format_ramming_stat_text(s, 1.2, 1.0)
 		"ballista":
 			var ballista_damage: float = s.get("base_damage", 45.0) + (next_level - 1) * s.get("damage_per_lv", 15.0)
 			var pierce: int = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))
@@ -241,7 +248,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "판옥선 포격함 1척 합류 | 편성 %s" % panokseon_summary
 		"geobukseon_upgrade":
 			var geobukseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
-			return "거북선 방호함 1척 합류 | 도선 면역 | 편성 %s" % geobukseon_summary
+			return "거북선 방호함 1척 합류 | 도선 면역 | %s | 편성 %s" % [format_ramming_stat_text(s, 1.12, 0.72), geobukseon_summary]
 		"supply":
 			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(s.get("hull_heal", 20)), int(s.get("stamina_recover", 25))]
 		"gold":

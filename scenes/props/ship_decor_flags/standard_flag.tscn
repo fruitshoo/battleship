@@ -31,9 +31,12 @@ shader_parameter/emblem_uv_scale = Vector2(1, 1)
 shader_parameter/emblem_uv_offset = Vector2(0, 0)
 shader_parameter/alpha_cutoff = 0.02
 shader_parameter/wave_speed = 5.5
-shader_parameter/wave_strength = 0.3999999910592
-shader_parameter/side_drag = 0.1999999955296
+shader_parameter/wave_strength = 0.31
+shader_parameter/side_drag = 0.6
 shader_parameter/pin_mode = 0
+shader_parameter/cloth_roughness = 0.96
+shader_parameter/cloth_weave_strength = 0.035
+shader_parameter/cloth_weave_scale = 42.0
 
 [node name="StandardDecorFlag" type="Node3D" unique_id=764534485]
 script = ExtResource("1_script")

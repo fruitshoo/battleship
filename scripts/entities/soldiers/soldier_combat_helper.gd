@@ -198,4 +198,27 @@ static func find_ranged_target(soldier) -> Node3D:
 		if dist_xz <= max_range:
 			return nearest
 
+	var can_target_ships := false
+	if is_instance_valid(soldier.current_weapon) and soldier.current_weapon.has_method("can_target_ships"):
+		can_target_ships = soldier.current_weapon.call("can_target_ships") == true
+	if can_target_ships:
+		var opposing_team := "enemy" if soldier.team == "player" else "player"
+		var nearest_ship: Node3D = null
+		var nearest_ship_distance := INF
+		for ship_variant in EntityRegistry.get_ships_by_team(opposing_team):
+			var ship := ship_variant as Node3D
+			if not is_instance_valid(ship) or ship == soldier.owned_ship:
+				continue
+			if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
+				continue
+			var ship_dist_xz := Vector2(
+				soldier.global_position.x - ship.global_position.x,
+				soldier.global_position.z - ship.global_position.z
+			).length()
+			if ship_dist_xz <= max_range and ship_dist_xz < nearest_ship_distance:
+				nearest_ship_distance = ship_dist_xz
+				nearest_ship = ship
+		if is_instance_valid(nearest_ship):
+			return nearest_ship
+
 	return null

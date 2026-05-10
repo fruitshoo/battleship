@@ -3,6 +3,7 @@ extends RefCounted
 const BOW_SCENE = preload("res://scenes/entities/weapons/weapon_bow.tscn")
 const REPEATING_CROSSBOW_SCENE = preload("res://scenes/entities/weapons/weapon_repeating_crossbow.tscn")
 const SINGIGEON_SCENE = preload("res://scenes/entities/weapons/weapon_singigeon.tscn")
+const DAECHEOLPO_SCENE = preload("res://scenes/entities/weapons/weapon_daecheolpo.tscn")
 const SWORD_SCENE = preload("res://scenes/entities/weapons/weapon_sword.tscn")
 const SPEARMAN_MELEE_SCENES := [
 	preload("res://scenes/entities/weapons/weapon_spear.tscn"),
@@ -41,6 +42,11 @@ static func apply_role_loadout(soldier) -> void:
 				soldier.equip_weapon(SINGIGEON_SCENE, "singigeon")
 			elif is_instance_valid(soldier.weapon_bow) and soldier.weapon_bow.has_method("refresh_upgrade_stats"):
 				soldier.weapon_bow.refresh_upgrade_stats()
+			if not soldier.is_melee_only:
+				soldier._set_active_weapon("bow")
+		"daecheolpo":
+			if get_ranged_weapon_id(soldier) != "daecheolpo":
+				soldier.equip_weapon(DAECHEOLPO_SCENE, "daecheolpo")
 			if not soldier.is_melee_only:
 				soldier._set_active_weapon("bow")
 		_:

@@ -11,6 +11,8 @@ const AUTHORING_SCENARIO_TRIGGER_USER_PATH := "user://authoring_palette_scenario
 const AUTHORING_SCENARIO_PRESETS_USER_PATH := "user://authoring_palette_scenario_presets.json"
 const AUTHORING_DATA_PATCH_USER_PATH := "user://authoring_palette_data_patch.json"
 const PALETTE_PRESET_FALLBACK_ID := "palette_queue"
+const SHOW_AUTHORING_PALETTE_TAB_SETTING := "battleship/debug/show_authoring_palette_tab"
+const SHOW_AUTHORING_PALETTE_TAB_ENV := "BATTLESHIP_SHOW_AUTHORING_PALETTE"
 const DEBUG_PANEL_SIZE := Vector2(920.0, 560.0)
 const DEBUG_PANEL_MIN_SIZE := Vector2(760.0, 460.0)
 
@@ -83,7 +85,7 @@ static func setup_debug_panel(hud) -> void:
 	var close_button := Button.new()
 	close_button.text = "닫기"
 	close_button.custom_minimum_size = Vector2(64, 28)
-	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.focus_mode = Control.FOCUS_ALL
 	NavalUiTheme.apply_hud_button(close_button, 11)
 	close_button.pressed.connect(func() -> void:
 		hud._set_debug_modal_active(false)
@@ -93,7 +95,7 @@ static func setup_debug_panel(hud) -> void:
 
 	var debug_tabs := TabContainer.new()
 	debug_tabs.name = "DebugToolsTabs"
-	debug_tabs.focus_mode = Control.FOCUS_NONE
+	debug_tabs.focus_mode = Control.FOCUS_ALL
 	debug_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	debug_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	modal_box.add_child(debug_tabs)
@@ -101,7 +103,8 @@ static func setup_debug_panel(hud) -> void:
 	_add_environment_section(hud, debug_tabs)
 	_add_debug_draw_section(hud, debug_tabs)
 	_add_spawn_section(hud, debug_tabs)
-	_add_authoring_palette_section(hud, debug_tabs)
+	if is_authoring_palette_tab_visible():
+		_add_authoring_palette_section(hud, debug_tabs)
 	_add_misc_section(hud, debug_tabs)
 	_add_ship_section(hud, debug_tabs)
 	_add_sail_section(hud, debug_tabs)
@@ -121,6 +124,123 @@ static func setup_debug_panel(hud) -> void:
 	hud._sync_sail_debug_panel_from_player()
 	hud._sync_debug_tools_panel_state()
 	hud._update_sail_debug_toggle_button_text()
+
+
+static func is_authoring_palette_tab_visible() -> bool:
+	if ProjectSettings.has_setting(SHOW_AUTHORING_PALETTE_TAB_SETTING):
+		return bool(ProjectSettings.get_setting(SHOW_AUTHORING_PALETTE_TAB_SETTING))
+	var env_value := OS.get_environment(SHOW_AUTHORING_PALETTE_TAB_ENV).strip_edges().to_lower()
+	return ["1", "true", "yes", "on"].has(env_value)
+
+
+static func handle_debug_panel_keyboard_input(hud, event: InputEvent) -> bool:
+	if not is_instance_valid(hud.sail_debug_panel) or not hud.sail_debug_panel.visible:
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.is_echo():
+		return false
+	var keycode := key_event.physical_keycode if key_event.physical_keycode != 0 else key_event.keycode
+	match keycode:
+		KEY_PAGEUP:
+			_cycle_debug_tab(hud, -1)
+			return true
+		KEY_PAGEDOWN:
+			_cycle_debug_tab(hud, 1)
+			return true
+		KEY_HOME:
+			if key_event.ctrl_pressed or key_event.meta_pressed:
+				_set_debug_tab(hud, 0)
+				return true
+		KEY_END:
+			if key_event.ctrl_pressed or key_event.meta_pressed:
+				_set_debug_tab(hud, -1)
+				return true
+		KEY_TAB:
+			if not _is_debug_focus_inside_panel(hud):
+				grab_initial_debug_focus(hud)
+				return true
+	return false
+
+
+static func grab_initial_debug_focus(hud) -> void:
+	if not is_instance_valid(hud.sail_debug_panel):
+		return
+	var debug_tabs := hud.sail_debug_panel.find_child("DebugToolsTabs", true, false) as TabContainer
+	var focus_target: Control = null
+	if is_instance_valid(debug_tabs):
+		var current_tab := debug_tabs.get_current_tab_control()
+		if is_instance_valid(current_tab):
+			focus_target = _find_first_focusable_control(current_tab)
+	if not is_instance_valid(focus_target):
+		focus_target = _find_first_focusable_control(hud.sail_debug_panel)
+	if is_instance_valid(focus_target):
+		focus_target.grab_focus()
+
+
+static func clear_debug_focus(hud) -> void:
+	var viewport: Viewport = hud.get_viewport()
+	if viewport == null or not is_instance_valid(hud.sail_debug_panel):
+		return
+	var focused: Control = viewport.gui_get_focus_owner()
+	if is_instance_valid(focused) and _is_node_descendant_of(focused, hud.sail_debug_panel):
+		focused.release_focus()
+
+
+static func _cycle_debug_tab(hud, delta: int) -> void:
+	var debug_tabs := hud.sail_debug_panel.find_child("DebugToolsTabs", true, false) as TabContainer
+	if not is_instance_valid(debug_tabs) or debug_tabs.get_tab_count() <= 0:
+		return
+	var next_tab := posmod(debug_tabs.current_tab + delta, debug_tabs.get_tab_count())
+	debug_tabs.current_tab = next_tab
+	grab_initial_debug_focus(hud)
+
+
+static func _set_debug_tab(hud, tab_index: int) -> void:
+	var debug_tabs := hud.sail_debug_panel.find_child("DebugToolsTabs", true, false) as TabContainer
+	if not is_instance_valid(debug_tabs) or debug_tabs.get_tab_count() <= 0:
+		return
+	if tab_index < 0:
+		debug_tabs.current_tab = debug_tabs.get_tab_count() - 1
+	else:
+		debug_tabs.current_tab = clampi(tab_index, 0, debug_tabs.get_tab_count() - 1)
+	grab_initial_debug_focus(hud)
+
+
+static func _is_debug_focus_inside_panel(hud) -> bool:
+	var viewport: Viewport = hud.get_viewport()
+	if viewport == null or not is_instance_valid(hud.sail_debug_panel):
+		return false
+	var focused: Control = viewport.gui_get_focus_owner()
+	return is_instance_valid(focused) and _is_node_descendant_of(focused, hud.sail_debug_panel)
+
+
+static func _find_first_focusable_control(root: Node) -> Control:
+	var control := root as Control
+	if is_instance_valid(control) and control.visible and control.focus_mode != Control.FOCUS_NONE:
+		if not _is_control_disabled(control):
+			return control
+	for child in root.get_children():
+		var focusable := _find_first_focusable_control(child)
+		if is_instance_valid(focusable):
+			return focusable
+	return null
+
+
+static func _is_control_disabled(control: Control) -> bool:
+	if control is BaseButton:
+		return (control as BaseButton).disabled
+	if control is OptionButton:
+		return (control as OptionButton).disabled
+	return false
+
+
+static func _is_node_descendant_of(node: Node, ancestor: Node) -> bool:
+	var current := node
+	while current != null:
+		if current == ancestor:
+			return true
+		current = current.get_parent()
+	return false
 
 
 static func get_level_manager_for_debug(hud) -> Node:
@@ -204,31 +324,34 @@ static func _add_environment_section(hud, panel_box: Control) -> void:
 
 
 static func _add_debug_draw_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("드로우 채널", false)
+	var section: Dictionary = create_debug_section("시각화", false)
 	panel_box.add_child(section["root"])
+	var columns := create_debug_columns(section["body"], 2)
+	var status_group := create_debug_group(columns[0], "상태")
+	var channel_group := create_debug_group(columns[1], "드로우 채널")
 
 	var status := Label.new()
 	status.text = "DebugDraw3D: -"
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_body(status, 11)
-	section["body"].add_child(status)
+	status_group.add_child(status)
 	hud.debug_draw_channels_value = status
 
 	var collision_status := Label.new()
 	collision_status.text = "선박 영역: OFF"
 	NavalUiTheme.style_body(collision_status, 11)
-	section["body"].add_child(collision_status)
+	status_group.add_child(collision_status)
 	hud.debug_collision_value = collision_status
 
 	var distance_status := Label.new()
 	distance_status.text = "거리 표시: OFF"
 	NavalUiTheme.style_body(distance_status, 11)
-	section["body"].add_child(distance_status)
+	status_group.add_child(distance_status)
 	hud.debug_distance_value = distance_status
 
 	var collision_row := HBoxContainer.new()
 	collision_row.add_theme_constant_override("separation", 4)
-	section["body"].add_child(collision_row)
+	status_group.add_child(collision_row)
 	collision_row.add_child(create_debug_action_button("선박 영역", func() -> void:
 		hud._invoke_level_debug_method("_toggle_collision_visualizers")
 		hud._sync_debug_tools_panel_state()
@@ -244,7 +367,7 @@ static func _add_debug_draw_section(hud, panel_box: Control) -> void:
 
 	var row_a := HBoxContainer.new()
 	row_a.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_a)
+	channel_group.add_child(row_a)
 	row_a.add_child(create_debug_action_button("충돌", func() -> void:
 		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_COLLISION)
 	))
@@ -257,7 +380,7 @@ static func _add_debug_draw_section(hud, panel_box: Control) -> void:
 
 	var row_b := HBoxContainer.new()
 	row_b.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_b)
+	channel_group.add_child(row_b)
 	row_b.add_child(create_debug_action_button("스폰", func() -> void:
 		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_SPAWN)
 	))
@@ -270,7 +393,7 @@ static func _add_debug_draw_section(hud, panel_box: Control) -> void:
 
 	var row_c := HBoxContainer.new()
 	row_c.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_c)
+	channel_group.add_child(row_c)
 	row_c.add_child(create_debug_action_button("바람", func() -> void:
 		_toggle_debug_draw_channel(hud, DebugDrawBridge.CHANNEL_WIND)
 	))
@@ -280,7 +403,7 @@ static func _add_debug_draw_section(hud, panel_box: Control) -> void:
 
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_d)
+	channel_group.add_child(row_d)
 	row_d.add_child(create_debug_action_button("드로우 끄기", func() -> void:
 		for channel in DebugDrawBridge.CHANNEL_ORDER:
 			DebugDrawBridge.set_channel_enabled(str(channel), false)
@@ -300,12 +423,15 @@ static func _toggle_debug_draw_channel(hud, channel: String) -> void:
 
 
 static func _add_spawn_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("스폰", false)
+	var section: Dictionary = create_debug_section("생성", false)
 	panel_box.add_child(section["root"])
+	var columns := create_debug_columns(section["body"], 2)
+	var enemy_group := create_debug_group(columns[0], "적 함선")
+	var fleet_group := create_debug_group(columns[1], "편대 / 지원")
 
 	var row_a := HBoxContainer.new()
 	row_a.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_a)
+	enemy_group.add_child(row_a)
 	row_a.add_child(create_debug_action_button("세키 근접", func() -> void:
 		hud._invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_melee", 40.0, -12.0])
 	))
@@ -315,7 +441,7 @@ static func _add_spawn_section(hud, panel_box: Control) -> void:
 
 	var row_b := HBoxContainer.new()
 	row_b.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_b)
+	enemy_group.add_child(row_b)
 	row_b.add_child(create_debug_action_button("중간보스", func() -> void:
 		hud._invoke_level_debug_method("_debug_spawn_mid_boss")
 	))
@@ -325,7 +451,7 @@ static func _add_spawn_section(hud, panel_box: Control) -> void:
 
 	var row_c := HBoxContainer.new()
 	row_c.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_c)
+	fleet_group.add_child(row_c)
 	row_c.add_child(create_debug_action_button("지원함 추가", func() -> void:
 		hud._invoke_level_debug_method("_debug_spawn_support_ship")
 	))
@@ -335,7 +461,7 @@ static func _add_spawn_section(hud, panel_box: Control) -> void:
 
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_d)
+	fleet_group.add_child(row_d)
 	row_d.add_child(create_debug_action_button("소형 편대", func() -> void:
 		hud._invoke_level_debug_method("_debug_spawn_fleet", ["light"])
 	))
@@ -424,7 +550,7 @@ static func _add_authoring_palette_section(hud, panel_box: Control) -> void:
 	preset_select.name = "AuthoringPalettePresetSelect"
 	preset_select.custom_minimum_size = Vector2(0, 28)
 	preset_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	preset_select.focus_mode = Control.FOCUS_NONE
+	preset_select.focus_mode = Control.FOCUS_ALL
 	preset_select.disabled = true
 	section["body"].add_child(preset_select)
 	hud.debug_authoring_palette_preset_select = preset_select
@@ -2519,12 +2645,16 @@ static func _palette_entry_has_tag(entry: Dictionary, tag_name: String) -> bool:
 
 
 static func _add_misc_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("게임", false)
+	var section: Dictionary = create_debug_section("진행", false)
 	panel_box.add_child(section["root"])
+	var columns := create_debug_columns(section["body"], 2)
+	var progression_group := create_debug_group(columns[0], "성장 / 보상")
+	var result_group := create_debug_group(columns[1], "결과 / 화면")
+	var diagnostics_group := create_debug_group(columns[1], "전투 진단")
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row)
+	progression_group.add_child(row)
 	row.add_child(create_debug_action_button("강제 레벨업", func() -> void:
 		var lm = hud._get_level_manager_for_debug()
 		if lm and lm.get("current_level") != null:
@@ -2537,23 +2667,10 @@ static func _add_misc_section(hud, panel_box: Control) -> void:
 		hud._invoke_level_debug_method("show_meta_shop")
 	))
 
-	var row_b := HBoxContainer.new()
-	row_b.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_b)
-	row_b.add_child(create_debug_action_button("대포 디버그", func() -> void:
-		hud._invoke_level_debug_method("_debug_cannons")
-	))
-	row_b.add_child(create_debug_action_button("체력바 토글", func() -> void:
-		hud.toggle_ship_health_bars()
-	))
-
-	var row_c := HBoxContainer.new()
-	row_c.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_c)
-	row_c.add_child(create_debug_action_button("통계 패널", func() -> void:
-		hud.toggle_stat_panel()
-	))
-	row_c.add_child(create_debug_action_button("해역 보너스", func() -> void:
+	var reward_row := HBoxContainer.new()
+	reward_row.add_theme_constant_override("separation", 4)
+	progression_group.add_child(reward_row)
+	reward_row.add_child(create_debug_action_button("해역 보너스", func() -> void:
 		if not is_instance_valid(hud.player_ship):
 			hud.show_gust_warning_message("해역 보너스 대상 없음", 0.8)
 			return
@@ -2576,73 +2693,106 @@ static func _add_misc_section(hud, panel_box: Control) -> void:
 			hud._sync_debug_tools_panel_state()
 	))
 
+	var row_b := HBoxContainer.new()
+	row_b.add_theme_constant_override("separation", 4)
+	result_group.add_child(row_b)
+	row_b.add_child(create_debug_action_button("승리 결과", func() -> void:
+		hud._invoke_level_debug_method("_debug_show_victory_result")
+	))
+	row_b.add_child(create_debug_action_button("패배 결과", func() -> void:
+		hud._invoke_level_debug_method("_debug_show_defeat_result")
+	))
+
+	var row_c := HBoxContainer.new()
+	row_c.add_theme_constant_override("separation", 4)
+	result_group.add_child(row_c)
+	row_c.add_child(create_debug_action_button("체력바 토글", func() -> void:
+		hud.toggle_ship_health_bars()
+	))
+	row_c.add_child(create_debug_action_button("통계 패널", func() -> void:
+		hud.toggle_stat_panel()
+	))
+
+	var row_d := HBoxContainer.new()
+	row_d.add_theme_constant_override("separation", 4)
+	diagnostics_group.add_child(row_d)
+	row_d.add_child(create_debug_action_button("대포 디버그", func() -> void:
+		hud._invoke_level_debug_method("_debug_cannons")
+	))
+
 
 static func _add_ship_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("함선", false)
 	panel_box.add_child(section["root"])
+	var columns := create_debug_columns(section["body"], 2)
+	var status_group := create_debug_group(columns[0], "상태 모니터")
+	var damage_group := create_debug_group(columns[0], "피해 시뮬레이션")
+	var action_group := create_debug_group(columns[1], "즉시 조작")
+	var crew_group := create_debug_group(columns[1], "승선 / 지원")
+	var stat_group := create_debug_group(columns[1], "함선 스탯")
 
 	var ship_status := Label.new()
 	ship_status.text = "함선 상태: -"
 	NavalUiTheme.style_body(ship_status, 11)
-	section["body"].add_child(ship_status)
+	status_group.add_child(ship_status)
 	hud.debug_ship_status_value = ship_status
 
 	var ship_config := Label.new()
 	ship_config.text = "설정: -"
 	NavalUiTheme.style_muted(ship_config, 10)
-	section["body"].add_child(ship_config)
+	status_group.add_child(ship_config)
 	hud.debug_ship_config_value = ship_config
 
 	var enemy_fleet_status := Label.new()
 	enemy_fleet_status.text = "근처 편대: -"
 	NavalUiTheme.style_muted(enemy_fleet_status, 10)
-	section["body"].add_child(enemy_fleet_status)
+	status_group.add_child(enemy_fleet_status)
 	hud.debug_enemy_fleet_value = enemy_fleet_status
 
 	var ship_ai_status := Label.new()
 	ship_ai_status.text = "플레이어 AI: -"
 	ship_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(ship_ai_status, 10)
-	section["body"].add_child(ship_ai_status)
+	status_group.add_child(ship_ai_status)
 	hud.debug_ship_ai_value = ship_ai_status
 
 	var enemy_ai_status := Label.new()
 	enemy_ai_status.text = "적선 AI: -"
 	enemy_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(enemy_ai_status, 10)
-	section["body"].add_child(enemy_ai_status)
+	status_group.add_child(enemy_ai_status)
 	hud.debug_enemy_ai_value = enemy_ai_status
 
 	var ally_ai_status := Label.new()
 	ally_ai_status.text = "아군 AI: -"
 	ally_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(ally_ai_status, 10)
-	section["body"].add_child(ally_ai_status)
+	status_group.add_child(ally_ai_status)
 	hud.debug_ally_ai_value = ally_ai_status
 
 	var support_fleet_status := Label.new()
 	support_fleet_status.text = "지원함 진형: -"
 	support_fleet_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(support_fleet_status, 10)
-	section["body"].add_child(support_fleet_status)
+	status_group.add_child(support_fleet_status)
 	hud.debug_support_fleet_value = support_fleet_status
 
 	var player_soldier_ai_status := Label.new()
 	player_soldier_ai_status.text = "아군 병사 AI: -"
 	player_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(player_soldier_ai_status, 10)
-	section["body"].add_child(player_soldier_ai_status)
+	status_group.add_child(player_soldier_ai_status)
 	hud.debug_player_soldier_ai_value = player_soldier_ai_status
 
 	var enemy_soldier_ai_status := Label.new()
 	enemy_soldier_ai_status.text = "적 병사 AI: -"
 	enemy_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(enemy_soldier_ai_status, 10)
-	section["body"].add_child(enemy_soldier_ai_status)
+	status_group.add_child(enemy_soldier_ai_status)
 	hud.debug_enemy_soldier_ai_value = enemy_soldier_ai_status
 
 	var hull_row: Dictionary = create_slider_row("Hull")
-	section["body"].add_child(hull_row["root"])
+	damage_group.add_child(hull_row["root"])
 	hud.debug_ship_hull_slider = hull_row["slider"]
 	hud.debug_ship_hull_value = hull_row["value"]
 	hud.debug_ship_hull_slider.value = 1.0
@@ -2650,7 +2800,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	hud.debug_ship_hull_slider.value_changed.connect(hud._on_debug_ship_hull_changed)
 
 	var stamina_row: Dictionary = create_slider_row("Stamina")
-	section["body"].add_child(stamina_row["root"])
+	damage_group.add_child(stamina_row["root"])
 	hud.debug_ship_stamina_slider = stamina_row["slider"]
 	hud.debug_ship_stamina_value = stamina_row["value"]
 	hud.debug_ship_stamina_slider.value = 1.0
@@ -2659,26 +2809,26 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_a := HBoxContainer.new()
 	row_a.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_a)
+	action_group.add_child(row_a)
 	row_a.add_child(create_debug_action_button("선원 보충", hud._refill_player_crew_for_debug))
 	row_a.add_child(create_debug_action_button("지원함 호출", hud._spawn_support_ship_for_debug))
 
 	var row_b := HBoxContainer.new()
 	row_b.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_b)
+	action_group.add_child(row_b)
 	row_b.add_child(create_debug_action_button("정지", hud._stop_player_ship_for_debug))
 	row_b.add_child(create_debug_action_button("화재 토글", hud._toggle_player_ship_fire_for_debug))
 
 	var row_c := HBoxContainer.new()
 	row_c.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_c)
+	action_group.add_child(row_c)
 	row_c.add_child(create_debug_action_button("노젓기 토글", hud._toggle_player_rowing_for_debug))
 	row_c.add_child(create_debug_action_button("돛 정렬", hud._auto_adjust_player_sail_for_debug))
 	row_c.add_child(create_debug_action_button("돛대 접기", hud._toggle_player_masts_folded_for_debug))
 
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_d)
+	crew_group.add_child(row_d)
 	row_d.add_child(create_debug_action_button("정원 +1", func() -> void:
 		hud._adjust_player_crew_capacity_for_debug(1)
 	))
@@ -2688,7 +2838,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_e := HBoxContainer.new()
 	row_e.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_e)
+	crew_group.add_child(row_e)
 	row_e.add_child(create_debug_action_button("장군 +1", func() -> void:
 		hud._adjust_player_captain_count_for_debug(1)
 	))
@@ -2698,7 +2848,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_f := HBoxContainer.new()
 	row_f.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_f)
+	crew_group.add_child(row_f)
 	row_f.add_child(create_debug_action_button("지원한도 +1", func() -> void:
 		hud._adjust_player_support_limit_for_debug(1)
 	))
@@ -2708,7 +2858,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_g := HBoxContainer.new()
 	row_g.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_g)
+	stat_group.add_child(row_g)
 	row_g.add_child(create_debug_action_button("속도 +", func() -> void:
 		hud._adjust_player_ship_float_for_debug("max_speed", 0.5, 2.0, 30.0, "속도")
 	))
@@ -2718,7 +2868,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_h := HBoxContainer.new()
 	row_h.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_h)
+	stat_group.add_child(row_h)
 	row_h.add_child(create_debug_action_button("선회 +", func() -> void:
 		hud._adjust_player_ship_float_for_debug("turn_rate", 5.0, 10.0, 140.0, "선회")
 	))
@@ -2728,7 +2878,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_i := HBoxContainer.new()
 	row_i.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_i)
+	stat_group.add_child(row_i)
 	row_i.add_child(create_debug_action_button("방어 +", func() -> void:
 		hud._adjust_player_ship_float_for_debug("hull_defense", 1.0, 0.0, 20.0, "방어")
 	))
@@ -2738,7 +2888,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_j := HBoxContainer.new()
 	row_j.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_j)
+	stat_group.add_child(row_j)
 	row_j.add_child(create_debug_action_button("보충 +", func() -> void:
 		hud._adjust_player_ship_float_for_debug("crew_respawn_interval", 1.0, 2.0, 30.0, "보충")
 	))
@@ -2748,7 +2898,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 	var row_k := HBoxContainer.new()
 	row_k.add_theme_constant_override("separation", 4)
-	section["body"].add_child(row_k)
+	stat_group.add_child(row_k)
 	row_k.add_child(create_debug_action_button("장악 +", func() -> void:
 		hud._adjust_player_ship_float_for_debug("boarding_capture_duration", 0.5, 1.0, 12.0, "장악")
 	))
@@ -2790,7 +2940,7 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 		preset_button.text = str(preset["name"])
 		preset_button.custom_minimum_size = Vector2(0, 26)
 		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		preset_button.focus_mode = Control.FOCUS_NONE
+		preset_button.focus_mode = Control.FOCUS_ALL
 		NavalUiTheme.apply_hud_button(preset_button, 11)
 		preset_button.pressed.connect(func() -> void:
 			hud._apply_sail_debug_values(float(preset["damage"]), float(preset["burn"]), float(preset.get("hole", 1.0)))
@@ -2804,7 +2954,7 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 	var sync_button := Button.new()
 	sync_button.text = "Sync"
 	sync_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sync_button.focus_mode = Control.FOCUS_NONE
+	sync_button.focus_mode = Control.FOCUS_ALL
 	NavalUiTheme.apply_hud_button(sync_button, 11)
 	sync_button.pressed.connect(hud._sync_sail_debug_panel_from_player)
 	action_row.add_child(sync_button)
@@ -2812,7 +2962,7 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 	var reset_button := Button.new()
 	reset_button.text = "Reset"
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reset_button.focus_mode = Control.FOCUS_NONE
+	reset_button.focus_mode = Control.FOCUS_ALL
 	NavalUiTheme.apply_hud_button(reset_button, 11)
 	reset_button.pressed.connect(func() -> void:
 		hud._apply_sail_debug_values(
@@ -2822,6 +2972,37 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 		)
 	)
 	action_row.add_child(reset_button)
+
+
+static func create_debug_columns(parent: Control, column_count: int) -> Array[VBoxContainer]:
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 14)
+	parent.add_child(row)
+
+	var columns: Array[VBoxContainer] = []
+	for _index in range(maxi(1, column_count)):
+		var column := VBoxContainer.new()
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		column.add_theme_constant_override("separation", 12)
+		row.add_child(column)
+		columns.append(column)
+	return columns
+
+
+static func create_debug_group(parent: Control, title_text: String) -> VBoxContainer:
+	var group := VBoxContainer.new()
+	group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	group.add_theme_constant_override("separation", 6)
+	parent.add_child(group)
+
+	var title := Label.new()
+	title.text = title_text
+	NavalUiTheme.style_accent(title, 11)
+	group.add_child(title)
+	return group
 
 
 static func create_debug_section(title_text: String, _expanded: bool) -> Dictionary:
@@ -2859,7 +3040,7 @@ static func create_debug_action_button(button_text: String, callback: Callable) 
 	button.text = button_text
 	button.custom_minimum_size = Vector2(0, 28)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.focus_mode = Control.FOCUS_NONE
+	button.focus_mode = Control.FOCUS_ALL
 	NavalUiTheme.apply_hud_button(button, 11)
 	button.pressed.connect(callback)
 	return button
@@ -2885,6 +3066,7 @@ static func create_slider_row(title_text: String) -> Dictionary:
 	root.add_child(header)
 
 	var slider := HSlider.new()
+	slider.focus_mode = Control.FOCUS_ALL
 	slider.min_value = 0.0
 	slider.max_value = 1.0
 	slider.step = 0.01

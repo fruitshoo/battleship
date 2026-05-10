@@ -10,6 +10,8 @@ Folders:
 
 - `barrel/`
 - `cannon/`
+- `daecheolpo/`
+- `janggunjeon/`
 - `mast/`
 - `sail/`
 - `shield/`

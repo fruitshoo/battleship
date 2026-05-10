@@ -62,6 +62,7 @@ orientation = 1
 [node name="WakeTrail" type="GPUParticles3D" unique_id=1501401394]
 material_override = SubResource("StandardMaterial3D_wake")
 cast_shadow = 0
+emitting = false
 amount = 20
 lifetime = 2.8
 fixed_fps = 20

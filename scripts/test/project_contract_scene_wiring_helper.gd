@@ -266,7 +266,7 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 
 	player_ship.set("max_hull_hp", 0.33)
 	player_ship.set("fire_effect_scene", load("res://scenes/effects/wood_splinter.tscn"))
-	player_ship.set("loot_scene", load("res://scenes/effects/water_burst.tscn"))
+	player_ship.set("loot_scene", load("res://scenes/effects/water_blast.tscn"))
 	player_ship.set("survivor_scene", load("res://scenes/effects/fire_effect.tscn"))
 	player_ship.set("boarding_hook_throw_delay", 12.0)
 	wrapper.add_child(player_ship)
@@ -373,6 +373,26 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 			var misaligned_no_floor_speed := float(player_ship.call("_calculate_sail_speed"))
 			if misaligned_floor_speed <= misaligned_no_floor_speed + 0.25:
 				failures.append("misaligned open sails should retain a small minimum speed floor")
+			wind_manager.call("set_wind_direction", Vector2(0.0, -1.0))
+			wind_manager.call("set_wind_strength", 0.72)
+			player_ship.set("sail_angle", 0.0)
+			player_ship.rotation.y = 0.0
+			player_ship.set("misaligned_sail_min_thrust_ratio", 0.0)
+			var direct_tailwind_speed := float(player_ship.call("_calculate_sail_speed"))
+			if direct_tailwind_speed < float(player_ship.get("max_speed")) * 0.9:
+				failures.append("direct tailwind should drive player ship close to listed max speed")
+			wind_manager.call("set_wind_direction", Vector2.RIGHT)
+			player_ship.set("sail_angle", 45.0)
+			var beam_reach_speed := float(player_ship.call("_calculate_sail_speed"))
+			if beam_reach_speed < float(player_ship.get("max_speed")) * 0.65:
+				failures.append("beam reach should not collapse to half speed with trimmed sails")
+			wind_manager.call("set_wind_direction", Vector2(0.6427876, -0.7660444).normalized())
+			player_ship.set("sail_angle", 20.0)
+			var quarter_tailwind_speed := float(player_ship.call("_calculate_sail_speed"))
+			if quarter_tailwind_speed < float(player_ship.get("max_speed")) * 0.72:
+				failures.append("quartering tailwind should retain strong sail speed")
+			if quarter_tailwind_speed <= direct_tailwind_speed * 1.03:
+				failures.append("quartering tailwind should be slightly faster than a dead run")
 			wind_manager.call("set_wind_direction", previous_wind_dir)
 			wind_manager.call("set_wind_strength", previous_wind_strength)
 
@@ -626,7 +646,7 @@ static func _run_transparent_vfx_render_priority_contract(failures: Array[String
 	_expect_file_contains("res://scenes/effects/water_blast.tscn", "render_priority = 6", "water blast spray should render above ocean/wake", failures)
 	_expect_file_contains("res://scenes/effects/impact_puff.tscn", "render_priority = 12", "impact puff should render above water effects", failures)
 	_expect_file_contains("res://scenes/effects/fire_effect.tscn", "render_priority = 17", "fire smoke should render above water without overpainting sails", failures)
-	_expect_file_contains("res://scenes/effects/fire_effect.tscn", "render_priority = 18", "fire flames should render above water without overpainting sails", failures)
+	_expect_file_contains("res://resources/vfx/materials/fire_billboard.tres", "render_priority = 18", "fire flames should render above water without overpainting sails", failures)
 	_expect_file_contains("res://scenes/effects/fire_effect.tscn", "render_priority = 19", "fire sparks should render above water without overpainting sails", failures)
 	_expect_file_contains("res://scenes/effects/fire_pot_explosion.tscn", "render_priority = 18", "fire pot explosion should render above water", failures)
 	_expect_file_contains("res://scenes/effects/cannon_muzzle_smoke.tscn", "render_priority = 32", "muzzle smoke should keep its high foreground priority", failures)
@@ -1018,6 +1038,8 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"anchors": 8,
 			"crew": 8,
 			"large_crew": true,
+			"oars_left": 4,
+			"oars_right": 4,
 		},
 		{
 			"path": "res://scenes/ships/hulls/maengseon_hull.tscn",
@@ -1038,6 +1060,8 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"anchors": 8,
 			"crew": 8,
 			"large_crew": true,
+			"oars_left": 4,
+			"oars_right": 4,
 		},
 		{
 			"path": "res://scenes/ships/hulls/geobukseon_hull.tscn",
@@ -1058,6 +1082,8 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"anchors": 8,
 			"crew": 6,
 			"large_crew": false,
+			"oars_left": 1,
+			"oars_right": 1,
 		},
 		{
 			"path": "res://scenes/ships/hulls/sekibune_hull.tscn",
@@ -1068,6 +1094,8 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"anchors": 8,
 			"crew": 6,
 			"large_crew": false,
+			"oars_left": 2,
+			"oars_right": 2,
 		},
 	]
 
@@ -1098,6 +1126,23 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 		if check["large_crew"] == true:
 			required_crew_slots.append_array(["CrewSternLeft", "CrewSternRight"])
 		_expect_authoring_marker_names(hull_root, label, "CrewSlots", required_crew_slots, failures)
+		var expected_left_oars := int(check.get("oars_left", 0))
+		var expected_right_oars := int(check.get("oars_right", 0))
+		if expected_left_oars > 0 or expected_right_oars > 0:
+			var left_oars := 0
+			var right_oars := 0
+			for oar in hull_root.find_children("OarBase*", "Node", true, false):
+				var oar_name := str(oar.name)
+				if not oar.has_node("OarPivot"):
+					failures.append("%s oar base missing OarPivot: %s" % [label, oar_name])
+				if oar_name.begins_with("OarBaseLeft"):
+					left_oars += 1
+				elif oar_name.begins_with("OarBaseRight"):
+					right_oars += 1
+			if left_oars < expected_left_oars:
+				failures.append("%s should expose at least %d left oar bases, got %d" % [label, expected_left_oars, left_oars])
+			if right_oars < expected_right_oars:
+				failures.append("%s should expose at least %d right oar bases, got %d" % [label, expected_right_oars, right_oars])
 		_expect_authoring_visualizer(hull_root, label, failures)
 		_expect_authoring_marker_layout(hull_root, label, failures)
 		_expect_runtime_authoring_visuals_absent(hull_root, label, failures)
@@ -1115,6 +1160,40 @@ static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String])
 	_validate_weapon_profiles(profiles, failures)
 	var ship_archetypes := _load_ship_archetypes(all_stats, failures)
 	_validate_ship_archetypes(ship_archetypes, combat_profiles, profiles, failures)
+	var sekibune_stats_variant: Variant = ship_archetypes.get("sekibune_gunner", {})
+	if typeof(sekibune_stats_variant) != TYPE_DICTIONARY:
+		failures.append("sekibune_gunner archetype missing")
+	else:
+		var sekibune_stats := sekibune_stats_variant as Dictionary
+		if sekibune_stats.get("has_cannons", false) == true:
+			failures.append("sekibune_gunner should not mount ship cannons; use daecheolpo crew instead")
+		if sekibune_stats.has("weapon_loadout"):
+			failures.append("sekibune_gunner should not use a ship weapon_loadout")
+		var crew_variant: Variant = sekibune_stats.get("crew_composition", {})
+		if typeof(crew_variant) != TYPE_DICTIONARY:
+			failures.append("sekibune_gunner crew_composition should be a Dictionary")
+		else:
+			var crew := crew_variant as Dictionary
+			if int(crew.get("daecheolpo", 0)) < 1:
+				failures.append("sekibune_gunner should carry daecheolpo crew")
+	for boss_archetype_name in ["atakebune_mid_boss", "atakebune_final_boss"]:
+		var boss_stats_variant: Variant = ship_archetypes.get(boss_archetype_name, {})
+		if typeof(boss_stats_variant) != TYPE_DICTIONARY:
+			failures.append("%s archetype missing" % boss_archetype_name)
+			continue
+		var boss_stats := boss_stats_variant as Dictionary
+		var boss_loadout_variant: Variant = boss_stats.get("weapon_loadout", [])
+		if typeof(boss_loadout_variant) != TYPE_ARRAY:
+			failures.append("%s weapon_loadout should be an Array" % boss_archetype_name)
+		elif not (boss_loadout_variant as Array).is_empty():
+			failures.append("%s should not mount ship weapons; use daecheolpo crew instead" % boss_archetype_name)
+		var boss_crew_variant: Variant = boss_stats.get("crew_composition", {})
+		if typeof(boss_crew_variant) != TYPE_DICTIONARY:
+			failures.append("%s crew_composition should be a Dictionary" % boss_archetype_name)
+		else:
+			var boss_crew := boss_crew_variant as Dictionary
+			if int(boss_crew.get("daecheolpo", 0)) < 1:
+				failures.append("%s should carry daecheolpo crew" % boss_archetype_name)
 	_validate_geobukseon_support_contract(ship_archetypes, failures)
 	_validate_ship_blueprint_crew_contracts(all_stats, ship_archetypes, combat_profiles, failures)
 	for type_name_variant in all_stats.keys():
@@ -1155,16 +1234,21 @@ static func _validate_geobukseon_support_contract(ship_archetypes: Dictionary, f
 		return
 	var loadout := loadout_variant as Array
 	var cannon_count := 0
+	var front_cannon_count := 0
 	for spec_variant in loadout:
 		if typeof(spec_variant) != TYPE_DICTIONARY:
 			continue
 		var spec := spec_variant as Dictionary
 		if str(spec.get("slot", "")) == "CannonFront":
-			failures.append("geobukseon_support should not have a front cannon")
+			failures.append("geobukseon_support should not have a central dragon-head front cannon")
 		if str(spec.get("profile", "")) == "joseon_light_cannon":
 			cannon_count += 1
-	if cannon_count != 4:
-		failures.append("geobukseon_support should expose exactly 4 side cannons, got %d" % cannon_count)
+			if str(spec.get("slot", "")).begins_with("CannonFront"):
+				front_cannon_count += 1
+	if front_cannon_count != 2:
+		failures.append("geobukseon_support should expose exactly 2 split forward cannons, got %d" % front_cannon_count)
+	if cannon_count != 6:
+		failures.append("geobukseon_support should expose exactly 6 cannons, got %d" % cannon_count)
 
 
 static func _validate_ship_blueprint_crew_contracts(all_stats: Dictionary, ship_archetypes: Dictionary, combat_profiles: Dictionary, failures: Array[String]) -> void:
@@ -3048,13 +3132,16 @@ static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], 
 		failures.append("result scene wiring load failed")
 		return
 	RunResultStore.set_latest_result({
-		"title": "항해 결과",
+		"title": "결과",
 		"outcome": "테스트",
 		"weapon_rows": [
 			{"id": "cannon", "name": "대포", "damage": 100.0},
 			{"id": "mystery_source", "name": "미상", "damage": 10.0},
 		],
 		"total_weapon_damage": 110.0,
+		"defeated_ship_rows": [
+			{"id": "sekibune_cannon", "name": "대철포 세키부네", "defeated": 2, "sunk": 1, "derelicted": 1},
+		],
 	})
 	var result_root := packed.instantiate()
 	if result_root == null:
@@ -3072,19 +3159,18 @@ static func _run_result_scene_wiring_pass(owner: Node, failures: Array[String], 
 			failures.append("result scene button missing ui click sound: %s" % button_path)
 	var weapon_list := result_root.get_node_or_null("Content/Body/WeaponPanel/Margin/WeaponList") as VBoxContainer
 	if is_instance_valid(weapon_list):
-		var first_row: HBoxContainer = null
-		if weapon_list.get_child_count() > 0:
-			first_row = weapon_list.get_child(0) as HBoxContainer
-		if not is_instance_valid(first_row):
-			failures.append("result scene weapon damage row should be a horizontal row")
+		var ship_card: PanelContainer = null
+		for child in weapon_list.get_children():
+			if child is PanelContainer:
+				ship_card = child as PanelContainer
+				break
+		if not is_instance_valid(ship_card):
+			failures.append("result scene ship defeat row should render as a card")
 		else:
-			var icon_frame: PanelContainer = null
-			if first_row.get_child_count() > 0:
-				icon_frame = first_row.get_child(0) as PanelContainer
-			if not is_instance_valid(icon_frame):
-				failures.append("result scene weapon damage row missing icon frame")
-			elif icon_frame.get_child_count() <= 0 or not (icon_frame.get_child(0) is TextureRect):
-				failures.append("result scene weapon damage row should render a texture icon when art exists")
+			var illustration := ship_card.find_child("ShipDefeatIllustration", true, false)
+			var texture := ship_card.find_child("ShipDefeatTexture", true, false)
+			if not is_instance_valid(illustration) and not is_instance_valid(texture):
+				failures.append("result scene ship defeat row missing ship illustration")
 	var button_block := result_root.get_node_or_null("ButtonBlock") as Control
 	var content := result_root.get_node_or_null("Content") as Control
 	if is_instance_valid(button_block) and is_instance_valid(content):
@@ -3133,7 +3219,7 @@ static func _run_main_player_effect_scene_wiring_pass(failures: Array[String]) -
 		failures.append("main scene PlayerShip max_hull_hp suspiciously low: %.2f" % float(max_hull_hp))
 
 	_validate_packed_scene_path(player_ship, "wood_splinter_scene", "res://scenes/effects/wood_splinter.tscn", failures)
-	_validate_packed_scene_path(player_ship, "water_splash_scene", "res://scenes/effects/water_burst.tscn", failures)
+	_validate_packed_scene_path(player_ship, "water_splash_scene", "res://scenes/effects/water_blast.tscn", failures)
 	_validate_packed_scene_path(player_ship, "fire_effect_scene", "res://scenes/effects/fire_effect.tscn", failures)
 	_validate_packed_scene_path(player_ship, "survivor_scene", "res://scenes/effects/survivor.tscn", failures)
 	_run_main_player_ship_text_contract(failures)

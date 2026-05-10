@@ -1,7 +1,7 @@
 extends Node3D
 
 const FIRE_EFFECT_SCENE := preload("res://scenes/effects/fire_effect.tscn")
-const WATER_BURST_SCENE := preload("res://scenes/effects/water_burst.tscn")
+const WATER_BLAST_SCENE := preload("res://scenes/effects/water_blast.tscn")
 const IMPACT_PUFF_SCENE := preload("res://scenes/effects/impact_puff.tscn")
 const FIRE_POT_EXPLOSION_SCENE := preload("res://scenes/effects/fire_pot_explosion.tscn")
 const CANNON_MUZZLE_SMOKE_SCENE := preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
@@ -40,8 +40,8 @@ func _process(delta: float) -> void:
 func _trigger_cycle() -> void:
 	_cycle_elapsed = 0.0
 	_set_fire_enabled(true)
-	_spawn_water_burst("Slots/WaterBurst")
-	_spawn_water_burst("Slots/DeckWaterBurst", 0.75)
+	_spawn_water_blast("Slots/WaterBlast")
+	_spawn_water_blast("Slots/DeckWaterBlast", 0.75)
 	_spawn_impact_puff("Slots/ImpactPuff")
 	_spawn_fire_pot_explosion("Slots/FirePotExplosion")
 	_spawn_muzzle_smoke("Slots/MuzzleSmoke")
@@ -70,8 +70,8 @@ func _set_fire_enabled(enabled: bool) -> void:
 			fire.call("set_fire_active", enabled, enabled)
 
 
-func _spawn_water_burst(marker_path: NodePath, intensity: float = 0.9) -> void:
-	var effect := _spawn_scene_at_marker(WATER_BURST_SCENE, marker_path)
+func _spawn_water_blast(marker_path: NodePath, intensity: float = 0.9) -> void:
+	var effect := _spawn_scene_at_marker(WATER_BLAST_SCENE, marker_path)
 	if not is_instance_valid(effect):
 		return
 	if effect.has_method("configure_as_splash"):

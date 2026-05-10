@@ -148,7 +148,7 @@ func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
 	if not has_cannons:
 		_remove_all_cannons()
 	else:
-		_equip_minion_cannons()
+		_equip_ship_weapons("player", true)
 
 	initial_crew_count = clampi(desired_crew_count, 1, max(1, max_crew))
 	_reconcile_support_crew_count(initial_crew_count)

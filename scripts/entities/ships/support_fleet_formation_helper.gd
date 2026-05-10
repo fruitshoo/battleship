@@ -37,6 +37,7 @@ const WING_SCREEN_TURN_CLEAR_FULL_RUDDER := 34.0
 const WING_SCREEN_TURN_TRAIL_BACK := 0.96
 const WING_SCREEN_TURN_OUTER_WIDEN := 0.30
 const WING_SCREEN_TURN_INNER_WIDEN := 0.55
+const WING_LANE_KEEP_MIN_LATERAL := 3.2
 const LARGE_SHIP_REFERENCE_HALF_WIDTH := 2.4
 const LARGE_SHIP_REFERENCE_HALF_LENGTH := 4.8
 const LARGE_SHIP_LATERAL_PAD_SCALE := 0.62
@@ -471,6 +472,8 @@ static func _get_role_lateral_distance(ship, anchor_ship: Node3D, spacing: float
 	if absf(lateral_scale) <= 0.001:
 		return 0.0
 	var side_sign: float = _get_rescue_lane_side_sign(ship, role_name, my_index) if rescue_lane else _get_role_side_sign(role_name, my_index)
+	if formation_value == FORMATION_WING and not rescue_lane:
+		side_sign = _get_lane_stable_wing_side_sign(ship, anchor_ship, side_sign, role_name)
 	var pair_spacing := _get_pair_lateral_spacing(ship, anchor_ship, role_name)
 	var minimum_spacing := maxf(spacing * 0.68, pair_spacing)
 	if formation_value == FORMATION_WING and absf(side_sign) > 0.001:
@@ -491,6 +494,33 @@ static func _get_rescue_lane_side_sign(ship, role_name: String, my_index: int) -
 	if is_instance_valid(ship):
 		slot_index = int(ship.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, my_index))
 	return 1.0 if slot_index % 2 == 0 else -1.0
+
+
+static func _get_lane_stable_wing_side_sign(ship, anchor_ship: Node3D, role_side: float, role_name: String = "") -> float:
+	if absf(role_side) <= 0.001 or not is_instance_valid(ship) or not is_instance_valid(anchor_ship):
+		return role_side
+	if _role_has_fixed_wing_side(role_name):
+		return role_side
+	var anchor_fwd: Vector3 = get_ship_forward_flat(anchor_ship)
+	var anchor_right: Vector3 = anchor_fwd.cross(Vector3.UP)
+	anchor_right.y = 0.0
+	if anchor_right.length_squared() <= 0.0001:
+		return role_side
+	anchor_right = anchor_right.normalized()
+	var relative_pos: Vector3 = ship.global_position - anchor_ship.global_position
+	relative_pos.y = 0.0
+	var current_lateral: float = relative_pos.dot(anchor_right)
+	if absf(current_lateral) < WING_LANE_KEEP_MIN_LATERAL:
+		return role_side
+	var current_side: float = signf(current_lateral)
+	return current_side if absf(current_side) > 0.001 else role_side
+
+
+static func _role_has_fixed_wing_side(role_name: String) -> bool:
+	var role_spec := _get_role_spec(role_name)
+	if role_spec.is_empty():
+		return false
+	return absf(float(role_spec.get("wing_side", 0.0))) > 0.001
 
 
 static func _get_pair_lateral_spacing(ship, anchor_ship: Node3D, role_name: String) -> float:

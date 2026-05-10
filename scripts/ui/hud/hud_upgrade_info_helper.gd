@@ -142,7 +142,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var supply_stats := _calculate_supply_bonus_stats(level, stats)
 			return "획득 반경 %.1fm" % supply_stats["pickup_radius"]
 		"geobukseon":
-			return "기함 거북선화 | 도선 면역 | 좌우 포문 4문 한계 | 전면포 없음"
+			return "기함 거북선화 | 도선 면역 | 정면 포문 2문 | 측면 포문 4문 | %s" % _format_ramming_stat_text(stats, 1.2, 1.0)
 		"fleet_signal":
 			var signal_fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades_data)
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
@@ -152,7 +152,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "판옥선 포격함 1척 합류 | 편성 %s" % slot_summary
 		"geobukseon_upgrade":
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
-			return "거북선 방호함 1척 합류 | 도선 면역 | 편성 %s" % slot_summary
+			return "거북선 방호함 1척 합류 | 도선 면역 | %s | 편성 %s" % [_format_ramming_stat_text(stats, 1.12, 0.72), slot_summary]
 		"crew_reserve":
 			var assist_duration := maxf(float(stats.get("min_assist_channel_duration", 0.55)), float(stats.get("base_assist_channel_duration", 1.1)) - (float(level) * float(stats.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio := clampf(0.35 + (float(level) * float(stats.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(stats.get("max_assist_recovery_health_ratio", 0.7)))
@@ -198,6 +198,13 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"gold":
 			return "골드 +%d" % int(stats.get("score_add", 50))
 	return ""
+
+static func _format_ramming_stat_text(stats: Dictionary, fallback_damage_mult: float, fallback_knockback_mult: float) -> String:
+	var damage_mult := float(stats.get("ramming_damage_multiplier", fallback_damage_mult))
+	var knockback_mult := float(stats.get("ramming_knockback_multiplier", fallback_knockback_mult))
+	var damage_pct := int(round((damage_mult - 1.0) * 100.0))
+	var knockback_pct := int(round(knockback_mult * 100.0))
+	return "충각 피해 +%d%% | 밀어냄 강도 %d%%" % [damage_pct, knockback_pct]
 
 static func get_upgrade_icon(upgrade_id: String) -> String:
 	var icon_map = {

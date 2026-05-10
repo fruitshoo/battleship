@@ -1001,6 +1001,15 @@ static func _run_launcher_smoke_pass(owner: Node, failures: Array[String], packe
 						if stale_valid:
 							failures.append("launcher stale target validator accepted freed target: %s" % launcher_scene_path)
 
+					if launcher_scene_path.contains("janggun") and launcher.has_method("_is_cannon_target_pair_valid"):
+						var stale_cannon := Node3D.new()
+						smoke_root.add_child(stale_cannon)
+						stale_cannon.queue_free()
+						await _wait_frames(owner, 2)
+						var stale_pair_valid: bool = bool(launcher.call("_is_cannon_target_pair_valid", stale_cannon, target_ship))
+						if stale_pair_valid:
+							failures.append("janggun launcher accepted freed cached cannon")
+
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -1200,6 +1209,11 @@ static func _run_projectile_aim_height_contract(failures: Array[String]) -> void
 		failures.append("singigeon launcher should not clamp target aim height to shooter height")
 	if not singigeon_source.contains("get_projectile_aim_point(target"):
 		failures.append("singigeon launcher should use projectile aim point for raised ship targets")
+	var janggun_source := FileAccess.get_file_as_string("res://scripts/entities/launchers/janggun_launcher.gd")
+	if not janggun_source.contains("JANGGUN_SHIP_AIM_VERTICAL_OFFSET"):
+		failures.append("janggun launcher should use its lower ship impact aim offset")
+	if not janggun_source.contains("get_projectile_aim_point(target_node, JANGGUN_SHIP_AIM_VERTICAL_OFFSET)"):
+		failures.append("janggun launcher should aim below the high HitArea ceiling")
 	var rocket_source := FileAccess.get_file_as_string("res://scripts/projectiles/singigeon_rocket.gd")
 	if rocket_source.contains("homing_target.global_position + Vector3(0.0, 0.4, 0.0)"):
 		failures.append("singigeon rocket homing should keep using projectile aim point")
@@ -1212,6 +1226,26 @@ static func _run_projectile_aim_height_contract(failures: Array[String]) -> void
 	var node_contract_source := FileAccess.get_file_as_string("res://scripts/helpers/node_contract_helper.gd")
 	if not node_contract_source.contains("node_3d.global_position if node_3d.is_inside_tree() else node_3d.position"):
 		failures.append("projectile aim helper should have an off-tree position fallback")
+	var janggun_scene := load("res://scenes/projectiles/janggun_missile.tscn") as PackedScene
+	if janggun_scene == null:
+		failures.append("janggun missile scene should load for visible impact contract")
+	else:
+		var missile := janggun_scene.instantiate()
+		var impact_ship := BaseShip.new()
+		impact_ship.deck_height = 1.4
+		impact_ship.base_collision_radius = 4.0
+		impact_ship.width_multiplier = 0.55
+		impact_ship.length_multiplier = 1.0
+		missile.global_position = Vector3(8.0, 5.0, 8.0)
+		var impact: Vector3 = missile.call("_resolve_visible_ship_impact_position", impact_ship)
+		if impact.y > impact_ship.global_position.y + impact_ship.deck_height + 0.25:
+			failures.append("janggun visible impact should clamp below high invisible HitArea ceiling")
+		var local_impact: Vector3 = impact_ship.to_local(impact)
+		var half := impact_ship.get_collision_half_extents()
+		if absf(local_impact.x) > half.x + 0.01 or absf(local_impact.z) > half.y + 0.01:
+			failures.append("janggun visible impact should clamp into the visible hull footprint")
+		missile.free()
+		impact_ship.free()
 
 	low_ship.free()
 	high_ship.free()
@@ -1514,6 +1548,26 @@ static func _validate_spawned_ship(failures: Array[String], spawned_ship: Node3D
 	if not registered_enemy:
 		failures.append("%s instance was not registered in enemy team bucket" % label)
 	_validate_spawned_ship_collision_fit(failures, spawned_ship, label)
+
+	if label == "sekibune_cannon":
+		var scan_stack: Array[Node] = [spawned_ship]
+		var cannon_count := 0
+		var daecheolpo_count := 0
+		while not scan_stack.is_empty():
+			var node := scan_stack.pop_back() as Node
+			if not is_instance_valid(node):
+				continue
+			for child in node.get_children():
+				if child.has_method("fire") or "cannonball_scene" in child:
+					cannon_count += 1
+					continue
+				if child.get("crew_role") != null and str(child.get("crew_role")) == "daecheolpo":
+					daecheolpo_count += 1
+				scan_stack.append(child)
+		if cannon_count > 0:
+			failures.append("sekibune_cannon should not spawn ship-mounted cannons")
+		if daecheolpo_count < 1:
+			failures.append("sekibune_cannon should spawn daecheolpo crew")
 
 
 static func _validate_spawned_ship_collision_fit(failures: Array[String], spawned_ship: Node3D, label: String) -> void:

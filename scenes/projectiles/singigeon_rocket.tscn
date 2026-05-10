@@ -1,74 +1,25 @@
 [gd_scene format=3 uid="uid://c8mlvs7ekic16"]
 
 [ext_resource type="Script" uid="uid://dhyvrlyy7yrm0" path="res://scripts/projectiles/singigeon_rocket.gd" id="1"]
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_body"]
-top_radius = 0.05
-bottom_radius = 0.08
-height = 0.8
+[ext_resource type="PackedScene" uid="uid://wdr6kfrgumfw" path="res://assets/models/props/singijeon/singijeon.glb" id="2_model"]
+[ext_resource type="PackedScene" uid="uid://cgnuyvb15fep1" path="res://scenes/effects/singigeon_rocket_trail.tscn" id="3_trail"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_col"]
 size = Vector3(0.15, 0.15, 0.8)
-
-[sub_resource type="Gradient" id="Gradient_spark"]
-offsets = PackedFloat32Array(0, 0.2, 0.6, 1)
-colors = PackedColorArray(1, 0.8, 0.3, 1, 1, 0.8, 0.3, 1, 1, 0.8, 0.3, 1, 1, 0.8, 0.3, 0)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_color"]
-gradient = SubResource("Gradient_spark")
-
-[sub_resource type="Curve" id="Curve_spark"]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -2.5, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_scale"]
-curve = SubResource("Curve_spark")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
-direction = Vector3(0, 0, 1)
-initial_velocity_min = 2.0
-initial_velocity_max = 5.0
-gravity = Vector3(0, -0.5, 0)
-damping_min = 1.0
-damping_max = 3.0
-scale_min = 0.05
-scale_max = 0.08
-scale_curve = SubResource("CurveTexture_scale")
-color_ramp = SubResource("GradientTexture1D_color")
-hue_variation_min = -0.05
-hue_variation_max = 0.05
-turbulence_enabled = true
-turbulence_noise_scale = 3.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spark"]
-transparency = 1
-vertex_color_use_as_albedo = true
-billboard_mode = 3
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-
-[sub_resource type="QuadMesh" id="QuadMesh_spark"]
-material = SubResource("StandardMaterial3D_spark")
-size = Vector2(0.08, 0.08)
 
 [node name="SingijeonRocket" type="Area3D" unique_id=1589379526]
 collision_layer = 2
 collision_mask = 4
 script = ExtResource("1")
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=401189843]
-transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0)
-mesh = SubResource("CylinderMesh_body")
+[node name="Visual" type="Node3D" parent="." unique_id=401189843]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0.37438002)
+
+[node name="Model" parent="Visual" unique_id=673682576 instance=ExtResource("2_model")]
+transform = Transform3D(0.22, 0, 0, 0, 0.22, 0, 0, 0, 0.22, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=476615349]
 shape = SubResource("BoxShape_col")
 
-[node name="RocketTrail" type="GPUParticles3D" parent="." unique_id=1529075744]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4)
-amount = 28
-lifetime = 0.28
-explosiveness = 0.05
-fixed_fps = 20
-process_material = SubResource("ParticleProcessMaterial_spark")
-draw_pass_1 = SubResource("QuadMesh_spark")
+[node name="RocketTrail" parent="." unique_id=788387067 instance=ExtResource("3_trail")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.48)

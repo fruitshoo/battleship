@@ -15,35 +15,6 @@
 [ext_resource type="PackedScene" path="res://scenes/props/anchor.tscn" id="14_e110r"]
 [ext_resource type="Script" uid="uid://cua6d8e2qoc53" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_vmufi"]
-render_priority = 20
-shader = ExtResource("5_fp17e")
-shader_parameter/wave_speed = 3.0
-shader_parameter/wave_strength = 0.38
-shader_parameter/use_sail_texture = true
-shader_parameter/sail_texture = ExtResource("7_7nler")
-shader_parameter/burn_mask_texture_c = ExtResource("6_bmed2")
-shader_parameter/use_dark_alpha_cutoff = false
-shader_parameter/dark_alpha_cutoff = 0.12
-shader_parameter/dark_alpha_softness = 0.04
-shader_parameter/sail_uv_scale = Vector2(1, 2)
-shader_parameter/sail_uv_offset = Vector2(0, 0)
-shader_parameter/swap_uv_axes = false
-shader_parameter/flip_u = false
-shader_parameter/flip_v = false
-shader_parameter/sail_damage = 0.0
-shader_parameter/burn_amount = 0.0
-shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.5105315947843531
-shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
-shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
-shader_parameter/burn_edge_emission_strength = 0.28
-shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
-shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
-shader_parameter/bottom_width_scale = 1.0
-shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 391042461452085
-
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_e110r"]
 render_priority = 20
 shader = ExtResource("5_fp17e")
@@ -63,7 +34,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.02708124373119358
+shader_parameter/damage_seed = 0.7873620862587764
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -71,11 +42,40 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 391042629220781
+metadata/mast_owner_id = 124409046220558
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fp17e"]
+render_priority = 20
+shader = ExtResource("5_fp17e")
+shader_parameter/wave_speed = 3.0
+shader_parameter/wave_strength = 0.38
+shader_parameter/use_sail_texture = true
+shader_parameter/sail_texture = ExtResource("7_7nler")
+shader_parameter/burn_mask_texture_c = ExtResource("6_bmed2")
+shader_parameter/use_dark_alpha_cutoff = false
+shader_parameter/dark_alpha_cutoff = 0.12
+shader_parameter/dark_alpha_softness = 0.04
+shader_parameter/sail_uv_scale = Vector2(1, 2)
+shader_parameter/sail_uv_offset = Vector2(0, 0)
+shader_parameter/swap_uv_axes = false
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/sail_damage = 0.0
+shader_parameter/burn_amount = 0.0
+shader_parameter/hole_alpha_strength = 1.0
+shader_parameter/damage_seed = 0.6529588766298897
+shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
+shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
+shader_parameter/burn_edge_emission_strength = 0.28
+shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
+shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
+shader_parameter/bottom_width_scale = 1.0
+shader_parameter/sail_deployed_ratio = 1.0
+metadata/mast_owner_id = 124409213955704
 
 [node name="PanokHull" type="Node3D" unique_id=466901266]
 
-[node name="ScaleRoot" type="Node3D" parent="."]
+[node name="ScaleRoot" type="Node3D" parent="." unique_id=1232936077]
 
 [node name="Hull" parent="ScaleRoot" unique_id=707038974 instance=ExtResource("1_panok_model")]
 transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, 0, 0, 0)
@@ -95,7 +95,7 @@ fold_duration = 2.2
 transform = Transform3D(0.92, 0, 0, 0, 0.92, 0, 0, 0, 0.92, 0, 0, 0)
 
 [node name="SailMesh" parent="ScaleRoot/Masts/MastPivot_01/Mast/SailVisual" parent_id_path=PackedInt32Array(304287122, 1842287473) index="0" unique_id=1903760530]
-material_override = SubResource("ShaderMaterial_vmufi")
+material_override = SubResource("ShaderMaterial_e110r")
 
 [node name="MastPivot_02" type="Node3D" parent="ScaleRoot/Masts" unique_id=548850923]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 1.85)
@@ -108,7 +108,7 @@ stow_target_path = NodePath("../MastStowTarget_02")
 transform = Transform3D(0.92, 0, 0, 0, 0.92, 0, 0, 0, 0.92, 0, 0, 0)
 
 [node name="SailMesh" parent="ScaleRoot/Masts/MastPivot_02/Mast2/SailVisual" parent_id_path=PackedInt32Array(733208232, 1842287473) index="0" unique_id=1903760530]
-material_override = SubResource("ShaderMaterial_e110r")
+material_override = SubResource("ShaderMaterial_fp17e")
 
 [node name="MastStowTarget_02" type="Marker3D" parent="ScaleRoot/Masts" unique_id=251005344]
 transform = Transform3D(1.02, 0, 0, 0, 0.51, -0.8833459, 0, 0.8833459, 0.51, 0.12, 0.85, -0.43)

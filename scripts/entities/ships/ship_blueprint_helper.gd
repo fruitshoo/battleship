@@ -2,7 +2,7 @@ extends RefCounted
 class_name ShipBlueprintHelper
 
 const STATS_PATH := "res://data/ship_stats.json"
-const CREW_ORDER: Array[String] = ["general", "melee", "ranged", "fire_pot"]
+const CREW_ORDER: Array[String] = ["general", "melee", "ranged", "daecheolpo", "fire_pot"]
 
 const COMBAT_PROFILES := "combat_profiles"
 const COMBAT_PROFILE := "combat_profile"
@@ -165,6 +165,16 @@ static func apply_chaser_stats(ship, stats: Dictionary) -> void:
 		ship.move_speed = float(stats["move_speed"])
 	if stats.has("has_cannons"):
 		ship.has_cannons = stats["has_cannons"] == true
+	if stats.has("blocks_boarding") and ship.get("blocks_boarding") != null:
+		ship.blocks_boarding = stats["blocks_boarding"] == true
+	if stats.has("ship_mass_scale") and ship.get("ship_mass_scale") != null:
+		ship.ship_mass_scale = clampf(float(stats["ship_mass_scale"]), 0.35, 4.0)
+		if ship.get("collision_profile") != null:
+			ship.collision_profile.ship_mass_scale = ship.ship_mass_scale
+	if stats.has("ramming_damage_multiplier") and ship.get("ramming_damage_multiplier") != null:
+		ship.ramming_damage_multiplier = maxf(0.1, float(stats["ramming_damage_multiplier"]))
+	if stats.has("ramming_knockback_multiplier") and ship.get("ramming_knockback_multiplier") != null:
+		ship.ramming_knockback_multiplier = clampf(float(stats["ramming_knockback_multiplier"]), 0.0, 3.0)
 	if stats.has("soldier_type"):
 		ship.preferred_soldier_type = str(stats["soldier_type"])
 	if stats.has("separation_pad_scale"):

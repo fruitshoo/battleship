@@ -210,7 +210,7 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 		_clear_target_and_try_muster_or_idle(soldier, 1.0, delta, MOVE_TURN_SPEED)
 		return
 
-	var target_node := soldier.current_target as Node3D
+	var target_node: Node3D = soldier.current_target if is_instance_valid(soldier.current_target) and soldier.current_target is Node3D else null
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
 		_clear_target_and_try_muster_or_idle(soldier, 1.0, delta, MOVE_TURN_SPEED)
 		return
@@ -282,7 +282,7 @@ static func state_attack(soldier, delta: float = 0.016) -> void:
 		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
 		return
 
-	var target_node := soldier.current_target as Node3D
+	var target_node: Node3D = soldier.current_target if is_instance_valid(soldier.current_target) and soldier.current_target is Node3D else null
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
 		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
 		return
@@ -333,7 +333,7 @@ static func _validate_attack_state(soldier, target_node: Node3D, delta: float) -
 	if SoldierStateHelper.is_dead_soldier(soldier.current_target) or soldier.current_target.get_team_tag() == soldier.team:
 		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
 		return false
-	target_node = soldier.current_target as Node3D
+	target_node = soldier.current_target if is_instance_valid(soldier.current_target) and soldier.current_target is Node3D else null
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
 		_clear_target_and_try_muster_or_idle(soldier, 0.95, delta, ATTACK_TURN_SPEED)
 		return false
@@ -498,7 +498,7 @@ static func _retarget_owned_ship_hostile(soldier) -> bool:
 
 
 static func _should_keep_current_owned_ship_hostile_target(soldier, nearest_boarder: Node3D) -> bool:
-	var current := soldier.current_target as Node3D
+	var current: Node3D = soldier.current_target if is_instance_valid(soldier.current_target) and soldier.current_target is Node3D else null
 	if not is_instance_valid(current) or not current.is_inside_tree():
 		return false
 	if SoldierStateHelper.is_dead_soldier(current):
@@ -517,9 +517,10 @@ static func _get_target_owned_ship(target: Node) -> Node3D:
 	if not is_instance_valid(target):
 		return null
 	if target.has_method("get_owned_ship_node"):
-		return target.call("get_owned_ship_node") as Node3D
+		var owned_node: Variant = target.call("get_owned_ship_node")
+		return owned_node if is_instance_valid(owned_node) and owned_node is Node3D else null
 	var owned_value: Variant = target.get("owned_ship")
-	return owned_value as Node3D if is_instance_valid(owned_value) else null
+	return owned_value if is_instance_valid(owned_value) and owned_value is Node3D else null
 
 
 static func _get_planar_distance_sq(from_node: Node3D, to_node: Node3D) -> float:

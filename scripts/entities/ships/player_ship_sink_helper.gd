@@ -1,6 +1,6 @@
 extends RefCounted
 
-const WATER_BURST_SCENE = preload("res://scenes/effects/water_burst.tscn")
+const WATER_BLAST_SCENE = preload("res://scenes/effects/water_blast.tscn")
 
 static func die(ship) -> void:
 	if ship.is_sinking or ship.is_dying:
@@ -26,7 +26,7 @@ static func die(ship) -> void:
 
 	fade_out_meshes(ship, ship, sink_tween, sink_duration)
 
-	var splash = ScenePool.acquire(ship.get_tree(), WATER_BURST_SCENE)
+	var splash = ScenePool.acquire(ship.get_tree(), WATER_BLAST_SCENE)
 	if splash.has_method("configure_as_sink"):
 		splash.configure_as_sink()
 	splash.position = Vector3(ship.global_position.x, 0.2, ship.global_position.z)

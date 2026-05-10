@@ -6,6 +6,35 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
 const LIMBO_AI_BOARDING_INTENT_STALE_FRAMES := 4
+const SAIL_DOWNWIND_START := -0.45
+const SAIL_DOWNWIND_FULL := 0.78
+const SAIL_TAILWIND_BONUS_START := 0.45
+const SAIL_TAILWIND_BONUS_FULL := 1.0
+const SAIL_BROAD_REACH_START := -0.45
+const SAIL_BROAD_REACH_FULL := 0.18
+const SAIL_BROAD_REACH_FADE_START := 0.78
+const SAIL_BROAD_REACH_FADE_FULL := 1.0
+const SAIL_DOWNWIND_WEIGHT := 0.78
+const SAIL_TAILWIND_WEIGHT := 0.22
+const SAIL_BROAD_REACH_WEIGHT := 0.16
+const SAIL_BEAM_REACH_START := -0.24
+const SAIL_BEAM_REACH_FULL := 0.08
+const SAIL_BEAM_REACH_FADE_START := 0.68
+const SAIL_BEAM_REACH_FADE_FULL := 1.0
+const SAIL_BEAM_REACH_WEIGHT := 0.42
+const SAIL_REACH_BOOST_START := 0.24
+const SAIL_REACH_BOOST_FULL := 0.56
+const SAIL_REACH_BOOST_FADE_START := 0.92
+const SAIL_REACH_BOOST_FADE_FULL := 1.0
+const SAIL_REACH_BOOST_WEIGHT := 0.18
+const SAIL_REACH_DRIVE_CAP := 1.08
+const SAIL_TRIM_ERROR_GOOD_DEG := 8.0
+const SAIL_TRIM_ERROR_BAD_DEG := 50.0
+const SAIL_TRIM_QUALITY_FLOOR := 0.12
+const WIND_STRENGTH_DEFAULT_MIN := 0.72
+const WIND_STRENGTH_DEFAULT_MAX := 0.88
+const WIND_SPEED_MULT_MIN := 0.92
+const WIND_SPEED_MULT_MAX := 1.08
 
 static func _is_true(value: Variant) -> bool:
 	return value == true
@@ -56,9 +85,62 @@ static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) ->
 	var ship_forward: Vector2 = Vector2(-sin(ship_angle_rad), -cos(ship_angle_rad))
 	var wind_force: float = max(0.0, wind_dir.dot(sail_normal))
 	var forward_component: float = max(0.0, sail_normal.dot(ship_forward))
-	var thrust: float = wind_force * forward_component
-	var sail_efficiency: float = clamp((thrust * wind_strength) / 0.6, 0.0, 1.0)
-	return lerp(floor_ratio, 1.05, sail_efficiency)
+	var trim_drive: float = wind_force * forward_component
+	var wind_along_ship: float = wind_dir.dot(ship_forward)
+	var sail_trim_quality: float = _calculate_sail_trim_quality(ship, wind_dir, ship_angle_rad)
+	var broad_angle_drive: float = _calculate_broad_sail_drive(wind_along_ship, trim_drive, sail_trim_quality)
+	var wind_speed_mult: float = _calculate_wind_speed_multiplier(ship._cached_wind_manager, wind_strength)
+	var sail_efficiency: float = clampf((broad_angle_drive * wind_speed_mult) / 0.95, 0.0, 1.0)
+	return lerpf(floor_ratio, 1.08, sail_efficiency)
+
+
+static func _calculate_broad_sail_drive(wind_along_ship: float, trim_drive: float, sail_trim_quality: float = 1.0) -> float:
+	var downwind_drive: float = smoothstep(SAIL_DOWNWIND_START, SAIL_DOWNWIND_FULL, wind_along_ship)
+	var tailwind_drive: float = smoothstep(SAIL_TAILWIND_BONUS_START, SAIL_TAILWIND_BONUS_FULL, wind_along_ship)
+	var broad_reach_drive: float = smoothstep(SAIL_BROAD_REACH_START, SAIL_BROAD_REACH_FULL, wind_along_ship)
+	broad_reach_drive *= 1.0 - smoothstep(SAIL_BROAD_REACH_FADE_START, SAIL_BROAD_REACH_FADE_FULL, wind_along_ship)
+	var beam_reach_drive: float = smoothstep(SAIL_BEAM_REACH_START, SAIL_BEAM_REACH_FULL, wind_along_ship)
+	beam_reach_drive *= 1.0 - smoothstep(SAIL_BEAM_REACH_FADE_START, SAIL_BEAM_REACH_FADE_FULL, wind_along_ship)
+	var side_wind_component: float = sqrt(maxf(0.0, 1.0 - wind_along_ship * wind_along_ship))
+	var reach_boost: float = smoothstep(SAIL_REACH_BOOST_START, SAIL_REACH_BOOST_FULL, wind_along_ship)
+	reach_boost *= 1.0 - smoothstep(SAIL_REACH_BOOST_FADE_START, SAIL_REACH_BOOST_FADE_FULL, wind_along_ship)
+	reach_boost *= side_wind_component * SAIL_REACH_BOOST_WEIGHT
+	var angle_drive: float = (
+		downwind_drive * SAIL_DOWNWIND_WEIGHT
+		+ tailwind_drive * SAIL_TAILWIND_WEIGHT
+		+ broad_reach_drive * SAIL_BROAD_REACH_WEIGHT
+		+ beam_reach_drive * SAIL_BEAM_REACH_WEIGHT
+		+ reach_boost
+	)
+	angle_drive *= clampf(sail_trim_quality, 0.0, 1.0)
+	return clampf(maxf(trim_drive, angle_drive), 0.0, SAIL_REACH_DRIVE_CAP)
+
+
+static func _calculate_sail_trim_quality(ship, wind_dir: Vector2, ship_angle_rad: float) -> float:
+	var wind_angle: float = rad_to_deg(atan2(wind_dir.x, -wind_dir.y))
+	var ship_angle_ccw: float = rad_to_deg(ship_angle_rad)
+	var rel_wind_angle: float = wrapf(wind_angle + ship_angle_ccw, -180.0, 180.0)
+	var ideal_sail_angle: float = clamp(rel_wind_angle / 2.0, -90.0, 90.0)
+	var sail_angle_value: float = float(ship.sail_angle) if "sail_angle" in ship else ideal_sail_angle
+	var trim_error: float = absf(wrapf(sail_angle_value - ideal_sail_angle, -180.0, 180.0))
+	var quality_drop: float = smoothstep(SAIL_TRIM_ERROR_GOOD_DEG, SAIL_TRIM_ERROR_BAD_DEG, trim_error)
+	return lerpf(1.0, SAIL_TRIM_QUALITY_FLOOR, quality_drop)
+
+
+static func _calculate_wind_speed_multiplier(wind_manager, wind_strength: float) -> float:
+	var min_strength := WIND_STRENGTH_DEFAULT_MIN
+	var max_strength := WIND_STRENGTH_DEFAULT_MAX
+	if is_instance_valid(wind_manager):
+		var configured_min = wind_manager.get("min_wind_strength")
+		var configured_max = wind_manager.get("max_wind_strength")
+		if configured_min != null:
+			min_strength = float(configured_min)
+		if configured_max != null:
+			max_strength = float(configured_max)
+	if max_strength <= min_strength + 0.001:
+		return lerpf(WIND_SPEED_MULT_MIN, WIND_SPEED_MULT_MAX, clampf(wind_strength, 0.0, 1.0))
+	var strength_ratio := clampf((wind_strength - min_strength) / (max_strength - min_strength), 0.0, 1.0)
+	return lerpf(WIND_SPEED_MULT_MIN, WIND_SPEED_MULT_MAX, strength_ratio)
 
 
 static func _get_sail_drive_ratio(ship) -> float:
@@ -210,6 +292,9 @@ static func process_physics(ship, delta: float) -> void:
 			ship.set_meta("boarding_impact_grace_timer", impact_grace_timer)
 
 	if ship.is_derelict:
+		var derelict_impulse: Vector3 = ship.consume_collision_impulse_velocity(delta)
+		if derelict_impulse.length_squared() > 0.0001:
+			ship.position += derelict_impulse * delta
 		var wind_manager = ship.get_node_or_null("/root/WindManager")
 		if is_instance_valid(wind_manager):
 			var wind_dir_v2: Vector2 = wind_manager.wind_direction
@@ -367,8 +452,9 @@ static func process_physics(ship, delta: float) -> void:
 	var velocity = forward_vec * ship.current_speed * wind_mult
 	velocity += ship.separation_force
 	velocity += ship._calculate_boarding_pull_velocity(delta)
+	velocity += ship.consume_collision_impulse_velocity(delta)
 	var collision_repulsion = ship._calculate_collision_repulsion()
-	if not _is_gunner(ship) and dist_to_target < ship.max_boarding_distance + 1.2:
+	if not _is_gunner(ship) and target_can_be_boarded and dist_to_target < ship.max_boarding_distance + 1.2:
 		var to_target_flat = ship.target.global_position - ship.global_position
 		to_target_flat.y = 0.0
 		if to_target_flat.length_squared() > 0.001:

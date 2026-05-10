@@ -130,7 +130,7 @@ static func run_bootstrap_contract_smoke(owner: Node, failures: Array[String], s
 
 	var effect_paths := [
 		"res://scenes/effects/impact_puff.tscn",
-		"res://scenes/effects/water_burst.tscn",
+		"res://scenes/effects/water_blast.tscn",
 		"res://scenes/effects/fire_effect.tscn",
 	]
 	for effect_path in effect_paths:

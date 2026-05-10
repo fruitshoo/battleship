@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://cua6d8e2qoc53" path="res://scripts/entities/ships/deck_area_authoring.gd" id="deck_area_authoring"]
 [ext_resource type="PackedScene" uid="uid://d1lw700sgders" path="res://assets/models/ships/kobaya/kobaya.glb" id="kobaya_model"]
 [ext_resource type="PackedScene" uid="uid://ba4vxcs7pc2pt" path="res://scenes/props/japanese_mast.tscn" id="mast_scene"]
+[ext_resource type="PackedScene" uid="uid://betqhloq4wsph" path="res://scenes/props/sculling_oar.tscn" id="oar_scene"]
 [ext_resource type="PackedScene" uid="uid://bf8x1gkp3wln5" path="res://scenes/props/rudder.tscn" id="rudder_scene"]
 
 [node name="KobayabuneHull" type="Node3D" unique_id=640043573]
@@ -16,6 +17,15 @@ transform = Transform3D(-0.63, 0, 5.50747e-08, 0, 0.63, 0, -5.50747e-08, 0, -0.6
 
 [node name="RudderVisual" parent="ScaleRoot" unique_id=1622814849 instance=ExtResource("rudder_scene")]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0.31073257, 2.75)
+
+[node name="Oars" type="Node3D" parent="ScaleRoot" unique_id=922436276]
+transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 1.9260607)
+
+[node name="OarBaseLeftMid" parent="ScaleRoot/Oars" unique_id=1548597967 instance=ExtResource("oar_scene")]
+transform = Transform3D(0.37668914, 0.01874425, -0.15562125, -0.02318872, 0.4072791, -0.0070735677, 0.15502055, 0.015375475, 0.37708884, -0.75, 0.5, 0.1)
+
+[node name="OarBaseRightMid" parent="ScaleRoot/Oars" unique_id=1139328471 instance=ExtResource("oar_scene")]
+transform = Transform3D(0.37668914, -0.01874425, 0.15562125, 0.02318872, 0.4072791, -0.0070735677, -0.15502055, 0.015375475, 0.37708884, 0.75, 0.5, 0.1)
 
 [node name="Authoring" type="Node3D" parent="ScaleRoot" unique_id=1820414183]
 script = ExtResource("authoring_visualizer")

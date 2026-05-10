@@ -8,6 +8,9 @@ const SUPPORT_FORMATION_SPACING := 10.0
 const SUPPORT_COLUMN_FORMATION_SPACING := 14.0
 const SUPPORT_JOIN_SPACING := 14.0
 const SUPPORT_COLUMN_JOIN_SPACING := 18.0
+const SUPPORT_JOIN_CATCHUP_SPEED_BONUS := 5.0
+const SUPPORT_JOIN_CATCHUP_SPEED_MULT := 2.2
+const SUPPORT_JOIN_ROWING_WIND_FLOOR := 0.9
 const SUPPORT_FLEET_SLOT_INDEX_META := "support_fleet_slot_index"
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
 const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
@@ -17,9 +20,13 @@ const SUPPORT_ANCHOR_FWD_META := "support_anchor_forward"
 const SUPPORT_IDLE_ORBIT_TIME_META := "support_idle_orbit_time"
 const SUPPORT_JOIN_STAGE_META := "support_join_stage"
 const SUPPORT_JOIN_STAGE_REAR_LANE := 0
-const SUPPORT_JOIN_STAGE_FINAL_SLOT := 1
+const SUPPORT_JOIN_STAGE_SIDE_LANE := 1
+const SUPPORT_JOIN_STAGE_FINAL_SLOT := 2
 const SUPPORT_JOIN_REAR_LANE_SETTLE_DISTANCE := 11.5
+const SUPPORT_JOIN_SIDE_LANE_SETTLE_DISTANCE := 10.0
 const SUPPORT_JOIN_FINAL_SETTLE_DISTANCE := 8.5
+const SUPPORT_JOIN_FINAL_SETTLE_DISTANCE_HEAVY := 5.5
+const SUPPORT_JOIN_SIDE_LANE_MIN_LATERAL := 4.0
 const SUPPORT_SLOT_SPEED_GAIN := 0.31
 const SUPPORT_SLOT_BRAKE_GAIN := 0.55
 const SUPPORT_MAX_CATCHUP_SPEED := 3.25
@@ -250,7 +257,13 @@ static func process_minion_ai(ship, delta: float) -> void:
 		var dist_to_join_target: float = ship.global_position.distance_to(target_pos)
 		dist_to_player = ship.global_position.distance_to(movement_target.global_position)
 		var join_stage := int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT))
-		var join_settle_distance := SUPPORT_JOIN_REAR_LANE_SETTLE_DISTANCE if join_stage == SUPPORT_JOIN_STAGE_REAR_LANE else SUPPORT_JOIN_FINAL_SETTLE_DISTANCE
+		var join_settle_distance := SUPPORT_JOIN_FINAL_SETTLE_DISTANCE
+		if join_stage == SUPPORT_JOIN_STAGE_REAR_LANE:
+			join_settle_distance = SUPPORT_JOIN_REAR_LANE_SETTLE_DISTANCE
+		elif join_stage == SUPPORT_JOIN_STAGE_SIDE_LANE:
+			join_settle_distance = SUPPORT_JOIN_SIDE_LANE_SETTLE_DISTANCE
+		elif is_heavy_support:
+			join_settle_distance = SUPPORT_JOIN_FINAL_SETTLE_DISTANCE_HEAVY
 		if join_stage == SUPPORT_JOIN_STAGE_FINAL_SLOT and dist_to_join_target <= join_settle_distance:
 			ship.set_meta("support_joining", false)
 			if ship.has_meta(SUPPORT_JOIN_STAGE_META):
@@ -269,7 +282,8 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var target_final_speed = player_speed
 	var ally_regrouping: bool = is_captured_minion and ally_limbo_mode == ShipAILimboKeys.ALLY_MODE_REGROUP
 	if is_joining_support:
-		target_final_speed = maxf(player_speed + 3.0, ship.move_speed * 1.9)
+		var join_stage := int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT))
+		target_final_speed = _calculate_support_join_speed(ship, float(player_speed), dist_to_target, join_stage, is_heavy_support)
 	elif is_support_ship:
 		var speed_step: Dictionary = _compute_support_follow_speed(
 			ship,
@@ -376,7 +390,8 @@ static func process_minion_ai(ship, delta: float) -> void:
 		if dist_to_target <= 1.5:
 			ship.rotation.y = lerp_angle(ship.rotation.y, player_head_rot, delta * 3.0)
 
-	var wind_mult = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, 0.6)
+	var wind_floor := SUPPORT_JOIN_ROWING_WIND_FLOOR if is_support_ship and is_joining_support else 0.6
+	var wind_mult = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor)
 	final_move_speed *= wind_mult
 	var forward_vec = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
 	var velocity = forward_vec * final_move_speed
@@ -546,6 +561,21 @@ static func _build_support_join_step(ship, minions: Array, my_index: int, suppor
 	var join_goal: Dictionary = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_join_spacing)
 	if support_formation_value == SupportFleetFormationHelper.FORMATION_WING:
 		var join_stage := int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_REAR_LANE))
+		var final_goal := SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_spacing)
+		var final_pos: Vector3 = final_goal.get("position", ship.global_position)
+		var final_fwd: Vector3 = final_goal.get("forward", fallback_lead_fwd)
+		if final_fwd.length_squared() <= 0.0001:
+			final_fwd = fallback_lead_fwd
+		final_fwd.y = 0.0
+		if final_fwd.length_squared() > 0.0001:
+			final_fwd = final_fwd.normalized()
+		var final_right := final_fwd.cross(Vector3.UP)
+		final_right.y = 0.0
+		if final_right.length_squared() <= 0.0001:
+			final_right = Vector3.RIGHT
+		else:
+			final_right = final_right.normalized()
+
 		if join_stage <= SUPPORT_JOIN_STAGE_REAR_LANE:
 			var rear_lane_goal := SupportFleetFormationHelper.get_support_join_chain_goal(ship, minions, my_index, support_join_spacing)
 			var rear_lane_pos: Vector3 = rear_lane_goal.get("position", ship.global_position)
@@ -555,14 +585,56 @@ static func _build_support_join_step(ship, minions: Array, my_index: int, suppor
 					"target_pos": rear_lane_pos,
 					"lead_fwd": rear_lane_goal.get("forward", fallback_lead_fwd),
 				}
+			var final_lateral: float = (final_pos - rear_lane_pos).dot(final_right)
+			ship.set_meta(
+				SUPPORT_JOIN_STAGE_META,
+				SUPPORT_JOIN_STAGE_SIDE_LANE if absf(final_lateral) >= SUPPORT_JOIN_SIDE_LANE_MIN_LATERAL else SUPPORT_JOIN_STAGE_FINAL_SLOT
+			)
+			join_stage = int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT))
+		if join_stage == SUPPORT_JOIN_STAGE_SIDE_LANE:
+			var rear_lane_goal := SupportFleetFormationHelper.get_support_join_chain_goal(ship, minions, my_index, support_join_spacing)
+			var rear_lane_pos: Vector3 = rear_lane_goal.get("position", ship.global_position)
+			var side_lane_pos := rear_lane_pos + final_right * (final_pos - rear_lane_pos).dot(final_right)
+			side_lane_pos.y = ship.global_position.y
+			if ship.global_position.distance_to(side_lane_pos) > SUPPORT_JOIN_SIDE_LANE_SETTLE_DISTANCE:
+				ship.set_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_SIDE_LANE)
+				return {
+					"target_pos": side_lane_pos,
+					"lead_fwd": rear_lane_goal.get("forward", final_fwd),
+				}
 			ship.set_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT)
-		join_goal = SupportFleetFormationHelper.get_support_chain_goal(ship, minions, my_index, support_spacing)
+		join_goal = final_goal
 	else:
 		ship.set_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT)
 	return {
 		"target_pos": join_goal.get("position", ship.global_position),
 		"lead_fwd": join_goal.get("forward", fallback_lead_fwd),
 	}
+
+
+static func _calculate_support_join_speed(ship, player_speed: float, dist_to_target: float, join_stage: int, is_heavy_support: bool) -> float:
+	var move_speed: float = float(ship.move_speed) if "move_speed" in ship else 4.0
+	var catchup_speed: float = maxf(
+		player_speed + SUPPORT_JOIN_CATCHUP_SPEED_BONUS,
+		move_speed * SUPPORT_JOIN_CATCHUP_SPEED_MULT
+	)
+	if is_heavy_support:
+		catchup_speed = minf(catchup_speed, maxf(player_speed + 3.4, move_speed * 1.75))
+	if join_stage == SUPPORT_JOIN_STAGE_REAR_LANE:
+		return catchup_speed
+
+	var near_speed: float = maxf(player_speed * 0.92, move_speed * (0.58 if is_heavy_support else 0.68))
+	var slow_radius: float = 28.0 if is_heavy_support else 22.0
+	var settle_radius: float = SUPPORT_JOIN_FINAL_SETTLE_DISTANCE_HEAVY if is_heavy_support else SUPPORT_JOIN_FINAL_SETTLE_DISTANCE
+	if join_stage == SUPPORT_JOIN_STAGE_SIDE_LANE:
+		slow_radius = 24.0 if is_heavy_support else 19.0
+		settle_radius = SUPPORT_JOIN_SIDE_LANE_SETTLE_DISTANCE
+	var catchup_blend: float = clampf(
+		(dist_to_target - settle_radius) / maxf(slow_radius - settle_radius, 0.001),
+		0.0,
+		1.0
+	)
+	return lerpf(near_speed, catchup_speed, catchup_blend)
 
 
 static func _compute_support_follow_speed(

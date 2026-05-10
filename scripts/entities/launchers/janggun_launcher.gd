@@ -1,6 +1,7 @@
 extends Node3D
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const DEBUG_COMBAT_LOGS := false
+const JANGGUN_SHIP_AIM_VERTICAL_OFFSET := 0.05
 
 ## 장군전 발사 컨트롤러
 ## 배 중앙에서 전방위로 쏘지 않고, 활성 대포 포문 중 하나를 빌려 느리게 추가 발사한다.
@@ -120,7 +121,7 @@ func _find_best_cannon_for_target(target: Node3D) -> Node3D:
 
 
 func _is_cannon_target_pair_valid(cannon: Variant, target: Variant) -> bool:
-	if not (cannon is Node3D):
+	if not is_instance_valid(cannon) or not (cannon is Node3D):
 		return false
 	if not _is_active_cannon(cannon):
 		return false
@@ -161,7 +162,7 @@ func _collect_active_cannons(node: Node, out: Array[Node3D]) -> void:
 
 
 func _is_active_cannon(node: Variant) -> bool:
-	if not (node is Node3D):
+	if not is_instance_valid(node) or not (node is Node3D):
 		return false
 	var cannon := node as Node3D
 	if cannon == self:
@@ -216,7 +217,7 @@ func fire(target: Variant) -> void:
 	cooldown_timer = _get_janggun_cooldown(janggun_lv)
 	var spawn_pos: Vector3 = _get_cannon_muzzle_position(firing_cannon)
 
-	var target_aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.65)
+	var target_aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, JANGGUN_SHIP_AIM_VERTICAL_OFFSET)
 	var dist := spawn_pos.distance_to(target_aim_pos)
 	var projectile_speed := 16.5 * (1.0 + janggun_lv * 0.15)
 	var travel_time := dist / projectile_speed

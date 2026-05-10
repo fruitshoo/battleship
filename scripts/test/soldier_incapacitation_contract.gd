@@ -147,6 +147,7 @@ func _ready() -> void:
 	_verify_player_soldier_level_progression(failures)
 	_verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures)
 	_verify_cross_ship_attack_state_exits_unreachable_melee(failures)
+	_verify_stale_current_target_does_not_cast_freed_enemy(failures)
 	_verify_soldier_visual_slot_contract(failures)
 	_verify_dead_boarding_jump_finish_keeps_death_pose(failures)
 	_verify_enemy_combat_damage_still_dies(failures)
@@ -534,6 +535,27 @@ func _verify_cross_ship_attack_state_exits_unreachable_melee(failures: Array[Str
 	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
 	if soldier.current_weapon != soldier.weapon_bow:
 		failures.append("cross-ship attacker did not switch to bow after leaving unreachable melee")
+
+
+func _verify_stale_current_target_does_not_cast_freed_enemy(failures: Array[String]) -> void:
+	var soldier := SoldierScript.new()
+	if soldier == null:
+		failures.append("stale current target contract could not instantiate soldier script")
+		return
+	add_child(soldier)
+	soldier.team = "player"
+	soldier.detection_range = 30.0
+	var target := SoldierScript.new()
+	target.team = "enemy"
+	add_child(target)
+	soldier.current_target = target
+	target.free()
+	var sticky = soldier.call("_get_sticky_current_enemy")
+	if is_instance_valid(sticky):
+		failures.append("stale current target should not remain sticky after target was freed")
+	if is_instance_valid(soldier.current_target):
+		failures.append("stale current target should be cleared after freed-target validation")
+	soldier.queue_free()
 
 
 func _verify_soldier_visual_slot_contract(failures: Array[String]) -> void:

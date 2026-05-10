@@ -171,11 +171,15 @@ var fire_threshold: float = 100.0
 @export_range(0.0, 1.0, 0.01) var fire_pot_ignition_chance: float = 0.25
 @export_range(0.1, 20.0, 0.1) var fire_pot_burn_duration: float = 5.0
 @export_range(0.0, 20.0, 0.1) var burn_hull_damage_per_second: float = 2.0
+@export_range(0.0, 10.0, 0.1) var burning_crew_damage_per_second: float = 1.0
+@export_range(0.25, 3.0, 0.05) var burning_crew_damage_tick_interval: float = 1.0
 
 # === 충돌 및 충각(Ramming) 관련 상태 ===
 var _recent_ram_targets: Dictionary = {}
 var min_ramming_speed: float = 6.0 # 충돌 데미지가 발생하기 위한 최소 상대 속도 상향 (4.0 -> 6.0)
 @export_range(0.25, 3.0, 0.05) var ramming_damage_multiplier: float = 1.0 ## 이 배가 상대에게 주는 충돌 피해 배율.
+@export_range(0.0, 3.0, 0.05) var ramming_knockback_multiplier: float = 0.0 ## 이 배가 충각으로 상대에게 주는 밀림 배율.
+var collision_impulse_velocity: Vector3 = Vector3.ZERO
 var broad_phase_padding: float = 2.0 # 충돌 broad-phase 여유 거리
 var burn_timer: float = 0.0
 
@@ -184,7 +188,7 @@ var _hull_half_extents: Vector2 = Vector2(1.5, 4.0) # X:반폭, Y:반길이
 
 
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-@export var water_splash_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
+@export var water_splash_scene: PackedScene = preload("res://scenes/effects/water_blast.tscn")
 @export var impact_puff_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var fire_effect_scene: PackedScene = preload("res://scenes/effects/fire_effect.tscn")
 @export var loot_scene: PackedScene = preload("res://scenes/effects/floating_loot.tscn")
@@ -523,6 +527,10 @@ func load_ship_stats(type_name: String) -> Dictionary:
 		if collision_profile != null:
 			collision_profile.ship_mass_scale = ship_mass_scale
 	if stats.has("blocks_boarding"): blocks_boarding = stats["blocks_boarding"] == true
+	if stats.has("ramming_damage_multiplier"):
+		ramming_damage_multiplier = maxf(0.1, float(stats["ramming_damage_multiplier"]))
+	if stats.has("ramming_knockback_multiplier"):
+		ramming_knockback_multiplier = clampf(float(stats["ramming_knockback_multiplier"]), 0.0, 3.0)
 	
 	return stats
 
@@ -789,6 +797,20 @@ func get_collision_length_multiplier_value() -> float:
 
 func get_current_speed_value() -> float:
 	return current_speed
+
+func apply_collision_impulse(impulse_velocity: Vector3) -> void:
+	impulse_velocity.y = 0.0
+	if impulse_velocity.length_squared() <= 0.0001:
+		return
+	collision_impulse_velocity += impulse_velocity
+	var max_impulse_speed := 8.0
+	if collision_impulse_velocity.length() > max_impulse_speed:
+		collision_impulse_velocity = collision_impulse_velocity.normalized() * max_impulse_speed
+
+func consume_collision_impulse_velocity(delta: float) -> Vector3:
+	var impulse := collision_impulse_velocity
+	collision_impulse_velocity = collision_impulse_velocity.move_toward(Vector3.ZERO, 14.0 * delta)
+	return impulse
 
 func get_move_direction_value() -> Vector3:
 	var move_dir: Vector3 = -global_transform.basis.z
@@ -1328,12 +1350,10 @@ func _calculate_boarding_pull() -> Vector3:
 	var spring_k = 3.6 * enemy_boarding_pull_mult * pull_size_scale
 	var stretch = dist - rest_length
 	
-	# 거리가 rest_length보다 작으면(겹치려 하면) 밀어내는 반발력(Repulsion) 발생
-	var propulsion_force = Vector3.ZERO
+	# 밧줄은 당기는 힘만 준다. 가까워졌을 때 반대로 밀면 충돌 가드와 서로 싸우며
+	# 도선 중인 배가 앞뒤로 진동하므로, 느슨한 구간에서는 장력을 0으로 둔다.
 	if stretch < 0:
-		var repulsion_k = 5.8 * pull_size_scale
-		propulsion_force = - dir * (abs(stretch) * repulsion_k)
-		stretch = 0 # 인동력은 발생시키지 않음
+		stretch = 0
 	
 	# 거리가 도선 한계치(9.0)에 가까워지면 힘을 점진적으로 증가
 	var tension_multiplier = 1.0
@@ -1370,7 +1390,7 @@ func _calculate_boarding_pull() -> Vector3:
 		final_damping_force = dir * (rel_vel_on_rope * damping_c)
 	
 	# 3. 최종 힘 계산 및 제한 (가속도 상한)
-	var final_pull = (spring_force + propulsion_force + final_damping_force) * pull_role_accel_mult
+	var final_pull = (spring_force + final_damping_force) * pull_role_accel_mult
 	var max_pull_accel = 15.5 * enemy_boarding_pull_mult * pull_size_scale * pull_role_accel_mult
 	if final_pull.length() > max_pull_accel:
 		final_pull = final_pull.normalized() * max_pull_accel

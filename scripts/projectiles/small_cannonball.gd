@@ -1,0 +1,146 @@
+extends Area3D
+
+const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
+const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
+const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
+const MIN_FLIGHT_DURATION: float = 0.08
+const TERMINAL_HIT_RADIUS: float = 1.6
+
+@export var damage: float = 24.0
+@export var speed: float = 58.0
+
+var start_pos: Vector3 = Vector3.ZERO
+var target_pos: Vector3 = Vector3.ZERO
+var target_node: Node3D = null
+var team: String = "enemy"
+var damage_source: String = "small_cannonball"
+
+var progress: float = 0.0
+var duration: float = 1.0
+var _is_releasing: bool = false
+
+
+func _ready() -> void:
+	pool_reset()
+
+
+func _enter_tree() -> void:
+	if process_mode == Node.PROCESS_MODE_DISABLED:
+		return
+	EntityRegistry.register_projectile(self)
+
+
+func _exit_tree() -> void:
+	EntityRegistry.unregister_projectile(self)
+
+
+func pool_capacity() -> int:
+	return 32
+
+
+func restart_flight() -> void:
+	progress = 0.0
+	_is_releasing = false
+	visible = true
+	process_mode = Node.PROCESS_MODE_INHERIT
+	monitoring = false
+	monitorable = false
+	var distance := start_pos.distance_to(target_pos)
+	duration = maxf(distance / maxf(speed, 1.0), MIN_FLIGHT_DURATION)
+	global_position = start_pos
+
+
+func pool_reset() -> void:
+	progress = 0.0
+	duration = 1.0
+	start_pos = Vector3.ZERO
+	target_pos = Vector3.ZERO
+	target_node = null
+	team = "enemy"
+	damage_source = "small_cannonball"
+	_is_releasing = false
+	visible = false
+	process_mode = Node.PROCESS_MODE_DISABLED
+	monitoring = false
+	monitorable = false
+
+
+func _physics_process(delta: float) -> void:
+	if _is_releasing:
+		return
+	progress += delta / duration
+	var next_pos := start_pos.lerp(_get_visual_target_pos(), clampf(progress, 0.0, 1.0))
+	if next_pos.distance_squared_to(global_position) > 0.0001:
+		look_at(next_pos, Vector3.UP)
+	global_position = next_pos
+	if progress >= 1.0:
+		_resolve_terminal_hit(global_position)
+		_release_self()
+
+
+func _get_visual_target_pos() -> Vector3:
+	if not is_instance_valid(target_node) or target_node.is_queued_for_deletion():
+		return target_pos
+	var live_target_pos := _get_target_aim_point(target_node)
+	return target_pos.lerp(live_target_pos, clampf(progress, 0.0, 1.0))
+
+
+func _resolve_terminal_hit(hit_position: Vector3) -> void:
+	if not is_instance_valid(target_node) or target_node.is_queued_for_deletion():
+		return
+	if target_node.is_in_group("soldiers"):
+		if NodeContractHelper.get_team_tag(target_node) == team:
+			return
+		if SoldierStateHelper.is_dead_soldier(target_node):
+			return
+		if hit_position.distance_to(_get_target_aim_point(target_node)) > TERMINAL_HIT_RADIUS:
+			return
+		if target_node.has_method("take_damage"):
+			target_node.take_damage(damage, hit_position, damage_source)
+			_spawn_hit_spark(target_node.global_position + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0))
+		return
+
+	var ship := HitTargetResolver.resolve_ship_from_node(target_node)
+	if not is_instance_valid(ship):
+		return
+	if HitTargetResolver.resolve_team_tag(ship) == team:
+		return
+	if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
+		return
+	if ship.has_method("take_damage"):
+		ship.take_damage(damage, hit_position, damage_source)
+
+
+func _get_target_aim_point(node: Node) -> Vector3:
+	var offset := SOLDIER_AIM_VERTICAL_OFFSET if node.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
+	return NodeContractHelper.get_projectile_aim_point(node, offset)
+
+
+func _spawn_hit_spark(effect_position: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
+	if not is_instance_valid(effect):
+		return
+	get_tree().root.add_child(effect)
+	effect.global_position = effect_position
+	if effect.has_method("pool_activate"):
+		effect.pool_activate()
+
+
+func _release_self() -> void:
+	if _is_releasing:
+		return
+	_is_releasing = true
+	if is_inside_tree():
+		set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+		call_deferred("_finalize_release")
+	else:
+		process_mode = Node.PROCESS_MODE_DISABLED
+		ScenePool.release(self)
+
+
+func _finalize_release() -> void:
+	if not is_instance_valid(self):
+		return
+	ScenePool.release(self)

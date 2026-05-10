@@ -1,65 +1,10 @@
 [gd_scene format=3 uid="uid://bilro8ijftry1"]
 
 [ext_resource type="Script" uid="uid://7dh0uy8e1nb" path="res://scripts/effects/fire_effect.gd" id="1_script"]
-[ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="2_fire"]
+[ext_resource type="Material" path="res://resources/vfx/materials/fire_billboard.tres" id="2_fire_material"]
 [ext_resource type="Texture2D" uid="uid://j3er0rga8slr" path="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG" id="3_glow"]
 [ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="4_smoke"]
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fire"]
-render_priority = 18
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-vertex_color_is_srgb = true
-albedo_texture = ExtResource("2_fire")
-albedo_texture_force_srgb = true
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-
-[sub_resource type="Curve" id="Curve_fire_alpha"]
-_data = [Vector2(0, 0.80154634), 0.0, 0.0, 0, 0, Vector2(1, 0.03178692), -2.4691818, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_fire_alpha"]
-curve = SubResource("Curve_fire_alpha")
-
-[sub_resource type="Gradient" id="Gradient_fire"]
-offsets = PackedFloat32Array(0.13802083, 0.41480654, 0.81956846)
-colors = PackedColorArray(1, 1, 1, 1, 0.38841417, 0.31827274, 0.22096011, 1, 0.06634452, 0.06634452, 0.06634452, 1)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_fire"]
-gradient = SubResource("Gradient_fire")
-
-[sub_resource type="Curve" id="Curve_fire_scale"]
-_data = [Vector2(0.002371274, 0.51859206), 0.0, 1.4660757, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_fire_scale"]
-curve = SubResource("Curve_fire_scale")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_fire"]
-lifetime_randomness = 0.08
-particle_flag_rotate_y = true
-emission_shape = 1
-emission_sphere_radius = 0.5
-angle_min = -179.99998
-angle_max = 180.00002
-direction = Vector3(0, 1, 0)
-spread = 5.0
-initial_velocity_min = 1.0
-initial_velocity_max = 2.0
-radial_velocity_min = -2.2351742e-05
-radial_velocity_max = 0.49997765
-gravity = Vector3(0, 1, 0)
-scale_min = 2.0
-scale_max = 4.0
-scale_curve = SubResource("CurveTexture_fire_scale")
-color = Color(1.7893038, 1.2962637, 0.76034313, 0.57100004)
-color_ramp = SubResource("GradientTexture1D_fire")
-alpha_curve = SubResource("CurveTexture_fire_alpha")
+[ext_resource type="Material" path="res://resources/vfx/process/fire_effect_flame_process.tres" id="5_fire_process"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_fire"]
 
@@ -164,10 +109,10 @@ size = Vector2(2.75, 2.75)
 script = ExtResource("1_script")
 
 [node name="fire" type="GPUParticles3D" parent="." unique_id=1314138651]
-material_override = SubResource("StandardMaterial3D_fire")
+material_override = ExtResource("2_fire_material")
 amount = 20
 lifetime = 1.2
-process_material = SubResource("ParticleProcessMaterial_fire")
+process_material = ExtResource("5_fire_process")
 draw_pass_1 = SubResource("QuadMesh_fire")
 
 [node name="sparks" type="GPUParticles3D" parent="." unique_id=1224939236]

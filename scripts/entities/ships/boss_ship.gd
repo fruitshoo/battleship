@@ -222,6 +222,9 @@ func _configure_boss_soldier(soldier, soldier_type_name: String) -> void:
 			soldier.is_melee_only = true
 		"ranged":
 			soldier.is_ranged_only = true
+		"daecheolpo":
+			soldier.crew_role = "daecheolpo"
+			soldier.is_ranged_only = true
 		"fire_pot":
 			soldier.crew_role = "fire_pot"
 	if soldier.is_node_ready():
@@ -627,7 +630,7 @@ func die() -> void:
 	play_sink_bubbles(0.45, -1.5)
 	if is_instance_valid(cached_lm):
 		if cached_lm.has_method("add_ship_sunk"):
-			cached_lm.add_ship_sunk(1)
+			cached_lm.add_ship_sunk(1, self)
 		# 규칙 통일: 함선 격침 골드는 즉시 지급하고, XP는 침몰 부유물 회수로 지급한다.
 		if cached_lm.has_method("add_score"):
 			cached_lm.add_score(120)

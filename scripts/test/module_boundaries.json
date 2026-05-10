@@ -1046,7 +1046,7 @@
         "_weather_derelict_sails",
         "_play_derelict_transition_visuals",
         "_spawn_derelict_smoke",
-        "_spawn_derelict_water_burst",
+        "_spawn_derelict_water_blast",
         "_set_derelict_settle_pose",
         "sink_derelict",
         "check_offscreen_despawn",

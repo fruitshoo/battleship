@@ -4,6 +4,7 @@ class_name BaseShipStatusHelper
 const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
 const FIRE_EFFECT_RANDOM_OFFSET_META := "fire_effect_random_offset"
 const FIRE_EFFECT_RANDOM_SCALE_META := "fire_effect_random_scale"
+const BURNING_CREW_DAMAGE_TIMER_META := "burning_crew_damage_timer"
 
 static func update_fire_effect(ship) -> void:
 	if ship.is_burning and not ship.is_dying:
@@ -267,11 +268,15 @@ static func update_burning_status(ship, delta: float) -> void:
 		if ship.hull_hp <= 0:
 			ship.die()
 
+		_apply_burning_crew_damage(ship, delta)
+
 		ship.burn_timer -= delta
 		if ship.burn_timer <= 0:
 			ship.is_burning = false
 			ship.fire_build_up = 0.0
+			_clear_burning_crew_damage_timer(ship)
 	else:
+		_clear_burning_crew_damage_timer(ship)
 		if ship.fire_build_up > 0:
 			ship.fire_build_up = move_toward(ship.fire_build_up, 0, 15.0 * delta)
 
@@ -281,6 +286,37 @@ static func get_furled_sail_fire_damage_multiplier(ship) -> float:
 		if "furled_sail_fire_damage_multiplier" in ship and ship.get("furled_sail_fire_damage_multiplier") != null:
 			return clampf(float(ship.get("furled_sail_fire_damage_multiplier")), 0.0, 1.0)
 	return 1.0
+
+
+static func _apply_burning_crew_damage(ship, delta: float) -> void:
+	var damage_per_second := 1.0
+	if "burning_crew_damage_per_second" in ship:
+		damage_per_second = maxf(0.0, float(ship.burning_crew_damage_per_second))
+	if damage_per_second <= 0.0:
+		return
+	var tick_interval := 1.0
+	if "burning_crew_damage_tick_interval" in ship:
+		tick_interval = clampf(float(ship.burning_crew_damage_tick_interval), 0.25, 3.0)
+	var timer := float(ship.get_meta(BURNING_CREW_DAMAGE_TIMER_META, tick_interval))
+	timer -= delta
+	if timer > 0.0:
+		ship.set_meta(BURNING_CREW_DAMAGE_TIMER_META, timer)
+		return
+	var tick_damage := damage_per_second * tick_interval
+	ship.set_meta(BURNING_CREW_DAMAGE_TIMER_META, timer + tick_interval)
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(soldier):
+			continue
+		if SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		if not soldier.has_method("take_damage"):
+			continue
+		soldier.take_damage(tick_damage, soldier.global_position, "fire")
+
+
+static func _clear_burning_crew_damage_timer(ship) -> void:
+	if ship != null and ship.has_meta(BURNING_CREW_DAMAGE_TIMER_META):
+		ship.remove_meta(BURNING_CREW_DAMAGE_TIMER_META)
 
 
 static func update_hull_regeneration(ship, delta: float) -> void:

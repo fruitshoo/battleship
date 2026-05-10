@@ -1,7 +1,7 @@
 [gd_scene load_steps=2 format=3 uid="uid://cgf6m5j8jll08"]
 
 [ext_resource type="Script" path="res://scripts/ui/results/result_screen.gd" id="1_script"]
-[ext_resource type="Texture2D" uid="uid://bxyt040k77j8j" path="res://assets/ui/menu/main_menu_background.png" id="2_bg"]
+[ext_resource type="Texture2D" uid="uid://vs6rmj3yshat" path="res://assets/ui/menu/main_menu_illustration_background.png" id="2_bg"]
 
 [node name="ResultScreen" type="Control"]
 layout_mode = 3
@@ -53,7 +53,7 @@ horizontal_alignment = 1
 
 [node name="Title" type="Label" parent="Content/TitleBlock"]
 layout_mode = 2
-text = "항해 결과"
+text = "결과"
 horizontal_alignment = 1
 
 [node name="Body" type="HBoxContainer" parent="Content"]
@@ -97,9 +97,9 @@ alignment = 1
 [node name="RestartButton" type="Button" parent="ButtonBlock"]
 custom_minimum_size = Vector2(220, 48)
 layout_mode = 2
-text = "다시 항해"
+text = "다시 하기"
 
 [node name="MainMenuButton" type="Button" parent="ButtonBlock"]
 custom_minimum_size = Vector2(220, 48)
 layout_mode = 2
-text = "항구로"
+text = "메인 메뉴"

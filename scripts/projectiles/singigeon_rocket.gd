@@ -104,13 +104,7 @@ func pool_reset() -> void:
 	_collision_check_left = 0.0
 	_last_collision_check_pos = global_position
 	_face_velocity(true)
-	var trail = get_node_or_null("RocketTrail") as GPUParticles3D
-	if is_instance_valid(trail):
-		var enable_trail = VfxBudget.allow_spawn(get_tree(), "rocket_trail", global_position, 8, 75.0)
-		if VfxBudget.get_continuous_effect_scale() <= 0.42:
-			enable_trail = false
-		trail.visible = enable_trail
-		trail.emitting = enable_trail
+	_update_rocket_trail_enabled(_should_enable_rocket_trail())
 
 func restart_flight() -> void:
 	pool_reset()
@@ -210,6 +204,24 @@ func _face_velocity(force: bool = false) -> void:
 	if absf(dir.y) > 0.999:
 		up_vec = Vector3.RIGHT
 	look_at(look_target, up_vec)
+
+func _should_enable_rocket_trail() -> bool:
+	var enable_trail := VfxBudget.allow_spawn(get_tree(), "rocket_trail", global_position, 8, 75.0)
+	if VfxBudget.get_continuous_effect_scale() <= 0.42:
+		enable_trail = false
+	return enable_trail
+
+func _update_rocket_trail_enabled(enabled: bool) -> void:
+	var trail_root := get_node_or_null("RocketTrail")
+	if not is_instance_valid(trail_root):
+		return
+	trail_root.visible = enabled
+	if trail_root is GPUParticles3D:
+		(trail_root as GPUParticles3D).emitting = enabled
+		return
+	for child in trail_root.find_children("*", "GPUParticles3D", true, false):
+		if child is GPUParticles3D:
+			(child as GPUParticles3D).emitting = enabled
 
 func _should_run_collision_check(prev_pos: Vector3, delta: float) -> bool:
 	_collision_check_left -= delta
@@ -391,10 +403,7 @@ func _finish_flight(primary_target: Node3D = null) -> void:
 		_apply_damage(primary_target, 1.0)
 		_apply_soldier_knockback(primary_target)
 
-	# 트레일 중단
-	var trail = get_node_or_null("RocketTrail")
-	if trail:
-		trail.emitting = false
+	_update_rocket_trail_enabled(false)
 	
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(primary_target) and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):

@@ -71,7 +71,7 @@ const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 			_setup_soldier_visual()
 			_update_team_color()
 			_update_weapon_stats()
-@export_enum("general", "spearman", "fire_pot", "repeating_crossbow", "singigeon") var crew_role: String = "general"
+@export_enum("general", "spearman", "fire_pot", "repeating_crossbow", "singigeon", "daecheolpo") var crew_role: String = "general"
 @export var is_captain: bool = false
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
 @export var weapon_switch_distance: float = 4.0 # 무기 교체 거리 (이내면 검, 밖이면 활)하향 (10 -> 4)
@@ -155,6 +155,7 @@ var CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 16.5
 const RANGED_DAMAGE_SOURCES := {
 	"bow": true,
 	"repeating_crossbow": true,
+	"daecheolpo": true,
 	"ballista": true,
 	"singigeon": true,
 	"fire_pot": true,
@@ -821,7 +822,7 @@ func _physics_process(delta: float) -> void:
 		set_meta("last_death_cause", "drowned")
 		set_meta("last_damage_source", "drowned")
 		# 바다에 빠질 때 작은 물보라 이펙트 재생
-		var water_explosion_scene = preload("res://scenes/effects/water_burst.tscn")
+		var water_explosion_scene = preload("res://scenes/effects/water_blast.tscn")
 		if water_explosion_scene:
 			var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
 			if explosion.has_method("configure_as_small"):
@@ -1151,7 +1152,10 @@ func find_nearest_enemy() -> Node3D:
 
 
 func _get_sticky_current_enemy() -> Node3D:
-	var target := current_target as Node3D
+	if not is_instance_valid(current_target):
+		current_target = null
+		return null
+	var target: Node3D = current_target
 	if not _is_valid_enemy_target(target):
 		return null
 	var max_sticky_distance: float = detection_range * TARGET_STICKY_DETECTION_MULTIPLIER
@@ -1173,9 +1177,10 @@ func _get_target_owned_ship_node(target: Node) -> Node3D:
 	if not is_instance_valid(target):
 		return null
 	if target.has_method("get_owned_ship_node"):
-		return target.call("get_owned_ship_node") as Node3D
+		var owned_node: Variant = target.call("get_owned_ship_node")
+		return owned_node if is_instance_valid(owned_node) and owned_node is Node3D else null
 	var owned_value: Variant = target.get("owned_ship")
-	return owned_value as Node3D if is_instance_valid(owned_value) else null
+	return owned_value if is_instance_valid(owned_value) and owned_value is Node3D else null
 
 
 func _get_planar_distance_sq_to(target: Node3D) -> float:
@@ -1603,7 +1608,8 @@ func _get_incapacitated_assist_anchor_position(assist_target: Node3D) -> Vector3
 
 func _get_incapacitated_assist_ship(assist_target: Node3D) -> Node3D:
 	if is_instance_valid(assist_target):
-		var target_ship := assist_target.get("owned_ship") as Node3D
+		var target_ship_value: Variant = assist_target.get("owned_ship")
+		var target_ship: Node3D = target_ship_value if is_instance_valid(target_ship_value) and target_ship_value is Node3D else null
 		if is_instance_valid(target_ship):
 			return target_ship
 	if is_instance_valid(owned_ship):
@@ -2035,7 +2041,7 @@ func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
 
 func get_limbo_ai_default_tree_path() -> String:
 	var role_name: String = crew_role.strip_edges().to_lower()
-	if is_ranged_only or role_name == "repeating_crossbow" or role_name == "singigeon":
+	if is_ranged_only or role_name == "repeating_crossbow" or role_name == "singigeon" or role_name == "daecheolpo":
 		return SoldierLimboAIPilot.RANGED_TREE_PATH
 	if _should_use_boarding_limbo_tree():
 		return SoldierLimboAIPilot.BOARDING_TREE_PATH

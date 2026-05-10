@@ -21,6 +21,7 @@
 | sfx_cannon_fire.ogg |CC0|https://freesound.org/people/SamsterBirdies/sounds/581599/|
 | sfx_cannon_fire_02.ogg |CC0|https://freesound.org/people/gerainsan/sounds/457044/|
 | sfx_explosion_impact.ogg |Attribution 4.0|https://freesound.org/people/Artninja/sounds/750822/|
+| sfx_epic_drum_cc0.wav |CC0|https://freesound.org/s/328009/|
 | sfx_fire_crackling.ogg |CC0|https://freesound.org/people/StevenMyat_/sounds/676385/|
 | sfx_flag_crash.ogg |Attribution 4.0|https://freesound.org/people/everythingsounds/sounds/319986/|
 | sfx_flag_flapping.ogg |CC0|https://freesound.org/people/ani_music/sounds/244976/|

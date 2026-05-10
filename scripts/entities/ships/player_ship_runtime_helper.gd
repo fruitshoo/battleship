@@ -88,16 +88,21 @@ static func update_rowing_audio(ship, delta: float) -> void:
 				if ship.rowing_locked:
 					pitch = randf_range(0.85, 0.92)
 				ship._cached_audio_manager.play_sfx("oars_rowing", ship.global_position, pitch, 5.0)
+				if not ship.rowing_locked and ship.rowing_stamina > 0.1:
+					ship._rowing_drum_beat_count += 1
+					if ship._rowing_drum_beat_count % 3 == 0:
+						ship._cached_audio_manager.play_sfx("rowing_drum", ship.global_position, randf_range(0.96, 1.02), -1.5)
 			ship._oars_timer = 1.8 if ship.rowing_locked else 1.3
 		else:
 			ship._oars_timer -= delta
 
-		if ship.rowing_stamina > 0.1 and not ship.rowing_locked and not ship._gilgunak_playing:
-			ship._gilgunak_playing = true
+		if ship._gilgunak_playing:
+			ship._gilgunak_playing = false
 			if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_gilgunak"):
-				ship._cached_audio_manager.play_gilgunak(true)
+				ship._cached_audio_manager.play_gilgunak(false)
 	else:
 		ship._oars_timer = 0.0
+		ship._rowing_drum_beat_count = 0
 		if ship._gilgunak_playing:
 			ship._gilgunak_playing = false
 			if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_gilgunak"):

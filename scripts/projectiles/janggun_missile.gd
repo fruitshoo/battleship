@@ -15,7 +15,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 @export var arc_height: float = 4.0
 @export var impact_puff_scene: PackedScene = preload("res://scenes/effects/impact_puff.tscn")
 @export var wood_splinter_scene: PackedScene = preload("res://scenes/effects/wood_splinter.tscn")
-var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_burst.tscn")
+var water_explosion_scene: PackedScene = preload("res://scenes/effects/water_blast.tscn")
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -33,6 +33,9 @@ const MIN_LONG_FLIGHT_DURATION := 0.55
 const MIN_FLIGHT_DURATION_FULL_DISTANCE := 14.0
 const MIN_CLOSE_ARC_HEIGHT := 0.25
 const MIN_LONG_ARC_HEIGHT := 0.8
+const SHIP_IMPACT_VERTICAL_OFFSET := 0.05
+const SHIP_IMPACT_HEIGHT_PAD := 0.12
+const SHIP_IMPACT_HULL_CLAMP_RATIO := 0.96
 
 func _ready() -> void:
 	# 시그널은 한 번만 연결
@@ -159,7 +162,7 @@ func _on_hit(target: Node) -> void:
 		var target_is_sinking = NodeContractHelper.is_sinking_or_dying(ship)
 		if target_is_sinking:
 			return # 침몰 중인 배엔 데미지도 스플래시도 넣지 않고 통과 (또는 다른 처리)
-			
+		global_position = _resolve_visible_ship_impact_position(ship)
 		_play_impact_vfx() # 임팩트 이펙트 재생
 		_stick_to_ship(ship)
 		
@@ -195,6 +198,25 @@ func _stick_to_ship(ship: Node3D) -> void:
 	
 	# 일정 시간 후 제거
 	get_tree().create_timer(stick_duration).timeout.connect(_unstick)
+
+
+func _resolve_visible_ship_impact_position(ship: Node3D) -> Vector3:
+	if not is_instance_valid(ship):
+		return global_position
+	var local_impact: Vector3 = ship.to_local(global_position)
+	var hull_half := Vector2.ZERO
+	if ship.has_method("get_collision_half_extents"):
+		var half_variant: Variant = ship.call("get_collision_half_extents")
+		if half_variant is Vector2:
+			hull_half = half_variant as Vector2
+	if hull_half.x > 0.01 and hull_half.y > 0.01:
+		local_impact.x = clampf(local_impact.x, -hull_half.x * SHIP_IMPACT_HULL_CLAMP_RATIO, hull_half.x * SHIP_IMPACT_HULL_CLAMP_RATIO)
+		local_impact.z = clampf(local_impact.z, -hull_half.y * SHIP_IMPACT_HULL_CLAMP_RATIO, hull_half.y * SHIP_IMPACT_HULL_CLAMP_RATIO)
+	var visible_ceiling_y := 0.65
+	if ship.get("deck_height") != null:
+		visible_ceiling_y = maxf(0.55, float(ship.get("deck_height")) + SHIP_IMPACT_VERTICAL_OFFSET + SHIP_IMPACT_HEIGHT_PAD)
+	local_impact.y = clampf(local_impact.y, 0.2, visible_ceiling_y)
+	return ship.to_global(local_impact)
 
 func _unstick() -> void:
 	if is_instance_valid(target_ship) and target_ship.has_method("remove_stuck_object"):

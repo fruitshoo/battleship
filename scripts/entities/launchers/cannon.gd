@@ -11,6 +11,8 @@ const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 
 @export var cannonball_scene: PackedScene = preload("res://scenes/projectiles/cannonball.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
+@export_range(0.0, 80.0, 0.5) var projectile_damage: float = 1.0
+@export_range(1.0, 140.0, 0.5) var projectile_speed: float = 60.0
 @export_range(0.0, 0.5, 0.01) var muzzle_smoke_follow_muzzle_time: float = 0.22
 @export var fire_cooldown: float = 2.8
 @export var crew_operated_reload_enabled: bool = true
@@ -186,7 +188,7 @@ func _get_current_range() -> float:
 
 func get_debug_cannon_snapshot() -> Dictionary:
 	var projectile_stats: Dictionary = _get_projectile_stats_snapshot()
-	var base_damage: float = float(projectile_stats.get("damage", 0.0))
+	var base_damage: float = _get_projectile_base_damage()
 	if base_damage <= 1.0 and team == "player":
 		base_damage = 22.0
 	var site_damage_bonus := _get_owner_site_bonus_total("cannon_damage_pct")
@@ -316,7 +318,7 @@ func _get_projectile_stats_snapshot() -> Dictionary:
 	var projectile = (projectile_scene as PackedScene).instantiate()
 	if projectile == null:
 		return stats
-	stats["damage"] = float(projectile.get("damage")) if projectile.get("damage") != null else 0.0
+	stats["damage"] = _get_projectile_base_damage()
 	stats["crit_chance"] = float(projectile.get("crit_chance")) if projectile.get("crit_chance") != null else 0.0
 	stats["crit_multiplier"] = float(projectile.get("crit_multiplier")) if projectile.get("crit_multiplier") != null else 1.0
 	if projectile is Node:
@@ -475,8 +477,8 @@ func _execute_fire() -> void:
 	var target_aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.55)
 	var dist = muzzle.global_position.distance_to(target_aim_pos)
 	
-	var projectile_speed: float = _cached_projectile_speed
-	var time_to_hit = dist / maxf(projectile_speed, 1.0)
+	var current_projectile_speed: float = _cached_projectile_speed
+	var time_to_hit = dist / maxf(current_projectile_speed, 1.0)
 	
 	var enemy_speed: float = _get_ship_speed(target_node, 3.5)
 	var enemy_dir = - target_node.global_transform.basis.z
@@ -501,10 +503,11 @@ func _execute_fire() -> void:
 	var final_damage = 1.0
 	var ball = ScenePool.acquire(get_tree(), cannonball_scene)
 	get_tree().root.add_child(ball)
-	var projectile_base_damage: float = 0.0
+	var projectile_base_damage: float = _get_projectile_base_damage()
 	if "damage" in ball:
-		projectile_base_damage = float(ball.damage)
 		final_damage = projectile_base_damage * _cached_dmg_mult * fleet_damage_mult
+	if "speed" in ball:
+		ball.speed = _cached_projectile_speed
 	if ball.has_method("set_meta"):
 		ball.set_meta("shooter_label", name)
 	if team == "player" and "crit_chance" in ball:
@@ -638,15 +641,31 @@ func _restart_plain_muzzle_particles(node: Node) -> float:
 
 
 func _get_projectile_speed() -> float:
+	if projectile_speed > 0.0:
+		return maxf(projectile_speed, 1.0)
 	if not cannonball_scene:
 		return 50.0
 	var projectile = cannonball_scene.instantiate()
 	if projectile == null:
 		return 50.0
-	var projectile_speed: float = float(projectile.get("speed")) if projectile.get("speed") != null else 50.0
+	var scene_projectile_speed: float = float(projectile.get("speed")) if projectile.get("speed") != null else 50.0
 	if projectile is Node:
 		(projectile as Node).free()
-	return maxf(projectile_speed, 1.0)
+	return maxf(scene_projectile_speed, 1.0)
+
+
+func _get_projectile_base_damage() -> float:
+	if projectile_damage > 0.0:
+		return projectile_damage
+	if not cannonball_scene:
+		return 1.0
+	var projectile = cannonball_scene.instantiate()
+	if projectile == null:
+		return 1.0
+	var projectile_base_damage: float = float(projectile.get("damage")) if projectile.get("damage") != null else 1.0
+	if projectile is Node:
+		(projectile as Node).free()
+	return maxf(projectile_base_damage, 1.0)
 
 
 func _get_ship_speed(ship: Node3D, fallback: float = 0.0) -> float:

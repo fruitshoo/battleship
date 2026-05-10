@@ -1,0 +1,43 @@
+[gd_resource type="ParticleProcessMaterial" format=3 uid="uid://dus600juh63rn"]
+
+[sub_resource type="Curve" id="Curve_fire_alpha"]
+_data = [Vector2(0, 0.80154634), 0.0, 0.0, 0, 0, Vector2(1, 0.03178692), -2.4691818, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_fire_alpha"]
+curve = SubResource("Curve_fire_alpha")
+
+[sub_resource type="Gradient" id="Gradient_fire"]
+offsets = PackedFloat32Array(0.13802083, 0.41480654, 0.81956846)
+colors = PackedColorArray(1, 1, 1, 1, 0.38841417, 0.31827274, 0.22096011, 1, 0.06634452, 0.06634452, 0.06634452, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_fire"]
+gradient = SubResource("Gradient_fire")
+
+[sub_resource type="Curve" id="Curve_fire_scale"]
+_data = [Vector2(0.002371274, 0.51859206), 0.0, 1.4660757, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_fire_scale"]
+curve = SubResource("Curve_fire_scale")
+
+[resource]
+lifetime_randomness = 0.08
+particle_flag_rotate_y = true
+emission_shape = 1
+emission_sphere_radius = 0.5
+angle_min = -179.99998
+angle_max = 180.00002
+direction = Vector3(0, 1, 0)
+spread = 5.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.0
+radial_velocity_min = -2.2351742e-05
+radial_velocity_max = 0.49997765
+gravity = Vector3(0, 1, 0)
+scale_min = 2.0
+scale_max = 4.0
+scale_curve = SubResource("CurveTexture_fire_scale")
+color = Color(1.7893038, 1.2962637, 0.76034313, 0.57100004)
+color_ramp = SubResource("GradientTexture1D_fire")
+alpha_curve = SubResource("CurveTexture_fire_alpha")
