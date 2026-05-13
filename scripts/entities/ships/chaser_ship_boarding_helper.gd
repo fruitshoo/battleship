@@ -7,6 +7,8 @@ const LATCHED_CORRECTION_BLEND := 0.42
 const LATCHED_PULL_BLEND := 0.62
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85
 const BOARDING_CONTACT_ANCHOR_EDGE_MARGIN := 0.18
+const NEIGHBOR_GUARD_BROAD_PHASE_SCALE := 1.35
+const NEIGHBOR_GUARD_BROAD_PHASE_PAD := 1.5
 
 static func process_boarding(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
@@ -206,6 +208,8 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 	var corrected_pos = proposed_pos
 	var neighbors = ship.get_ships_cached(ship.get_tree())
 	var check_count = 0
+	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else "enemy"
+	var ship_guard_radius := _get_neighbor_guard_broad_radius(ship)
 
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other):
@@ -217,16 +221,19 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
 
+		var diff = corrected_pos - other.global_position
+		diff.y = 0.0
+		var broad_probe := (ship_guard_radius + _get_neighbor_guard_broad_radius(other)) * NEIGHBOR_GUARD_BROAD_PHASE_SCALE + NEIGHBOR_GUARD_BROAD_PHASE_PAD
+		if diff.length_squared() > broad_probe * broad_probe:
+			continue
+
 		var use_support_guard: bool = _is_support_fleet_pair(ship, other)
 		var safe_ratio: float = 0.84 if use_support_guard else 0.99
 		var probe_ratio: float = 1.08 if use_support_guard else 1.25
 		var safe_probe = ship.get_collision_distance_to(other) * probe_ratio
-		var diff = corrected_pos - other.global_position
-		diff.y = 0.0
 		if diff.length_squared() > safe_probe * safe_probe:
 			continue
 
-		var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else "enemy"
 		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else "enemy"
 		var emit_collision_event: bool = ship_team != other_team
 		corrected_pos = apply_ship_collision_guard(ship, other, prev_pos, corrected_pos, safe_ratio, ship.current_speed, emit_collision_event)
@@ -235,6 +242,13 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 			break
 
 	return corrected_pos
+
+
+static func _get_neighbor_guard_broad_radius(ship) -> float:
+	var base_radius := NodeContractHelper.get_base_collision_radius_value(ship)
+	var width_mult := NodeContractHelper.get_collision_width_multiplier_value(ship)
+	var length_mult := NodeContractHelper.get_collision_length_multiplier_value(ship)
+	return maxf(0.5, base_radius * maxf(width_mult, length_mult))
 
 
 static func apply_ship_collision_guard(ship, other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = 0.94, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:

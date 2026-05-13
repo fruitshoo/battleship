@@ -593,6 +593,8 @@ static func _refresh_soldier_duty_visual(soldier) -> void:
 static func _can_consider_deck_work(soldier, ship: Node3D, allow_current_same_task: bool = false) -> bool:
 	if not is_instance_valid(soldier) or not is_instance_valid(ship):
 		return false
+	if _get_node_team_tag(soldier) != "player":
+		return false
 	var owned_team: String = _get_node_team_tag(ship)
 	if owned_team != _get_node_team_tag(soldier):
 		return false

@@ -14,6 +14,7 @@ const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd"
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
 const PLAYER_DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
 const PLAYER_DEFAULT_WATER_SPLASH_SCENE = preload("res://scenes/effects/water_blast.tscn")
+const PLAYER_DEFAULT_IMPACT_PUFF_SCENE = preload("res://scenes/effects/impact_puff.tscn")
 const PLAYER_DEFAULT_FIRE_EFFECT_SCENE = preload("res://scenes/effects/fire_effect.tscn")
 const PLAYER_DEFAULT_SURVIVOR_SCENE = preload("res://scenes/effects/survivor.tscn")
 const PlayerShipCrewHelper = preload("res://scripts/entities/ships/player_ship_crew_helper.gd")
@@ -231,6 +232,7 @@ func _apply_runtime_scene_safety_defaults() -> void:
 
 	wood_splinter_scene = PLAYER_DEFAULT_WOOD_SPLINTER_SCENE
 	water_splash_scene = PLAYER_DEFAULT_WATER_SPLASH_SCENE
+	impact_puff_scene = PLAYER_DEFAULT_IMPACT_PUFF_SCENE
 	fire_effect_scene = PLAYER_DEFAULT_FIRE_EFFECT_SCENE
 	survivor_scene = PLAYER_DEFAULT_SURVIVOR_SCENE
 	loot_scene = null

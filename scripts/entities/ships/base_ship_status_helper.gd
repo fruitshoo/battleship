@@ -145,12 +145,21 @@ static func update_boarding_state(ship, delta: float) -> void:
 	var overrun: bool = hostile_count > 0 and friendly_count <= 0
 	var was_contested: bool = ship.get_meta("boarding_feedback_contested", false) == true
 	var was_overrun: bool = ship.get_meta("boarding_feedback_overrun", false) == true
+	var had_boarding_feedback: bool = ship.has_meta("boarding_feedback_hostile_count")
+	var previous_hostile_count: int = int(ship.get_meta("boarding_feedback_hostile_count", hostile_count))
 	ship.deck_friendly_crew_count = friendly_count
 	ship.deck_hostile_boarder_count = hostile_count
 	ship.deck_is_contested = contested
 	ship.deck_is_overrun = overrun
 	ship.set_meta("boarding_feedback_contested", contested)
 	ship.set_meta("boarding_feedback_overrun", overrun)
+	ship.set_meta("boarding_feedback_hostile_count", hostile_count)
+	if had_boarding_feedback and (was_contested != contested or was_overrun != overrun or previous_hostile_count != hostile_count):
+		for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+			if not is_instance_valid(soldier):
+				continue
+			if soldier.has_method("notify_ai_event"):
+				soldier.call("notify_ai_event", "boarding_state_changed")
 
 	if overrun:
 		var attacker_ship: Node = ship.get_boarding_attacker_ship() if ship.has_method("get_boarding_attacker_ship") else null
@@ -193,7 +202,6 @@ static func update_boarding_state(ship, delta: float) -> void:
 		ship._deck_overrun_announced = false
 		if ship_team == "player":
 			SupportBoardingHelper.finish_support_rescue_boarding_if_safe(ship)
-
 
 static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
 	for child in EntityRegistry.get_soldiers_by_ship(ship):

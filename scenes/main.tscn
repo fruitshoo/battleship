@@ -9,17 +9,10 @@
 [ext_resource type="Script" uid="uid://chumpd1rfm1oj" path="res://scripts/managers/level_manager.gd" id="8_level_manager"]
 [ext_resource type="PackedScene" uid="uid://xbd1hcgmpq23" path="res://scenes/ships/player_ship.tscn" id="10_choun"]
 [ext_resource type="PackedScene" uid="uid://bx5h2f3mwak2a" path="res://scenes/effects/ocean_plane.tscn" id="10_ocean"]
-[ext_resource type="PackedScene" uid="uid://dtwfm6fynapr" path="res://scenes/effects/water_blast.tscn" id="16_0ld40"]
-[ext_resource type="PackedScene" uid="uid://sdp4lml0kdip" path="res://scenes/effects/impact_puff.tscn" id="17_gqmmt"]
-[ext_resource type="PackedScene" uid="uid://cn32xp1401yfh" path="res://scenes/effects/floating_loot.tscn" id="17_muem4"]
-[ext_resource type="PackedScene" uid="uid://bilro8ijftry1" path="res://scenes/effects/fire_effect.tscn" id="18_yc10j"]
 [ext_resource type="Script" uid="uid://wrcy347cln3m" path="res://scripts/managers/environment_preset_manager.gd" id="env_preset_manager"]
 [ext_resource type="PackedScene" uid="uid://ls4h8nvi8rjl" path="res://scenes/ui/game_hud.tscn" id="game_hud_scene"]
 [ext_resource type="Script" uid="uid://b3sxf5qk2myeh" path="res://scripts/world/decor/sea_decor_spawner.gd" id="sea_decor_spawner"]
 [ext_resource type="Script" uid="uid://covouwc1mtv57" path="res://scripts/world/sea_sites/sea_site_spawner.gd" id="sea_site_spawner"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_choun"]
-size = Vector3(8, 8, 8)
 
 [node name="Main" type="Node3D" unique_id=1911711204]
 
@@ -58,6 +51,7 @@ script = ExtResource("sea_decor_spawner")
 [node name="LevelManager" type="Node" parent="." unique_id=789013057 node_paths=PackedStringArray("hud", "enemy_spawner")]
 script = ExtResource("8_level_manager")
 hud = NodePath("../GameHUD")
+prologue_enabled = true
 enemy_spawner = NodePath("../EnemySpawner")
 
 [node name="EnvironmentPresetManager" type="Node" parent="." unique_id=1467533123]
@@ -72,30 +66,15 @@ controlled_ship = NodePath("")
 [node name="OceanPlane" parent="." unique_id=1629146247 instance=ExtResource("10_ocean")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0006620884, 0.024617195, -0.0119075775)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1808775112]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.673962, 0.9558134, 0)
-mesh = SubResource("BoxMesh_choun")
-
-[node name="MeshInstance3D2" type="MeshInstance3D" parent="." unique_id=626961768]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.7230787, -5.3855224, 0)
-mesh = SubResource("BoxMesh_choun")
-
-[node name="MeshInstance3D3" type="MeshInstance3D" parent="." unique_id=420706576]
-transform = Transform3D(1, 0, 0, 0, 0.9371481, -0.3489319, 0, 0.3489319, 0.9371481, 16.745987, -1.1631579, 6.324033)
-mesh = SubResource("BoxMesh_choun")
-
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
 furled_sail_rowing_stamina_cost_multiplier = 0.85
 stamina_drain_rate = 10.0
 auto_raid_enabled = true
+width_multiplier = 0.49231468759964886
 floating_offset = 0.5
 boarding_contact_grace_duration = 0.8
-impact_puff_scene = ExtResource("16_0ld40")
-fire_effect_scene = ExtResource("17_gqmmt")
-loot_scene = ExtResource("18_yc10j")
-survivor_scene = ExtResource("17_muem4")
 fire_effect_offset = Vector3(0, 1.5, 0)
 fire_effect_offset_randomness = Vector3(0, 0.55, -0.25)
 fire_effect_scale_randomness = 1.6

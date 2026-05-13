@@ -12,23 +12,37 @@ const SEPARATION_PLAYER_PAD := 0.12
 const SEPARATION_BOSS_PAD := 0.20
 const AUTHORED_DECK_COLLISION_PAD := 0.35
 
+static var _half_extents_cache_frame: int = -1
+static var _half_extents_cache: Dictionary = {}
+
 
 static func get_soft_collision_half_extents(ship: Node) -> Vector2:
 	if not is_instance_valid(ship):
 		return Vector2(DEFAULT_BASE_COLLISION_RADIUS, DEFAULT_BASE_COLLISION_RADIUS)
+	var current_frame := Engine.get_physics_frames()
+	if current_frame != _half_extents_cache_frame:
+		_half_extents_cache_frame = current_frame
+		_half_extents_cache.clear()
+	var ship_id := ship.get_instance_id()
+	if _half_extents_cache.has(ship_id):
+		return _half_extents_cache[ship_id]
 	var authored_deck_extents := ShipAuthoringHelper.get_deck_area_half_extents(ship)
 	if authored_deck_extents.x > 0.01 and authored_deck_extents.y > 0.01:
-		return Vector2(
+		var authored_extents := Vector2(
 			authored_deck_extents.x + AUTHORED_DECK_COLLISION_PAD,
 			authored_deck_extents.y + AUTHORED_DECK_COLLISION_PAD
 		)
+		_half_extents_cache[ship_id] = authored_extents
+		return authored_extents
 	var base_radius := NodeContractHelper.get_base_collision_radius_value(ship)
 	var width_mult := NodeContractHelper.get_collision_width_multiplier_value(ship)
 	var length_mult := NodeContractHelper.get_collision_length_multiplier_value(ship)
-	return Vector2(
+	var fallback_extents := Vector2(
 		maxf(0.01, base_radius * width_mult),
 		maxf(0.01, base_radius * length_mult)
 	)
+	_half_extents_cache[ship_id] = fallback_extents
+	return fallback_extents
 
 
 static func get_contact_area_collision_shape(area: Node) -> CollisionShape3D:

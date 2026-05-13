@@ -698,7 +698,9 @@ func _verify_hook_timer_uses_collision_scaled_contact_distance(failures: Array[S
 	defender.set("base_collision_radius", 7.0)
 	defender.set("width_multiplier", 1.0)
 	defender.set("length_multiplier", 1.0)
-	defender.global_position = Vector3(14.6, 0.0, 0.0)
+	defender.global_position = Vector3(1.0, 0.0, 0.0)
+	var collision_contact_distance: float = float(attacker.call("get_collision_distance_to", defender))
+	defender.global_position = Vector3(collision_contact_distance + 0.6, 0.0, 0.0)
 
 	attacker.set("boarding_target", defender)
 	defender.set("boarding_attacker", attacker)

@@ -5,6 +5,10 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
+static var _cached_load_counts_frame: int = -1
+static var _cached_ship_count: int = 0
+static var _cached_soldier_count: int = 0
+static var _cached_projectile_count: int = 0
 const LIMBO_AI_BOARDING_INTENT_STALE_FRAMES := 4
 const SAIL_DOWNWIND_START := -0.45
 const SAIL_DOWNWIND_FULL := 0.78
@@ -35,6 +39,15 @@ const WIND_STRENGTH_DEFAULT_MIN := 0.72
 const WIND_STRENGTH_DEFAULT_MAX := 0.88
 const WIND_SPEED_MULT_MIN := 0.92
 const WIND_SPEED_MULT_MAX := 1.08
+const NAV_CACHE_META := "chaser_ai_nav_cache"
+const NAV_CACHE_TARGET_ID_META := "chaser_ai_nav_cache_target_id"
+const NAV_CACHE_TIMER_META := "chaser_ai_nav_cache_timer"
+const NAV_CACHE_SHIP_POS_META := "chaser_ai_nav_cache_ship_pos"
+const NAV_CACHE_TARGET_POS_META := "chaser_ai_nav_cache_target_pos"
+const BOARDING_WINDOW_CACHE_META := "chaser_ai_boarding_window_cache"
+const BOARDING_WINDOW_TARGET_ID_META := "chaser_ai_boarding_window_target_id"
+const BOARDING_WINDOW_TIMER_META := "chaser_ai_boarding_window_timer"
+const NAV_CACHE_REBUILD_DISTANCE_SQ := 2.25
 
 static func _is_true(value: Variant) -> bool:
 	return value == true
@@ -171,6 +184,9 @@ static func configure_logic_throttle(ship) -> void:
 	ship._ai_separation_update_interval_runtime = get_separation_update_interval_runtime(ship, seed_value)
 	ship.logic_timer = ship._ai_logic_update_interval_runtime * phase
 	ship.separation_timer = ship._ai_separation_update_interval_runtime * phase
+	if "_limbo_ai_tick_timer" in ship and "limbo_ai_tick_interval" in ship:
+		ship._limbo_ai_tick_timer = ship.limbo_ai_tick_interval * phase
+		ship._limbo_ai_tick_accum = 0.0
 
 
 static func get_logic_update_interval_for_ship(ship) -> float:
@@ -182,14 +198,21 @@ static func get_separation_update_interval_for_ship(ship) -> float:
 
 
 static func get_load_multiplier(ship) -> float:
-	var ship_count: int = EntityRegistry.count_ships()
-	var soldier_count: int = EntityRegistry.count_soldiers()
-	var projectile_count: int = EntityRegistry.count_projectiles()
+	_update_load_counts_cache()
+	var ship_count: int = _cached_ship_count
+	var soldier_count: int = _cached_soldier_count
+	var projectile_count: int = _cached_projectile_count
 	var load_multiplier: float = 1.0
+	if ship_count > 5:
+		load_multiplier += minf(0.28, float(ship_count - 5) * 0.07)
 	if ship_count > 12:
 		load_multiplier += minf(0.45, float(ship_count - 12) * 0.03)
+	if soldier_count > 24:
+		load_multiplier += minf(0.36, float(soldier_count - 24) * 0.024)
 	if soldier_count > 42:
 		load_multiplier += minf(0.55, float(soldier_count - 42) * 0.014)
+	if projectile_count > 6:
+		load_multiplier += minf(0.22, float(projectile_count - 6) * 0.025)
 	if projectile_count > 18:
 		load_multiplier += minf(0.25, float(projectile_count - 18) * 0.01)
 	if ship.team == "player":
@@ -197,6 +220,16 @@ static func get_load_multiplier(ship) -> float:
 	if _is_gunner(ship):
 		load_multiplier *= 1.05
 	return clampf(load_multiplier, 0.75, 2.0)
+
+
+static func _update_load_counts_cache() -> void:
+	var current_frame := Engine.get_physics_frames()
+	if current_frame == _cached_load_counts_frame:
+		return
+	_cached_load_counts_frame = current_frame
+	_cached_ship_count = EntityRegistry.count_ships()
+	_cached_soldier_count = EntityRegistry.count_soldiers()
+	_cached_projectile_count = EntityRegistry.count_projectiles()
 
 
 static func get_separation_update_interval_runtime(ship, seed_value: int) -> float:
@@ -254,6 +287,84 @@ static func calculate_separation(ship) -> Vector3:
 
 	PhysicsFrameProfiler.end("ship_separation", profile_start)
 	return force
+
+
+static func _get_navigation_cached(ship, current_target: Node3D, delta: float, raw_dist_to_target: float) -> Dictionary:
+	var interval := _get_navigation_cache_interval(ship, raw_dist_to_target)
+	if interval <= 0.0:
+		return ChaserShipNavigationHelper.build_navigation(ship, current_target)
+
+	var target_id := current_target.get_instance_id()
+	var cached_target_id := int(ship.get_meta(NAV_CACHE_TARGET_ID_META, 0))
+	var cached_nav_variant: Variant = ship.get_meta(NAV_CACHE_META, {})
+	var timer := maxf(0.0, float(ship.get_meta(NAV_CACHE_TIMER_META, 0.0)) - delta)
+	var cached_ship_pos: Variant = ship.get_meta(NAV_CACHE_SHIP_POS_META) if ship.has_meta(NAV_CACHE_SHIP_POS_META) else null
+	var cached_target_pos: Variant = ship.get_meta(NAV_CACHE_TARGET_POS_META) if ship.has_meta(NAV_CACHE_TARGET_POS_META) else null
+	var anchor_valid := cached_ship_pos is Vector3 \
+		and cached_target_pos is Vector3 \
+		and (cached_ship_pos as Vector3).distance_squared_to(ship.global_position) <= NAV_CACHE_REBUILD_DISTANCE_SQ \
+		and (cached_target_pos as Vector3).distance_squared_to(current_target.global_position) <= NAV_CACHE_REBUILD_DISTANCE_SQ
+	if cached_target_id == target_id and cached_nav_variant is Dictionary and timer > 0.0 and anchor_valid:
+		ship.set_meta(NAV_CACHE_TIMER_META, timer)
+		return cached_nav_variant
+
+	var nav := ChaserShipNavigationHelper.build_navigation(ship, current_target)
+	ship.set_meta(NAV_CACHE_META, nav)
+	ship.set_meta(NAV_CACHE_TARGET_ID_META, target_id)
+	ship.set_meta(NAV_CACHE_TIMER_META, interval + randf_range(0.0, interval * 0.18))
+	ship.set_meta(NAV_CACHE_SHIP_POS_META, ship.global_position)
+	ship.set_meta(NAV_CACHE_TARGET_POS_META, current_target.global_position)
+	return nav
+
+
+static func _get_navigation_cache_interval(ship, raw_dist_to_target: float) -> float:
+	if raw_dist_to_target <= 16.0:
+		return 0.0
+	var load_mult := minf(get_load_multiplier(ship), 1.85)
+	if _is_gunner(ship):
+		if raw_dist_to_target > 42.0:
+			return 0.20 * load_mult
+		return 0.12 * load_mult
+	if raw_dist_to_target > 55.0:
+		return 0.24 * load_mult
+	if raw_dist_to_target > 32.0:
+		return 0.18 * load_mult
+	return 0.10 * load_mult
+
+
+static func _get_boarding_window_cached(ship, current_target: Node3D, delta: float, raw_dist_to_target: float) -> Dictionary:
+	var interval := _get_boarding_window_cache_interval(ship, raw_dist_to_target)
+	if interval <= 0.0:
+		return {
+			"attempt_distance": ShipContactGeometry.get_boarding_attempt_distance(ship, current_target),
+			"target_can_be_boarded": ShipCombatModeHelper.can_be_boarded(current_target, ship),
+		}
+
+	var target_id := current_target.get_instance_id()
+	var cached_target_id := int(ship.get_meta(BOARDING_WINDOW_TARGET_ID_META, 0))
+	var cached_window_variant: Variant = ship.get_meta(BOARDING_WINDOW_CACHE_META, {})
+	var timer := maxf(0.0, float(ship.get_meta(BOARDING_WINDOW_TIMER_META, 0.0)) - delta)
+	if cached_target_id == target_id and cached_window_variant is Dictionary and timer > 0.0:
+		ship.set_meta(BOARDING_WINDOW_TIMER_META, timer)
+		return cached_window_variant
+
+	var window := {
+		"attempt_distance": ShipContactGeometry.get_boarding_attempt_distance(ship, current_target),
+		"target_can_be_boarded": ShipCombatModeHelper.can_be_boarded(current_target, ship),
+	}
+	ship.set_meta(BOARDING_WINDOW_CACHE_META, window)
+	ship.set_meta(BOARDING_WINDOW_TARGET_ID_META, target_id)
+	ship.set_meta(BOARDING_WINDOW_TIMER_META, interval + randf_range(0.0, interval * 0.16))
+	return window
+
+
+static func _get_boarding_window_cache_interval(ship, raw_dist_to_target: float) -> float:
+	if raw_dist_to_target <= 16.0:
+		return 0.0
+	var load_mult := minf(get_load_multiplier(ship), 1.75)
+	if raw_dist_to_target > 42.0:
+		return 0.24 * load_mult
+	return 0.14 * load_mult
 
 
 static func process_physics(ship, delta: float) -> void:
@@ -335,9 +446,10 @@ static func process_physics(ship, delta: float) -> void:
 		ship._set_wake_state(false)
 		return
 	var current_target: Node3D = _target_ship(ship)
+	var raw_dist_to_target: float = ship.global_position.distance_to(current_target.global_position)
 
 	var nav_profile_start := PhysicsFrameProfiler.begin()
-	var nav := ChaserShipNavigationHelper.build_navigation(ship, current_target)
+	var nav := _get_navigation_cached(ship, current_target, delta, raw_dist_to_target)
 	PhysicsFrameProfiler.end("chaser_navigation", nav_profile_start)
 	var target_pos: Vector3 = ShipMovementIntent.get_target_pos(nav, current_target.global_position)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, current_target.global_position)
@@ -348,9 +460,14 @@ static func process_physics(ship, delta: float) -> void:
 	var dir_to_target: Vector3 = ShipMovementIntent.get_dir_to_target(nav, Vector3.ZERO)
 
 	var boarding_profile_start := PhysicsFrameProfiler.begin()
-	var boarding_attempt_distance: float = ShipContactGeometry.get_boarding_attempt_distance(ship, current_target)
-	var target_can_be_boarded := ShipCombatModeHelper.can_be_boarded(current_target, ship)
-	if not _is_gunner(ship) and _can_board(ship) and target_can_be_boarded and dist_to_target <= boarding_attempt_distance:
+	var can_attempt_boarding := not _is_gunner(ship) and _can_board(ship)
+	var boarding_attempt_distance := 0.0
+	var target_can_be_boarded := false
+	if can_attempt_boarding:
+		var boarding_window := _get_boarding_window_cached(ship, current_target, delta, raw_dist_to_target)
+		boarding_attempt_distance = float(boarding_window.get("attempt_distance", 0.0))
+		target_can_be_boarded = bool(boarding_window.get("target_can_be_boarded", false))
+	if can_attempt_boarding and target_can_be_boarded and dist_to_target <= boarding_attempt_distance:
 		var can_use_limbo_boarding_intent := true
 		if ship.get("limbo_ai_pilot_enabled") == true:
 			var boarding_frame := int(ship.get_meta(ShipAILimboKeys.META_BOARDING_FRAME, -1000000))
@@ -453,7 +570,9 @@ static func process_physics(ship, delta: float) -> void:
 	velocity += ship.separation_force
 	velocity += ship._calculate_boarding_pull_velocity(delta)
 	velocity += ship.consume_collision_impulse_velocity(delta)
+	var repulsion_profile_start := PhysicsFrameProfiler.begin()
 	var collision_repulsion = ship._calculate_collision_repulsion()
+	PhysicsFrameProfiler.end("chaser_motion_collision_repulsion", repulsion_profile_start)
 	if not _is_gunner(ship) and target_can_be_boarded and dist_to_target < ship.max_boarding_distance + 1.2:
 		var to_target_flat = ship.target.global_position - ship.global_position
 		to_target_flat.y = 0.0

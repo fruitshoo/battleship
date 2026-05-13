@@ -41,6 +41,8 @@ const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
 
 static var _last_contact_sfx_msec_by_pair: Dictionary = {}
 static var _last_contact_vfx_msec_by_pair: Dictionary = {}
+static var _cached_collision_neighbors: Array = []
+static var _cached_collision_neighbors_frame: int = -1
 
 static func get_ship_mass_scale(ship: Node) -> float:
 	if not is_instance_valid(ship):
@@ -73,8 +75,8 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
-	var neighbors = EntityRegistry.get_ships()
 	var current_frame: int = Engine.get_physics_frames()
+	var neighbors = _get_collision_neighbors_cached(current_frame)
 	var ship_count: int = neighbors.size()
 	var skip_cache: bool = false
 	if ship_count < COLLISION_REPULSION_CACHE_MIN_SHIP_COUNT:
@@ -97,6 +99,8 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			return cached_force if cached_force is Vector3 else Vector3.ZERO
 
 	var force = Vector3.ZERO
+	var my_half = ship.get_collision_half_extents()
+	var my_team: String = NodeContractHelper.get_team_tag(ship)
 
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
@@ -105,7 +109,6 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		var diff = other.global_position - ship.global_position
 		diff.y = 0.0
 		var dist_sq = diff.length_squared()
-		var my_half = ship.get_collision_half_extents()
 		var other_base_radius: float = NodeContractHelper.get_base_collision_radius_value(other)
 		var other_width_mult: float = NodeContractHelper.get_collision_width_multiplier_value(other)
 		var other_length_mult: float = NodeContractHelper.get_collision_length_multiplier_value(other)
@@ -114,7 +117,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			other_base_radius * other_length_mult
 		)
 		var derelict_approach_padding := 0.0
-		if NodeContractHelper.get_team_tag(ship) == "player" and NodeContractHelper.get_team_tag(other) == "enemy" and _is_derelict_ship(other):
+		if my_team == "player" and NodeContractHelper.get_team_tag(other) == "enemy" and _is_derelict_ship(other):
 			derelict_approach_padding = DERELICT_FIRE_POT_APPROACH_PADDING
 		var broad_phase_dist = maxf(my_half.x, my_half.y) + maxf(other_half.x, other_half.y) + ship.broad_phase_padding + derelict_approach_padding
 
@@ -263,6 +266,13 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	ship.set_meta(COLLISION_REPULSION_CACHE_SHIP_COUNT_META, ship_count)
 	ship.set_meta(COLLISION_REPULSION_CACHE_FORCE_META, force)
 	return force
+
+
+static func _get_collision_neighbors_cached(current_frame: int) -> Array:
+	if current_frame != _cached_collision_neighbors_frame:
+		_cached_collision_neighbors = EntityRegistry.get_ships()
+		_cached_collision_neighbors_frame = current_frame
+	return _cached_collision_neighbors
 
 static func _is_backing_out_of_head_on(ship) -> bool:
 	if not is_instance_valid(ship):
@@ -805,16 +815,6 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 			4,
 			80.0
 		)
-
-	# 임팩트 퍼프 (연기/먼지)
-	if ship.impact_puff_scene and VfxBudget.allow_spawn(ship.get_tree(), "ship_collision_smoke", impact_pos, 4, 85.0):
-		var smoke = ScenePool.acquire(ship.get_tree(), ship.impact_puff_scene)
-		ship.get_tree().root.add_child(smoke)
-		smoke.position = impact_pos + Vector3(0.0, 0.6, 0.0)
-		if smoke.has_method("set_intensity"):
-			smoke.set_intensity(clampf(impact_speed / 6.5, 0.9, 1.6))
-		if smoke.has_method("pool_activate"):
-			smoke.pool_activate()
 
 
 static func _spawn_ship_collision_water_splash(ship, impact_pos: Vector3, impact_speed: float) -> void:

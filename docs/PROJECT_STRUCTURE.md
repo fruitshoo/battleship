@@ -197,6 +197,7 @@ scripts/
 - `scripts/entities/weapons/` = 병사 개인 무기
 
 즉, 한 파일만 보면 안 보이고 helper까지 같이 봐야 전체가 보입니다.
+함선 AI 흐름은 [ship_ai_flow.md](/Users/shk/Godot/battleship/docs/ship_ai_flow.md)에 따로 정리했습니다.
 
 #### `scripts/props/`
 배 위 부품 로직

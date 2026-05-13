@@ -1,6 +1,7 @@
 extends Node
 const CollisionVisualizer = preload("res://scripts/helpers/collision_visualizer.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const LevelManagerPrologueHelper = preload("res://scripts/managers/level_manager_prologue_helper.gd")
 const DEBUG_LEVEL_LOGS := false
 const LEVEL_PROGRESSION_DATA_PATH := "res://data/level_progression.json"
 const REWARD_RULES_DATA_PATH := "res://data/reward_rules.json"
@@ -22,6 +23,9 @@ signal score_changed(new_score: int)
 @export var max_level: int = 15
 @export var max_hull_hp_cap: float = 800.0 # 레벨업 HP 보너스 상한 (함선 체력 상향에 맞춰 400->800)
 @export var hud: CanvasLayer = null
+@export_group("Prologue Tutorial")
+@export var prologue_enabled: bool = false
+@export_range(1.0, 8.0, 0.1) var prologue_intro_seconds: float = 3.0
 @export_group("Progression Tuning")
 @export var level_xp_base: float = 7.0 ## 플레이어 레벨 1->2 기본 필요 XP
 @export var level_xp_exponent: float = 1.10 ## 레벨업 필요 XP 성장 곡선 지수
@@ -78,6 +82,11 @@ var _boss_boundary_container: Node3D = null
 var _boss_boundary_elapsed: float = 0.0
 var _boss_boundary_hidden_for_current_boss: bool = false
 var _victory_result_transition_started: bool = false
+var _prologue_pending: bool = false
+var _prologue_active: bool = false
+var _prologue_stage_elapsed: float = 0.0
+var _prologue_notice_layer: CanvasLayer = null
+var _prologue_notice_label: Label = null
 
 const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
@@ -132,6 +141,8 @@ func _ready() -> void:
 	if is_instance_valid(MetaManager) and MetaManager.has_method("get_xp_gain_multiplier"):
 		xp_multiplier = float(MetaManager.get_xp_gain_multiplier())
 	_calculate_next_level_xp()
+	if LevelManagerPrologueHelper.should_prepare(self):
+		LevelManagerPrologueHelper.prepare(self)
 	LevelManagerStartupHelper.initialize(self)
 
 
@@ -307,6 +318,9 @@ func _run_startup_prewarm_async() -> void:
 func _run_startup_bootstrap_async() -> void:
 	await LevelManagerStartupHelper.run_startup_bootstrap_async(self)
 
+func _maybe_start_run_prologue() -> void:
+	LevelManagerPrologueHelper.start_if_needed(self)
+
 func _prewarm_shaders(show_blocking_overlay: bool = true) -> void:
 	await LevelManagerStartupHelper.prewarm_shaders(self, show_blocking_overlay)
 
@@ -318,6 +332,10 @@ func _prime_visual_resources(node: Node) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if LevelManagerPrologueHelper.handle_skip_input(self, event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		if not get_tree().paused:
 			var pause_menu = PAUSE_MENU_SCENE.instantiate()
@@ -404,6 +422,8 @@ func _process(delta: float) -> void:
 
 
 func _profiled_process(delta: float) -> void:
+	if LevelManagerPrologueHelper.is_active_or_pending(self):
+		LevelManagerPrologueHelper.update_prologue(self, delta)
 	if _boss_phase_active:
 		current_time = boss_spawn_time
 	else:
@@ -636,6 +656,10 @@ func _debug_show_defeat_result() -> void:
 	RunResultStore.set_latest_result(_build_defeat_result())
 	_victory_result_transition_started = true
 	_go_to_result_scene()
+
+
+func _debug_toggle_controls_hint() -> void:
+	LevelManagerPrologueHelper.toggle_controls_hint(self)
 
 
 func _debug_collect_treasure_reward(forced_upgrade_count: int = 3) -> void:

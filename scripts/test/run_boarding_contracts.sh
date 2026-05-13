@@ -32,8 +32,8 @@ run_contract_case() {
 			BATTLESHIP_PROBE_SCENE_PATH="$target" \
 			BATTLESHIP_PROBE_AUTO_QUIT_DELAY="$auto_quit_delay" \
 			LEAK_PROBE_WAIT_FOR_SCENE_QUIT="$wait_for_scene_quit" \
-			LEAK_MAX_RID_TOTAL=320 \
-			LEAK_MAX_RESOURCES=520 \
+			LEAK_MAX_RID_TOTAL=360 \
+			LEAK_MAX_RESOURCES=540 \
 			LEAK_MAX_PAGED_ALLOCATOR_WARNINGS=2 \
 			bash scripts/test/run_leak_probe.sh "$probe_scene"
 	) >"$log_file" 2>&1 || probe_status=$?

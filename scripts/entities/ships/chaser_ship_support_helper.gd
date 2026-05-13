@@ -367,13 +367,19 @@ static func _spawn_derelict_smoke(ship, local_offset: Vector3, intensity: float)
 	var scene: PackedScene = ship.get("impact_puff_scene") if "impact_puff_scene" in ship else null
 	if not is_instance_valid(scene):
 		return
-	var smoke = ScenePool.acquire(ship.get_tree(), scene)
+	var smoke = scene.instantiate()
 	if not is_instance_valid(smoke):
 		return
-	ship.get_tree().root.add_child(smoke)
-	smoke.global_position = ship.to_global(local_offset)
+	var smoke_pos: Vector3 = ship.to_global(local_offset)
+	if not VfxBudget.allow_spawn(ship.get_tree(), "hit_effect", smoke_pos, 10, 100.0):
+		smoke.queue_free()
+		return
 	if smoke.has_method("set_intensity"):
 		smoke.set_intensity(intensity)
+	if smoke.has_method("set_budget_reserved"):
+		smoke.set_budget_reserved()
+	ship.get_tree().root.add_child(smoke)
+	smoke.global_position = smoke_pos
 	if smoke.has_method("pool_activate"):
 		smoke.pool_activate()
 

@@ -17,7 +17,7 @@ background_texture = ExtResource("5_illustration_bg")
 use_3d_background = false
 background_dim = 0.34
 
-[node name="MenuFleetBackground" parent="." unique_id=1578433137 instance=ExtResource("3_fleet_bg")]
+[node name="MenuFleetBackground" parent="." unique_id=383968476 instance=ExtResource("3_fleet_bg")]
 
 [node name="BackgroundImage" type="TextureRect" parent="." unique_id=200381114]
 layout_mode = 0

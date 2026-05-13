@@ -118,6 +118,10 @@ var owned_ship: Node3D:
 		_owned_ship = value
 		if is_inside_tree():
 			EntityRegistry.move_soldier_ship(self, previous_ship, _owned_ship)
+		if previous_ship != _owned_ship:
+			notify_ai_event("owned_ship_changed")
+			_notify_ship_deck_ai_event(previous_ship, "crew_changed")
+			_notify_ship_deck_ai_event(_owned_ship, "crew_changed")
 var home_ship: Node3D = null # 최초 소속된 플레이어 배 (나포함 침몰 시 복귀용)
 var _cached_level_manager: Node = null
 var last_nav_target_pos: Vector3 = Vector3.ZERO # 경로 갱신 최적화용
@@ -133,6 +137,9 @@ var _limbo_ai_update_interval_runtime: float = 0.08
 var _deck_bounds_check_timer: float = 0.0
 var _routine_wander_step_timer: float = 0.0
 var _routine_support_step_timer: float = 0.0
+var _routine_support_step_accum: float = 0.0
+var _ai_event_wake_timer: float = 0.0
+var _passive_sleep_timer: float = 0.0
 static var _ai_load_cache_frame: int = -1
 static var _ai_load_multiplier_cache: float = 1.0
 var external_knockback_velocity: Vector3 = Vector3.ZERO
@@ -284,7 +291,7 @@ func _ready() -> void:
 	combat_timer = randf_range(0.0, 0.12)
 	_nearest_enemy_cache_timer = randf_range(0.0, 0.18)
 	attack_validation_timer = randf_range(0.0, 0.12)
-	_limbo_ai_update_timer = randf_range(0.0, 0.08)
+	_limbo_ai_update_timer = randf_range(0.0, 0.18)
 	_deck_bounds_check_timer = randf_range(0.0, 0.16)
 	_routine_wander_step_timer = randf_range(0.0, 0.06)
 	_routine_support_step_timer = randf_range(0.0, 0.10)
@@ -640,6 +647,9 @@ func set_team(new_team: String) -> void:
 	_update_team_color()
 	if is_inside_tree():
 		_apply_soldier_level_stats()
+	if old_team != team:
+		notify_ai_event("team_changed")
+		_notify_ship_deck_ai_event(owned_ship, "crew_team_changed")
 
 func get_team_tag() -> String:
 	return team
@@ -658,6 +668,7 @@ func get_crit_multiplier_value() -> float:
 
 func mark_recent_combat_damage() -> void:
 	rest_recovery_delay_timer = REST_RECOVERY_DELAY_AFTER_DAMAGE
+	notify_ai_event("damaged")
 
 func get_damage_multiplier_value() -> float:
 	return float(get_meta("damage_multiplier", 1.0))
@@ -804,12 +815,40 @@ func is_jumping_value() -> bool:
 
 
 func set_boarding_status(next_status: String) -> void:
+	var previous_status := boarding_status
 	boarding_status = next_status
 	set_meta("boarding_status", boarding_status)
+	if previous_status != boarding_status:
+		notify_ai_event("boarding_status")
+		_notify_ship_deck_ai_event(owned_ship, "boarding_status")
 
 
 func get_boarding_status_value() -> String:
 	return boarding_status
+
+
+func notify_ai_event(reason: String = "") -> void:
+	if current_state == State.DEAD:
+		return
+	if not reason.is_empty():
+		set_meta("last_ai_event", reason)
+	_ai_event_wake_timer = maxf(_ai_event_wake_timer, 0.42)
+	decision_timer = minf(decision_timer, 0.015)
+	combat_timer = minf(combat_timer, 0.02)
+	_limbo_ai_update_timer = minf(_limbo_ai_update_timer, 0.02)
+	_nearest_enemy_cache_timer = 0.0
+	_routine_support_step_timer = 0.0
+	_passive_sleep_timer = 0.0
+
+
+func _notify_ship_deck_ai_event(ship: Node3D, reason: String) -> void:
+	if not is_instance_valid(ship):
+		return
+	for other in EntityRegistry.get_soldiers_by_ship(ship):
+		if not is_instance_valid(other) or other == self:
+			continue
+		if other.has_method("notify_ai_event"):
+			other.call("notify_ai_event", reason)
 
 
 func _update_team_color() -> void:
@@ -854,6 +893,10 @@ func _physics_process(delta: float) -> void:
 			attack_timer -= delta
 		return
 
+	_ai_event_wake_timer = maxf(0.0, _ai_event_wake_timer - delta)
+	if _try_passive_ai_sleep(delta):
+		return
+
 	var speech_profile_start := PhysicsFrameProfiler.begin()
 	SoldierSpeechHelper.update(self, delta)
 	PhysicsFrameProfiler.end("soldier_speech", speech_profile_start)
@@ -883,7 +926,7 @@ func _physics_process(delta: float) -> void:
 		if attack_timer > 0: attack_timer -= delta
 		_check_ranged_combat()
 		return
-	
+
 	# 의사결정 스로틀링 (0.2초마다 고비용 로직 수행)
 	decision_timer -= delta
 	var run_heavy_logic = false
@@ -893,7 +936,7 @@ func _physics_process(delta: float) -> void:
 		var ship_hp_ratio = 1.0
 		if is_instance_valid(owned_ship) and owned_ship.has_method("get_hull_ratio"):
 			ship_hp_ratio = owned_ship.get_hull_ratio()
-			
+
 		# === 성능 최적화: 거리 기반 AI LOD (Level of Detail) ===
 		var dist_to_player = 0.0
 		var player_ships = get_ships_cached(get_tree(), "player")
@@ -901,9 +944,9 @@ func _physics_process(delta: float) -> void:
 			dist_to_player = global_position.distance_to(player_ships[0].global_position)
 
 		_lod_dist_to_player = dist_to_player
-		_lod_is_combat_priority = _is_lod_combat_priority()
+		_lod_is_combat_priority = _is_lod_combat_priority() or _ai_event_wake_timer > 0.0
 		var throttle_time = _get_decision_throttle_time(ship_hp_ratio, dist_to_player, _lod_is_combat_priority)
-			
+
 		decision_timer = throttle_time + randf_range(0.0, 0.05)
 		run_heavy_logic = true
 		if _lod_is_combat_priority:
@@ -918,7 +961,7 @@ func _physics_process(delta: float) -> void:
 	var run_combat_logic: bool = false
 	if combat_timer <= 0:
 		var combat_throttle_time = _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
-		combat_timer = combat_throttle_time + randf_range(0.0, 0.04)
+		combat_timer = combat_throttle_time + randf_range(0.0, combat_throttle_time * 0.35)
 		run_combat_logic = true
 		
 	# === 적군 도선병 방화(Chaos) 로직 ===
@@ -1044,6 +1087,101 @@ func _update_external_knockback(delta: float) -> bool:
 		velocity = Vector3.ZERO
 		_change_state(State.IDLE)
 	return true
+
+
+func _try_passive_ai_sleep(delta: float) -> bool:
+	if not _should_use_passive_ai_sleep():
+		_passive_sleep_timer = 0.0
+		return false
+	_passive_sleep_timer -= delta
+	if _passive_sleep_timer <= 0.0:
+		_passive_sleep_timer = _get_passive_ai_sleep_interval()
+		return false
+	_tick_passive_ai_sleep_timers(delta)
+	velocity = Vector3.ZERO
+	return true
+
+
+func _tick_passive_ai_sleep_timers(delta: float) -> void:
+	if attack_timer > 0.0:
+		attack_timer = maxf(0.0, attack_timer - delta)
+	if attack_validation_timer > 0.0:
+		attack_validation_timer = maxf(0.0, attack_validation_timer - delta)
+	if wander_timer > 0.0:
+		wander_timer = maxf(0.0, wander_timer - delta)
+	decision_timer -= delta
+	combat_timer -= delta
+	_limbo_ai_update_timer -= delta
+	_nearest_enemy_cache_timer -= delta
+	_routine_wander_step_timer -= delta
+	_routine_support_step_timer -= delta
+	_update_rest_recovery(delta)
+
+
+func _should_use_passive_ai_sleep() -> bool:
+	if _ai_event_wake_timer > 0.0:
+		return false
+	if current_state != State.IDLE and current_state != State.WANDER:
+		return false
+	if is_captain or is_stationary or _is_jumping:
+		return false
+	if boarding_status != BOARDING_STATUS_ON_DECK:
+		return false
+	if has_named_action():
+		return false
+	if is_instance_valid(current_target):
+		return false
+	if not is_instance_valid(owned_ship):
+		return false
+	if external_knockback_timer > 0.0 or external_knockback_snap_timer > 0.0:
+		return false
+	if cannon_reload_pose_timer > 0.0:
+		return false
+	if velocity.length_squared() > 0.0009:
+		return false
+	if float(get_meta("speech_visible_timer", 0.0)) > 0.0:
+		return false
+	return not _owned_ship_needs_active_deck_ai(owned_ship)
+
+
+func _owned_ship_needs_active_deck_ai(ship: Node3D) -> bool:
+	if not is_instance_valid(ship):
+		return true
+	if ship.has_method("is_sinking_or_dying") and ship.call("is_sinking_or_dying") == true:
+		return true
+	if ship.get("is_dying") == true or ship.get("is_sinking") == true:
+		return true
+	if ship.get("is_burning") == true:
+		return true
+	if ship.get("deck_is_contested") == true or ship.get("deck_is_overrun") == true:
+		return true
+	var hostile_count: int = int(ship.get("deck_hostile_boarder_count")) if ship.get("deck_hostile_boarder_count") != null else 0
+	if hostile_count > 0:
+		return true
+	if ship.get("is_boarding") == true:
+		return true
+	var boarding_target: Variant = ship.get("boarding_target")
+	return is_instance_valid(boarding_target)
+
+
+func _get_passive_ai_sleep_interval() -> float:
+	var load_mult := _get_ai_load_multiplier()
+	var interval := 0.22
+	if _is_passive_ally_ship_crew():
+		interval = 0.46
+		if _lod_dist_to_player > 24.0:
+			interval = 0.68
+	elif team == "enemy":
+		interval = 0.34
+		if _lod_dist_to_player > 40.0:
+			interval = 0.56
+	else:
+		interval = 0.28
+		if _lod_dist_to_player > 40.0:
+			interval = 0.48
+	if EntityRegistry.count_soldiers() > 60:
+		interval *= 1.35
+	return clampf(interval * minf(load_mult, 1.85) + randf_range(0.0, interval * 0.22), 0.18, 1.15)
 
 
 func _is_outside_owned_ship_deck(margin: float = 0.0) -> bool:
@@ -1328,7 +1466,9 @@ func _should_run_deck_bounds_check(delta: float) -> bool:
 func _get_deck_bounds_check_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
 	if current_state == State.MOVE or current_state == State.WANDER:
-		return 0.055 * minf(load_mult, 1.5)
+		if not _lod_is_combat_priority:
+			return 0.12 * minf(load_mult, 1.8)
+		return 0.075 * minf(load_mult, 1.6)
 	if is_stationary:
 		return 0.34 * minf(load_mult, 1.7)
 	if current_state == State.ATTACK:
@@ -1901,10 +2041,10 @@ func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, co
 	var load_mult := _get_ai_load_multiplier()
 	if _is_passive_ally_ship_crew():
 		if dist_to_player > 40.0:
-			return 1.1 * load_mult
+			return 1.25 * load_mult
 		if dist_to_player > 24.0:
-			return 0.8 * load_mult
-		return 0.55 * load_mult
+			return 0.95 * load_mult
+		return 0.72 * load_mult
 	var throttle_time: float = 0.2 if ship_hp_ratio > 0.2 else 0.1
 	if combat_priority:
 		if dist_to_player > 65.0:
@@ -1914,14 +2054,14 @@ func _get_decision_throttle_time(ship_hp_ratio: float, dist_to_player: float, co
 		return throttle_time * minf(load_mult, 1.35)
 
 	if dist_to_player > 80.0:
-		return 1.1 * load_mult
+		return 1.25 * load_mult
 	if dist_to_player > 60.0:
-		return 0.85 * load_mult
+		return 1.0 * load_mult
 	if dist_to_player > 40.0:
-		return 0.55 * load_mult
+		return 0.72 * load_mult
 	if dist_to_player > 28.0:
-		return 0.32 * load_mult
-	return throttle_time * minf(load_mult, 1.25)
+		return 0.48 * load_mult
+	return 0.36 * minf(load_mult, 1.35)
 
 func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> float:
 	var load_mult := _get_ai_load_multiplier()
@@ -1938,7 +2078,7 @@ func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> 
 			return 0.2 * load_mult
 		if dist_to_player > 28.0:
 			return 0.14 * minf(load_mult, 1.45)
-		return 0.08 * minf(load_mult, 1.2)
+		return 0.10 * minf(load_mult, 1.45)
 
 	if dist_to_player > 80.0:
 		return 0.95 * load_mult
@@ -1966,7 +2106,7 @@ func _get_limbo_ai_update_interval() -> float:
 			return 0.14 * load_mult
 		if _lod_dist_to_player > 28.0:
 			return 0.10 * minf(load_mult, 1.35)
-		return 0.075 * minf(load_mult, 1.2)
+		return 0.10 * minf(load_mult, 1.45)
 	if _lod_dist_to_player > 60.0:
 		return 0.22 * load_mult
 	if _lod_dist_to_player > 40.0:
@@ -1981,8 +2121,12 @@ func _get_ai_load_multiplier() -> float:
 	var ship_count := EntityRegistry.count_ships()
 	var projectile_count := EntityRegistry.count_projectiles()
 	var load_mult := 1.0
+	if soldier_count > 28:
+		load_mult += minf(0.42, float(soldier_count - 28) * 0.03)
 	if soldier_count > 36:
 		load_mult += minf(0.65, float(soldier_count - 36) * 0.018)
+	if ship_count > 6:
+		load_mult += minf(0.22, float(ship_count - 6) * 0.055)
 	if ship_count > 10:
 		load_mult += minf(0.28, float(ship_count - 10) * 0.025)
 	if projectile_count > 20:
@@ -1995,18 +2139,21 @@ func _get_ai_load_multiplier() -> float:
 func _get_routine_wander_step_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
 	if _is_passive_ally_ship_crew():
-		return 0.14 * minf(load_mult, 1.8)
+		return 0.22 * minf(load_mult, 1.8)
 	if not _lod_is_combat_priority:
-		return 0.10 * minf(load_mult, 1.7)
+		return 0.16 * minf(load_mult, 1.8)
 	return 0.0
 
 
 func _should_run_routine_support_step(delta: float, run_heavy_logic: bool) -> bool:
-	if run_heavy_logic or _lod_is_combat_priority:
+	if not _should_consider_routine_support_step():
+		_routine_support_step_timer = 0.0
+		_routine_support_step_accum = 0.0
+		return false
+	_routine_support_step_accum = minf(_routine_support_step_accum + maxf(delta, 0.0), 0.35)
+	if run_heavy_logic:
 		return true
 	if current_state != State.IDLE and current_state != State.WANDER:
-		return true
-	if has_meta("ship_work_active_target_local"):
 		return true
 	var interval := _get_routine_support_step_interval()
 	if interval <= 0.0:
@@ -2018,11 +2165,29 @@ func _should_run_routine_support_step(delta: float, run_heavy_logic: bool) -> bo
 	return true
 
 
+func _should_consider_routine_support_step() -> bool:
+	if team == "player":
+		return true
+	return has_meta("ship_work_active_target_local")
+
+
+func _consume_routine_support_step_delta(fallback_delta: float) -> float:
+	var step_delta := _routine_support_step_accum
+	_routine_support_step_accum = 0.0
+	if step_delta <= 0.0:
+		return fallback_delta
+	return minf(step_delta, 0.35)
+
+
 func _get_routine_support_step_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
+	if has_meta("ship_work_active_target_local"):
+		return 0.09 * minf(load_mult, 1.8)
 	if _is_passive_ally_ship_crew():
-		return 0.24 * minf(load_mult, 1.8)
-	return 0.16 * minf(load_mult, 1.65)
+		return 0.34 * minf(load_mult, 1.8)
+	if _lod_is_combat_priority:
+		return 0.12 * minf(load_mult, 1.65)
+	return 0.22 * minf(load_mult, 1.65)
 
 func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
 	var limbo_target: Node3D = _get_recent_limbo_target()
@@ -2086,7 +2251,7 @@ func _update_limbo_ai_pilot_runtime(delta: float) -> void:
 	if _limbo_ai_update_timer > 0.0:
 		return
 	_limbo_ai_update_interval_runtime = _get_limbo_ai_update_interval()
-	_limbo_ai_update_timer = _limbo_ai_update_interval_runtime + randf_range(0.0, 0.015)
+	_limbo_ai_update_timer = _limbo_ai_update_interval_runtime + randf_range(0.0, _limbo_ai_update_interval_runtime * 0.45)
 	_update_limbo_ai_pilot(delta)
 
 

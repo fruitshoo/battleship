@@ -47,6 +47,7 @@ enum CombatRole {CHARGER, GUNNER}
 			_apply_formation_role_profile()
 @export var limbo_ai_pilot_enabled: bool = false
 @export_file("*.tres") var limbo_ai_pilot_tree_path: String = ShipLimboAIPilot.DEFAULT_TREE_PATH
+@export_range(0.03, 0.25, 0.01) var limbo_ai_tick_interval: float = 0.08
 @export var ship_type: String = "sekibune_melee":
 	set(value):
 		ship_type = value
@@ -122,6 +123,10 @@ var cached_lm: Node = null
 var separation_force: Vector3 = Vector3.ZERO
 var separation_timer: float = 0.0
 var logic_timer: float = 0.0 # 타겟 체크 등 일반 로직용
+var _limbo_ai_tick_timer: float = 0.0
+var _limbo_ai_tick_accum: float = 0.0
+var _minion_ai_update_phase: int = -1
+var _minion_ai_accum_delta: float = 0.0
 @export_range(0.05, 0.5, 0.01) var ai_logic_update_interval: float = 0.2
 @export_range(0.0, 0.15, 0.01) var ai_logic_update_jitter: float = 0.05
 var _ai_logic_update_interval_runtime: float = 0.2
@@ -678,8 +683,12 @@ func _update_enemy_fire_pot_logic(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	var profile_start := PhysicsProfiler.begin()
+	var limbo_profile_start := PhysicsProfiler.begin()
 	_update_limbo_ai_pilot(delta)
+	PhysicsProfiler.end("chaser_limbo_ai_pilot", limbo_profile_start)
+	var ai_profile_start := PhysicsProfiler.begin()
 	ChaserShipAiHelper.process_physics(self, delta)
+	PhysicsProfiler.end("chaser_ai_process_total", ai_profile_start)
 	PhysicsProfiler.end("chaser_ship_physics", profile_start)
 
 func _update_logic_throttled() -> void:
@@ -722,15 +731,27 @@ func _find_player() -> void:
 
 func _update_limbo_ai_pilot(delta: float) -> void:
 	if not limbo_ai_pilot_enabled:
+		_limbo_ai_tick_timer = 0.0
+		_limbo_ai_tick_accum = 0.0
 		return
 	var team_tag := get_team_tag()
 	if team_tag != "enemy" and not (
 		team_tag == "player"
 		and (ShipAllyRoleHelper.is_support_ship(self) or ShipAllyRoleHelper.is_captured_minion(self))
 	):
+		_limbo_ai_tick_timer = 0.0
+		_limbo_ai_tick_accum = 0.0
 		return
+	_limbo_ai_tick_accum += delta
+	_limbo_ai_tick_timer -= delta
+	if _limbo_ai_tick_timer > 0.0:
+		return
+	var tick_delta := _limbo_ai_tick_accum
+	_limbo_ai_tick_accum = 0.0
+	var load_mult := ChaserShipAiHelper.get_load_multiplier(self)
+	_limbo_ai_tick_timer = maxf(0.03, limbo_ai_tick_interval * load_mult)
 	var profile_start := PhysicsProfiler.begin()
-	ShipLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path)
+	ShipLimboAIPilot.tick(self, tick_delta, limbo_ai_pilot_tree_path)
 	PhysicsProfiler.end("ship_limbo_ai", profile_start)
 
 ## 나포(Capture) 처리
@@ -988,8 +1009,62 @@ func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
 ## 나포함 AI 로직 (플레이어 호위 및 적 탐지)
 func _process_minion_ai(delta: float) -> void:
 	var profile_start := PhysicsProfiler.begin()
-	ChaserShipMinionHelper.process_minion_ai(self, delta)
+	var tick_delta := _consume_minion_ai_delta(delta)
+	if tick_delta <= 0.0:
+		_update_minion_ai_idle_visuals()
+		PhysicsProfiler.end("support_minion_ai", profile_start)
+		return
+	ChaserShipMinionHelper.process_minion_ai(self, tick_delta)
 	PhysicsProfiler.end("support_minion_ai", profile_start)
+
+
+func _consume_minion_ai_delta(delta: float) -> float:
+	if not _should_throttle_minion_ai():
+		_minion_ai_accum_delta = 0.0
+		return delta
+	_minion_ai_accum_delta = minf(_minion_ai_accum_delta + maxf(delta, 0.0), 0.16)
+	var interval_frames := _get_minion_ai_frame_interval()
+	if interval_frames <= 1:
+		var immediate_delta := _minion_ai_accum_delta
+		_minion_ai_accum_delta = 0.0
+		return immediate_delta
+	if _minion_ai_update_phase < 0:
+		_minion_ai_update_phase = abs(hash("%s:%s" % [get_instance_id(), ship_type])) % interval_frames
+	var frame := Engine.get_physics_frames()
+	if (frame + _minion_ai_update_phase) % interval_frames != 0:
+		return 0.0
+	var tick_delta := _minion_ai_accum_delta
+	_minion_ai_accum_delta = 0.0
+	return tick_delta
+
+
+func _should_throttle_minion_ai() -> bool:
+	if team != "player":
+		return false
+	if is_boarding or is_dying or is_sinking or is_derelict:
+		return false
+	return ShipAllyRoleHelper.is_support_ship(self) or ShipAllyRoleHelper.is_captured_minion(self)
+
+
+func _get_minion_ai_frame_interval() -> int:
+	var support_assist_target_id: int = int(get_meta("support_assist_target_id", 0))
+	var is_joining_support: bool = get_meta("support_joining", false) == true
+	if support_assist_target_id != 0 or is_joining_support:
+		return 2
+	var load_mult := ChaserShipAiHelper.get_load_multiplier(self)
+	var interval := 2
+	if load_mult >= 1.35:
+		interval = 3
+	if ShipAllyRoleHelper.is_heavy_support(self) and load_mult >= 1.15:
+		interval = max(interval, 3)
+	return clampi(interval, 1, 4)
+
+
+func _update_minion_ai_idle_visuals() -> void:
+	_update_rudder_visual()
+	_apply_bobbing_effect()
+	var speed_ratio := clampf(current_speed / maxf(max_speed, 0.01), 0.0, 1.0)
+	_set_wake_state(current_speed > 0.4, speed_ratio, 0.0, 0.0)
 
 func _update_wave_sounds(delta: float) -> void:
 	ChaserShipAiHelper.update_wave_sounds(self, delta)

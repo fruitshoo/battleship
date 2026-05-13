@@ -17,6 +17,16 @@
       "id": "module_boundaries",
       "registry": "res://scripts/test/module_boundaries.json",
       "purpose": "Architecture guard registry for helper ownership and boundary baselines."
+    },
+    {
+      "id": "project_structure_doc",
+      "document": "res://docs/PROJECT_STRUCTURE.md",
+      "purpose": "Human-readable map of project folders and major entry points."
+    },
+    {
+      "id": "ship_ai_flow_doc",
+      "document": "res://docs/ship_ai_flow.md",
+      "purpose": "Human-readable map of ship AI flow, LimboAI boundaries, and safe refactor order."
     }
   ],
   "runtime_harnesses": [

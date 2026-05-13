@@ -7,7 +7,6 @@ const STARTUP_BLOCKING_PREWARM_MIN_SECONDS: float = 1.6
 const STARTUP_POOL_PREWARM_DEFAULT: int = 4
 const STARTUP_POOL_PREWARM_MAX: int = 12
 const STARTUP_POOL_PREWARM_COUNTS := {
-	"res://scenes/effects/impact_puff.tscn": 10,
 	"res://scenes/effects/water_blast.tscn": 8,
 	"res://scenes/effects/wood_splinter.tscn": 6,
 	"res://scenes/projectiles/fire_pot.tscn": 6,
@@ -41,6 +40,8 @@ static func initialize(lm: Node) -> void:
 			var level_manager := NodeContractHelper.get_instance_node(lm_id)
 			if is_instance_valid(level_manager):
 				_apply_startup_default_equipment(level_manager)
+				if level_manager.has_method("_maybe_start_run_prologue"):
+					level_manager.call_deferred("_maybe_start_run_prologue")
 		)
 
 static func run_startup_bootstrap_async(lm: Node) -> void:
@@ -77,7 +78,6 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		lm.add_child(loading_layer)
 
 	var pooled_scenes_to_warm = [
-		preload("res://scenes/effects/impact_puff.tscn"),
 		preload("res://scenes/effects/wood_splinter.tscn"),
 		preload("res://scenes/effects/fire_effect.tscn"),
 		preload("res://scenes/effects/fire_pot_explosion.tscn"),
@@ -171,6 +171,8 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		var tween = lm.create_tween()
 		tween.tween_property(bg, "modulate:a", 0.0, 1.0)
 		tween.tween_callback(loading_layer.queue_free)
+	if lm.has_method("_maybe_start_run_prologue"):
+		lm.call_deferred("_maybe_start_run_prologue")
 
 
 static func _apply_startup_default_equipment(_lm: Node) -> void:

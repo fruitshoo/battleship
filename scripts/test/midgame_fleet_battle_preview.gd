@@ -2,6 +2,7 @@ extends Node3D
 
 const DistanceDebugVisualizer = preload("res://scripts/helpers/distance_debug_visualizer.gd")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 enum BattleMode {
 	STRESS,
@@ -85,6 +86,8 @@ var _support_probe_monitor_start: Dictionary = {}
 var _support_probe_monitor_last: Dictionary = {}
 var _support_probe_monitor_peak_static_bytes: float = 0.0
 var _support_probe_monitor_peak_objects: float = 0.0
+var _support_probe_profile_buckets: bool = false
+var _support_probe_profile_print_elapsed: float = 0.0
 
 
 func _ready() -> void:
@@ -198,6 +201,9 @@ func _apply_env_overrides() -> void:
 	var support_probe_survival_text := OS.get_environment("BATTLESHIP_MIDGAME_SUPPORT_PROBE_LOCK_SURVIVAL").strip_edges()
 	if not support_probe_survival_text.is_empty():
 		support_probe_lock_survival = _env_text_enabled(support_probe_survival_text)
+	_support_probe_profile_buckets = _env_flag_enabled("BATTLESHIP_MIDGAME_PROFILE_BUCKETS")
+	if _support_probe_profile_buckets:
+		PhysicsFrameProfiler.set_enabled(true)
 	print_orphan_nodes = _env_flag_enabled("BATTLESHIP_MIDGAME_PRINT_ORPHANS")
 
 
@@ -589,6 +595,11 @@ func _track_support_probe(delta: float) -> void:
 	_support_probe_sample_elapsed += delta
 	_support_probe_frame_samples.append(delta)
 	_support_probe_window_samples.append(delta)
+	if _support_probe_profile_buckets and delta >= 0.05:
+		_support_probe_profile_print_elapsed += delta
+		if _support_probe_profile_print_elapsed >= 0.45:
+			_support_probe_profile_print_elapsed = 0.0
+			_print_support_probe_profile("slow_frame", delta)
 	if _support_probe_sample_elapsed >= support_probe_sample_interval_seconds:
 		_print_support_probe_sample()
 	if _support_probe_elapsed >= support_probe_duration_seconds:
@@ -720,8 +731,19 @@ func _print_support_probe_sample() -> void:
 		int(_support_probe_monitor_value(_support_probe_monitor_last, "objects")),
 		int(_support_probe_monitor_value(_support_probe_monitor_last, "nodes")),
 	])
+	if _support_probe_profile_buckets:
+		_print_support_probe_profile("sample_%d" % _support_probe_sample_index)
 	_support_probe_window_samples.clear()
 	_support_probe_sample_elapsed = 0.0
+
+
+func _print_support_probe_profile(reason: String, frame_delta: float = -1.0) -> void:
+	var header := "[MidgameSupportPerf] profile %s" % reason
+	if frame_delta >= 0.0:
+		header += " frame=%.2fms" % (frame_delta * 1000.0)
+	print(header)
+	for line in PhysicsFrameProfiler.build_summary_lines(14):
+		print("[MidgameSupportPerf]   %s" % line)
 
 
 func _print_support_probe_summary() -> void:

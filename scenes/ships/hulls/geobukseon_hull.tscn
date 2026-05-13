@@ -14,35 +14,7 @@
 [ext_resource type="PackedScene" uid="uid://dsya706s4y2wn" path="res://scenes/props/ship_decor_flags/obang_front_jujak.tscn" id="12_g8xhb"]
 [ext_resource type="PackedScene" uid="uid://jwpbskmjqpw2" path="res://scenes/props/ship_decor_flags/obang_center_hwangryong.tscn" id="12_wi7sv"]
 [ext_resource type="PackedScene" uid="uid://dcf4di2j0lr01" path="res://scenes/props/ship_decor_flags/obang_left_cheongryong.tscn" id="14_1484i"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_1484i"]
-render_priority = 20
-shader = ExtResource("7_78chh")
-shader_parameter/wave_speed = 3.0
-shader_parameter/wave_strength = 0.38
-shader_parameter/use_sail_texture = true
-shader_parameter/sail_texture = ExtResource("4_horizon_sail")
-shader_parameter/burn_mask_texture_c = ExtResource("8_wi7sv")
-shader_parameter/use_dark_alpha_cutoff = false
-shader_parameter/dark_alpha_cutoff = 0.12
-shader_parameter/dark_alpha_softness = 0.04
-shader_parameter/sail_uv_scale = Vector2(1, 2)
-shader_parameter/sail_uv_offset = Vector2(0, 0)
-shader_parameter/swap_uv_axes = false
-shader_parameter/flip_u = false
-shader_parameter/flip_v = false
-shader_parameter/sail_damage = 0.0
-shader_parameter/burn_amount = 0.0
-shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.3039117352056169
-shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
-shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
-shader_parameter/burn_edge_emission_strength = 0.28
-shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
-shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
-shader_parameter/bottom_width_scale = 1.0
-shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 719332648805625
+[ext_resource type="PackedScene" uid="uid://uxbny6pjpli1" path="res://scenes/effects/smoke_effect.tscn" id="15_lukdh"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_lukdh"]
 render_priority = 20
@@ -63,7 +35,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.03811434302908726
+shader_parameter/damage_seed = 0.09327983951855567
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -71,13 +43,42 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 719332816530670
+metadata/mast_owner_id = 2237912919513
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gvf0h"]
+render_priority = 20
+shader = ExtResource("7_78chh")
+shader_parameter/wave_speed = 3.0
+shader_parameter/wave_strength = 0.38
+shader_parameter/use_sail_texture = true
+shader_parameter/sail_texture = ExtResource("4_horizon_sail")
+shader_parameter/burn_mask_texture_c = ExtResource("8_wi7sv")
+shader_parameter/use_dark_alpha_cutoff = false
+shader_parameter/dark_alpha_cutoff = 0.12
+shader_parameter/dark_alpha_softness = 0.04
+shader_parameter/sail_uv_scale = Vector2(1, 2)
+shader_parameter/sail_uv_offset = Vector2(0, 0)
+shader_parameter/swap_uv_axes = false
+shader_parameter/flip_u = false
+shader_parameter/flip_v = false
+shader_parameter/sail_damage = 0.0
+shader_parameter/burn_amount = 0.0
+shader_parameter/hole_alpha_strength = 1.0
+shader_parameter/damage_seed = 0.09428284854563691
+shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
+shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
+shader_parameter/burn_edge_emission_strength = 0.28
+shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
+shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
+shader_parameter/bottom_width_scale = 1.0
+shader_parameter/sail_deployed_ratio = 1.0
+metadata/mast_owner_id = 2238080691683
 
 [node name="GeobukseonHull" type="Node3D" unique_id=1045646202]
 
 [node name="ScaleRoot" type="Node3D" parent="." unique_id=1253777387]
 
-[node name="Hull" parent="ScaleRoot" unique_id=1466983354 instance=ExtResource("1_geobuk_model")]
+[node name="Hull" parent="ScaleRoot" unique_id=446341442 instance=ExtResource("1_geobuk_model")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 
 [node name="RudderVisual" parent="ScaleRoot" unique_id=9468343 instance=ExtResource("5_rudder_scene")]
@@ -237,7 +238,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.758852, 0)
 
 [node name="SailMesh" parent="ScaleRoot/Masts/MastPivot_01/Mast/SailVisual" index="0" unique_id=1903760530]
 transform = Transform3D(1, 0, 0, 0, 0.85, 0, 0, 0, 1, 0, 1.5, -0.35)
-material_override = SubResource("ShaderMaterial_1484i")
+material_override = SubResource("ShaderMaterial_lukdh")
 
 [node name="Flag" parent="ScaleRoot/Masts/MastPivot_01/Mast/SailVisual" index="1" unique_id=85230560]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.521003, 0)
@@ -260,7 +261,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.758852, 0)
 
 [node name="SailMesh" parent="ScaleRoot/Masts/MastPivot_02/Mast2/SailVisual" index="0" unique_id=1903760530]
 transform = Transform3D(1, 0, 0, 0, 0.85, 0, 0, 0, 1, 0, 1.5, -0.35)
-material_override = SubResource("ShaderMaterial_lukdh")
+material_override = SubResource("ShaderMaterial_gvf0h")
 
 [node name="Flag" parent="ScaleRoot/Masts/MastPivot_02/Mast2/SailVisual" index="1" unique_id=85230560]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.521003, 0)
@@ -281,6 +282,9 @@ transform = Transform3D(0.99128693, 0, 0.13172007, 0, 1, 0, -0.13172007, 0, 0.99
 
 [node name="ObangLeftCheongryong" parent="ScaleRoot/flags" unique_id=1053279811 instance=ExtResource("14_1484i")]
 transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 1.7868049, 2.5545678, -4.7895)
+
+[node name="SmokeEffect" parent="ScaleRoot" unique_id=1847126054 instance=ExtResource("15_lukdh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.943425, -6.059725)
 
 [editable path="ScaleRoot/Masts/MastPivot_01/Mast"]
 [editable path="ScaleRoot/Masts/MastPivot_01/Mast/SailVisual/Flag"]

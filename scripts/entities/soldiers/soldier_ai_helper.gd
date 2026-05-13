@@ -21,11 +21,14 @@ static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 			soldier.wander_timer = randf_range(1.5, 3.0)
 		return
 	if _should_run_routine_support_step(soldier, delta, run_heavy_logic):
+		var support_delta := delta
+		if soldier.has_method("_consume_routine_support_step_delta"):
+			support_delta = float(soldier.call("_consume_routine_support_step_delta", delta))
 		var support_profile_start := PhysicsFrameProfiler.begin()
-		if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.72, WANDER_TURN_SPEED):
+		if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(support_delta, 0.72, WANDER_TURN_SPEED):
 			PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
 			return
-		if _try_move_to_active_ship_duty_target(soldier, 0.75, delta, WANDER_TURN_SPEED):
+		if _try_move_to_active_ship_duty_target(soldier, 0.75, support_delta, WANDER_TURN_SPEED):
 			PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
 			return
 		PhysicsFrameProfiler.end("soldier_idle_support", support_profile_start)
@@ -79,12 +82,15 @@ static func state_wander(soldier, delta_or_run_heavy_logic: Variant = 0.016, run
 		soldier._change_state(soldier.State.IDLE)
 		return
 	if _should_run_routine_support_step(soldier, delta, run_heavy_logic):
+		var support_delta := delta
+		if soldier.has_method("_consume_routine_support_step_delta"):
+			support_delta = float(soldier.call("_consume_routine_support_step_delta", delta))
 		var support_profile_start := PhysicsFrameProfiler.begin()
-		if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(delta, 0.68, WANDER_TURN_SPEED):
+		if soldier.has_method("_try_assist_incapacitated_ally") and soldier._try_assist_incapacitated_ally(support_delta, 0.68, WANDER_TURN_SPEED):
 			PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
 			return
 
-		if _try_move_to_active_ship_duty_target(soldier, 0.7, delta, WANDER_TURN_SPEED):
+		if _try_move_to_active_ship_duty_target(soldier, 0.7, support_delta, WANDER_TURN_SPEED):
 			PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)
 			return
 		PhysicsFrameProfiler.end("soldier_wander_support", support_profile_start)

@@ -25,6 +25,7 @@ signal boss_died
 @export_range(0.0, 1.0, 0.01) var boss_wake_min_speed_ratio: float = 0.42
 @export_range(0.0, 1.0, 0.01) var boss_wake_turbulence_floor: float = 0.16
 @export_range(0.0, 1.0, 0.01) var orbit_inward_bias: float = 0.34 # 선회 중에도 플레이어 쪽으로 얼마나 파고들지
+@export_range(0.06, 0.35, 0.01) var boss_separation_update_interval: float = 0.16
 @export var cannon_scene: PackedScene = preload("res://scenes/entities/launchers/cannon_enemy_heavy.tscn")
 @export var singigeon_scene: PackedScene = preload("res://scenes/entities/launchers/singigeon_launcher.tscn")
 @export var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
@@ -32,6 +33,7 @@ signal boss_died
 @export var chest_scene: PackedScene = preload("res://scenes/effects/treasure_chest.tscn")
 @export var limbo_ai_pilot_enabled: bool = true
 @export_file("*.tres") var limbo_ai_pilot_tree_path: String = ShipLimboAIPilot.DEFAULT_TREE_PATH
+@export_range(0.03, 0.18, 0.01) var limbo_ai_tick_interval: float = 0.06
 
 var target: Node3D = null
 var orbit_angle: float = 0.0
@@ -45,6 +47,10 @@ var _defeat_flourish_started: bool = false
 var crew_composition: Array[String] = []
 var _base_move_speed: float = 0.0
 var _base_orbit_inward_bias: float = 0.0
+var _limbo_ai_tick_timer: float = 0.0
+var _limbo_ai_tick_accum: float = 0.0
+var separation_force: Vector3 = Vector3.ZERO
+var separation_timer: float = 0.0
 
 @export var ship_type: String = "atakebune_mid":
 	set(value):
@@ -297,7 +303,7 @@ func _physics_process(delta: float) -> void:
 		desired_heading_point = hinted_heading_point
 
 	# === 이동 및 회전 (Rudder-driven) ===
-	var sep: Vector3 = _calculate_separation()
+	var sep: Vector3 = _get_cached_separation(delta)
 	var hard_rep: Vector3 = _calculate_collision_repulsion()
 	var steering_dir: Vector3 = desired_move_dir
 	if (sep + hard_rep).length_squared() > 0.001:
@@ -353,6 +359,27 @@ func _physics_process(delta: float) -> void:
 	PhysicsProfiler.end("boss_ship_physics", profile_start)
 
 
+func _get_cached_separation(delta: float) -> Vector3:
+	separation_timer -= delta
+	if separation_timer > 0.0:
+		return separation_force
+	var interval := boss_separation_update_interval * _get_boss_load_multiplier()
+	separation_timer = interval + randf_range(0.0, interval * 0.25)
+	separation_force = _calculate_separation()
+	return separation_force
+
+
+func _get_boss_load_multiplier() -> float:
+	var ship_count := EntityRegistry.count_ships()
+	var soldier_count := EntityRegistry.count_soldiers()
+	var load_mult := 1.0
+	if ship_count > 6:
+		load_mult += minf(0.35, float(ship_count - 6) * 0.07)
+	if soldier_count > 36:
+		load_mult += minf(0.45, float(soldier_count - 36) * 0.025)
+	return clampf(load_mult, 1.0, 1.9)
+
+
 func _update_boss_wake_state(world_velocity: Vector3, separation_velocity: Vector3) -> void:
 	var planar_velocity := world_velocity
 	planar_velocity.y = 0.0
@@ -378,6 +405,7 @@ func _calculate_separation() -> Vector3:
 	var profile_start := PhysicsProfiler.begin()
 	var force = Vector3.ZERO
 	var neighbors = EntityRegistry.get_ships()
+	var my_radius := base_collision_radius * maxf(width_multiplier, length_multiplier)
 	
 	for other in neighbors:
 		if other == self or not is_instance_valid(other) or other.get("is_dead") or other.get("is_sinking"):
@@ -389,6 +417,13 @@ func _calculate_separation() -> Vector3:
 		offset.y = 0.0
 		var dist_sq = offset.length_squared()
 		if dist_sq <= 0.01:
+			continue
+		var other_radius := NodeContractHelper.get_base_collision_radius_value(other) * maxf(
+			NodeContractHelper.get_collision_width_multiplier_value(other),
+			NodeContractHelper.get_collision_length_multiplier_value(other)
+		)
+		var broad_dist := my_radius + other_radius + 2.0
+		if dist_sq > broad_dist * broad_dist:
 			continue
 		
 		var dist = sqrt(dist_sq)
@@ -441,8 +476,17 @@ func _cache_limbo_base_combat_values() -> void:
 
 func _update_limbo_ai_pilot(delta: float) -> void:
 	if not limbo_ai_pilot_enabled:
+		_limbo_ai_tick_timer = 0.0
+		_limbo_ai_tick_accum = 0.0
 		return
-	ShipLimboAIPilot.tick(self, delta, limbo_ai_pilot_tree_path)
+	_limbo_ai_tick_accum += delta
+	_limbo_ai_tick_timer -= delta
+	if _limbo_ai_tick_timer > 0.0:
+		return
+	var tick_delta := _limbo_ai_tick_accum
+	_limbo_ai_tick_accum = 0.0
+	_limbo_ai_tick_timer = maxf(0.03, limbo_ai_tick_interval)
+	ShipLimboAIPilot.tick(self, tick_delta, limbo_ai_pilot_tree_path)
 	_apply_limbo_pilot_modifiers()
 	_draw_limbo_ai_debug()
 
