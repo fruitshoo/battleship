@@ -25,6 +25,9 @@ class MockTargetShip:
 	var deck_hostile_boarder_count: int = 0
 	var is_sinking: bool = false
 	var is_dying: bool = false
+	var is_rowing: bool = false
+	var rowing_locked: bool = false
+	var rowing_stamina: float = 100.0
 	var boarding_capture_duration: float = 10.0
 	var boarding_capture_damage_tick: float = 10.0
 	var boarding_capture_progress: float = 0.0
@@ -338,6 +341,7 @@ func _ready() -> void:
 	_verify_soldier_targets_boarder_on_distressed_ally_ship(failures)
 	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
 	_verify_player_crew_speaks_when_ship_is_burning(failures)
+	_verify_rowing_speech_uses_single_crew_label(failures)
 	_verify_support_rescue_boarding_holds_player_capture_progress(failures)
 	_verify_support_rescue_boarders_return_after_deck_safe(failures)
 	_verify_support_attack_boarders_return_after_enemy_deck_safe(failures)
@@ -1995,6 +1999,39 @@ func _verify_player_crew_speaks_when_ship_is_burning(failures: Array[String]) ->
 	elif label.visible != true or label.text.is_empty():
 		failures.append("player crew fire speech did not use fire-context lines")
 
+	sailor.queue_free()
+	player_ship.queue_free()
+
+
+func _verify_rowing_speech_uses_single_crew_label(failures: Array[String]) -> void:
+	var player_ship := MockTargetShip.new()
+	add_child(player_ship)
+	player_ship.team = "player"
+
+	var sailor := MockCombatSoldier.new()
+	add_child(sailor)
+	sailor.team = "player"
+	sailor.owned_ship = player_ship
+	player_ship.is_rowing = true
+
+	EntityRegistry.register_ship(player_ship)
+	EntityRegistry.register_soldier(sailor)
+	SoldierSpeechHelper.reset(sailor)
+	sailor.set_meta("speech_timer", 0.0)
+	SoldierSpeechHelper.update(sailor, 1.0)
+
+	var label := sailor.get_node_or_null("SpeechLabel") as Label3D
+	if label == null:
+		failures.append("rowing speech did not create a crew label")
+	elif label.visible != true or label.text.is_empty():
+		failures.append("rowing speech label was not visible")
+	elif not SoldierSpeechHelper.CREW_ROWING_LINES.has(label.text):
+		failures.append("rowing speech used an unexpected line")
+	elif int(player_ship.get_meta("speech_rowing_next_allowed_msec", 0)) <= Time.get_ticks_msec():
+		failures.append("rowing speech did not set ship cooldown")
+
+	EntityRegistry.unregister_soldier(sailor)
+	EntityRegistry.unregister_ship(player_ship)
 	sailor.queue_free()
 	player_ship.queue_free()
 

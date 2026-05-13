@@ -60,6 +60,10 @@ var sfx_streams = {
 		{
 			"path": "res://assets/audio/sfx/sfx_musket_fire_02.ogg",
 			"volume_db": -4.0,
+		},
+		{
+			"path": "res://assets/audio/sfx/sfx_musket_fire_03_cc0.wav",
+			"volume_db": -7.0,
 		}
 	],
 	"soldier_hit": [
@@ -119,7 +123,10 @@ var sfx_streams = {
 
 var bgm_streams = {
 	"main_menu": "res://assets/audio/music/bgm_main_menu_battle_tactics.ogg",
-	"boss_taiko": "res://assets/audio/music/bgm_boss_taiko_loop_cc0.ogg",
+	"boss_taiko": [
+		"res://assets/audio/music/bgm_boss_taiko_drumloop_120_cc0.wav",
+		"res://assets/audio/music/bgm_boss_tribe_drum_loop_cc0.wav",
+	],
 }
 
 const DEFAULT_3D_SFX_VOLUME_DB := 3.0
@@ -215,7 +222,7 @@ const SFX_PROFILE_OVERRIDES := {
 		"max_distance": 260.0,
 		"unit_size": 90.0,
 		"pitch_jitter": 0.025,
-		"rate_limit_msec": 3000,
+		"rate_limit_msec": 1200,
 	},
 	"sail_flap": {
 		"volume_db": -0.5,
@@ -296,6 +303,7 @@ var _last_sfx_play_msec_by_key: Dictionary = {}
 # BGM 플레이어
 var bgm_player: AudioStreamPlayer
 var current_bgm_name: String = ""
+var _active_boss_bgm_path: String = ""
 
 # 예열 완료 신호
 signal prewarm_finished
@@ -571,18 +579,41 @@ func _get_sfx_entry_volume_db(entry) -> float:
 	return 0.0
 
 func _load_bgm_stream(stream_name: String) -> AudioStream:
-	if _cached_bgm_streams.has(stream_name):
-		return _cached_bgm_streams[stream_name]
 	if not bgm_streams.has(stream_name):
 		return null
-	var path = bgm_streams[stream_name]
-	if not (path is String) or not ResourceLoader.exists(path):
+	var path := _resolve_bgm_path(stream_name)
+	if path.is_empty() or not ResourceLoader.exists(path):
 		return null
+	if _cached_bgm_streams.has(path):
+		return _cached_bgm_streams[path]
 	var stream := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REUSE) as AudioStream
 	if stream:
 		_set_stream_loop(stream, true)
-		_cached_bgm_streams[stream_name] = stream
+		_cached_bgm_streams[path] = stream
 	return stream
+
+func _resolve_bgm_path(stream_name: String) -> String:
+	var entry = bgm_streams.get(stream_name, "")
+	if entry is String:
+		return str(entry)
+	if entry is Array:
+		if stream_name == BOSS_TAIKO_BGM:
+			if _active_boss_bgm_path.is_empty() or not ResourceLoader.exists(_active_boss_bgm_path):
+				_active_boss_bgm_path = _pick_bgm_variant_path(entry)
+			return _active_boss_bgm_path
+		return _pick_bgm_variant_path(entry)
+	return ""
+
+func _pick_bgm_variant_path(variants: Array) -> String:
+	var valid_paths: Array[String] = []
+	for variant in variants:
+		var path := str(variant)
+		if path.is_empty() or not ResourceLoader.exists(path):
+			continue
+		valid_paths.append(path)
+	if valid_paths.is_empty():
+		return ""
+	return valid_paths.pick_random()
 
 func _set_stream_loop(stream: AudioStream, enabled: bool) -> void:
 	if not stream:
@@ -737,8 +768,10 @@ func stop_bgm(stream_name: String = "") -> void:
 func set_boss_battle_music(active: bool) -> void:
 	if active:
 		play_bgm(BOSS_TAIKO_BGM)
-	elif current_bgm_name == BOSS_TAIKO_BGM:
-		stop_bgm(BOSS_TAIKO_BGM)
+	else:
+		if current_bgm_name == BOSS_TAIKO_BGM:
+			stop_bgm(BOSS_TAIKO_BGM)
+		_active_boss_bgm_path = ""
 
 
 func play_main_menu_music() -> void:

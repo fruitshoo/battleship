@@ -17,6 +17,8 @@
 | sfx_boarding_war_cry_2.ogg |CC0|https://freesound.org/s/521832/|
 | sfx_boarding_war_cry_3.ogg |CC0|https://freesound.org/s/521831/|
 | bgm_boss_taiko_loop_cc0.ogg |CC0|https://freesound.org/people/infinita08/sounds/459561/|
+| bgm_boss_taiko_drumloop_120_cc0.wav |CC0|https://freesound.org/people/Xinematix/sounds/491277/|
+| bgm_boss_tribe_drum_loop_cc0.wav |CC0|https://freesound.org/people/PearceWilsonKing/sounds/342465/|
 | sfx_boss_medieval_horn_cc0.ogg |CC0|https://freesound.org/people/klavo1985/sounds/402753/|
 | sfx_cannon_fire.ogg |CC0|https://freesound.org/people/SamsterBirdies/sounds/581599/|
 | sfx_cannon_fire_02.ogg |CC0|https://freesound.org/people/gerainsan/sounds/457044/|
@@ -36,6 +38,7 @@
 | sfx_metal_drop.mp3 |CC0|https://freesound.org/people/gamer500/sounds/682736/|
 | sfx_musket_fire.ogg |Attribution 4.0|https://freesound.org/people/aaronsiler/sounds/128980/|
 | sfx_musket_fire_02.ogg |Attribution 4.0|https://freesound.org/people/J8054/sounds/648747/|
+| sfx_musket_fire_03_cc0.wav |CC0|https://freesound.org/people/fennelliott/sounds/347647/|
 | sfx_oars.ogg |Attribution 3.0|https://freesound.org/people/pugaeme/sounds/389223/|
 | sfx_pickup_1.ogg |CC0|https://freesound.org/people/IENBA/sounds/698768/|
 | sfx_pickup_2.ogg |CC0|https://freesound.org/people/IENBA/sounds/698768/|

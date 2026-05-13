@@ -10,6 +10,8 @@ const SPEECH_VISIBLE_TIMER_META := "speech_visible_timer"
 const SPEECH_DURATION_META := "speech_duration"
 const SPEECH_LAST_CONTEXT_META := "speech_last_context"
 const SPEECH_LINES_DATA_PATH := "res://data/soldier_speech_lines.json"
+const ROWING_SHIP_NEXT_ALLOWED_META := "speech_rowing_next_allowed_msec"
+const ROWING_SHIP_LAST_LINE_META := "speech_rowing_last_line"
 
 const CAPTAIN_GENERAL_LINES: Array[String] = [
 	"대열을 지켜라!",
@@ -41,6 +43,11 @@ const CAPTAIN_FIRE_LINES: Array[String] = [
 	"돛에 불 붙지 않게!",
 	"침착해라, 불부터 꺼라!",
 ]
+const CAPTAIN_ROWING_LINES: Array[String] = [
+	"노를 저어라!",
+	"박자 맞춰!",
+	"속도를 올려라!",
+]
 const CREW_RANGED_LINES: Array[String] = [
 	"쏩니다!",
 	"맞춰라!",
@@ -61,6 +68,12 @@ const CREW_FIRE_LINES: Array[String] = [
 	"물 가져와!",
 	"갑판에 불!",
 	"불길이 번집니다!",
+]
+const CREW_ROWING_LINES: Array[String] = [
+	"영차!",
+	"박자 맞춰!",
+	"파도를 타라!",
+	"조금만 더!",
 ]
 const ENEMY_BOARDING_LINES: Array[String] = [
 	"갑판을 빼앗아라!",
@@ -122,14 +135,19 @@ static func update(soldier, delta: float) -> void:
 	if lines.is_empty():
 		soldier.set_meta(SPEECH_TIMER_META, _get_next_interval(soldier, context))
 		return
+	if not _can_emit_context_line(soldier, context):
+		soldier.set_meta(SPEECH_TIMER_META, _get_blocked_context_retry_interval(soldier, context))
+		return
 
 	duration = 2.0 if bool(soldier.get("is_captain")) else 1.45
 	soldier.set_meta(SPEECH_DURATION_META, duration)
 	soldier.set_meta(SPEECH_VISIBLE_TIMER_META, duration)
 	soldier.set_meta(SPEECH_TIMER_META, _get_next_interval(soldier, context))
-	label.text = str(lines.pick_random())
+	var line := _pick_line_for_context(soldier, context, lines)
+	label.text = line
 	label.visible = true
 	label.modulate = _get_label_color(soldier, 0.0)
+	_mark_context_line_emitted(soldier, context, line)
 
 
 static func hide(soldier) -> void:
@@ -209,6 +227,8 @@ static func _get_context(soldier) -> String:
 		return "melee" if _is_current_weapon_melee(soldier) else "ranged"
 	if is_instance_valid(soldier.get("current_target")):
 		return "melee" if _is_current_weapon_melee(soldier) else "ranged"
+	if _is_owned_ship_rowing(soldier):
+		return "rowing"
 	return "moving"
 
 
@@ -221,6 +241,8 @@ static func _get_lines_for_context(soldier, context: String) -> Array[String]:
 		match context:
 			"fire":
 				return _get_configured_lines("captain", "fire", CAPTAIN_FIRE_LINES)
+			"rowing":
+				return _get_configured_lines("captain", "rowing", CAPTAIN_ROWING_LINES)
 			"danger":
 				return _get_configured_lines("captain", "danger", CAPTAIN_DANGER_LINES)
 			"melee":
@@ -233,6 +255,8 @@ static func _get_lines_for_context(soldier, context: String) -> Array[String]:
 	match context:
 		"fire":
 			return _get_configured_lines("crew", "fire", CREW_FIRE_LINES)
+		"rowing":
+			return _get_configured_lines("crew", "rowing", CREW_ROWING_LINES)
 		"danger":
 			return _get_configured_lines("crew", "danger", CREW_DANGER_LINES)
 		"melee":
@@ -251,6 +275,8 @@ static func _get_next_interval(soldier, context: String) -> float:
 		match context:
 			"fire":
 				return randf_range(6.0, 10.0)
+			"rowing":
+				return randf_range(24.0, 38.0)
 			"danger":
 				return randf_range(8.0, 13.0)
 			"melee":
@@ -263,6 +289,8 @@ static func _get_next_interval(soldier, context: String) -> float:
 	match context:
 		"fire":
 			return randf_range(9.0, 16.0)
+		"rowing":
+			return randf_range(34.0, 58.0)
 		"danger":
 			return randf_range(16.0, 26.0)
 		"melee":
@@ -271,6 +299,47 @@ static func _get_next_interval(soldier, context: String) -> float:
 			return randf_range(24.0, 40.0)
 		_:
 			return randf_range(36.0, 58.0)
+
+
+static func _get_blocked_context_retry_interval(soldier, context: String) -> float:
+	if context == "rowing":
+		return randf_range(4.0, 8.0) if bool(soldier.get("is_captain")) else randf_range(7.0, 12.0)
+	return _get_next_interval(soldier, context)
+
+
+static func _can_emit_context_line(soldier, context: String) -> bool:
+	if context != "rowing":
+		return true
+	var owned_ship = soldier.get("owned_ship")
+	if not is_instance_valid(owned_ship):
+		return false
+	var next_allowed := int(owned_ship.get_meta(ROWING_SHIP_NEXT_ALLOWED_META, 0))
+	return Time.get_ticks_msec() >= next_allowed
+
+
+static func _pick_line_for_context(soldier, context: String, lines: Array[String]) -> String:
+	var line := str(lines.pick_random())
+	if context != "rowing" or lines.size() <= 1:
+		return line
+	var owned_ship = soldier.get("owned_ship")
+	if not is_instance_valid(owned_ship):
+		return line
+	var last_line := str(owned_ship.get_meta(ROWING_SHIP_LAST_LINE_META, ""))
+	if line == last_line:
+		var next_index := (lines.find(line) + 1) % lines.size()
+		line = lines[next_index]
+	return line
+
+
+static func _mark_context_line_emitted(soldier, context: String, line: String) -> void:
+	if context != "rowing":
+		return
+	var owned_ship = soldier.get("owned_ship")
+	if not is_instance_valid(owned_ship):
+		return
+	owned_ship.set_meta(ROWING_SHIP_LAST_LINE_META, line)
+	var cooldown_msec := int(roundf(randf_range(18.0, 30.0) * 1000.0))
+	owned_ship.set_meta(ROWING_SHIP_NEXT_ALLOWED_META, Time.get_ticks_msec() + cooldown_msec)
 
 
 static func _is_current_weapon_melee(soldier) -> bool:
@@ -333,6 +402,18 @@ static func _is_owned_ship_burning(soldier) -> bool:
 	if not is_instance_valid(owned_ship):
 		return false
 	return owned_ship.get("is_burning") == true
+
+
+static func _is_owned_ship_rowing(soldier) -> bool:
+	if not is_instance_valid(soldier) or str(soldier.get("team")) != "player":
+		return false
+	var owned_ship = soldier.get("owned_ship")
+	if not is_instance_valid(owned_ship):
+		return false
+	if owned_ship.get("is_rowing") != true or owned_ship.get("rowing_locked") == true:
+		return false
+	var stamina_variant: Variant = owned_ship.get("rowing_stamina")
+	return stamina_variant == null or float(stamina_variant) > 0.1
 
 
 static func _is_enemy_boarder_on_player_ship(soldier) -> bool:
