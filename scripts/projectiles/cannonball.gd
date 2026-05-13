@@ -140,11 +140,13 @@ func _spawn_effects(_is_crit: bool = false) -> void:
 		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.9, 1.1))
 
 	# 타격 연기는 별도 budget을 사용해야 동시에 보여도 막히지 않는다.
-	if impact_smoke_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 8, 180.0):
-		var smoke = ScenePool.acquire(get_tree(), impact_smoke_scene)
+	if impact_smoke_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 10, 100.0):
+		var smoke = impact_smoke_scene.instantiate()
 		if smoke.has_method("set_intensity"):
 			var hit_intensity: float = 1.0 + (0.22 if _is_crit else 0.0)
 			smoke.set_intensity(clampf(hit_intensity, 1.0, 1.35))
+		if smoke.has_method("set_budget_reserved"):
+			smoke.set_budget_reserved()
 		get_tree().root.add_child(smoke)
 		smoke.global_position = global_position
 		# 연기는 위쪽으로 퍼지게.

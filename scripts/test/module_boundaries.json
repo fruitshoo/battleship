@@ -3,6 +3,10 @@
   "max_helper_lines": 360,
   "max_known_warning_lines": 12,
   "helpers": {
+    "res://scripts/effects/blood_deck_decal_helper.gd": {
+      "layer": "effects/blood_deck_decal_helper.gd",
+      "responsibility": "Owns soldier-hit blood stain decal spawning, deck-local placement, ship-scoped decal caps, and VFX budget checks."
+    },
     "res://scripts/effects/field_item_helper.gd": {
       "layer": "effects/field_item_helper.gd",
       "responsibility": "Owns the current field item helper responsibilities; update this baseline when moving behavior across module boundaries."
@@ -17,7 +21,7 @@
     },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
       "layer": "entities/ships/base_ship_collision_helper.gd",
-      "responsibility": "Owns the current base ship collision helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns ship collision physics feedback, guard correction shares, head-on escape assistance, ramming knockback, and contact VFX/SFX throttling."
     },
     "res://scripts/entities/ships/base_ship_crew_helper.gd": {
       "layer": "entities/ships/base_ship_crew_helper.gd",
@@ -29,7 +33,7 @@
     },
     "res://scripts/entities/ships/base_ship_status_helper.gd": {
       "layer": "entities/ships/base_ship_status_helper.gd",
-      "responsibility": "Owns the current base ship status helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns ship fire/status updates, boarding state, hull regeneration, rigging recovery, and fire damage spillover to crew."
     },
     "res://scripts/entities/ships/base_ship_visual_helper.gd": {
       "layer": "entities/ships/base_ship_visual_helper.gd",
@@ -37,15 +41,15 @@
     },
     "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
       "layer": "entities/ships/chaser_ship_ai_helper.gd",
-      "responsibility": "Owns the current chaser ship ai helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns chaser/support physics AI execution, logic and separation throttles, sail-drive motion math, load-aware update intervals, and AI debug intent drawing."
     },
     "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
       "layer": "entities/ships/chaser_ship_boarding_helper.gd",
-      "responsibility": "Owns the current chaser ship boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns chaser boarding motion, latch/contact hold, ship collision guards, neighbor broad-phase checks, and boarding collision softening."
     },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
       "layer": "entities/ships/chaser_ship_minion_helper.gd",
-      "responsibility": "Owns chaser minion, support assist, captured guard, and allied escort execution, including free-assist lane deconfliction and soft target distribution."
+      "responsibility": "Owns chaser minion, support assist, support joining, captured guard, and allied escort execution, including free-assist lane deconfliction and speed smoothing."
     },
     "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
       "layer": "entities/ships/chaser_ship_navigation_helper.gd",
@@ -65,7 +69,7 @@
     },
     "res://scripts/entities/ships/player_ship_movement_helper.gd": {
       "layer": "entities/ships/player_ship_movement_helper.gd",
-      "responsibility": "Owns the current player ship movement helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns player movement input response, sail and rowing speed calculation, wind trim math, collision separation, and boarding drag."
     },
     "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
       "layer": "entities/ships/player_ship_runtime_helper.gd",
@@ -117,7 +121,7 @@
     },
     "res://scripts/entities/ships/support_fleet_formation_helper.gd": {
       "layer": "entities/ships/support_fleet_formation_helper.gd",
-      "responsibility": "Owns role-aware support-fleet anchor selection, trail goals, generated extra-slot lanes, and hull-size-based formation spacing for mixed support squadrons."
+      "responsibility": "Owns role-aware support-fleet anchor selection, trail goals, stable lane-side assignment, generated extra-slot lanes, and hull-size-based formation spacing."
     },
     "res://scripts/entities/ships/support_fleet_state_helper.gd": {
       "layer": "entities/ships/support_fleet_state_helper.gd",
@@ -189,7 +193,11 @@
     },
     "res://scripts/managers/level_manager_progression_helper.gd": {
       "layer": "managers/level_manager_progression_helper.gd",
-      "responsibility": "Owns the current level manager progression helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns level score/xp progression, defeated-ship result rows, weapon-damage rows, and difficulty scaling."
+    },
+    "res://scripts/managers/level_manager_prologue_helper.gd": {
+      "layer": "managers/level_manager_prologue_helper.gd",
+      "responsibility": "Owns first-run controls hint display, debug replay completion reset, and completion persistence."
     },
     "res://scripts/managers/level_manager_startup_helper.gd": {
       "layer": "managers/level_manager_startup_helper.gd",
@@ -205,7 +213,7 @@
     },
     "res://scripts/managers/upgrade_manager_data_helper.gd": {
       "layer": "managers/upgrade_manager_data_helper.gd",
-      "responsibility": "Owns the current upgrade manager data helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns upgrade data predicates and player-facing stat text formatting for specialist, supply, singijeon, ramming, and roster-derived descriptions."
     },
     "res://scripts/managers/upgrade_manager_item_helper.gd": {
       "layer": "managers/upgrade_manager_item_helper.gd",
@@ -281,7 +289,7 @@
     },
     "res://scripts/ui/hud/hud_debug_panel_helper.gd": {
       "layer": "ui/hud/hud_debug_panel_helper.gd",
-      "responsibility": "Owns the current hud debug panel helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns debug panel construction, keyboard focus/navigation, environment/debug draw controls, spawn tools, and authoring palette/preset controls."
     },
     "res://scripts/ui/hud/hud_distance_debug_helper.gd": {
       "layer": "ui/hud/hud_distance_debug_helper.gd",
@@ -337,7 +345,7 @@
     },
     "res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
       "layer": "ui/hud/hud_upgrade_info_helper.gd",
-      "responsibility": "Owns the current hud upgrade info helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns upgrade classification, icon/color lookup, tooltip/spec text, and formatted stat previews for upgrade cards."
     },
     "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd": {
       "layer": "ui/hud/hud_upgrade_tooltip_helper.gd",
@@ -380,7 +388,8 @@
     "res://scripts/ui/hud/hud_ship_debug_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
     "res://scripts/world/sea_sites/sea_site_reward_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
     "res://scripts/entities/soldiers/soldier_ai_helper.gd": "Soldier AI helper still owns the compact idle/wander/move/attack state machine; recent cleanup removed repeated retarget fallback blocks, and a future split should extract movement/target validation deliberately.",
-    "res://scripts/entities/soldiers/soldier_ship_helper.gd": "Accepted current helper size after cross-ship contact and muster-cache expansion; split only with a focused soldier-ship owner-boundary refactor."
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd": "Accepted current helper size after cross-ship contact and muster-cache expansion; split only with a focused soldier-ship owner-boundary refactor.",
+    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": "Boarding collision guard grew slightly beyond the default line budget after neighbor broad-radius extraction; split only with a focused boarding-geometry owner change."
   },
   "thin_helper_exceptions": {
     "res://scripts/entities/ships/player_ship_aux_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
@@ -678,6 +687,30 @@
         "res://scripts/world/sea_sites/sea_site_reward_helper.gd"
       ],
       "reason": "Accepted duplicate helper entrypoint in current owner boundaries; rename or consolidate when touching these modules."
+    },
+    {
+      "name": "_calculate_broad_sail_drive",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/player_ship_movement_helper.gd"
+      ],
+      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
+    },
+    {
+      "name": "_calculate_sail_trim_quality",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/player_ship_movement_helper.gd"
+      ],
+      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
+    },
+    {
+      "name": "_calculate_wind_speed_multiplier",
+      "paths": [
+        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/player_ship_movement_helper.gd"
+      ],
+      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
     }
   ],
   "watched_responsibilities": [
@@ -695,10 +728,44 @@
       "id": "support_squadron_profiles",
       "owner": "res://scripts/entities/ships/player_ship_support_squadron_helper.gd",
       "invariant": "Support-fleet slot profiles decide support ship archetypes; the spawn helper only applies resolved profiles."
+    },
+    {
+      "id": "ship_contact_feedback_boundary",
+      "owner": "res://scripts/entities/ships/base_ship_collision_helper.gd",
+      "invariant": "Ship-contact VFX/SFX, contact point sampling, and ramming knockback should stay with the collision owner unless a dedicated contact-feedback helper is introduced."
+    },
+    {
+      "id": "ship_ai_throttle_boundary",
+      "owner": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+      "invariant": "Chaser/support AI load multipliers, logic intervals, and separation throttles should stay near process_physics so performance buckets remain meaningful."
+    },
+    {
+      "id": "support_lane_side_boundary",
+      "owner": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
+      "invariant": "Support-fleet lane side assignment should stay in formation geometry, not in spawn or debug-panel code."
     }
   ],
   "scenario_matrix_path": "res://scenes/test/runtime_scenario_matrix.json",
   "helper_static_function_baselines": {
+    "res://scripts/effects/blood_deck_decal_helper.gd": {
+      "count": 13,
+      "functions": [
+        "try_spawn_from_soldier_damage",
+        "_should_spawn_for_source",
+        "_spawn_chance",
+        "_resolve_owned_ship",
+        "_get_or_create_decal_root",
+        "_make_decal",
+        "_trim_old_decals",
+        "_get_deck_height",
+        "_get_deck_half_extents",
+        "_get_deck_half_width_at_z",
+        "_clamp_to_deck",
+        "_is_inside_deck",
+        "_get_spill_offset_local"
+      ],
+      "reason": "Blood deck decal spawning is isolated from soldier lifecycle so damage code only publishes hit context."
+    },
     "res://scripts/effects/field_item_helper.gd": {
       "count": 11,
       "functions": [
@@ -737,7 +804,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/base_ship_boarding_helper.gd": {
-      "count": 26,
+      "count": 27,
       "functions": [
         "process_boarding_common",
         "_uses_limited_rope_visuals",
@@ -769,22 +836,47 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
-      "count": 12,
+      "count": 37,
       "functions": [
         "get_ship_mass_scale",
         "get_collision_movement_share",
         "get_guard_correction_share",
         "calculate_collision_repulsion",
+        "_get_collision_neighbors_cached",
+        "_is_backing_out_of_head_on",
+        "_get_head_on_escape_side",
+        "_spawn_ship_contact_vfx",
+        "_get_contact_vfx_intensity",
+        "_get_contact_vfx_threshold",
+        "try_spawn_strong_collision_effects",
+        "_get_ship_contact_point",
+        "_get_visual_contact_radius",
+        "_get_visual_contact_height",
+        "_get_player_contact_height",
+        "_get_authored_hull_front_contact_height",
+        "_is_authored_hull_front_contact",
+        "_has_visual_hull_front_bounds",
+        "_is_player_team_ship",
+        "_get_visual_hull_half_extents",
+        "_can_play_contact_vfx",
+        "_prune_contact_vfx_cache",
+        "_play_ship_contact_sfx",
+        "_can_play_contact_sfx",
+        "_get_contact_sfx_pair_key",
+        "_prune_contact_sfx_cache",
         "_draw_ship_collision_debug",
         "_try_salvage_derelict_contact",
         "_is_derelict_ship",
         "_has_active_deck_melee",
         "_has_unresolved_affiliated_boarders",
         "_is_player_support_pair",
+        "_is_hostile_support_contact",
         "apply_ramming_damage",
-        "spawn_ship_collision_effects"
+        "_apply_ramming_knockback",
+        "spawn_ship_collision_effects",
+        "_spawn_ship_collision_water_splash"
       ],
-      "reason": "Collision DebugDraw instrumentation is intentionally owned by the collision helper so contact, compression, and repulsion vectors stay near the physics calculation."
+      "reason": "Ship collision feedback, contact-radius sampling, head-on escape assistance, VFX/SFX throttles, and ramming knockback intentionally remain in the collision owner so contact physics and feedback share one boundary."
     },
     "res://scripts/entities/ships/base_ship_crew_helper.gd": {
       "count": 28,
@@ -834,7 +926,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/base_ship_status_helper.gd": {
-      "count": 24,
+      "count": 26,
       "functions": [
         "update_fire_effect",
         "_apply_fire_effect_transform",
@@ -850,6 +942,8 @@
         "try_ignite_fire",
         "update_burning_status",
         "get_furled_sail_fire_damage_multiplier",
+        "_apply_burning_crew_damage",
+        "_clear_burning_crew_damage_timer",
         "update_hull_regeneration",
         "mark_rigging_damage_for_repair",
         "update_rigging_recovery",
@@ -861,7 +955,7 @@
         "_show_rigging_repair_feedback",
         "_should_show_rigging_repair_feedback"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Burning crew damage now lives with the existing ship fire/status owner so hull fire, crew feedback, and status timers stay together."
     },
     "res://scripts/entities/ships/base_ship_visual_helper.gd": {
       "count": 13,
@@ -883,7 +977,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
-      "count": 24,
+      "count": 32,
       "functions": [
         "_is_true",
         "_is_gunner",
@@ -892,14 +986,22 @@
         "_is_sinking_or_dying",
         "_is_player_controlled",
         "_calculate_sail_drive_multiplier",
+        "_calculate_broad_sail_drive",
+        "_calculate_sail_trim_quality",
+        "_calculate_wind_speed_multiplier",
         "_get_sail_drive_ratio",
         "get_ships_cached",
         "configure_logic_throttle",
         "get_logic_update_interval_for_ship",
         "get_separation_update_interval_for_ship",
         "get_load_multiplier",
+        "_update_load_counts_cache",
         "get_separation_update_interval_runtime",
         "calculate_separation",
+        "_get_navigation_cached",
+        "_get_navigation_cache_interval",
+        "_get_boarding_window_cached",
+        "_get_boarding_window_cache_interval",
         "process_physics",
         "_draw_ai_intent_debug",
         "_get_limbo_debug_text",
@@ -910,10 +1012,10 @@
         "find_player",
         "update_wave_sounds"
       ],
-      "reason": "AI DebugDraw instrumentation is intentionally owned by the AI helper because it visualizes the movement intent produced and consumed in process_physics, including LimboAI bridge metadata."
+      "reason": "AI sail-drive helpers, load-count throttling, and short-lived navigation/boarding caches extend the chaser movement owner so enemy/support motion math and profiling buckets stay near process_physics."
     },
     "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
-      "count": 15,
+      "count": 16,
       "functions": [
         "process_boarding",
         "_has_active_boarding_rope_link",
@@ -925,21 +1027,23 @@
         "_build_boarding_motion",
         "_build_contact_hold_motion",
         "apply_neighbor_ship_guards",
+        "_get_neighbor_guard_broad_radius",
         "apply_ship_collision_guard",
         "_get_guard_correction_share",
         "emit_guarded_collision",
         "soften_collision_speed",
         "_is_support_fleet_pair"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Neighbor broad-radius guard remains part of chaser boarding collision guard logic; split only with a focused boarding-geometry extraction."
     },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
-      "count": 48,
+      "count": 49,
       "functions": [
         "process_minion_ai",
         "_build_support_formation_step",
         "_apply_support_column_turn_assist",
         "_build_support_join_step",
+        "_calculate_support_join_speed",
         "_compute_support_follow_speed",
         "_compute_support_heading",
         "_apply_support_turn_brake",
@@ -985,7 +1089,7 @@
         "_get_ship_speed",
         "_record_support_trail_point"
       ],
-      "reason": "Support-fleet and captured-minion LimboAI bridges intentionally extend the minion helper with allied escort execution, while free-assist lane deconfliction and soft target distribution keep support ships from crowding after formation hold is released."
+      "reason": "Support join speed smoothing extends support/minion execution so joining, formation, and assist speeds remain in one owner."
     },
     "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
       "count": 36,
@@ -1119,7 +1223,7 @@
       "reason": "Player boarding continues to use the auto-raid helper as the single execution owner. Manual boarding intent is intentionally added here so flagship-authored boarding requests reuse the same rope, recall, and boarder-dispatch path instead of creating a second boarding system, including HUD-safe messaging for test doubles."
     },
     "res://scripts/entities/ships/player_ship_movement_helper.gd": {
-      "count": 16,
+      "count": 19,
       "functions": [
         "auto_adjust_sail",
         "calculate_separation",
@@ -1127,6 +1231,9 @@
         "update_movement",
         "update_steering",
         "calculate_sail_speed",
+        "_calculate_broad_sail_drive",
+        "_calculate_sail_trim_quality",
+        "_calculate_wind_speed_multiplier",
         "get_misaligned_sail_min_thrust",
         "get_sail_drive_ratio",
         "get_furled_sail_rowing_efficiency_multiplier",
@@ -1138,7 +1245,7 @@
         "_relax_oar_pivot",
         "update_rowing_stamina"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Player sail-drive helpers mirror chaser sail math locally because player movement owns direct input, rowing, and sail speed calculation."
     },
     "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
       "count": 9,
@@ -1751,7 +1858,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/helpers/node_contract_helper.gd": {
-      "count": 24,
+      "count": 26,
       "functions": [
         "get_instance_node",
         "get_instance_node3d",
@@ -1831,7 +1938,7 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/managers/level_manager_progression_helper.gd": {
-      "count": 15,
+      "count": 22,
       "functions": [
         "add_score",
         "add_ship_sunk",
@@ -1841,6 +1948,13 @@
         "add_player_weapon_damage",
         "get_total_weapon_damage",
         "get_weapon_damage_rows",
+        "get_defeated_ship_rows",
+        "_record_defeated_ship",
+        "_get_unique_defeated_count",
+        "_get_ship_type_id",
+        "_normalize_defeated_ship_type",
+        "_get_defeated_ship_name",
+        "_get_defeated_ship_sort_weight",
         "_normalize_damage_source_id",
         "add_xp",
         "add_bonus_xp",
@@ -1849,7 +1963,28 @@
         "update_difficulty",
         "_env_flag_enabled"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Defeated-ship result rows extend progression/stat ownership so run result data and score/xp progression share one owner."
+    },
+    "res://scripts/managers/level_manager_prologue_helper.gd": {
+      "count": 15,
+      "functions": [
+        "should_prepare",
+        "prepare",
+        "start_if_needed",
+        "update_prologue",
+        "handle_skip_input",
+        "is_active_or_pending",
+        "complete",
+        "toggle_controls_hint",
+        "_get_controls_text",
+        "_create_notice_layer",
+        "_set_notice_text",
+        "_show_final_notice",
+        "_fade_out_notice_layer",
+        "_remove_notice_layer",
+        "_is_prologue_env_flag_enabled"
+      ],
+      "reason": "Per-run controls hint flow is isolated from level progression while keeping auto fade-out and debug toggling explicit."
     },
     "res://scripts/managers/level_manager_startup_helper.gd": {
       "count": 13,
@@ -1895,16 +2030,17 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/managers/upgrade_manager_data_helper.gd": {
-      "count": 6,
+      "count": 7,
       "functions": [
         "level_matches",
+        "format_ramming_stat_text",
         "get_specialist_unit_count",
         "get_supply_bonus_stats",
         "get_singigeon_proc_stats",
         "get_player_crew_roster",
         "get_next_description"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Ramming stat text formatting extends upgrade data formatting so card/spec text remains data-driven."
     },
     "res://scripts/managers/upgrade_manager_item_helper.gd": {
       "count": 5,
@@ -2344,9 +2480,19 @@
       "reason": "Generated baseline for the current helper public static surface."
     },
     "res://scripts/ui/hud/hud_debug_panel_helper.gd": {
-      "count": 122,
+      "count": 134,
       "functions": [
         "setup_debug_panel",
+        "is_authoring_palette_tab_visible",
+        "handle_debug_panel_keyboard_input",
+        "grab_initial_debug_focus",
+        "clear_debug_focus",
+        "_cycle_debug_tab",
+        "_set_debug_tab",
+        "_is_debug_focus_inside_panel",
+        "_find_first_focusable_control",
+        "_is_control_disabled",
+        "_is_node_descendant_of",
         "get_level_manager_for_debug",
         "get_environment_preset_manager_for_debug",
         "invoke_level_debug_method",
@@ -2464,12 +2610,14 @@
         "_add_misc_section",
         "_add_ship_section",
         "_add_sail_section",
+        "create_debug_columns",
+        "create_debug_group",
         "create_debug_section",
         "_update_debug_section_button_text",
         "create_debug_action_button",
         "create_slider_row"
       ],
-      "reason": "DebugDraw channel controls are intentionally owned by the debug panel helper with the rest of the runtime debug UI wiring."
+      "reason": "Debug-panel keyboard focus, authoring-palette visibility, and column/group builders extend the existing debug HUD owner."
     },
     "res://scripts/ui/hud/hud_distance_debug_helper.gd": {
       "count": 9,
@@ -2718,13 +2866,14 @@
       "reason": "HUD update helper owns support fleet display ordering, variable ship-icon sizing, ship health overlays, boss HP rows, and runtime HUD refresh state."
     },
     "res://scripts/ui/hud/hud_upgrade_info_helper.gd": {
-      "count": 14,
+      "count": 15,
       "functions": [
         "is_ship_upgrade",
         "is_crew_upgrade",
         "get_upgrade_track_name",
         "build_upgrade_tooltip_text",
         "build_upgrade_spec_text",
+        "_format_ramming_stat_text",
         "get_upgrade_icon",
         "get_upgrade_icon_texture_path",
         "get_upgrade_color",
@@ -2735,7 +2884,7 @@
         "_calculate_hull_defense_stats",
         "_calculate_supply_bonus_stats"
       ],
-      "reason": "Generated baseline for the current helper public static surface."
+      "reason": "Ramming stat text display extends upgrade tooltip/spec formatting so card text stays in the upgrade info owner."
     },
     "res://scripts/entities/ships/support_fleet_cannon_helper.gd": {
       "count": 13,
@@ -2757,7 +2906,7 @@
       "reason": "Support fleet cannon helper owns support broadside scaling, slot-aware support summary generation, and authored support cannon activation rules."
     },
     "res://scripts/entities/ships/support_fleet_formation_helper.gd": {
-      "count": 40,
+      "count": 42,
       "functions": [
         "get_support_fleet_offset",
         "get_support_join_offset",
@@ -2779,6 +2928,8 @@
         "_get_role_follow_distance",
         "_get_role_lateral_distance",
         "_get_rescue_lane_side_sign",
+        "_get_lane_stable_wing_side_sign",
+        "_role_has_fixed_wing_side",
         "_get_pair_lateral_spacing",
         "_get_large_ship_lateral_pad",
         "_get_large_ship_trail_pad",
@@ -2800,7 +2951,7 @@
         "_get_support_squadron_id",
         "_get_flagship_anchor"
       ],
-      "reason": "Support fleet formation helper owns role-aware squadron anchors, trail-follow goals, spec-table role geometry, and generated extra-slot lanes for mixed support formations."
+      "reason": "Lane-stable wing-side helpers extend support formation geometry so slot side ownership stays with formation offsets."
     },
     "res://scripts/entities/ships/support_fleet_state_helper.gd": {
       "count": 11,
@@ -3210,6 +3361,11 @@
       "from": "res://scripts/entities/soldiers/soldier_combat_helper.gd",
       "to": "res://scripts/entities/soldiers/soldier_visual_helper.gd",
       "reason": "Generated baseline for current helper-to-helper preload boundary."
+    },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/effects/blood_deck_decal_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
+      "to": "res://scripts/effects/blood_deck_decal_helper.gd",
+      "reason": "Soldier lifecycle publishes damage context; the effect helper owns deck-local blood decal placement and caps."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/entities/ships/ship_boarding_meta_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
@@ -4077,6 +4233,26 @@
       "reason": "Cross-ship contact and muster-cache helpers still belong to the soldier-ship owner until a dedicated soldier spatial-boundary refactor is scheduled.",
       "priority": "medium",
       "recommended_action": "Split contact-point caching from general soldier ship lookup only when the call sites can move together without widening scene-node access."
+    },
+    "large_helper|res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+      "reason": "Boarding collision guard grew slightly beyond the default line budget after neighbor broad-radius extraction; split only with a focused boarding-geometry owner change.",
+      "priority": "baseline",
+      "recommended_action": "Extract boarding geometry and neighbor broad-phase logic only if chaser boarding collision guard code grows again."
+    },
+    "duplicate_static_function|_calculate_broad_sail_drive|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
+      "priority": "known-local-adapter",
+      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and chaser movement are refactored together."
+    },
+    "duplicate_static_function|_calculate_sail_trim_quality|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
+      "priority": "known-local-adapter",
+      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and chaser movement are refactored together."
+    },
+    "duplicate_static_function|_calculate_wind_speed_multiplier|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
+      "priority": "known-local-adapter",
+      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and chaser movement are refactored together."
     }
   }
 }

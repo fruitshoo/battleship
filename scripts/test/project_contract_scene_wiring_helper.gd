@@ -3205,6 +3205,9 @@ static func _run_main_player_effect_scene_wiring_pass(failures: Array[String]) -
 
 	if player_ship.transform != Transform3D.IDENTITY:
 		failures.append("main scene PlayerShip should not carry placement override")
+	for child in main_root.get_children():
+		if child is MeshInstance3D and str(child.name).begins_with("MeshInstance3D"):
+			failures.append("main scene should not contain orphan debug mesh at root: %s" % child.name)
 
 	var screen_edge_fx := main_root.get_node_or_null("ScreenEdgeFx") as CanvasLayer
 	if not is_instance_valid(screen_edge_fx):
@@ -3220,7 +3223,9 @@ static func _run_main_player_effect_scene_wiring_pass(failures: Array[String]) -
 
 	_validate_packed_scene_path(player_ship, "wood_splinter_scene", "res://scenes/effects/wood_splinter.tscn", failures)
 	_validate_packed_scene_path(player_ship, "water_splash_scene", "res://scenes/effects/water_blast.tscn", failures)
+	_validate_packed_scene_path(player_ship, "impact_puff_scene", "res://scenes/effects/impact_puff.tscn", failures)
 	_validate_packed_scene_path(player_ship, "fire_effect_scene", "res://scenes/effects/fire_effect.tscn", failures)
+	_validate_packed_scene_path(player_ship, "loot_scene", "res://scenes/effects/floating_loot.tscn", failures)
 	_validate_packed_scene_path(player_ship, "survivor_scene", "res://scenes/effects/survivor.tscn", failures)
 	_run_main_player_ship_text_contract(failures)
 	main_root.queue_free()

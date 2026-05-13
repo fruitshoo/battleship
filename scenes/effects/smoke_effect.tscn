@@ -1,0 +1,114 @@
+[gd_scene format=3 uid="uid://uxbny6pjpli1"]
+
+[ext_resource type="Script" uid="uid://7dh0uy8e1nb" path="res://scripts/effects/fire_effect.gd" id="1_d6f3u"]
+[ext_resource type="Curve" path="res://resources/vfx/curves/alpha_soft_fade_curve.tres" id="2_dsbkk"]
+[ext_resource type="Texture2D" uid="uid://j3er0rga8slr" path="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG" id="4_qta0k"]
+[ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="5_xsle2"]
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+offsets = PackedFloat32Array(0, 0.36164123, 0.72, 0.97232825)
+colors = PackedColorArray(0.06, 0.05, 0.045, 0, 0.34064347, 0.31711304, 0.29128972, 0.59300005, 0.49231848, 0.49231848, 0.463739, 0.33900002, 0.025, 0.023, 0.022, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
+curve = ExtResource("2_dsbkk")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+lifetime_randomness = 0.1
+particle_flag_rotate_y = true
+emission_shape = 1
+emission_sphere_radius = 0.2
+angle_min = -90.0
+angle_max = 90.0
+direction = Vector3(0, 1, 0)
+spread = 15.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.0
+angular_velocity_min = -14.0
+angular_velocity_max = 14.0
+gravity = Vector3(0, 0.24, 0)
+damping_min = 0.15
+damping_max = 0.55
+scale_max = 2.0
+scale_curve = SubResource("CurveTexture_smoke_scale")
+color = Color(1, 1, 1, 0.748)
+color_ramp = SubResource("GradientTexture1D_smoke")
+anim_speed_min = 0.55
+anim_speed_max = 1.0
+anim_offset_max = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+render_priority = 17
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("5_xsle2")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
+particles_anim_loop = false
+proximity_fade_enabled = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(2.75, 2.75)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_44gkc"]
+render_priority = 19
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+albedo_texture = ExtResource("4_qta0k")
+albedo_texture_force_srgb = true
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="Curve" id="Curve_d6f3u"]
+_data = [Vector2(0, 0.7539046), 0.0, 0.0, 0, 0, Vector2(0.1541328, 0.3861552), 0.0, 0.0, 0, 0, Vector2(0.31944448, 0.6881112), 0.0, 0.0, 0, 0, Vector2(0.53624666, 0.36496532), 0.0, 0.0, 0, 0, Vector2(0.6934282, 0.74108595), 0.0, 0.0, 0, 0, Vector2(0.8614499, 0.5079971), 5.0823927, 5.0823927, 0, 0, Vector2(1, 0.07890177), -8.301756, 0.0, 0, 0]
+point_count = 7
+
+[sub_resource type="CurveTexture" id="CurveTexture_sparks_scale"]
+curve = SubResource("Curve_d6f3u")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_aky0i"]
+lifetime_randomness = 0.1
+emission_shape_scale = Vector3(0.5, 0.5, 0.5)
+emission_shape = 1
+emission_sphere_radius = 1.0
+angle_min = -29.99999
+angle_max = 30.000011
+direction = Vector3(0, 1, 0)
+initial_velocity_min = 0.5
+initial_velocity_max = 1.0
+gravity = Vector3(0, 1, 0)
+scale_min = 0.049999997
+scale_max = 0.099999994
+scale_curve = SubResource("CurveTexture_sparks_scale")
+color = Color(2.5025156, 1.7872053, 0.9409713, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_yon73"]
+
+[node name="SmokeEffect" type="Node3D" unique_id=1847126054]
+script = ExtResource("1_d6f3u")
+
+[node name="SmokeParticles" type="GPUParticles3D" parent="." unique_id=450742158]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+lifetime = 2.0
+randomness = 0.62
+fixed_fps = 20
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+
+[node name="sparks" type="GPUParticles3D" parent="." unique_id=157973357]
+material_override = SubResource("StandardMaterial3D_44gkc")
+amount = 6
+process_material = SubResource("ParticleProcessMaterial_aky0i")
+draw_pass_1 = SubResource("QuadMesh_yon73")

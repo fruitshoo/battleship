@@ -129,6 +129,7 @@ static func _prepare_acquired_node(node: Node) -> void:
 		(node as CollisionObject3D).disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
 
 static func _prepare_released_node(node: Node) -> void:
+	_stop_released_particles_recursive(node)
 	if node.is_inside_tree():
 		node.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
 	else:
@@ -145,3 +146,12 @@ static func _prepare_released_node(node: Node) -> void:
 		else:
 			area.monitoring = false
 			area.monitorable = false
+
+
+static func _stop_released_particles_recursive(node: Node) -> void:
+	if node is GPUParticles3D:
+		var particles := node as GPUParticles3D
+		particles.emitting = false
+		particles.visible = false
+	for child in node.get_children():
+		_stop_released_particles_recursive(child)

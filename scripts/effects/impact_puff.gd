@@ -10,6 +10,7 @@ var _emit_secondary: bool = false
 var _life_left: float = 0.0
 var _active: bool = false
 var _intensity_scale: float = 1.0
+var _budget_reserved: bool = false
 
 func _ready() -> void:
 	_apply_hit_effect()
@@ -22,14 +23,18 @@ func set_intensity(scale: float) -> void:
 	if is_node_ready():
 		_apply_hit_effect()
 
+func set_budget_reserved(reserved: bool = true) -> void:
+	_budget_reserved = reserved
+
 func pool_capacity() -> int:
 	return 18
 
 func pool_activate() -> void:
 	_apply_hit_effect()
-	if not VfxBudget.allow_spawn(get_tree(), _budget_key_value, global_position, _budget_limit_value, _budget_distance_value):
+	if not _budget_reserved and not VfxBudget.allow_spawn(get_tree(), _budget_key_value, global_position, _budget_limit_value, _budget_distance_value):
 		ScenePool.release(self)
 		return
+	_budget_reserved = false
 	_active = true
 	visible = true
 	set_process(true)
@@ -48,9 +53,10 @@ func pool_reset() -> void:
 	_active = false
 	_life_left = 0.0
 	_intensity_scale = 1.0
+	_budget_reserved = false
 	set_process(false)
-	emitting = false
 	visible = false
+	emitting = false
 	if is_instance_valid(secondary_puff):
 		secondary_puff.visible = false
 		secondary_puff.emitting = false
@@ -72,13 +78,13 @@ func _is_prewarm_mode() -> bool:
 
 func _apply_hit_effect() -> void:
 	var intensity: float = _intensity_scale
-	var size_scale: float = lerpf(0.9, 1.3, inverse_lerp(0.6, 1.8, intensity))
+	var size_scale: float = lerpf(1.0, 1.45, inverse_lerp(0.6, 1.8, intensity))
 	_budget_key_value = "hit_effect"
-	_budget_limit_value = 8
-	_budget_distance_value = 55.0
+	_budget_limit_value = 10
+	_budget_distance_value = 100.0
 
-	amount = clampi(int(round(2.0 * intensity)), 2, 5)
-	lifetime = 0.10 + (0.05 * intensity)
+	amount = clampi(int(round(3.0 * intensity)), 3, 7)
+	lifetime = 0.12 + (0.05 * intensity)
 	explosiveness = 1.0
 	randomness = 0.15
 
@@ -86,18 +92,18 @@ func _apply_hit_effect() -> void:
 	if main_mat:
 		main_mat.direction = Vector3(0, 1, 0)
 		main_mat.spread = 62.0
-		main_mat.initial_velocity_min = 1.2 * intensity
-		main_mat.initial_velocity_max = 3.0 * intensity
+		main_mat.initial_velocity_min = 1.6 * intensity
+		main_mat.initial_velocity_max = 4.2 * intensity
 		main_mat.gravity = Vector3(0, 0.2, 0)
 		main_mat.damping_min = 1.0
 		main_mat.damping_max = 2.0
 		main_mat.scale_min = 0.8 * size_scale
 		main_mat.scale_max = 1.65 * size_scale
-		main_mat.color = Color(0.74, 0.74, 0.72, 0.72)
+		main_mat.color = Color(0.82, 0.82, 0.78, 0.82)
 
 	var main_mesh := _ensure_quad_material(self)
 	if main_mesh:
-		main_mesh.size = Vector2(1.2, 1.2) * size_scale
+		main_mesh.size = Vector2(1.32, 1.32) * size_scale
 		main_mesh.material.emission = Color.BLACK
 		main_mesh.material.emission_energy_multiplier = 0.0
 

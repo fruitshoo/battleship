@@ -77,6 +77,7 @@ func _set_particles_emitting(node: Node, active: bool, restart_particles: bool) 
 			var particles := child as GPUParticles3D
 			if restart_particles and active:
 				particles.restart()
+			particles.visible = active
 			particles.emitting = active
 		_set_particles_emitting(child, active, restart_particles)
 

@@ -2,6 +2,8 @@ extends RefCounted
 class_name SoldierLifecycleHelper
 
 
+const BloodDeckDecalHelper = preload("res://scripts/effects/blood_deck_decal_helper.gd")
+
 const MELEE_DAMAGE_SOURCES := {
 	"sword": true,
 	"spear": true,
@@ -46,6 +48,8 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 
 	if soldier.has_method("_flash_hit"):
 		soldier._flash_hit()
+
+	BloodDeckDecalHelper.try_spawn_from_soldier_damage(soldier, final_damage, hit_position, damage_source)
 
 	if hit_position != Vector3.ZERO and soldier.current_state != soldier.State.DEAD:
 		var knock_dir: Vector3 = soldier.global_position - hit_position

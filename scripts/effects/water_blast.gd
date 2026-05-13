@@ -252,7 +252,9 @@ func _apply_splash_preset() -> void:
 
 func _apply_ship_collision_preset() -> void:
 	var intensity := _intensity_scale
-	var size_scale := lerpf(2.55, 3.25, clampf(inverse_lerp(2.2, 4.0, intensity), 0.0, 1.0))
+	var high_speed_t := clampf(inverse_lerp(3.35, 4.0, intensity), 0.0, 1.0)
+	var high_speed_boost := lerpf(1.0, 1.18, high_speed_t)
+	var size_scale := lerpf(2.55, 3.35, clampf(inverse_lerp(2.2, 4.0, intensity), 0.0, 1.0)) * high_speed_boost
 	_budget_key_value = "ship_collision_water_blast"
 	_budget_limit_value = 3
 	_budget_distance_value = 85.0
@@ -285,10 +287,10 @@ func _apply_ship_collision_preset() -> void:
 
 	_droplets_enabled = true
 	_configure_droplets(
-		clampi(int(round(18.0 + intensity * 4.0)), 18, 34),
+		clampi(int(round(18.0 + intensity * 4.0 + high_speed_t * 5.0)), 18, 39),
 		0.76 + (0.06 * intensity),
-		4.6 + (1.1 * intensity),
-		9.0 + (1.8 * intensity),
+		4.6 + (1.1 * intensity) + (1.2 * high_speed_t),
+		9.0 + (1.8 * intensity) + (2.2 * high_speed_t),
 		0.04,
 		0.13 * size_scale
 	)

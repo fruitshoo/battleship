@@ -66,9 +66,11 @@ func pool_activate() -> void:
 	visible = true
 	set_process(true)
 	if cubes:
+		cubes.visible = true
 		cubes.restart()
 		cubes.emitting = true
 	if planks:
+		planks.visible = true
 		planks.restart()
 		planks.emitting = true
 	_life_left = DEFAULT_LIFETIME
@@ -80,8 +82,10 @@ func pool_reset() -> void:
 	set_process(false)
 	visible = false
 	if cubes:
+		cubes.visible = false
 		cubes.emitting = false
 	if planks:
+		planks.visible = false
 		planks.emitting = false
 
 func _process(delta: float) -> void:

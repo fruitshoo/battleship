@@ -304,10 +304,12 @@ func _play_impact_vfx() -> void:
 		)
 			
 	# 타격 이펙트
-	if impact_puff_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 8, 180.0):
-		var smoke = ScenePool.acquire(get_tree(), impact_puff_scene)
+	if impact_puff_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 10, 100.0):
+		var smoke = impact_puff_scene.instantiate()
 		if smoke.has_method("set_intensity"):
 			smoke.set_intensity(1.18)
+		if smoke.has_method("set_budget_reserved"):
+			smoke.set_budget_reserved()
 		get_tree().root.add_child(smoke)
 		smoke.global_position = global_position
 		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
