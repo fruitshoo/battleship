@@ -6,15 +6,12 @@ const SUPPORT_ICON_PANOKSEON_PATH := "res://assets/ui/support_fleet/support_flee
 const SUPPORT_ICON_GEOBUKSEON_PATH := "res://assets/ui/support_fleet/support_fleet_geobukseon_icon.png"
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
 const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
-const CAPTURE_HINT_DISTANCE_PADDING: float = 2.5
-const CAPTURE_HINT_CREW_RATIO: float = 0.34
-const CAPTURE_HINT_CREW_MAX: int = 2
-const SUPPORT_SLOT_SIZE_DEFAULT := 56.0
-const SUPPORT_SLOT_SIZE_COMPACT := 52.0
-const SUPPORT_SLOT_SIZE_DENSE := 48.0
-const SUPPORT_SLOT_SIZE_MAENGSEON := 48.0
-const SUPPORT_SLOT_SIZE_PANOKSEON := 54.0
-const SUPPORT_SLOT_SIZE_GEOBUKSEON := 58.0
+const SUPPORT_SLOT_SIZE_DEFAULT := 66.0
+const SUPPORT_SLOT_SIZE_COMPACT := 60.0
+const SUPPORT_SLOT_SIZE_DENSE := 54.0
+const SUPPORT_SLOT_SIZE_MAENGSEON := 58.0
+const SUPPORT_SLOT_SIZE_PANOKSEON := 64.0
+const SUPPORT_SLOT_SIZE_GEOBUKSEON := 70.0
 const SUPPORT_SLOT_PANOKSEON_ACCENT := Color(0.86, 0.58, 0.34, 0.96)
 const SUPPORT_SLOT_MAENGSEON_ACCENT := Color(0.82, 0.69, 0.42, 0.92)
 const SUPPORT_SLOT_EMPTY_BG := Color(0.05, 0.07, 0.10, 0.72)
@@ -625,79 +622,11 @@ static func update_boarding_display(hud) -> void:
 static func update_capture_opportunity_display(hud) -> void:
 	if not is_instance_valid(hud.capture_opportunity_label):
 		return
-	if not is_instance_valid(hud.player_ship):
-		hud.capture_opportunity_label.visible = false
-		hud._last_capture_opportunity_text = ""
-		return
-	var next_text: String = _get_capture_opportunity_text(hud.player_ship)
-	if next_text.is_empty():
-		if hud.capture_opportunity_label.visible:
-			hud.capture_opportunity_label.visible = false
-		hud._last_capture_opportunity_text = ""
-		return
-	if hud._last_capture_opportunity_text != next_text:
-		hud._last_capture_opportunity_text = next_text
-		hud.capture_opportunity_label.text = next_text
-	hud.capture_opportunity_label.visible = true
+	hud.capture_opportunity_label.visible = false
+	hud.capture_opportunity_label.text = ""
+	hud._last_capture_opportunity_text = ""
 
-static func _get_capture_opportunity_text(player_ship) -> String:
-	if not is_instance_valid(player_ship):
-		return ""
-	if player_ship.get("is_boarding") == true:
-		return ""
-
-	var best_derelict: Node3D = null
-	var best_derelict_dist: float = INF
-	var best_weakened: Node3D = null
-	var best_weakened_dist: float = INF
-	var best_weakened_alive: int = 0
-
-	var detect_distance: float = 12.0
-	if player_ship.get("max_boarding_distance") != null:
-		detect_distance = float(player_ship.get("max_boarding_distance")) + CAPTURE_HINT_DISTANCE_PADDING
-
-	var ships: Array = EntityRegistry.get_ships_by_team("enemy")
-	for ship in ships:
-		if not is_instance_valid(ship) or ship == player_ship:
-			continue
-		if str(ship.get("team")) != "enemy":
-			continue
-		if ship.get("is_dying") == true or ship.get("is_sinking") == true:
-			continue
-
-		var distance: float = player_ship.global_position.distance_to(ship.global_position)
-		if distance > detect_distance:
-			continue
-
-		if ship.get("is_derelict") == true:
-			if distance < best_derelict_dist:
-				best_derelict = ship
-				best_derelict_dist = distance
-			continue
-
-		if player_ship.has_method("_is_side_boarding_approach"):
-			var can_side_board: bool = player_ship.call("_is_side_boarding_approach", ship) == true
-			if not can_side_board:
-				continue
-
-		if not ship.has_method("get_alive_crew_count"):
-			continue
-		var alive_count: int = int(ship.call("get_alive_crew_count"))
-		var max_count: int = alive_count
-		if ship.get("max_crew_count") != null:
-			max_count = max(1, int(ship.get("max_crew_count")))
-		var low_crew_threshold: int = max(1, min(CAPTURE_HINT_CREW_MAX, int(ceili(float(max_count) * CAPTURE_HINT_CREW_RATIO))))
-		if alive_count > low_crew_threshold:
-			continue
-		if distance < best_weakened_dist:
-			best_weakened = ship
-			best_weakened_dist = distance
-			best_weakened_alive = alive_count
-
-	if is_instance_valid(best_derelict):
-		return "폐선 확보 가능"
-	if is_instance_valid(best_weakened):
-		return "나포 기회 - 적선 병력 %d" % best_weakened_alive
+static func _get_capture_opportunity_text(_player_ship) -> String:
 	return ""
 
 static func update_boss_hp(hud, current: float, maximum: float) -> void:

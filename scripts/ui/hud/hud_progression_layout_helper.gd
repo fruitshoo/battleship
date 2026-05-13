@@ -10,7 +10,11 @@ static func apply_overlay_theme(hud) -> void:
 		hud.gust_warning.offset_right = 260.0
 		hud.gust_warning.offset_bottom = 134.0
 		hud.gust_warning.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		NavalUiTheme.style_status_banner(hud.gust_warning, 22, Color(1.0, 0.7, 0.2, 1.0), 4)
+		hud.gust_warning.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		NavalUiTheme.style_body(hud.gust_warning, 15)
+		hud.gust_warning.add_theme_color_override("font_color", Color(0.93, 0.92, 0.86, 0.95))
+		hud.gust_warning.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.92))
+		hud.gust_warning.add_theme_constant_override("outline_size", 3)
 	if is_instance_valid(hud.game_over_label):
 		NavalUiTheme.style_status_banner(hud.game_over_label, 36, Color(0.84, 0.34, 0.28, 1.0), 4)
 	if is_instance_valid(hud.victory_label):
@@ -34,7 +38,10 @@ static func apply_overlay_density(hud) -> void:
 		hud.gust_warning.offset_right = roundf(lerpf(220.0, 260.0, density))
 		hud.gust_warning.offset_top = roundf(lerpf(70.0, 82.0, density))
 		hud.gust_warning.offset_bottom = hud.gust_warning.offset_top + roundf(lerpf(24.0, 28.0, density))
-		NavalUiTheme.style_status_banner(hud.gust_warning, roundi(lerpf(16.0, 20.0, density)), Color(1.0, 0.7, 0.2, 1.0), 4)
+		NavalUiTheme.style_body(hud.gust_warning, roundi(lerpf(14.0, 16.0, density)))
+		hud.gust_warning.add_theme_color_override("font_color", Color(0.93, 0.92, 0.86, 0.95))
+		hud.gust_warning.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.92))
+		hud.gust_warning.add_theme_constant_override("outline_size", 3)
 	if is_instance_valid(hud.game_over_label):
 		NavalUiTheme.style_status_banner(hud.game_over_label, roundi(lerpf(30.0, 36.0, density)), Color(0.84, 0.34, 0.28, 1.0), 4)
 	if is_instance_valid(hud.victory_label):

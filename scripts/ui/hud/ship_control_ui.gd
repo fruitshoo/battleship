@@ -33,6 +33,8 @@ var _nearest_site: Node3D = null
 var _site_marker_slots: Array[Dictionary] = []
 var _site_marker_refresh_left: float = 0.0
 var _site_marker_alpha: float = 0.0
+var _rock_marker_slots: Array[Dictionary] = []
+var _rock_marker_refresh_left: float = 0.0
 var _glow_phase: float = 0.0
 
 const SITE_MARKER_REFRESH_INTERVAL: float = 0.18
@@ -40,15 +42,25 @@ const SITE_MARKER_OUTER_RADIUS: float = 58.0
 const SITE_MARKER_DISTANCE_AT_EDGE: float = 62.0
 const SITE_MARKER_FADE_SPEED: float = 5.5
 const MAX_SITE_MARKERS: int = 6
+const ROCK_MARKER_REFRESH_INTERVAL: float = 0.22
+const ROCK_MARKER_OUTER_RADIUS: float = 52.0
+const ROCK_MARKER_DISTANCE_AT_EDGE: float = 72.0
+const ROCK_MARKER_MAX_DISTANCE: float = 150.0
+const ROCK_MARKER_DANGER_DISTANCE: float = 26.0
+const MAX_ROCK_MARKERS: int = 5
 const BASE_WIND_PANEL_SIZE: float = 180.0
 const MAX_WIND_PANEL_SIZE: float = 204.0
 const MIN_WIND_PANEL_SIZE: float = 170.0
 const SEA_SITE_GROUP := "sea_site"
 const TREASURE_CHEST_GROUP := "treasure_chest"
+const SEA_ROCK_GROUP := "sea_rock_decor"
 const SITE_MARKER_GLOW_COLOR := Color(0.24, 0.64, 1.0, 0.18)
 const SITE_MARKER_DOT_COLOR := Color(1.0, 0.88, 0.28, 0.96)
 const TREASURE_MARKER_GLOW_COLOR := Color(1.0, 0.62, 0.18, 0.20)
 const TREASURE_MARKER_DOT_COLOR := Color(1.0, 0.94, 0.34, 1.0)
+const ROCK_MARKER_FILL_COLOR := Color(0.58, 0.65, 0.63, 0.92)
+const ROCK_MARKER_SHADOW_COLOR := Color(0.12, 0.16, 0.16, 0.72)
+const ROCK_MARKER_DANGER_COLOR := Color(0.94, 0.40, 0.28, 0.96)
 
 var _compass_base_scale: float = 1.0
 var _last_layout_viewport_size := Vector2.ZERO
@@ -148,6 +160,7 @@ func _apply_theme() -> void:
 	if is_instance_valid(arrow_center_cap):
 		arrow_center_cap.color = cap_color
 	_apply_site_marker_palette_to_marker(site_marker, null)
+	_sync_rock_marker_slots([])
 
 func _apply_layout_density() -> void:
 	var viewport := get_viewport()
@@ -166,7 +179,7 @@ func _apply_layout_density() -> void:
 
 	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.20, MIN_WIND_PANEL_SIZE, MAX_WIND_PANEL_SIZE)
 	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - MIN_WIND_PANEL_SIZE) / (MAX_WIND_PANEL_SIZE - MIN_WIND_PANEL_SIZE), 0.0, 1.0)))
-	var top_offset := roundf(clampf(viewport_size.y * 0.055, 58.0, 64.0))
+	var top_offset := roundf(clampf(viewport_size.y * 0.04, 42.0, 48.0))
 	wind_panel.anchor_left = 0.0
 	wind_panel.anchor_right = 0.0
 	wind_panel.anchor_top = 0.0
@@ -240,6 +253,7 @@ func _update_wind_indicator(delta: float) -> void:
 		glow_color.a = clampf(glow_alpha * 0.35, 0.02, 0.08)
 		arrow_glow.color = glow_color
 	_update_site_marker(delta)
+	_update_rock_markers(delta)
 
 
 func _update_site_marker(delta: float) -> void:
@@ -305,6 +319,137 @@ func _update_site_marker(delta: float) -> void:
 	_site_marker_alpha = 1.0 if active_count > 0 else 0.0
 
 
+func _update_rock_markers(delta: float) -> void:
+	if not is_instance_valid(compass_wheel) or not is_instance_valid(ship):
+		return
+
+	_rock_marker_refresh_left -= delta
+	if _rock_marker_refresh_left <= 0.0:
+		_rock_marker_refresh_left = ROCK_MARKER_REFRESH_INTERVAL
+		_sync_rock_marker_slots(_collect_rock_marker_targets())
+
+	for slot_index in range(_rock_marker_slots.size()):
+		var slot := _rock_marker_slots[slot_index]
+		var marker_variant: Variant = slot.get("node", null)
+		if not is_instance_valid(marker_variant) or not (marker_variant is Node2D):
+			continue
+		var marker := marker_variant as Node2D
+		var rock_variant: Variant = slot.get("rock", null)
+		if not _is_valid_rock_marker_target(rock_variant):
+			slot["rock"] = null
+			slot["rock_id"] = 0
+			slot["alpha"] = 0.0
+			_rock_marker_slots[slot_index] = slot
+			marker.visible = false
+			continue
+
+		var rock := rock_variant as Node3D
+		var offset := rock.global_position - ship.global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance <= 0.01 or distance > ROCK_MARKER_MAX_DISTANCE:
+			marker.visible = false
+			continue
+
+		var distance_ratio := _get_rock_marker_distance_ratio(distance)
+		var target_position := _get_marker_target_position(offset, ROCK_MARKER_OUTER_RADIUS, ROCK_MARKER_DISTANCE_AT_EDGE)
+		var displayed_position: Vector2 = slot.get("position", target_position)
+		var target_id := int(rock.get_instance_id())
+		if int(slot.get("rock_id", 0)) != target_id or not marker.visible:
+			displayed_position = target_position
+			slot["alpha"] = 0.0
+			slot["rock_id"] = target_id
+		else:
+			displayed_position = displayed_position.lerp(target_position, minf(1.0, delta * lerpf(16.0, 8.0, distance_ratio)))
+
+		var alpha := move_toward(float(slot.get("alpha", 0.0)), 1.0, delta * SITE_MARKER_FADE_SPEED)
+		slot["position"] = displayed_position
+		slot["alpha"] = alpha
+		marker.position = displayed_position
+		marker.modulate = Color(1.0, 1.0, 1.0, alpha)
+		marker.visible = true
+		_apply_rock_marker_palette(marker, distance)
+		_rock_marker_slots[slot_index] = slot
+
+
+func _sync_rock_marker_slots(targets: Array[Node3D]) -> void:
+	for index in range(MAX_ROCK_MARKERS):
+		var marker := _ensure_rock_marker_slot(index)
+		if not is_instance_valid(marker):
+			continue
+		if index >= targets.size():
+			marker.visible = false
+			if index < _rock_marker_slots.size():
+				var inactive_slot := _rock_marker_slots[index]
+				inactive_slot["rock"] = null
+				inactive_slot["rock_id"] = 0
+				inactive_slot["alpha"] = 0.0
+				_rock_marker_slots[index] = inactive_slot
+			continue
+
+		var rock := targets[index]
+		var offset := rock.global_position - ship.global_position
+		offset.y = 0.0
+		var target_position := _get_marker_target_position(offset, ROCK_MARKER_OUTER_RADIUS, ROCK_MARKER_DISTANCE_AT_EDGE)
+		var slot := _rock_marker_slots[index]
+		if int(slot.get("rock_id", 0)) != int(rock.get_instance_id()):
+			slot["position"] = target_position
+			slot["alpha"] = 0.0
+		slot["rock"] = rock
+		slot["rock_id"] = int(rock.get_instance_id())
+		_rock_marker_slots[index] = slot
+
+
+func _ensure_rock_marker_slot(index: int) -> Node2D:
+	while _rock_marker_slots.size() <= index:
+		var marker := _make_rock_marker()
+		if is_instance_valid(marker):
+			marker.name = "RockMarker%d" % _rock_marker_slots.size()
+			compass_wheel.add_child(marker)
+		if not is_instance_valid(marker):
+			return null
+		marker.visible = false
+		_rock_marker_slots.append({
+			"node": marker,
+			"rock": null,
+			"rock_id": 0,
+			"position": Vector2.ZERO,
+			"alpha": 0.0,
+		})
+	var marker_variant: Variant = _rock_marker_slots[index].get("node", null)
+	if is_instance_valid(marker_variant) and marker_variant is Node2D:
+		return marker_variant as Node2D
+	return null
+
+
+func _make_rock_marker() -> Node2D:
+	var marker := Node2D.new()
+
+	var shadow := Polygon2D.new()
+	shadow.name = "Shadow"
+	shadow.color = ROCK_MARKER_SHADOW_COLOR
+	shadow.polygon = PackedVector2Array([
+		Vector2(-6.5, 4.0),
+		Vector2(-2.2, -5.0),
+		Vector2(2.8, -2.8),
+		Vector2(6.0, 4.0),
+	])
+	marker.add_child(shadow)
+
+	var crest := Polygon2D.new()
+	crest.name = "Crest"
+	crest.color = ROCK_MARKER_FILL_COLOR
+	crest.polygon = PackedVector2Array([
+		Vector2(-4.8, 3.0),
+		Vector2(-1.7, -4.8),
+		Vector2(1.0, -1.3),
+		Vector2(3.6, -4.0),
+		Vector2(5.3, 3.0),
+	])
+	marker.add_child(crest)
+	return marker
+
+
 func _sync_site_marker_slots(targets: Array[Node3D]) -> void:
 	_nearest_site = targets[0] if not targets.is_empty() else null
 	for index in range(MAX_SITE_MARKERS):
@@ -359,22 +504,62 @@ func _ensure_site_marker_slot(index: int) -> Node2D:
 
 
 func _get_site_marker_target_position(offset: Vector3) -> Vector2:
+	return _get_marker_target_position(offset, SITE_MARKER_OUTER_RADIUS, SITE_MARKER_DISTANCE_AT_EDGE)
+
+
+func _get_marker_target_position(offset: Vector3, outer_radius: float, distance_at_edge: float) -> Vector2:
 	var flat_offset := offset
 	flat_offset.y = 0.0
 	var distance := flat_offset.length()
 	if distance <= 0.01:
 		return Vector2.ZERO
 	var angle := atan2(flat_offset.x, -flat_offset.z)
-	return Vector2(sin(angle), -cos(angle)) * _get_site_marker_radius(distance)
+	return Vector2(sin(angle), -cos(angle)) * _get_marker_radius(distance, outer_radius, distance_at_edge)
 
 
 func _get_site_marker_radius(distance: float) -> float:
-	var distance_ratio := _get_site_marker_distance_ratio(distance)
-	return SITE_MARKER_OUTER_RADIUS * smoothstep(0.0, 1.0, distance_ratio)
+	return _get_marker_radius(distance, SITE_MARKER_OUTER_RADIUS, SITE_MARKER_DISTANCE_AT_EDGE)
+
+
+func _get_marker_radius(distance: float, outer_radius: float, distance_at_edge: float) -> float:
+	var distance_ratio := clampf(distance / maxf(distance_at_edge, 0.01), 0.0, 1.0)
+	return outer_radius * smoothstep(0.0, 1.0, distance_ratio)
 
 
 func _get_site_marker_distance_ratio(distance: float) -> float:
 	return clampf(distance / SITE_MARKER_DISTANCE_AT_EDGE, 0.0, 1.0)
+
+
+func _get_rock_marker_distance_ratio(distance: float) -> float:
+	return clampf(distance / ROCK_MARKER_DISTANCE_AT_EDGE, 0.0, 1.0)
+
+
+func _collect_rock_marker_targets() -> Array[Node3D]:
+	var candidates: Array[Dictionary] = []
+	for candidate in get_tree().get_nodes_in_group(SEA_ROCK_GROUP):
+		if not _is_valid_rock_marker_target(candidate):
+			continue
+		var rock := candidate as Node3D
+		var offset := rock.global_position - ship.global_position
+		offset.y = 0.0
+		var distance_sq := offset.length_squared()
+		if distance_sq > ROCK_MARKER_MAX_DISTANCE * ROCK_MARKER_MAX_DISTANCE:
+			continue
+		candidates.append({
+			"rock": rock,
+			"distance_sq": distance_sq,
+		})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("distance_sq", INF)) < float(b.get("distance_sq", INF))
+	)
+	var targets: Array[Node3D] = []
+	for candidate in candidates:
+		if targets.size() >= MAX_ROCK_MARKERS:
+			break
+		var rock := candidate.get("rock", null) as Node3D
+		if _is_valid_rock_marker_target(rock):
+			targets.append(rock)
+	return targets
 
 
 func _collect_site_marker_targets() -> Array[Node3D]:
@@ -458,6 +643,16 @@ func _is_valid_site_marker_target(site: Variant) -> bool:
 	return true
 
 
+func _is_valid_rock_marker_target(rock: Variant) -> bool:
+	if not is_instance_valid(rock) or not (rock is Node3D):
+		return false
+	if not rock.is_inside_tree():
+		return false
+	if rock.is_queued_for_deletion():
+		return false
+	return rock.is_in_group(SEA_ROCK_GROUP)
+
+
 func _is_treasure_marker_target(site: Variant) -> bool:
 	return is_instance_valid(site) and site.is_in_group(TREASURE_CHEST_GROUP)
 
@@ -488,3 +683,19 @@ func _apply_site_marker_pulse(marker: Node2D, distance_ratio: float) -> void:
 		glow.modulate = Color(1.0, 1.0, 1.0, clampf(pulse, 0.06, 0.18))
 	if is_instance_valid(dot):
 		dot.modulate = Color(1.0, 1.0, 1.0, lerpf(0.82, 1.0, 1.0 - distance_ratio))
+
+
+func _apply_rock_marker_palette(marker: Node2D, distance: float) -> void:
+	if not is_instance_valid(marker):
+		return
+	var danger_ratio := clampf(1.0 - distance / ROCK_MARKER_DANGER_DISTANCE, 0.0, 1.0)
+	var fill := ROCK_MARKER_FILL_COLOR.lerp(ROCK_MARKER_DANGER_COLOR, danger_ratio)
+	var shadow := ROCK_MARKER_SHADOW_COLOR.lerp(Color(0.38, 0.12, 0.10, 0.82), danger_ratio)
+	var crest := marker.get_node_or_null("Crest") as Polygon2D
+	var shadow_poly := marker.get_node_or_null("Shadow") as Polygon2D
+	if is_instance_valid(crest):
+		crest.color = fill
+	if is_instance_valid(shadow_poly):
+		shadow_poly.color = shadow
+	var pulse := 1.0 + sin(_glow_phase * 2.1) * 0.08 * danger_ratio
+	marker.scale = Vector2.ONE * pulse

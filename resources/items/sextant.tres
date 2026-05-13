@@ -6,6 +6,7 @@
 script = ExtResource("1")
 item_id = "sextant"
 item_name = "육분의"
+slot = "항해"
 description = "돛이 바람의 방향에 맞춰 자동으로 조절됩니다."
 icon = "explore"
 alert_msg = "!! 아이템 획득: 육분의 !!\n(자동 항해 활성화)"

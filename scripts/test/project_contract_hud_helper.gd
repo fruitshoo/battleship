@@ -339,10 +339,10 @@ static func _run_hud_capture_state_check(hud: Node, player_ship: Node3D, failure
 		target_ship.set("is_derelict", true)
 	if hud.has_method("_update_capture_opportunity_display"):
 		hud.call("_update_capture_opportunity_display")
-	if not is_instance_valid(hud.capture_opportunity_label) or not hud.capture_opportunity_label.visible:
-		failures.append("hud smoke capture label was not visible")
-	if is_instance_valid(hud.capture_opportunity_label) and hud.capture_opportunity_label.text != "폐선 확보 가능":
-		failures.append("hud smoke capture label mismatch")
+	if is_instance_valid(hud.capture_opportunity_label) and hud.capture_opportunity_label.visible:
+		failures.append("hud smoke capture label should stay hidden")
+	if is_instance_valid(hud.capture_opportunity_label) and not hud.capture_opportunity_label.text.is_empty():
+		failures.append("hud smoke capture label text should stay empty")
 	if hud.has_method("_update_distance_debug_display"):
 		hud.call("_toggle_distance_debug")
 		hud.call("_update_distance_debug_display")
@@ -1342,6 +1342,21 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 	elif not marker.visible:
 		failures.append("hud smoke compass marker should recover to the remaining sea site after treasure freed")
 	decoy_site.queue_free()
+
+	var rock := Node3D.new()
+	rock.name = "CompassRockMarkerSmoke"
+	rock.add_to_group("sea_rock_decor")
+	smoke_root.add_child(rock)
+	rock.global_position = player_ship.global_position + Vector3(18.0, 0.0, 0.0)
+	await _wait_frames(owner, 15)
+	var rock_marker := control_panel.get_node_or_null("WindPanel/WindIndicator/CompassWheel/RockMarker0") as Node2D
+	if not is_instance_valid(rock_marker):
+		failures.append("hud smoke compass rock marker missing")
+	elif not rock_marker.visible:
+		failures.append("hud smoke compass rock marker did not become visible")
+	elif rock_marker.position.length() <= 4.0:
+		failures.append("hud smoke compass rock marker should be offset from center: %.2f" % rock_marker.position.length())
+	rock.queue_free()
 	control_panel.queue_free()
 	ui_layer.queue_free()
 	await _wait_frames(owner, 1)

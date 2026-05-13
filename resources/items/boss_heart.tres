@@ -6,6 +6,7 @@
 script = ExtResource("1")
 item_id = "boss_heart"
 item_name = "보스의 심장"
+slot = "선체"
 description = "격파한 보스의 잔향이 선체에 스며듭니다. 선체 내구와 방어력이 증가합니다."
 icon = "favorite"
 alert_msg = "!! 전리품 획득: 보스의 심장 !!\n(최대 선체 HP/방어력 증가)"

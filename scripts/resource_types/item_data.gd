@@ -3,6 +3,7 @@ extends Resource
 
 @export var item_id: String = ""
 @export var item_name: String = ""
+@export var slot: String = "전리품"
 @export_multiline var description: String = ""
 @export var icon: String = ""
 @export var icon_texture: Texture2D

@@ -7,11 +7,13 @@ static func add_item_icon(hud, icon_data) -> void:
 	var slot: PanelContainer = hud.item_bar.add_icon(icon_data)
 	if is_instance_valid(slot):
 		var item_name := ""
+		var item_slot := ""
 		var item_description := ""
 		if icon_data is Dictionary:
 			item_name = str(icon_data.get("name", "아이템"))
+			item_slot = str(icon_data.get("slot", "전리품"))
 			item_description = str(icon_data.get("description", ""))
-		var tooltip_text := "[%s]\n%s" % [item_name, item_description]
+		var tooltip_text := "[%s] %s\n%s" % [item_slot, item_name, item_description]
 		slot.set_meta("tooltip_text", tooltip_text.strip_edges())
 		slot.set_meta("tooltip_color", NavalUiTheme.TEXT_GOLD)
 		if slot.get_meta("hover_bound", false) != true:

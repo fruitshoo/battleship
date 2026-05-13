@@ -20,7 +20,7 @@
 			"name": "전면 포문",
 			"category": 0,
 			"description": "판옥선 전면 대포 1문 해금",
-			"card_art_path": "res://assets/ui/upgrades/cannon_card.png",
+			"card_art_path": "res://assets/ui/upgrades/front_cannon_card.png",
 			"max_level": 1,
 			"color": "ffb24a",
 			"stats": {
@@ -406,18 +406,21 @@
 		"items": {
 			"sextant": {
 				"name": "육분의",
+				"slot": "항해",
 				"description": "돛이 바람의 방향에 맞춰 자동으로 조절됩니다.",
 				"icon": "explore",
 				"alert_msg": "!! 아이템 획득: 육분의 !!\n(자동 항해 활성화)"
 			},
 			"boss_heart": {
 				"name": "보스의 심장",
+				"slot": "선체",
 				"description": "임시 보스 드롭 전리품입니다.",
 				"icon": "favorite",
 				"alert_msg": "!! 전리품 획득: 보스의 심장 !!"
 			},
 			"choyogi": {
 				"name": "초요기",
+				"slot": "함대",
 				"description": "맹선 업그레이드 +1 효과를 부여하는 초요기 군기입니다.",
 				"icon_texture": "res://assets/ui/items/choyogi.png",
 				"icon": "flag",
@@ -425,6 +428,7 @@
 			},
 			"ilseongjeongsiui": {
 				"name": "일성정시의",
+				"slot": "항해",
 				"description": "천체와 바람을 읽어 돛이 바람 방향에 맞춰 자동으로 조절됩니다.",
 				"icon_texture": "res://assets/ui/items/ilseongjeongsiui.png",
 				"icon": "explore",

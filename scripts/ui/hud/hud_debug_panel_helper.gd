@@ -2713,6 +2713,13 @@ static func _add_misc_section(hud, panel_box: Control) -> void:
 		hud.toggle_stat_panel()
 	))
 
+	var row_tutorial := HBoxContainer.new()
+	row_tutorial.add_theme_constant_override("separation", 4)
+	result_group.add_child(row_tutorial)
+	row_tutorial.add_child(create_debug_action_button("조작 안내", func() -> void:
+		hud._invoke_level_debug_method("_debug_toggle_controls_hint")
+	))
+
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)
 	diagnostics_group.add_child(row_d)

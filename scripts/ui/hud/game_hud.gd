@@ -16,6 +16,8 @@ const MAIN_MENU_SCENE_PATH := "res://scenes/main_menu.tscn"
 const RESULT_SCENE_PATH := "res://scenes/ui/result_screen.tscn"
 const CANNON_CLOSE_RANGE_FALLOFF_DISTANCE: float = 8.0
 const CANNON_CLOSE_RANGE_MIN_MULTIPLIER: float = 0.55
+const DEBUG_PANEL_TOGGLE_GRAVE_KEYCODE: int = 96
+const DEBUG_PANEL_TOGGLE_TILDE_KEYCODE: int = 126
 
 ## 게임 HUD
 ## 현재 HUD는 런타임에 레이아웃을 조립하며, 이 스크립트는 상태 보관과 갱신 허브 역할을 맡는다.
@@ -463,6 +465,12 @@ func _update_stat_panel() -> void:
 func toggle_stat_panel() -> void:
 	HudStatPanelHelper.toggle_stat_panel(self)
 
+func _input(event: InputEvent) -> void:
+	if _is_debug_tools_toggle_event(event):
+		_toggle_debug_tools_panel_from_shortcut()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_performance_overlay_toggle_event(event):
 		_toggle_performance_overlay()
@@ -620,9 +628,16 @@ func _is_debug_tools_toggle_event(event: InputEvent) -> bool:
 		return false
 	if key_event.alt_pressed or key_event.ctrl_pressed or key_event.meta_pressed:
 		return false
+	var keycodes := [
+		KEY_BACKSLASH,
+		DEBUG_PANEL_TOGGLE_GRAVE_KEYCODE,
+		DEBUG_PANEL_TOGGLE_TILDE_KEYCODE,
+	]
 	return (
-		key_event.physical_keycode == KEY_BACKSLASH
-		or key_event.keycode == KEY_BACKSLASH
+		keycodes.has(key_event.physical_keycode)
+		or keycodes.has(key_event.keycode)
+		or keycodes.has(key_event.key_label)
+		or keycodes.has(key_event.unicode)
 		or key_event.unicode == 8361
 	)
 

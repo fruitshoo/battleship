@@ -65,9 +65,9 @@ static func apply_layout_density(hud) -> void:
 		hud.top_left_container.offset_left = edge_margin
 		hud.top_left_container.offset_top = top_margin
 	if is_instance_valid(hud.weapon_track):
-		hud.weapon_track.custom_minimum_size.x = roundf(lerpf(176.0, 200.0, density))
+		hud.weapon_track.custom_minimum_size.x = roundf(lerpf(220.0, 252.0, density))
 	if is_instance_valid(hud.support_track):
-		hud.support_track.custom_minimum_size.x = roundf(lerpf(176.0, 200.0, density))
+		hud.support_track.custom_minimum_size.x = roundf(lerpf(220.0, 252.0, density))
 	if is_instance_valid(hud.combat_stats_row):
 		hud.combat_stats_row.add_theme_constant_override("separation", panel_gap)
 	if is_instance_valid(hud.score_label):

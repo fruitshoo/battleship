@@ -1,6 +1,13 @@
 extends MarginContainer
 
-const SLOT_SIZE := Vector2(40, 40)
+const SLOT_SIZE := Vector2(50, 50)
+const SLOT_BADGES := {
+	"항해": "항",
+	"함대": "함",
+	"전투": "전",
+	"선체": "선",
+	"전리품": "품",
+}
 
 var item_container: HBoxContainer = null
 var current_item_count: int = 0
@@ -52,17 +59,19 @@ func _create_slot(icon_data) -> PanelContainer:
 		icon_rect.texture = icon_texture
 		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon_rect.custom_minimum_size = SLOT_SIZE - Vector2(4, 4)
+		icon_rect.custom_minimum_size = SLOT_SIZE - Vector2(6, 6)
 		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		slot_bg.add_child(icon_rect)
+		_add_slot_badge(slot_bg, icon_data)
 		return slot_bg
 
 	var icon_label = Label.new()
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	NavalUiTheme.apply_emblem(icon_label, str(_extract_icon_data(icon_data)), 18, NavalUiTheme.TEXT_MAIN)
+	NavalUiTheme.apply_emblem(icon_label, str(_extract_icon_data(icon_data)), 23, NavalUiTheme.TEXT_MAIN)
 
 	slot_bg.add_child(icon_label)
+	_add_slot_badge(slot_bg, icon_data)
 	return slot_bg
 
 func _resolve_icon_texture(icon_data) -> Texture2D:
@@ -79,3 +88,37 @@ func _extract_icon_data(icon_data):
 	if icon_data is Dictionary:
 		return icon_data.get("icon_data", "")
 	return icon_data
+
+
+func _add_slot_badge(slot_bg: PanelContainer, icon_data) -> void:
+	var badge_text := _get_slot_badge(icon_data)
+	if badge_text.is_empty():
+		return
+	var badge := Label.new()
+	badge.text = badge_text
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.custom_minimum_size = Vector2(16, 14)
+	badge.anchor_left = 1.0
+	badge.anchor_top = 1.0
+	badge.anchor_right = 1.0
+	badge.anchor_bottom = 1.0
+	badge.offset_left = -17.0
+	badge.offset_top = -15.0
+	badge.offset_right = -2.0
+	badge.offset_bottom = -1.0
+	NavalUiTheme.style_overlay_caption(badge, 9, NavalUiTheme.TEXT_GOLD, 2)
+	slot_bg.add_child(badge)
+
+
+func _get_slot_badge(icon_data) -> String:
+	var slot_name := _get_slot_name(icon_data)
+	return str(SLOT_BADGES.get(slot_name, "품"))
+
+
+func _get_slot_name(icon_data) -> String:
+	if icon_data is Dictionary:
+		var slot_name := str(icon_data.get("slot", "전리품")).strip_edges()
+		return slot_name if not slot_name.is_empty() else "전리품"
+	return "전리품"

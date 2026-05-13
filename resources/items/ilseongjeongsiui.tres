@@ -7,6 +7,7 @@
 script = ExtResource("1")
 item_id = "ilseongjeongsiui"
 item_name = "일성정시의"
+slot = "항해"
 description = "천체와 바람을 읽어 돛이 바람 방향에 맞춰 자동으로 조절됩니다."
 icon = "star"
 icon_texture = ExtResource("2")

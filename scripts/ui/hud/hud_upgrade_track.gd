@@ -1,5 +1,9 @@
 extends VBoxContainer
 
+const SLOT_SIZE := Vector2(42, 42)
+const ICON_FONT_SIZE := 20
+const LEVEL_FONT_SIZE := 11
+
 var slot_container: HFlowContainer = null
 var slots: Array[PanelContainer] = []
 var _slot_panel_bg: Color = Color(0, 0, 0, 0.4)
@@ -38,7 +42,7 @@ func update_slot(slot_idx: int, upgrade_id: String, level: int, icon_text: Strin
 		icon_texture_rect.texture = icon_texture
 		icon_texture_rect.visible = icon_texture != null
 	if icon_label:
-		NavalUiTheme.apply_emblem(icon_label, icon_text, 16, icon_color)
+		NavalUiTheme.apply_emblem(icon_label, icon_text, ICON_FONT_SIZE, icon_color)
 		icon_label.visible = icon_texture == null
 	if lv_label:
 		lv_label.text = str(level)
@@ -64,7 +68,7 @@ func _ensure_slot(slot_idx: int) -> void:
 
 func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	var slot_bg = PanelContainer.new()
-	slot_bg.custom_minimum_size = Vector2(32, 32)
+	slot_bg.custom_minimum_size = SLOT_SIZE
 	slot_bg.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	var slot_sb = StyleBoxFlat.new()
@@ -74,10 +78,10 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	var icon_texture := TextureRect.new()
 	icon_texture.name = "IconTexture"
 	icon_texture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	icon_texture.offset_left = 2.0
-	icon_texture.offset_top = 2.0
-	icon_texture.offset_right = -2.0
-	icon_texture.offset_bottom = -2.0
+	icon_texture.offset_left = 3.0
+	icon_texture.offset_top = 3.0
+	icon_texture.offset_right = -3.0
+	icon_texture.offset_bottom = -3.0
 	icon_texture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	icon_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -89,7 +93,7 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon_label.name = "Icon"
-	NavalUiTheme.apply_emblem(icon_label, "build", 16, NavalUiTheme.TEXT_ACCENT)
+	NavalUiTheme.apply_emblem(icon_label, "build", ICON_FONT_SIZE, NavalUiTheme.TEXT_ACCENT)
 	slot_bg.add_child(icon_label)
 
 	var level_label_overlay = Label.new()
@@ -97,11 +101,11 @@ func _create_slot(panel_bg: Color, border_color: Color) -> PanelContainer:
 	level_label_overlay.text = "1"
 	level_label_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	level_label_overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	NavalUiTheme.style_overlay_value(level_label_overlay, 10)
+	NavalUiTheme.style_overlay_value(level_label_overlay, LEVEL_FONT_SIZE)
 	level_label_overlay.visible = false
 	level_label_overlay.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	level_label_overlay.offset_left = -16
-	level_label_overlay.offset_top = -14
+	level_label_overlay.offset_left = -20
+	level_label_overlay.offset_top = -16
 	level_label_overlay.offset_right = -2
 	level_label_overlay.offset_bottom = -2
 	slot_bg.add_child(level_label_overlay)

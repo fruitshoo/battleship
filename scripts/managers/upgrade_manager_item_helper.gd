@@ -19,6 +19,7 @@ static func load_items_from_resources(manager) -> bool:
 					file_name = dir.get_next()
 					continue
 				var item_name := str(item_res.get("item_name"))
+				var item_slot := str(item_res.get("slot"))
 				var item_description := str(item_res.get("description"))
 				var item_icon := str(item_res.get("icon"))
 				var item_alert_msg := str(item_res.get("alert_msg"))
@@ -28,6 +29,7 @@ static func load_items_from_resources(manager) -> bool:
 					icon_texture_path = (icon_texture_variant as Texture2D).resource_path
 				manager.ITEMS[item_id] = {
 					"name": item_name,
+					"slot": item_slot,
 					"description": item_description,
 					"icon": item_icon,
 					"icon_texture": icon_texture_path,
@@ -104,6 +106,7 @@ static func get_item_icon_payload(item_id: String, item_data: Dictionary) -> Dic
 	var payload: Dictionary = {
 		"item_id": item_id,
 		"name": str(item_data.get("name", item_id)),
+		"slot": str(item_data.get("slot", "전리품")),
 		"description": str(item_data.get("description", "")),
 		"icon_data": null,
 	}

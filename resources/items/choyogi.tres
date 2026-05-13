@@ -7,6 +7,7 @@
 script = ExtResource("1")
 item_id = "choyogi"
 item_name = "초요기"
+slot = "함대"
 description = "지원함대 한계가 1 증가합니다."
 icon = "flag"
 icon_texture = ExtResource("2")
