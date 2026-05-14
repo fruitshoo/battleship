@@ -86,6 +86,24 @@ static func _setup_player_status_overlay(hud) -> void:
 	hud.speed_bar_label.add_theme_constant_override("outline_size", 4)
 	hud.speed_bar.add_child(hud.speed_bar_label)
 
+	hud.boost_bar = HudGaugeBar.new()
+	hud.boost_bar.name = "RamBoost"
+	hud.boost_bar.show_percentage = false
+	hud.boost_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.boost_bar.position = Vector2(0.0, hud.PLAYER_STATUS_HP_HEIGHT + hud.PLAYER_STATUS_BAR_GAP + hud.PLAYER_STATUS_SPEED_HEIGHT + hud.PLAYER_STATUS_BAR_GAP)
+	hud.boost_bar.custom_minimum_size = Vector2(hud.PLAYER_STATUS_BAR_WIDTH, hud.PLAYER_STATUS_BOOST_HEIGHT)
+	hud.boost_bar.size = hud.boost_bar.custom_minimum_size
+	hud.boost_bar.min_value = 0.0
+	hud.boost_bar.max_value = 100.0
+	hud.boost_bar.value = 100.0
+	root.add_child(hud.boost_bar)
+	hud.boost_bar.configure_gauge(Color(0.03, 0.03, 0.035, 0.36), Color(0.96, 0.68, 0.24, 0.94), 1, {
+		"damage_trail": false,
+		"low_pulse": false,
+		"border_color": Color(0.0, 0.0, 0.0, 0.0),
+		"shine_strength": 0.03,
+	})
+
 
 static func update_ship_health_bars(hud, positions_only: bool = false) -> void:
 	hud.HudUpdateHelper.update_ship_health_bars(hud, positions_only)

@@ -2,7 +2,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
-const BASE_SOLDIER_DAMAGE: float = 24.0
+const BASE_SOLDIER_DAMAGE: float = 18.0
 const BASE_HULL_DAMAGE: float = 5.5
 const NODE_MUZZLE := "Muzzle"
 

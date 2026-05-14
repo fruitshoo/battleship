@@ -2,6 +2,7 @@ extends CanvasLayer
 
 const MAIN_MENU_PATH := "res://scenes/main_menu.tscn"
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
+const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
@@ -32,6 +33,7 @@ const BUTTON_ENTRY_DELAY := 0.055
 var _modal_open: bool = false
 var _menu_buttons: Array[Button] = []
 var _focused_button_index: int = 0
+var _nav_repeater := MenuInputHelper.NavRepeater.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -232,11 +234,24 @@ func _apply_background_fx() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _modal_open:
 		return
-	if event.is_action_pressed("ui_cancel"):
+	if MenuInputHelper.is_cancel_event(event):
 		_on_resume_pressed()
 		if get_viewport():
 			get_viewport().set_input_as_handled()
-	elif _is_menu_prev_event(event):
+		return
+
+	var nav := _nav_repeater.consume_event(event)
+	if nav.y != 0:
+		_move_pause_focus(nav.y)
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
+	if MenuInputHelper.is_navigation_axis_event(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
+
+	if _is_menu_prev_event(event):
 		_move_pause_focus(-1)
 		if get_viewport():
 			get_viewport().set_input_as_handled()
@@ -281,20 +296,12 @@ func _on_quit_pressed() -> void:
 
 
 func _is_menu_prev_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_up") or _is_physical_key_pressed(event, KEY_W) or _is_physical_key_pressed(event, KEY_A)
+	return MenuInputHelper.is_menu_prev_event(event)
 
 
 func _is_menu_next_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_down") or _is_physical_key_pressed(event, KEY_S) or _is_physical_key_pressed(event, KEY_D)
+	return MenuInputHelper.is_menu_next_event(event)
 
 
 func _is_confirm_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
-
-
-func _is_physical_key_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == keycode
-
-
-func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode
+	return MenuInputHelper.is_confirm_event(event)

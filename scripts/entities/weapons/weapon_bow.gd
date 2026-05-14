@@ -1,6 +1,6 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
-const BASE_DAMAGE: float = 18.0
+const BASE_DAMAGE: float = 10.0
 const ARROW_SPEED: float = 34.0
 const MIN_ARROW_FLIGHT_TIME: float = 0.12
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
@@ -178,7 +178,7 @@ func _launch_singigeon_proc_rocket(target: Node3D, attacker: Node3D, team_name: 
 	if "damage" in rocket:
 		rocket.damage = float(stats.get("base_damage", 2.5))
 	if "personnel_damage_mult" in rocket:
-		rocket.personnel_damage_mult = float(stats.get("personnel_damage_mult", 5.0))
+		rocket.personnel_damage_mult = float(stats.get("personnel_damage_mult", 6.0))
 	if "soldier_knockback_speed" in rocket:
 		rocket.soldier_knockback_speed = float(stats.get("base_knockback_speed", 9.0)) + float(singigeon_level - 1) * float(stats.get("knockback_speed_per_lv", 0.0))
 	if "soldier_knockback_duration" in rocket:

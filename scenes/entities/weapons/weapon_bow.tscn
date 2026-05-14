@@ -22,7 +22,9 @@ script = ExtResource("1_script")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("BoxMesh_bow")
 surface_material_override/0 = SubResource("Material_wood")
+cast_shadow = 0
 
 [node name="String" type="MeshInstance3D" parent="Visual" unique_id=986152838]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.5, 0)
 mesh = SubResource("CylinderMesh_string")
+cast_shadow = 0

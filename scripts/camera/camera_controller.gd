@@ -24,6 +24,9 @@ extends Camera3D
 @export var initial_zoom_ratio: float = 0.86
 @export_range(1.0, 20.0) var zoom_smooth_speed: float = 12.0
 @export var rotation_sensitivity: float = 0.005
+@export_range(0.2, 4.0, 0.05) var gamepad_rotation_speed: float = 1.35
+@export_range(2.0, 28.0, 0.5) var gamepad_zoom_speed: float = 14.0
+@export_range(0.0, 0.6, 0.01) var gamepad_camera_deadzone: float = 0.16
 
 @export_group("Fog Settings")
 @export_range(0.0, 300.0) var fog_begin_min: float = 90.0
@@ -111,6 +114,7 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target):
 		return
 	
+	_update_gamepad_camera_input(delta)
 	current_zoom = move_toward(current_zoom, target_zoom, zoom_smooth_speed * delta)
 	
 	# 1. 타겟 위치 + 진행 방향 리드
@@ -158,6 +162,19 @@ func _physics_process(delta: float) -> void:
 			randf_range(-1.0, 1.0)
 		) * shake_intensity * damping
 		global_position += shake_offset
+
+func _update_gamepad_camera_input(delta: float) -> void:
+	var rotate_x := Input.get_action_strength("camera_rotate_right") - Input.get_action_strength("camera_rotate_left")
+	var rotate_y := Input.get_action_strength("camera_rotate_down") - Input.get_action_strength("camera_rotate_up")
+	var zoom_modifier_pressed := Input.is_action_pressed("camera_zoom_modifier")
+	if absf(rotate_x) > gamepad_camera_deadzone:
+		_cam_rotation.x -= rotate_x * gamepad_rotation_speed * delta
+	if zoom_modifier_pressed:
+		if absf(rotate_y) > gamepad_camera_deadzone:
+			target_zoom = clamp(target_zoom + rotate_y * gamepad_zoom_speed * delta, min_zoom, max_zoom)
+	elif absf(rotate_y) > gamepad_camera_deadzone:
+		_cam_rotation.y -= rotate_y * gamepad_rotation_speed * delta
+		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
 
 func _update_sail_occlusion_fade(delta: float) -> void:
 	if not sail_occlusion_fade_enabled:

@@ -746,7 +746,9 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 				smoothstep(0.25, 0.95, attacker_alignment)
 			)
 	var attacker_ram_mult := 1.0
-	if is_instance_valid(other) and other.get("ramming_damage_multiplier") != null:
+	if is_instance_valid(other) and other.has_method("get_ramming_damage_multiplier_value"):
+		attacker_ram_mult = maxf(0.1, float(other.call("get_ramming_damage_multiplier_value")))
+	elif is_instance_valid(other) and other.get("ramming_damage_multiplier") != null:
 		attacker_ram_mult = maxf(0.1, float(other.get("ramming_damage_multiplier")))
 	var final_ram_damage = impact_speed * RAMMING_DAMAGE_SPEED_SCALE * angle_mult * attacker_alignment_mult * attacker_ram_mult
 

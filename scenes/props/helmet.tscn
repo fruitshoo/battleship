@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cp32kp45r1iv7" path="res://assets/models/props/helmat/helmat.glb" id="1_model"]
+
+[node name="Helmet" instance=ExtResource("1_model")]
+cast_shadow = 0

@@ -10,3 +10,8 @@ shared_material = ExtResource("3_material")
 
 [node name="Model" parent="." unique_id=193627370 instance=ExtResource("2_model")]
 transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+
+[node name="Plane.001" parent="Model" index="0"]
+cast_shadow = 0
+
+[editable path="Model"]

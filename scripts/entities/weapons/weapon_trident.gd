@@ -1,18 +1,22 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 ## 삼지창 (Trident)
-## 공격력이 높고 리치도 길지만 쿨다운이 깁니다.
+## 창과 같은 스펙을 쓰고, 외형과 사운드만 다르게 표현합니다.
 
-const BASE_DAMAGE: float = 16.0
+const BASE_DAMAGE: float = 12.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE
-	attack_range = 3.0
-	attack_cooldown = 1.6
+	attack_range = 3.2
+	attack_cooldown = 1.2
 
 
 func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
 	damage = BASE_DAMAGE * (1.0 + maxf(0.0, damage_bonus_pct))
+
+
+func apply_owner_damage_modifiers(damage_bonus_pct: float, damage_add: float = 0.0) -> void:
+	damage = (BASE_DAMAGE + maxf(0.0, damage_add)) * (1.0 + maxf(0.0, damage_bonus_pct))
 
 
 func attack(target: Node3D, attacker: Node3D) -> void:

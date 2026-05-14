@@ -3,6 +3,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 const DEBUG_SPAWNER_LOGS := false
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 const BOSS_WAVE_SPAWN_STAGGER_SECONDS := 0.75
+const BOSS_WAVE_DELAYED_SPAWN_SAFE_DISTANCE := 42.0
 
 ## 적 생성 관리자 (Enemy Spawner)
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
@@ -373,6 +374,7 @@ func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
 			var spawn_entry := {
 				"ship_type": ship_type_name,
 				"spawn_pos": spawn_pos,
+				"lateral_offset": lateral_offset,
 				"spawn_escorts": not escort_layout.is_empty(),
 				"is_final_wave": is_final_wave,
 				"allow_final_wave_member": is_final_wave,
@@ -386,6 +388,7 @@ func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
 					spawned.append(boss_ship)
 			else:
 				spawn_entry["delay"] = spawn_delay
+				spawn_entry["recalculate_spawn_on_release"] = true
 				pending_boss_wave_spawns.append(spawn_entry)
 			spawned_index += 1
 
@@ -406,6 +409,8 @@ func _spawn_queued_boss_wave_ship(entry: Dictionary) -> Node3D:
 		return null
 	var spawn_pos_variant: Variant = entry.get("spawn_pos", Vector3.ZERO)
 	var spawn_pos: Vector3 = spawn_pos_variant if spawn_pos_variant is Vector3 else Vector3.ZERO
+	if bool(entry.get("recalculate_spawn_on_release", false)):
+		spawn_pos = _get_delayed_boss_wave_spawn_position(entry)
 	var escort_layout: Array = entry.get("escort_layout", []) as Array
 	return _spawn_boss_ship(
 		ship_type_name,
@@ -415,6 +420,49 @@ func _spawn_queued_boss_wave_ship(entry: Dictionary) -> Node3D:
 		escort_layout,
 		bool(entry.get("allow_final_wave_member", false))
 	)
+
+
+func _get_delayed_boss_wave_spawn_position(entry: Dictionary) -> Vector3:
+	if not is_instance_valid(player):
+		_find_player()
+	if not is_instance_valid(player):
+		var fallback_variant: Variant = entry.get("spawn_pos", Vector3.ZERO)
+		return fallback_variant if fallback_variant is Vector3 else Vector3.ZERO
+
+	var center_pos: Vector3 = _get_biased_spawn_position()
+	var player_forward: Vector3 = -player.global_transform.basis.z
+	player_forward.y = 0.0
+	if player_forward.length_squared() <= 0.0001:
+		player_forward = Vector3.FORWARD
+	else:
+		player_forward = player_forward.normalized()
+	var player_right: Vector3 = player_forward.cross(Vector3.UP)
+	if player_right.length_squared() <= 0.0001:
+		player_right = Vector3.RIGHT
+	else:
+		player_right = player_right.normalized()
+
+	var lateral_offset: float = float(entry.get("lateral_offset", 0.0))
+	var spawn_pos: Vector3 = center_pos + player_right * lateral_offset
+	spawn_pos += player_forward * -absf(lateral_offset) * 0.18
+	spawn_pos.y = 0.0
+	return _push_spawn_position_to_safe_distance(spawn_pos, BOSS_WAVE_DELAYED_SPAWN_SAFE_DISTANCE)
+
+
+func _push_spawn_position_to_safe_distance(spawn_pos: Vector3, min_dist: float) -> Vector3:
+	var adjusted_pos := spawn_pos
+	for _attempt in range(8):
+		if _is_position_safe(adjusted_pos, min_dist):
+			return adjusted_pos
+		var away_dir: Vector3 = adjusted_pos - player.global_position if is_instance_valid(player) else adjusted_pos
+		away_dir.y = 0.0
+		if away_dir.length_squared() <= 0.0001:
+			away_dir = Vector3.FORWARD
+		else:
+			away_dir = away_dir.normalized()
+		adjusted_pos += away_dir * 8.0
+		adjusted_pos.y = 0.0
+	return adjusted_pos
 
 
 func _spawn_elite_wave(ship_count: int) -> Array[Node3D]:

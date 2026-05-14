@@ -2,10 +2,12 @@ class_name LevelManagerPrologueHelper
 extends RefCounted
 
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
+const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 
 const ENV_SKIP_KEY := "BATTLESHIP_SKIP_PROLOGUE"
 const FADE_OUT_SECONDS := 0.75
 const SKIP_FADE_OUT_SECONDS := 0.28
+const INPUT_MODE_META := "prologue_input_mode"
 
 static func should_prepare(lm: Node) -> bool:
 	if not bool(lm.prologue_enabled):
@@ -29,7 +31,7 @@ static func start_if_needed(lm: Node) -> void:
 	lm._prologue_active = true
 	lm._prologue_stage_elapsed = 0.0
 	lm._prologue_notice_layer = _create_notice_layer(lm)
-	_set_notice_text(lm, _get_controls_text())
+	_refresh_controls_text(lm)
 
 
 static func update_prologue(lm: Node, delta: float) -> void:
@@ -43,12 +45,8 @@ static func update_prologue(lm: Node, delta: float) -> void:
 static func handle_skip_input(lm: Node, event: InputEvent) -> bool:
 	if not bool(lm._prologue_active):
 		return false
-	if not (event is InputEventKey):
-		return false
-	var key_event := event as InputEventKey
-	if not key_event.pressed or key_event.echo:
-		return false
-	if key_event.keycode != KEY_TAB and key_event.keycode != KEY_ESCAPE:
+	_refresh_controls_text(lm, event)
+	if not _is_skip_event(event):
 		return false
 	complete(lm, true)
 	return true
@@ -76,11 +74,24 @@ static func toggle_controls_hint(lm: Node) -> void:
 		_remove_notice_layer(lm)
 		return
 	lm._prologue_notice_layer = _create_notice_layer(lm)
-	_set_notice_text(lm, _get_controls_text())
+	_refresh_controls_text(lm)
 
 
-static func _get_controls_text() -> String:
-	return "WASD/방향키: 이동    Q/E: 돛 방향    R: 돛 접기/펼치기"
+static func _get_controls_text(gamepad_mode: bool) -> String:
+	if gamepad_mode:
+		return "패드: L스틱 이동    Y 돛 접기    접힌 뒤 RT 충각 돌진    R스틱 카메라    R3+R스틱 상하 줌    LB/RB 돛 방향"
+	return "WASD/방향키: 이동    R: 돛 접기    접힌 뒤 Shift: 충각 돌진    마우스 드래그/휠: 카메라/줌    Q/E: 돛 방향"
+
+
+static func _refresh_controls_text(lm: Node, event: InputEvent = null) -> void:
+	if event != null:
+		MenuInputHelper.observe_event(event)
+	var input_mode := MenuInputHelper.get_last_input_device()
+	if lm.has_meta(INPUT_MODE_META) and str(lm.get_meta(INPUT_MODE_META)) == input_mode:
+		return
+	lm.set_meta(INPUT_MODE_META, input_mode)
+	var gamepad_mode := MenuInputHelper.is_gamepad_last_used()
+	_set_notice_text(lm, _get_controls_text(gamepad_mode), gamepad_mode)
 
 
 static func _create_notice_layer(lm: Node) -> CanvasLayer:
@@ -111,9 +122,26 @@ static func _create_notice_layer(lm: Node) -> CanvasLayer:
 	return layer
 
 
-static func _set_notice_text(lm: Node, text: String) -> void:
+static func _set_notice_text(lm: Node, text: String, gamepad_mode: bool = false) -> void:
 	if is_instance_valid(lm._prologue_notice_label):
-		lm._prologue_notice_label.text = "%s    Tab/Esc: 건너뛰기" % text
+		var skip_text := "Start/취소: 건너뛰기" if gamepad_mode else "Tab/Esc: 건너뛰기"
+		lm._prologue_notice_label.text = "%s    %s" % [text, skip_text]
+
+
+static func _is_skip_event(event: InputEvent) -> bool:
+	if event.is_action_pressed("ui_cancel"):
+		return true
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		if not key_event.pressed or key_event.echo:
+			return false
+		return key_event.keycode == KEY_TAB or key_event.keycode == KEY_ESCAPE
+	if event is InputEventJoypadButton:
+		var joy_event := event as InputEventJoypadButton
+		if not joy_event.pressed:
+			return false
+		return joy_event.button_index == JOY_BUTTON_START
+	return false
 
 
 static func _show_final_notice(lm: Node, text: String) -> void:

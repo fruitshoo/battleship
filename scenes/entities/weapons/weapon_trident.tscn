@@ -8,3 +8,11 @@ script = ExtResource("1_script")
 
 [node name="Visual" parent="." instance=ExtResource("2_trident_model")]
 transform = Transform3D(0.8, 0, 0, 0, 0, -0.8, 0, 0.8, 0, 0, 0, 0)
+
+[node name="trident" parent="Visual" index="0"]
+cast_shadow = 0
+
+[node name="trident.001" parent="Visual" index="1"]
+cast_shadow = 0
+
+[editable path="Visual"]

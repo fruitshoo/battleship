@@ -8,10 +8,18 @@ const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
 const SUPPORT_ASSIST_EVAL_TIMER_META := "support_assist_eval_timer"
 const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 const SUPPORT_JOIN_STAGE_META := "support_join_stage"
+const CONTROL_SCHEME_SCREEN := "screen"
+const SCREEN_STEER_FULL_ANGLE_DEG := 95.0
+const SCREEN_STEER_SOFT_ZONE_DEG := 16.0
+const SCREEN_STEER_SPEED_DAMPING := 0.035
+const SCREEN_INPUT_DEADZONE := 0.08
+const RAM_BOOST_TRIGGER_THRESHOLD := 0.45
 
 static func handle_input(ship, delta: float) -> void:
 	if Input.is_action_just_pressed("toggle_sail_furl") and ship.has_method("toggle_sail_furl"):
 		ship.toggle_sail_furl()
+	if _is_ramming_boost_just_pressed(ship) and ship.has_method("try_activate_ramming_boost"):
+		ship.try_activate_ramming_boost()
 
 	var sail_turn_speed: float = float(ship.sail_turn_speed)
 	if Input.is_action_pressed("sail_left"):
@@ -19,6 +27,25 @@ static func handle_input(ship, delta: float) -> void:
 	if Input.is_action_pressed("sail_right"):
 		ship.adjust_sail_angle(sail_turn_speed * delta)
 
+	if _is_screen_relative_control_enabled():
+		_handle_screen_relative_navigation(ship, delta)
+	else:
+		_handle_ship_relative_navigation(ship, delta)
+
+
+static func _is_ramming_boost_just_pressed(ship) -> bool:
+	var pressed := InputMap.has_action("ram_boost") and Input.is_action_pressed("ram_boost")
+	pressed = pressed or Input.is_key_pressed(KEY_SHIFT)
+	for device in Input.get_connected_joypads():
+		if Input.get_joy_axis(device, JOY_AXIS_TRIGGER_RIGHT) >= RAM_BOOST_TRIGGER_THRESHOLD:
+			pressed = true
+			break
+	var was_pressed := bool(ship.get("ramming_boost_input_was_pressed")) if ship.get("ramming_boost_input_was_pressed") != null else false
+	ship.set("ramming_boost_input_was_pressed", pressed)
+	return pressed and not was_pressed
+
+
+static func _handle_ship_relative_navigation(ship, delta: float) -> void:
 	var steer_input = 0.0
 	if Input.is_action_pressed("ship_left"):
 		steer_input = -1.0
@@ -33,6 +60,68 @@ static func handle_input(ship, delta: float) -> void:
 	else:
 		if ship.is_rowing:
 			ship.set_rowing(false)
+
+
+static func _handle_screen_relative_navigation(ship, delta: float) -> void:
+	var input_vec := Vector2(
+		Input.get_action_strength("ship_right") - Input.get_action_strength("ship_left"),
+		Input.get_action_strength("row_forward") - Input.get_action_strength("row_backward")
+	)
+	if input_vec.length() <= SCREEN_INPUT_DEADZONE:
+		ship.steer(0.0, delta)
+		if ship.is_rowing:
+			ship.set_rowing(false)
+		return
+	input_vec = input_vec.normalized()
+	var desired_dir := _get_screen_relative_world_direction(ship, input_vec)
+	if desired_dir.length_squared() <= 0.001:
+		_handle_ship_relative_navigation(ship, delta)
+		return
+	var ship_forward := Vector2(-sin(ship.rotation.y), -cos(ship.rotation.y)).normalized()
+	var desired_2d := Vector2(desired_dir.x, desired_dir.z).normalized()
+	var signed_angle := ship_forward.angle_to(desired_2d)
+	var angle_deg := rad_to_deg(signed_angle)
+	var steer_input := _calculate_screen_relative_steer(ship, angle_deg)
+	ship.steer(steer_input, delta)
+	ship.set_rowing(true, 1)
+
+
+static func _get_screen_relative_world_direction(ship, input_vec: Vector2) -> Vector3:
+	var camera: Camera3D = null
+	var viewport: Viewport = ship.get_viewport() if is_instance_valid(ship) else null
+	if viewport != null:
+		camera = viewport.get_camera_3d()
+	if not is_instance_valid(camera):
+		return Vector3.ZERO
+	var camera_forward := camera.global_transform.basis.y
+	var camera_right := camera.global_transform.basis.x
+	camera_forward.y = 0.0
+	camera_right.y = 0.0
+	if camera_forward.length_squared() <= 0.001:
+		camera_forward = -camera.global_transform.basis.z
+		camera_forward.y = 0.0
+	if camera_forward.length_squared() <= 0.001 or camera_right.length_squared() <= 0.001:
+		return Vector3.ZERO
+	return (camera_right.normalized() * input_vec.x + camera_forward.normalized() * input_vec.y).normalized()
+
+
+static func _is_screen_relative_control_enabled() -> bool:
+	if not is_instance_valid(SaveManager):
+		return false
+	return str(SaveManager.get_setting("control_scheme", "ship")) == CONTROL_SCHEME_SCREEN
+
+
+static func _calculate_screen_relative_steer(ship, angle_deg: float) -> float:
+	var abs_angle := absf(angle_deg)
+	if abs_angle <= 0.5:
+		return 0.0
+	var steer := clampf(angle_deg / SCREEN_STEER_FULL_ANGLE_DEG, -1.0, 1.0)
+	var soft_ratio := smoothstep(0.0, SCREEN_STEER_SOFT_ZONE_DEG, abs_angle)
+	var speed_ratio := clampf(absf(float(ship.current_speed)) / maxf(float(ship.max_speed), 0.1), 0.0, 1.4)
+	var damping := clampf(1.0 - speed_ratio * SCREEN_STEER_SPEED_DAMPING, 0.78, 1.0)
+	return steer * soft_ratio * damping
+
+
 static func toggle_fleet_formation(ship) -> void:
 	var hold_enabled := not SupportFleetStateHelper.is_flagship_hold_enabled(ship)
 	SupportFleetStateHelper.set_flagship_hold_enabled(ship, hold_enabled)

@@ -135,6 +135,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var sail_turn_speed: float = _get_float(ship, "sail_turn_speed", PLAYER_SAIL_TURN_SPEED)
 	var rowing_speed: float = _get_float(ship, "rowing_speed", 0.0)
 	var rowing_acceleration_mult: float = _get_float(ship, "rowing_acceleration_mult", 1.0)
+	var ram_boost_recharge_duration: float = _get_float(ship, "ramming_boost_recharge_duration", 0.0)
 	var rudder_turn_speed: float = _get_float(ship, "rudder_turn_speed", 0.0)
 	sections.append({
 		"title": "항해",
@@ -145,6 +146,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "sync_alt", "label": "돛 회전", "value": "%.0f°/s" % sail_turn_speed},
 			{"icon": "rowing", "label": "노젓기 속도", "value": "%.1f" % rowing_speed},
 			{"icon": "offline_bolt", "label": "노 가속", "value": "+%d%%" % max(0, int(round((rowing_acceleration_mult - 1.0) * 100.0)))},
+			{"icon": "bolt", "label": "충각 회복", "value": "%.1fs" % ram_boost_recharge_duration},
 			{"icon": "turn_right", "label": "러더 선회", "value": "%.0f°/s" % rudder_turn_speed},
 		],
 	})
@@ -230,7 +232,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "swords", "label": "근접 / 활", "value": "%.1f / %.1f" % [
 				float(crew_stats.get("sword_damage", 0.0)),
 				float(crew_stats.get("bow_damage", 0.0)),
-			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "장창 피해 = 기본 장창 피해 x (1 + 장창 업그레이드 + 해역 병사 무기)\n활 피해 = 기본 활 피해 x (1 + 해역 병사 무기)")},
+			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "장창 피해 = (기본 장창 피해 + 장창 업그레이드) x (1 + 해역 병사 무기)\n활 피해 = 기본 활 피해 x (1 + 해역 병사 무기)")},
 			{"icon": "grade", "label": "치명타", "value": "%.0f%% x%.1f" % [
 				float(crew_stats.get("crit_chance", 0.0)) * 100.0,
 				float(crew_stats.get("crit_multiplier", 1.0)),
@@ -742,7 +744,7 @@ static func _build_site_bonus_tooltip(bonus_id: String, bonus_name: String, valu
 			lines.append("계산: 기본 재장전 x 화약 배율 x (1 - 해역 포격 속도) x 병사/함대/상태 배율")
 		"crew_damage_pct":
 			lines.append("적용: 병사 장창/활/무기 피해 배율에 합산")
-			lines.append("계산: 장창 피해는 장창 업그레이드와 합산, 활 피해는 해역 병사 무기 보너스와 합산")
+			lines.append("계산: 장창 업그레이드는 고정 피해를 더하고, 해역 보너스는 최종 배율에 합산")
 		"crew_defense_add":
 			lines.append("적용: 병사 방어력에 더함")
 			lines.append("계산: 기존 병사 방어력 + 해역 보너스")

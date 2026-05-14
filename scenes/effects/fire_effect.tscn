@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://7dh0uy8e1nb" path="res://scripts/effects/fire_effect.gd" id="1_script"]
 [ext_resource type="Material" path="res://resources/vfx/materials/fire_billboard.tres" id="2_fire_material"]
 [ext_resource type="Texture2D" uid="uid://j3er0rga8slr" path="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG" id="3_glow"]
-[ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="4_smoke"]
+[ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="4_smoke"]
 [ext_resource type="Material" uid="uid://dus600juh63rn" path="res://resources/vfx/process/fire_effect_flame_process.tres" id="5_fire_process"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_fire"]

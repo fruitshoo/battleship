@@ -7,6 +7,7 @@ const PLAYER_HULL_BASE_HP := 200.0
 const PLAYER_BASE_MAX_SPEED := 6.0
 const PLAYER_ROWING_BASE_SPEED := 4.8
 const PLAYER_ROWING_BASE_ACCEL := 1.0
+const PLAYER_RAMMING_BOOST_RECHARGE := 18.0
 const PLAYER_MAX_ROWING_STAMINA := 100.0
 const PLAYER_SAIL_EFFICIENCY := 1.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
@@ -122,17 +123,18 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "선체 자동 수리 %.1f/s" % repair_rate
 		"sailing":
 			var sailing_stats := _calculate_sailing_stats(level, stats)
-			return "돛 최고속 +%d%% | 풍력 효율 +%d%% | 돛 회전 +%d%% | 전환 +%d%%" % [
-				_percent_delta_from_ratio(float(sailing_stats["max_speed"]) / PLAYER_BASE_MAX_SPEED),
+			return "돛 최고속 +%.0f | 풍력 효율 +%d%% | 돛 회전 +%d%% | 전환 +%d%%" % [
+				float(sailing_stats["max_speed"]) - PLAYER_BASE_MAX_SPEED,
 				_percent_delta_from_ratio(float(sailing_stats["efficiency"]) / PLAYER_SAIL_EFFICIENCY),
 				_percent_delta_from_ratio(float(sailing_stats["turn_speed"]) / PLAYER_SAIL_TURN_SPEED),
 				_percent_delta_from_ratio(float(sailing_stats["furl_rate"]) / PLAYER_SAIL_FURL_RATE),
 			]
 		"rowing":
 			var rowing_stats := _calculate_rowing_stats(level, stats)
-			return "노 속도 +%d%% | 노 가속 +%d%%" % [
-				_percent_delta_from_ratio(float(rowing_stats["rowing_speed"]) / PLAYER_ROWING_BASE_SPEED),
+			return "노 속도 +%.0f | 노 가속 +%d%% | 충각 회복 +%d%%" % [
+				float(rowing_stats["rowing_speed"]) - PLAYER_ROWING_BASE_SPEED,
 				_percent_delta_from_ratio(float(rowing_stats["acceleration_mult"]) / PLAYER_ROWING_BASE_ACCEL),
+				_percent_delta_from_ratio(PLAYER_RAMMING_BOOST_RECHARGE / float(rowing_stats["ram_boost_recharge_duration"])),
 			]
 		"supply_bonus":
 			var supply_stats := _calculate_supply_bonus_stats(level, stats)
@@ -161,8 +163,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var boarding_fire_reduce_pct := int(round(float(level) * float(stats.get("boarding_fire_reduce_per_lv", 0.1)) * 100.0))
 			return "도선병 피해 %.1f/초 | 장악 피해 -%d%% | 화염 -%d%%" % [defense_damage, capture_reduce_pct, boarding_fire_reduce_pct]
 		"crew_numbers":
-			var spear_damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
-			return "장창 피해 +%.0f%%" % (spear_damage_bonus_pct * 100.0)
+			var spear_damage_add := float(stats.get("damage_add_per_lv", 1.0)) * level
+			return "장창 피해 +%.0f" % spear_damage_add
 		"crew_attack":
 			var damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
 			var melee_damage := SOLDIER_MELEE_BASE_DAMAGE * (1.0 + damage_bonus_pct)
@@ -293,7 +295,7 @@ static func _calculate_sailing_stats(level: int, stats: Dictionary) -> Dictionar
 	var furl_rate := PLAYER_SAIL_FURL_RATE
 	for current_level in range(1, level + 1):
 		if _level_matches(current_level, stats.get("speed_levels", [])):
-			max_speed *= float(stats.get("speed_mult", 1.08))
+			max_speed += float(stats.get("speed_add", 1.0))
 		if _level_matches(current_level, stats.get("efficiency_levels", [])):
 			efficiency *= float(stats.get("efficiency_mult", 1.08))
 		if _level_matches(current_level, stats.get("turn_levels", [])):
@@ -310,14 +312,20 @@ static func _calculate_sailing_stats(level: int, stats: Dictionary) -> Dictionar
 static func _calculate_rowing_stats(level: int, stats: Dictionary) -> Dictionary:
 	var rowing_speed := PLAYER_ROWING_BASE_SPEED
 	var acceleration_mult := PLAYER_ROWING_BASE_ACCEL
+	var ram_boost_recharge_duration := PLAYER_RAMMING_BOOST_RECHARGE
 	var max_stamina := PLAYER_MAX_ROWING_STAMINA
 	var drain_rate := PLAYER_STAMINA_DRAIN_RATE
 	var recovery_rate := PLAYER_STAMINA_RECOVERY_RATE
 	for current_level in range(1, level + 1):
 		if _level_matches(current_level, stats.get("speed_levels", [])):
-			rowing_speed *= float(stats.get("speed_mult", 1.15))
+			rowing_speed += float(stats.get("speed_add", 1.0))
 		if _level_matches(current_level, stats.get("accel_levels", [])):
 			acceleration_mult *= float(stats.get("accel_mult", 1.2))
+		if _level_matches(current_level, stats.get("ram_boost_recharge_levels", [])):
+			ram_boost_recharge_duration = maxf(
+				float(stats.get("ram_boost_min_recharge_duration", 10.5)),
+				ram_boost_recharge_duration * float(stats.get("ram_boost_recharge_mult", 0.92))
+			)
 		if _level_matches(current_level, stats.get("stamina_add_levels", [])):
 			max_stamina += float(stats.get("stamina_add", 20.0))
 		if _level_matches(current_level, stats.get("drain_levels", [])):
@@ -327,6 +335,7 @@ static func _calculate_rowing_stats(level: int, stats: Dictionary) -> Dictionary
 	return {
 		"rowing_speed": rowing_speed,
 		"acceleration_mult": acceleration_mult,
+		"ram_boost_recharge_duration": ram_boost_recharge_duration,
 		"max_stamina": max_stamina,
 		"drain_rate": drain_rate,
 		"recovery_rate": recovery_rate,

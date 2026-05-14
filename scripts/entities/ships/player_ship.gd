@@ -69,8 +69,9 @@ var rowing_locked: bool = false
 @export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
 @export_range(0.0, 0.35, 0.01) var misaligned_sail_min_thrust_ratio: float = 0.12
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
-@export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
-@export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
+@export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.0
+@export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.0
+@export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 1.0
 @export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.78
 @export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
 @export_group("")
@@ -85,6 +86,21 @@ var rowing_locked: bool = false
 @export_range(0.05, 1.0, 0.01) var rowing_exhaustion_recover_ratio: float = 0.25
 @export var stamina_drain_rate: float = 6.0
 @export var stamina_recovery_rate: float = 8.5
+
+@export_group("Ramming Boost")
+@export_range(0.4, 3.0, 0.05) var ramming_boost_duration: float = 1.35
+@export_range(4.0, 45.0, 0.5) var ramming_boost_recharge_duration: float = 18.0
+@export_range(1.0, 2.0, 0.05) var ramming_boost_speed_multiplier: float = 1.35
+@export_range(1.0, 6.0, 0.1) var ramming_boost_acceleration_multiplier: float = 3.2
+@export_range(0.0, 8.0, 0.1) var ramming_boost_impulse_speed: float = 2.8
+@export_range(0.2, 1.0, 0.05) var ramming_boost_turn_multiplier: float = 0.68
+@export_range(1.0, 4.0, 0.05) var ramming_boost_damage_multiplier: float = 2.0
+@export_group("")
+var ramming_boost_active: bool = false
+var ramming_boost_charge: float = 1.0
+var ramming_boost_timer: float = 0.0
+var ramming_boost_input_was_pressed: bool = false
+var ramming_boost_blocked_message_timer: float = 0.0
 
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
 @export_range(0, 1, 1) var captain_count: int = 1
@@ -326,6 +342,7 @@ func _physics_process(delta: float) -> void:
 		
 	if is_player_controlled:
 		_handle_input(delta)
+	_update_ramming_boost(delta)
 	if _is_auto_sail_control_enabled():
 		_auto_adjust_sail(delta)
 	_update_sail_deployment(delta)
@@ -936,6 +953,77 @@ func _cycle_fleet_formation() -> void:
 	PlayerShipRuntimeHelper.cycle_fleet_formation(self)
 
 
+func try_activate_ramming_boost() -> bool:
+	if ramming_boost_active:
+		return false
+	if not _can_activate_ramming_boost_with_sail_state():
+		_show_ramming_boost_blocked_message()
+		return false
+	if ramming_boost_charge < 1.0:
+		return false
+	ramming_boost_active = true
+	ramming_boost_timer = maxf(0.05, ramming_boost_duration)
+	ramming_boost_charge = 0.0
+	var boosted_floor := maxf(min_ramming_speed + 0.45, max_speed * 0.72)
+	var boosted_cap := get_ramming_boost_target_speed()
+	current_speed = minf(maxf(current_speed + ramming_boost_impulse_speed, boosted_floor), boosted_cap)
+	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
+		_cached_audio_manager.play_sfx("wave_splash", global_position, randf_range(0.94, 1.08), 2.5)
+	return true
+
+
+func _update_ramming_boost(delta: float) -> void:
+	ramming_boost_blocked_message_timer = maxf(0.0, ramming_boost_blocked_message_timer - delta)
+	if ramming_boost_active:
+		ramming_boost_timer = maxf(0.0, ramming_boost_timer - delta)
+		if ramming_boost_timer <= 0.0:
+			ramming_boost_active = false
+		return
+	if ramming_boost_charge < 1.0:
+		ramming_boost_charge = minf(1.0, ramming_boost_charge + delta / maxf(0.1, ramming_boost_recharge_duration))
+
+
+func _can_activate_ramming_boost_with_sail_state() -> bool:
+	if not sail_furled:
+		return false
+	if sail_deployed_ratio > 0.02:
+		return false
+	if not mast_fold_pivots.is_empty() and not are_masts_folded():
+		return false
+	return true
+
+
+func _show_ramming_boost_blocked_message() -> void:
+	if ramming_boost_blocked_message_timer > 0.0:
+		return
+	ramming_boost_blocked_message_timer = 0.8
+	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
+		_cached_hud.show_message("돛을 완전히 접어야 충각 돌진 가능", 1.2)
+
+
+func is_ramming_boost_active() -> bool:
+	return ramming_boost_active and ramming_boost_timer > 0.0
+
+
+func get_ramming_boost_charge_ratio() -> float:
+	if is_ramming_boost_active():
+		return clampf(ramming_boost_timer / maxf(0.05, ramming_boost_duration), 0.0, 1.0)
+	return clampf(ramming_boost_charge, 0.0, 1.0)
+
+
+func get_ramming_boost_target_speed() -> float:
+	return maxf(max_speed, min_ramming_speed) * maxf(1.0, ramming_boost_speed_multiplier)
+
+
+func get_ramming_boost_turn_multiplier() -> float:
+	return ramming_boost_turn_multiplier if is_ramming_boost_active() else 1.0
+
+
+func get_ramming_damage_multiplier_value() -> float:
+	var boost_mult := ramming_boost_damage_multiplier if is_ramming_boost_active() else 1.0
+	return maxf(0.1, ramming_damage_multiplier) * boost_mult
+
+
 ## 러더 조향 입력 처리
 ## direction: -1.0 (왼쪽), 1.0 (오른쪽), 0.0 (중립)
 func steer(direction: float, delta: float) -> void:
@@ -1017,7 +1105,7 @@ func set_sail_furled(furled: bool) -> void:
 		if mast_fold_pivots.is_empty():
 			_play_sail_handling_sound(true, 2.0)
 	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
-		var message := "돛 접음: 조타·노젓기 강화 / 화재 피해 감소" if sail_furled else "돛 펼침: 항해 속도 회복"
+		var message := "돛 접음: 노 속도 +1 / 화재 피해 감소 / 충각 돌진 가능" if sail_furled else "돛 펼침: 항해 속도 회복"
 		_cached_hud.show_message(message, 1.4)
 	_sync_support_fleet_sail_furl()
 

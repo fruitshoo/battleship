@@ -155,8 +155,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var knockback_note := "낙수 가능" if next_level >= overboard_level else "밀침 %.0f" % knockback
 			return "활 공격 %.0f%% | 대병 %.0f | %s | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, knockback_note, float(proc_stats.get("cooldown", 1.0))]
 		"crew_numbers":
-			var damage_bonus_pct := float(next_level) * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0
-			return "장창 피해 +%.0f%%" % damage_bonus_pct
+			var damage_add := float(next_level) * float(s.get("damage_add_per_lv", 1.0))
+			return "장창 피해 +%.0f" % damage_add
 		"crew_reserve":
 			var assist_duration: float = maxf(float(s.get("min_assist_channel_duration", 0.55)), float(s.get("base_assist_channel_duration", 1.1)) - (float(next_level) * float(s.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio: float = clampf(0.35 + (float(next_level) * float(s.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(s.get("max_assist_recovery_health_ratio", 0.7)))
@@ -187,7 +187,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"sailing":
 			var sailing_parts: Array[String] = []
 			if level_matches(next_level, s.get("speed_levels", [])):
-				sailing_parts.append("돛 최고 속도 +%d%%" % int(round((float(s.get("speed_mult", 1.08)) - 1.0) * 100.0)))
+				sailing_parts.append("돛 최고 속도 +%.0f" % float(s.get("speed_add", 1.0)))
 			if level_matches(next_level, s.get("efficiency_levels", [])):
 				sailing_parts.append("풍력 효율 +%d%%" % int(round((float(s.get("efficiency_mult", 1.08)) - 1.0) * 100.0)))
 			if level_matches(next_level, s.get("turn_levels", [])):
@@ -200,9 +200,12 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"rowing":
 			var rowing_parts: Array[String] = []
 			if level_matches(next_level, s.get("speed_levels", [])):
-				rowing_parts.append("노젓기 속도 +%d%%" % int(round((float(s.get("speed_mult", 1.15)) - 1.0) * 100.0)))
+				rowing_parts.append("노젓기 속도 +%.0f" % float(s.get("speed_add", 1.0)))
 			if level_matches(next_level, s.get("accel_levels", [])):
 				rowing_parts.append("노젓기 가속 +%d%%" % int(round((float(s.get("accel_mult", 1.2)) - 1.0) * 100.0)))
+			if level_matches(next_level, s.get("ram_boost_recharge_levels", [])):
+				var recharge_speed_bonus := int(round((1.0 / maxf(0.01, float(s.get("ram_boost_recharge_mult", 0.92))) - 1.0) * 100.0))
+				rowing_parts.append("충각 돌진 회복 +%d%%" % recharge_speed_bonus)
 			if not rowing_parts.is_empty():
 				return " | ".join(rowing_parts)
 			return "노 운용 성능 향상"

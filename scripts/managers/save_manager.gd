@@ -3,6 +3,7 @@ extends Node
 ## 세이브 매니저 (Save Manager)
 ## 골드 및 영구 업그레이드 데이터 저장/로드
 
+const InputSettingsHelper = preload("res://scripts/helpers/input_settings_helper.gd")
 const SAVE_PATH = "user://save_data.cfg"
 const BACKUP_SAVE_PATH = "user://save_data.backup.cfg"
 const DEFAULT_SETTINGS := {
@@ -14,6 +15,8 @@ const DEFAULT_SETTINGS := {
 	"screen_edge_fx_enabled": true,
 	"screen_edge_fx_strength": 0.75,
 	"sail_control_mode": "manual",
+	"control_scheme": "ship",
+	"gamepad_confirm_button": "bottom",
 	"locale": "ko",
 }
 
@@ -141,6 +144,7 @@ func apply_settings() -> void:
 	_set_bus_volume_linear("UI", float(get_setting("ui_volume", 0.85)))
 	var fullscreen: bool = get_setting("fullscreen", false) == true
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	_apply_gamepad_confirm_button_layout()
 
 func _set_bus_volume_linear(bus_name: String, linear: float) -> void:
 	var bus_idx: int = AudioServer.get_bus_index(bus_name)
@@ -151,6 +155,9 @@ func _set_bus_volume_linear(bus_name: String, linear: float) -> void:
 	if clamped <= 0.001:
 		volume_db = -80.0
 	AudioServer.set_bus_volume_db(bus_idx, volume_db)
+
+func _apply_gamepad_confirm_button_layout() -> void:
+	InputSettingsHelper.apply_gamepad_confirm_button_layout(str(get_setting("gamepad_confirm_button", "bottom")))
 
 func _env_flag_enabled(name: String) -> bool:
 	var value := OS.get_environment(name).strip_edges().to_lower()

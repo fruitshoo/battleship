@@ -479,10 +479,10 @@ func _apply_crew_numbers(ship: Node3D, level: int) -> void:
 	for sol in _get_player_soldiers(ship):
 		_apply_current_stats_to_soldier(sol)
 	var stats: Dictionary = UPGRADES["crew_numbers"].get("stats", {})
-	var spear_bonus_pct := float(level) * float(stats.get("damage_bonus_pct_per_lv", 0.06)) * 100.0
-	print("[CrewFormation] 장창 Lv.%d 갱신! (장창 피해 +%.0f%%, 정원: %d)" % [
+	var spear_damage_add := float(level) * float(stats.get("damage_add_per_lv", 1.0))
+	print("[CrewFormation] 장창 Lv.%d 갱신! (장창 피해 +%.0f, 정원: %d)" % [
 		level,
-		spear_bonus_pct,
+		spear_damage_add,
 		ship.max_crew_count,
 	])
 
@@ -583,7 +583,7 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var spear_stats: Dictionary = UPGRADES["crew_numbers"]["stats"]
 	var defense_stats: Dictionary = UPGRADES["crew_defense"]["stats"]
 	var damage_bonus_pct: float = 0.0
-	var spear_damage_bonus_pct: float = spear_lv * float(spear_stats.get("damage_bonus_pct_per_lv", 0.06))
+	var spear_damage_add: float = spear_lv * float(spear_stats.get("damage_add_per_lv", 1.0))
 	var defense_flat_bonus: float = defense_lv * float(defense_stats.get("defense_add_per_lv", 1.0))
 	damage_bonus_pct += _get_soldier_site_bonus_total(soldier, "crew_damage_pct")
 	defense_flat_bonus += _get_soldier_site_bonus_total(soldier, "crew_defense_add")
@@ -595,7 +595,9 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	soldier.set_meta("damage_bonus_pct", damage_bonus_pct)
 	if soldier.has_meta("attack_flat_bonus"):
 		soldier.remove_meta("attack_flat_bonus")
-	soldier.set_meta("spear_damage_bonus_pct", spear_damage_bonus_pct)
+	if soldier.has_meta("spear_damage_bonus_pct"):
+		soldier.remove_meta("spear_damage_bonus_pct")
+	soldier.set_meta("spear_damage_add", spear_damage_add)
 	soldier.set_meta("defense_flat_bonus", defense_flat_bonus)
 	soldier.set_meta("defense_reduction", defense_reduction)
 	if soldier.has_meta("damage_multiplier"):
@@ -696,7 +698,7 @@ func _apply_hull_repair(ship: Node3D, level: int) -> void:
 func _apply_sailing(ship: Node3D, level: int) -> void:
 	var s = UPGRADES["sailing"]["stats"]
 	if _level_matches(level, s.get("speed_levels", [])) and "max_speed" in ship:
-		ship.max_speed *= float(s.get("speed_mult", 1.08))
+		ship.max_speed += float(s.get("speed_add", 1.0))
 	if _level_matches(level, s.get("efficiency_levels", [])) and "sail_efficiency_mult" in ship:
 		ship.sail_efficiency_mult *= float(s.get("efficiency_mult", 1.08))
 	if _level_matches(level, s.get("turn_levels", [])) and "sail_turn_speed" in ship:
@@ -714,9 +716,13 @@ func _apply_sailing(ship: Node3D, level: int) -> void:
 func _apply_rowing(ship: Node3D, level: int) -> void:
 	var s = UPGRADES["rowing"]["stats"]
 	if _level_matches(level, s.get("speed_levels", [])) and "rowing_speed" in ship:
-		ship.rowing_speed *= float(s.get("speed_mult", 1.15))
+		ship.rowing_speed += float(s.get("speed_add", 1.0))
 	if _level_matches(level, s.get("accel_levels", [])) and "rowing_acceleration_mult" in ship:
 		ship.rowing_acceleration_mult *= float(s.get("accel_mult", 1.2))
+	if _level_matches(level, s.get("ram_boost_recharge_levels", [])) and "ramming_boost_recharge_duration" in ship:
+		var recharge_mult := clampf(float(s.get("ram_boost_recharge_mult", 0.92)), 0.1, 1.0)
+		var min_recharge_duration := maxf(1.0, float(s.get("ram_boost_min_recharge_duration", 10.5)))
+		ship.ramming_boost_recharge_duration = maxf(min_recharge_duration, ship.ramming_boost_recharge_duration * recharge_mult)
 	if _level_matches(level, s.get("stamina_add_levels", [])) and "max_rowing_stamina" in ship:
 		var stamina_add := float(s.get("stamina_add", 25.0))
 		ship.max_rowing_stamina += stamina_add

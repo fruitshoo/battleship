@@ -12,5 +12,28 @@ transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 [node name="Model" parent="Visual" unique_id=1811916373 instance=ExtResource("1_model")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 
+[node name="holder" parent="Visual/Model" index="0"]
+cast_shadow = 0
+
+[node name="Cube.037" parent="Visual/Model" index="1"]
+cast_shadow = 0
+
+[node name="Cube.038" parent="Visual/Model" index="2"]
+cast_shadow = 0
+
+[node name="handcannon" parent="Visual/Model" index="3"]
+cast_shadow = 0
+
+[node name="ring" parent="Visual/Model" index="4"]
+cast_shadow = 0
+
+[node name="ring.001" parent="Visual/Model" index="5"]
+cast_shadow = 0
+
+[node name="poewr_plate" parent="Visual/Model" index="6"]
+cast_shadow = 0
+
 [node name="Muzzle" type="Marker3D" parent="." unique_id=211942540]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, -0.9)
+
+[editable path="Visual/Model"]

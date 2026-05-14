@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const HudUpgradeInfoHelper = preload("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
+const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const CARD_WIDTH := 212
@@ -71,6 +72,7 @@ var _display_previous_paused: bool = false
 var _display_confirm_button: Button = null
 var _reward_level_overrides: Dictionary = {}
 var _treasure_shimmer: ColorRect = null
+var _nav_repeater := MenuInputHelper.NavRepeater.new()
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
@@ -170,7 +172,7 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _display_only_mode:
-		if visible and (_is_confirm_event(event) or event.is_action_pressed("ui_cancel") or _is_keycode_pressed(event, KEY_ESCAPE)):
+		if visible and (_is_confirm_event(event) or MenuInputHelper.is_cancel_event(event)):
 			if _is_confirm_event(event) and is_instance_valid(_display_confirm_button) and _display_confirm_button.visible:
 				_display_confirm_button.emit_signal("pressed")
 			else:
@@ -184,28 +186,31 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.is_echo():
 		return
 
+	var nav := _nav_repeater.consume_event(event)
+	if nav != Vector2i.ZERO:
+		_handle_discrete_nav(nav)
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
+	if MenuInputHelper.is_navigation_axis_event(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
+
 	if _is_prev_event(event):
-		if not _reroll_focused:
-			_focused_index = maxi(0, _focused_index - 1)
-		_update_focus()
+		_handle_discrete_nav(Vector2i(-1, 0))
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 	elif _is_next_event(event):
-		if not _reroll_focused:
-			_focused_index = mini(card_ids.size() - 1, _focused_index + 1)
-		_update_focus()
+		_handle_discrete_nav(Vector2i(1, 0))
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 	elif _is_down_event(event):
-		if not _reroll_focused and reroll_button and not reroll_button.disabled:
-			_reroll_focused = true
-			_update_focus()
+		_handle_discrete_nav(Vector2i(0, 1))
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 	elif _is_up_event(event):
-		if _reroll_focused:
-			_reroll_focused = false
-			_update_focus()
+		_handle_discrete_nav(Vector2i(0, -1))
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 	elif _is_confirm_event(event):
@@ -215,6 +220,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_choice_pressed(card_ids[_focused_index])
 		if get_viewport():
 			get_viewport().set_input_as_handled()
+
+func _handle_discrete_nav(direction: Vector2i) -> void:
+	if direction.x < 0 and not _reroll_focused:
+		_focused_index = maxi(0, _focused_index - 1)
+		_update_focus()
+	elif direction.x > 0 and not _reroll_focused:
+		_focused_index = mini(card_ids.size() - 1, _focused_index + 1)
+		_update_focus()
+	elif direction.y > 0:
+		if not _reroll_focused and reroll_button and not reroll_button.disabled:
+			_reroll_focused = true
+			_update_focus()
+	elif direction.y < 0:
+		if _reroll_focused:
+			_reroll_focused = false
+			_update_focus()
+
 
 func _update_focus(immediate: bool = false) -> void:
 	if not immediate and is_instance_valid(AudioManager):
@@ -1152,28 +1174,20 @@ func _apply_card_focus_visuals(card: PanelContainer, color: Color, focused: bool
 
 
 func _is_prev_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_left") or _is_physical_key_pressed(event, KEY_A)
+	return MenuInputHelper.is_left_event(event)
 
 
 func _is_next_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_right") or _is_physical_key_pressed(event, KEY_D)
+	return MenuInputHelper.is_right_event(event)
 
 
 func _is_up_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_up") or _is_physical_key_pressed(event, KEY_W)
+	return MenuInputHelper.is_up_event(event)
 
 
 func _is_down_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_down") or _is_physical_key_pressed(event, KEY_S)
+	return MenuInputHelper.is_down_event(event)
 
 
 func _is_confirm_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
-
-
-func _is_physical_key_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == keycode
-
-
-func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode
+	return MenuInputHelper.is_confirm_event(event)

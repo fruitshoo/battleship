@@ -45,8 +45,9 @@ enum CombatRole {CHARGER, GUNNER}
 @export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
 @export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
-@export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
-@export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
+@export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.0
+@export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.0
+@export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 1.0
 @export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.85
 @export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
 @export_group("Boarding Sail AI")

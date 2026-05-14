@@ -2,6 +2,7 @@ extends PanelContainer
 
 
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
+const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 
 signal return_requested
 
@@ -105,7 +106,4 @@ func _focus_return_button() -> void:
 	return_button.grab_focus()
 
 func _is_confirm_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
-
-func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode
+	return MenuInputHelper.is_confirm_event(event)

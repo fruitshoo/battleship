@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cl1cb1aajn8m"]
 
-[ext_resource type="PackedScene" uid="uid://cp32kp45r1iv7" path="res://assets/models/props/helmat/helmat.glb" id="1_helmet"]
+[ext_resource type="PackedScene" path="res://scenes/props/helmet.tscn" id="1_helmet"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
 radius = 0.22

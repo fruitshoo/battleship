@@ -19,7 +19,10 @@ const CLOUD_TEXTURE_VARIANTS := [
 @export_range(20.0, 120.0, 1.0, "suffix:m") var spawn_radius_min: float = 36.0
 @export_range(40.0, 180.0, 1.0, "suffix:m") var spawn_radius_max: float = 92.0
 @export_range(70.0, 220.0, 1.0, "suffix:m") var recycle_radius: float = 125.0
+@export var wind_drift_enabled: bool = true
 @export_range(0.2, 5.0, 0.05, "suffix:m/s") var drift_speed: float = 0.75
+@export_range(0.2, 2.0, 0.05) var drift_speed_variation_min: float = 0.7
+@export_range(0.2, 2.0, 0.05) var drift_speed_variation_max: float = 1.2
 @export_range(4.0, 48.0, 0.5, "suffix:m") var cloud_size_min: float = 8.0
 @export_range(4.0, 64.0, 0.5, "suffix:m") var cloud_size_max: float = 16.0
 @export_range(0.0, 1.0, 0.01) var cloud_alpha: float = 0.42
@@ -80,11 +83,12 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(_target):
 		_target = get_node_or_null(target_path) as Node3D
 	var center := _get_follow_center()
-	var drift := _get_wind_direction_flat() * drift_speed * _get_wind_strength() * delta
+	var wind_drift := _get_wind_direction_flat() * drift_speed * _get_wind_strength() * delta
 	for cloud in _clouds:
 		if not is_instance_valid(cloud):
 			continue
-		cloud.global_position += drift
+		if wind_drift_enabled:
+			cloud.global_position += wind_drift * _get_cloud_drift_scale(cloud)
 		var flat_offset := cloud.global_position - center
 		flat_offset.y = 0.0
 		if flat_offset.length() > recycle_radius:
@@ -95,6 +99,7 @@ func _create_cloud(index: int) -> Node3D:
 	var cluster := Node3D.new()
 	cluster.name = "CloudCluster%02d" % index
 	cluster.set_meta("cloud_field_generated", true)
+	_randomize_cloud_drift_scale(cluster)
 	var puff_count := randi_range(2, 3)
 	var spread := randf_range(cloud_size_min * 0.34, cloud_size_max * 0.48)
 	for puff_index in range(puff_count):
@@ -142,7 +147,20 @@ func _place_cloud(cloud: Node3D, initial: bool) -> void:
 		offset = Vector3(cos(angle), 0.0, sin(angle)) * radius
 	else:
 		offset = (-wind * randf_range(spawn_radius_max * 0.72, spawn_radius_max)) + (tangent * randf_range(-spawn_radius_max * 0.55, spawn_radius_max * 0.55))
+		_randomize_cloud_drift_scale(cloud)
 	cloud.global_position = Vector3(center.x + offset.x, cloud_altitude + randf_range(-3.0, 3.0), center.z + offset.z)
+
+
+func _randomize_cloud_drift_scale(cloud: Node3D) -> void:
+	var min_scale := minf(drift_speed_variation_min, drift_speed_variation_max)
+	var max_scale := maxf(drift_speed_variation_min, drift_speed_variation_max)
+	cloud.set_meta("cloud_drift_scale", randf_range(min_scale, max_scale))
+
+
+func _get_cloud_drift_scale(cloud: Node3D) -> float:
+	if cloud.has_meta("cloud_drift_scale"):
+		return maxf(0.0, float(cloud.get_meta("cloud_drift_scale")))
+	return 1.0
 
 
 func _get_follow_center() -> Vector3:

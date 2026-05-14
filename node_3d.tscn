@@ -2,7 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_a202f"]
 [ext_resource type="Texture2D" uid="uid://j3er0rga8slr" path="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG" id="2_noarx"]
-[ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="3_a0tk4"]
+[ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="3_a0tk4"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_noarx"]
 transparency = 1

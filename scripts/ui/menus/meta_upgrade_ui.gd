@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
+const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
 const PLAYER_BASE_MOVE_SPEED := 6.0
@@ -81,6 +82,7 @@ var _row_height: int = 62
 var _category_width: int = 132
 var _detail_width: int = 276
 var _art_texture_cache: Dictionary = {}
+var _nav_repeater := MenuInputHelper.NavRepeater.new()
 
 func _ready() -> void:
 	_apply_static_text()
@@ -112,44 +114,37 @@ func _on_locale_changed(_locale: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
+	if MenuInputHelper.is_cancel_event(event):
 		_on_close_pressed()
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
 		return
 
+	var nav := _nav_repeater.consume_event(event)
+	if nav != Vector2i.ZERO:
+		_handle_nav(nav)
+		if get_viewport() != null:
+			get_viewport().set_input_as_handled()
+		return
+	if MenuInputHelper.is_navigation_axis_event(event):
+		if get_viewport() != null:
+			get_viewport().set_input_as_handled()
+		return
+
 	if _is_prev_event(event):
-		if _footer_focus_index >= 0:
-			_move_footer_focus(-1)
-		elif not _category_focus_active:
-			_enter_category_focus()
-		else:
-			pass
+		_handle_nav(Vector2i(-1, 0))
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
 	elif _is_next_event(event):
-		if _footer_focus_index >= 0:
-			_move_footer_focus(1)
-		elif _category_focus_active:
-			_exit_category_focus_to_list()
-		else:
-			pass
+		_handle_nav(Vector2i(1, 0))
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
 	elif _is_up_event(event):
-		if _footer_focus_index >= 0:
-			_exit_footer_focus_to_list()
-		elif _category_focus_active:
-			_move_category_focus(-1)
-		else:
-			_move_selection_vertical(-1)
+		_handle_nav(Vector2i(0, -1))
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
 	elif _is_down_event(event):
-		if _category_focus_active:
-			_move_category_focus(1)
-		elif _footer_focus_index < 0:
-			_move_selection_vertical(1)
+		_handle_nav(Vector2i(0, 1))
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
 	elif _is_confirm_event(event):
@@ -166,6 +161,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_buy_pressed()
 		if get_viewport() != null:
 			get_viewport().set_input_as_handled()
+
+
+func _handle_nav(nav: Vector2i) -> void:
+	if nav.x < 0:
+		if _footer_focus_index >= 0:
+			_move_footer_focus(-1)
+		elif not _category_focus_active:
+			_enter_category_focus()
+	elif nav.x > 0:
+		if _footer_focus_index >= 0:
+			_move_footer_focus(1)
+		elif _category_focus_active:
+			_exit_category_focus_to_list()
+	elif nav.y < 0:
+		if _footer_focus_index >= 0:
+			_exit_footer_focus_to_list()
+		elif _category_focus_active:
+			_move_category_focus(-1)
+		else:
+			_move_selection_vertical(-1)
+	elif nav.y > 0:
+		if _category_focus_active:
+			_move_category_focus(1)
+		elif _footer_focus_index < 0:
+			_move_selection_vertical(1)
 
 
 func _apply_theme() -> void:
@@ -772,31 +792,23 @@ func _exit_footer_focus_to_list() -> void:
 
 
 func _is_prev_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_left") or _is_physical_key_pressed(event, KEY_A)
+	return MenuInputHelper.is_left_event(event)
 
 
 func _is_next_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_right") or _is_physical_key_pressed(event, KEY_D)
+	return MenuInputHelper.is_right_event(event)
 
 
 func _is_up_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_up") or _is_physical_key_pressed(event, KEY_W)
+	return MenuInputHelper.is_up_event(event)
 
 
 func _is_down_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_down") or _is_physical_key_pressed(event, KEY_S)
+	return MenuInputHelper.is_down_event(event)
 
 
 func _is_confirm_event(event: InputEvent) -> bool:
-	return event.is_action_pressed("ui_accept") or _is_keycode_pressed(event, KEY_SPACE) or _is_keycode_pressed(event, KEY_ENTER) or _is_keycode_pressed(event, KEY_KP_ENTER)
-
-
-func _is_physical_key_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == keycode
-
-
-func _is_keycode_pressed(event: InputEvent, keycode: Key) -> bool:
-	return event is InputEventKey and event.pressed and not event.echo and event.keycode == keycode
+	return MenuInputHelper.is_confirm_event(event)
 
 
 func _build_effect_text(id: String, level: int) -> String:

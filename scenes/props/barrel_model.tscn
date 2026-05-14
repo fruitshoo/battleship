@@ -9,3 +9,8 @@ script = ExtResource("1_script")
 shared_material = ExtResource("3_material")
 
 [node name="Model" parent="." unique_id=1301088972 instance=ExtResource("2_model")]
+
+[node name="Circle" parent="Model" index="0"]
+cast_shadow = 0
+
+[editable path="Model"]

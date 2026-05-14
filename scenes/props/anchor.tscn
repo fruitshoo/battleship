@@ -6,8 +6,34 @@
 
 [node name="Model" parent="." instance=ExtResource("1_anchor_model")]
 
+[node name="weight_rock_02" parent="Model" index="0"]
+cast_shadow = 0
+
+[node name="weight_rock_01" parent="Model" index="1"]
+cast_shadow = 0
+
+[node name="weight_rock_04" parent="Model" index="2"]
+cast_shadow = 0
+
+[node name="anchor_body" parent="Model" index="3"]
+cast_shadow = 0
+
+[node name="rock_tie" parent="Model" index="4"]
+cast_shadow = 0
+
+[node name="rope_01" parent="Model" index="5"]
+cast_shadow = 0
+
+[node name="rope_02" parent="Model" index="6"]
+cast_shadow = 0
+
+[node name="weight_rock_03" parent="Model" index="7"]
+cast_shadow = 0
+
 [node name="ChainAttachPoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
 
 [node name="TipPoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.95, 0)
+
+[editable path="Model"]

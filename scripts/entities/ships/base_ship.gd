@@ -542,6 +542,9 @@ func _physics_process(_delta: float) -> void:
 	
 	_apply_bobbing_effect()
 
+func get_ramming_damage_multiplier_value() -> float:
+	return maxf(0.1, ramming_damage_multiplier)
+
 func set_team(new_team: String) -> void:
 	var old_team = get_team_tag()
 	var normalized_team = "player" if new_team == "player" else "enemy"

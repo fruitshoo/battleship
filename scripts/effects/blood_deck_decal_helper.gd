@@ -24,6 +24,7 @@ const OWNED_SHIP_CHANGE_GRACE_MSEC := 260
 const META_OWNED_SHIP_CHANGED_MSEC := "owned_ship_changed_msec"
 const DEBUG_BLOOD_DECAL_REJECTS := false
 const USE_STAIN_PLANE := true
+const STAIN_SIZE_MULTIPLIER := 1.2
 
 const BLOOD_BLOCKED_DAMAGE_SOURCES := {
 	"drowned": true,
@@ -190,7 +191,7 @@ static func _make_decal(damage_amount: float) -> Node3D:
 		randf_range(0.76, 0.88),
 		randf_range(0.88, 1.0)
 	)
-	var stain_scale := clampf(0.52 + damage_amount * 0.016, 0.52, 1.08) * randf_range(0.9, 1.32)
+	var stain_scale := clampf(0.52 + damage_amount * 0.016, 0.52, 1.08) * randf_range(0.9, 1.32) * STAIN_SIZE_MULTIPLIER
 	var stain_texture := _pick_stain_texture()
 
 	var plane_mesh := PlaneMesh.new()

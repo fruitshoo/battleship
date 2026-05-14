@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cn32xp1401yfh"]
 
 [ext_resource type="Script" uid="uid://cb7f3e58o5jvh" path="res://scripts/effects/floating_loot.gd" id="1_387e1"]
-[ext_resource type="PackedScene" uid="uid://dh3bmbsqdseax" path="res://assets/models/props/barrel/barrel.glb" id="2_barrel"]
+[ext_resource type="PackedScene" uid="uid://bed8fua1cj6ls" path="res://scenes/props/barrel_model.tscn" id="2_barrel"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5r4jb"]
 radius = 4.0

@@ -10,3 +10,8 @@ shared_material = ExtResource("3_material")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 scale = Vector3(0.26, 0.26, 0.26)
+
+[node name="Circle.001" parent="Model" index="0"]
+cast_shadow = 0
+
+[editable path="Model"]

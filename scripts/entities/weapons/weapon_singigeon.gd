@@ -8,7 +8,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
 
-var personnel_damage_mult: float = 5.0
+var personnel_damage_mult: float = 6.0
 var _cached_spawn_parent: Node = null
 var _upgrade_base_damage: float = 2.5
 var _owner_damage_bonus_pct: float = 0.0
@@ -125,7 +125,7 @@ func _apply_upgrade_stats() -> void:
 	if "singigeon" in um.UPGRADES:
 		var stats: Dictionary = um.UPGRADES["singigeon"].get("stats", {})
 		_upgrade_base_damage = float(stats.get("base_damage", 2.5))
-		personnel_damage_mult = float(stats.get("personnel_damage_mult", 5.0))
+		personnel_damage_mult = float(stats.get("personnel_damage_mult", 6.0))
 		attack_cooldown = maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(_upgrade_level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 		projectile_speed = float(stats.get("projectile_speed", 32.0))
 		_soldier_knockback_speed = float(stats.get("base_knockback_speed", 9.0)) \

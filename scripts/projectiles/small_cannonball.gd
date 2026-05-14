@@ -1,10 +1,15 @@
 extends Area3D
 
+const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
+const DEFAULT_SHIP_IMPACT_PUFF_SCENE = preload("res://scenes/effects/impact_puff.tscn")
+const DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
 const MIN_FLIGHT_DURATION: float = 0.08
 const TERMINAL_HIT_RADIUS: float = 1.6
+const SHIP_HIT_FEEDBACK_DAMAGE_FLOOR: float = 24.0
+const SHIP_HIT_FEEDBACK_Y_OFFSET: float = 0.35
 
 @export var damage: float = 24.0
 @export var speed: float = 58.0
@@ -108,7 +113,9 @@ func _resolve_terminal_hit(hit_position: Vector3) -> void:
 	if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
 		return
 	if ship.has_method("take_damage"):
-		ship.take_damage(damage, hit_position, damage_source)
+		var impact_position := _resolve_ship_impact_position(ship, hit_position)
+		_spawn_ship_hit_feedback(ship, impact_position)
+		ship.take_damage(damage, impact_position, damage_source)
 
 
 func _get_target_aim_point(node: Node) -> Vector3:
@@ -126,6 +133,63 @@ func _spawn_hit_spark(effect_position: Vector3) -> void:
 	effect.global_position = effect_position
 	if effect.has_method("pool_activate"):
 		effect.pool_activate()
+
+
+func _resolve_ship_impact_position(ship: Node3D, hit_position: Vector3) -> Vector3:
+	if hit_position != Vector3.ZERO and hit_position.is_finite():
+		return hit_position
+	return _get_target_aim_point(ship)
+
+
+func _spawn_ship_hit_feedback(ship: Node3D, impact_position: Vector3) -> void:
+	if not is_inside_tree() or not is_instance_valid(ship):
+		return
+	var effect_position := impact_position + Vector3(0.0, SHIP_HIT_FEEDBACK_Y_OFFSET, 0.0)
+	_spawn_ship_impact_puff(ship, effect_position)
+	_spawn_ship_impact_splinters(ship, effect_position, impact_position - global_position)
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("impact_wood", effect_position, randf_range(0.9, 1.08), 1.5)
+
+
+func _spawn_ship_impact_puff(ship: Node3D, effect_position: Vector3) -> void:
+	var scene: PackedScene = DEFAULT_SHIP_IMPACT_PUFF_SCENE
+	if "impact_puff_scene" in ship and ship.get("impact_puff_scene") != null:
+		scene = ship.get("impact_puff_scene") as PackedScene
+	if scene == null:
+		return
+	if not VfxBudget.allow_spawn(get_tree(), "small_cannonball_ship_hit", effect_position, 5, 90.0):
+		return
+	var puff = ScenePool.acquire(get_tree(), scene)
+	if not is_instance_valid(puff):
+		return
+	get_tree().root.add_child(puff)
+	if puff is Node3D:
+		(puff as Node3D).global_position = effect_position
+	if puff.has_method("set_intensity"):
+		puff.set_intensity(1.15)
+	if puff.has_method("set_budget_reserved"):
+		puff.set_budget_reserved()
+	if puff.has_method("pool_activate"):
+		puff.pool_activate()
+
+
+func _spawn_ship_impact_splinters(ship: Node3D, effect_position: Vector3, impact_direction: Vector3) -> void:
+	var scene: PackedScene = DEFAULT_WOOD_SPLINTER_SCENE
+	if "wood_splinter_scene" in ship and ship.get("wood_splinter_scene") != null:
+		scene = ship.get("wood_splinter_scene") as PackedScene
+	if scene == null:
+		return
+	WoodSplinter.spawn_burst(
+		get_tree(),
+		scene,
+		effect_position,
+		maxf(damage, SHIP_HIT_FEEDBACK_DAMAGE_FLOOR),
+		impact_direction,
+		"small_cannonball_splinter",
+		4,
+		90.0
+	)
 
 
 func _release_self() -> void:

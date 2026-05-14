@@ -1,6 +1,6 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
-const BASE_DAMAGE: float = 13.0
+const BASE_DAMAGE: float = 10.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE

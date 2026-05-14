@@ -52,7 +52,7 @@ const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 		max_health = value
 		current_health = max_health
 @export var detection_range: float = 35.0 # 적 탐지 범위 (이 밖의 적은 무시)
-@export var crit_chance: float = 0.1 # 크리티컬 확률 (10%)
+@export var crit_chance: float = 0.05 # 크리티컬 확률 (5%)
 @export var crit_multiplier: float = 2.0 # 크리티컬 데미지 배율
 @export var attack_damage: float = 12.0: # 기본 공격력 (근접/원거리 공용)
 	set(value):
@@ -469,19 +469,22 @@ func _update_weapon_stats() -> void:
 	var damage_bonus_pct := _get_total_weapon_damage_bonus_pct()
 
 	var melee_damage_bonus_pct := damage_bonus_pct
+	var melee_damage_add := 0.0
 	if _get_melee_weapon_id() in ["spearman", "spear", "trident"]:
-		melee_damage_bonus_pct += _get_spear_damage_bonus_pct()
-	_sync_weapon_damage_bonus(weapon_sword, melee_damage_bonus_pct)
+		melee_damage_add = _get_spear_damage_add()
+	_sync_weapon_damage_bonus(weapon_sword, melee_damage_bonus_pct, melee_damage_add)
 	_sync_weapon_damage_bonus(weapon_bow, damage_bonus_pct)
 
 
-func _sync_weapon_damage_bonus(weapon: Node, damage_bonus_pct: float) -> void:
+func _sync_weapon_damage_bonus(weapon: Node, damage_bonus_pct: float, damage_add: float = 0.0) -> void:
 	if not is_instance_valid(weapon):
 		return
-	if weapon.has_method("apply_owner_damage_bonus_pct"):
+	if weapon.has_method("apply_owner_damage_modifiers"):
+		weapon.call("apply_owner_damage_modifiers", damage_bonus_pct, damage_add)
+	elif weapon.has_method("apply_owner_damage_bonus_pct"):
 		weapon.call("apply_owner_damage_bonus_pct", damage_bonus_pct)
 	elif "damage" in weapon:
-		weapon.damage = attack_damage * (1.0 + damage_bonus_pct)
+		weapon.damage = (attack_damage + damage_add) * (1.0 + damage_bonus_pct)
 
 
 func _get_total_weapon_damage_bonus_pct() -> float:
@@ -498,11 +501,11 @@ func _get_total_weapon_damage_bonus_pct() -> float:
 	return maxf(0.0, damage_bonus_pct)
 
 
-func _get_spear_damage_bonus_pct() -> float:
+func _get_spear_damage_add() -> float:
 	if team != "player":
 		return 0.0
-	if has_meta("spear_damage_bonus_pct"):
-		return maxf(0.0, float(get_meta("spear_damage_bonus_pct")))
+	if has_meta("spear_damage_add"):
+		return maxf(0.0, float(get_meta("spear_damage_add")))
 	return 0.0
 
 

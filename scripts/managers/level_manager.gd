@@ -338,7 +338,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed("ui_cancel"):
+	if _is_pause_menu_event(event):
 		if not get_tree().paused:
 			var pause_menu = PAUSE_MENU_SCENE.instantiate()
 			add_child(pause_menu)
@@ -415,6 +415,18 @@ func _unhandled_input(event: InputEvent) -> void:
 					_debug_adjust_player_sail_burn(0.15)
 			KEY_M: # 메타 업그레이드 상점 (테스트용)
 				show_meta_shop()
+
+
+func _is_pause_menu_event(event: InputEvent) -> bool:
+	if event.is_action_pressed("pause_menu"):
+		return true
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		return key_event.pressed and not key_event.echo and key_event.keycode == KEY_ESCAPE
+	if event is InputEventJoypadButton:
+		var joy_event := event as InputEventJoypadButton
+		return joy_event.pressed and joy_event.button_index == JOY_BUTTON_START
+	return false
 
 
 func _process(delta: float) -> void:

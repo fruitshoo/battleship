@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://7dh0uy8e1nb" path="res://scripts/effects/fire_effect.gd" id="1_d6f3u"]
 [ext_resource type="Curve" path="res://resources/vfx/curves/alpha_soft_fade_curve.tres" id="2_dsbkk"]
 [ext_resource type="Texture2D" uid="uid://j3er0rga8slr" path="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG" id="4_qta0k"]
-[ext_resource type="Texture2D" uid="uid://dc5pg6wfmtss2" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.tga" id="5_xsle2"]
+[ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="5_xsle2"]
 
 [sub_resource type="Gradient" id="Gradient_smoke"]
 offsets = PackedFloat32Array(0, 0.36164123, 0.72, 0.97232825)

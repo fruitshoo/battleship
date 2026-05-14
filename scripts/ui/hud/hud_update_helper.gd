@@ -94,6 +94,39 @@ static func _apply_speed_bar_state(hud, speed_state: String) -> void:
 		else:
 			fill_box.bg_color = NavalUiTheme.STATUS_ACTIVE_BLUE
 
+static func _apply_boost_bar_state(hud, active: bool, ready: bool) -> void:
+	if not hud.boost_bar:
+		return
+	var fill = hud.boost_bar.get_theme_stylebox("fill")
+	if fill is StyleBoxFlat:
+		var fill_box := fill as StyleBoxFlat
+		if active:
+			fill_box.bg_color = Color(1.0, 0.34, 0.16, 0.96)
+		elif ready:
+			fill_box.bg_color = Color(0.96, 0.68, 0.24, 0.94)
+		else:
+			fill_box.bg_color = Color(0.47, 0.36, 0.24, 0.82)
+
+static func _update_boost_bar(hud) -> void:
+	if not hud.boost_bar:
+		return
+	if not is_instance_valid(hud.player_ship) or not hud.player_ship.has_method("get_ramming_boost_charge_ratio"):
+		hud.boost_bar.visible = false
+		return
+	hud.boost_bar.visible = true
+	var boost_ratio: float = clampf(float(hud.player_ship.call("get_ramming_boost_charge_ratio")), 0.0, 1.0)
+	var boost_active: bool = hud.player_ship.has_method("is_ramming_boost_active") and hud.player_ship.call("is_ramming_boost_active") == true
+	var boost_ready := boost_ratio >= 0.999 and not boost_active
+	hud._boost_visual_value = lerpf(hud._boost_visual_value, boost_ratio * 100.0, 0.42)
+	if absf(hud.boost_bar.value - hud._boost_visual_value) > 0.1:
+		hud.boost_bar.value = hud._boost_visual_value
+	if absf(hud._last_boost_ratio - boost_ratio) > 0.005:
+		hud._last_boost_ratio = boost_ratio
+	if hud._last_boost_ready != boost_ready or hud._last_boost_active != boost_active:
+		hud._last_boost_ready = boost_ready
+		hud._last_boost_active = boost_active
+		_apply_boost_bar_state(hud, boost_active, boost_ready)
+
 static func update_speed_display(hud) -> void:
 	if not is_instance_valid(hud.player_ship):
 		return
@@ -122,11 +155,13 @@ static func update_speed_display(hud) -> void:
 		if hud._last_speed_mode != speed_state:
 			hud._last_speed_mode = speed_state
 			_apply_speed_bar_state(hud, speed_state)
+		_update_boost_bar(hud)
 	elif hud.speed_display:
 		var speed_text = "%.1f" % speed
 		if hud._last_speed_str != speed_text:
 			hud._last_speed_str = speed_text
 			hud.speed_display.text = speed_text
+		_update_boost_bar(hud)
 
 # Crew and combat
 static func update_force_panel(hud) -> void:

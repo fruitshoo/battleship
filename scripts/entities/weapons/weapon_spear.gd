@@ -1,9 +1,9 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 ## 창 (Spear)
-## 검보다 리치가 길지만 쿨다운이 약간 더 깁니다.
+## 삼지창과 같은 스펙을 쓰고, 외형과 사운드만 다르게 표현합니다.
 
-const BASE_DAMAGE: float = 13.5
+const BASE_DAMAGE: float = 12.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE
@@ -13,6 +13,10 @@ func _ready() -> void:
 
 func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:
 	damage = BASE_DAMAGE * (1.0 + maxf(0.0, damage_bonus_pct))
+
+
+func apply_owner_damage_modifiers(damage_bonus_pct: float, damage_add: float = 0.0) -> void:
+	damage = (BASE_DAMAGE + maxf(0.0, damage_add)) * (1.0 + maxf(0.0, damage_bonus_pct))
 
 
 func attack(target: Node3D, attacker: Node3D) -> void:
