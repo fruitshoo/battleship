@@ -16,3 +16,7 @@ explosiveness = 1.0
 process_material = ExtResource("2_burst_process")
 draw_pass_1 = SubResource("QuadMesh_burst")
 script = ExtResource("1_script")
+sfx_name = "critical_flesh_hit"
+sfx_pitch_min = 0.92
+sfx_pitch_max = 1.08
+sfx_volume_db = -1.5

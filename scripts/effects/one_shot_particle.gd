@@ -7,6 +7,11 @@ var _active: bool = false
 var _activate_when_ready: bool = false
 var _life_left: float = 0.0
 
+@export var sfx_name: String = ""
+@export_range(0.5, 1.5, 0.01) var sfx_pitch_min: float = 0.94
+@export_range(0.5, 1.5, 0.01) var sfx_pitch_max: float = 1.06
+@export_range(-24.0, 12.0, 0.5, "suffix:dB") var sfx_volume_db: float = 0.0
+
 
 func _enter_tree() -> void:
 	if _activate_when_ready and is_node_ready():
@@ -43,6 +48,7 @@ func pool_activate() -> void:
 	_life_left = lifetime + 0.3
 	visible = true
 	set_process(true)
+	_play_activation_sfx()
 	restart()
 	emitting = true
 	# 자식 파티클도 함께 emit
@@ -77,6 +83,21 @@ func _process(delta: float) -> void:
 	_life_left -= delta
 	if _life_left <= 0.0:
 		ScenePool.release(self)
+
+
+func _play_activation_sfx() -> void:
+	if sfx_name.strip_edges().is_empty():
+		return
+	var audio_manager := get_node_or_null("/root/AudioManager")
+	if not is_instance_valid(audio_manager) or not audio_manager.has_method("play_sfx_random_pitch"):
+		return
+	audio_manager.play_sfx_random_pitch(
+		sfx_name,
+		global_position,
+		sfx_pitch_min,
+		sfx_pitch_max,
+		sfx_volume_db
+	)
 
 func _is_prewarm_mode() -> bool:
 	var n: Node = self

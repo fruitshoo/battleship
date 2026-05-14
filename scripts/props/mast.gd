@@ -98,7 +98,7 @@ var yardarm_scale: Vector3 = Vector3.ONE
 var yardarm_offset: Vector3 = Vector3.ZERO
 var flag_offset: Vector3 = Vector3.ZERO
 
-@onready var mast_mesh: MeshInstance3D = $MastMesh
+@onready var mast_mesh: MeshInstance3D = get_node_or_null("MastMesh") as MeshInstance3D
 @onready var sail_visual: Node3D = $SailVisual
 @onready var sail_mesh: MeshInstance3D = $SailVisual/SailMesh
 # Optional dormant reference roots kept only if we temporarily park imported meshes

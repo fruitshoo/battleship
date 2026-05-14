@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://dfds5i3xuhjlk" path="res://assets/vfx/masks/sail_burn_mask_c.png" id="3_0u7u4"]
 [ext_resource type="PackedScene" path="res://scenes/props/ship_decor_flags/standard_flag.tscn" id="8_player_flag"]
 [ext_resource type="PackedScene" uid="uid://dnk408xuw63p4" path="res://assets/models/props/yardarm/yardarm.glb" id="6_nkkxi"]
+[ext_resource type="PackedScene" uid="uid://dx5rj4oae0yf7" path="res://assets/models/props/mast/mast.glb" id="7_mast_model"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_mast"]
 top_radius = 0.1
@@ -61,6 +62,9 @@ sail_uv_scale = Vector2(1, 2)
 transform = Transform3D(1, 0, 0, 0, 1.4207367, 0, 0, 0, 1, 0, 5.1829467, 0)
 mesh = SubResource("CylinderMesh_mast")
 surface_material_override/0 = SubResource("Material_mast")
+
+[node name="mast_model" parent="." instance=ExtResource("7_mast_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, -0.966)
 
 [node name="SailVisual" type="Node3D" parent="." unique_id=1842287473]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.3933, 0)

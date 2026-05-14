@@ -85,6 +85,8 @@ static func _is_player_controlled(node: Node) -> bool:
 
 
 static func _calculate_sail_drive_multiplier(ship, floor_ratio: float = 0.45) -> float:
+	if "sail_furled" in ship and ship.get("sail_furled") == true:
+		return 1.0
 	if not is_instance_valid(ship._cached_wind_manager):
 		return 1.0
 	if not ship._cached_wind_manager.has_method("get_wind_direction") or not ship._cached_wind_manager.has_method("get_wind_strength"):
@@ -323,13 +325,13 @@ static func _get_navigation_cache_interval(ship, raw_dist_to_target: float) -> f
 	var load_mult := minf(get_load_multiplier(ship), 1.85)
 	if _is_gunner(ship):
 		if raw_dist_to_target > 42.0:
-			return 0.20 * load_mult
-		return 0.12 * load_mult
+			return 0.16 * load_mult
+		return 0.09 * load_mult
 	if raw_dist_to_target > 55.0:
-		return 0.24 * load_mult
+		return 0.19 * load_mult
 	if raw_dist_to_target > 32.0:
-		return 0.18 * load_mult
-	return 0.10 * load_mult
+		return 0.14 * load_mult
+	return 0.08 * load_mult
 
 
 static func _get_boarding_window_cached(ship, current_target: Node3D, delta: float, raw_dist_to_target: float) -> Dictionary:
@@ -363,8 +365,8 @@ static func _get_boarding_window_cache_interval(ship, raw_dist_to_target: float)
 		return 0.0
 	var load_mult := minf(get_load_multiplier(ship), 1.75)
 	if raw_dist_to_target > 42.0:
-		return 0.24 * load_mult
-	return 0.14 * load_mult
+		return 0.18 * load_mult
+	return 0.10 * load_mult
 
 
 static func process_physics(ship, delta: float) -> void:

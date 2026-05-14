@@ -43,11 +43,12 @@ func set_palette(
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, radius - 5.0, Color(0.0, 0.0, 0.0, 0.18))
+	draw_circle(Vector2.ZERO, radius - 5.0, Color(0.0, 0.0, 0.0, 0.20))
 	draw_circle(Vector2.ZERO, radius - 8.0, panel_color)
-	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 96, outer_ring_color, 6.0, true)
-	draw_arc(Vector2.ZERO, radius - 7.0, 0.0, TAU, 96, Color(0.28, 0.20, 0.12, 0.72), 2.0, true)
-	draw_arc(Vector2.ZERO, radius - 14.0, 0.0, TAU, 96, inner_ring_color, 1.1, true)
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 128, outer_ring_color, 2.2, true)
+	draw_arc(Vector2.ZERO, radius - 3.8, 0.0, TAU, 128, Color(0.97, 0.84, 0.54, 0.34), 0.9, true)
+	draw_arc(Vector2.ZERO, radius - 7.5, 0.0, TAU, 128, Color(0.18, 0.13, 0.08, 0.72), 1.1, true)
+	draw_arc(Vector2.ZERO, radius - 14.0, 0.0, TAU, 128, inner_ring_color, 0.85, true)
 	_draw_subtle_waves()
 	_draw_ticks()
 	if draw_swirl and swirl_color.a > 0.001:

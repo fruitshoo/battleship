@@ -110,7 +110,6 @@ These should not remain unresolved near release:
 - Any file still marked `UNVERIFIED` in [audio_license_inventory.md](/Users/shk/Godot/battleship/docs/audio_license_inventory.md)
 - Any runtime key in `AudioManager` still pointing at temporary audio
 - Format outliers that should likely be normalized during replacement:
-  - `sfx_metal_drop.mp3`
   - `sfx_water_splash.mov`
 
 ## Current asset notes
@@ -131,6 +130,8 @@ Current `AudioManager` keys and the files they map to.
 | `cannon_fuse` | `sfx_match_sizzle.ogg`, `sfx_steam_hiss.ogg` |
 | `impact_wood` | `sfx_flag_crash.ogg` |
 | `ui_click` | `sfx_ui_click_1.ogg` ~ `sfx_ui_click_5.ogg` |
+| `gameplay` | `bgm_gameplay_tea_tyme.ogg` |
+| `boss_taiko` | `bgm_boss_taiko_drumloop_120_cc0.ogg`, `bgm_boss_tribe_drum_loop_cc0.ogg`, `bgm_boss_taiko_loop_cc0.ogg` |
 | `level_up` | `sfx_levelup.ogg` |
 | `rocket_launch` | `sfx_explosion_impact.ogg` |
 | `rocket_launch_01` | `sfx_rocket_launch_01.ogg` |
@@ -138,17 +139,19 @@ Current `AudioManager` keys and the files they map to.
 | `rocket_launch_03` | `sfx_rocket_launch_03.ogg` |
 | `heavy_missle_impact` | `sfx_heavy_missle_impact.ogg` |
 | `wood_break` | `sfx_flag_crash.ogg` |
-| `sail_flap` | `sfx_flag_flapping.ogg` |
+| `sail_flap` | `sfx_sail_canvas_01.ogg` ~ `sfx_sail_canvas_08.ogg` |
+| `mast_creak` | `sfx_mast_creak_01.ogg` ~ `sfx_mast_creak_04.ogg` |
 | `sword_swing` | `sfx_sword_swing_1.ogg` ~ `sfx_sword_swing_4.ogg` |
 | `bow_shoot` | `sfx_bow_01.ogg`, `sfx_bow_02.ogg` |
-| `musket_fire` | `sfx_musket_fire.ogg`, `sfx_musket_fire_02.ogg` |
+| `musket_fire` | `sfx_musket_fire_02.ogg`, `sfx_musket_fire_03_cc0.ogg` |
 | `soldier_hit` | `sfx_sword_ting_1.ogg` ~ `sfx_sword_ting_4.ogg` |
+| `critical_flesh_hit` | `sfx_crit_flesh_slashkut.ogg`, `sfx_crit_flesh_slice.ogg`, `sfx_crit_flesh_crush.ogg`, `sfx_crit_flesh_headshot.ogg` |
 | `wave_splash` | `sfx_wave_01.ogg` ~ `sfx_wave_03.ogg` |
 | `treasure_collect` | `sfx_pickup_1.ogg` ~ `sfx_pickup_3.ogg` |
 | `soldier_die` | `sfx_soldier_die_1.ogg` ~ `sfx_soldier_die_6.ogg` |
 | `water_splash_large` | `sfx_water_splash_large_1.ogg` ~ `sfx_water_splash_large_3.ogg` |
 | `water_splash_small` | `sfx_water_splash_small_1.ogg` ~ `sfx_water_splash_small_3.ogg` |
-| `cannon_reload` | `sfx_metal_drop.mp3` |
+| `cannon_reload` | `sfx_metal_drop.ogg` |
 | `oars_rowing` | `sfx_oars.ogg` |
 
 ## Suggested Work Order
@@ -165,4 +168,4 @@ Current `AudioManager` keys and the files they map to.
 
 - Favor keeping the current `AudioManager` keys stable and only swapping file paths.
 - If a replacement pack contains multiple variants, match the current pattern of grouped random playback.
-- Consider converting `sfx_metal_drop.mp3` to `.ogg` during replacement so all SFX share the same distribution format.
+- Keep runtime SFX in `.ogg` where practical so shipping assets use a consistent format.

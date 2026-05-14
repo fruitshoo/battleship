@@ -3,6 +3,7 @@
     "spawn_interval": 5.2,
     "min_spawn_distance": 50.0,
     "max_spawn_distance": 70.0,
+    "max_enemies": 3,
     "max_distance_limit": 115.0,
     "reposition_check_interval": 1.0
   },
@@ -26,7 +27,12 @@
   "encounter_profiles": {
     "coastal_opening": {
       "fleet_progression": [
-        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.85, "mixed": 0.15 } }
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.65, "mixed": 0.35 } }
+      ]
+    },
+    "coastal_pre_boss": {
+      "fleet_progression": [
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.50, "mixed": 0.40, "heavy": 0.10 } }
       ]
     },
     "coastal_escalation": {
@@ -36,6 +42,14 @@
     }
   },
   "scenario_triggers": [
+    {
+      "id": "enter_coastal_pre_boss",
+      "condition": { "elapsed_time": 70.0 },
+      "actions": [
+        { "type": "set_encounter_profile", "profile": "coastal_pre_boss" },
+        { "type": "spawn_recipe", "recipe": "mixed_crossfire", "max_slots": 2 }
+      ]
+    },
     {
       "id": "enter_coastal_escalation",
       "condition": { "elapsed_time": 120.0 },
@@ -92,7 +106,9 @@
       "final": true,
       "stop_regular_spawns": true,
       "ships": [
-        { "ship_type": "atakebune_final", "count": 1, "escorts": false }
+        { "ship_type": "atakebune_mid", "count": 2, "escorts": false, "lateral_spacing": 30.0 },
+        { "ship_type": "atakebune_mid", "count": 1, "escorts": false, "lateral_spacing": 30.0, "delay": 18.0 },
+        { "ship_type": "atakebune_mid", "count": 1, "escorts": false, "lateral_spacing": 30.0, "delay": 36.0 }
       ]
     }
   },

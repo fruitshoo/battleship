@@ -195,8 +195,6 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 		hud.call("_update_speed_display")
 	if hud.has_method("_update_hull_display"):
 		hud.call("_update_hull_display")
-	if hud.has_method("_update_stamina_display"):
-		hud.call("_update_stamina_display")
 	if hud.has_method("_update_player_status_overlay"):
 		hud.call("_update_player_status_overlay", false)
 	if hud.has_method("_update_boarding_display"):
@@ -523,8 +521,18 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 		hud.call("_update_ship_health_bars", false)
 	if is_instance_valid(hud.hp_text_label) and hud.hp_text_label.text != "HP 143 / 200":
 		failures.append("hud smoke HP label mismatch")
-	if is_instance_valid(hud.speed_bar_label) and hud.speed_bar_label.text != "3.5":
+	if not is_instance_valid(hud.speed_bar):
+		failures.append("hud smoke speed bar missing")
+	elif not is_instance_valid(hud.player_status_root) or not hud.player_status_root.is_ancestor_of(hud.speed_bar):
+		failures.append("hud smoke speed bar should live under player status overlay")
+	if not is_instance_valid(hud.speed_bar_label):
+		failures.append("hud smoke speed label missing")
+	elif hud.speed_bar_label.text != "3.5":
 		failures.append("hud smoke speed label mismatch")
+	elif hud.speed_bar_label.visible:
+		failures.append("hud smoke speed label should be hidden")
+	if is_instance_valid(hud.speed_mode_icon):
+		failures.append("hud smoke speed display should not use a compass-side icon")
 
 
 static func _run_hud_authoring_palette_harness(owner: Node, hud: Node, smoke_root: Node, failures: Array[String], wait_frames_after_spawn: int) -> void:
@@ -1356,6 +1364,11 @@ static func _run_compass_site_marker_check(owner: Node, failures: Array[String],
 		failures.append("hud smoke compass rock marker did not become visible")
 	elif rock_marker.position.length() <= 4.0:
 		failures.append("hud smoke compass rock marker should be offset from center: %.2f" % rock_marker.position.length())
+	if is_instance_valid(rock_marker) and control_panel.has_method("_apply_marker_screen_upright"):
+		control_panel.set("_displayed_compass_rotation", 0.7)
+		control_panel.call("_apply_marker_screen_upright", rock_marker)
+		if absf(wrapf(rock_marker.rotation + 0.7, -PI, PI)) > 0.01:
+			failures.append("hud smoke compass rock marker should counter-rotate against the compass wheel")
 	rock.queue_free()
 	control_panel.queue_free()
 	ui_layer.queue_free()
@@ -1434,10 +1447,10 @@ static func _validate_hud_baseline_state(hud: Node, failures: Array[String]) -> 
 		if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.is_ancestor_of(hud.hp_bar):
 			failures.append("hud smoke player hp bar should live under player status overlay")
 	if is_instance_valid(hud.stamina_bar):
-		if hud.stamina_bar.get_parent() == hud.bottom_left_container:
-			failures.append("hud smoke player stamina bar should not live in bottom-left hud")
-		if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.is_ancestor_of(hud.stamina_bar):
-			failures.append("hud smoke player stamina bar should live under player status overlay")
+		failures.append("hud smoke player stamina bar should be hidden from the core HUD")
+	if is_instance_valid(hud.speed_bar):
+		if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.is_ancestor_of(hud.speed_bar):
+			failures.append("hud smoke speed bar should live under player status overlay")
 
 
 static func _validate_hud_upgrade_track_art(hud: Node, failures: Array[String]) -> void:

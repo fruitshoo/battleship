@@ -145,7 +145,8 @@ static func apply_enemy_spawn_rules_root(spawner, root: Dictionary) -> void:
 						SHIP_TYPE: ship_type_name,
 						"count": maxi(1, int(ship_info.get("count", 1))),
 						"escorts": bool(ship_info.get("escorts", false)),
-						"lateral_spacing": maxf(1.0, float(ship_info.get("lateral_spacing", 28.0)))
+						"lateral_spacing": maxf(1.0, float(ship_info.get("lateral_spacing", 28.0))),
+						"delay": maxf(0.0, float(ship_info.get("delay", ship_info.get("spawn_delay", 0.0))))
 					})
 				if parsed_template_ships.is_empty():
 					continue
@@ -207,7 +208,8 @@ static func apply_enemy_spawn_rules_root(spawner, root: Dictionary) -> void:
 							SHIP_TYPE: ship_type_name,
 							"count": maxi(1, int(ship_info.get("count", 1))),
 							"escorts": bool(ship_info.get("escorts", false)),
-							"lateral_spacing": maxf(1.0, float(ship_info.get("lateral_spacing", 28.0)))
+							"lateral_spacing": maxf(1.0, float(ship_info.get("lateral_spacing", 28.0))),
+							"delay": maxf(0.0, float(ship_info.get("delay", ship_info.get("spawn_delay", 0.0))))
 						})
 					if parsed_wave_ships.is_empty():
 						continue

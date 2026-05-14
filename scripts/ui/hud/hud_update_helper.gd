@@ -9,9 +9,6 @@ const HudGaugeBar = preload("res://scripts/ui/hud/hud_gauge_bar.gd")
 const SUPPORT_SLOT_SIZE_DEFAULT := 66.0
 const SUPPORT_SLOT_SIZE_COMPACT := 60.0
 const SUPPORT_SLOT_SIZE_DENSE := 54.0
-const SUPPORT_SLOT_SIZE_MAENGSEON := 58.0
-const SUPPORT_SLOT_SIZE_PANOKSEON := 64.0
-const SUPPORT_SLOT_SIZE_GEOBUKSEON := 70.0
 const SUPPORT_SLOT_PANOKSEON_ACCENT := Color(0.86, 0.58, 0.34, 0.96)
 const SUPPORT_SLOT_MAENGSEON_ACCENT := Color(0.82, 0.69, 0.42, 0.92)
 const SUPPORT_SLOT_EMPTY_BG := Color(0.05, 0.07, 0.10, 0.72)
@@ -126,7 +123,7 @@ static func update_speed_display(hud) -> void:
 			hud._last_speed_mode = speed_state
 			_apply_speed_bar_state(hud, speed_state)
 	elif hud.speed_display:
-		var speed_text = "%.1f ㏏" % speed
+		var speed_text = "%.1f" % speed
 		if hud._last_speed_str != speed_text:
 			hud._last_speed_str = speed_text
 			hud.speed_display.text = speed_text
@@ -364,15 +361,8 @@ static func _get_support_ship_display_rank(ship) -> int:
 		return 1
 	return 2
 
-static func _get_support_slot_display_size(ship, fallback_size: float) -> float:
-	if not is_instance_valid(ship):
-		return fallback_size
-	var ship_type_name := _get_support_ship_type_name(ship)
-	if ship_type_name.contains("geobukseon") or ship_type_name.contains("turtle"):
-		return SUPPORT_SLOT_SIZE_GEOBUKSEON
-	if ship_type_name.contains("panokseon"):
-		return SUPPORT_SLOT_SIZE_PANOKSEON
-	return SUPPORT_SLOT_SIZE_MAENGSEON
+static func _get_support_slot_display_size(_ship, fallback_size: float) -> float:
+	return fallback_size
 
 static func _get_support_ship_type_name(ship) -> String:
 	if is_instance_valid(ship) and ship.get("ship_type") != null:
@@ -749,7 +739,7 @@ static func _ensure_boss_hp_entry(hud, boss_id: int) -> Dictionary:
 	var root := VBoxContainer.new()
 	root.name = "BossHPRow_%s" % str(boss_id)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.custom_minimum_size = Vector2(560.0, 44.0)
+	root.custom_minimum_size = Vector2(560.0, 40.0)
 	root.add_theme_constant_override("separation", 2)
 	hud.boss_hp_container.add_child(root)
 
@@ -768,7 +758,7 @@ static func _ensure_boss_hp_entry(hud, boss_id: int) -> Dictionary:
 	var bar := HudGaugeBar.new()
 	bar.name = "BossHP_%s" % str(boss_id)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.custom_minimum_size = Vector2(560.0, 20.0)
+	bar.custom_minimum_size = Vector2(560.0, 16.0)
 	bar.min_value = 0.0
 	bar.max_value = 1.0
 	bar.value = 1.0
@@ -876,7 +866,18 @@ static func _is_ship_hp_bar_target_valid(ship) -> bool:
 	if max_hp <= 0.0:
 		return false
 	var current_hp: float = clampf(float(ship.get("hull_hp")), 0.0, max_hp)
-	return current_hp > 0.0
+	return current_hp > 0.0 and _should_show_ship_hp_bar(ship, current_hp, max_hp)
+
+static func _should_show_ship_hp_bar(ship, current_hp: float, max_hp: float) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if ship.get("deck_is_contested") == true or ship.get("deck_is_overrun") == true:
+		return true
+	var hostile_count: int = int(ship.get("deck_hostile_boarder_count")) if ship.get("deck_hostile_boarder_count") != null else 0
+	if hostile_count > 0:
+		return true
+	var damage_threshold: float = maxf(1.0, max_hp * 0.01)
+	return current_hp < max_hp - damage_threshold
 
 static func _update_single_ship_health_bar(hud, ship, cam: Camera3D, viewport_rect: Rect2, positions_only: bool = false) -> bool:
 	var max_hp: float = float(ship.get("max_hull_hp"))
@@ -1059,10 +1060,10 @@ static func _ensure_ship_hp_bar(hud, ship_id: int, team_tag: String) -> Control:
 
 	var accent := NavalUiTheme.STATUS_ACTIVE_BLUE if team_tag == "player" else Color(1.0, 0.42, 0.42, 0.95)
 	if hp_bar.has_method("configure_gauge"):
-		hp_bar.configure_gauge(Color(0.03, 0.04, 0.06, 0.72), NavalUiTheme.STATUS_GOOD, 3, {
+		hp_bar.configure_gauge(Color(0.03, 0.04, 0.06, 0.66), NavalUiTheme.STATUS_GOOD, 2, {
 			"damage_trail": true,
 			"border_color": accent,
-			"shine_strength": 0.16,
+			"shine_strength": 0.08,
 			"trail_follow_speed": 3.4,
 		})
 	else:

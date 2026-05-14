@@ -127,6 +127,42 @@ class MockSupportShip:
 		die_calls += 1
 
 
+class MockPlayerFlagshipOverrun:
+	extends Node3D
+
+	var team: String = "player"
+	var boarding_attacker: Node3D = null
+	var deck_is_contested: bool = false
+	var deck_is_overrun: bool = false
+	var deck_friendly_crew_count: int = 0
+	var deck_hostile_boarder_count: int = 0
+	var is_sinking: bool = false
+	var is_dying: bool = false
+	var boarding_capture_duration: float = 8.0
+	var boarding_capture_damage_tick: float = 25.0
+	var boarding_capture_progress: float = 0.0
+	var max_hull_hp: float = 200.0
+	var _deck_overrun_announced: bool = false
+	var _cached_hud: Node = null
+	var damage_taken: float = 0.0
+	var game_over_calls: int = 0
+
+	func get_team_tag() -> String:
+		return team
+
+	func set_boarding_attacker_ship(attacker: Node3D) -> void:
+		boarding_attacker = attacker
+
+	func get_boarding_attacker_ship() -> Node3D:
+		return boarding_attacker
+
+	func take_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO, _damage_source: String = "") -> void:
+		damage_taken += amount
+
+	func trigger_boarding_overrun_game_over() -> void:
+		game_over_calls += 1
+
+
 func _set_support_hold_enabled(ship: Node3D, enabled: bool) -> void:
 	if not is_instance_valid(ship):
 		return
@@ -343,6 +379,7 @@ func _ready() -> void:
 	_verify_player_crew_speaks_when_ship_is_burning(failures)
 	_verify_rowing_speech_uses_single_crew_label(failures)
 	_verify_support_rescue_boarding_holds_player_capture_progress(failures)
+	_verify_player_flagship_overrun_triggers_game_over(failures)
 	_verify_support_rescue_boarders_return_after_deck_safe(failures)
 	_verify_support_attack_boarders_return_after_enemy_deck_safe(failures)
 	_verify_support_attack_boarders_hold_on_boss_until_sinking(failures)
@@ -2069,6 +2106,32 @@ func _verify_support_rescue_boarding_holds_player_capture_progress(failures: Arr
 	EntityRegistry.unregister_ship(support)
 	EntityRegistry.unregister_soldier(enemy_boarder)
 	support.queue_free()
+	enemy_boarder.queue_free()
+	player.queue_free()
+
+
+func _verify_player_flagship_overrun_triggers_game_over(failures: Array[String]) -> void:
+	var player := MockPlayerFlagshipOverrun.new()
+	add_child(player)
+
+	var enemy_boarder := MockTransferSoldier.new()
+	add_child(enemy_boarder)
+	enemy_boarder.team = "enemy"
+	enemy_boarder.owned_ship = player
+	EntityRegistry.register_soldier(enemy_boarder)
+
+	BaseShipStatusHelper.update_boarding_state(player, 0.25)
+
+	if player.deck_is_overrun != true:
+		failures.append("player flagship overrun contract did not mark deck overrun")
+	if player.game_over_calls != 1:
+		failures.append("player flagship overrun should trigger immediate game over, got %d" % player.game_over_calls)
+	if player.boarding_capture_progress > 0.0:
+		failures.append("player flagship overrun should not wait on capture progress")
+	if player.damage_taken > 0.0:
+		failures.append("player flagship overrun should not wait for capture hull damage")
+
+	EntityRegistry.unregister_soldier(enemy_boarder)
 	enemy_boarder.queue_free()
 	player.queue_free()
 

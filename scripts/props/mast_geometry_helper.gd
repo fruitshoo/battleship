@@ -28,11 +28,13 @@ static func capture_base_state(mast: Node3D) -> void:
 
 
 static func apply_mast_geometry(mast: Node3D) -> void:
+	if is_instance_valid(mast.mast_model_root):
+		mast.mast_model_root.visible = true
+		if is_instance_valid(mast.mast_mesh):
+			mast.mast_mesh.visible = false
+		return
 	if is_instance_valid(mast.mast_mesh):
 		mast.mast_mesh.visible = true
-	if is_instance_valid(mast.mast_model_root):
-		# Keep the GLB mast in the scene only as a dormant reference.
-		mast.mast_model_root.visible = false
 
 
 static func apply_sail_geometry(mast: Node3D) -> void:
@@ -74,12 +76,12 @@ static func get_yardarm_furl_drop(mast: Node3D) -> float:
 
 
 static func get_current_mast_top_y(mast: Node3D, height_scale: float) -> float:
-	if is_instance_valid(mast.mast_mesh) and mast.mast_mesh.mesh is CylinderMesh:
-		var mast_cylinder: CylinderMesh = mast.mast_mesh.mesh as CylinderMesh
-		return mast.mast_mesh.position.y + (mast_cylinder.height * mast.mast_mesh.scale.y * 0.5)
 	if mast._has_mast_model_bounds:
 		var scaled_top: float = mast.mast_model_root.position.y + (mast._base_mast_model_bounds.position.y + mast._base_mast_model_bounds.size.y) * mast.mast_model_root.scale.y
 		return scaled_top
+	if is_instance_valid(mast.mast_mesh) and mast.mast_mesh.mesh is CylinderMesh:
+		var mast_cylinder: CylinderMesh = mast.mast_mesh.mesh as CylinderMesh
+		return mast.mast_mesh.position.y + (mast_cylinder.height * mast.mast_mesh.scale.y * 0.5)
 	return mast.sail_visual.position.y if is_instance_valid(mast.sail_visual) else mast._base_sail_visual_position.y
 
 

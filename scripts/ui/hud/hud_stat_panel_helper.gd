@@ -135,11 +135,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var sail_turn_speed: float = _get_float(ship, "sail_turn_speed", PLAYER_SAIL_TURN_SPEED)
 	var rowing_speed: float = _get_float(ship, "rowing_speed", 0.0)
 	var rowing_acceleration_mult: float = _get_float(ship, "rowing_acceleration_mult", 1.0)
-	var max_rowing_stamina: float = float(ship_snapshot.get("max_rowing_stamina", 100.0))
 	var rudder_turn_speed: float = _get_float(ship, "rudder_turn_speed", 0.0)
-	var rowing_stamina: float = float(ship_snapshot.get("rowing_stamina", 0.0))
-	var stamina_drain_rate: float = _get_float(ship, "stamina_drain_rate", 0.0)
-	var stamina_recovery_rate: float = _get_float(ship, "stamina_recovery_rate", 0.0)
 	sections.append({
 		"title": "항해",
 		"icon": "air",
@@ -150,8 +146,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "rowing", "label": "노젓기 속도", "value": "%.1f" % rowing_speed},
 			{"icon": "offline_bolt", "label": "노 가속", "value": "+%d%%" % max(0, int(round((rowing_acceleration_mult - 1.0) * 100.0)))},
 			{"icon": "turn_right", "label": "러더 선회", "value": "%.0f°/s" % rudder_turn_speed},
-			{"icon": "bolt", "label": "스태미나", "value": "%.0f / %.0f" % [rowing_stamina, max_rowing_stamina]},
-			{"icon": "trending_down", "label": "소모 / 회복", "value": "%.1f/s / %.1f/s" % [stamina_drain_rate, stamina_recovery_rate]},
 		],
 	})
 
@@ -236,7 +230,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "swords", "label": "근접 / 활", "value": "%.1f / %.1f" % [
 				float(crew_stats.get("sword_damage", 0.0)),
 				float(crew_stats.get("bow_damage", 0.0)),
-			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "창 피해 = 기본 창 피해 x (1 + 창병 업그레이드 + 해역 병사 무기)\n활 피해 = 기본 활 피해 x (1 + 해역 병사 무기)")},
+			], "tooltip": _build_percent_bonus_tooltip("병사 무기", "병사 무기 피해", crew_damage_site_bonus, "장창 피해 = 기본 장창 피해 x (1 + 장창 업그레이드 + 해역 병사 무기)\n활 피해 = 기본 활 피해 x (1 + 해역 병사 무기)")},
 			{"icon": "grade", "label": "치명타", "value": "%.0f%% x%.1f" % [
 				float(crew_stats.get("crit_chance", 0.0)) * 100.0,
 				float(crew_stats.get("crit_multiplier", 1.0)),
@@ -253,7 +247,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "sports_baseball", "label": "피해 / DPS", "value": "%.1f | %.1f" % [cannon_damage, cannon_expected_dps]},
 			{"icon": "groups", "label": "병력", "value": "%d / %d" % [int(crew_stats.get("alive_count", 0)), int(_get_int(ship, "max_crew_count", 0))]},
 			{"icon": "speed", "label": "속도", "value": "%.1f / %.1f" % [current_speed, max_speed]},
-			{"icon": "bolt", "label": "스태미나", "value": "%.0f / %.0f" % [rowing_stamina, max_rowing_stamina]},
 		],
 	})
 
@@ -748,8 +741,8 @@ static func _build_site_bonus_tooltip(bonus_id: String, bonus_name: String, valu
 			lines.append("적용: 대포 재장전 시간을 감소")
 			lines.append("계산: 기본 재장전 x 화약 배율 x (1 - 해역 포격 속도) x 병사/함대/상태 배율")
 		"crew_damage_pct":
-			lines.append("적용: 병사 검/활/무기 피해 배율에 합산")
-			lines.append("계산: 창 피해는 창병 업그레이드와 합산, 활 피해는 해역 병사 무기 보너스와 합산")
+			lines.append("적용: 병사 장창/활/무기 피해 배율에 합산")
+			lines.append("계산: 장창 피해는 장창 업그레이드와 합산, 활 피해는 해역 병사 무기 보너스와 합산")
 		"crew_defense_add":
 			lines.append("적용: 병사 방어력에 더함")
 			lines.append("계산: 기존 병사 방어력 + 해역 보너스")

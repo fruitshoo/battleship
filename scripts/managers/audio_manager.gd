@@ -31,20 +31,20 @@ var sfx_streams = {
 	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.ogg",
 	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.ogg",
 	"sail_flap": [
-		"res://assets/audio/sfx/sfx_sail_canvas_01.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_02.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_03.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_04.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_05.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_06.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_07.wav",
-		"res://assets/audio/sfx/sfx_sail_canvas_08.wav",
+		"res://assets/audio/sfx/sfx_sail_canvas_01.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_02.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_03.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_04.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_05.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_06.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_07.ogg",
+		"res://assets/audio/sfx/sfx_sail_canvas_08.ogg",
 	],
 	"mast_creak": [
-		"res://assets/audio/sfx/sfx_mast_creak_01.wav",
-		"res://assets/audio/sfx/sfx_mast_creak_02.wav",
-		"res://assets/audio/sfx/sfx_mast_creak_03.wav",
-		"res://assets/audio/sfx/sfx_mast_creak_04.wav",
+		"res://assets/audio/sfx/sfx_mast_creak_01.ogg",
+		"res://assets/audio/sfx/sfx_mast_creak_02.ogg",
+		"res://assets/audio/sfx/sfx_mast_creak_03.ogg",
+		"res://assets/audio/sfx/sfx_mast_creak_04.ogg",
 	],
 	"sword_swing": [
 		"res://assets/audio/sfx/sfx_sword_swing_1.ogg",
@@ -62,7 +62,7 @@ var sfx_streams = {
 			"volume_db": -4.0,
 		},
 		{
-			"path": "res://assets/audio/sfx/sfx_musket_fire_03_cc0.wav",
+			"path": "res://assets/audio/sfx/sfx_musket_fire_03_cc0.ogg",
 			"volume_db": -7.0,
 		}
 	],
@@ -71,6 +71,12 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_sword_ting_2.ogg",
 		"res://assets/audio/sfx/sfx_sword_ting_3.ogg",
 		"res://assets/audio/sfx/sfx_sword_ting_4.ogg"
+	],
+	"critical_flesh_hit": [
+		"res://assets/audio/sfx/sfx_crit_flesh_slashkut.ogg",
+		"res://assets/audio/sfx/sfx_crit_flesh_slice.ogg",
+		"res://assets/audio/sfx/sfx_crit_flesh_crush.ogg",
+		"res://assets/audio/sfx/sfx_crit_flesh_headshot.ogg",
 	],
 	"wave_splash": [
 		"res://assets/audio/sfx/sfx_wave_01.ogg",
@@ -114,28 +120,31 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_water_splash_small_3.ogg",
 	],
 	"ship_sink_bubbles": "res://assets/audio/sfx/sfx_ship_sink_bubbles_cc0.ogg",
-	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.mp3",
+	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.ogg",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
-	"rowing_drum": "res://assets/audio/sfx/sfx_epic_drum_cc0.wav",
 	"boss_horn": "res://assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg",
 	"support_foghorn": "res://assets/audio/sfx/sfx_support_foghorn_cc0.ogg",
 }
 
 var bgm_streams = {
 	"main_menu": "res://assets/audio/music/bgm_main_menu_battle_tactics.ogg",
+	"gameplay": "res://assets/audio/music/bgm_gameplay_tea_tyme.ogg",
 	"boss_taiko": [
-		"res://assets/audio/music/bgm_boss_taiko_drumloop_120_cc0.wav",
-		"res://assets/audio/music/bgm_boss_tribe_drum_loop_cc0.wav",
+		"res://assets/audio/music/bgm_boss_taiko_drumloop_120_cc0.ogg",
+		"res://assets/audio/music/bgm_boss_tribe_drum_loop_cc0.ogg",
+		"res://assets/audio/music/bgm_boss_taiko_loop_cc0.ogg",
 	],
 }
 
-const DEFAULT_3D_SFX_VOLUME_DB := 3.0
+const DEFAULT_3D_SFX_VOLUME_DB := -1.5
 const DEFAULT_3D_SFX_MAX_DISTANCE := 220.0
 const DEFAULT_3D_SFX_UNIT_SIZE := 55.0
 const GILGUNAK_VOLUME_DB := -4.0
 const MAIN_MENU_BGM := "main_menu"
+const GAMEPLAY_BGM := "gameplay"
 const BOSS_TAIKO_BGM := "boss_taiko"
 const MAIN_MENU_BGM_VOLUME_DB := -8.0
+const GAMEPLAY_BGM_VOLUME_DB := -10.0
 const BOSS_TAIKO_VOLUME_DB := 1.5
 const SFX_ALIASES := {
 	"arrow_shoot": "bow_shoot",
@@ -155,36 +164,36 @@ const SFX_PROFILE_BATTLE_ALERT := "battle_alert"
 const SFX_PROFILE_PRESETS := {
 	SFX_PROFILE_DEFAULT_3D: {},
 	SFX_PROFILE_WEAPON_CLOSE: {
-		"volume_db": -1.0,
+		"volume_db": -3.0,
 		"max_distance": 220.0,
 		"unit_size": 60.0,
 	},
 	SFX_PROFILE_LIGHT_PROJECTILE: {
-		"volume_db": -5.0,
+		"volume_db": -7.0,
 		"max_distance": 150.0,
 		"unit_size": 38.0,
 		"pitch_jitter": 0.035,
 		"rate_limit_msec": 55,
 	},
 	SFX_PROFILE_CANNON_BLAST: {
-		"volume_db": 1.5,
+		"volume_db": -1.0,
 		"max_distance": 340.0,
 		"unit_size": 95.0,
 		"pitch_jitter": 0.08,
 	},
 	SFX_PROFILE_SHIP_AMBIENT: {
-		"volume_db": 2.0,
+		"volume_db": -1.0,
 		"max_distance": 260.0,
 		"unit_size": 75.0,
 	},
 	SFX_PROFILE_CHARACTER_VOICE: {
-		"volume_db": 0.5,
+		"volume_db": -1.5,
 		"max_distance": 250.0,
 		"unit_size": 80.0,
 		"pitch_jitter": 0.025,
 	},
 	SFX_PROFILE_BOARDING_VOICE: {
-		"volume_db": 1.5,
+		"volume_db": -0.5,
 		"max_distance": 320.0,
 		"unit_size": 110.0,
 		"pitch_jitter": 0.025,
@@ -200,12 +209,12 @@ const SFX_PROFILE_BY_KEY := {
 	"sail_flap": SFX_PROFILE_SHIP_AMBIENT,
 	"mast_creak": SFX_PROFILE_SHIP_AMBIENT,
 	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
-	"rowing_drum": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
 	"bow_shoot": SFX_PROFILE_LIGHT_PROJECTILE,
 	"musket_fire": SFX_PROFILE_LIGHT_PROJECTILE,
 	"sword_swing": SFX_PROFILE_WEAPON_CLOSE,
 	"soldier_hit": SFX_PROFILE_WEAPON_CLOSE,
+	"critical_flesh_hit": SFX_PROFILE_WEAPON_CLOSE,
 	"soldier_die": SFX_PROFILE_CHARACTER_VOICE,
 	"ballistic_death": SFX_PROFILE_CHARACTER_VOICE,
 	"boarding_war_cry": SFX_PROFILE_BOARDING_VOICE,
@@ -216,13 +225,6 @@ const SFX_PROFILE_OVERRIDES := {
 	"oars_rowing": {
 		"max_distance": 240.0,
 		"unit_size": 70.0,
-	},
-	"rowing_drum": {
-		"volume_db": -8.5,
-		"max_distance": 260.0,
-		"unit_size": 90.0,
-		"pitch_jitter": 0.025,
-		"rate_limit_msec": 1200,
 	},
 	"sail_flap": {
 		"volume_db": -0.5,
@@ -242,12 +244,19 @@ const SFX_PROFILE_OVERRIDES := {
 		"volume_db": 0.5,
 	},
 	"soldier_hit": {
-		"volume_db": 1.0,
+		"volume_db": -2.0,
 		"max_distance": 230.0,
 		"unit_size": 65.0,
 	},
+	"critical_flesh_hit": {
+		"volume_db": -7.0,
+		"max_distance": 190.0,
+		"unit_size": 54.0,
+		"pitch_jitter": 0.065,
+		"rate_limit_msec": 90,
+	},
 	"cannon_fire": {
-		"volume_db": 2.5,
+		"volume_db": -1.0,
 		"max_distance": 360.0,
 		"unit_size": 110.0,
 		"pitch_jitter": 0.04,
@@ -267,7 +276,7 @@ const SFX_PROFILE_OVERRIDES := {
 		"rate_limit_msec": 110,
 	},
 	"ship_sink_bubbles": {
-		"volume_db": 8.0,
+		"volume_db": 1.0,
 		"max_distance": 320.0,
 		"unit_size": 130.0,
 		"pitch_jitter": 0.04,
@@ -304,6 +313,8 @@ var _last_sfx_play_msec_by_key: Dictionary = {}
 var bgm_player: AudioStreamPlayer
 var current_bgm_name: String = ""
 var _active_boss_bgm_path: String = ""
+var _gameplay_bgm_active: bool = false
+var _boss_bgm_active: bool = false
 
 # 예열 완료 신호
 signal prewarm_finished
@@ -318,6 +329,7 @@ var _essential_warm_keys: Array[String] = [
 	"impact_wood",
 	"sword_swing",
 	"soldier_hit",
+	"critical_flesh_hit",
 	"bow_shoot",
 	"musket_fire",
 	"level_up",
@@ -330,6 +342,7 @@ var _essential_warm_keys: Array[String] = [
 	"boss_horn"
 ]
 var _essential_bgm_warm_keys: Array[String] = [
+	GAMEPLAY_BGM,
 	BOSS_TAIKO_BGM
 ]
 var _web_essential_warm_keys: Array[String] = [
@@ -766,12 +779,28 @@ func stop_bgm(stream_name: String = "") -> void:
 	current_bgm_name = ""
 
 func set_boss_battle_music(active: bool) -> void:
+	_boss_bgm_active = active
 	if active:
 		play_bgm(BOSS_TAIKO_BGM)
 	else:
 		if current_bgm_name == BOSS_TAIKO_BGM:
 			stop_bgm(BOSS_TAIKO_BGM)
 		_active_boss_bgm_path = ""
+		if _gameplay_bgm_active:
+			play_bgm(GAMEPLAY_BGM)
+
+
+func play_gameplay_music() -> void:
+	_gameplay_bgm_active = true
+	if not _boss_bgm_active and current_bgm_name != BOSS_TAIKO_BGM:
+		play_bgm(GAMEPLAY_BGM)
+
+
+func stop_gameplay_music() -> void:
+	_gameplay_bgm_active = false
+	_boss_bgm_active = false
+	if current_bgm_name == GAMEPLAY_BGM:
+		stop_bgm(GAMEPLAY_BGM)
 
 
 func play_main_menu_music() -> void:
@@ -785,6 +814,8 @@ func stop_main_menu_music() -> void:
 func _get_bgm_volume_db(stream_name: String) -> float:
 	if stream_name == BOSS_TAIKO_BGM:
 		return BOSS_TAIKO_VOLUME_DB
+	if stream_name == GAMEPLAY_BGM:
+		return GAMEPLAY_BGM_VOLUME_DB
 	if stream_name == MAIN_MENU_BGM:
 		return MAIN_MENU_BGM_VOLUME_DB
 	return 0.0

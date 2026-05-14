@@ -410,10 +410,7 @@ static func _is_owned_ship_rowing(soldier) -> bool:
 	var owned_ship = soldier.get("owned_ship")
 	if not is_instance_valid(owned_ship):
 		return false
-	if owned_ship.get("is_rowing") != true or owned_ship.get("rowing_locked") == true:
-		return false
-	var stamina_variant: Variant = owned_ship.get("rowing_stamina")
-	return stamina_variant == null or float(stamina_variant) > 0.1
+	return owned_ship.get("is_rowing") == true
 
 
 static func _is_enemy_boarder_on_player_ship(soldier) -> bool:

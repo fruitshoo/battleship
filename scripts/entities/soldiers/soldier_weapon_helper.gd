@@ -9,6 +9,7 @@ const SPEARMAN_MELEE_SCENES := [
 	preload("res://scenes/entities/weapons/weapon_spear.tscn"),
 	preload("res://scenes/entities/weapons/weapon_trident.tscn"),
 ]
+const JOSEON_DEFAULT_MELEE_SCENE = preload("res://scenes/entities/weapons/weapon_spear.tscn")
 
 
 static func get_ranged_weapon_id(soldier) -> String:
@@ -24,10 +25,13 @@ static func get_melee_weapon_id(soldier) -> String:
 
 
 static func apply_role_loadout(soldier) -> void:
+	_ensure_standard_melee_weapon(soldier)
 	match str(soldier.crew_role):
 		"spearman":
 			if get_melee_weapon_id(soldier) != "spearman":
-				var spear_scene: PackedScene = SPEARMAN_MELEE_SCENES[randi() % SPEARMAN_MELEE_SCENES.size()]
+				var spear_scene: PackedScene = _get_standard_melee_scene(soldier)
+				if not _should_use_spear_loadout(soldier):
+					spear_scene = SPEARMAN_MELEE_SCENES[randi() % SPEARMAN_MELEE_SCENES.size()]
 				soldier.equip_melee_weapon(spear_scene, "spearman")
 			soldier._set_active_weapon("sword")
 		"repeating_crossbow":
@@ -66,7 +70,7 @@ static func _get_standard_melee_weapon_id(soldier) -> String:
 
 static func _get_standard_melee_scene(soldier) -> PackedScene:
 	if _should_use_spear_loadout(soldier):
-		return SPEARMAN_MELEE_SCENES[randi() % SPEARMAN_MELEE_SCENES.size()]
+		return JOSEON_DEFAULT_MELEE_SCENE
 	return SWORD_SCENE
 
 
@@ -75,10 +79,15 @@ static func _should_use_spear_loadout(soldier) -> bool:
 		return false
 	if soldier.get("team") == null or str(soldier.get("team")) != "player":
 		return false
-	var um: Node = soldier.get_node_or_null("/root/UpgradeManager")
-	if not is_instance_valid(um) or not ("current_levels" in um):
-		return false
-	return int(um.current_levels.get("crew_numbers", 0)) > 0
+	return true
+
+
+static func _ensure_standard_melee_weapon(soldier) -> void:
+	if not _should_use_spear_loadout(soldier):
+		return
+	if get_melee_weapon_id(soldier) == "spearman":
+		return
+	soldier.equip_melee_weapon(_get_standard_melee_scene(soldier), "spearman")
 
 
 static func update_combat_weapon_choice(soldier, nearest) -> void:

@@ -35,7 +35,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.09327983951855567
+shader_parameter/damage_seed = 0.2888665997993982
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -43,7 +43,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 2237912919513
+metadata/mast_owner_id = 277934531227014
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_gvf0h"]
 render_priority = 20
@@ -64,7 +64,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.09428284854563691
+shader_parameter/damage_seed = 0.6389167502507522
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -72,7 +72,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 2238080691683
+metadata/mast_owner_id = 277934699046391
 
 [node name="GeobukseonHull" type="Node3D" unique_id=1045646202]
 
@@ -151,10 +151,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, -3.25)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.2010349, 0)
 
 [node name="CannonFrontLeft" type="Marker3D" parent="ScaleRoot/Authoring/CannonSlots" unique_id=491409939]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 1.1, -4.704)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7, 1.4769999, -4.2)
 
 [node name="CannonFrontRight" type="Marker3D" parent="ScaleRoot/Authoring/CannonSlots" unique_id=1430685378]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1.1, -4.704)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 1.4769999, -4.2)
 
 [node name="CannonLeft" type="Marker3D" parent="ScaleRoot/Authoring/CannonSlots" unique_id=541043472]
 transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -1.7, 1.1, -1.4)

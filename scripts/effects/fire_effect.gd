@@ -9,6 +9,10 @@ var _active: bool = false
 var _extinguish_timer: float = 0.0
 
 
+func _ready() -> void:
+	pool_reset()
+
+
 func pool_capacity() -> int:
 	return 12
 

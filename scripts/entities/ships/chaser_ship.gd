@@ -40,6 +40,22 @@ enum CombatRole {CHARGER, GUNNER}
 @export_range(0.2, 3.0, 0.05) var boarding_latch_duration: float = 1.15
 @export_range(0.0, 4.0, 0.05) var boarding_latch_distance_pad: float = 1.55
 @export_range(1.0, 5.0, 0.05) var boarding_latch_relative_speed_mult: float = 2.8
+@export_group("Sail Handling")
+@export var sail_furled: bool = false
+@export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
+@export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
+@export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
+@export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.3
+@export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.2
+@export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.85
+@export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
+@export_group("Boarding Sail AI")
+@export var boarding_sail_furl_enabled: bool = true
+@export_range(6.0, 40.0, 0.5, "suffix:m") var boarding_sail_furl_distance: float = 30.0
+@export_range(10.0, 60.0, 0.5, "suffix:m") var boarding_sail_unfurl_distance: float = 45.0
+@export_range(0.0, 5.0, 0.1, "suffix:s") var boarding_sail_unfurl_delay: float = 1.5
+@export_range(0.2, 1.0, 0.01) var boarding_furled_drive_ratio: float = 0.82
+@export_group("")
 @export var formation_role_name: String = "":
 	set(value):
 		formation_role_name = value
@@ -47,7 +63,7 @@ enum CombatRole {CHARGER, GUNNER}
 			_apply_formation_role_profile()
 @export var limbo_ai_pilot_enabled: bool = false
 @export_file("*.tres") var limbo_ai_pilot_tree_path: String = ShipLimboAIPilot.DEFAULT_TREE_PATH
-@export_range(0.03, 0.25, 0.01) var limbo_ai_tick_interval: float = 0.08
+@export_range(0.03, 0.25, 0.01) var limbo_ai_tick_interval: float = 0.07
 @export var ship_type: String = "sekibune_melee":
 	set(value):
 		ship_type = value
@@ -92,6 +108,7 @@ var _wave_timer: float = 0.0 # 물결 소리 타이머
 var _last_ai_speed: float = 0.0 # 속도 평활화를 위한 이전 프레임 속도 저장
 var _oar_time: float = 0.0
 var _derelict_status_check_timer: float = DERELICT_STATUS_CHECK_INTERVAL
+var _boarding_sail_unfurl_timer: float = 0.0
 
 # [신규] 스태미나 시스템 (돌격용)
 var stamina: float = 100.0
@@ -127,11 +144,11 @@ var _limbo_ai_tick_timer: float = 0.0
 var _limbo_ai_tick_accum: float = 0.0
 var _minion_ai_update_phase: int = -1
 var _minion_ai_accum_delta: float = 0.0
-@export_range(0.05, 0.5, 0.01) var ai_logic_update_interval: float = 0.2
-@export_range(0.0, 0.15, 0.01) var ai_logic_update_jitter: float = 0.05
-var _ai_logic_update_interval_runtime: float = 0.2
-@export_range(0.05, 0.5, 0.01) var ai_separation_update_interval: float = 0.12
-var _ai_separation_update_interval_runtime: float = 0.12
+@export_range(0.05, 0.5, 0.01) var ai_logic_update_interval: float = 0.16
+@export_range(0.0, 0.15, 0.01) var ai_logic_update_jitter: float = 0.035
+var _ai_logic_update_interval_runtime: float = 0.16
+@export_range(0.05, 0.5, 0.01) var ai_separation_update_interval: float = 0.09
+var _ai_separation_update_interval_runtime: float = 0.09
 
 # 도선 로직 변수 (base_ship.gd에서 상속)
 var has_rammed: bool = false # 중복 데미지 방지
@@ -513,6 +530,7 @@ func _spawn_one_soldier(s_team: String, soldier_type_override: String = "") -> v
 func die() -> void:
 	if is_dying: return
 	var was_derelict_disposal: bool = is_derelict or get_meta("derelict_burning_down", false) == true or get_meta("derelict_contact_ignition_started", false) == true
+	BaseShipStatusHelper.clear_fire_effect(self)
 	is_dying = true
 	
 	# ✅ 배 위의 병사들을 원래 배로 복귀시키고, 복귀 불가 시 생존자로 전환
@@ -686,6 +704,7 @@ func _physics_process(delta: float) -> void:
 	var limbo_profile_start := PhysicsProfiler.begin()
 	_update_limbo_ai_pilot(delta)
 	PhysicsProfiler.end("chaser_limbo_ai_pilot", limbo_profile_start)
+	_update_boarding_sail_furl(delta)
 	var ai_profile_start := PhysicsProfiler.begin()
 	ChaserShipAiHelper.process_physics(self, delta)
 	PhysicsProfiler.end("chaser_ai_process_total", ai_profile_start)
@@ -767,6 +786,7 @@ func capture_ship() -> void:
 			
 	set_team("player")
 	set_ally_ship_role(ShipAllyRoleHelper.ROLE_CAPTURED_MINION)
+	set_sail_furled(false)
 	
 	# ✅ 상태 초기화 및 긴급 수리 (나포 후 즉시 가라앉는 현상 방지)
 	is_dying = false
@@ -948,6 +968,8 @@ func _apply_minion_visuals() -> void:
 func _auto_adjust_sail(delta: float) -> void:
 	if not is_instance_valid(_cached_wind_manager) or not _cached_wind_manager.has_method("get_wind_direction"):
 		return
+	if sail_furled and sail_deployed_ratio <= 0.001:
+		return
 	var wind_dir = _cached_wind_manager.get_wind_direction()
 
 	# 플레이어 배와 같은 기준으로 상대풍을 계산해 돛이 바람을 향해 자연스럽게 따라가게 한다.
@@ -956,6 +978,100 @@ func _auto_adjust_sail(delta: float) -> void:
 	var rel_wind_angle = wrapf(wind_angle + ship_angle_ccw, -180.0, 180.0)
 	var target_sail_angle = clamp(rel_wind_angle / 2.0, -90.0, 90.0)
 	sail_angle = move_toward(sail_angle, target_sail_angle, 60.0 * delta)
+
+
+func set_sail_furled(furled: bool) -> void:
+	var target_furled := bool(furled)
+	if sail_furled == target_furled:
+		_sync_mast_fold_after_sail_deployment()
+		return
+	sail_furled = target_furled
+	if not sail_furled:
+		_sync_mast_fold_with_sail_furl()
+
+
+func is_sail_furled() -> bool:
+	return sail_furled
+
+
+func get_effective_sail_deployment() -> float:
+	var residual_drive := clampf(furled_sail_drive_ratio, 0.0, 1.0)
+	if _is_boarding_sail_behavior_enabled():
+		residual_drive = clampf(boarding_furled_drive_ratio, 0.0, 1.0)
+	var deployed := clampf(sail_deployed_ratio, 0.0, 1.0)
+	return clampf(lerpf(residual_drive, 1.0, deployed), 0.0, 1.0)
+
+
+func _update_boarding_sail_furl(delta: float) -> void:
+	if not _is_boarding_sail_behavior_enabled():
+		if sail_deployed_ratio < 0.999 or are_masts_folded():
+			_update_sail_deployment(delta)
+		return
+	if is_derelict or is_sinking or is_dying:
+		return
+	if not is_instance_valid(target):
+		set_sail_furled(false)
+		_update_sail_deployment(delta)
+		return
+	var distance_to_target := global_position.distance_to(target.global_position)
+	if distance_to_target <= boarding_sail_furl_distance:
+		_boarding_sail_unfurl_timer = 0.0
+		set_sail_furled(true)
+	elif distance_to_target >= maxf(boarding_sail_unfurl_distance, boarding_sail_furl_distance + 1.0):
+		_boarding_sail_unfurl_timer += delta
+		if _boarding_sail_unfurl_timer >= boarding_sail_unfurl_delay:
+			set_sail_furled(false)
+	else:
+		_boarding_sail_unfurl_timer = 0.0
+	_update_sail_deployment(delta)
+
+
+func _is_boarding_sail_behavior_enabled() -> bool:
+	if not boarding_sail_furl_enabled:
+		return false
+	if get_team_tag() != "enemy":
+		return false
+	if not allow_boarding or is_gunner_role():
+		return false
+	var type_lower := ship_type.strip_edges().to_lower()
+	return type_lower.contains("sekibune") and not type_lower.contains("cannon") and not type_lower.contains("gunner")
+
+
+func _update_sail_deployment(delta: float) -> void:
+	var target_ratio := _get_target_sail_deployment_ratio()
+	sail_deployed_ratio = move_toward(
+		clampf(sail_deployed_ratio, 0.0, 1.0),
+		target_ratio,
+		maxf(sail_furl_rate, 0.01) * delta
+	)
+	_sync_mast_fold_after_sail_deployment()
+
+
+func _sync_mast_fold_with_sail_furl(immediate: bool = false) -> void:
+	if mast_fold_pivots.is_empty():
+		return
+	set_masts_folded(sail_furled, immediate)
+
+
+func _sync_mast_fold_after_sail_deployment() -> void:
+	if mast_fold_pivots.is_empty():
+		return
+	if sail_furled:
+		if sail_deployed_ratio <= 0.001 and not are_masts_folded():
+			set_masts_folded(true)
+		return
+	if are_masts_folded():
+		set_masts_folded(false)
+
+
+func _get_target_sail_deployment_ratio() -> float:
+	if sail_furled:
+		return 0.0
+	if mast_fold_pivots.is_empty():
+		return 1.0
+	if get_mast_fold_ratio() > 0.001:
+		return 0.0
+	return 1.0
 
 ## 동양식 노(Ro/Yuloh) 8자 젓기 애니메이션
 func _update_oar_visual(delta: float) -> void:
@@ -1011,10 +1127,10 @@ func _process_minion_ai(delta: float) -> void:
 	var profile_start := PhysicsProfiler.begin()
 	var tick_delta := _consume_minion_ai_delta(delta)
 	if tick_delta <= 0.0:
-		_update_minion_ai_idle_visuals()
+		ChaserShipMinionHelper.continue_minion_motion(self, delta)
 		PhysicsProfiler.end("support_minion_ai", profile_start)
 		return
-	ChaserShipMinionHelper.process_minion_ai(self, tick_delta)
+	ChaserShipMinionHelper.process_minion_ai(self, tick_delta, delta)
 	PhysicsProfiler.end("support_minion_ai", profile_start)
 
 

@@ -23,6 +23,7 @@ const SHIP_SINK_BUBBLES_VOLUME_DB := -1.5
 const SHIP_SINK_BUBBLES_PITCH_MIN := 0.94
 const SHIP_SINK_BUBBLES_PITCH_MAX := 1.06
 const RUNTIME_GENERATED_HULL_META := "runtime_generated_hull"
+const CREW_RANGED_COVER_BASE_DEFENSE_META := "crew_ranged_cover_base_defense"
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -531,6 +532,8 @@ func load_ship_stats(type_name: String) -> Dictionary:
 		ramming_damage_multiplier = maxf(0.1, float(stats["ramming_damage_multiplier"]))
 	if stats.has("ramming_knockback_multiplier"):
 		ramming_knockback_multiplier = clampf(float(stats["ramming_knockback_multiplier"]), 0.0, 3.0)
+	if stats.has("crew_ranged_cover_defense"):
+		set_meta(CREW_RANGED_COVER_BASE_DEFENSE_META, maxf(0.0, float(stats["crew_ranged_cover_defense"])))
 	
 	return stats
 

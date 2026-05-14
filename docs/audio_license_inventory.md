@@ -19,6 +19,9 @@ Status: project-local provenance not found. Each asset below needs source/licens
 | `assets/audio/sfx/click5.ogg` | UNVERIFIED |  |  | Not currently mapped in `AudioManager` |
 | `assets/audio/sfx/sfx_ballistic_death_01.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_ballistic_death_02.ogg` | UNVERIFIED |  |  |  |
+| `assets/audio/music/bgm_gameplay_tea_tyme.ogg` | UNVERIFIED | https://freesound.org/people/evanjones4/sounds/346899/ |  | User-supplied AIFF converted to Ogg Vorbis for gameplay music test |
+| `assets/audio/music/bgm_boss_taiko_drumloop_120_cc0.ogg` | VERIFIED | https://freesound.org/people/Xinematix/sounds/491277/ | CC0 | User-supplied source; converted from WAV to Ogg Vorbis for boss combat music |
+| `assets/audio/music/bgm_boss_tribe_drum_loop_cc0.ogg` | VERIFIED | https://freesound.org/people/PearceWilsonKing/sounds/342465/ | CC0 | User-supplied source; converted from WAV to Ogg Vorbis for boss combat music |
 | `assets/audio/music/bgm_boss_taiko_loop_cc0.ogg` | VERIFIED | https://freesound.org/people/infinita08/sounds/459561/ | CC0 | User-supplied source; converted from MP3 to Ogg Vorbis for looping boss combat music |
 | `assets/audio/sfx/sfx_bow_01.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_bow_02.ogg` | UNVERIFIED |  |  |  |
@@ -33,7 +36,7 @@ Status: project-local provenance not found. Each asset below needs source/licens
 | `assets/audio/sfx/sfx_heavy_missle_impact.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_levelup.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_match_sizzle.ogg` | UNVERIFIED |  |  |  |
-| `assets/audio/sfx/sfx_metal_drop.mp3` | UNVERIFIED |  |  |  |
+| `assets/audio/sfx/sfx_metal_drop.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_musket_fire.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_musket_fire_02.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_oars.ogg` | UNVERIFIED |  |  |  |

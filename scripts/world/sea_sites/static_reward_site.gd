@@ -16,10 +16,12 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 @export var completed_label: String = "탐색 완료"
 @export var waterline_y: float = 0.0
 @export var lock_to_waterline: bool = true
+@export_range(0.05, 1.5, 0.05) var collection_fade_duration: float = 0.45
 
 var is_collected: bool = false
 var _target_player: Node3D = null
 var _hint_label: Label3D = null
+var _fade_tween: Tween = null
 
 
 func _ready() -> void:
@@ -86,6 +88,7 @@ func _collect(_player_ship: Node3D) -> void:
 	if is_instance_valid(label):
 		label.text = completed_label
 		label.modulate = Color(0.72, 1.0, 0.72, 0.0)
+	_hide_after_collection()
 
 
 func _apply_site_reward(player_ship: Node3D) -> bool:
@@ -153,6 +156,10 @@ func _ensure_hint_label() -> Label3D:
 
 
 func _update_hint_visibility() -> void:
+	if is_collected:
+		if is_instance_valid(_hint_label):
+			_hint_label.visible = false
+		return
 	var label := _ensure_hint_label()
 	if not is_instance_valid(label):
 		return
@@ -163,9 +170,60 @@ func _update_hint_visibility() -> void:
 	var flat_self := Vector3(global_position.x, 0.0, global_position.z)
 	var flat_player := Vector3(player.global_position.x, 0.0, player.global_position.z)
 	var dist := flat_self.distance_to(flat_player)
-	var fade_start := interaction_range if not is_collected else interaction_range * 0.6
+	var fade_start := interaction_range
 	var alpha := clampf(1.0 - ((dist - fade_start) / maxf(1.0, hint_range - fade_start)), 0.0, 1.0)
 	label.visible = alpha > 0.05
-	label.text = completed_label if is_collected else site_label
-	var color := Color(0.72, 1.0, 0.72, alpha * 0.75) if is_collected else Color(1.0, 0.92, 0.45, alpha)
-	label.modulate = color
+	label.text = site_label
+	label.modulate = Color(1.0, 0.92, 0.45, alpha)
+
+
+func _hide_after_collection() -> void:
+	monitoring = false
+	monitorable = false
+	remove_from_group("sea_site")
+	remove_from_group("static_reward_site")
+	set_physics_process(false)
+	_disable_collision_shapes(self)
+	if is_instance_valid(_hint_label):
+		_hint_label.visible = false
+	_play_collection_fade()
+
+
+func _play_collection_fade() -> void:
+	if is_instance_valid(_fade_tween):
+		_fade_tween.kill()
+	var fade_targets := _collect_fade_targets(self)
+	if fade_targets.is_empty():
+		visible = false
+		return
+	_fade_tween = create_tween()
+	_fade_tween.set_parallel(true)
+	for target in fade_targets:
+		if target is GeometryInstance3D:
+			var geometry := target as GeometryInstance3D
+			geometry.transparency = 0.0
+			_fade_tween.tween_property(geometry, "transparency", 1.0, collection_fade_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	var visual_root := get_node_or_null("Visual") as Node3D
+	if is_instance_valid(visual_root):
+		_fade_tween.tween_property(visual_root, "scale", visual_root.scale * 0.92, collection_fade_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_fade_tween.chain().tween_callback(func() -> void:
+		visible = false
+	)
+
+
+func _collect_fade_targets(root: Node) -> Array[Node]:
+	var result: Array[Node] = []
+	for child in root.get_children():
+		if child is GeometryInstance3D:
+			result.append(child)
+		result.append_array(_collect_fade_targets(child))
+	return result
+
+
+func _disable_collision_shapes(root: Node) -> void:
+	for child in root.get_children():
+		if child is CollisionShape3D:
+			(child as CollisionShape3D).disabled = true
+		elif child is CollisionPolygon3D:
+			(child as CollisionPolygon3D).disabled = true
+		_disable_collision_shapes(child)

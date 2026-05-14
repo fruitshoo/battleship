@@ -24,6 +24,7 @@ static func run_save_contract_smoke(failures: Array[String]) -> void:
 			"fullscreen": false,
 			"screen_edge_fx_enabled": true,
 			"screen_edge_fx_strength": 0.42,
+			"sail_control_mode": "auto",
 		},
 	}
 
@@ -67,7 +68,7 @@ static func _capture_save_manager_state() -> Dictionary:
 
 static func _capture_settings_snapshot() -> Dictionary:
 	var snapshot: Dictionary = {}
-	for key in ["master_volume", "music_volume", "sfx_volume", "ui_volume", "fullscreen", "screen_edge_fx_enabled", "screen_edge_fx_strength"]:
+	for key in ["master_volume", "music_volume", "sfx_volume", "ui_volume", "fullscreen", "screen_edge_fx_enabled", "screen_edge_fx_strength", "sail_control_mode"]:
 		snapshot[key] = SaveManager.get_setting(key)
 	return snapshot
 

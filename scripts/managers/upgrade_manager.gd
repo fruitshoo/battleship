@@ -21,6 +21,7 @@ var ITEMS = {}
 
 const DATA_PATH = "res://data/upgrades.json"
 const ITEM_DATA_DIR = "res://resources/items"
+const ITEM_SYSTEM_ENABLED := false
 
 
 # 현재 업그레이드 레벨 추적
@@ -170,6 +171,9 @@ func equip_owned_items() -> void:
 
 func refresh_hud_item_icons() -> void:
 	UpgradeManagerItemHelper.refresh_hud_item_icons(self)
+
+func is_item_system_enabled() -> bool:
+	return ITEM_SYSTEM_ENABLED
 
 func get_ship_upgrade_choices(count: int = 3) -> Array:
 	return UpgradeManagerChoiceHelper.build_ship_upgrade_choices(
@@ -476,7 +480,7 @@ func _apply_crew_numbers(ship: Node3D, level: int) -> void:
 		_apply_current_stats_to_soldier(sol)
 	var stats: Dictionary = UPGRADES["crew_numbers"].get("stats", {})
 	var spear_bonus_pct := float(level) * float(stats.get("damage_bonus_pct_per_lv", 0.06)) * 100.0
-	print("[CrewFormation] 창병 Lv.%d 갱신! (창 피해 +%.0f%%, 정원: %d)" % [
+	print("[CrewFormation] 장창 Lv.%d 갱신! (장창 피해 +%.0f%%, 정원: %d)" % [
 		level,
 		spear_bonus_pct,
 		ship.max_crew_count,
@@ -617,11 +621,18 @@ func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 	var def_lv = current_levels.get("hull_defense", 0)
 	var s = UPGRADES["hull_defense"]["stats"]
 	if "hull_defense" in ship:
+		var base_defense: float
+		if ship.has_meta("base_player_hull_defense"):
+			base_defense = float(ship.get_meta("base_player_hull_defense"))
+		else:
+			base_defense = float(ship.hull_defense)
+			ship.set_meta("base_player_hull_defense", base_defense)
 		var defense_bonus := 0.0
 		for level_entry in s.get("def_levels", []):
 			if int(level_entry) <= def_lv:
 				defense_bonus += float(s.get("def_add", 2.0))
-		ship.hull_defense = defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
+		ship.hull_defense = base_defense + defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
+	ship.set_meta("crew_ranged_cover_defense_bonus", float(def_lv) * float(s.get("crew_ranged_cover_defense_add_per_lv", 0.4)))
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.hull_hp, ship.max_hull_hp)
 
@@ -752,6 +763,17 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 		ship.ramming_damage_multiplier = geobuk_ram_mult * (1.0 + float(hull_stats.get("ramming_damage_pct_per_lv", 0.07)) * float(hull_level))
 	if "ramming_knockback_multiplier" in ship:
 		ship.ramming_knockback_multiplier = clampf(float(stats.get("ramming_knockback_multiplier", 1.0)), 0.0, 3.0)
+	if "hull_defense" in ship:
+		var geobuk_base_defense := maxf(0.0, float(stats.get("hull_defense", 2.0)))
+		ship.set_meta("base_player_hull_defense", geobuk_base_defense)
+		var def_stats: Dictionary = UPGRADES.get("hull_defense", {}).get("stats", {})
+		var def_level := int(current_levels.get("hull_defense", 0))
+		var defense_bonus := 0.0
+		for level_entry in def_stats.get("def_levels", []):
+			if int(level_entry) <= def_level:
+				defense_bonus += float(def_stats.get("def_add", 1.0))
+		ship.hull_defense = geobuk_base_defense + defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
+	ship.set_meta("crew_ranged_cover_base_defense", maxf(0.0, float(stats.get("crew_ranged_cover_defense", 3.0))))
 
 	_swap_player_hull_scene(ship, hull_scene_to_apply, "GeobukseonHull")
 	if ship.has_method("_cache_hull_references"):
@@ -1035,16 +1057,11 @@ func _apply_repeating_crossbow(ship: Node3D, level: int) -> void:
 func _apply_supply(ship: Node3D, _level: int) -> void:
 	var s = UPGRADES["supply"]["stats"]
 	var hull_heal: float = float(s.get("hull_heal", 20.0))
-	var stamina_recover: float = float(s.get("stamina_recover", 25.0))
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.max_hull_hp, ship.hull_hp + hull_heal)
-	if "rowing_stamina" in ship and "max_rowing_stamina" in ship:
-		ship.rowing_stamina = minf(ship.max_rowing_stamina, ship.rowing_stamina + stamina_recover)
-	print("[Supply] 보급! HP: %.0f / %.0f | ST: %.0f / %.0f" % [
+	print("[Supply] 보급! HP: %.0f / %.0f" % [
 		ship.hull_hp,
 		ship.max_hull_hp,
-		ship.rowing_stamina,
-		ship.max_rowing_stamina,
 	])
 	
 	# HUD 업데이트
@@ -1142,9 +1159,13 @@ func _apply_item_to_ship(item_id: String, ship: Node3D) -> void:
 
 
 func add_item(item_id: String) -> void:
+	if not ITEM_SYSTEM_ENABLED:
+		return
 	UpgradeManagerItemHelper.add_item(self, item_id)
 
 func grant_final_boss_item() -> void:
+	if not ITEM_SYSTEM_ENABLED:
+		return
 	if acquired_items.has("choyogi") == false:
 		add_item("choyogi")
 		return
@@ -1258,6 +1279,7 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 			if int(level_entry) <= lv:
 				defense_bonus += float(s.get("def_add", 2.0))
 		ship.hull_defense = base_defense + defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
+		ship.set_meta("crew_ranged_cover_defense_bonus", float(lv) * float(s.get("crew_ranged_cover_defense_add_per_lv", 0.4)))
 
 	if "hull_regen_rate" in ship:
 		var repair_lv: int = int(current_levels.get("hull_repair", 0))
@@ -1274,8 +1296,6 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 		)
 		regen_bonus += SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_regen_add")
 		ship.hull_regen_rate = base_regen + regen_bonus
-
-	ship.set_meta("crew_ranged_damage_reduction", 0.0)
 
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(float(ship.hull_hp), float(ship.max_hull_hp))

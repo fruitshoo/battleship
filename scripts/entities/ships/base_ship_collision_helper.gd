@@ -36,6 +36,11 @@ const RAMMING_KNOCKBACK_MIN_FORWARD_DOT := 0.55
 const RAMMING_KNOCKBACK_BASE_SPEED := 2.6
 const RAMMING_KNOCKBACK_SPEED_SCALE := 0.42
 const RAMMING_KNOCKBACK_MAX_SPEED := 7.2
+const RAMMING_DAMAGE_SPEED_SCALE := 4.2
+const RAMMING_DAMAGE_SIDE_HIT_MULT := 1.35
+const RAMMING_DAMAGE_BOW_HIT_MULT := 0.55
+const RAMMING_DAMAGE_ATTACKER_MIN_ALIGNMENT_MULT := 0.75
+const RAMMING_DAMAGE_ATTACKER_MAX_ALIGNMENT_MULT := 1.22
 const HEAD_ON_ESCAPE_RUDDER_DEADZONE := 5.0
 const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
 
@@ -726,16 +731,24 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	var my_fwd = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y)).normalized()
 	var dir_to_other = (other.global_position - ship.global_position).normalized()
 	var dot = abs(my_fwd.dot(dir_to_other))
-	var other_dot = 1.0
-	if other.has_method("get_rotation"):
-		var other_fwd = Vector3(-sin(other.rotation.y), 0, -cos(other.rotation.y)).normalized()
-		other_dot = abs(other_fwd.dot(-dir_to_other))
 
-	var angle_mult = remap(dot, 0.0, 1.0, 1.25, 0.30)
+	var angle_mult = remap(dot, 0.0, 1.0, RAMMING_DAMAGE_SIDE_HIT_MULT, RAMMING_DAMAGE_BOW_HIT_MULT)
+	var attacker_alignment_mult := 1.0
+	if is_instance_valid(other):
+		var attacker_fwd := -other.global_transform.basis.z
+		attacker_fwd.y = 0.0
+		if attacker_fwd.length_squared() > 0.0001:
+			attacker_fwd = attacker_fwd.normalized()
+			var attacker_alignment := maxf(0.0, attacker_fwd.dot(-dir_to_other))
+			attacker_alignment_mult = lerpf(
+				RAMMING_DAMAGE_ATTACKER_MIN_ALIGNMENT_MULT,
+				RAMMING_DAMAGE_ATTACKER_MAX_ALIGNMENT_MULT,
+				smoothstep(0.25, 0.95, attacker_alignment)
+			)
 	var attacker_ram_mult := 1.0
 	if is_instance_valid(other) and other.get("ramming_damage_multiplier") != null:
 		attacker_ram_mult = maxf(0.1, float(other.get("ramming_damage_multiplier")))
-	var final_ram_damage = impact_speed * 3.2 * angle_mult * attacker_ram_mult
+	var final_ram_damage = impact_speed * RAMMING_DAMAGE_SPEED_SCALE * angle_mult * attacker_alignment_mult * attacker_ram_mult
 
 	var impact_pos = (ship.global_position + other.global_position) * 0.5
 	impact_pos.y = 0.5
@@ -751,7 +764,7 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	ship.apply_ramming_aoe(clamp(impact_speed * 1.5, 5.0, 20.0), impact_pos)
 
 	if ship.DEBUG_COMBAT_LOGS:
-		print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, final_ram_damage])
+		print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f, 공격 정렬: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, attacker_alignment_mult, final_ram_damage])
 	ship.take_damage(final_ram_damage, (ship.global_position + other.global_position) * 0.5, "ramming")
 	_apply_ramming_knockback(ship, other, impact_speed, dir_to_other)
 

@@ -156,7 +156,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "활 공격 %.0f%% | 대병 %.0f | %s | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, knockback_note, float(proc_stats.get("cooldown", 1.0))]
 		"crew_numbers":
 			var damage_bonus_pct := float(next_level) * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0
-			return "전 병사 창 장비 | 창 피해 +%.0f%%" % damage_bonus_pct
+			return "장창 피해 +%.0f%%" % damage_bonus_pct
 		"crew_reserve":
 			var assist_duration: float = maxf(float(s.get("min_assist_channel_duration", 0.55)), float(s.get("base_assist_channel_duration", 1.1)) - (float(next_level) * float(s.get("assist_channel_reduce_per_lv", 0.1))))
 			var assist_health_ratio: float = clampf(0.35 + (float(next_level) * float(s.get("assist_recovery_health_add_per_lv", 0.07))), 0.35, float(s.get("max_assist_recovery_health_ratio", 0.7)))
@@ -205,12 +205,6 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				rowing_parts.append("노젓기 가속 +%d%%" % int(round((float(s.get("accel_mult", 1.2)) - 1.0) * 100.0)))
 			if not rowing_parts.is_empty():
 				return " | ".join(rowing_parts)
-			if level_matches(next_level, s.get("stamina_add_levels", [])):
-				return "최대 스태미나 +%d" % int(s.get("stamina_add", 25.0))
-			if level_matches(next_level, s.get("drain_levels", [])):
-				return "스태미나 소모 -%d%%" % int(round((1.0 - float(s.get("drain_mult", 0.8))) * 100.0))
-			if level_matches(next_level, s.get("recovery_levels", [])):
-				return "스태미나 회복 +%d%%" % int(round((float(s.get("recovery_mult", 1.25)) - 1.0) * 100.0))
 			return "노 운용 성능 향상"
 		"fire_pot":
 			var throwers: int = get_specialist_unit_count(upgrades, current_levels, "fire_pot", next_level)
@@ -250,7 +244,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var geobukseon_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades)
 			return "거북선 방호함 1척 합류 | 도선 면역 | %s | 편성 %s" % [format_ramming_stat_text(s, 1.12, 0.72), geobukseon_summary]
 		"supply":
-			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(s.get("hull_heal", 20)), int(s.get("stamina_recover", 25))]
+			return "선체 회복 +%d" % int(s.get("hull_heal", 20))
 		"gold":
 			return "골드 +%d" % int(s.get("score_add", 50))
 

@@ -32,11 +32,12 @@ Recommendation:
 - keep `shield_albedo.png` as canonical
 - consider archiving or removing the other four after confirming they are not needed for future GLB reimport workflow
 
-### Mast / yardarm / sail mast textures
+### Yardarm / sail mast textures
 
-All of the following are identical `1024x1024` PNGs at about `1.68 MB` each:
+The old mast GLB was re-exported with embedded material colors, so
+`assets/models/props/mast/mast_mast_albedo.png` is no longer required.
+The remaining duplicated rig textures are identical `1024x1024` PNGs at about `1.68 MB` each:
 
-- `assets/models/props/mast/mast_mast_albedo.png`
 - `assets/models/props/yardarm/yardarm_mast_albedo.png`
 - `assets/models/props/sail/sail_mast_albedo.png`
 

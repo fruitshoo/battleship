@@ -20,7 +20,7 @@ var UPGRADES = {
 		"name": "최대 체력",
 		"description": "선체 +12",
 		"category": "ship",
-		"card_art_path": "res://assets/ui/upgrades/panokseon_upgrade_card.png",
+		"card_art_path": "res://assets/ui/upgrades/hull_card.png",
 		"base_cost": 180,
 		"cost_multiplier": 1.32,
 		"max_level": 8
@@ -29,7 +29,7 @@ var UPGRADES = {
 		"name": "방어력",
 		"description": "방어력 +0.4",
 		"category": "ship",
-		"card_art_path": "res://assets/ui/upgrades/boarding_resist_card.png",
+		"card_art_path": "res://assets/ui/upgrades/hull_defense_card.png",
 		"base_cost": 220,
 		"cost_multiplier": 1.34,
 		"max_level": 8
@@ -71,6 +71,7 @@ var UPGRADES = {
 		"name": "병사 수",
 		"description": "병사 +1",
 		"category": "crew",
+		"card_art_path": "res://assets/ui/upgrades/jangchang_card.png",
 		"base_cost": 1000,
 		"cost_multiplier": 1.0,
 		"max_level": 1
@@ -79,6 +80,7 @@ var UPGRADES = {
 		"name": "병사 체력",
 		"description": "체력 +2%",
 		"category": "crew",
+		"card_art_path": "res://assets/ui/upgrades/crew_defense_card.png",
 		"base_cost": 220,
 		"cost_multiplier": 1.34,
 		"max_level": 8
@@ -87,6 +89,7 @@ var UPGRADES = {
 		"name": "무기",
 		"description": "병사 무기 피해 +1.5%",
 		"category": "crew",
+		"card_art_path": "res://assets/ui/upgrades/jangchang_card.png",
 		"base_cost": 220,
 		"cost_multiplier": 1.35,
 		"max_level": 8

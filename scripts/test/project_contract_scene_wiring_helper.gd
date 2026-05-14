@@ -231,6 +231,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	await _run_support_ship_spawn_template_contract(owner, failures, wait_frames_after_attach)
 	_run_ship_ally_role_contract(failures)
 	_run_hull_authoring_marker_contract(failures)
+	_run_enemy_boarding_sail_ai_contract(failures)
 	_run_ship_blueprint_weapon_loadout_contract(failures)
 	_run_level_progression_contract(failures)
 	_run_enemy_spawn_rules_contract(failures)
@@ -422,23 +423,18 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		player_ship.set("rowing_stamina", 0.0)
 		player_ship.set("current_speed", 0.0)
 		player_ship.call("_update_movement", 0.1)
-		var exhausted_rowing_speed := float(player_ship.get("current_speed"))
-		if exhausted_rowing_speed >= open_rowing_speed * 0.55:
-			failures.append("exhausted rowing should feel clearly slower than stamina rowing")
+		var unlocked_rowing_speed := float(player_ship.get("current_speed"))
+		if unlocked_rowing_speed <= open_rowing_speed * 0.9:
+			failures.append("rowing should ignore stale stamina locks")
+		player_ship.set("max_rowing_stamina", 100.0)
+		player_ship.set("rowing_locked", true)
+		player_ship.set("rowing_stamina", 10.0)
+		player_ship.call("_update_rowing_stamina", 1.0)
+		if player_ship.get("rowing_locked") == true:
+			failures.append("rowing stamina update should clear stale stamina locks")
+		if float(player_ship.get("rowing_stamina")) < float(player_ship.get("max_rowing_stamina")):
+			failures.append("rowing stamina should stay full while the stamina system is disabled")
 		player_ship.set("rowing_locked", false)
-
-		player_ship.set("stamina_drain_rate", 10.0)
-		player_ship.call("set_rowing", true, 1)
-		player_ship.call("set_sail_furled", true)
-		player_ship.set("rowing_stamina", 100.0)
-		player_ship.call("_update_rowing_stamina", 1.0)
-		var furled_stamina_loss := 100.0 - float(player_ship.get("rowing_stamina"))
-		player_ship.call("set_sail_furled", false)
-		player_ship.set("rowing_stamina", 100.0)
-		player_ship.call("_update_rowing_stamina", 1.0)
-		var open_stamina_loss := 100.0 - float(player_ship.get("rowing_stamina"))
-		if furled_stamina_loss >= open_stamina_loss:
-			failures.append("furled sail should reduce rowing stamina cost")
 
 		player_ship.set("burn_hull_damage_per_second", 10.0)
 		player_ship.set("hull_hp", 100.0)
@@ -1096,6 +1092,8 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 			"large_crew": false,
 			"oars_left": 2,
 			"oars_right": 2,
+			"mast_fold_pivots": 1,
+			"mast_fold_angle_degrees": 90.0,
 		},
 	]
 
@@ -1145,8 +1143,48 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 				failures.append("%s should expose at least %d right oar bases, got %d" % [label, expected_right_oars, right_oars])
 		_expect_authoring_visualizer(hull_root, label, failures)
 		_expect_authoring_marker_layout(hull_root, label, failures)
+		if check.has("mast_fold_pivots"):
+			_expect_mast_fold_pivots(hull_root, label, int(check["mast_fold_pivots"]), float(check.get("mast_fold_angle_degrees", 0.0)), failures)
 		_expect_runtime_authoring_visuals_absent(hull_root, label, failures)
 		hull_root.free()
+
+
+static func _run_enemy_boarding_sail_ai_contract(failures: Array[String]) -> void:
+	var target := Node3D.new()
+	target.global_position = Vector3.ZERO
+
+	var boarder := ChaserShip.new()
+	boarder.ship_type = "sekibune_melee"
+	boarder.team = "enemy"
+	boarder.allow_boarding = true
+	boarder.combat_role = ChaserShip.CombatRole.CHARGER
+	boarder.target = target
+	boarder.global_position = Vector3(float(boarder.get("boarding_sail_furl_distance")) - 1.0, 0.0, 0.0)
+	boarder.call("_update_boarding_sail_furl", 0.25)
+	if boarder.get("sail_furled") != true:
+		failures.append("sekibune boarding AI should furl sails inside boarding approach range")
+	if float(boarder.call("get_effective_sail_deployment")) >= 1.0:
+		failures.append("sekibune boarding AI should reduce sail drive after furling starts")
+
+	boarder.global_position = Vector3(float(boarder.get("boarding_sail_unfurl_distance")) + 2.0, 0.0, 0.0)
+	boarder.call("_update_boarding_sail_furl", float(boarder.get("boarding_sail_unfurl_delay")) + 0.1)
+	if boarder.get("sail_furled") == true:
+		failures.append("sekibune boarding AI should unfurl after staying outside the reset range")
+
+	var gunner := ChaserShip.new()
+	gunner.ship_type = "sekibune_cannon"
+	gunner.team = "enemy"
+	gunner.allow_boarding = false
+	gunner.combat_role = ChaserShip.CombatRole.GUNNER
+	gunner.target = target
+	gunner.global_position = Vector3(float(gunner.get("boarding_sail_furl_distance")) - 1.0, 0.0, 0.0)
+	gunner.call("_update_boarding_sail_furl", 0.25)
+	if gunner.get("sail_furled") == true:
+		failures.append("sekibune cannon AI should not use boarding sail furl behavior")
+
+	boarder.free()
+	gunner.free()
+	target.free()
 
 
 static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String]) -> void:
@@ -1195,6 +1233,7 @@ static func _run_ship_blueprint_weapon_loadout_contract(failures: Array[String])
 			if int(boss_crew.get("daecheolpo", 0)) < 1:
 				failures.append("%s should carry daecheolpo crew" % boss_archetype_name)
 	_validate_geobukseon_support_contract(ship_archetypes, failures)
+	_validate_joseon_ranged_cover_contract(ship_archetypes, failures)
 	_validate_ship_blueprint_crew_contracts(all_stats, ship_archetypes, combat_profiles, failures)
 	for type_name_variant in all_stats.keys():
 		var type_name := str(type_name_variant)
@@ -1249,6 +1288,48 @@ static func _validate_geobukseon_support_contract(ship_archetypes: Dictionary, f
 		failures.append("geobukseon_support should expose exactly 2 split forward cannons, got %d" % front_cannon_count)
 	if cannon_count != 6:
 		failures.append("geobukseon_support should expose exactly 6 cannons, got %d" % cannon_count)
+
+
+static func _validate_joseon_ranged_cover_contract(ship_archetypes: Dictionary, failures: Array[String]) -> void:
+	var expected_cover := {
+		"maengseon_support": 1.0,
+		"panokseon_support": 2.0,
+		"panokseon_player_default": 2.0,
+		"geobukseon_support": 3.0,
+		"geobukseon_player_default": 3.0,
+	}
+	var expected_hull_defense := {
+		"maengseon_support": 0.0,
+		"panokseon_support": 1.0,
+		"panokseon_player_default": 1.0,
+		"geobukseon_support": 2.0,
+		"geobukseon_player_default": 2.0,
+	}
+	var expected_ramming_knockback := {
+		"maengseon_support": 0.5,
+		"panokseon_support": 1.0,
+		"panokseon_player_default": 1.0,
+		"geobukseon_support": 2.0,
+		"geobukseon_player_default": 2.0,
+	}
+	for archetype_id in expected_cover.keys():
+		var stats_variant: Variant = ship_archetypes.get(archetype_id, {})
+		if typeof(stats_variant) != TYPE_DICTIONARY:
+			failures.append("%s archetype missing for ranged cover contract" % archetype_id)
+			continue
+		var stats := stats_variant as Dictionary
+		var actual := float(stats.get("crew_ranged_cover_defense", -1.0))
+		var wanted := float(expected_cover[archetype_id])
+		if absf(actual - wanted) > 0.001:
+			failures.append("%s crew_ranged_cover_defense should be %.1f, got %.1f" % [archetype_id, wanted, actual])
+		var actual_hull_defense := float(stats.get("hull_defense", -1.0))
+		var wanted_hull_defense := float(expected_hull_defense[archetype_id])
+		if absf(actual_hull_defense - wanted_hull_defense) > 0.001:
+			failures.append("%s hull_defense should be %.1f, got %.1f" % [archetype_id, wanted_hull_defense, actual_hull_defense])
+		var actual_knockback := float(stats.get("ramming_knockback_multiplier", -1.0))
+		var wanted_knockback := float(expected_ramming_knockback[archetype_id])
+		if absf(actual_knockback - wanted_knockback) > 0.001:
+			failures.append("%s ramming_knockback_multiplier should be %.2f, got %.2f" % [archetype_id, wanted_knockback, actual_knockback])
 
 
 static func _validate_ship_blueprint_crew_contracts(all_stats: Dictionary, ship_archetypes: Dictionary, combat_profiles: Dictionary, failures: Array[String]) -> void:
@@ -1442,8 +1523,10 @@ static func _run_enemy_spawn_rules_contract(failures: Array[String]) -> void:
 					failures.append("enemy spawn rules final template should set final=true")
 				if not bool(template.get("stop_regular_spawns", false)):
 					failures.append("enemy spawn rules final template should stop regular spawns")
-				if final_boss_count < 1:
-					failures.append("enemy spawn rules final template should spawn at least one final boss")
+				if mid_boss_count < 4:
+					failures.append("enemy spawn rules final template should use a multi mid-boss fleet")
+				if final_boss_count > 0:
+					failures.append("enemy spawn rules final template should not depend on the placeholder final boss")
 
 	var boss_progression_variant: Variant = root.get(EnemySpawnerFleetHelper.BOSS_PROGRESSION, {})
 	if typeof(boss_progression_variant) != TYPE_DICTIONARY:
@@ -1474,8 +1557,8 @@ static func _run_enemy_spawn_rules_contract(failures: Array[String]) -> void:
 			failures.append("enemy spawn rules boss_progression.final_template should be non-empty")
 		elif not boss_template_final_counts.has(final_template):
 			failures.append("enemy spawn rules boss_progression.final_template unknown template: %s" % final_template)
-		elif int(boss_template_final_counts[final_template]) < 1:
-			failures.append("enemy spawn rules boss_progression.final_template should spawn a final boss")
+		elif int(boss_template_mid_counts.get(final_template, 0)) < 4:
+			failures.append("enemy spawn rules boss_progression.final_template should spawn a final mid-boss fleet")
 		if float(boss_progression.get("final_time", 0.0)) <= 0.0:
 			failures.append("enemy spawn rules boss_progression.final_time should be > 0")
 	var spawner_script := load("res://scripts/managers/enemy_spawner.gd") as Script
@@ -2659,6 +2742,26 @@ static func _expect_runtime_authoring_visuals_absent(root: Node, label: String, 
 	var visual_root := authoring.get_node_or_null("__AuthoringVisuals")
 	if is_instance_valid(visual_root):
 		failures.append("%s authoring visualizer should not instantiate editor visuals in runtime contract" % label)
+
+
+static func _expect_mast_fold_pivots(root: Node, label: String, expected_count: int, expected_angle_degrees: float, failures: Array[String]) -> void:
+	var pivots: Array[Node] = []
+	for node in root.find_children("MastPivot*", "Node3D", true, false):
+		if node.has_method("set_folded"):
+			pivots.append(node)
+	if pivots.size() != expected_count:
+		failures.append("%s should expose %d mast fold pivot(s), got %d" % [label, expected_count, pivots.size()])
+		return
+	for pivot in pivots:
+		var fold_axis_variant: Variant = pivot.get("fold_axis")
+		var fold_angle_variant: Variant = pivot.get("fold_angle_degrees")
+		if fold_axis_variant == null or int(fold_axis_variant) != 0:
+			failures.append("%s mast fold pivot should fold around local X axis: %s" % [label, pivot.name])
+		if fold_angle_variant == null or absf(float(fold_angle_variant) - expected_angle_degrees) > 0.1:
+			failures.append("%s mast fold pivot angle mismatch on %s: %s" % [label, pivot.name, str(fold_angle_variant)])
+		var stow_path := NodePath(pivot.get("stow_target_path"))
+		if str(stow_path).is_empty() or pivot.get_node_or_null(stow_path) == null:
+			failures.append("%s mast fold pivot should have a valid deck stow target: %s" % [label, pivot.name])
 
 
 static func _expect_authoring_marker_layout(root: Node, label: String, failures: Array[String]) -> void:

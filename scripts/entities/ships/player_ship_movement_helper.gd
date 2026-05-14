@@ -101,8 +101,8 @@ static func get_boarding_drag_multiplier(ship) -> float:
 
 static func update_movement(ship, delta: float) -> void:
 	var target_speed: float = calculate_sail_speed(ship)
-	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
-	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
+	var is_exhausted_rowing := false
+	var is_actively_rowing: bool = ship.is_rowing
 	var rowing_direction: int = _get_rowing_direction(ship)
 	var is_reverse_rowing: bool = (is_actively_rowing or is_exhausted_rowing) and rowing_direction < 0
 	var rowing_efficiency: float = get_furled_sail_rowing_efficiency_multiplier(ship)
@@ -292,8 +292,8 @@ static func update_oar_visual(ship, delta: float) -> void:
 	var right_oars := _get_oar_pivots(ship, false)
 	if left_oars.is_empty() and right_oars.is_empty():
 		return
-	var is_exhausted_rowing: bool = ship.is_rowing and ship.rowing_locked
-	var is_actively_rowing: bool = ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0.0
+	var is_exhausted_rowing := false
+	var is_actively_rowing: bool = ship.is_rowing
 	var is_moving_fast: bool = absf(ship.current_speed) > 1.0
 	if is_actively_rowing or is_exhausted_rowing or is_moving_fast:
 		var row_speed = 2.2 if is_actively_rowing else (1.45 if is_exhausted_rowing else 1.2)
@@ -336,15 +336,6 @@ static func _relax_oar_pivot(pivot: Node3D, delta: float) -> void:
 	pivot.rotation.y = lerp_angle(pivot.rotation.y, 0.0, delta * 2.0)
 	pivot.rotation.z = lerp_angle(pivot.rotation.z, 0.0, delta * 2.0)
 
-static func update_rowing_stamina(ship, delta: float) -> void:
-	if ship.is_rowing and not ship.rowing_locked and ship.rowing_stamina > 0:
-		var reverse_cost_mult := float(ship.reverse_rowing_stamina_cost_mult) if _get_rowing_direction(ship) < 0 and "reverse_rowing_stamina_cost_mult" in ship else 1.0
-		ship.rowing_stamina -= ship.stamina_drain_rate * get_furled_sail_rowing_stamina_cost_multiplier(ship) * reverse_cost_mult * delta
-		ship.rowing_stamina = max(0.0, ship.rowing_stamina)
-		if ship.rowing_stamina <= 0:
-			ship.rowing_locked = true
-	if ship.rowing_stamina < ship.max_rowing_stamina and (not ship.is_rowing or ship.rowing_locked):
-		ship.rowing_stamina += ship.stamina_recovery_rate * delta
-		ship.rowing_stamina = min(ship.max_rowing_stamina, ship.rowing_stamina)
-		if ship.rowing_locked and ship.rowing_stamina > 0.0:
-			ship.rowing_locked = false
+static func update_rowing_stamina(ship, _delta: float) -> void:
+	ship.rowing_locked = false
+	ship.rowing_stamina = ship.max_rowing_stamina

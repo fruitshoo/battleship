@@ -18,9 +18,9 @@ func _ready() -> void:
 	z_index = 400
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	offset_left = -180.0
-	offset_top = 54.0
+	offset_top = 58.0
 	offset_right = 180.0
-	offset_bottom = 150.0
+	offset_bottom = 124.0
 
 	var panel_style = NavalUiTheme.make_panel_style(NavalUiTheme.PANEL_BG, NavalUiTheme.BORDER_GOLD, 12, 2, 18.0, 16.0, 18.0, 16.0)
 	add_theme_stylebox_override("panel", panel_style)
@@ -34,7 +34,8 @@ func _ready() -> void:
 	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_body(subtitle_label, 14)
-	subtitle_label.text = "함선이 침몰했습니다. 항구로 복귀합니다."
+	subtitle_label.text = ""
+	subtitle_label.visible = false
 	vbox.add_child(subtitle_label)
 
 	return_button = Button.new()
@@ -69,6 +70,7 @@ func show_overlay(subtitle: String, countdown: float, button_text: String = "메
 	_button_text = button_text
 	if subtitle_label:
 		subtitle_label.text = subtitle
+		subtitle_label.visible = false
 	_update_button_text()
 	visible = true
 	modulate.a = 0.0

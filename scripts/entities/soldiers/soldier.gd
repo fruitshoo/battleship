@@ -39,6 +39,7 @@ const EXTERNAL_KNOCKBACK_DECK_MARGIN: float = 0.18
 const EXTERNAL_KNOCKBACK_SNAP_DURATION: float = 0.07
 const EXTERNAL_KNOCKBACK_SNAP_MULTIPLIER: float = 1.22
 const META_OVERBOARD_KNOCKBACK_VOICE_PLAYED := "overboard_knockback_voice_played"
+const META_OWNED_SHIP_CHANGED_MSEC := "owned_ship_changed_msec"
 const SFX_OVERBOARD_KNOCKBACK_DEATH := "ballistic_death"
 const NODE_HAND_PIVOT := "HandPivot"
 const NODE_BODY_COLLISION_SHAPE := "CollisionShape3D"
@@ -119,6 +120,7 @@ var owned_ship: Node3D:
 		if is_inside_tree():
 			EntityRegistry.move_soldier_ship(self, previous_ship, _owned_ship)
 		if previous_ship != _owned_ship:
+			set_meta(META_OWNED_SHIP_CHANGED_MSEC, Time.get_ticks_msec())
 			notify_ai_event("owned_ship_changed")
 			_notify_ship_deck_ai_event(previous_ship, "crew_changed")
 			_notify_ship_deck_ai_event(_owned_ship, "crew_changed")
@@ -460,8 +462,6 @@ func _get_selected_soldier_visual_scene() -> PackedScene:
 
 func _on_upgrade_applied(upgrade_id: String, _new_level: int) -> void:
 	if upgrade_id in ["crew_numbers", "crew_attack", "crew_defense"]:
-		if upgrade_id == "crew_numbers":
-			_apply_role_loadout()
 		_update_weapon_stats()
 
 ## 무기 공격력 수치 동기화

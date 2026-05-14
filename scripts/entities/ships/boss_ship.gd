@@ -655,6 +655,7 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 
 func die() -> void:
 	if is_dying: return
+	BaseShipStatusHelper.clear_fire_effect(self)
 	is_dying = true
 	if is_instance_valid(cached_lm) and cached_lm.has_method("update_boss_hp"):
 		cached_lm.update_boss_hp(0.0, max_hull_hp)

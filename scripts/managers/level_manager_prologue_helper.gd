@@ -5,6 +5,7 @@ const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 const ENV_SKIP_KEY := "BATTLESHIP_SKIP_PROLOGUE"
 const FADE_OUT_SECONDS := 0.75
+const SKIP_FADE_OUT_SECONDS := 0.28
 
 static func should_prepare(lm: Node) -> bool:
 	if not bool(lm.prologue_enabled):
@@ -63,7 +64,7 @@ static func complete(lm: Node, skipped: bool) -> void:
 	lm._prologue_active = false
 	lm._prologue_pending = false
 	if skipped:
-		_remove_notice_layer(lm)
+		_fade_out_notice_layer(lm, SKIP_FADE_OUT_SECONDS)
 	else:
 		_fade_out_notice_layer(lm)
 
@@ -128,14 +129,18 @@ static func _show_final_notice(lm: Node, text: String) -> void:
 	)
 
 
-static func _fade_out_notice_layer(lm: Node) -> void:
+static func _fade_out_notice_layer(lm: Node, duration: float = FADE_OUT_SECONDS) -> void:
 	if not is_instance_valid(lm._prologue_notice_layer):
 		return
 	var layer: CanvasLayer = lm._prologue_notice_layer
+	var label: Label = lm._prologue_notice_label
 	lm._prologue_notice_layer = null
 	lm._prologue_notice_label = null
+	if not is_instance_valid(label):
+		layer.queue_free()
+		return
 	var tween := lm.create_tween()
-	tween.tween_property(layer, "modulate:a", 0.0, FADE_OUT_SECONDS)
+	tween.tween_property(label, "modulate:a", 0.0, maxf(duration, 0.01))
 	tween.tween_callback(layer.queue_free)
 
 

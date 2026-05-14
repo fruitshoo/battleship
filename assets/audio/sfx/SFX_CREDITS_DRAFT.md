@@ -67,7 +67,7 @@
   License: CC BY 4.0
 
 ### fennelliott
-- `sfx_musket_fire_03_cc0.wav` by fennelliott
+- `sfx_musket_fire_03_cc0.ogg` by fennelliott
   Source: https://freesound.org/people/fennelliott/sounds/347647/
   License: CC0
 
@@ -86,7 +86,7 @@ If you want a shorter in-game credit section, this format is enough:
 - `sfx_heavy_missle_impact.ogg` by EvanBoyerman — CC BY 3.0 — https://freesound.org/people/EvanBoyerman/
 - `sfx_musket_fire.ogg` by aaronsiler — CC BY 4.0 — https://freesound.org/people/aaronsiler/
 - `sfx_musket_fire_02.ogg` by J8054 — CC BY 4.0 — https://freesound.org/people/J8054/
-- `sfx_musket_fire_03_cc0.wav` by fennelliott — CC0 — https://freesound.org/people/fennelliott/
+- `sfx_musket_fire_03_cc0.ogg` by fennelliott — CC0 — https://freesound.org/people/fennelliott/
 - `sfx_oars.ogg` by pugaeme — CC BY 3.0 — https://freesound.org/people/pugaeme/
 
 ## Final Check Notes

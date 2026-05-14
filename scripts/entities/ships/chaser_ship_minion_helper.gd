@@ -132,7 +132,49 @@ const ALLY_GUARD_ROWING_WIND_FLOOR := 0.78
 static var _support_roster_cache_frame: int = -1
 static var _support_roster_cache: Dictionary = {}
 
-static func process_minion_ai(ship, delta: float) -> void:
+static func continue_minion_motion(ship, delta: float) -> void:
+	if delta <= 0.0 or not is_instance_valid(ship):
+		return
+	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
+	var is_captured_minion: bool = ShipAllyRoleHelper.is_captured_minion(ship) and not is_support_ship
+	if not is_support_ship and not is_captured_minion:
+		ship._update_minion_ai_idle_visuals()
+		return
+
+	var movement_target: Node3D = _get_support_flagship(ship) if is_support_ship else (ship.target as Node3D if is_instance_valid(ship.target) else null)
+	var speed: float = maxf(float(ship.current_speed), 0.0)
+	if speed > 0.1:
+		var speed_ratio: float = clampf(speed / maxf(float(ship.max_speed), 0.01), 0.0, 1.0)
+		var turn_scale: float = float(ship.ai_turn_authority)
+		var actual_turn: float = (float(ship.rudder_angle) / 45.0) * float(ship.turn_rate) * ship.get_rudder_turn_multiplier() * speed_ratio * float(ship.turn_mult) * turn_scale * delta
+		var max_turn_this_frame: float = float(ship.ai_max_turn_rate) * delta
+		actual_turn = clampf(actual_turn, -max_turn_this_frame, max_turn_this_frame)
+		ship.rotation.y -= deg_to_rad(actual_turn)
+
+		var wind_floor := SUPPORT_JOIN_ROWING_WIND_FLOOR if is_support_ship and ship.get_meta("support_joining", false) == true else 0.6
+		var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor)
+		var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
+		var velocity: Vector3 = forward_vec * speed * wind_mult
+		velocity += ship.separation_force
+		velocity += ship.consume_collision_impulse_velocity(delta)
+		velocity += ship._calculate_collision_repulsion() * delta
+
+		var prev_pos: Vector3 = ship.global_position
+		var next_pos: Vector3 = prev_pos + velocity * delta
+		if is_instance_valid(movement_target):
+			var target_guard_ratio: float = SUPPORT_TARGET_GUARD_RATIO if is_support_ship else 0.94
+			next_pos = ship._apply_ship_collision_guard(movement_target, prev_pos, next_pos, target_guard_ratio, velocity.length(), false)
+		next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, movement_target)
+		ship.global_position = next_pos
+		if is_support_ship:
+			_record_support_trail_point(ship)
+
+	ship._update_rudder_visual()
+	ship._apply_bobbing_effect()
+	ship._set_wake_state(speed > 0.4, clampf(speed / maxf(float(ship.max_speed), 0.01), 0.0, 1.0), 0.0, 0.0)
+
+static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) -> void:
+	var step_delta: float = delta if motion_delta < 0.0 else maxf(motion_delta, 0.0)
 	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
 	var is_captured_minion: bool = ShipAllyRoleHelper.is_captured_minion(ship) and not is_support_ship
 	var movement_target: Node3D = _get_support_flagship(ship) if is_support_ship else (ship.target as Node3D if is_instance_valid(ship.target) else null)
@@ -273,10 +315,10 @@ static func process_minion_ai(ship, delta: float) -> void:
 	if is_support_ship and not is_joining_support and is_instance_valid(support_assist_target):
 		if _try_start_support_boarding(ship, support_assist_target, delta):
 			return
-		_process_support_assist_ai(ship, delta, support_assist_target, minions, my_index)
+		_process_support_assist_ai(ship, delta, support_assist_target, minions, my_index, step_delta)
 		return
 	if is_captured_minion and ally_limbo_mode == ShipAILimboKeys.ALLY_MODE_GUARD_THREAT and is_instance_valid(ally_guard_target):
-		_process_captured_guard_ai(ship, delta, ally_guard_target, minions, my_index)
+		_process_captured_guard_ai(ship, delta, ally_guard_target, minions, my_index, step_delta)
 		return
 
 	var target_final_speed = player_speed
@@ -384,11 +426,11 @@ static func process_minion_ai(ship, delta: float) -> void:
 			if support_column_turn_blend > 0.0:
 				var column_turn_bonus: float = SUPPORT_PANOKSEON_COLUMN_TURN_AUTHORITY_BONUS if is_heavy_support else SUPPORT_COLUMN_TURN_AUTHORITY_BONUS
 				turn_authority_mult += column_turn_bonus * 0.35 * support_column_turn_blend
-		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority_mult * delta
+		var actual_turn = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_authority_mult * step_delta
 		ship.rotation.y -= deg_to_rad(actual_turn)
 	else:
 		if dist_to_target <= 1.5:
-			ship.rotation.y = lerp_angle(ship.rotation.y, player_head_rot, delta * 3.0)
+			ship.rotation.y = lerp_angle(ship.rotation.y, player_head_rot, step_delta * 3.0)
 
 	var wind_floor := SUPPORT_JOIN_ROWING_WIND_FLOOR if is_support_ship and is_joining_support else 0.6
 	var wind_mult = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor)
@@ -396,10 +438,10 @@ static func process_minion_ai(ship, delta: float) -> void:
 	var forward_vec = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
 	var velocity = forward_vec * final_move_speed
 	velocity += ship.separation_force
-	velocity += ship._calculate_collision_repulsion() * delta
+	velocity += ship._calculate_collision_repulsion() * step_delta
 
 	var prev_pos = ship.global_position
-	var next_pos = prev_pos + velocity * delta
+	var next_pos = prev_pos + velocity * step_delta
 	if is_instance_valid(movement_target):
 		var target_guard_ratio: float = SUPPORT_TARGET_GUARD_RATIO if is_support_ship else 0.94
 		next_pos = ship._apply_ship_collision_guard(movement_target, prev_pos, next_pos, target_guard_ratio, velocity.length(), false)
@@ -856,9 +898,10 @@ static func _process_support_idle_patrol(ship, delta: float) -> void:
 	ship.set_meta("support_debug_lead_speed", 0.0)
 	ship.set_meta("support_debug_target_speed", desired_speed)
 
-static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D, minions: Array, my_index: int) -> void:
+static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D, minions: Array, my_index: int, motion_delta: float = -1.0) -> void:
 	if not is_instance_valid(assist_target) or _is_ship_disabled(assist_target):
 		return
+	var step_delta: float = delta if motion_delta < 0.0 else maxf(motion_delta, 0.0)
 	var emergency_assist: bool = _is_player_deck_emergency(_get_support_flagship(ship))
 	var rescue_assist: bool = _is_support_rescue_target(ship, assist_target)
 	var boss_breach_assist: bool = _is_support_boss_breach_target(ship, assist_target)
@@ -929,7 +972,8 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 		assist_target,
 		0.45,
 		true,
-		true
+		true,
+		step_delta
 	)
 	ship.set_meta("support_debug_lead_name", assist_target.name)
 	ship.set_meta("support_debug_target_pos", desired_point)
@@ -945,9 +989,10 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 	_draw_support_limbo_debug(ship)
 
 
-static func _process_captured_guard_ai(ship, delta: float, guard_target: Node3D, minions: Array, my_index: int) -> void:
+static func _process_captured_guard_ai(ship, delta: float, guard_target: Node3D, minions: Array, my_index: int, motion_delta: float = -1.0) -> void:
 	if not is_instance_valid(guard_target) or _is_ship_disabled(guard_target):
 		return
+	var step_delta: float = delta if motion_delta < 0.0 else maxf(motion_delta, 0.0)
 	var emergency_guard: bool = is_instance_valid(ship.target) \
 		and guard_target.has_method("get_boarding_target_ship") \
 		and guard_target.call("get_boarding_target_ship") == ship.target
@@ -996,7 +1041,10 @@ static func _process_captured_guard_ai(ship, delta: float, guard_target: Node3D,
 		secondary_guard_target,
 		0.86,
 		guard_target,
-		0.35
+		0.35,
+		false,
+		false,
+		step_delta
 	)
 	_draw_ally_limbo_debug(ship)
 
@@ -1019,8 +1067,10 @@ static func _apply_role_navigation_motion(
 	neighbor_guard_target: Node3D = null,
 	collision_repulsion_scale: float = 0.0,
 	record_support_trail: bool = false,
-	apply_leak_damage: bool = false
+	apply_leak_damage: bool = false,
+	motion_delta: float = -1.0
 ) -> void:
+	var step_delta: float = delta if motion_delta < 0.0 else maxf(motion_delta, 0.0)
 	var angle_diff: float = wrapf(target_rotation_y - ship.rotation.y, -PI, PI)
 	var desired_rudder: float = clamp(-rad_to_deg(angle_diff) * ship.ai_rudder_gain, -40.0, 40.0)
 	desired_rudder *= close_turn_factor
@@ -1036,8 +1086,8 @@ static func _apply_role_navigation_motion(
 	if ship.current_speed > 0.1:
 		var speed_ratio: float = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 		var turn_scale: float = ship.ai_turn_authority * close_turn_factor
-		var actual_turn: float = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_scale * delta
-		var max_turn_this_frame: float = ship.ai_max_turn_rate * max_turn_rate_mult * delta
+		var actual_turn: float = (ship.rudder_angle / 45.0) * ship.turn_rate * ship.get_rudder_turn_multiplier() * speed_ratio * ship.turn_mult * turn_scale * step_delta
+		var max_turn_this_frame: float = ship.ai_max_turn_rate * max_turn_rate_mult * step_delta
 		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
 		ship.rotation.y -= deg_to_rad(actual_turn)
 
@@ -1046,10 +1096,10 @@ static func _apply_role_navigation_motion(
 	var velocity: Vector3 = forward_vec * ship.current_speed * wind_mult
 	velocity += local_sep
 	if collision_repulsion_scale > 0.0:
-		velocity += ship._calculate_collision_repulsion() * collision_repulsion_scale * delta
+		velocity += ship._calculate_collision_repulsion() * collision_repulsion_scale * step_delta
 
 	var prev_pos: Vector3 = ship.global_position
-	var next_pos: Vector3 = prev_pos + velocity * delta
+	var next_pos: Vector3 = prev_pos + velocity * step_delta
 	if is_instance_valid(primary_guard_target):
 		next_pos = ship._apply_ship_collision_guard(primary_guard_target, prev_pos, next_pos, primary_guard_ratio, velocity.length(), false)
 	if is_instance_valid(secondary_guard_target):

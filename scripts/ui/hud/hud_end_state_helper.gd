@@ -5,14 +5,14 @@ static func show_game_over(hud) -> void:
 	if hud._game_over_transitioning:
 		return
 	if hud.game_over_label:
-		hud.game_over_label.text = "!!! SHIP DESTROYED !!!"
+		hud.game_over_label.text = "배를 버려라!"
 		hud.game_over_label.visible = true
 		var tween: Tween = hud.create_tween()
 		hud.game_over_label.modulate.a = 0.0
 		tween.tween_property(hud.game_over_label, "modulate:a", 1.0, 1.0)
 	hud.get_tree().paused = true
 	if is_instance_valid(hud.game_over_overlay):
-		hud.game_over_overlay.show_overlay("함선이 침몰했습니다. 항구로 복귀합니다.", 4.0)
+		hud.game_over_overlay.show_overlay("", 4.0)
 
 
 static func show_victory(hud) -> void:

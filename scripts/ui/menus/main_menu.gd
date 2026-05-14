@@ -320,7 +320,7 @@ func _on_meta_pressed() -> void:
 	_modal_open = true
 	_set_buttons_disabled(true)
 	var ui = META_UPGRADE_UI_SCENE.instantiate()
-	ui.title_text = LocaleManager.t("meta.title", "[항구] 영구 강화")
+	ui.title_text = LocaleManager.t("meta.title", "업그레이드")
 	ui.close_button_text = LocaleManager.t("meta.close_to_menu", "메뉴로 돌아가기")
 	add_child(ui)
 	ui.closed.connect(func():

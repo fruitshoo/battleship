@@ -69,6 +69,9 @@ static func process_boarding_common(ship, delta: float) -> void:
 			ship._full_rope_deployed = true
 			if ship.DEBUG_COMBAT_LOGS:
 				print("[Boarding] 추가 밧줄이 연결되었습니다.")
+		if not ship._full_rope_deployed and _requires_full_rope_before_transfer(ship):
+			ship._update_ropes(delta)
+			return
 	_play_boarding_rally_cry(ship)
 
 	if ship.boarding_prep_timer < ship.boarding_prep_duration:
@@ -86,7 +89,16 @@ static func process_boarding_common(ship, delta: float) -> void:
 
 static func _uses_limited_rope_visuals(ship) -> bool:
 	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
+	if ShipBoardingMetaHelper.get_approach_mode(ship) == ShipBoardingMetaHelper.APPROACH_REAR:
+		return false
 	return contact_mode == ShipBoardingMetaHelper.CONTACT_HEAD_ON or contact_mode == ShipBoardingMetaHelper.CONTACT_CLEANUP
+
+
+static func _requires_full_rope_before_transfer(ship) -> bool:
+	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
+	if contact_mode == ShipBoardingMetaHelper.CONTACT_SIDE:
+		return true
+	return ShipBoardingMetaHelper.get_approach_mode(ship) == ShipBoardingMetaHelper.APPROACH_REAR
 
 
 static func _can_target_be_boarded(target_ship: Node, attacker_ship: Node = null) -> bool:

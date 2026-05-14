@@ -8,13 +8,6 @@ const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
 const SUPPORT_ASSIST_EVAL_TIMER_META := "support_assist_eval_timer"
 const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 const SUPPORT_JOIN_STAGE_META := "support_join_stage"
-const ROWING_DRUM_BEAT_INTERVAL := 1
-const ROWING_DRUM_STRONG_VOLUME_DB := -0.8
-const ROWING_DRUM_WEAK_VOLUME_DB := -4.8
-const ROWING_DRUM_STRONG_PITCH_MIN := 0.92
-const ROWING_DRUM_STRONG_PITCH_MAX := 0.98
-const ROWING_DRUM_WEAK_PITCH_MIN := 1.02
-const ROWING_DRUM_WEAK_PITCH_MAX := 1.09
 
 static func handle_input(ship, delta: float) -> void:
 	if Input.is_action_just_pressed("toggle_sail_furl") and ship.has_method("toggle_sail_furl"):
@@ -92,19 +85,8 @@ static func update_rowing_audio(ship, delta: float) -> void:
 		if ship._oars_timer <= 0:
 			if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
 				var pitch := randf_range(0.95, 1.05)
-				if ship.rowing_locked:
-					pitch = randf_range(0.85, 0.92)
 				ship._cached_audio_manager.play_sfx("oars_rowing", ship.global_position, pitch, 5.0)
-				if not ship.rowing_locked and ship.rowing_stamina > 0.1:
-					ship._rowing_drum_beat_count += 1
-					if ship._rowing_drum_beat_count % ROWING_DRUM_BEAT_INTERVAL == 0:
-						var is_strong_beat: bool = ship._rowing_drum_beat_count % 2 == 1
-						var drum_pitch_min: float = ROWING_DRUM_STRONG_PITCH_MIN if is_strong_beat else ROWING_DRUM_WEAK_PITCH_MIN
-						var drum_pitch_max: float = ROWING_DRUM_STRONG_PITCH_MAX if is_strong_beat else ROWING_DRUM_WEAK_PITCH_MAX
-						var drum_pitch: float = randf_range(drum_pitch_min, drum_pitch_max)
-						var drum_volume: float = ROWING_DRUM_STRONG_VOLUME_DB if is_strong_beat else ROWING_DRUM_WEAK_VOLUME_DB
-						ship._cached_audio_manager.play_sfx("rowing_drum", ship.global_position, drum_pitch, drum_volume)
-			ship._oars_timer = 1.8 if ship.rowing_locked else 1.3
+			ship._oars_timer = 1.3
 		else:
 			ship._oars_timer -= delta
 
@@ -114,7 +96,6 @@ static func update_rowing_audio(ship, delta: float) -> void:
 				ship._cached_audio_manager.play_gilgunak(false)
 	else:
 		ship._oars_timer = 0.0
-		ship._rowing_drum_beat_count = 0
 		if ship._gilgunak_playing:
 			ship._gilgunak_playing = false
 			if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_gilgunak"):

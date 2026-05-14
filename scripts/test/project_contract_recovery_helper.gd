@@ -267,6 +267,15 @@ static func _run_static_reward_site_smoke(owner: Node, failures: Array[String], 
 		failures.append("recovery static reward site did not grant a minor stat bonus")
 	if site.is_queued_for_deletion():
 		failures.append("recovery static reward site queued for deletion after reward")
+	if site.is_in_group("sea_site"):
+		failures.append("recovery static reward site should leave sea_site group after reward")
+	if site.is_in_group("static_reward_site"):
+		failures.append("recovery static reward site should leave static_reward_site group after reward")
+	if site is Node3D and not (site as Node3D).visible:
+		failures.append("recovery static reward site should remain visible while fading out")
+	await _wait_frames(owner, 34)
+	if site is Node3D and (site as Node3D).visible:
+		failures.append("recovery static reward site should hide after fade")
 	if site.get("reward_type") != "minor_stat_bonus":
 		failures.append("recovery static reward reef should be a minor-stat-bonus site")
 	site.queue_free()

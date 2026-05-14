@@ -39,6 +39,7 @@ var elite_spawn_allow_overlap: bool = true
 var boss_waves: Array[Dictionary] = []
 var triggered_boss_wave_ids: Dictionary = {}
 var pending_boss_wave_spawns: Array[Dictionary] = []
+var active_final_boss_wave_member_ids: Dictionary = {}
 var regular_spawn_stopped: bool = false
 var start_time: int = 0
 var blockade_spacing: float = 15.0
@@ -110,6 +111,7 @@ func _ready() -> void:
 	triggered_scenario_ids.clear()
 	triggered_boss_wave_ids.clear()
 	pending_boss_wave_spawns.clear()
+	active_final_boss_wave_member_ids.clear()
 	start_time = Time.get_ticks_msec()
 	_find_player()
 
@@ -359,6 +361,7 @@ func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
 			continue
 		var ship_count: int = maxi(1, int(ship_info.get("count", 1)))
 		var lateral_spacing: float = maxf(1.0, float(ship_info.get("lateral_spacing", 28.0)))
+		var group_delay: float = maxf(0.0, float(ship_info.get("delay", ship_info.get("spawn_delay", 0.0))))
 		for local_index in range(ship_count):
 			var lateral_offset := 0.0
 			if total_ship_count > 1:
@@ -372,15 +375,17 @@ func _spawn_boss_wave(wave: Dictionary) -> Array[Node3D]:
 				"spawn_pos": spawn_pos,
 				"spawn_escorts": not escort_layout.is_empty(),
 				"is_final_wave": is_final_wave,
+				"allow_final_wave_member": is_final_wave,
 				"escort_layout": escort_layout,
 				"wave_id": str(wave.get("id", ""))
 			}
-			if spawned_index == 0:
+			var spawn_delay: float = group_delay + BOSS_WAVE_SPAWN_STAGGER_SECONDS * float(spawned_index)
+			if spawn_delay <= 0.0:
 				var boss_ship := _spawn_queued_boss_wave_ship(spawn_entry)
 				if is_instance_valid(boss_ship):
 					spawned.append(boss_ship)
 			else:
-				spawn_entry["delay"] = BOSS_WAVE_SPAWN_STAGGER_SECONDS * float(spawned_index)
+				spawn_entry["delay"] = spawn_delay
 				pending_boss_wave_spawns.append(spawn_entry)
 			spawned_index += 1
 
@@ -407,7 +412,8 @@ func _spawn_queued_boss_wave_ship(entry: Dictionary) -> Node3D:
 		spawn_pos,
 		bool(entry.get("spawn_escorts", false)),
 		bool(entry.get("is_final_wave", false)),
-		escort_layout
+		escort_layout,
+		bool(entry.get("allow_final_wave_member", false))
 	)
 
 
@@ -569,14 +575,14 @@ func _get_boss_wave_escort_layout(ship_count: int, local_index: int) -> Array:
 	return [mid_boss_escort_layout[local_index % mid_boss_escort_layout.size()]]
 
 
-func _spawn_boss_ship(ship_type_name: String, spawn_pos: Vector3, spawn_escorts: bool = false, marks_final_boss: bool = false, escort_layout_override: Array = []) -> Node3D:
+func _spawn_boss_ship(ship_type_name: String, spawn_pos: Vector3, spawn_escorts: bool = false, marks_final_boss: bool = false, escort_layout_override: Array = [], allow_final_wave_member: bool = false) -> Node3D:
 	if not boss_scene:
 		return null
 	if not is_instance_valid(player):
 		_find_player()
 	if not is_instance_valid(player):
 		return null
-	if marks_final_boss and boss_spawned:
+	if marks_final_boss and boss_spawned and not allow_final_wave_member:
 		return null
 
 	var boss_ship = boss_scene.instantiate()
@@ -593,9 +599,52 @@ func _spawn_boss_ship(ship_type_name: String, spawn_pos: Vector3, spawn_escorts:
 	_prime_enemy_momentum(boss_ship, true)
 	_push_boss_hp_to_hud(boss_ship)
 	_start_boss_audio(boss_ship)
+	if marks_final_boss and allow_final_wave_member:
+		_register_final_boss_wave_member(boss_ship)
 	if spawn_escorts:
 		_spawn_elite_escorts(boss_ship, escort_layout_override)
 	return boss_ship
+
+
+func _register_final_boss_wave_member(boss_ship: Node3D) -> void:
+	if not is_instance_valid(boss_ship):
+		return
+	var boss_id := boss_ship.get_instance_id()
+	active_final_boss_wave_member_ids[boss_id] = true
+	boss_ship.set_meta("final_boss_wave_member", true)
+	if boss_ship.has_signal("boss_died"):
+		boss_ship.connect("boss_died", Callable(self, "_on_final_boss_wave_member_died").bind(boss_id), CONNECT_ONE_SHOT)
+
+
+func _on_final_boss_wave_member_died(boss_id: int) -> void:
+	active_final_boss_wave_member_ids.erase(boss_id)
+	call_deferred("_check_final_boss_wave_victory")
+
+
+func _check_final_boss_wave_victory() -> void:
+	_cleanup_final_boss_wave_members()
+	if not active_final_boss_wave_member_ids.is_empty() or _has_pending_final_boss_wave_spawns():
+		return
+	var lm: Node = LevelManagerRegistry.get_level_manager(get_tree())
+	if is_instance_valid(lm) and lm.has_method("show_victory"):
+		if "hud" in lm and is_instance_valid(lm.hud) and lm.hud.has_method("show_gust_warning_message"):
+			lm.hud.show_gust_warning_message("최종 보스 함대 격파!", 2.4)
+		lm.show_victory()
+
+
+func _cleanup_final_boss_wave_members() -> void:
+	for boss_id_variant in active_final_boss_wave_member_ids.keys():
+		var boss_id := int(boss_id_variant)
+		var boss := NodeContractHelper.get_instance_node(boss_id)
+		if not is_instance_valid(boss) or boss.get("is_dying") == true or boss.get("is_sinking") == true:
+			active_final_boss_wave_member_ids.erase(boss_id)
+
+
+func _has_pending_final_boss_wave_spawns() -> bool:
+	for entry in pending_boss_wave_spawns:
+		if bool(entry.get("is_final_wave", false)):
+			return true
+	return false
 
 
 func _notify_data_driven_boss_wave_started(wave: Dictionary) -> void:
@@ -656,6 +705,12 @@ func debug_spawn_final_boss() -> Node3D:
 		_find_player()
 	if not is_instance_valid(player):
 		return null
+	for wave in boss_waves:
+		if bool(wave.get("final", false)):
+			var wave_id := str(wave.get("id", "debug_final_boss"))
+			triggered_boss_wave_ids[wave_id] = true
+			var spawned := _spawn_boss_wave(wave)
+			return spawned[0] if not spawned.is_empty() else null
 	return trigger_boss_event()
 
 

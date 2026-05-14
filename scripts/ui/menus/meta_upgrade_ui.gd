@@ -32,7 +32,7 @@ const FALLBACK_CATEGORY_BY_ID := {
 
 signal closed
 
-@export var title_text: String = "[업그레이드] 영구 강화"
+@export var title_text: String = "업그레이드"
 @export var close_button_text: String = "닫기"
 
 @onready var backdrop: ColorRect = $Backdrop
@@ -101,7 +101,7 @@ func _ready() -> void:
 
 func _apply_static_text() -> void:
 	if is_instance_valid(title_label):
-		title_label.text = LocaleManager.t("meta.default_title", "[업그레이드] 영구 강화") if title_text == "[업그레이드] 영구 강화" else title_text
+		title_label.text = LocaleManager.t("meta.default_title", "업그레이드") if title_text == "업그레이드" else title_text
 	if is_instance_valid(close_button):
 		close_button.text = LocaleManager.t("meta.default_close", "닫기") if close_button_text == "닫기" else close_button_text
 

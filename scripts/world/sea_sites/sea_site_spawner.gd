@@ -1,14 +1,15 @@
 extends Node
 
 
-const DEFAULT_STATIC_SITE_SCENES: Array[PackedScene] = [
-	preload("res://scenes/world/sea_sites/reef_marker_site.tscn"),
-	preload("res://scenes/world/sea_sites/tiny_islet_site.tscn"),
-	preload("res://scenes/world/sea_sites/temporary_outpost_site.tscn"),
+const DEFAULT_STATIC_SITE_SCENE_PATHS: Array[String] = [
+	"res://scenes/world/sea_sites/reef_marker_site.tscn",
+	"res://scenes/world/sea_sites/tiny_islet_site.tscn",
+	"res://scenes/world/sea_sites/temporary_outpost_site.tscn",
 ]
 
 @export var drifting_supply_site_scene: PackedScene = preload("res://scenes/world/sea_sites/drifting_supply_site.tscn")
 @export var static_site_scenes: Array[PackedScene] = []
+@export var use_default_static_site_scenes: bool = true
 @export var enabled: bool = true
 @export var max_active_sites: int = 3
 @export var initial_spawn_delay: float = 18.0
@@ -154,6 +155,9 @@ func _cleanup_active_sites() -> void:
 		if not is_instance_valid(site):
 			_active_sites.remove_at(i)
 			continue
+		if site.get("is_collected") == true:
+			_active_sites.remove_at(i)
+			continue
 		if is_instance_valid(_player):
 			var site_pos := site.global_position
 			var player_pos := _player.global_position
@@ -192,14 +196,25 @@ func debug_spawn_cache(distance: float = 24.0, lateral: float = 0.0) -> Node3D:
 
 func _pick_site_scene() -> PackedScene:
 	var scenes: Array = static_site_scenes
-	if scenes.is_empty():
-		scenes = DEFAULT_STATIC_SITE_SCENES
+	if scenes.is_empty() and use_default_static_site_scenes:
+		scenes = _load_default_static_site_scenes()
 	if scenes.is_empty():
 		return drifting_supply_site_scene
 	var site_scene: Variant = scenes.pick_random()
 	if site_scene is PackedScene:
 		return site_scene as PackedScene
 	return drifting_supply_site_scene
+
+
+func _load_default_static_site_scenes() -> Array[PackedScene]:
+	var scenes: Array[PackedScene] = []
+	for scene_path in DEFAULT_STATIC_SITE_SCENE_PATHS:
+		if not ResourceLoader.exists(scene_path, "PackedScene"):
+			continue
+		var packed := load(scene_path) as PackedScene
+		if is_instance_valid(packed):
+			scenes.append(packed)
+	return scenes
 
 
 func _env_flag_enabled(name: String) -> bool:

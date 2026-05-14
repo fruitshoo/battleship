@@ -21,6 +21,7 @@ extends Camera3D
 @export var zoom_speed: float = 2.0
 @export var min_zoom: float = 10.0
 @export var max_zoom: float = 88.0 # +10% 줌아웃 (기존 80.0)
+@export var initial_zoom_ratio: float = 0.86
 @export_range(1.0, 20.0) var zoom_smooth_speed: float = 12.0
 @export var rotation_sensitivity: float = 0.005
 
@@ -61,7 +62,7 @@ func _ready() -> void:
 	if target_path:
 		target = get_node_or_null(target_path)
 	
-	current_zoom = offset.length()
+	current_zoom = _get_initial_zoom()
 	target_zoom = current_zoom
 	
 	# 초기 회전값 설정
@@ -75,6 +76,11 @@ func _ready() -> void:
 	audio_listener = AudioListener3D.new()
 	add_child(audio_listener)
 	audio_listener.make_current()
+
+func _get_initial_zoom() -> float:
+	if initial_zoom_ratio >= 0.0:
+		return lerpf(min_zoom, max_zoom, clampf(initial_zoom_ratio, 0.0, 1.0))
+	return offset.length()
 
 func _input(event: InputEvent) -> void:
 	# 마우스 휠로 줌

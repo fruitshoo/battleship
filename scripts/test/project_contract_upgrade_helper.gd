@@ -126,7 +126,11 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 전면 포문 missing immediate apply handler")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
 		failures.append("upgrade smoke fleet_cannon should not be in support ship pool")
+	if upgrades.has("hull_repair") and upgrades["hull_repair"].get("disabled", false) != true:
+		failures.append("upgrade smoke hull_repair data should stay disabled")
 	var supply_stats: Dictionary = upgrades.get("supply_bonus", {}).get("stats", {})
+	if upgrades.has("supply_bonus") and upgrades["supply_bonus"].get("disabled", false) != true:
+		failures.append("upgrade smoke supply_bonus data should stay disabled")
 	if str(upgrades.get("supply_bonus", {}).get("description", "")).contains("회복"):
 		failures.append("upgrade smoke 보급 description should not mention healing")
 	if supply_stats.has("base_heal") or supply_stats.has("heal_levels") or supply_stats.has("heal_add"):
@@ -181,7 +185,7 @@ static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Ar
 			failures.append("upgrade smoke fixed crew roster should keep at least one %s operator when all crew weapons are active" % role)
 	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_SPEARMAN, 0))
 	if int(roster.get(UpgradeDataHelper.CREW_ROLE_SPEARMAN, 0)) != 0:
-		failures.append("upgrade smoke crew_numbers should equip spears instead of assigning spearman operators")
+		failures.append("upgrade smoke crew_numbers should improve spear damage instead of assigning spearman operators")
 	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_SINGIGEON, 0))
 	if int(roster.get(UpgradeDataHelper.CREW_ROLE_SINGIGEON, 0)) != 0:
 		failures.append("upgrade smoke singigeon should proc from bow attacks instead of assigning operators")
@@ -198,6 +202,8 @@ static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Ar
 		failures.append("upgrade smoke repeating_crossbow should be retired from command choices")
 	if upgrades.has("repeating_crossbow") and upgrades["repeating_crossbow"].get("disabled", false) != true:
 		failures.append("upgrade smoke repeating_crossbow data should stay disabled")
+	if upgrades.has("fire_pot") and upgrades["fire_pot"].get("disabled", false) != true:
+		failures.append("upgrade smoke fire_pot data should stay disabled")
 
 	var source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager.gd")
 	if source.contains("for upgrade_id in [\"crew_numbers\", \"singigeon\", \"fire_pot\", \"repeating_crossbow\"]"):

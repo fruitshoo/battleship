@@ -81,8 +81,9 @@ var rowing_locked: bool = false
 @export_range(0.2, 1.2, 0.05) var reverse_rowing_acceleration_mult: float = 0.70
 @export_range(0.2, 1.0, 0.05) var reverse_rudder_turn_authority_mult: float = 0.65
 @export_range(0.5, 2.0, 0.05) var reverse_rowing_stamina_cost_mult: float = 1.05
-@export_range(0.2, 0.9, 0.05) var exhausted_rowing_speed_ratio: float = 0.38
-@export var stamina_drain_rate: float = 8.0
+@export_range(0.05, 0.9, 0.01) var exhausted_rowing_speed_ratio: float = 0.12
+@export_range(0.05, 1.0, 0.01) var rowing_exhaustion_recover_ratio: float = 0.25
+@export var stamina_drain_rate: float = 6.0
 @export var stamina_recovery_rate: float = 8.5
 
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
@@ -115,7 +116,6 @@ var _flap_timer: float = 0.0
 var _wave_timer: float = 2.0
 var _current_wind_intake: float = 1.0 # 0.0(쳐짐) ~ 1.0(빵빵함)
 var _oars_timer: float = 0.0
-var _rowing_drum_beat_count: int = 0
 var _oar_time: float = 0.0
 var _sail_catch_audio_timer: float = 0.0
 var _sail_luff_audio_timer: float = 0.0
@@ -199,11 +199,13 @@ func _ready() -> void:
 	
 	# 영구 업그레이드 보너스 적용
 	if is_in_group("player") or is_player_controlled:
+		if not has_meta("base_player_hull_defense"):
+			set_meta("base_player_hull_defense", hull_defense)
 		var meta_manager = get_node_or_null("/root/MetaManager")
 		if is_instance_valid(meta_manager):
 			if meta_manager.has_method("get_hull_hp_bonus"): max_hull_hp += meta_manager.get_hull_hp_bonus()
 			if meta_manager.has_method("get_sail_speed_multiplier"): max_speed *= meta_manager.get_sail_speed_multiplier()
-			if meta_manager.has_method("get_hull_defense_bonus"): hull_defense = meta_manager.get_hull_defense_bonus()
+			if meta_manager.has_method("get_hull_defense_bonus"): hull_defense = float(get_meta("base_player_hull_defense")) + meta_manager.get_hull_defense_bonus()
 			if meta_manager.has_method("get_max_crew_bonus"): max_crew_count += int(meta_manager.get_max_crew_bonus())
 		print("[Ship] 플레이어 배 초기화 (HP: %.0f, 속도: %.1f, 방어: %.1f, 병사 정원: %d)" % [max_hull_hp, max_speed, hull_defense, max_crew_count])
 	if not has_meta("base_player_max_crew_count"):
@@ -324,7 +326,7 @@ func _physics_process(delta: float) -> void:
 		
 	if is_player_controlled:
 		_handle_input(delta)
-	if has_sextant:
+	if _is_auto_sail_control_enabled():
 		_auto_adjust_sail(delta)
 	_update_sail_deployment(delta)
 	update_crew_allocation_state(delta)
@@ -949,6 +951,11 @@ func steer(direction: float, delta: float) -> void:
 func _auto_adjust_sail(delta: float) -> void:
 	PlayerShipMovementHelper.auto_adjust_sail(self, delta)
 
+func _is_auto_sail_control_enabled() -> bool:
+	if not is_instance_valid(SaveManager):
+		return has_sextant
+	return str(SaveManager.get_setting("sail_control_mode", "manual")) == "auto"
+
 func _calculate_separation() -> Vector3:
 	return PlayerShipMovementHelper.calculate_separation(self)
 
@@ -1134,6 +1141,9 @@ func toggle_rowing() -> void:
 ## 게임 오버 (침몰)
 func die() -> void:
 	PlayerShipSinkHelper.die(self)
+
+func trigger_boarding_overrun_game_over() -> void:
+	PlayerShipSinkHelper.trigger_boarding_overrun_game_over(self)
 
 func _disable_combat_modules_on_sink() -> void:
 	PlayerShipSinkHelper.disable_combat_modules_on_sink(self)

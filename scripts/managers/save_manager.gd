@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS := {
 	"fullscreen": false,
 	"screen_edge_fx_enabled": true,
 	"screen_edge_fx_strength": 0.75,
+	"sail_control_mode": "manual",
 	"locale": "ko",
 }
 

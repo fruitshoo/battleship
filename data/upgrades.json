@@ -95,6 +95,7 @@
 				"name": "화통",
 				"category": 1,
 				"description": "전투 중 기존 병사에게 화통 투척을 맡기고 착화 확률 강화",
+				"disabled": true,
 				"max_level": 5,
 				"color": "e54c19",
 				"stats": {
@@ -144,9 +145,9 @@
 			}
 			},
 			"crew_numbers": {
-				"name": "창병",
+				"name": "장창",
 				"category": 1,
-				"description": "병사들의 근접 무기를 창으로 바꾸고 창 피해를 강화",
+				"description": "조선 병사의 장창 공격 피해 강화",
 				"max_level": 5,
 				"color": "66ccff",
 				"card_art_path": "res://assets/ui/upgrades/jangchang_card.png",
@@ -221,7 +222,8 @@
 			"card_art_path": "res://assets/ui/upgrades/hull_defense_card.png",
 			"stats": {
 				"def_levels": [1, 2, 3, 4, 5],
-				"def_add": 1.0
+				"def_add": 1.0,
+				"crew_ranged_cover_defense_add_per_lv": 0.4
 			}
 		},
 		"hull": {
@@ -240,6 +242,7 @@
 			"name": "수리",
 			"category": 2,
 			"description": "선체 자동 수리",
+			"disabled": true,
 			"max_level": 5,
 			"color": "3a8f65",
 			"stats": {
@@ -268,27 +271,22 @@
 		"rowing": {
 			"name": "노",
 			"category": 3,
-			"description": "노 속도와 스태미나 강화",
+			"description": "노 속도와 가속 강화",
 			"max_level": 5,
 			"color": "ffc65a",
 			"card_art_path": "res://assets/ui/upgrades/rowing_card.png",
 			"stats": {
-				"speed_levels": [1, 5],
-				"speed_mult": 1.15,
-				"accel_levels": [1],
-				"accel_mult": 1.25,
-				"stamina_add_levels": [2],
-				"stamina_add": 25.0,
-				"drain_levels": [3],
-				"drain_mult": 0.8,
-				"recovery_levels": [4],
-				"recovery_mult": 1.25
+				"speed_levels": [1, 3, 5],
+				"speed_mult": 1.12,
+				"accel_levels": [2, 4],
+				"accel_mult": 1.18
 			}
 		},
 		"supply_bonus": {
 			"name": "보급",
 			"category": 2,
 			"description": "부유물, 생존자, 표류 적병 획득 범위 증가",
+			"disabled": true,
 			"max_level": 5,
 			"color": "4ccc4c",
 			"stats": {
@@ -300,7 +298,7 @@
 		"geobukseon": {
 			"name": "거북선",
 			"category": 2,
-			"description": "기함을 도선을 막는 거북선으로 변경. 정면 포문 2문, 측면 포문 4문, 충각 피해 +20%",
+			"description": "기함을 도선을 막는 거북선으로 변경. 정면 포문 2문, 측면 포문 4문, 충각 피해 +100%",
 			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
 			"max_level": 1,
 			"color": "6f8f7a",
@@ -309,19 +307,20 @@
 				"hull_scene": "res://scenes/ships/hulls/geobukseon_hull.tscn",
 				"blocks_boarding": true,
 				"ship_mass_scale": 2.05,
-				"ramming_damage_multiplier": 1.2,
-				"ramming_knockback_multiplier": 1.0
+				"hull_defense": 2.0,
+				"crew_ranged_cover_defense": 3.0,
+				"ramming_damage_multiplier": 2.0,
+				"ramming_knockback_multiplier": 2.0
 			}
 		},
 		"supply": {
 			"name": "회복",
 			"category": 2,
-			"description": "선체와 스태미나를 즉시 회복",
+			"description": "선체를 즉시 회복",
 			"max_level": 99,
 			"color": "7fff7f",
 			"stats": {
-				"hull_heal": 20.0,
-				"stamina_recover": 25.0
+				"hull_heal": 20.0
 			}
 		},
 		"gold": {

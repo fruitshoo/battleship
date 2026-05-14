@@ -25,7 +25,7 @@ signal score_changed(new_score: int)
 @export var hud: CanvasLayer = null
 @export_group("Prologue Tutorial")
 @export var prologue_enabled: bool = false
-@export_range(1.0, 8.0, 0.1) var prologue_intro_seconds: float = 3.0
+@export_range(1.0, 8.0, 0.1) var prologue_intro_seconds: float = 6.5
 @export_group("Progression Tuning")
 @export var level_xp_base: float = 7.0 ## 플레이어 레벨 1->2 기본 필요 XP
 @export var level_xp_exponent: float = 1.10 ## 레벨업 필요 XP 성장 곡선 지수
@@ -92,7 +92,7 @@ const DAMAGE_SOURCE_NAME := {
 	"cannon": "대포",
 	"singigeon": "신기전",
 	"janggun": "장군전",
-	"crew_numbers": "창병",
+	"crew_numbers": "장창",
 	"fire_pot": "화통",
 	"ballista": "팔우노",
 	"repeating_crossbow": "연노",
@@ -156,6 +156,8 @@ func _stop_run_audio_state() -> void:
 	var audio_manager := get_node_or_null("/root/AudioManager")
 	if not is_instance_valid(audio_manager):
 		return
+	if audio_manager.has_method("stop_gameplay_music"):
+		audio_manager.stop_gameplay_music()
 	if audio_manager.has_method("set_boss_battle_music"):
 		audio_manager.set_boss_battle_music(false)
 	elif audio_manager.has_method("stop_bgm"):

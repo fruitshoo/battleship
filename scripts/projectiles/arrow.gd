@@ -16,6 +16,7 @@ const TERMINAL_VISUAL_CONVERGE_START := 0.42
 const TERMINAL_VISUAL_TRACK_RADIUS := 8.0
 const SOLDIER_AIM_VERTICAL_OFFSET := 1.05
 const SHIP_AIM_VERTICAL_OFFSET := 0.55
+const CRIT_EFFECT_DECK_MARGIN := 0.75
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO
@@ -212,11 +213,10 @@ func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
 	if hit_check_position.distance_to(target_aim_point) > terminal_hit_radius:
 		return
 	if target_node.has_method("take_damage"):
-		var crit_effect_position := target_node.global_position + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0)
 		var crit_effect_direction := target_node.global_position - start_pos
 		target_node.take_damage(damage, global_position, damage_source)
 		if is_critical_hit:
-			_spawn_critical_hit_effect(crit_effect_position, crit_effect_direction)
+			_spawn_critical_hit_effect(target_node, crit_effect_direction)
 
 
 func _get_arrow_target_aim_point(node: Node) -> Vector3:
@@ -224,9 +224,13 @@ func _get_arrow_target_aim_point(node: Node) -> Vector3:
 	return NodeContractHelper.get_projectile_aim_point(node, offset)
 
 
-func _spawn_critical_hit_effect(effect_position: Vector3, hit_direction: Vector3) -> void:
-	if not is_inside_tree():
+func _spawn_critical_hit_effect(target: Node3D, hit_direction: Vector3) -> void:
+	if not is_inside_tree() or not is_instance_valid(target):
 		return
+	var effect_position_variant: Variant = _get_valid_critical_effect_position(target)
+	if not effect_position_variant is Vector3:
+		return
+	var effect_position := effect_position_variant as Vector3
 	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
 	if not is_instance_valid(effect):
 		return
@@ -237,3 +241,33 @@ func _spawn_critical_hit_effect(effect_position: Vector3, hit_direction: Vector3
 		effect.global_basis = Basis.looking_at(hit_direction.normalized(), Vector3.UP)
 	if effect.has_method("pool_activate"):
 		effect.pool_activate()
+
+
+func _get_valid_critical_effect_position(target: Node3D) -> Variant:
+	if not is_instance_valid(target) or not target.is_inside_tree():
+		return null
+	var target_pos := target.global_position
+	if not target_pos.is_finite():
+		return null
+	var owned_ship: Node3D = target.get_owned_ship_node() if target.has_method("get_owned_ship_node") else null
+	if not is_instance_valid(owned_ship) or not owned_ship.is_inside_tree():
+		return null
+	if owned_ship.get("is_sinking") == true or owned_ship.get("is_dying") == true:
+		return null
+	if owned_ship.has_method("is_sinking_or_dying") and owned_ship.call("is_sinking_or_dying") == true:
+		return null
+	var local_pos := owned_ship.to_local(target_pos)
+	var deck_height: float = float(owned_ship.get("deck_height")) if owned_ship.get("deck_height") != null else 0.4
+	if local_pos.y < deck_height - 1.0 or local_pos.y > deck_height + 1.75:
+		return null
+	var half_ext := Vector2(2.0, 3.0)
+	if owned_ship.has_method("get_deck_half_extents"):
+		var extents: Variant = owned_ship.call("get_deck_half_extents")
+		if extents is Vector2:
+			half_ext = extents
+	var half_width := half_ext.x
+	if owned_ship.has_method("get_deck_half_width_at_z"):
+		half_width = maxf(0.08, float(owned_ship.call("get_deck_half_width_at_z", clampf(local_pos.z, -half_ext.y, half_ext.y))))
+	if absf(local_pos.z) > half_ext.y + CRIT_EFFECT_DECK_MARGIN or absf(local_pos.x) > half_width + CRIT_EFFECT_DECK_MARGIN:
+		return null
+	return target_pos + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0)

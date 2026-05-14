@@ -106,7 +106,6 @@ Some current assets still need compatibility texture names because existing `glb
 Examples:
 
 - `cannon_cannon_albedo.png`
-- `mast_mast_albedo.png`
 - `yardarm_mast_albedo.png`
 
 Rule:

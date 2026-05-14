@@ -1,9 +1,9 @@
 {
   "general": {
-    "spawn_interval": 5.8,
+    "spawn_interval": 5.2,
     "min_spawn_distance": 50.0,
     "max_spawn_distance": 70.0,
-    "max_enemies": 2,
+    "max_enemies": 3,
     "max_distance_limit": 102.0,
     "reposition_check_interval": 1.0,
     "pressure_reposition_min_distance": 42.0,
@@ -77,7 +77,12 @@
   "encounter_profiles": {
     "opening_pressure": {
       "fleet_progression": [
-        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.80, "mixed": 0.20 } }
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.65, "mixed": 0.35 } }
+      ]
+    },
+    "pre_boss_pressure": {
+      "fleet_progression": [
+        { "start_time": 0.0, "end_time": 9999.0, "fleet_weights": { "light": 0.50, "mixed": 0.40, "heavy": 0.10 } }
       ]
     },
     "midgame_pressure": {
@@ -92,6 +97,14 @@
     }
   },
   "scenario_triggers": [
+    {
+      "id": "enter_pre_boss_pressure",
+      "condition": { "elapsed_time": 70.0 },
+      "actions": [
+        { "type": "set_encounter_profile", "profile": "pre_boss_pressure" },
+        { "type": "spawn_recipe", "recipe": "mixed_assault", "max_slots": 2 }
+      ]
+    },
     {
       "id": "enter_midgame_pressure",
       "condition": { "elapsed_time": 120.0 },
@@ -153,7 +166,9 @@
       "final": true,
       "stop_regular_spawns": true,
       "ships": [
-        { "ship_type": "atakebune_final", "count": 1, "escorts": false }
+        { "ship_type": "atakebune_mid", "count": 2, "escorts": false, "lateral_spacing": 30.0 },
+        { "ship_type": "atakebune_mid", "count": 1, "escorts": false, "lateral_spacing": 30.0, "delay": 18.0 },
+        { "ship_type": "atakebune_mid", "count": 1, "escorts": false, "lateral_spacing": 30.0, "delay": 36.0 }
       ]
     }
   },

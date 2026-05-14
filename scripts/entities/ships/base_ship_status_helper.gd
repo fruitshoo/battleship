@@ -22,6 +22,19 @@ static func update_fire_effect(ship) -> void:
 		_clear_fire_effect_random_transform(ship)
 
 
+static func clear_fire_effect(ship) -> void:
+	if "is_burning" in ship:
+		ship.is_burning = false
+	if "burn_timer" in ship:
+		ship.burn_timer = 0.0
+	if "fire_build_up" in ship:
+		ship.fire_build_up = 0.0
+	_clear_burning_crew_damage_timer(ship)
+	if is_instance_valid(ship._fire_instance):
+		set_fire_emitting(ship, false)
+	_clear_fire_effect_random_transform(ship)
+
+
 static func _apply_fire_effect_transform(ship) -> void:
 	if not is_instance_valid(ship._fire_instance):
 		return
@@ -172,6 +185,13 @@ static func update_boarding_state(ship, delta: float) -> void:
 			effective_capture_duration = float(ship.call("get_effective_boarding_capture_duration", attacker_ship))
 		var support_rescue_active: bool = ship_team == "player" and SupportBoardingHelper.is_support_rescue_boarding_active(ship)
 		if ship_team != "player" and SupportBoardingHelper.finish_support_attack_boarding_if_safe(ship, ship_team):
+			return
+		if ship_team == "player" and ship.has_method("trigger_boarding_overrun_game_over"):
+			if not ship._deck_overrun_announced:
+				ship._deck_overrun_announced = true
+				if is_instance_valid(ship._cached_hud) and ship._cached_hud.has_method("show_message"):
+					ship._cached_hud.show_message("적이 갑판을 장악했습니다!", 1.75)
+			ship.call("trigger_boarding_overrun_game_over")
 			return
 		if not support_rescue_active:
 			ship.boarding_capture_progress = minf(effective_capture_duration, ship.boarding_capture_progress + delta)

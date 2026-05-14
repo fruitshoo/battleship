@@ -1,6 +1,12 @@
 extends RefCounted
 
 
+static func _is_item_system_enabled(manager) -> bool:
+	if manager != null and manager.has_method("is_item_system_enabled"):
+		return manager.is_item_system_enabled()
+	return true
+
+
 static func load_items_from_resources(manager) -> bool:
 	manager.ITEMS.clear()
 	var dir := DirAccess.open(manager.ITEM_DATA_DIR)
@@ -43,6 +49,8 @@ static func load_items_from_resources(manager) -> bool:
 
 
 static func equip_owned_items(manager) -> void:
+	if not _is_item_system_enabled(manager):
+		return
 	manager._sync_items_from_save()
 	var ship = manager._get_player_ship()
 	if not ship:
@@ -55,6 +63,8 @@ static func equip_owned_items(manager) -> void:
 
 
 static func refresh_hud_item_icons(manager) -> void:
+	if not _is_item_system_enabled(manager):
+		return
 	manager._sync_items_from_save()
 	var ship = manager._get_player_ship()
 	if not ship:
@@ -75,6 +85,8 @@ static func refresh_hud_item_icons(manager) -> void:
 
 
 static func add_item(manager, item_id: String) -> void:
+	if not _is_item_system_enabled(manager):
+		return
 	if item_id not in manager.ITEMS:
 		push_warning("UpgradeManager: 존재하지 않는 아이템 ID입니다 - %s" % item_id)
 		return

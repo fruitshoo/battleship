@@ -33,6 +33,7 @@ offset = Vector3(0, 23, 30)
 zoom_speed = 3.2
 min_zoom = 18.0
 max_zoom = 66.0
+initial_zoom_ratio = -1.0
 zoom_smooth_speed = 24.0
 
 [node name="EnemySpawner" type="Node" parent="."]

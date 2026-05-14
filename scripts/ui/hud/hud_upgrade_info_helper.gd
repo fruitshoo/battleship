@@ -13,7 +13,7 @@ const PLAYER_SAIL_TURN_SPEED := 60.0
 const PLAYER_SAIL_FURL_RATE := 0.55
 const PLAYER_STAMINA_DRAIN_RATE := 10.0
 const PLAYER_STAMINA_RECOVERY_RATE := 8.5
-const SOLDIER_SWORD_BASE_DAMAGE := 13.0
+const SOLDIER_MELEE_BASE_DAMAGE := 13.5
 const SOLDIER_BOW_BASE_DAMAGE := 18.0
 const SUPPORT_FLEET_BASE_RESPAWN_INTERVAL := 30.0
 const SUPPORT_FLEET_BASE_LIMIT := 1
@@ -130,13 +130,9 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			]
 		"rowing":
 			var rowing_stats := _calculate_rowing_stats(level, stats)
-			var drain_pct := int(round((1.0 - (float(rowing_stats["drain_rate"]) / PLAYER_STAMINA_DRAIN_RATE)) * 100.0))
-			return "노 속도 +%d%% | 노 가속 +%d%% | 최대 스태미나 +%.0f | 소모 -%d%% | 회복 +%d%%" % [
+			return "노 속도 +%d%% | 노 가속 +%d%%" % [
 				_percent_delta_from_ratio(float(rowing_stats["rowing_speed"]) / PLAYER_ROWING_BASE_SPEED),
 				_percent_delta_from_ratio(float(rowing_stats["acceleration_mult"]) / PLAYER_ROWING_BASE_ACCEL),
-				float(rowing_stats["max_stamina"]) - PLAYER_MAX_ROWING_STAMINA,
-				max(drain_pct, 0),
-				_percent_delta_from_ratio(float(rowing_stats["recovery_rate"]) / PLAYER_STAMINA_RECOVERY_RATE),
 			]
 		"supply_bonus":
 			var supply_stats := _calculate_supply_bonus_stats(level, stats)
@@ -166,12 +162,12 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "도선병 피해 %.1f/초 | 장악 피해 -%d%% | 화염 -%d%%" % [defense_damage, capture_reduce_pct, boarding_fire_reduce_pct]
 		"crew_numbers":
 			var spear_damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
-			return "전 병사 창 장비 | 창 피해 +%.0f%%" % (spear_damage_bonus_pct * 100.0)
+			return "장창 피해 +%.0f%%" % (spear_damage_bonus_pct * 100.0)
 		"crew_attack":
 			var damage_bonus_pct := float(stats.get("damage_bonus_pct_per_lv", 0.06)) * level
-			var sword_damage := SOLDIER_SWORD_BASE_DAMAGE * (1.0 + damage_bonus_pct)
+			var melee_damage := SOLDIER_MELEE_BASE_DAMAGE * (1.0 + damage_bonus_pct)
 			var bow_damage := SOLDIER_BOW_BASE_DAMAGE * (1.0 + damage_bonus_pct)
-			return "무기 피해 +%.0f%% | 검 %.1f | 활 %.1f" % [damage_bonus_pct * 100.0, sword_damage, bow_damage]
+			return "무기 피해 +%.0f%% | 근접 %.1f | 활 %.1f" % [damage_bonus_pct * 100.0, melee_damage, bow_damage]
 		"crew_defense":
 			var defense_bonus := float(stats.get("defense_add_per_lv", 1.0)) * level
 			var damage_reduction := clampf(float(stats.get("damage_reduction_per_lv", 0.04)) * level, 0.0, float(stats.get("max_damage_reduction", 0.22)))
@@ -194,7 +190,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var rc_dmg = stats.get("base_damage", 7.0) + (level - 1) * stats.get("damage_per_lv", 1.0)
 			return "연노 운용 %d명 | 연사 %d발 | 1발 %.0f" % [repeaters, burst, rc_dmg]
 		"supply":
-			return "선체 회복 +%d | 스태미나 회복 +%d" % [int(stats.get("hull_heal", 20.0)), int(stats.get("stamina_recover", 25.0))]
+			return "선체 회복 +%d" % int(stats.get("hull_heal", 20.0))
 		"gold":
 			return "골드 +%d" % int(stats.get("score_add", 50))
 	return ""

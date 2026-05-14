@@ -179,7 +179,7 @@ func _apply_layout_density() -> void:
 
 	var panel_size := clampf(min(viewport_size.x, viewport_size.y) * 0.20, MIN_WIND_PANEL_SIZE, MAX_WIND_PANEL_SIZE)
 	var panel_margin := roundf(lerpf(12.0, 20.0, clampf((panel_size - MIN_WIND_PANEL_SIZE) / (MAX_WIND_PANEL_SIZE - MIN_WIND_PANEL_SIZE), 0.0, 1.0)))
-	var top_offset := roundf(clampf(viewport_size.y * 0.04, 42.0, 48.0))
+	var top_offset := roundf(clampf(viewport_size.y * 0.028, 26.0, 32.0))
 	wind_panel.anchor_left = 0.0
 	wind_panel.anchor_right = 0.0
 	wind_panel.anchor_top = 0.0
@@ -368,6 +368,7 @@ func _update_rock_markers(delta: float) -> void:
 		marker.position = displayed_position
 		marker.modulate = Color(1.0, 1.0, 1.0, alpha)
 		marker.visible = true
+		_apply_marker_screen_upright(marker)
 		_apply_rock_marker_palette(marker, distance)
 		_rock_marker_slots[slot_index] = slot
 
@@ -448,6 +449,12 @@ func _make_rock_marker() -> Node2D:
 	])
 	marker.add_child(crest)
 	return marker
+
+
+func _apply_marker_screen_upright(marker: Node2D) -> void:
+	if not is_instance_valid(marker):
+		return
+	marker.rotation = -_displayed_compass_rotation
 
 
 func _sync_site_marker_slots(targets: Array[Node3D]) -> void:

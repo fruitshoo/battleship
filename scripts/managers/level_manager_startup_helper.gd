@@ -31,6 +31,8 @@ static func initialize(lm: Node) -> void:
 		if lm.hud.has_method("update_difficulty_ui"):
 			lm.hud.update_difficulty_ui(lm.game_difficulty)
 
+	_start_run_music()
+
 	# 시작 직후 짧은 로딩 오버레이 안에서 예열을 끝내 첫 전투 끊김을 줄인다.
 	if not _env_flag_enabled("BATTLESHIP_SKIP_STARTUP_PREWARM"):
 		lm.call_deferred("_run_startup_bootstrap_async")
@@ -43,6 +45,11 @@ static func initialize(lm: Node) -> void:
 				if level_manager.has_method("_maybe_start_run_prologue"):
 					level_manager.call_deferred("_maybe_start_run_prologue")
 		)
+
+
+static func _start_run_music() -> void:
+	if is_instance_valid(AudioManager) and AudioManager.has_method("play_gameplay_music"):
+		AudioManager.play_gameplay_music()
 
 static func run_startup_bootstrap_async(lm: Node) -> void:
 	await prewarm_shaders(lm, true, true)
@@ -180,6 +187,8 @@ static func _apply_startup_default_equipment(_lm: Node) -> void:
 		return
 	if UpgradeManager.has_method("initialize_default_weapons"):
 		UpgradeManager.initialize_default_weapons()
+	if UpgradeManager.has_method("is_item_system_enabled") and not UpgradeManager.is_item_system_enabled():
+		return
 	# 초요기/일성정시는 현재 시작 기본 아이템으로 장착한다.
 	if not (is_instance_valid(SaveManager) and SaveManager.has_method("has_item") and SaveManager.has_item("choyogi")):
 		UpgradeManager.add_item("choyogi")

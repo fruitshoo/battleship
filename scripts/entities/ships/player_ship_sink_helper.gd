@@ -5,6 +5,7 @@ const WATER_BLAST_SCENE = preload("res://scenes/effects/water_blast.tscn")
 static func die(ship) -> void:
 	if ship.is_sinking or ship.is_dying:
 		return
+	BaseShipStatusHelper.clear_fire_effect(ship)
 	ship.is_dying = true
 	ship.is_sinking = true
 	ship.is_player_controlled = false
@@ -52,6 +53,26 @@ static func die(ship) -> void:
 		if player_ship._cached_level_manager and "current_score" in player_ship._cached_level_manager:
 			print("[GameOver] 침몰! 최종 점수: %d" % player_ship._cached_level_manager.current_score)
 	)
+
+static func trigger_boarding_overrun_game_over(ship) -> void:
+	if ship.is_sinking or ship.is_dying:
+		return
+	BaseShipStatusHelper.clear_fire_effect(ship)
+	ship.is_dying = true
+	ship.is_sinking = true
+	ship.is_player_controlled = false
+	ship.current_speed = 0.0
+	ship.fire_pot_cooldown_timer = 9999.0
+	if is_instance_valid(ship.boarding_target) and ship.boarding_target.has_method("get_boarding_attacker_ship") and ship.boarding_target.get_boarding_attacker_ship() == ship:
+		ship.boarding_target.clear_boarding_attacker_ship()
+	ship.clear_boarding_attacker_ship()
+	disable_combat_modules_on_sink(ship)
+
+	var hud = find_hud(ship)
+	if hud and hud.has_method("show_game_over"):
+		hud.show_game_over()
+	if ship._cached_level_manager and "current_score" in ship._cached_level_manager:
+		print("[GameOver] 갑판 장악! 최종 점수: %d" % ship._cached_level_manager.current_score)
 
 static func disable_combat_modules_on_sink(ship) -> void:
 	for child in ship.get_children():

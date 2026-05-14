@@ -34,10 +34,15 @@ var _language_row: VBoxContainer = null
 var _language_label: Label = null
 var _language_option: OptionButton = null
 var _syncing_language_option: bool = false
+var _sail_control_row: VBoxContainer = null
+var _sail_control_label: Label = null
+var _sail_control_option: OptionButton = null
+var _syncing_sail_control_option: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_create_language_controls()
+	_create_sail_control_controls()
 	_apply_theme()
 	_apply_layout_density()
 	UiButtonAudio.wire_buttons(self)
@@ -58,6 +63,7 @@ func _ready() -> void:
 	fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	back_button.pressed.connect(_on_back_pressed)
 	_populate_language_options()
+	_populate_sail_control_options()
 	_apply_localized_text()
 	_sync_screen_fx_controls()
 	_setup_focus_navigation()
@@ -100,6 +106,38 @@ func _create_language_controls() -> void:
 		content_box.move_child(_language_row, ui_row.get_index() + 1)
 
 
+func _create_sail_control_controls() -> void:
+	if is_instance_valid(_sail_control_option) or not is_instance_valid(content_box):
+		return
+	_sail_control_row = VBoxContainer.new()
+	_sail_control_row.name = "SailControlRow"
+	_sail_control_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var header := HBoxContainer.new()
+	header.name = "SailControlHeader"
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.alignment = BoxContainer.ALIGNMENT_CENTER
+	header.add_theme_constant_override("separation", 12)
+	_sail_control_row.add_child(header)
+
+	_sail_control_label = Label.new()
+	_sail_control_label.name = "SailControlLabel"
+	_sail_control_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_sail_control_label)
+
+	_sail_control_option = OptionButton.new()
+	_sail_control_option.name = "SailControlOption"
+	_sail_control_option.custom_minimum_size = Vector2(172, 34)
+	_sail_control_option.focus_mode = Control.FOCUS_ALL
+	_sail_control_option.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_sail_control_option.item_selected.connect(_on_sail_control_selected)
+	header.add_child(_sail_control_option)
+
+	content_box.add_child(_sail_control_row)
+	if is_instance_valid(_language_row) and _language_row.get_parent() == content_box:
+		content_box.move_child(_sail_control_row, _language_row.get_index() + 1)
+
+
 func _populate_language_options() -> void:
 	if not is_instance_valid(_language_option):
 		return
@@ -117,9 +155,29 @@ func _populate_language_options() -> void:
 	_syncing_language_option = false
 
 
+func _populate_sail_control_options() -> void:
+	if not is_instance_valid(_sail_control_option):
+		return
+	_syncing_sail_control_option = true
+	_sail_control_option.clear()
+	var modes: Array[String] = ["manual", "auto"]
+	var selected_mode := str(SaveManager.get_setting("sail_control_mode", "manual"))
+	var selected_index := 0
+	for i in range(modes.size()):
+		var mode: String = modes[i]
+		var label_key := "options.sail_control.%s" % mode
+		var fallback := "수동" if mode == "manual" else "자동"
+		_sail_control_option.add_item(LocaleManager.t(label_key, fallback), i)
+		_sail_control_option.set_item_metadata(i, mode)
+		if mode == selected_mode:
+			selected_index = i
+	_sail_control_option.select(selected_index)
+	_syncing_sail_control_option = false
+
+
 func _apply_localized_text() -> void:
 	if is_instance_valid(title_label):
-		title_label.text = LocaleManager.t("options.title", "항해 설정")
+		title_label.text = LocaleManager.t("options.title", "설정")
 	if is_instance_valid(subtitle_label):
 		subtitle_label.text = LocaleManager.t("options.subtitle", "음향과 화면 모드를 조정합니다.")
 	if is_instance_valid(master_label):
@@ -132,6 +190,8 @@ func _apply_localized_text() -> void:
 		ui_label.text = LocaleManager.t("options.ui_volume", "UI")
 	if is_instance_valid(_language_label):
 		_language_label.text = LocaleManager.t("options.language", "언어")
+	if is_instance_valid(_sail_control_label):
+		_sail_control_label.text = LocaleManager.t("options.sail_control", "돛 조절")
 	if is_instance_valid(screen_fx_check):
 		screen_fx_check.text = LocaleManager.t("options.screen_fx_enabled", "가장자리 집중 연출")
 	if is_instance_valid(screen_fx_label):
@@ -145,6 +205,7 @@ func _apply_localized_text() -> void:
 
 func _on_locale_changed(_locale: String) -> void:
 	_populate_language_options()
+	_populate_sail_control_options()
 	_apply_localized_text()
 
 
@@ -162,7 +223,7 @@ func _apply_theme() -> void:
 		)
 	if is_instance_valid(panel):
 		ModalMenuSkin.apply_modal_shell(panel, title_label, subtitle_label, true)
-	for label in [master_label, music_label, sfx_label, ui_label, _language_label]:
+	for label in [master_label, music_label, sfx_label, ui_label, _language_label, _sail_control_label]:
 		if not is_instance_valid(label):
 			continue
 		NavalUiTheme.style_body(label, 13)
@@ -176,6 +237,8 @@ func _apply_theme() -> void:
 		NavalUiTheme.apply_menu_toggle(fullscreen_check, 13)
 	if is_instance_valid(_language_option):
 		ModalMenuSkin.apply_action_button_theme(_language_option, false, true)
+	if is_instance_valid(_sail_control_option):
+		ModalMenuSkin.apply_action_button_theme(_sail_control_option, false, true)
 	for slider in [master_slider, music_slider, sfx_slider, ui_slider, screen_fx_slider]:
 		NavalUiTheme.apply_slider(slider, NavalUiTheme.PANEL_BG_DARK, NavalUiTheme.STATUS_ACTIVE_BLUE, 4)
 	if is_instance_valid(back_button):
@@ -192,7 +255,7 @@ func _apply_layout_density() -> void:
 	var density: float = min(width_fit, height_fit)
 	if is_instance_valid(panel):
 		var panel_width := roundf(clampf(viewport_size.x - 148.0, 396.0, 560.0))
-		var panel_height := roundf(clampf(viewport_size.y - 72.0, 408.0, 488.0))
+		var panel_height := roundf(clampf(viewport_size.y - 72.0, 432.0, 532.0))
 		panel.offset_left = -panel_width * 0.5
 		panel.offset_right = panel_width * 0.5
 		panel.offset_top = -panel_height * 0.5
@@ -205,7 +268,7 @@ func _apply_layout_density() -> void:
 		NavalUiTheme.style_display_title(title_label, roundi(lerpf(32.0, 40.0, density)))
 	if is_instance_valid(subtitle_label):
 		NavalUiTheme.style_caption(subtitle_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_BODY)
-	for label in [master_label, music_label, sfx_label, ui_label, _language_label]:
+	for label in [master_label, music_label, sfx_label, ui_label, _language_label, _sail_control_label]:
 		if is_instance_valid(label):
 			NavalUiTheme.style_body(label, roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(screen_fx_label):
@@ -217,6 +280,9 @@ func _apply_layout_density() -> void:
 	if is_instance_valid(_language_option):
 		_language_option.custom_minimum_size = Vector2(roundf(lerpf(154.0, 172.0, density)), roundf(lerpf(32.0, 34.0, density)))
 		_language_option.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
+	if is_instance_valid(_sail_control_option):
+		_sail_control_option.custom_minimum_size = Vector2(roundf(lerpf(154.0, 172.0, density)), roundf(lerpf(32.0, 34.0, density)))
+		_sail_control_option.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(screen_fx_check):
 		screen_fx_check.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(fullscreen_check):
@@ -234,6 +300,7 @@ func _setup_focus_navigation() -> void:
 		sfx_slider,
 		ui_slider,
 		_language_option,
+		_sail_control_option,
 		screen_fx_check,
 		screen_fx_slider,
 		fullscreen_check,
@@ -287,6 +354,13 @@ func _on_language_selected(index: int) -> void:
 		return
 	var locale := str(_language_option.get_item_metadata(index))
 	LocaleManager.set_locale(locale)
+
+
+func _on_sail_control_selected(index: int) -> void:
+	if _syncing_sail_control_option or not is_instance_valid(_sail_control_option):
+		return
+	var mode := str(_sail_control_option.get_item_metadata(index))
+	SaveManager.set_setting("sail_control_mode", mode, false)
 
 
 func _on_screen_fx_toggled(pressed: bool) -> void:

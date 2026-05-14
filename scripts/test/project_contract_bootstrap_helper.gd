@@ -59,6 +59,8 @@ static func run_bootstrap_contract_smoke(owner: Node, failures: Array[String], s
 				failures.append("bootstrap smoke boss taiko BGM did not start")
 			elif bgm_player.volume_db < 1.0:
 				failures.append("bootstrap smoke boss taiko BGM volume too low: %.1fdB" % bgm_player.volume_db)
+			elif not str(bgm_player.stream.resource_path).ends_with(".ogg"):
+				failures.append("bootstrap smoke boss taiko BGM should use an Ogg stream: %s" % bgm_player.stream.resource_path)
 			AudioManager.set_boss_battle_music(false)
 			if not previous_bgm_name.is_empty() and previous_bgm_name != "boss_taiko" and AudioManager.has_method("play_bgm"):
 				AudioManager.play_bgm(previous_bgm_name)

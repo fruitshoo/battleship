@@ -20,6 +20,8 @@ const SOLDIER_DEATH_PITCH_MAX: float = 1.26
 const SOLDIER_DEATH_VOLUME_DB: float = -1.0
 const SOLDIER_SINKING_DEATH_VOLUME_DB: float = -10.0
 const SOLDIER_SINKING_SPLASH_VOLUME_DB: float = -6.0
+const DEFAULT_SHIP_RANGED_COVER_DEFENSE_BONUS: float = 1.0
+const SHIP_RANGED_COVER_BASE_DEFENSE_META := "crew_ranged_cover_base_defense"
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -29,12 +31,12 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 	var defense_bonus: float = 0.0
 	if soldier.has_meta("defense_flat_bonus"):
 		defense_bonus = maxf(0.0, float(soldier.get_meta("defense_flat_bonus")))
+	defense_bonus += get_ship_ranged_cover_defense_bonus(soldier, damage_source)
 	var mitigated_damage: float = maxf(amount - (soldier.defense + defense_bonus), 1.0)
 	var quality_reduction: float = 0.0
 	if soldier.has_meta("defense_reduction"):
 		quality_reduction = clampf(float(soldier.get_meta("defense_reduction")), 0.0, 0.9)
-	var cover_reduction: float = get_ship_ranged_cover_reduction(soldier, damage_source)
-	var total_reduction: float = clampf(quality_reduction + cover_reduction, 0.0, 0.9)
+	var total_reduction: float = clampf(quality_reduction, 0.0, 0.9)
 	var final_damage: float = maxf(mitigated_damage * (1.0 - total_reduction), 1.0)
 	soldier.current_health -= final_damage
 	soldier.set_meta("last_damage_source", damage_source)
@@ -66,6 +68,10 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 
 
 static func get_ship_ranged_cover_reduction(soldier, damage_source: String) -> float:
+	return 0.0
+
+
+static func get_ship_ranged_cover_defense_bonus(soldier, damage_source: String) -> float:
 	if not soldier.RANGED_DAMAGE_SOURCES.has(damage_source):
 		return 0.0
 	if not is_instance_valid(soldier.owned_ship):
@@ -74,7 +80,13 @@ static func get_ship_ranged_cover_reduction(soldier, damage_source: String) -> f
 		return 0.0
 	if soldier.current_state == soldier.State.DEAD:
 		return 0.0
-	return 0.2
+	var base_bonus: float = DEFAULT_SHIP_RANGED_COVER_DEFENSE_BONUS
+	if soldier.owned_ship.has_meta(SHIP_RANGED_COVER_BASE_DEFENSE_META):
+		base_bonus = maxf(0.0, float(soldier.owned_ship.get_meta(SHIP_RANGED_COVER_BASE_DEFENSE_META)))
+	var upgrade_bonus: float = 0.0
+	if soldier.owned_ship.has_meta("crew_ranged_cover_defense_bonus"):
+		upgrade_bonus = maxf(0.0, float(soldier.owned_ship.get_meta("crew_ranged_cover_defense_bonus")))
+	return base_bonus + upgrade_bonus
 
 
 static func update_boarding_chaos(soldier, delta: float) -> void:
