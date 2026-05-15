@@ -2,6 +2,8 @@ extends Node3D
 
 const PLAYER_SHIP_SCENE := preload("res://scenes/ships/player_ship.tscn")
 const ENEMY_MELEE_SCENE := preload("res://scenes/ships/enemy_melee_ship.tscn")
+const SoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 
 @export var auto_open_debug_panel: bool = true
 @export var stop_regular_spawns: bool = true
@@ -23,6 +25,8 @@ var _current_scenario_elapsed: float = 0.0
 var _current_scenario_started_usec: int = 0
 var _current_player_ship: Node3D = null
 var _current_enemy_ship: Node3D = null
+var _current_player_soldiers: Array[Node3D] = []
+var _current_enemy_soldiers: Array[Node3D] = []
 var _scenario_running: bool = false
 var _sequence_finished: bool = false
 
@@ -39,6 +43,11 @@ func _process(delta: float) -> void:
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = 0.2
 		_update_overlay()
+
+
+func _physics_process(delta: float) -> void:
+	if _scenario_running:
+		_tick_preview_duel(delta)
 
 
 func _configure_preview() -> void:
@@ -110,6 +119,7 @@ func _run_scenarios() -> void:
 	for scenario_index in range(_scenario_defs.size()):
 		var scenario: Dictionary = _scenario_defs[scenario_index]
 		_current_scenario_index = scenario_index
+		seed(9100 + scenario_index)
 		await _setup_scenario(scenario)
 		_current_scenario_elapsed = 0.0
 		_current_scenario_started_usec = Time.get_ticks_usec()
@@ -160,13 +170,13 @@ func _setup_scenario(scenario: Dictionary) -> void:
 	_configure_player_runtime()
 	_configure_enemy_runtime()
 
-	await _configure_ship_roster(
+	_current_player_soldiers = await _configure_ship_roster(
 		_current_player_ship,
 		scenario.get("player_roles", []),
 		true,
 		scenario.get("player_force_ranged_only", false) == true
 	)
-	await _configure_ship_roster(
+	_current_enemy_soldiers = await _configure_ship_roster(
 		_current_enemy_ship,
 		scenario.get("enemy_roles", []),
 		false,
@@ -180,6 +190,8 @@ func _setup_scenario(scenario: Dictionary) -> void:
 
 
 func _clear_existing_preview_ships() -> void:
+	_current_player_soldiers.clear()
+	_current_enemy_soldiers.clear()
 	for child in get_children():
 		if child is Node3D and (
 			child.name == "PlayerShip"
@@ -249,16 +261,17 @@ func _configure_enemy_runtime() -> void:
 		_current_enemy_ship.set("allow_boarding", false)
 
 
-func _configure_ship_roster(ship: Node3D, roster_variant: Variant, is_player: bool, force_ranged_only: bool) -> void:
+func _configure_ship_roster(ship: Node3D, roster_variant: Variant, is_player: bool, force_ranged_only: bool) -> Array[Node3D]:
+	var configured: Array[Node3D] = []
 	if not is_instance_valid(ship):
-		return
+		return configured
 	var roster: Array[String] = []
 	for entry in roster_variant:
 		roster.append(str(entry).strip_edges().to_lower())
 
 	var soldiers_node: Node = ship.get_node_or_null("Soldiers")
 	if not is_instance_valid(soldiers_node):
-		return
+		return configured
 
 	while soldiers_node.get_child_count() < roster.size():
 		if is_player and ship.has_method("_spawn_player_soldier"):
@@ -287,12 +300,17 @@ func _configure_ship_roster(ship: Node3D, roster_variant: Variant, is_player: bo
 			soldiers.append(child)
 
 	for soldier_index in range(mini(soldiers.size(), roster.size())):
+		var soldier := soldiers[soldier_index] as Node3D
+		if not is_instance_valid(soldier):
+			continue
 		_configure_soldier_for_role(
-			soldiers[soldier_index],
+			soldier,
 			roster[soldier_index],
 			is_player,
 			force_ranged_only
 		)
+		configured.append(soldier)
+	return configured
 
 
 func _configure_soldier_for_role(soldier: Node, role_name: String, is_player: bool, force_ranged_only: bool) -> void:
@@ -300,6 +318,8 @@ func _configure_soldier_for_role(soldier: Node, role_name: String, is_player: bo
 		return
 	if soldier.has_method("set_captain_status"):
 		soldier.call("set_captain_status", false, 1.0, 1.0, 0.0)
+	soldier.set_meta("disable_incapacitation", true)
+	soldier.set_meta("disable_kill_rewards", true)
 	if "is_melee_only" in soldier:
 		soldier.set("is_melee_only", false)
 	if "is_ranged_only" in soldier:
@@ -317,6 +337,7 @@ func _configure_soldier_for_role(soldier: Node, role_name: String, is_player: bo
 
 	if soldier.has_method("set_team"):
 		soldier.call("set_team", "player" if is_player else "enemy")
+	_normalize_preview_soldier_stats(soldier)
 	if "current_health" in soldier and "max_health" in soldier:
 		soldier.set("current_health", float(soldier.get("max_health")))
 	if "attack_timer" in soldier:
@@ -327,17 +348,45 @@ func _configure_soldier_for_role(soldier: Node, role_name: String, is_player: bo
 		soldier.set("combat_timer", 0.0)
 	if "rest_recovery_delay_timer" in soldier:
 		soldier.set("rest_recovery_delay_timer", 999.0)
+	if "limbo_ai_pilot_enabled" in soldier:
+		soldier.set("limbo_ai_pilot_enabled", false)
+	soldier.set_meta("balance_preview_force_ranged_only", force_ranged_only)
+	if soldier.has_method("_change_state"):
+		soldier.call("_change_state", 0)
+	soldier.set_physics_process(false)
+
+
+func _normalize_preview_soldier_stats(soldier: Node) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if "max_health" in soldier:
+		soldier.set("max_health", 100.0)
+	if "current_health" in soldier:
+		soldier.set("current_health", 100.0)
+	if "defense" in soldier:
+		soldier.set("defense", 0.0)
+	if "attack_damage" in soldier:
+		soldier.set("attack_damage", 12.0)
+	if soldier.has_meta("defense_flat_bonus"):
+		soldier.remove_meta("defense_flat_bonus")
+	if soldier.has_meta("defense_reduction"):
+		soldier.remove_meta("defense_reduction")
+	if soldier.has_meta("damage_multiplier"):
+		soldier.remove_meta("damage_multiplier")
+	if soldier.has_method("_update_weapon_stats"):
+		soldier.call("_update_weapon_stats")
 
 
 func _stage_soldier_lines(line_gap: float) -> void:
-	var player_soldiers := _get_alive_ship_soldiers(_current_player_ship)
-	var enemy_soldiers := _get_alive_ship_soldiers(_current_enemy_ship)
+	var player_soldiers := _get_alive_preview_soldiers(_current_player_soldiers)
+	var enemy_soldiers := _get_alive_preview_soldiers(_current_enemy_soldiers)
 	if player_soldiers.is_empty() or enemy_soldiers.is_empty():
 		return
 
 	var enemy_forward := -_current_enemy_ship.global_basis.z.normalized()
 	var enemy_right := _current_enemy_ship.global_basis.x.normalized()
-	var stage_center := _current_enemy_ship.global_position + enemy_right * stage_line_x + Vector3.UP * 0.65
+	var deck_height: float = float(_current_enemy_ship.get("deck_height")) if _current_enemy_ship.get("deck_height") != null else 0.65
+	var stage_center := _current_enemy_ship.global_position + enemy_right * stage_line_x + Vector3.UP * deck_height
 
 	var player_anchor := stage_center - enemy_forward * (line_gap * 0.5)
 	var enemy_anchor := stage_center + enemy_forward * (line_gap * 0.5)
@@ -363,8 +412,8 @@ func _stage_soldier_lines(line_gap: float) -> void:
 
 
 func _seed_initial_targets() -> void:
-	var player_soldiers := _get_alive_ship_soldiers(_current_player_ship)
-	var enemy_soldiers := _get_alive_ship_soldiers(_current_enemy_ship)
+	var player_soldiers := _get_alive_preview_soldiers(_current_player_soldiers)
+	var enemy_soldiers := _get_alive_preview_soldiers(_current_enemy_soldiers)
 	for player_soldier in player_soldiers:
 		var target := _find_nearest_opponent(player_soldier, enemy_soldiers)
 		_assign_initial_target(player_soldier, target)
@@ -404,6 +453,98 @@ func _assign_initial_target(soldier: Node, target: Node3D) -> void:
 		soldier.call("_change_state", 3 if distance_xz <= attack_range else 2)
 
 
+func _tick_preview_duel(delta: float) -> void:
+	var player_soldiers := _get_alive_preview_soldiers(_current_player_soldiers)
+	var enemy_soldiers := _get_alive_preview_soldiers(_current_enemy_soldiers)
+	for soldier in player_soldiers:
+		_tick_preview_soldier(soldier, enemy_soldiers, delta)
+	for soldier in enemy_soldiers:
+		_tick_preview_soldier(soldier, player_soldiers, delta)
+
+
+func _tick_preview_soldier(soldier: Node3D, opponents: Array[Node3D], delta: float) -> void:
+	if not is_instance_valid(soldier) or SoldierStateHelper.is_dead_soldier(soldier):
+		return
+	var target := _find_nearest_opponent(soldier, opponents)
+	if not is_instance_valid(target):
+		if soldier.has_method("_change_state"):
+			soldier.call("_change_state", 0)
+		return
+
+	soldier.set("current_target", target)
+	if "attack_timer" in soldier:
+		soldier.set("attack_timer", maxf(0.0, float(soldier.get("attack_timer")) - delta))
+	if "velocity" in soldier:
+		soldier.set("velocity", Vector3.ZERO)
+
+	var distance_xz := Vector2(
+		soldier.global_position.x - target.global_position.x,
+		soldier.global_position.z - target.global_position.z
+	).length()
+	_select_preview_weapon(soldier, distance_xz)
+
+	var current_weapon: Variant = soldier.get("current_weapon")
+	var attack_range: float = 1.2
+	if current_weapon != null and "attack_range" in current_weapon:
+		attack_range = float(current_weapon.attack_range)
+	var is_ranged_weapon := current_weapon != null and current_weapon.get("max_range") != null
+	var desired_range := attack_range * (0.74 if is_ranged_weapon else 0.92)
+	if distance_xz > desired_range:
+		_move_preview_soldier_toward(soldier, target.global_position, delta)
+		if soldier.has_method("_change_state"):
+			soldier.call("_change_state", 2)
+		return
+
+	if soldier.has_method("_change_state"):
+		soldier.call("_change_state", 3)
+	if float(soldier.get("attack_timer")) > 0.0:
+		return
+	_perform_preview_attack(soldier, target)
+	soldier.set("attack_timer", SoldierCombatHelper.get_effective_attack_cooldown(soldier))
+
+
+func _perform_preview_attack(soldier: Node3D, target: Node3D) -> void:
+	if not is_instance_valid(soldier) or not is_instance_valid(target):
+		return
+	if not target.has_method("take_damage"):
+		return
+	var current_weapon: Variant = soldier.get("current_weapon")
+	var damage: float = float(soldier.get("attack_damage")) if soldier.get("attack_damage") != null else 12.0
+	var damage_source := "preview"
+	if current_weapon != null:
+		if current_weapon.get("damage") != null:
+			damage = float(current_weapon.get("damage"))
+		damage_source = str(current_weapon.get_meta("weapon_id", damage_source))
+		if damage_source == "repeating_crossbow" and current_weapon.get("burst_count") != null:
+			damage *= maxf(1.0, float(current_weapon.get("burst_count")))
+	target.call("take_damage", damage, soldier.global_position, damage_source)
+
+
+func _select_preview_weapon(soldier: Node, distance_xz: float) -> void:
+	if not is_instance_valid(soldier) or not soldier.has_method("_set_active_weapon"):
+		return
+	var force_ranged := bool(soldier.get_meta("balance_preview_force_ranged_only", false))
+	var role_name := str(soldier.get("crew_role")).strip_edges().to_lower() if soldier.get("crew_role") != null else ""
+	if force_ranged:
+		soldier.call("_set_active_weapon", "bow")
+	elif role_name == "spearman":
+		soldier.call("_set_active_weapon", "sword")
+	else:
+		var switch_distance := float(soldier.get("weapon_switch_distance")) if soldier.get("weapon_switch_distance") != null else 4.0
+		soldier.call("_set_active_weapon", "sword" if distance_xz <= switch_distance else "bow")
+
+
+func _move_preview_soldier_toward(soldier: Node3D, target_position: Vector3, delta: float) -> void:
+	var flat_target := Vector3(target_position.x, soldier.global_position.y, target_position.z)
+	var diff := flat_target - soldier.global_position
+	diff.y = 0.0
+	if diff.length_squared() <= 0.01:
+		return
+	var speed: float = float(soldier.get("move_speed")) if soldier.get("move_speed") != null else 3.0
+	soldier.global_position = soldier.global_position.move_toward(soldier.global_position + diff.normalized() * speed, speed * delta)
+	soldier.look_at(flat_target, Vector3.UP)
+
+
 func _get_line_spread_offset(index: int, count: int) -> float:
 	if count <= 1:
 		return 0.0
@@ -421,18 +562,29 @@ func _get_alive_ship_soldiers(ship: Node3D) -> Array[Node3D]:
 	for child in soldiers_node.get_children():
 		if not (child is Node3D):
 			continue
-		if child.has_method("is_dead_soldier") and child.call("is_dead_soldier") == true:
+		if SoldierStateHelper.is_dead_soldier(child):
 			continue
 		alive.append(child)
+	return alive
+
+
+func _get_alive_preview_soldiers(soldiers: Array[Node3D]) -> Array[Node3D]:
+	var alive: Array[Node3D] = []
+	for soldier in soldiers:
+		if not is_instance_valid(soldier):
+			continue
+		if SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		alive.append(soldier)
 	return alive
 
 
 func _is_current_scenario_finished() -> bool:
 	if not is_instance_valid(_current_player_ship) or not is_instance_valid(_current_enemy_ship):
 		return true
-	if _get_ship_alive_crew(_current_player_ship) <= 0:
+	if _get_side_alive_crew(true) <= 0:
 		return true
-	if _get_ship_alive_crew(_current_enemy_ship) <= 0:
+	if _get_side_alive_crew(false) <= 0:
 		return true
 	return _current_scenario_elapsed >= scenario_time_limit_seconds
 
@@ -441,12 +593,12 @@ func _build_current_result() -> Dictionary:
 	var scenario: Dictionary = {}
 	if _current_scenario_index >= 0 and _current_scenario_index < _scenario_defs.size():
 		scenario = _scenario_defs[_current_scenario_index]
-	var player_alive := _get_ship_alive_crew(_current_player_ship)
-	var enemy_alive := _get_ship_alive_crew(_current_enemy_ship)
-	var player_hp := _get_ship_alive_health(_current_player_ship)
-	var enemy_hp := _get_ship_alive_health(_current_enemy_ship)
-	var player_hp_pct := _get_ship_alive_health_ratio(_current_player_ship)
-	var enemy_hp_pct := _get_ship_alive_health_ratio(_current_enemy_ship)
+	var player_alive := _get_side_alive_crew(true)
+	var enemy_alive := _get_side_alive_crew(false)
+	var player_hp := _get_side_alive_health(true)
+	var enemy_hp := _get_side_alive_health(false)
+	var player_hp_pct := _get_side_alive_health_ratio(true)
+	var enemy_hp_pct := _get_side_alive_health_ratio(false)
 	var winner := "draw"
 	if player_alive > 0 and enemy_alive <= 0:
 		winner = "player"
@@ -473,12 +625,37 @@ func _build_current_result() -> Dictionary:
 	}
 
 
+func _get_side_alive_crew(is_player: bool) -> int:
+	return _get_alive_preview_soldiers(_current_player_soldiers if is_player else _current_enemy_soldiers).size()
+
+
 func _get_ship_alive_crew(ship: Node) -> int:
 	if not is_instance_valid(ship):
 		return 0
 	if ship.has_method("get_alive_crew_count"):
 		return int(ship.call("get_alive_crew_count"))
 	return 0
+
+
+func _get_side_alive_health(is_player: bool) -> float:
+	var total_health: float = 0.0
+	for soldier in _get_alive_preview_soldiers(_current_player_soldiers if is_player else _current_enemy_soldiers):
+		if "current_health" in soldier:
+			total_health += float(soldier.get("current_health"))
+	return total_health
+
+
+func _get_side_alive_health_ratio(is_player: bool) -> float:
+	var total_health: float = 0.0
+	var total_max_health: float = 0.0
+	for soldier in _get_alive_preview_soldiers(_current_player_soldiers if is_player else _current_enemy_soldiers):
+		if "current_health" in soldier:
+			total_health += float(soldier.get("current_health"))
+		if "max_health" in soldier:
+			total_max_health += float(soldier.get("max_health"))
+	if total_max_health <= 0.0:
+		return 0.0
+	return total_health / total_max_health
 
 
 func _get_ship_alive_health(ship: Node3D) -> float:
@@ -557,10 +734,10 @@ func _update_overlay() -> void:
 	var scenario_name := "Waiting"
 	if _current_scenario_index >= 0 and _current_scenario_index < _scenario_defs.size():
 		scenario_name = str(_scenario_defs[_current_scenario_index].get("name", scenario_name))
-	var player_alive := _get_ship_alive_crew(_current_player_ship)
-	var enemy_alive := _get_ship_alive_crew(_current_enemy_ship)
-	var player_hp := _get_ship_alive_health(_current_player_ship)
-	var enemy_hp := _get_ship_alive_health(_current_enemy_ship)
+	var player_alive := _get_side_alive_crew(true)
+	var enemy_alive := _get_side_alive_crew(false)
+	var player_hp := _get_side_alive_health(true)
+	var enemy_hp := _get_side_alive_health(false)
 	var winner := "-"
 	if _sequence_finished and not _scenario_results.is_empty():
 		winner = str(_scenario_results[_scenario_results.size() - 1].get("winner", "-"))

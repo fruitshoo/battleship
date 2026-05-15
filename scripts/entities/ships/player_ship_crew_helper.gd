@@ -5,6 +5,9 @@ const RAID_LARGE_TARGET_EDGE_BUFFER: float = 1.45
 const RAID_LARGE_TARGET_ALONG_BUFFER: float = 1.0
 const RAID_MAX_ACTIVE_THREATS: int = 1
 const AUTO_RAID_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_AUTO_RAID
+const SURVIVOR_JOIN_HEALTH_RATIO: float = 0.35
+const SURVIVOR_JOIN_MIN_HEALTH: float = 8.0
+const SURVIVOR_JOIN_HEALTH_BAR_DURATION: float = 2.4
 
 static func get_desired_player_captain_count(ship) -> int:
 	return clampi(int(ship.captain_count), 0, maxi(0, int(ship.max_crew_count)))
@@ -201,7 +204,11 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 		current_by_role[role] += 1
 
 	if current_captains < desired_captains:
-		spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
+		var captain := spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
+		if source == "respawn":
+			_place_respawn_crew_at_stair(ship, soldiers_node, captain)
+		if source == "survivor":
+			_apply_survivor_join_condition(captain)
 		var captain_message: String = "생존자 구조: 장군 복귀" if source == "survivor" else "병사 보충: 장군 복귀"
 		print("[%s] 장군 1명이 복귀했습니다. (현재: %d/%d)" % [_get_crew_add_log_tag(source), alive_count + 1, ship.max_crew_count])
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
@@ -220,7 +227,11 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 			break
 	if not found_slot and not allow_over_capacity:
 		return false
-	spawn_player_soldier(ship, soldiers_node, role_to_add)
+	var new_crew := spawn_player_soldier(ship, soldiers_node, role_to_add)
+	if source == "respawn":
+		_place_respawn_crew_at_stair(ship, soldiers_node, new_crew)
+	if source == "survivor":
+		_apply_survivor_join_condition(new_crew)
 
 	var crew_message: String = "생존자 구조 완료!" if source == "survivor" else "병사 보충 완료!"
 	print("[%s] 아군 병사 1명 합류. (현재: %d/%d)" % [_get_crew_add_log_tag(source), alive_count + 1, ship.max_crew_count])
@@ -230,6 +241,41 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("soldier_hit", ship.global_position, 1.5)
 	return true
+
+
+static func _apply_survivor_join_condition(soldier: Node) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if soldier.get("max_health") == null or soldier.get("current_health") == null:
+		return
+	var max_health := maxf(1.0, float(soldier.get("max_health")))
+	var rescued_health := clampf(maxf(SURVIVOR_JOIN_MIN_HEALTH, max_health * SURVIVOR_JOIN_HEALTH_RATIO), 1.0, max_health)
+	soldier.set("current_health", rescued_health)
+	if soldier.get("ally_health_bar_visible_timer") != null:
+		soldier.set("ally_health_bar_visible_timer", SURVIVOR_JOIN_HEALTH_BAR_DURATION)
+	if soldier.get("rest_recovery_delay_timer") != null:
+		soldier.set("rest_recovery_delay_timer", 0.0)
+
+
+static func _place_respawn_crew_at_stair(ship, soldiers_node: Node, soldier: Node) -> void:
+	var soldier_3d := soldier as Node3D
+	var soldiers_node_3d := soldiers_node as Node3D
+	if not is_instance_valid(soldier_3d) or not is_instance_valid(soldiers_node_3d):
+		return
+	if not is_instance_valid(ship) or not ship.has_method("get_crew_respawn_global_position"):
+		return
+	var spawn_global: Vector3 = ship.call("get_crew_respawn_global_position")
+	soldier_3d.global_position = spawn_global
+	var look_forward := Vector3.FORWARD
+	var ship_3d := ship as Node3D
+	if is_instance_valid(ship_3d):
+		look_forward = -ship_3d.global_transform.basis.z
+	var look_target: Vector3 = spawn_global + look_forward
+	look_target.y = spawn_global.y
+	if not spawn_global.is_equal_approx(look_target):
+		soldier_3d.look_at(look_target, Vector3.UP)
+	if soldier.get("ally_health_bar_visible_timer") != null:
+		soldier.set("ally_health_bar_visible_timer", 1.4)
 
 
 static func _get_crew_add_log_tag(source: String) -> String:

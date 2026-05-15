@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cwnaa6dya4x2g"]
 
-[ext_resource type="PackedScene" path="res://scenes/props/helmet.tscn" id="1_g1b0k"]
+[ext_resource type="PackedScene" path="res://scenes/props/korean_helmet.tscn" id="1_g1b0k"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
 radius = 0.2
@@ -16,5 +16,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.625, 0)
 mesh = SubResource("CapsuleMesh_body")
 surface_material_override/0 = SubResource("Material_body")
 
-[node name="Helmet" parent="." unique_id=333543666 instance=ExtResource("1_g1b0k")]
-transform = Transform3D(-0.59999996, 0, 5.2453665e-08, 0, 0.59999996, 0, -5.2453665e-08, 0, -0.59999996, 0, 0.9634069, 0)
+[node name="KoreanHelmet" parent="." unique_id=2013234783 instance=ExtResource("1_g1b0k")]
+transform = Transform3D(-0.6, 0, 9.059749e-08, 0, 0.6, 0, -9.059749e-08, 0, -0.6, 0, 0.8210652, 0)

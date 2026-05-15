@@ -221,7 +221,14 @@ static func get_load_multiplier(ship) -> float:
 		load_multiplier *= 0.9
 	if _is_gunner(ship):
 		load_multiplier *= 1.05
+	load_multiplier *= _get_performance_cpu_interval_scale()
 	return clampf(load_multiplier, 0.75, 2.0)
+
+
+static func _get_performance_cpu_interval_scale() -> float:
+	if is_instance_valid(SaveManager) and SaveManager.has_method("get_performance_cpu_interval_scale"):
+		return float(SaveManager.call("get_performance_cpu_interval_scale"))
+	return 1.0
 
 
 static func _update_load_counts_cache() -> void:

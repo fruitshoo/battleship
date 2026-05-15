@@ -41,6 +41,13 @@ const RAMMING_DAMAGE_SIDE_HIT_MULT := 1.35
 const RAMMING_DAMAGE_BOW_HIT_MULT := 0.55
 const RAMMING_DAMAGE_ATTACKER_MIN_ALIGNMENT_MULT := 0.75
 const RAMMING_DAMAGE_ATTACKER_MAX_ALIGNMENT_MULT := 1.22
+const RAMMING_BOOST_ASSIST_PAD := 0.95
+const RAMMING_BOOST_ASSIST_FORWARD_DOT := 0.52
+const RAMMING_BOOST_ASSIST_MIN_SPEED_RATIO := 0.68
+const RAMMING_BOOST_IMPACT_BRAKE := 0.42
+const RAMMING_LETHAL_IMPACT_BRAKE := 0.58
+const RAMMING_BOOST_BACK_IMPULSE := 1.15
+const RAMMING_LETHAL_VFX_SPEED_MULT := 1.28
 const HEAD_ON_ESCAPE_RUDDER_DEADZONE := 5.0
 const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
 
@@ -163,6 +170,8 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			continue
 		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
+
+		_try_assisted_ramming_boost_contact(ship, other, dist, coll_dist)
 
 		if dist < coll_dist:
 			var compression = coll_dist - dist
@@ -637,6 +646,45 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 	return true
 
 
+static func _try_assisted_ramming_boost_contact(ship, other: Node3D, dist: float, coll_dist: float) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return false
+	if not NodeContractHelper.is_player_controlled_ship(ship):
+		return false
+	if NodeContractHelper.get_team_tag(ship) == NodeContractHelper.get_team_tag(other):
+		return false
+	if NodeContractHelper.is_sinking_or_dying(other):
+		return false
+	if not ship.has_method("is_ramming_boost_active") or ship.call("is_ramming_boost_active") != true:
+		return false
+	if dist > coll_dist + RAMMING_BOOST_ASSIST_PAD:
+		return false
+	var to_other: Vector3 = other.global_position - ship.global_position
+	to_other.y = 0.0
+	if to_other.length_squared() <= 0.0001:
+		return false
+	var dir := to_other.normalized()
+	var ship_fwd: Vector3 = -ship.global_transform.basis.z
+	ship_fwd.y = 0.0
+	if ship_fwd.length_squared() <= 0.0001:
+		return false
+	ship_fwd = ship_fwd.normalized()
+	var forward_dot := ship_fwd.dot(dir)
+	if forward_dot < RAMMING_BOOST_ASSIST_FORWARD_DOT:
+		return false
+	var speed_value: Variant = ship.get("current_speed")
+	var current_speed: float = absf(float(speed_value)) if speed_value != null else 0.0
+	var min_speed_value: Variant = ship.get("min_ramming_speed")
+	var min_speed: float = maxf(float(min_speed_value) if min_speed_value != null else 6.0, 0.1)
+	if current_speed < min_speed * RAMMING_BOOST_ASSIST_MIN_SPEED_RATIO:
+		return false
+	var impact_speed: float = maxf(current_speed * lerpf(0.82, 1.0, clampf(forward_dot, 0.0, 1.0)), min_speed)
+	if other.has_method("apply_ramming_damage"):
+		other.call("apply_ramming_damage", ship, impact_speed)
+		return true
+	return false
+
+
 static func _is_derelict_ship(node: Node) -> bool:
 	if not is_instance_valid(node):
 		return false
@@ -754,6 +802,8 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 
 	var impact_pos = (ship.global_position + other.global_position) * 0.5
 	impact_pos.y = 0.5
+	var is_boosted_hit := _is_ramming_boost_attacker(other)
+	var will_sink_from_hit := _will_ramming_hit_sink(ship, final_ram_damage)
 
 	if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
 		ship._cached_audio_manager.play_sfx("impact_wood", ship.global_position, randf_range(0.6, 0.8), 5.0)
@@ -762,13 +812,62 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	if cam and cam.has_method("shake"):
 		cam.shake(clamp(impact_speed * 0.05, 0.2, 0.6), 0.3)
 
-	try_spawn_strong_collision_effects(ship, other, impact_speed)
+	if is_boosted_hit or will_sink_from_hit:
+		spawn_ship_collision_effects(ship, _get_ship_contact_point(ship, other), impact_speed * (RAMMING_LETHAL_VFX_SPEED_MULT if will_sink_from_hit else 1.0))
+	else:
+		try_spawn_strong_collision_effects(ship, other, impact_speed)
 	ship.apply_ramming_aoe(clamp(impact_speed * 1.5, 5.0, 20.0), impact_pos)
+	_apply_ramming_impact_resistance(ship, other, impact_speed, dir_to_other, is_boosted_hit, will_sink_from_hit)
+	_apply_ramming_knockback(ship, other, impact_speed, dir_to_other)
 
 	if ship.DEBUG_COMBAT_LOGS:
 		print("[Ramming] 충각 발생! (속도: %.1f) - 내 각도계수: %.2f, 공격 정렬: %.2f -> 입은 피해: %.1f" % [impact_speed, angle_mult, attacker_alignment_mult, final_ram_damage])
 	ship.take_damage(final_ram_damage, (ship.global_position + other.global_position) * 0.5, "ramming")
-	_apply_ramming_knockback(ship, other, impact_speed, dir_to_other)
+	if is_instance_valid(other) and other.has_method("notify_ramming_boost_hit"):
+		other.call("notify_ramming_boost_hit")
+
+
+static func _is_ramming_boost_attacker(attacker: Node) -> bool:
+	if not is_instance_valid(attacker) or not attacker.has_method("is_ramming_boost_active"):
+		return false
+	return attacker.call("is_ramming_boost_active") == true
+
+
+static func _will_ramming_hit_sink(victim: Node, raw_ramming_damage: float) -> bool:
+	if not is_instance_valid(victim):
+		return false
+	var hp_value: Variant = victim.get("hull_hp")
+	if hp_value == null:
+		return false
+	var defense_value: Variant = victim.get("hull_defense")
+	var defense := float(defense_value) if defense_value != null else 0.0
+	var expected_damage := maxf(raw_ramming_damage - defense, 1.0)
+	return float(hp_value) - expected_damage <= 0.0
+
+
+static func _apply_ramming_impact_resistance(victim: Node, attacker: Node3D, impact_speed: float, dir_to_attacker: Vector3, is_boosted_hit: bool, will_sink_from_hit: bool) -> void:
+	if not is_instance_valid(victim) or not is_instance_valid(attacker):
+		return
+	if NodeContractHelper.get_team_tag(victim) == NodeContractHelper.get_team_tag(attacker):
+		return
+	if not is_boosted_hit and not will_sink_from_hit:
+		return
+
+	var speed_value: Variant = attacker.get("current_speed")
+	if speed_value != null:
+		var current_speed := float(speed_value)
+		var victim_mass := get_ship_mass_scale(victim)
+		var attacker_mass := get_ship_mass_scale(attacker)
+		var mass_brake := clampf((victim_mass / maxf(attacker_mass, 0.1) - 1.0) * 0.10, 0.0, 0.16)
+		var brake := clampf((RAMMING_LETHAL_IMPACT_BRAKE if will_sink_from_hit else RAMMING_BOOST_IMPACT_BRAKE) + mass_brake, 0.22, 0.72)
+		attacker.set("current_speed", lerpf(current_speed, 0.0, brake))
+
+	dir_to_attacker.y = 0.0
+	if dir_to_attacker.length_squared() <= 0.0001:
+		return
+	if attacker.has_method("apply_collision_impulse"):
+		var back_impulse := dir_to_attacker.normalized() * clampf(impact_speed * 0.16, 0.35, RAMMING_BOOST_BACK_IMPULSE)
+		attacker.call("apply_collision_impulse", back_impulse)
 
 
 static func _apply_ramming_knockback(victim, attacker: Node3D, impact_speed: float, dir_to_attacker: Vector3) -> void:

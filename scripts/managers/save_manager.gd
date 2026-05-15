@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS := {
 	"music_volume": 0.75,
 	"sfx_volume": 0.85,
 	"ui_volume": 0.85,
+	"performance_preset": "quality",
 	"fullscreen": false,
 	"screen_edge_fx_enabled": true,
 	"screen_edge_fx_strength": 0.75,
@@ -24,6 +25,8 @@ var gold: int = 0
 var meta_upgrades: Dictionary = {}
 var items: Array[String] = []
 var settings: Dictionary = {}
+var performance_vfx_scale: float = 1.0
+var performance_cpu_interval_scale: float = 1.0
 
 func _ready() -> void:
 	load_game()
@@ -144,6 +147,7 @@ func apply_settings() -> void:
 	_set_bus_volume_linear("UI", float(get_setting("ui_volume", 0.85)))
 	var fullscreen: bool = get_setting("fullscreen", false) == true
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	_apply_performance_preset()
 	_apply_gamepad_confirm_button_layout()
 
 func _set_bus_volume_linear(bus_name: String, linear: float) -> void:
@@ -158,6 +162,41 @@ func _set_bus_volume_linear(bus_name: String, linear: float) -> void:
 
 func _apply_gamepad_confirm_button_layout() -> void:
 	InputSettingsHelper.apply_gamepad_confirm_button_layout(str(get_setting("gamepad_confirm_button", "bottom")))
+
+func _apply_performance_preset() -> void:
+	var preset := str(get_setting("performance_preset", "quality"))
+	var render_scale := 1.0
+	performance_vfx_scale = 1.0
+	performance_cpu_interval_scale = 1.0
+	match preset:
+		"balanced":
+			render_scale = 0.88
+			performance_vfx_scale = 0.84
+			performance_cpu_interval_scale = 1.06
+		"performance":
+			render_scale = 0.74
+			performance_vfx_scale = 0.64
+			performance_cpu_interval_scale = 1.14
+		_:
+			render_scale = 1.0
+			performance_vfx_scale = 1.0
+			performance_cpu_interval_scale = 1.0
+	var viewport := get_tree().root if get_tree() != null else null
+	if viewport == null:
+		return
+	_set_viewport_property_if_present(viewport, "scaling_3d_scale", render_scale)
+	_set_viewport_property_if_present(viewport, "scaling_3d_mode", 1 if render_scale < 0.999 else 0)
+
+
+func _set_viewport_property_if_present(viewport: Viewport, property_name: String, value) -> void:
+	for property in viewport.get_property_list():
+		if str(property.get("name", "")) == property_name:
+			viewport.set(property_name, value)
+			return
+
+
+func get_performance_cpu_interval_scale() -> float:
+	return clampf(performance_cpu_interval_scale, 1.0, 1.25)
 
 func _env_flag_enabled(name: String) -> bool:
 	var value := OS.get_environment(name).strip_edges().to_lower()

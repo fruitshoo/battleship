@@ -286,7 +286,7 @@ func _grant_reward(player_ship: Node3D) -> void:
 			var total_xp := xp_amount + bonus_xp_amount
 			if total_xp > 0:
 				reward_parts.append("XP +%d" % total_xp)
-			hud.call("show_message", "표류 적병 수습: %s" % " / ".join(reward_parts), 1.5)
+			hud.call("show_message", LocaleManager.t("hud.enemy_drifter.recovered", "표류 적병 수습: {rewards}", {"rewards": " / ".join(reward_parts)}), 1.5)
 	var audio_manager := get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("treasure_collect", null, randf_range(0.9, 1.05))

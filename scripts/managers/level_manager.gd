@@ -1025,9 +1025,14 @@ func show_victory() -> void:
 		var result_delay := _get_result_transition_delay()
 		if hud.has_method("show_victory_result_transition"):
 			var transition_outcome_text := _get_victory_outcome_text()
-			var transition_message := "%.0f초 후 전적을 확인합니다." % ceil(result_delay)
+			var transition_seconds := int(ceil(result_delay))
+			var transition_message := LocaleManager.t("victory.transition", "{seconds}초 후 전적을 확인합니다.", {"seconds": transition_seconds})
 			if not transition_outcome_text.is_empty():
-				transition_message = "%s. %s" % [transition_outcome_text, transition_message]
+				transition_message = LocaleManager.t(
+					"victory.transition.with_outcome",
+					"{outcome}. {seconds}초 후 전적을 확인합니다.",
+					{"outcome": transition_outcome_text, "seconds": transition_seconds}
+				)
 			hud.show_victory_result_transition(transition_message, result_delay)
 		elif hud.has_method("show_victory"):
 			hud.show_victory()
@@ -1039,7 +1044,7 @@ func _build_victory_result() -> Dictionary:
 
 
 func _build_defeat_result() -> Dictionary:
-	return _build_run_result("기함 침몰")
+	return _build_run_result(LocaleManager.t("result.outcome.flagship_sunk", "기함 침몰"))
 
 
 func _build_run_result(outcome_text: String) -> Dictionary:
@@ -1060,7 +1065,7 @@ func _build_run_result(outcome_text: String) -> Dictionary:
 		if player_ship.get("max_hull_hp") != null:
 			hull_hp_max = float(player_ship.get("max_hull_hp"))
 	var result: Dictionary = {
-		"title": "결과",
+		"title": LocaleManager.t("result.title", "결과"),
 		"outcome": outcome_text,
 		"survived_seconds": current_time,
 		"gold": current_score,
@@ -1085,7 +1090,7 @@ func _build_run_result(outcome_text: String) -> Dictionary:
 
 func _get_victory_outcome_text() -> String:
 	if _boss_triggered:
-		return "최종 보스 격침"
+		return LocaleManager.t("result.outcome.final_boss_defeated", "최종 보스 격침")
 	return ""
 
 

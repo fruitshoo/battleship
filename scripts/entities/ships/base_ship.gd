@@ -7,8 +7,8 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_DAMAGE_LOGS := false
 const PLAYER_CREW_RAMMING_AOE_MULTIPLIER := 0.35
-const DAMAGE_ROCK_FORWARD_MULT := 1.6
-const DAMAGE_ROCK_BACK_MULT := 1.1
+const DAMAGE_ROCK_FORWARD_MULT := 0.9
+const DAMAGE_ROCK_BACK_MULT := 0.65
 const NODE_PROXIMITY_AREA := NodeContractHelper.SHIP_NODE_PROXIMITY_AREA
 const NODE_HIT_AREA := NodeContractHelper.SHIP_NODE_HIT_AREA
 const NODE_SOLDIERS := NodeContractHelper.SHIP_NODE_SOLDIERS
@@ -80,8 +80,8 @@ var _rigging_repair_complete_feedback_shown: bool = false
 @export var floating_offset: float = 0.55 ## 기본 부력 오프셋 (수면 위로 배를 띄움)
 @export_group("Anchor Impact Sway")
 @export var anchor_impact_sway_enabled: bool = true
-@export_range(0.0, 18.0, 0.5) var anchor_impact_max_pitch_degrees: float = 7.0
-@export_range(0.0, 8.0, 0.1) var anchor_impact_impulse: float = 2.4
+@export_range(0.0, 18.0, 0.5) var anchor_impact_max_pitch_degrees: float = 5.0
+@export_range(0.0, 8.0, 0.1) var anchor_impact_impulse: float = 1.7
 @export_range(1.0, 80.0, 1.0) var anchor_impact_stiffness: float = 36.0
 @export_range(0.0, 24.0, 0.5) var anchor_impact_damping: float = 8.5
 @export_group("")
@@ -144,6 +144,14 @@ const BOARDING_ROPE_RADIUS := 0.18
 const BOARDING_ROPE_EXTRA_CULL_MARGIN := 24.0
 const BOARDING_ROPE_DECK_HEIGHT_OFFSET := 0.85
 const BOARDING_ROPE_MIN_ANCHOR_HEIGHT := 0.65
+const BOARDING_ROPE_NORMAL_ALBEDO := Color(1.0, 0.88, 0.52, 1.0)
+const BOARDING_ROPE_NORMAL_EMISSION := Color(1.0, 0.66, 0.24, 1.0)
+const BOARDING_ROPE_STRAIN_ALBEDO := Color(1.0, 0.18, 0.08, 1.0)
+const BOARDING_ROPE_STRAIN_EMISSION := Color(1.0, 0.06, 0.02, 1.0)
+const BOARDING_HOOK_NORMAL_ALBEDO := Color(1.0, 0.86, 0.52, 0.95)
+const BOARDING_HOOK_NORMAL_EMISSION := Color(1.0, 0.72, 0.28, 1.0)
+const BOARDING_HOOK_STRAIN_ALBEDO := Color(1.0, 0.20, 0.08, 0.98)
+const BOARDING_HOOK_STRAIN_EMISSION := Color(1.0, 0.08, 0.02, 1.0)
 const BOARDING_PULL_BASE_REST_LENGTH := 8.5
 const BOARDING_PULL_EDGE_SLACK := 0.25
 const BOARDING_PULL_MIN_REST_LENGTH := 4.25
@@ -165,6 +173,8 @@ var boarding_secondary_rope_timer: float = 0.0
 var _initial_rope_deployed: bool = false
 var _full_rope_deployed: bool = false
 var boarding_pull_velocity: Vector3 = Vector3.ZERO
+var boarding_rope_visual_pulse: float = 0.0
+var _boarding_rope_visual_tween: Tween = null
 
 var fire_build_up: float = 0.0
 var fire_threshold: float = 100.0
@@ -1230,6 +1240,8 @@ func get_alive_crew_count() -> int:
 
 
 func request_cannon_reload_pose(cannon_node: Node3D, duration: float = 0.9) -> void:
+	if not SoldierShipWorkPriorityHelper.are_crew_work_directives_enabled():
+		return
 	if not is_instance_valid(cannon_node):
 		return
 	if deck_is_contested or deck_is_overrun:
@@ -1545,9 +1557,6 @@ func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_sou
 	var hp_before: float = hull_hp
 	if deck_is_contested and _is_contested_hull_damage_source(damage_source):
 		amount *= contested_hull_damage_multiplier
-	if damage_source == "boarding_capture" and has_meta("boarding_capture_damage_reduction"):
-		var capture_reduction: float = clampf(float(get_meta("boarding_capture_damage_reduction")), 0.0, 0.75)
-		amount *= 1.0 - capture_reduction
 	var final_damage: float = maxf(amount, 1.0) if damage_source == "boarding_capture" else maxf(amount - hull_defense, 1.0)
 	hull_hp -= final_damage
 	_apply_sail_damage_from_hit(final_damage, damage_source)
@@ -1683,7 +1692,7 @@ func _update_rigging_recovery(delta: float) -> void:
 	BaseShipStatusHelper.update_rigging_recovery(self, delta)
 
 func _flash_damage(amount: float = 10.0) -> void:
-	var shake_mult = clamp(amount / 10.0, 0.12, 1.35)
+	var shake_mult = clamp(amount / 16.0, 0.08, 0.9)
 	var shake_tween = create_tween()
 	shake_tween.tween_property(self , "rotation:z", rocking_amplitude * DAMAGE_ROCK_FORWARD_MULT * shake_mult, 0.1)
 	shake_tween.tween_property(self , "rotation:z", -rocking_amplitude * DAMAGE_ROCK_BACK_MULT * shake_mult, 0.1)
@@ -1737,11 +1746,11 @@ func _spawn_ropes(count_override: int = -1) -> void:
 		mesh_instance.ignore_occlusion_culling = true
 		
 		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(1.0, 0.88, 0.52, 1.0)
+		mat.albedo_color = BOARDING_ROPE_NORMAL_ALBEDO
 		mat.roughness = 0.55
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.emission_enabled = true
-		mat.emission = Color(1.0, 0.66, 0.24, 1.0)
+		mat.emission = BOARDING_ROPE_NORMAL_EMISSION
 		mat.emission_energy_multiplier = 1.8
 		mat.no_depth_test = false
 		mesh_instance.material_override = mat
@@ -1754,9 +1763,9 @@ func _spawn_ropes(count_override: int = -1) -> void:
 		hook_mesh.height = 0.56
 		hook_visual.mesh = hook_mesh
 		var hook_mat := StandardMaterial3D.new()
-		hook_mat.albedo_color = Color(1.0, 0.86, 0.52, 0.95)
+		hook_mat.albedo_color = BOARDING_HOOK_NORMAL_ALBEDO
 		hook_mat.emission_enabled = true
-		hook_mat.emission = Color(1.0, 0.72, 0.28, 1.0)
+		hook_mat.emission = BOARDING_HOOK_NORMAL_EMISSION
 		hook_mat.emission_energy_multiplier = 2.2
 		hook_mat.roughness = 0.35
 		hook_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -1792,6 +1801,7 @@ func _update_ropes(delta: float = 0.0) -> void:
 	if not is_instance_valid(boarding_target):
 		_clear_ropes()
 		return
+	var rope_resist_ratio := clampf(_get_boarding_rope_visual_resist_ratio() + boarding_rope_visual_pulse * 0.38, 0.0, 1.0)
 		
 	for rope in rope_instances:
 		if not is_instance_valid(rope): continue
@@ -1808,26 +1818,70 @@ func _update_ropes(delta: float = 0.0) -> void:
 		
 		# 밧줄 투척 연출: 시작점에서 목표점까지 전개 길이가 점진적으로 늘어난다.
 		var current_end = start_pos.lerp(target_anchor, deploy_progress)
+		if boarding_rope_visual_pulse > 0.0 and deploy_progress >= 0.98:
+			var pullback_dir: Vector3 = start_pos - current_end
+			if pullback_dir.length_squared() > 0.0001:
+				current_end += pullback_dir.normalized() * minf(0.34, start_pos.distance_to(current_end) * 0.035) * boarding_rope_visual_pulse
 		var dist = maxf(0.05, start_pos.distance_to(current_end))
 		var rope_dir = (current_end - start_pos).normalized()
-		var sag_amount = minf(0.28, dist * 0.025) * deploy_progress
+		var sag_amount = minf(0.28, dist * 0.025) * deploy_progress * (1.0 - boarding_rope_visual_pulse * 0.72)
 		var sag_mid = (start_pos + current_end) * 0.5 + Vector3(0.0, -sag_amount, 0.0)
 		
 		rope.global_transform = Transform3D().looking_at(current_end - sag_mid, Vector3.UP)
 		rope.global_position = sag_mid
 		
 		rope.rotate_object_local(Vector3.RIGHT, deg_to_rad(-90))
-		rope.scale = Vector3(1.0, dist, 1.0) * (1.0 + (1.0 - deploy_progress) * 0.12)
-		var rope_material: StandardMaterial3D = rope.material_override as StandardMaterial3D
-		if is_instance_valid(rope_material):
-			rope_material.emission_energy_multiplier = lerpf(1.2, 2.4, deploy_progress)
+		var pull_snap := 1.0 + boarding_rope_visual_pulse * 0.42
+		rope.scale = Vector3(pull_snap, dist, pull_snap) * (1.0 + (1.0 - deploy_progress) * 0.12)
+		_update_boarding_rope_material(rope, rope_resist_ratio, deploy_progress)
 		var hook_visual = rope.get_meta("hook_visual", null) as MeshInstance3D
 		if is_instance_valid(hook_visual):
 			hook_visual.visible = deploy_progress >= 0.18
 			hook_visual.global_position = current_end
 			var hook_basis := Basis.looking_at(-rope_dir, Vector3.UP)
 			hook_visual.global_transform = Transform3D(hook_basis, current_end)
-			hook_visual.scale = Vector3.ONE * lerpf(0.65, 1.0, deploy_progress)
+			var strain_pulse := sin(float(Time.get_ticks_msec()) * 0.018) * 0.035 * rope_resist_ratio
+			strain_pulse += boarding_rope_visual_pulse * 0.16
+			hook_visual.scale = Vector3.ONE * (lerpf(0.65, 1.0, deploy_progress) + strain_pulse)
+			_update_boarding_hook_material(hook_visual, rope_resist_ratio, deploy_progress)
+
+func pulse_boarding_rope_feedback(intensity: float = 1.0) -> void:
+	if rope_instances.is_empty():
+		return
+	if is_instance_valid(_boarding_rope_visual_tween):
+		_boarding_rope_visual_tween.kill()
+	boarding_rope_visual_pulse = maxf(boarding_rope_visual_pulse, clampf(intensity, 0.0, 1.0) * 0.45)
+	_boarding_rope_visual_tween = create_tween()
+	_boarding_rope_visual_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_boarding_rope_visual_tween.tween_property(self, "boarding_rope_visual_pulse", clampf(intensity, 0.0, 1.0), 0.055)
+	_boarding_rope_visual_tween.tween_property(self, "boarding_rope_visual_pulse", 0.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+func _get_boarding_rope_visual_resist_ratio() -> float:
+	if not is_instance_valid(boarding_target):
+		return 0.0
+	if boarding_target.has_method("get_boarding_rope_resist_ratio"):
+		return clampf(float(boarding_target.call("get_boarding_rope_resist_ratio")), 0.0, 1.0)
+	return 0.0
+
+func _update_boarding_rope_material(rope: MeshInstance3D, resist_ratio: float, deploy_progress: float) -> void:
+	var rope_material: StandardMaterial3D = rope.material_override as StandardMaterial3D
+	if not is_instance_valid(rope_material):
+		return
+	var t := smoothstep(0.0, 1.0, clampf(resist_ratio, 0.0, 1.0))
+	rope_material.albedo_color = BOARDING_ROPE_NORMAL_ALBEDO.lerp(BOARDING_ROPE_STRAIN_ALBEDO, t)
+	rope_material.emission = BOARDING_ROPE_NORMAL_EMISSION.lerp(BOARDING_ROPE_STRAIN_EMISSION, t)
+	var pulse := sin(float(Time.get_ticks_msec()) * 0.022) * 0.35 * t
+	rope_material.emission_energy_multiplier = lerpf(1.2, 2.4, deploy_progress) + (2.0 * t) + pulse
+
+func _update_boarding_hook_material(hook_visual: MeshInstance3D, resist_ratio: float, deploy_progress: float) -> void:
+	var hook_material: StandardMaterial3D = hook_visual.material_override as StandardMaterial3D
+	if not is_instance_valid(hook_material):
+		return
+	var t := smoothstep(0.0, 1.0, clampf(resist_ratio, 0.0, 1.0))
+	hook_material.albedo_color = BOARDING_HOOK_NORMAL_ALBEDO.lerp(BOARDING_HOOK_STRAIN_ALBEDO, t)
+	hook_material.emission = BOARDING_HOOK_NORMAL_EMISSION.lerp(BOARDING_HOOK_STRAIN_EMISSION, t)
+	var pulse := sin(float(Time.get_ticks_msec()) * 0.022) * 0.45 * t
+	hook_material.emission_energy_multiplier = lerpf(1.6, 2.2, deploy_progress) + (2.4 * t) + pulse
 
 func _get_boarding_rope_source_anchor_local(side_sign: float, along_offset: float) -> Vector3:
 	var half_extents := get_deck_half_extents()
@@ -1876,6 +1930,10 @@ func _get_boarding_rope_local_anchor_height(ship_node: Node) -> float:
 	return BOARDING_ROPE_MIN_ANCHOR_HEIGHT + BOARDING_ROPE_DECK_HEIGHT_OFFSET
 
 func _clear_ropes(reset_pull_velocity: bool = true) -> void:
+	if is_instance_valid(_boarding_rope_visual_tween):
+		_boarding_rope_visual_tween.kill()
+	_boarding_rope_visual_tween = null
+	boarding_rope_visual_pulse = 0.0
 	for rope in rope_instances:
 		if is_instance_valid(rope):
 			var hook_visual = rope.get_meta("hook_visual", null) as MeshInstance3D

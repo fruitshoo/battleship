@@ -278,6 +278,7 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	card_ids = []
 	_current_reroll_count = rerolls
 	_reroll_focused = false
+	_nav_repeater.reset()
 	if is_instance_valid(footer_spacer):
 		footer_spacer.visible = true
 	if is_instance_valid(footer_row):
@@ -331,6 +332,7 @@ func show_reward_results(result: Dictionary, duration: float = -1.0) -> void:
 	card_ids = []
 	_current_reroll_count = 0
 	_reroll_focused = false
+	_nav_repeater.reset()
 	_pause_tree_for_display()
 
 	if is_instance_valid(title_label):
@@ -685,6 +687,7 @@ func _on_choice_pressed(upgrade_id: String) -> void:
 	var chosen_index := choice_ids.find(chosen_id)
 	card_ids.clear() # 두 번 눌리는 것 방지
 	_input_lock_timer = 0.35
+	_nav_repeater.reset()
 	
 	UiButtonAudio.play_upgrade_select()
 

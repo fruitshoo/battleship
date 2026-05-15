@@ -34,7 +34,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.7873620862587764
+shader_parameter/damage_seed = 0.12938816449348045
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -42,7 +42,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 124409046220558
+metadata/mast_owner_id = 814264277404131
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fp17e"]
 render_priority = 20
@@ -63,7 +63,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.6529588766298897
+shader_parameter/damage_seed = 0.9297893681043129
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -71,7 +71,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 124409213955704
+metadata/mast_owner_id = 814264445181086
 
 [node name="PanokHull" type="Node3D" unique_id=466901266]
 
@@ -152,28 +152,28 @@ metadata/use_authored_deck_area = true
 [node name="Points" type="Node3D" parent="ScaleRoot/Authoring/DeckArea" unique_id=421455651]
 
 [node name="BowLeft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1585573514]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4710133, 0, -4.685213)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6, 0, -4.685)
 
 [node name="BowRight" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1810527583]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5994606, 0, -4.685213)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 0, -4.685)
 
 [node name="RightForward" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1273753477]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2160223, 0, -0.48)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4, 0, -2)
 
 [node name="RightAft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1882223951]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2160223, 0, 2.002)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 0, 2)
 
 [node name="SternRight" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=170384510]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5994606, 0, 4.3857617)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 0, 4.386)
 
 [node name="SternLeft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1362249966]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4710133, 0, 4.3857617)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6, 0, 4.386)
 
 [node name="LeftAft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=296171771]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2023578, 0, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2, 0, 2)
 
 [node name="LeftForward" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=940351984]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2023578, 0, -0.48)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0, -2)
 
 [node name="CannonSlots" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1187771632]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.485, 0)
@@ -207,7 +207,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.76, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.225, 1.6500001, -4.523097)
 
 [node name="RightMid" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1130781892]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.126842, 1.6500001, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.65, 0)
 
 [node name="RightRear" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1910111397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.225, 1.6500001, 4.260827)
@@ -216,7 +216,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.225, 1.6500001, 4.260827)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.225, 1.6500001, -4.523097)
 
 [node name="LeftMid" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1545649435]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.126842, 1.6500001, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1.65, 0)
 
 [node name="LeftRear" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1662737766]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.225, 1.6500001, 4.260827)
@@ -254,6 +254,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.865239, 3.45)
 
 [node name="CrewSternRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=988245468]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.865239, 3.45)
+
+[node name="CrewStair" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1892455170]
+
+[node name="CrewStairTop" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair" unique_id=1510219061]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.037368536, 3.4249039)
+
+[node name="CrewStairBottom" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair" unique_id=1836678408]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.4530666, 1.8660877)
 
 [node name="flags" type="Node3D" parent="ScaleRoot" unique_id=428911056]
 

@@ -113,8 +113,14 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 	var barricade_stats: Dictionary = upgrades.get("boarding_resist", {}).get("stats", {})
 	if barricade_stats.has("capture_duration_mult_per_lv"):
 		failures.append("upgrade smoke 창벽 should not be a capture-duration-only upgrade")
-	if not barricade_stats.has("boarding_defense_damage_per_tick_per_lv"):
-		failures.append("upgrade smoke 창벽 missing boarding defense damage stat")
+	if barricade_stats.has("boarding_defense_damage_per_tick_per_lv") or barricade_stats.has("capture_damage_reduction_per_lv") or barricade_stats.has("boarding_fire_reduce_per_lv"):
+		failures.append("upgrade smoke 창벽 should not keep damage/capture/fire reduction stats")
+	if barricade_stats.has("enemy_boarding_interval_mult_per_lv"):
+		failures.append("upgrade smoke 창벽 should not modify enemy boarding delay")
+	if not barricade_stats.has("enemy_boarding_slot_reduce_levels"):
+		failures.append("upgrade smoke 창벽 missing enemy boarding limit stat")
+	if not barricade_stats.has("enemy_boarding_damage_per_lv") or not barricade_stats.has("enemy_boarding_max_damage"):
+		failures.append("upgrade smoke 창벽 missing enemy boarding transfer damage stats")
 
 	if not ("cannon_damage" in UpgradeManager.SHIP_UPGRADE_IDS):
 		failures.append("upgrade smoke 철환 missing from ship upgrade pool")

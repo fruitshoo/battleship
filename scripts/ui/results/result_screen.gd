@@ -252,7 +252,7 @@ func _on_viewport_size_changed() -> void:
 
 func _render_result(result: Dictionary) -> void:
 	_last_result = result.duplicate(true)
-	title_label.text = str(result.get("title", "결과"))
+	title_label.text = str(result.get("title", LocaleManager.t("result.title", "결과")))
 	var outcome_text := str(result.get("outcome", "")).strip_edges()
 	subtitle_label.text = outcome_text
 	subtitle_label.visible = not outcome_text.is_empty()
@@ -261,13 +261,13 @@ func _render_result(result: Dictionary) -> void:
 	_clear_children(weapon_list)
 
 	var survived_seconds: float = float(result.get("survived_seconds", 0.0))
-	_add_summary_row("생존 시간", _format_time(survived_seconds))
-	_add_summary_row("획득 골드", "%d G" % int(result.get("gold", 0)))
-	_add_summary_row("도달 레벨", "Lv.%d" % int(result.get("level", 1)))
-	_add_summary_row("격침", "%d척" % int(result.get("ships_sunk", 0)))
-	_add_summary_row("나포", "%d척" % int(result.get("ships_derelicted", 0)))
-	_add_summary_row("적 병사", "%d명" % int(result.get("soldiers_killed", 0)))
-	_add_summary_row("아군 생존", "%d / %d" % [int(result.get("crew_alive", 0)), int(result.get("crew_capacity", 0))])
+	_add_summary_row(LocaleManager.t("result.summary.survived", "생존 시간"), _format_time(survived_seconds))
+	_add_summary_row(LocaleManager.t("result.summary.gold", "획득 골드"), "%d G" % int(result.get("gold", 0)))
+	_add_summary_row(LocaleManager.t("result.summary.level", "도달 레벨"), "Lv.%d" % int(result.get("level", 1)))
+	_add_summary_row(LocaleManager.t("result.summary.sunk", "격침"), LocaleManager.t("result.value.ships", "{count}척", {"count": int(result.get("ships_sunk", 0))}))
+	_add_summary_row(LocaleManager.t("result.summary.captured", "나포"), LocaleManager.t("result.value.ships", "{count}척", {"count": int(result.get("ships_derelicted", 0))}))
+	_add_summary_row(LocaleManager.t("result.summary.enemy_soldiers", "적 병사"), LocaleManager.t("result.value.soldiers", "{count}명", {"count": int(result.get("soldiers_killed", 0))}))
+	_add_summary_row(LocaleManager.t("result.summary.crew_alive", "아군 생존"), "%d / %d" % [int(result.get("crew_alive", 0)), int(result.get("crew_capacity", 0))])
 
 	_add_ship_defeat_header()
 	var ship_rows: Array = result.get("defeated_ship_rows", [])
@@ -378,7 +378,7 @@ func _make_weapon_icon_frame_style() -> StyleBoxFlat:
 
 func _add_weapon_empty_row() -> void:
 	var label := Label.new()
-	label.text = "기록된 무기 피해 없음"
+	label.text = LocaleManager.t("result.weapon_damage.empty", "기록된 무기 피해 없음")
 	NavalUiTheme.style_muted(label, _summary_font_size)
 	weapon_list.add_child(label)
 
@@ -390,13 +390,13 @@ func _add_ship_defeat_header() -> void:
 	weapon_list.add_child(header)
 
 	var title := Label.new()
-	title.text = "격파 함선"
+	title.text = LocaleManager.t("result.ship_defeats.title", "격파 함선")
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	NavalUiTheme.style_body(title, _summary_font_size + 1)
 	header.add_child(title)
 
 	var caption := Label.new()
-	caption.text = "일본 함선별 전과"
+	caption.text = LocaleManager.t("result.ship_defeats.caption", "일본 함선별 전과")
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	NavalUiTheme.style_muted(caption, max(12, _summary_font_size - 3))
 	header.add_child(caption)
@@ -430,7 +430,7 @@ func _add_ship_defeat_row(row_data: Dictionary) -> void:
 	row.add_child(text_stack)
 
 	var name_label := Label.new()
-	name_label.text = str(row_data.get("name", _get_ship_type_label(type_id)))
+	name_label.text = _get_ship_type_label(type_id)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	NavalUiTheme.style_body(name_label, _summary_font_size)
@@ -439,7 +439,7 @@ func _add_ship_defeat_row(row_data: Dictionary) -> void:
 	var detail_label := Label.new()
 	var sunk := int(row_data.get("sunk", 0))
 	var derelicted := int(row_data.get("derelicted", 0))
-	detail_label.text = "격침 %d / 나포 %d" % [sunk, derelicted]
+	detail_label.text = LocaleManager.t("result.ship_defeats.detail", "격침 {sunk} / 나포 {captured}", {"sunk": sunk, "captured": derelicted})
 	NavalUiTheme.style_muted(detail_label, max(12, _summary_font_size - 3))
 	text_stack.add_child(detail_label)
 
@@ -505,7 +505,7 @@ func _normalize_ship_defeat_texture_id(type_id: String) -> String:
 
 func _add_ship_defeat_empty_row() -> void:
 	var label := Label.new()
-	label.text = "격파한 함선 없음"
+	label.text = LocaleManager.t("result.ship_defeats.empty", "격파한 함선 없음")
 	NavalUiTheme.style_muted(label, _summary_font_size)
 	weapon_list.add_child(label)
 
@@ -552,15 +552,15 @@ func _get_ship_type_accent(type_id: String) -> Color:
 func _get_ship_type_label(type_id: String) -> String:
 	match type_id.strip_edges().to_lower():
 		"kobayabune":
-			return "고바야부네"
+			return LocaleManager.t("result.ship.kobayabune", "고바야부네")
 		"sekibune":
-			return "세키부네"
+			return LocaleManager.t("result.ship.sekibune", "세키부네")
 		"sekibune_cannon":
-			return "대철포 세키부네"
+			return LocaleManager.t("result.ship.sekibune_cannon", "대철포 세키부네")
 		"atakebune":
-			return "아타케부네"
+			return LocaleManager.t("result.ship.atakebune", "아타케부네")
 		"atakebune_final":
-			return "대장선 아타케부네"
+			return LocaleManager.t("result.ship.atakebune_final", "대장선 아타케부네")
 		_:
 			return type_id.capitalize()
 

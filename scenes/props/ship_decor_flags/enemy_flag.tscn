@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://cj1oxwrkj21f3"]
+
+[ext_resource type="Script" uid="uid://baiedf4sfqc7a" path="res://scripts/props/ship_decor_flag.gd" id="1_2lahw"]
+[ext_resource type="Shader" uid="uid://ce66j4gp0y450" path="res://assets/shaders/ship_decor_flag.gdshader" id="2_g0v8g"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_standard_rod"]
+size = Vector3(0.05, 1.9440001, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="Material_decor_wood"]
+albedo_color = Color(0.35, 0.2, 0.1, 1)
+roughness = 0.85
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_standard_flag"]
+size = Vector2(0.5, 1.2)
+subdivide_width = 8
+subdivide_depth = 8
+orientation = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_decor_flag"]
+render_priority = 0
+shader = ExtResource("2_g0v8g")
+shader_parameter/base_color = Color(0.97156245, 0.39752537, 0.004411665, 1)
+shader_parameter/use_flag_texture = false
+shader_parameter/use_shape_mask = false
+shader_parameter/shape_mask_cutoff = 0.5
+shader_parameter/use_emblem_texture = false
+shader_parameter/emblem_strength = 1.0
+shader_parameter/emblem_use_texture_color = true
+shader_parameter/emblem_color = Color(1, 0.92, 0.55, 1)
+shader_parameter/emblem_uv_scale = Vector2(1, 1)
+shader_parameter/emblem_uv_offset = Vector2(0, 0)
+shader_parameter/alpha_cutoff = 0.02
+shader_parameter/wave_speed = 4.2
+shader_parameter/wave_strength = 0.13
+shader_parameter/side_drag = 0.08
+shader_parameter/pin_mode = 2
+shader_parameter/cloth_roughness = 0.96
+shader_parameter/cloth_weave_strength = 0.035
+shader_parameter/cloth_weave_scale = 42.0
+
+[node name="StandardDecorFlag" type="Node3D" unique_id=764534485]
+script = ExtResource("1_2lahw")
+color = Color(0.97156245, 0.39752537, 0.004411665, 1)
+wind_mode = 1
+pin_mode = 2
+free_rotate_with_wind = false
+
+[node name="VerticalRod" type="MeshInstance3D" parent="." unique_id=395224161]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.97200006, 0)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_standard_rod")
+surface_material_override/0 = SubResource("Material_decor_wood")
+
+[node name="horizontalRod2" type="MeshInstance3D" parent="." unique_id=1486067682]
+transform = Transform3D(-4.371139e-08, 0.2987948, 0, -1, -1.30607365e-08, 0, 0, 0, 1, 0.2672935, 1.9364357, 0)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_standard_rod")
+surface_material_override/0 = SubResource("Material_decor_wood")
+
+[node name="Panel" type="MeshInstance3D" parent="." unique_id=1564767733]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28279364, 1.3482589, 0)
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_standard_flag")
+surface_material_override/0 = SubResource("ShaderMaterial_decor_flag")

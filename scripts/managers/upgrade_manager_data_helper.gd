@@ -163,10 +163,13 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var assist_range: float = 4.6 + (float(next_level) * float(s.get("assist_acquire_range_add_per_lv", 0.45)))
 			return "일으키기 %.2f초 | 복귀 체력 %.0f%% | 구호 반경 %.1fm" % [assist_duration, assist_health_ratio * 100.0, assist_range]
 		"boarding_resist":
-			var defense_damage: float = minf(float(s.get("boarding_defense_max_damage_per_tick", 7.0)), float(next_level) * float(s.get("boarding_defense_damage_per_tick_per_lv", 1.4)))
-			var capture_reduce_pct: int = int(round(float(next_level) * float(s.get("capture_damage_reduction_per_lv", 0.06)) * 100.0))
-			var boarding_fire_reduce_pct: int = int(round(float(next_level) * float(s.get("boarding_fire_reduce_per_lv", 0.1)) * 100.0))
-			return "도선병 피해 %.1f/초 | 장악 피해 -%d%% | 화염 -%d%%" % [defense_damage, capture_reduce_pct, boarding_fire_reduce_pct]
+			var slot_penalty := 0
+			for threshold in s.get("enemy_boarding_slot_reduce_levels", [3, 5]):
+				if next_level >= int(threshold):
+					slot_penalty += 1
+			var slot_note := " | 동시 도선 한계 -%d" % slot_penalty if slot_penalty > 0 else ""
+			var boarding_damage: float = minf(float(s.get("enemy_boarding_max_damage", 40.0)), float(next_level) * float(s.get("enemy_boarding_damage_per_lv", 8.0)))
+			return "도선 피해 %.0f%s" % [boarding_damage, slot_note]
 		"crew_attack":
 			return "무기 피해 +%.0f%%" % [next_level * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0]
 		"crew_defense":
@@ -200,7 +203,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"rowing":
 			var rowing_parts: Array[String] = []
 			if level_matches(next_level, s.get("speed_levels", [])):
-				rowing_parts.append("노젓기 속도 +%.0f" % float(s.get("speed_add", 1.0)))
+				rowing_parts.append("노젓기 속도 +%.1f" % float(s.get("speed_add", 1.0)))
 			if level_matches(next_level, s.get("accel_levels", [])):
 				rowing_parts.append("노젓기 가속 +%d%%" % int(round((float(s.get("accel_mult", 1.2)) - 1.0) * 100.0)))
 			if level_matches(next_level, s.get("ram_boost_recharge_levels", [])):

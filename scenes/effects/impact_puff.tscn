@@ -20,6 +20,7 @@ point_count = 3
 curve = SubResource("Curve_scale")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puff"]
+lifetime_randomness = 0.1
 particle_flag_rotate_y = true
 angle_min = -159.7
 angle_max = 159.00002

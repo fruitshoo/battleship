@@ -90,6 +90,9 @@ func _run_contract() -> void:
 	await _run_active_shiphandling_station_hold_contract()
 	if _failed:
 		return
+	await _run_ship_multiplier_owned_cannon_contract()
+	if _failed:
+		return
 	await _run_legacy_multiplier_contract()
 	if _failed:
 		return
@@ -323,6 +326,26 @@ func _run_legacy_multiplier_contract() -> void:
 
 	var cooldown: float = float(cannon.call("_get_current_cooldown"))
 	_assert_close("disabled_crew_reload_keeps_legacy_ship_multiplier", cooldown, 5.5)
+
+	ship.queue_free()
+
+
+func _run_ship_multiplier_owned_cannon_contract() -> void:
+	var ship := MockLegacyShip.new()
+	ship.name = "OwnedShipMultiplier"
+	ship.add_to_group("ships")
+	add_child(ship)
+
+	var cannon := CANNON_SCENE.instantiate()
+	cannon.set("team", "enemy")
+	cannon.set("fire_cooldown", 10.0)
+	cannon.set("crew_operated_reload_enabled", true)
+	cannon.call("set_reload_crew_power", 0.0)
+	ship.add_child(cannon)
+	await get_tree().process_frame
+
+	var cooldown: float = float(cannon.call("_get_current_cooldown"))
+	_assert_close("owned_cannon_uses_ship_reload_multiplier_without_reload_crew", cooldown, 5.5)
 
 	ship.queue_free()
 

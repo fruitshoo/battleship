@@ -2,6 +2,8 @@ extends RefCounted
 class_name BaseShipCrewHelper
 
 const CANNON_RELOAD_CREW_MAX_PER_CANNON := 3.0
+const HOSTILE_BOARDING_INTERVAL_MULT := 2.2
+const CREW_WORK_SYSTEMS_ENABLED := false
 
 static func update_crew_allocation_state(ship, delta: float) -> void:
 	ship._crew_allocation_eval_left -= delta
@@ -9,14 +11,14 @@ static func update_crew_allocation_state(ship, delta: float) -> void:
 		return
 	ship._crew_allocation_eval_left = ship.crew_allocation_eval_interval
 
+	if not CREW_WORK_SYSTEMS_ENABLED:
+		_reset_crew_allocation_state(ship)
+		assign_cannon_reload_crew_power(ship)
+		return
+
 	var available_crew: int = estimate_available_crew_count(ship)
 	if available_crew <= 0:
-		ship.combat_crew_alloc = 0
-		ship.shiphandling_crew_alloc = 0
-		ship.gunnery_crew_alloc = 0
-		ship.combat_crew_ratio = 0.0
-		ship.shiphandling_crew_ratio = 0.0
-		ship.gunnery_crew_ratio = 0.0
+		_reset_crew_allocation_state(ship)
 		assign_cannon_reload_crew_power(ship)
 		return
 
@@ -43,12 +45,25 @@ static func update_crew_allocation_state(ship, delta: float) -> void:
 	assign_cannon_reload_crew_power(ship)
 
 
+static func _reset_crew_allocation_state(ship) -> void:
+	ship.combat_crew_alloc = 0
+	ship.shiphandling_crew_alloc = 0
+	ship.gunnery_crew_alloc = 0
+	ship.combat_crew_ratio = 0.0
+	ship.shiphandling_crew_ratio = 0.0
+	ship.gunnery_crew_ratio = 0.0
+
+
 static func get_shiphandling_multiplier(ship) -> float:
+	if not CREW_WORK_SYSTEMS_ENABLED:
+		return 1.0
 	var t: float = clampf((ship.shiphandling_crew_ratio - 0.2) / 0.3, 0.0, 1.0)
 	return lerpf(0.65, 1.0, t)
 
 
 static func get_gunnery_reload_multiplier(ship) -> float:
+	if not CREW_WORK_SYSTEMS_ENABLED:
+		return 1.0
 	var t: float = clampf((ship.gunnery_crew_ratio - 0.1) / 0.4, 0.0, 1.0)
 	return lerpf(1.35, 0.72, t)
 
@@ -177,12 +192,33 @@ static func cannon_can_cover_allocation_target(cannon: Node, target: Node) -> bo
 
 
 static func get_combat_effectiveness_multiplier(ship) -> float:
+	if not CREW_WORK_SYSTEMS_ENABLED:
+		return 1.0
 	var t: float = clampf((ship.combat_crew_ratio - 0.2) / 0.5, 0.0, 1.0)
 	return lerpf(0.8, 1.25, t)
 
 
 static func get_effective_boarding_interval(ship) -> float:
-	return maxf(0.45, ship.boarding_interval / get_combat_effectiveness_multiplier(ship))
+	if _is_hostile_boarding_player(ship):
+		var interval: float = ship.boarding_interval
+		interval *= HOSTILE_BOARDING_INTERVAL_MULT
+		return maxf(0.45, interval)
+	var interval: float = ship.boarding_interval / get_combat_effectiveness_multiplier(ship)
+	return maxf(0.45, interval)
+
+
+static func _is_hostile_boarding_player(ship) -> bool:
+	if not is_instance_valid(ship) or not is_instance_valid(ship.get("boarding_target")):
+		return false
+	return _get_ship_team_tag(ship) == "enemy" and _get_ship_team_tag(ship.get("boarding_target")) == "player"
+
+
+static func _get_ship_team_tag(ship) -> String:
+	if is_instance_valid(ship) and ship.has_method("get_team_tag"):
+		return str(ship.call("get_team_tag"))
+	if is_instance_valid(ship) and ship.get("team") != null:
+		return str(ship.get("team"))
+	return "unknown"
 
 
 static func get_effective_boarding_capture_duration(ship, attacker_ship: Node = null) -> float:

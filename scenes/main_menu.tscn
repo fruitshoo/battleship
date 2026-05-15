@@ -80,6 +80,7 @@ layout_mode = 2
 text = "시작"
 
 [node name="MetaButton" type="Button" parent="ButtonBlock" unique_id=1964063712]
+visible = false
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 text = "업그레이드"
@@ -88,6 +89,11 @@ text = "업그레이드"
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 text = "옵션"
+
+[node name="CreditsButton" type="Button" parent="ButtonBlock" unique_id=457209178]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+text = "크레딧"
 
 [node name="QuitButton" type="Button" parent="ButtonBlock" unique_id=769592080]
 custom_minimum_size = Vector2(0, 56)

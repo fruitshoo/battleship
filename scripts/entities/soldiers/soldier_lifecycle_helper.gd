@@ -3,6 +3,7 @@ class_name SoldierLifecycleHelper
 
 
 const BloodDeckDecalHelper = preload("res://scripts/effects/blood_deck_decal_helper.gd")
+const SoldierCaptainGuardHelper = preload("res://scripts/entities/soldiers/soldier_captain_guard_helper.gd")
 
 const MELEE_DAMAGE_SOURCES := {
 	"sword": true,
@@ -22,6 +23,8 @@ const SOLDIER_SINKING_DEATH_VOLUME_DB: float = -10.0
 const SOLDIER_SINKING_SPLASH_VOLUME_DB: float = -6.0
 const DEFAULT_SHIP_RANGED_COVER_DEFENSE_BONUS: float = 1.0
 const SHIP_RANGED_COVER_BASE_DEFENSE_META := "crew_ranged_cover_base_defense"
+const COMBAT_INCAPACITATION_CHANCE_META := "combat_incapacitation_chance"
+const SHIP_COMBAT_INCAPACITATION_CHANCE_META := "crew_combat_incapacitation_chance"
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -38,22 +41,25 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 		quality_reduction = clampf(float(soldier.get_meta("defense_reduction")), 0.0, 0.9)
 	var total_reduction: float = clampf(quality_reduction, 0.0, 0.9)
 	var final_damage: float = maxf(mitigated_damage * (1.0 - total_reduction), 1.0)
-	soldier.current_health -= final_damage
+	final_damage = SoldierCaptainGuardHelper.apply_damage_protection(soldier, final_damage)
+	if final_damage > 0.001:
+		soldier.current_health -= final_damage
 	soldier.set_meta("last_damage_source", damage_source)
 	if soldier.has_method("mark_recent_combat_damage"):
 		soldier.mark_recent_combat_damage()
 	soldier.set_meta("last_death_cause", "combat")
 
-	if not damage_source.is_empty() and soldier.team == "enemy":
+	if final_damage > 0.001 and not damage_source.is_empty() and soldier.team == "enemy":
 		if soldier._cached_level_manager and soldier._cached_level_manager.has_method("add_player_weapon_damage"):
 			soldier._cached_level_manager.add_player_weapon_damage(damage_source, final_damage)
 
 	if soldier.has_method("_flash_hit"):
 		soldier._flash_hit()
 
-	BloodDeckDecalHelper.try_spawn_from_soldier_damage(soldier, final_damage, hit_position, damage_source)
+	if final_damage > 0.001:
+		BloodDeckDecalHelper.try_spawn_from_soldier_damage(soldier, final_damage, hit_position, damage_source)
 
-	if hit_position != Vector3.ZERO and soldier.current_state != soldier.State.DEAD:
+	if final_damage > 0.001 and hit_position != Vector3.ZERO and soldier.current_state != soldier.State.DEAD:
 		var knock_dir: Vector3 = soldier.global_position - hit_position
 		knock_dir.y = 0.0
 		if knock_dir.length_squared() > 0.001:
@@ -112,16 +118,7 @@ static func update_boarding_chaos(soldier, delta: float) -> void:
 
 	if soldier.chaos_tick_timer <= 0.0:
 		soldier.chaos_tick_timer = 1.0
-		if soldier.owned_ship.has_meta("boarding_defense_damage_per_tick"):
-			var defense_damage: float = maxf(0.0, float(soldier.owned_ship.get_meta("boarding_defense_damage_per_tick")))
-			if defense_damage > 0.0:
-				take_damage(soldier, defense_damage, soldier.global_position, "boarding_defense")
-				if soldier.current_state == soldier.State.DEAD:
-					return
 		var chaos_damage: float = soldier.chaos_damage_per_tick
-		if soldier.owned_ship.has_meta("boarding_fire_damage_reduction"):
-			var reduction: float = clampf(float(soldier.owned_ship.get_meta("boarding_fire_damage_reduction")), 0.0, 0.75)
-			chaos_damage *= 1.0 - reduction
 		if soldier.owned_ship.has_method("take_fire_damage"):
 			soldier.owned_ship.take_fire_damage(chaos_damage, 2.0)
 		elif soldier.owned_ship.has_method("take_damage"):
@@ -262,6 +259,7 @@ static func die(soldier) -> void:
 	soldier.current_target = null
 	soldier.attack_timer = 0.0
 	soldier.is_boarder_on_player_ship = false
+	soldier.current_health = 0.0
 	soldier.set_meta("dead_body_order", Engine.get_physics_frames())
 	soldier.remove_meta("incapacitated_assist_reviver_id")
 
@@ -369,6 +367,8 @@ static func _is_ship_sinking_or_dying(ship) -> bool:
 
 
 static func _should_incapacitate_instead_of_die(soldier) -> bool:
+	if soldier.get_meta("disable_incapacitation", false) == true:
+		return false
 	if soldier.team != "player":
 		return false
 	var death_cause: String = str(soldier.get_meta("last_death_cause", "combat"))
@@ -382,7 +382,24 @@ static func _should_incapacitate_instead_of_die(soldier) -> bool:
 			return false
 		if soldier.owned_ship.get("is_sinking") == true or soldier.owned_ship.get("is_dying") == true:
 			return false
-	return true
+	var chance := _get_combat_incapacitation_chance(soldier)
+	if chance <= 0.0:
+		return false
+	if chance >= 1.0:
+		return true
+	return randf() < chance
+
+
+static func _get_combat_incapacitation_chance(soldier) -> float:
+	if not is_instance_valid(soldier):
+		return 0.0
+	if soldier.has_meta(COMBAT_INCAPACITATION_CHANCE_META):
+		return clampf(float(soldier.get_meta(COMBAT_INCAPACITATION_CHANCE_META)), 0.0, 1.0)
+	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_meta(SHIP_COMBAT_INCAPACITATION_CHANCE_META):
+		return clampf(float(soldier.owned_ship.get_meta(SHIP_COMBAT_INCAPACITATION_CHANCE_META)), 0.0, 1.0)
+	if is_instance_valid(soldier.home_ship) and soldier.home_ship.has_meta(SHIP_COMBAT_INCAPACITATION_CHANCE_META):
+		return clampf(float(soldier.home_ship.get_meta(SHIP_COMBAT_INCAPACITATION_CHANCE_META)), 0.0, 1.0)
+	return 0.0
 
 
 static func _schedule_incapacitated_recovery(soldier) -> void:
@@ -508,6 +525,8 @@ static func _apply_melee_kill_bonus(soldier) -> void:
 
 
 static func _apply_enemy_kill_rewards(soldier) -> void:
+	if soldier.get_meta("disable_kill_rewards", false) == true:
+		return
 	if soldier.get_meta(ENEMY_SINKING_REWARD_ACCOUNTED_META, false) == true:
 		return
 	var lm = soldier._cached_level_manager

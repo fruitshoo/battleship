@@ -139,9 +139,9 @@ static func trigger_anchor_impact_sway(ship, amount: float, hit_position: Vector
 		return
 	if damage_source == "leak" or damage_source == "fire" or damage_source == "burning":
 		return
-	var impact_scale := clampf(amount / 18.0, 0.18, 1.25)
+	var impact_scale := clampf(amount / 24.0, 0.12, 0.9)
 	if damage_source == "ramming" or damage_source == "ramming_aoe":
-		impact_scale *= 1.35
+		impact_scale *= 1.2
 	elif damage_source == "boarding_capture":
 		impact_scale *= 0.45
 	var pitch_sign := -1.0

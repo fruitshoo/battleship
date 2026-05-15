@@ -5,7 +5,7 @@ static func show_game_over(hud) -> void:
 	if hud._game_over_transitioning:
 		return
 	if hud.game_over_label:
-		hud.game_over_label.text = "배를 버려라!"
+		hud.game_over_label.text = LocaleManager.t("game_over.abandon_ship", "배를 버려라!")
 		hud.game_over_label.visible = true
 		var tween: Tween = hud.create_tween()
 		hud.game_over_label.modulate.a = 0.0
@@ -17,7 +17,7 @@ static func show_game_over(hud) -> void:
 
 static func show_victory(hud) -> void:
 	if hud.victory_label:
-		hud.victory_label.text = "[!] VICTORY [!]"
+		hud.victory_label.text = LocaleManager.t("victory.title", "[!] VICTORY [!]")
 		hud.victory_label.visible = true
 		var tween: Tween = hud.create_tween()
 		hud.victory_label.modulate.a = 0.0
@@ -28,14 +28,14 @@ static func show_victory_result_transition(hud, subtitle: String, countdown: flo
 	if hud.victory_label:
 		hud.victory_label.visible = false
 	if is_instance_valid(hud.victory_result_overlay):
-		hud.victory_result_overlay.show_overlay(subtitle, countdown, "전적 보기")
+		hud.victory_result_overlay.show_overlay(subtitle, countdown, LocaleManager.t("victory.view_record", "전적 보기"))
 
 
 static func show_victory_with_damage(hud, rows: Array, total_damage: float) -> void:
 	if not hud.victory_label:
 		return
 	var lines: Array[String] = []
-	lines.append("[!] VICTORY [!]")
+	lines.append(LocaleManager.t("victory.title", "[!] VICTORY [!]"))
 	lines.append("총 무기 피해: %.0f" % total_damage)
 	if rows.is_empty():
 		lines.append("무기 데미지 통계 없음")

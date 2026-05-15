@@ -6,7 +6,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 
 @export var gold_amount: int = 5
 @export var xp_amount: int = 0
-@export var hull_repair_amount: float = 20.0
+@export var hull_repair_amount: float = 0.0
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도
@@ -257,9 +257,9 @@ func _collect_loot() -> void:
 		if _cached_lm.get("hud") != null:
 			var hud: Variant = _cached_lm.get("hud")
 			if is_instance_valid(hud) and hud.has_method("show_message"):
-				var message := "침몰 부유물 회수"
+				var message := LocaleManager.t("hud.loot.recovered", "침몰 부유물 회수")
 				if repaired_amount > 0.0:
-					message = "침몰 부유물 회수: 선체 +%d" % int(round(repaired_amount))
+					message = LocaleManager.t("hud.loot.recovered_hull", "침몰 부유물 회수: 선체 +{amount}", {"amount": int(round(repaired_amount))})
 				hud.call("show_message", message, 1.5)
 				
 	# 파티클이나 시각적인 먹는 효과 (크기가 줄어들면서 사라짐)

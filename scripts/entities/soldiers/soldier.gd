@@ -4,6 +4,8 @@ const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_help
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
+const SoldierHealthBarHelper = preload("res://scripts/entities/soldiers/soldier_health_bar_helper.gd")
+const SoldierCaptainGuardHelper = preload("res://scripts/entities/soldiers/soldier_captain_guard_helper.gd")
 const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
 const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
@@ -33,6 +35,7 @@ enum State {
 
 const REST_RECOVERY_HEALTH_PER_SECOND: float = 1.0
 const REST_RECOVERY_DELAY_AFTER_DAMAGE: float = 3.0
+const ALLY_HEALTH_BAR_DAMAGE_VISIBLE_DURATION: float = 4.2
 const EXTERNAL_KNOCKBACK_GRAVITY: float = 18.0
 const EXTERNAL_KNOCKBACK_OVERBOARD_DECAY: float = 5.6
 const EXTERNAL_KNOCKBACK_DECK_MARGIN: float = 0.18
@@ -99,6 +102,7 @@ var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지�
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
 var combat_timer: float = 0.0 # 전투/사격 체크 스로틀링용
 var rest_recovery_delay_timer: float = 0.0
+var ally_health_bar_visible_timer: float = 0.0
 var _is_jumping: bool = false # 점프/도선 중인지 여부
 var boarding_status: String = "on_deck"
 var external_knockback_allows_overboard: bool = false
@@ -671,6 +675,8 @@ func get_crit_multiplier_value() -> float:
 
 func mark_recent_combat_damage() -> void:
 	rest_recovery_delay_timer = REST_RECOVERY_DELAY_AFTER_DAMAGE
+	if team == "player":
+		ally_health_bar_visible_timer = ALLY_HEALTH_BAR_DAMAGE_VISIBLE_DURATION
 	notify_ai_event("damaged")
 
 func get_damage_multiplier_value() -> float:
@@ -894,9 +900,11 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		if attack_timer > 0:
 			attack_timer -= delta
+		_update_ally_health_bar(delta)
 		return
 
 	_ai_event_wake_timer = maxf(0.0, _ai_event_wake_timer - delta)
+	_update_ally_health_bar(delta)
 	if _try_passive_ai_sleep(delta):
 		return
 
@@ -1033,6 +1041,13 @@ func _update_rest_recovery(delta: float) -> void:
 	if not _can_rest_recover():
 		return
 	current_health = minf(current_health + REST_RECOVERY_HEALTH_PER_SECOND * delta, max_health)
+
+
+func _update_ally_health_bar(delta: float) -> void:
+	if ally_health_bar_visible_timer > 0.0:
+		ally_health_bar_visible_timer = maxf(0.0, ally_health_bar_visible_timer - delta)
+	SoldierHealthBarHelper.update(self, ally_health_bar_visible_timer)
+	SoldierCaptainGuardHelper.update_warning_ring(self, delta)
 
 
 func _can_rest_recover() -> bool:
@@ -1533,6 +1548,8 @@ func _flash_hit(flash_color: Color = Color.WHITE) -> void:
 
 func _play_death_pose() -> void:
 	SoldierSpeechHelper.hide(self)
+	SoldierHealthBarHelper.hide(self)
+	SoldierCaptainGuardHelper.hide_warning_ring(self)
 	SoldierVisualHelper.play_death_pose(self)
 
 func _play_recovery_pose() -> void:
@@ -2134,9 +2151,16 @@ func _get_ai_load_multiplier() -> float:
 		load_mult += minf(0.28, float(ship_count - 10) * 0.025)
 	if projectile_count > 20:
 		load_mult += minf(0.22, float(projectile_count - 20) * 0.008)
+	load_mult *= _get_performance_cpu_interval_scale()
 	_ai_load_cache_frame = frame
 	_ai_load_multiplier_cache = clampf(load_mult, 1.0, 1.85)
 	return _ai_load_multiplier_cache
+
+
+func _get_performance_cpu_interval_scale() -> float:
+	if is_instance_valid(SaveManager) and SaveManager.has_method("get_performance_cpu_interval_scale"):
+		return float(SaveManager.call("get_performance_cpu_interval_scale"))
+	return 1.0
 
 
 func _get_routine_wander_step_interval() -> float:

@@ -356,7 +356,7 @@ func _grant_rescue_xp(player_ship: Node3D) -> void:
 	if _cached_lm.get("hud") != null:
 		var hud: Variant = _cached_lm.get("hud")
 		if is_instance_valid(hud) and hud.has_method("show_message"):
-			hud.call("show_message", "생존자 구조: XP +%d" % rescue_xp_amount, 1.5)
+			hud.call("show_message", LocaleManager.t("hud.survivor.rescue_xp", "생존자 구조: XP +{amount}", {"amount": rescue_xp_amount}), 1.5)
 	target_player = player_ship
 
 

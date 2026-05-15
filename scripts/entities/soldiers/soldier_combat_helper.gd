@@ -3,6 +3,7 @@ extends RefCounted
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 
 const ATTACK_COOLDOWN_TEMPO_MULT := 1.12
+const SHIP_RANGED_ATTACKER_RATIO := 0.5
 
 
 static func perform_special_attack(soldier, target: Node3D) -> void:
@@ -177,6 +178,8 @@ static func _stop_tracked_tween(soldier, meta_key: String) -> void:
 static func check_ranged_combat(soldier) -> void:
 	if not soldier.current_weapon or not "max_range" in soldier.current_weapon:
 		return
+	if not _can_use_ship_ranged_attack_slot(soldier):
+		return
 
 	var attack_cooldown := get_effective_attack_cooldown(soldier, 2.0)
 	if soldier.attack_timer > 0:
@@ -187,6 +190,55 @@ static func check_ranged_combat(soldier) -> void:
 		soldier.current_target = target
 		perform_attack(soldier)
 		soldier.attack_timer = attack_cooldown
+
+
+static func _can_use_ship_ranged_attack_slot(soldier) -> bool:
+	if not is_instance_valid(soldier) or not is_instance_valid(soldier.owned_ship):
+		return true
+	var soldiers := EntityRegistry.get_soldiers_by_ship(soldier.owned_ship)
+	if soldiers.is_empty():
+		return true
+	var team_name := str(soldier.get("team"))
+	var alive_count := 0
+	var ranged_rank := 0
+	var self_is_candidate := false
+	var self_id: int = soldier.get_instance_id()
+	for other in soldiers:
+		if not _is_alive_same_team_soldier(other, team_name):
+			continue
+		alive_count += 1
+		if not _is_ranged_slot_candidate(other):
+			continue
+		if other == soldier:
+			self_is_candidate = true
+		elif other.get_instance_id() < self_id:
+			ranged_rank += 1
+	if not self_is_candidate:
+		return true
+	var slot_limit := maxi(1, int(ceil(float(alive_count) * SHIP_RANGED_ATTACKER_RATIO)))
+	return ranged_rank < slot_limit
+
+
+static func _is_alive_same_team_soldier(candidate, team_name: String) -> bool:
+	if not is_instance_valid(candidate):
+		return false
+	if SoldierStateHelper.is_dead_soldier(candidate):
+		return false
+	if not candidate.has_method("get_team_tag") or str(candidate.call("get_team_tag")) != team_name:
+		return false
+	if candidate.get("_is_jumping") == true:
+		return false
+	return true
+
+
+static func _is_ranged_slot_candidate(candidate) -> bool:
+	if candidate.get("is_melee_only") == true:
+		return false
+	if str(candidate.get("crew_role")) == "spearman":
+		return false
+	if not is_instance_valid(candidate.get("weapon_bow")):
+		return false
+	return true
 
 
 static func find_ranged_target(soldier) -> Node3D:

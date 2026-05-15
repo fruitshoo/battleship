@@ -1,6 +1,7 @@
 extends Area3D
 const WATER_BLAST_SCENE = preload("res://scenes/effects/water_blast.tscn")
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
+const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 화살 (Arrow)
@@ -164,15 +165,14 @@ func _profiled_physics_process(delta: float) -> void:
 
 func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
-	if WATER_BLAST_SCENE and VfxBudget.allow_spawn(get_tree(), "water_explosion_small", global_position, 2, 60.0):
-		var pos = global_position
-		var explosion = ScenePool.acquire(get_tree(), WATER_BLAST_SCENE)
-		if explosion.has_method("configure_as_small"):
-			explosion.configure_as_small()
-		explosion.position = Vector3(pos.x, 0.05, pos.z)
-		get_tree().root.add_child(explosion)
-		if explosion.has_method("pool_activate"):
-			explosion.pool_activate()
+	if WATER_BLAST_SCENE:
+		var pos := global_position
+		pos = Vector3(pos.x, 0.05, pos.z)
+		var explosion := VfxSpawnHelper.acquire_world_node3d(get_tree(), WATER_BLAST_SCENE, pos, "water_explosion_small", 2, 60.0)
+		if is_instance_valid(explosion):
+			if explosion.has_method("configure_as_small"):
+				explosion.configure_as_small()
+			VfxSpawnHelper.activate(explosion)
 		
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -214,9 +214,10 @@ func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
 		return
 	if target_node.has_method("take_damage"):
 		var crit_effect_direction := target_node.global_position - start_pos
+		var crit_effect_position: Variant = _get_valid_critical_effect_position(target_node) if is_critical_hit else null
 		target_node.take_damage(damage, global_position, damage_source)
-		if is_critical_hit:
-			_spawn_critical_hit_effect(target_node, crit_effect_direction)
+		if is_critical_hit and crit_effect_position is Vector3:
+			_spawn_critical_hit_effect_at_position(crit_effect_position as Vector3, crit_effect_direction)
 
 
 func _get_arrow_target_aim_point(node: Node) -> Vector3:
@@ -230,17 +231,19 @@ func _spawn_critical_hit_effect(target: Node3D, hit_direction: Vector3) -> void:
 	var effect_position_variant: Variant = _get_valid_critical_effect_position(target)
 	if not effect_position_variant is Vector3:
 		return
-	var effect_position := effect_position_variant as Vector3
-	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
+	_spawn_critical_hit_effect_at_position(effect_position_variant as Vector3, hit_direction)
+
+
+func _spawn_critical_hit_effect_at_position(effect_position: Vector3, hit_direction: Vector3) -> void:
+	if not is_inside_tree() or not effect_position.is_finite():
+		return
+	var effect := VfxSpawnHelper.acquire_world_node3d(get_tree(), SOLDIER_CRIT_HIT_SCENE, effect_position)
 	if not is_instance_valid(effect):
 		return
-	get_tree().root.add_child(effect)
-	effect.global_position = effect_position
 	hit_direction.y = 0.0
 	if hit_direction.length_squared() > 0.001:
 		effect.global_basis = Basis.looking_at(hit_direction.normalized(), Vector3.UP)
-	if effect.has_method("pool_activate"):
-		effect.pool_activate()
+	VfxSpawnHelper.activate(effect)
 
 
 func _get_valid_critical_effect_position(target: Node3D) -> Variant:

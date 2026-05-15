@@ -5,7 +5,7 @@ const PLAYER_CANNON_BASE_RANGE := 24.0
 const PLAYER_CANNON_BASE_COOLDOWN := 3.2
 const PLAYER_HULL_BASE_HP := 200.0
 const PLAYER_BASE_MAX_SPEED := 6.0
-const PLAYER_ROWING_BASE_SPEED := 4.8
+const PLAYER_ROWING_BASE_SPEED := 3.8
 const PLAYER_ROWING_BASE_ACCEL := 1.0
 const PLAYER_RAMMING_BOOST_RECHARGE := 18.0
 const PLAYER_MAX_ROWING_STAMINA := 100.0
@@ -158,10 +158,13 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var reserve_respawn_interval := maxf(float(stats.get("min_respawn_interval", 10.5)), 12.0 - (float(level) * float(stats.get("respawn_reduce_per_lv", 0.25))))
 			return "일으키기 %.2f초 | 복귀 체력 %.0f%% | 구호 반경 %.1fm | 보충 %.1f초" % [assist_duration, assist_health_ratio * 100.0, assist_range, reserve_respawn_interval]
 		"boarding_resist":
-			var defense_damage := minf(float(stats.get("boarding_defense_max_damage_per_tick", 7.0)), float(level) * float(stats.get("boarding_defense_damage_per_tick_per_lv", 1.4)))
-			var capture_reduce_pct := int(round(float(level) * float(stats.get("capture_damage_reduction_per_lv", 0.06)) * 100.0))
-			var boarding_fire_reduce_pct := int(round(float(level) * float(stats.get("boarding_fire_reduce_per_lv", 0.1)) * 100.0))
-			return "도선병 피해 %.1f/초 | 장악 피해 -%d%% | 화염 -%d%%" % [defense_damage, capture_reduce_pct, boarding_fire_reduce_pct]
+			var slot_penalty := 0
+			for threshold in stats.get("enemy_boarding_slot_reduce_levels", [3, 5]):
+				if level >= int(threshold):
+					slot_penalty += 1
+			var slot_note := " | 동시 도선 한계 -%d" % slot_penalty if slot_penalty > 0 else ""
+			var boarding_damage := minf(float(stats.get("enemy_boarding_max_damage", 40.0)), float(level) * float(stats.get("enemy_boarding_damage_per_lv", 8.0)))
+			return "도선 피해 %.0f%s" % [boarding_damage, slot_note]
 		"crew_numbers":
 			var spear_damage_add := float(stats.get("damage_add_per_lv", 1.0)) * level
 			return "장창 피해 +%.0f" % spear_damage_add

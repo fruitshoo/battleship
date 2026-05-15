@@ -428,7 +428,7 @@ static func sink_derelict(ship) -> void:
 		ship.set_meta("derelict_sink_stat_accounted", true)
 		if ship.cached_lm.has_method("add_ship_sunk"):
 			ship.cached_lm.add_ship_sunk(1, ship)
-	drop_floating_loot(ship, true, 20)
+	drop_floating_loot(ship, true, 0)
 
 	ship._set_fire_emitting(true)
 
@@ -478,13 +478,13 @@ static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, wo
 	return not viewport_rect.has_point(screen_pos)
 
 
-static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_override: int = -1) -> void:
+static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_override: int = 0) -> void:
 	if not ship.loot_scene:
 		return
 	if ship.get_meta("floating_loot_dropped", false) == true:
 		return
 	ship.set_meta("floating_loot_dropped", true)
-	var contains_repair_reward := repair_amount_override != 0
+	var contains_repair_reward := repair_amount_override > 0
 	if not force_drop and not contains_repair_reward and randf() > float(ship.floating_loot_drop_chance):
 		return
 

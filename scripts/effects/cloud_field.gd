@@ -48,6 +48,7 @@ func _ready() -> void:
 			_rebuild_clouds(true)
 		return
 	_target = get_node_or_null(target_path) as Node3D
+	_apply_runtime_performance_preset()
 	_rebuild_clouds(true)
 
 
@@ -185,3 +186,15 @@ func _get_wind_strength() -> float:
 	if is_instance_valid(wind_manager) and wind_manager.has_method("get_wind_strength"):
 		return clampf(float(wind_manager.call("get_wind_strength")), 0.45, 1.15)
 	return 0.75
+
+
+func _apply_runtime_performance_preset() -> void:
+	if not is_instance_valid(SaveManager):
+		return
+	match str(SaveManager.get_setting("performance_preset", "quality")):
+		"balanced":
+			cloud_count = mini(cloud_count, 3)
+			cloud_alpha *= 0.92
+		"performance":
+			cloud_count = mini(cloud_count, 2)
+			cloud_alpha *= 0.82

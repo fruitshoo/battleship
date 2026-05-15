@@ -444,6 +444,8 @@ func apply_upgrade(upgrade_id: String) -> void:
 		var minions = EntityRegistry.get_captured_minions()
 		for m in minions:
 			apply_fleet_upgrades_to_ship(m)
+	if upgrade_id == "boarding_resist":
+		_apply_boarding_resist_to_player_fleet(new_level)
 	
 	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [LocaleManager.data_text(UPGRADES[upgrade_id], upgrade_id, "upgrade", "name", upgrade_id), new_level])
 	
@@ -546,19 +548,56 @@ func _recover_incapacitated_player_soldiers(ship: Node3D) -> int:
 	return recovered_count
 
 func _apply_boarding_resist(ship: Node3D, level: int) -> void:
+	_apply_boarding_resist_to_ship(ship, level)
+	print("[BoardingResist] 창벽 Lv.%d (동시 도선 제한 -%d, 도선 피해 %.1f)" % [
+		level,
+		_get_boarding_resist_slot_penalty(level),
+		_get_boarding_resist_transfer_damage(level),
+	])
+
+
+func _apply_boarding_resist_to_player_fleet(level: int) -> void:
+	for player_ship in EntityRegistry.get_ships_by_team("player"):
+		_apply_boarding_resist_to_ship(player_ship, level)
+
+
+func _apply_boarding_resist_to_ship(ship: Node3D, level: int) -> void:
+	if not is_instance_valid(ship):
+		return
+	_clear_legacy_boarding_resist_meta(ship)
+	ship.set_meta("enemy_boarding_slot_penalty", _get_boarding_resist_slot_penalty(level))
+	ship.set_meta("enemy_boarding_transfer_damage", _get_boarding_resist_transfer_damage(level))
+
+
+func _clear_legacy_boarding_resist_meta(ship: Node3D) -> void:
+	for meta_name in [
+		"boarding_capture_duration_multiplier",
+		"boarding_defense_damage_per_tick",
+		"boarding_capture_damage_reduction",
+		"boarding_fire_damage_reduction",
+		"player_boarding_wave_limit_bonus",
+		"enemy_boarding_interval_multiplier",
+		"enemy_boarding_transfer_damage",
+	]:
+		if ship.has_meta(meta_name):
+			ship.remove_meta(meta_name)
+
+
+func _get_boarding_resist_slot_penalty(level: int) -> int:
 	var stats: Dictionary = UPGRADES["boarding_resist"].get("stats", {})
-	var defense_damage: float = minf(
-		float(stats.get("boarding_defense_max_damage_per_tick", 7.0)),
-		float(stats.get("boarding_defense_damage_per_tick_per_lv", 1.4)) * float(level)
+	var penalty := 0
+	for threshold in stats.get("enemy_boarding_slot_reduce_levels", [3, 5]):
+		if level >= int(threshold):
+			penalty += 1
+	return penalty
+
+
+func _get_boarding_resist_transfer_damage(level: int) -> float:
+	var stats: Dictionary = UPGRADES["boarding_resist"].get("stats", {})
+	return minf(
+		float(stats.get("enemy_boarding_max_damage", 40.0)),
+		float(level) * float(stats.get("enemy_boarding_damage_per_lv", 8.0))
 	)
-	var capture_damage_reduction: float = float(stats.get("capture_damage_reduction_per_lv", 0.06)) * float(level)
-	var boarding_fire_reduction: float = float(stats.get("boarding_fire_reduce_per_lv", 0.1)) * float(level)
-	if ship.has_meta("boarding_capture_duration_multiplier"):
-		ship.remove_meta("boarding_capture_duration_multiplier")
-	ship.set_meta("boarding_defense_damage_per_tick", defense_damage)
-	ship.set_meta("boarding_capture_damage_reduction", clampf(capture_damage_reduction, 0.0, 0.75))
-	ship.set_meta("boarding_fire_damage_reduction", clampf(boarding_fire_reduction, 0.0, 0.75))
-	print("[BoardingResist] 창벽 Lv.%d (도선병 피해 %.1f/s)" % [level, defense_damage])
 
 func _apply_ballista(ship: Node3D, _level: int) -> void:
 	push_warning("UpgradeManager: ballista upgrade is disabled for current gameplay flow.")
@@ -1241,6 +1280,8 @@ func apply_fleet_upgrades_to_ship(ship: Node3D) -> void:
 			
 	# 2. 지원함 선체는 별도 업그레이드가 아니라 플레이어 선체 업그레이드를 공유한다.
 	_apply_shared_hull_upgrade_to_fleet_ship(ship)
+	if int(current_levels.get("boarding_resist", 0)) > 0:
+		_apply_boarding_resist_to_ship(ship, int(current_levels.get("boarding_resist", 0)))
 
 
 func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:

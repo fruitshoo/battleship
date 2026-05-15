@@ -14,12 +14,17 @@ const SCREEN_STEER_SOFT_ZONE_DEG := 16.0
 const SCREEN_STEER_SPEED_DAMPING := 0.035
 const SCREEN_INPUT_DEADZONE := 0.08
 const RAM_BOOST_TRIGGER_THRESHOLD := 0.45
+const ROPE_RESIST_STICK_THRESHOLD := 0.62
+const ROPE_RESIST_STICK_NEUTRAL := 0.28
 
 static func handle_input(ship, delta: float) -> void:
 	if Input.is_action_just_pressed("toggle_sail_furl") and ship.has_method("toggle_sail_furl"):
 		ship.toggle_sail_furl()
 	if _is_ramming_boost_just_pressed(ship) and ship.has_method("try_activate_ramming_boost"):
 		ship.try_activate_ramming_boost()
+	var rope_resist_direction := _get_rope_resist_input_direction(ship)
+	if rope_resist_direction != 0 and ship.has_method("try_resist_incoming_boarding_rope"):
+		ship.try_resist_incoming_boarding_rope(rope_resist_direction)
 
 	var sail_turn_speed: float = float(ship.sail_turn_speed)
 	if Input.is_action_pressed("sail_left"):
@@ -43,6 +48,39 @@ static func _is_ramming_boost_just_pressed(ship) -> bool:
 	var was_pressed := bool(ship.get("ramming_boost_input_was_pressed")) if ship.get("ramming_boost_input_was_pressed") != null else false
 	ship.set("ramming_boost_input_was_pressed", pressed)
 	return pressed and not was_pressed
+
+
+static func _get_rope_resist_input_direction(ship) -> int:
+	var left_pressed := Input.is_action_just_pressed("ship_left")
+	var right_pressed := Input.is_action_just_pressed("ship_right")
+	if left_pressed != right_pressed:
+		var digital_direction := -1 if left_pressed else 1
+		_set_rope_resist_stick_latch(ship, digital_direction)
+		return digital_direction
+
+	var axis := Input.get_action_strength("ship_right") - Input.get_action_strength("ship_left")
+	var latched_direction := _get_rope_resist_stick_latch(ship)
+	if absf(axis) <= ROPE_RESIST_STICK_NEUTRAL:
+		_set_rope_resist_stick_latch(ship, 0)
+		return 0
+	if axis <= -ROPE_RESIST_STICK_THRESHOLD and latched_direction != -1:
+		_set_rope_resist_stick_latch(ship, -1)
+		return -1
+	if axis >= ROPE_RESIST_STICK_THRESHOLD and latched_direction != 1:
+		_set_rope_resist_stick_latch(ship, 1)
+		return 1
+	return 0
+
+
+static func _get_rope_resist_stick_latch(ship) -> int:
+	if is_instance_valid(ship) and ship.get("boarding_rope_resist_stick_latch_direction") != null:
+		return int(ship.get("boarding_rope_resist_stick_latch_direction"))
+	return 0
+
+
+static func _set_rope_resist_stick_latch(ship, direction: int) -> void:
+	if is_instance_valid(ship) and ship.get("boarding_rope_resist_stick_latch_direction") != null:
+		ship.set("boarding_rope_resist_stick_latch_direction", direction)
 
 
 static func _handle_ship_relative_navigation(ship, delta: float) -> void:

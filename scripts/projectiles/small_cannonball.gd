@@ -1,6 +1,7 @@
 extends Area3D
 
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
 const DEFAULT_SHIP_IMPACT_PUFF_SCENE = preload("res://scenes/effects/impact_puff.tscn")
 const DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
@@ -10,6 +11,7 @@ const MIN_FLIGHT_DURATION: float = 0.08
 const TERMINAL_HIT_RADIUS: float = 1.6
 const SHIP_HIT_FEEDBACK_DAMAGE_FLOOR: float = 24.0
 const SHIP_HIT_FEEDBACK_Y_OFFSET: float = 0.35
+const SOLDIER_HIT_EFFECT_DECK_MARGIN: float = 0.55
 
 @export var damage: float = 24.0
 @export var speed: float = 58.0
@@ -101,8 +103,10 @@ func _resolve_terminal_hit(hit_position: Vector3) -> void:
 		if hit_position.distance_to(_get_target_aim_point(target_node)) > TERMINAL_HIT_RADIUS:
 			return
 		if target_node.has_method("take_damage"):
+			var hit_effect_position: Variant = _get_valid_soldier_hit_effect_position(target_node as Node3D)
 			target_node.take_damage(damage, hit_position, damage_source)
-			_spawn_hit_spark(target_node.global_position + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0))
+			if hit_effect_position is Vector3:
+				_spawn_hit_spark(hit_effect_position as Vector3)
 		return
 
 	var ship := HitTargetResolver.resolve_ship_from_node(target_node)
@@ -126,13 +130,40 @@ func _get_target_aim_point(node: Node) -> Vector3:
 func _spawn_hit_spark(effect_position: Vector3) -> void:
 	if not is_inside_tree():
 		return
-	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
+	var effect := VfxSpawnHelper.acquire_world_node3d(get_tree(), SOLDIER_CRIT_HIT_SCENE, effect_position)
 	if not is_instance_valid(effect):
 		return
-	get_tree().root.add_child(effect)
-	effect.global_position = effect_position
-	if effect.has_method("pool_activate"):
-		effect.pool_activate()
+	VfxSpawnHelper.activate(effect)
+
+
+func _get_valid_soldier_hit_effect_position(target: Node3D) -> Variant:
+	if not is_instance_valid(target) or not target.is_inside_tree():
+		return null
+	var target_pos := target.global_position
+	if not target_pos.is_finite():
+		return null
+	var owned_ship: Node3D = target.get_owned_ship_node() if target.has_method("get_owned_ship_node") else null
+	if not is_instance_valid(owned_ship) or not owned_ship.is_inside_tree():
+		return null
+	if owned_ship.get("is_sinking") == true or owned_ship.get("is_dying") == true:
+		return null
+	if owned_ship.has_method("is_sinking_or_dying") and owned_ship.call("is_sinking_or_dying") == true:
+		return null
+	var local_pos := owned_ship.to_local(target_pos)
+	var deck_height: float = float(owned_ship.get("deck_height")) if owned_ship.get("deck_height") != null else 0.4
+	if local_pos.y < deck_height - 1.0 or local_pos.y > deck_height + 1.75:
+		return null
+	var half_ext := Vector2(2.0, 3.0)
+	if owned_ship.has_method("get_deck_half_extents"):
+		var extents: Variant = owned_ship.call("get_deck_half_extents")
+		if extents is Vector2:
+			half_ext = extents
+	var half_width := half_ext.x
+	if owned_ship.has_method("get_deck_half_width_at_z"):
+		half_width = maxf(0.08, float(owned_ship.call("get_deck_half_width_at_z", clampf(local_pos.z, -half_ext.y, half_ext.y))))
+	if absf(local_pos.z) > half_ext.y + SOLDIER_HIT_EFFECT_DECK_MARGIN or absf(local_pos.x) > half_width + SOLDIER_HIT_EFFECT_DECK_MARGIN:
+		return null
+	return target_pos + Vector3(0.0, SOLDIER_AIM_VERTICAL_OFFSET, 0.0)
 
 
 func _resolve_ship_impact_position(ship: Node3D, hit_position: Vector3) -> Vector3:
@@ -158,20 +189,12 @@ func _spawn_ship_impact_puff(ship: Node3D, effect_position: Vector3) -> void:
 		scene = ship.get("impact_puff_scene") as PackedScene
 	if scene == null:
 		return
-	if not VfxBudget.allow_spawn(get_tree(), "small_cannonball_ship_hit", effect_position, 5, 90.0):
-		return
-	var puff = ScenePool.acquire(get_tree(), scene)
+	var puff := VfxSpawnHelper.acquire_world_node3d(get_tree(), scene, effect_position, "small_cannonball_ship_hit", 5, 90.0)
 	if not is_instance_valid(puff):
 		return
-	get_tree().root.add_child(puff)
-	if puff is Node3D:
-		(puff as Node3D).global_position = effect_position
 	if puff.has_method("set_intensity"):
 		puff.set_intensity(1.15)
-	if puff.has_method("set_budget_reserved"):
-		puff.set_budget_reserved()
-	if puff.has_method("pool_activate"):
-		puff.pool_activate()
+	VfxSpawnHelper.activate(puff)
 
 
 func _spawn_ship_impact_splinters(ship: Node3D, effect_position: Vector3, impact_direction: Vector3) -> void:

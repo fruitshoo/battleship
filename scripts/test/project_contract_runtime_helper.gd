@@ -6,6 +6,31 @@ const FIRE_EFFECT_SCENE_PATH := "res://scenes/effects/fire_effect.tscn"
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"
 const AUTHORING_INTENT_FAMILY_ENEMY_RUNTIME := "enemy_runtime"
 const AUTHORING_INTENT_FAMILY_SUPPORT_RUNTIME := "support_runtime"
+const PlayerShipScript = preload("res://scripts/entities/ships/player_ship.gd")
+const RAMMING_BOOST_ANGLE_SHIP_TYPES := [
+	"kobayabune_melee",
+	"sekibune_melee",
+	"sekibune_cannon",
+	"atakebune_mid",
+	"atakebune_final",
+]
+const RAMMING_BOOST_ASSIST_ANGLE_DEGREES := [
+	-90.0,
+	-75.0,
+	-60.0,
+	-55.0,
+	-45.0,
+	-30.0,
+	-15.0,
+	0.0,
+	15.0,
+	30.0,
+	45.0,
+	55.0,
+	60.0,
+	75.0,
+	90.0,
+]
 
 
 class MockTargetingShip:
@@ -59,13 +84,91 @@ class MockAuthoringSupportTarget:
 		return team
 
 
+class MockRammingAssistShip:
+	extends Node3D
+
+	var team: String = "enemy"
+	var current_speed: float = 0.0
+	var min_ramming_speed: float = 6.0
+	var boost_active: bool = false
+	var is_sinking: bool = false
+	var is_dying: bool = false
+	var is_dead: bool = false
+	var received_ramming_count: int = 0
+	var last_attacker: Node3D = null
+	var last_impact_speed: float = 0.0
+	var boost_hit_registered: bool = false
+	var ramming_damage_multiplier: float = 1.0
+	var ramming_knockback_multiplier: float = 1.0
+
+	func get_team_tag() -> String:
+		return team
+
+	func is_sinking_or_dying() -> bool:
+		return is_sinking or is_dying
+
+	func is_ramming_boost_active() -> bool:
+		return boost_active
+
+	func apply_ramming_damage(attacker: Node3D, impact_speed: float) -> void:
+		received_ramming_count += 1
+		last_attacker = attacker
+		last_impact_speed = impact_speed
+		if is_instance_valid(attacker) and attacker.has_method("notify_ramming_boost_hit"):
+			attacker.call("notify_ramming_boost_hit")
+
+	func notify_ramming_boost_hit() -> void:
+		boost_hit_registered = true
+
+	func get_ramming_damage_multiplier_value() -> float:
+		return ramming_damage_multiplier * (2.0 if boost_active else 1.0)
+
+
+class MockRammingDamageVictim:
+	extends Node3D
+
+	var team: String = "enemy"
+	var hull_hp: float = 8.0
+	var hull_defense: float = 0.0
+	var min_ramming_speed: float = 6.0
+	var is_sinking: bool = false
+	var is_dying: bool = false
+	var _recent_ram_targets: Dictionary = {}
+	var _cached_audio_manager: Node = null
+	var water_splash_scene: PackedScene = null
+	var wood_splinter_scene: PackedScene = null
+	var DEBUG_COMBAT_LOGS: bool = false
+	var received_damage: float = 0.0
+	var ramming_aoe_count: int = 0
+	var impulse_count: int = 0
+
+	func get_team_tag() -> String:
+		return team
+
+	func apply_ramming_aoe(_amount: float, _impact_pos: Vector3) -> void:
+		ramming_aoe_count += 1
+
+	func take_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO, _damage_source: String = "") -> void:
+		received_damage = amount
+		hull_hp -= maxf(amount - hull_defense, 1.0)
+		if hull_hp <= 0.0:
+			is_dying = true
+
+	func apply_collision_impulse(_impulse_velocity: Vector3) -> void:
+		impulse_count += 1
+
+
 static func run_runtime_smoke(owner: Node, failures: Array[String], smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int, smoke_spawn_boss: bool, smoke_spawn_final_boss: bool, smoke_spawn_ship_types: Array[String], smoke_spawn_launcher_scenes: Array[String], smoke_spawn_projectile_scenes: Array[String]) -> void:
 	var packed := load(smoke_scene_path) as PackedScene
 	if packed == null:
 		failures.append("smoke scene load failed: %s" % smoke_scene_path)
 		return
 	_run_ship_targeting_contract(owner, failures)
+	_run_ramming_boost_assist_contract(owner, failures)
+	_run_ramming_boost_refund_contract(failures)
+	_run_ramming_boost_lethal_feedback_contract(owner, failures)
 	await _run_authoring_spawn_runtime_contract(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
+	await _run_ramming_boost_spawned_angle_contract(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
 
 	if not smoke_spawn_boss and not smoke_spawn_final_boss and smoke_spawn_ship_types.is_empty() and smoke_spawn_launcher_scenes.is_empty() and smoke_spawn_projectile_scenes.is_empty():
 		failures.append("no smoke mode enabled")
@@ -130,6 +233,208 @@ static func _run_ship_targeting_contract(owner: Node, failures: Array[String]) -
 	EntityRegistry.unregister_ship(player_ship)
 	EntityRegistry.unregister_ship(support_ship)
 	root.queue_free()
+
+
+static func _run_ramming_boost_assist_contract(owner: Node, failures: Array[String]) -> void:
+	var root := Node3D.new()
+	owner.add_child(root)
+
+	var player := MockRammingAssistShip.new()
+	root.add_child(player)
+	player.team = "player"
+	player.boost_active = true
+	player.current_speed = 4.25
+	player.min_ramming_speed = 6.0
+	player.global_position = Vector3.ZERO
+	ShipAllyRoleHelper.mark_player_flagship(player)
+
+	var enemy := MockRammingAssistShip.new()
+	root.add_child(enemy)
+	enemy.team = "enemy"
+	enemy.global_position = Vector3(0.0, 0.0, -6.7)
+
+	var assisted_hit := BaseShipCollisionHelper._try_assisted_ramming_boost_contact(player, enemy, 6.7, 6.0)
+	if not assisted_hit:
+		failures.append("ramming boost assist contract did not trigger just outside collision distance")
+	if enemy.received_ramming_count != 1:
+		failures.append("ramming boost assist contract did not apply ramming damage")
+	if enemy.last_attacker != player:
+		failures.append("ramming boost assist contract did not pass the player as attacker")
+	if enemy.last_impact_speed < player.min_ramming_speed:
+		failures.append("ramming boost assist contract impact speed below minimum")
+	if not player.boost_hit_registered:
+		failures.append("ramming boost assist contract did not register the boost hit")
+
+	enemy.received_ramming_count = 0
+	player.boost_hit_registered = false
+	enemy.global_position = Vector3(6.7, 0.0, 0.0)
+	var side_hit := BaseShipCollisionHelper._try_assisted_ramming_boost_contact(player, enemy, 6.7, 6.0)
+	if side_hit or enemy.received_ramming_count != 0:
+		failures.append("ramming boost assist contract allowed a side scrape to spend a boost hit")
+
+	enemy.global_position = Vector3(0.0, 0.0, -6.7)
+	player.current_speed = 3.5
+	var slow_hit := BaseShipCollisionHelper._try_assisted_ramming_boost_contact(player, enemy, 6.7, 6.0)
+	if slow_hit or enemy.received_ramming_count != 0:
+		failures.append("ramming boost assist contract allowed a low-speed contact")
+
+	root.queue_free()
+
+
+static func _run_ramming_boost_refund_contract(failures: Array[String]) -> void:
+	var player := PlayerShipScript.new()
+	player.sail_furled = true
+	player.sail_deployed_ratio = 0.0
+	player.current_speed = 0.0
+	player.max_speed = 9.0
+	player.min_ramming_speed = 6.0
+	player.ramming_boost_duration = 0.2
+	player.ramming_boost_recharge_duration = 18.0
+	player.ramming_boost_charge = 1.0
+
+	if not player.try_activate_ramming_boost():
+		failures.append("ramming boost refund contract could not activate boost with folded sail")
+	else:
+		player._update_ramming_boost(0.25)
+		if player.ramming_boost_active:
+			failures.append("ramming boost refund contract did not end the boost")
+		if player.ramming_boost_charge < 0.34:
+			failures.append("ramming boost refund contract did not refund a missed boost")
+
+	player.ramming_boost_charge = 1.0
+	if player.try_activate_ramming_boost():
+		player.notify_ramming_boost_hit()
+		player._update_ramming_boost(0.25)
+		if player.ramming_boost_charge >= 0.34:
+			failures.append("ramming boost refund contract refunded a confirmed hit")
+	else:
+		failures.append("ramming boost refund contract could not reactivate boost after reset")
+
+	player.free()
+
+
+static func _run_ramming_boost_lethal_feedback_contract(owner: Node, failures: Array[String]) -> void:
+	var root := Node3D.new()
+	owner.add_child(root)
+
+	var attacker := MockRammingAssistShip.new()
+	root.add_child(attacker)
+	attacker.team = "player"
+	attacker.boost_active = true
+	attacker.current_speed = 9.0
+	attacker.min_ramming_speed = 6.0
+	attacker.global_position = Vector3(0.0, 0.0, 0.0)
+	ShipAllyRoleHelper.mark_player_flagship(attacker)
+
+	var victim := MockRammingDamageVictim.new()
+	root.add_child(victim)
+	victim.team = "enemy"
+	victim.hull_hp = 6.0
+	victim.global_position = Vector3(0.0, 0.0, -5.5)
+
+	var speed_before := attacker.current_speed
+	BaseShipCollisionHelper.apply_ramming_damage(victim, attacker, 8.5)
+
+	if victim.received_damage <= 0.0 or not victim.is_dying:
+		failures.append("ramming boost lethal feedback contract did not apply lethal damage")
+	if victim.ramming_aoe_count != 1:
+		failures.append("ramming boost lethal feedback contract did not apply impact aoe before sinking")
+	if not attacker.boost_hit_registered:
+		failures.append("ramming boost lethal feedback contract did not register boost hit")
+	if attacker.current_speed >= speed_before * 0.72:
+		failures.append("ramming boost lethal feedback contract did not brake attacker speed")
+	if attacker.get("collision_impulse_velocity") == null and attacker.current_speed >= speed_before * 0.55:
+		failures.append("ramming boost lethal feedback contract did not leave enough impact resistance")
+
+	root.queue_free()
+
+
+static func _run_ramming_boost_spawned_angle_contract(owner: Node, failures: Array[String], packed: PackedScene, smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:
+	var smoke_root := packed.instantiate()
+	if smoke_root == null:
+		failures.append("ramming boost angle contract instantiate failed: %s" % smoke_scene_path)
+		return
+
+	owner.add_child(smoke_root)
+	PreviewHarnessHelper.setup_common(smoke_root, false, true)
+	await _wait_frames(owner, wait_frames_after_attach)
+
+	var player := smoke_root.get_node_or_null("PlayerShip") as Node3D
+	var spawner := smoke_root.get_node_or_null("EnemySpawner")
+	if not is_instance_valid(player):
+		failures.append("ramming boost angle contract missing PlayerShip")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+	if not is_instance_valid(spawner) or not spawner.has_method("debug_spawn_ship"):
+		failures.append("ramming boost angle contract missing EnemySpawner.debug_spawn_ship")
+		smoke_root.queue_free()
+		await _wait_frames(owner, 1)
+		return
+
+	var player_forward: Vector3 = -player.global_transform.basis.z
+	player_forward.y = 0.0
+	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.0001 else Vector3.FORWARD
+	var player_right := player_forward.cross(Vector3.UP)
+	player_right.y = 0.0
+	player_right = player_right.normalized() if player_right.length_squared() > 0.0001 else Vector3.RIGHT
+	var player_min_speed: float = maxf(float(player.get("min_ramming_speed")) if player.get("min_ramming_speed") != null else 6.0, 0.1)
+
+	var mock_target := MockRammingAssistShip.new()
+	smoke_root.add_child(mock_target)
+	mock_target.team = "enemy"
+
+	for ship_type_variant in RAMMING_BOOST_ANGLE_SHIP_TYPES:
+		var ship_type := str(ship_type_variant)
+		var hull_probe := spawner.call("debug_spawn_ship", ship_type, 28.0, 0.0) as Node3D
+		if not is_instance_valid(hull_probe):
+			failures.append("ramming boost angle contract could not spawn %s" % ship_type)
+			continue
+		await _wait_frames(owner, wait_frames_after_spawn)
+
+		for angle_variant in RAMMING_BOOST_ASSIST_ANGLE_DEGREES:
+			var angle_degrees := float(angle_variant)
+			var angle_radians := deg_to_rad(angle_degrees)
+			var approach_dir := (player_forward * cos(angle_radians) + player_right * sin(angle_radians))
+			approach_dir.y = 0.0
+			approach_dir = approach_dir.normalized() if approach_dir.length_squared() > 0.0001 else player_forward
+
+			hull_probe.global_position = player.global_position + approach_dir * 12.0
+			hull_probe.look_at(player.global_position, Vector3.UP)
+			await _wait_frames(owner, 1)
+
+			var collision_distance: float = float(player.call("get_collision_distance_to", hull_probe)) if player.has_method("get_collision_distance_to") else 6.0
+			var test_distance := collision_distance + BaseShipCollisionHelper.RAMMING_BOOST_ASSIST_PAD * 0.75
+			mock_target.global_position = player.global_position + approach_dir * test_distance
+			mock_target.rotation = hull_probe.rotation
+			mock_target.received_ramming_count = 0
+			mock_target.last_attacker = null
+			mock_target.last_impact_speed = 0.0
+			mock_target.boost_hit_registered = false
+
+			player.set("ramming_boost_active", true)
+			player.set("ramming_boost_timer", 1.0)
+			player.set("ramming_boost_hit_registered", false)
+			player.set("current_speed", player_min_speed * 0.78)
+
+			var did_hit := BaseShipCollisionHelper._try_assisted_ramming_boost_contact(player, mock_target, test_distance, collision_distance)
+			var expected_hit := absf(angle_degrees) <= 55.0
+			var registered_hit := bool(player.get("ramming_boost_hit_registered"))
+			if expected_hit:
+				if not did_hit or mock_target.received_ramming_count != 1 or not registered_hit:
+					failures.append("ramming boost angle contract missed %s at %.0f degrees" % [ship_type, angle_degrees])
+				elif mock_target.last_impact_speed < player_min_speed:
+					failures.append("ramming boost angle contract low impact speed for %s at %.0f degrees" % [ship_type, angle_degrees])
+			else:
+				if did_hit or mock_target.received_ramming_count != 0 or registered_hit:
+					failures.append("ramming boost angle contract over-accepted %s at %.0f degrees" % [ship_type, angle_degrees])
+
+		hull_probe.queue_free()
+		await _wait_frames(owner, 1)
+
+	mock_target.queue_free()
+	smoke_root.queue_free()
+	await _wait_frames(owner, 1)
 
 
 static func _run_authoring_spawn_runtime_contract(owner: Node, failures: Array[String], packed: PackedScene, smoke_scene_path: String, wait_frames_after_attach: int, wait_frames_after_spawn: int) -> void:

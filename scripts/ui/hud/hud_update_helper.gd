@@ -113,6 +113,9 @@ static func _update_boost_bar(hud) -> void:
 	if not is_instance_valid(hud.player_ship) or not hud.player_ship.has_method("get_ramming_boost_charge_ratio"):
 		hud.boost_bar.visible = false
 		return
+	if hud.player_ship.has_method("should_show_ramming_boost_gauge") and not hud.player_ship.call("should_show_ramming_boost_gauge"):
+		hud.boost_bar.visible = false
+		return
 	hud.boost_bar.visible = true
 	var boost_ratio: float = clampf(float(hud.player_ship.call("get_ramming_boost_charge_ratio")), 0.0, 1.0)
 	var boost_active: bool = hud.player_ship.has_method("is_ramming_boost_active") and hud.player_ship.call("is_ramming_boost_active") == true
@@ -619,9 +622,7 @@ static func update_boarding_display(hud) -> void:
 		if prep_timer < prep_duration:
 			hud.boarding_label.text = "도선 준비 중%s  승조 %d | 월선 %d" % [target_suffix, target_friendly_count, target_hostile_count]
 			hud.boarding_bar.value = (prep_timer / prep_duration) * 100
-			var fill = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
-			if fill:
-				fill.bg_color = Color(1.0, 1.0, 1.0, 0.7)
+			_set_boarding_bar_fill(hud, Color(1.0, 1.0, 1.0, 0.7))
 		else:
 			if target_overrun:
 				hud.boarding_label.text = "갑판 장악 중%s  승조 %d | 월선 %d | %.1f초" % [
@@ -638,11 +639,19 @@ static func update_boarding_display(hud) -> void:
 					target_hostile_count
 				]
 				hud.boarding_bar.value = 100
-			var fill_active = hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
-			if fill_active:
-				fill_active.bg_color = NavalUiTheme.STATUS_WARN if target_overrun else NavalUiTheme.STATUS_ACTIVE_BLUE
+			_set_boarding_bar_fill(hud, NavalUiTheme.STATUS_WARN if target_overrun else NavalUiTheme.STATUS_ACTIVE_BLUE)
 	else:
 		hud.boarding_ui.visible = false
+
+
+static func _set_boarding_bar_fill(hud, color: Color) -> void:
+	if not is_instance_valid(hud.boarding_bar):
+		return
+	var fill := hud.boarding_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if fill:
+		fill.bg_color = color
+		hud.boarding_bar.queue_redraw()
+
 
 static func update_capture_opportunity_display(hud) -> void:
 	if not is_instance_valid(hud.capture_opportunity_label):

@@ -77,6 +77,8 @@ static func _finish_release_deferred(node_id: int, pool_root_id: int, key: Strin
 	var pool_root := NodeContractHelper.get_instance_node(pool_root_id)
 	if not is_instance_valid(node) or not is_instance_valid(pool_root):
 		return
+	if not node.has_meta(PENDING_RELEASE_META) or node.get_meta(PENDING_RELEASE_META) != true:
+		return
 	node.set_meta(PENDING_RELEASE_META, false)
 	var deferred_store: Dictionary = pool_root.get_meta(STORE_META) if pool_root.has_meta(STORE_META) else {}
 	var deferred_pool: Array = deferred_store.get(key, [])
@@ -112,6 +114,8 @@ static func _get_root_node(tree: SceneTree) -> Node:
 	return pool_root
 
 static func _prepare_acquired_node(node: Node) -> void:
+	if node.has_meta(PENDING_RELEASE_META):
+		node.set_meta(PENDING_RELEASE_META, false)
 	node.process_mode = Node.PROCESS_MODE_INHERIT
 	if node is Node3D:
 		(node as Node3D).visible = true

@@ -11,6 +11,9 @@ const BOARDING_WAR_CRY_VOLUME_DB := 1.0
 const BOARDING_RALLY_CRY_VOLUME_DB := 0.0
 const BOARDING_WAR_CRY_PITCH_MIN := 1.12
 const BOARDING_WAR_CRY_PITCH_MAX := 1.24
+const BOARDING_JUMP_SPEED := 17.0
+const BOARDING_JUMP_MIN_TIME := 0.32
+const BOARDING_JUMP_MAX_TIME := 0.62
 
 static var _last_war_cry_msec_by_team: Dictionary = {}
 
@@ -47,8 +50,8 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 	var start_local_pos: Vector3 = soldier.position
 	var start_local_y: float = start_local_pos.y
 	var horiz_dist: float = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
-	var jump_height: float = maxf(2.5, horiz_dist * 0.4)
-	var travel_time: float = clampf(horiz_dist / 15.0, 0.6, 1.0)
+	var jump_height: float = clampf(maxf(1.45, horiz_dist * 0.24), 1.45, 2.45)
+	var travel_time: float = clampf(horiz_dist / BOARDING_JUMP_SPEED, BOARDING_JUMP_MIN_TIME, BOARDING_JUMP_MAX_TIME)
 
 	var tween = soldier.create_tween()
 	tween.set_parallel(true)

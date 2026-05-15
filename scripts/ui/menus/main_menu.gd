@@ -2,6 +2,7 @@ extends Control
 
 const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
 const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
+const CREDITS_PANEL_SCENE := preload("res://scenes/ui/credits_panel.tscn")
 const GAME_SCENE_PATH := "res://scenes/main.tscn"
 const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
@@ -26,6 +27,7 @@ const INTRO_BUTTON_STAGGER: float = 0.11
 @onready var start_button: Button = $ButtonBlock/StartButton
 @onready var meta_button: Button = $ButtonBlock/MetaButton
 @onready var options_button: Button = $ButtonBlock/OptionsButton
+@onready var credits_button: Button = $ButtonBlock/CreditsButton
 @onready var quit_button: Button = $ButtonBlock/QuitButton
 @onready var version_label: Label = $VersionLabel
 
@@ -45,9 +47,11 @@ func _ready() -> void:
 	start_button.pressed.connect(_on_start_pressed)
 	meta_button.pressed.connect(_on_meta_pressed)
 	options_button.pressed.connect(_on_options_pressed)
+	credits_button.pressed.connect(_on_credits_pressed)
 	quit_button.pressed.connect(_on_quit_pressed)
+	meta_button.visible = false
 	quit_button.visible = OS.get_name() != "Web"
-	_menu_buttons = [start_button, meta_button, options_button]
+	_menu_buttons = [start_button, options_button, credits_button]
 	if quit_button.visible:
 		_menu_buttons.append(quit_button)
 	_apply_layout_density()
@@ -172,7 +176,7 @@ func _apply_ui_theme() -> void:
 		eyebrow_label.visible = false
 	if is_instance_valid(version_label):
 		NavalUiTheme.style_caption(version_label, 13, NavalUiTheme.TEXT_MUTED)
-	for button in [start_button, meta_button, options_button, quit_button]:
+	for button in [start_button, meta_button, options_button, credits_button, quit_button]:
 		_apply_compact_menu_button(button)
 
 
@@ -185,6 +189,8 @@ func _apply_localized_text() -> void:
 		meta_button.text = LocaleManager.t("main_menu.meta", "업그레이드")
 	if is_instance_valid(options_button):
 		options_button.text = LocaleManager.t("main_menu.options", "옵션")
+	if is_instance_valid(credits_button):
+		credits_button.text = LocaleManager.t("main_menu.credits", "크레딧")
 	if is_instance_valid(quit_button):
 		quit_button.text = LocaleManager.t("main_menu.quit", "종료")
 
@@ -309,6 +315,7 @@ func _set_buttons_disabled(disabled: bool) -> void:
 	start_button.disabled = disabled
 	meta_button.disabled = disabled
 	options_button.disabled = disabled
+	credits_button.disabled = disabled
 	quit_button.disabled = disabled
 	if not disabled:
 		_focus_first_menu_button()
@@ -340,6 +347,18 @@ func _on_options_pressed() -> void:
 	_modal_open = true
 	_set_buttons_disabled(true)
 	var ui = OPTIONS_PANEL_SCENE.instantiate()
+	add_child(ui)
+	ui.closed.connect(func():
+		_modal_open = false
+		_set_buttons_disabled(false)
+	)
+
+func _on_credits_pressed() -> void:
+	if _modal_open:
+		return
+	_modal_open = true
+	_set_buttons_disabled(true)
+	var ui = CREDITS_PANEL_SCENE.instantiate()
 	add_child(ui)
 	ui.closed.connect(func():
 		_modal_open = false

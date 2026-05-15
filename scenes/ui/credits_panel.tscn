@@ -1,0 +1,57 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/menus/credits_panel.gd" id="1_script"]
+
+[node name="CreditsPanel" type="CanvasLayer"]
+process_mode = 3
+layer = 112
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.03, 0.06, 0.1, 0.74)
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -340.0
+offset_top = -290.0
+offset_right = 340.0
+offset_bottom = 290.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Shell" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Panel/Shell"]
+layout_mode = 2
+text = "크레딧"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Panel/Shell"]
+layout_mode = 2
+text = "외부 자산과 라이선스 표기"
+horizontal_alignment = 1
+
+[node name="CreditsText" type="RichTextLabel" parent="Panel/Shell"]
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_active = true
+selection_enabled = true
+
+[node name="Footer" type="HBoxContainer" parent="Panel/Shell"]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="Panel/Shell/Footer"]
+custom_minimum_size = Vector2(200, 44)
+layout_mode = 2
+text = "메뉴로 돌아가기"

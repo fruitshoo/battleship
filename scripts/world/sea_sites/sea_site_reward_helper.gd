@@ -51,7 +51,7 @@ static func _apply_minor_stat_bonus(site: Node, player_ship: Node3D) -> bool:
 		return false
 	var entry := _pick_minor_stat_bonus(player_ship)
 	if entry.is_empty():
-		_notify(site, player_ship, "이미 충분히 탐색함")
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.exhausted", "이미 충분히 탐색함"))
 		return true
 
 	var bonus_id := str(entry.get("id", ""))
@@ -231,13 +231,14 @@ static func _get_upgrade_manager(site: Node) -> Node:
 
 
 static func _format_minor_bonus_message(entry: Dictionary, amount: float, total: float) -> String:
-	var name := str(entry.get("name", "탐색 보너스"))
+	var bonus_id := str(entry.get("id", ""))
+	var name := LocaleManager.data_text(entry, bonus_id, "sea_site_bonus", "name", "탐색 보너스")
 	var format := str(entry.get("format", "flat"))
-	return "%s %s (누적 %s)" % [
-		name,
-		_format_bonus_value(format, amount),
-		_format_bonus_value(format, total)
-	]
+	return LocaleManager.t("hud.sea_site.minor_bonus", "{name} {amount} (누적 {total})", {
+		"name": name,
+		"amount": _format_bonus_value(format, amount),
+		"total": _format_bonus_value(format, total),
+	})
 
 
 static func _format_bonus_value(format: String, value: float) -> String:
@@ -245,7 +246,7 @@ static func _format_bonus_value(format: String, value: float) -> String:
 		"percent":
 			return "+%d%%" % int(round(value * 100.0))
 		"per_second":
-			return "+%.1f/초" % value
+			return LocaleManager.t("hud.sea_site.format.per_second", "+{value}/초", {"value": "%.1f" % value})
 		"hp":
 			return "+%d" % int(round(value))
 		_:
@@ -281,9 +282,9 @@ static func _repair_hull(site: Node, player_ship: Node3D, repair_ratio: float, r
 	_sync_hull_hud(site, player_ship)
 
 	if after > before + 0.01:
-		_notify(site, player_ship, "선체 수리 +%d" % int(round(after - before)))
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.hull_repair", "선체 수리 +{amount}", {"amount": int(round(after - before))}))
 	else:
-		_notify(site, player_ship, "선체 상태 양호")
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.hull_good", "선체 상태 양호"))
 	return true
 
 
@@ -309,11 +310,11 @@ static func _train_crew(site: Node, player_ship: Node3D, xp_amount: float) -> bo
 			level_ups += after_level - before_level
 
 	if trained_count <= 0:
-		_notify(site, player_ship, "훈련할 병사 없음")
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.no_crew_to_train", "훈련할 병사 없음"))
 	elif level_ups > 0:
-		_notify(site, player_ship, "병사 훈련: Lv +%d" % level_ups)
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_training_level", "병사 훈련: Lv +{amount}", {"amount": level_ups}))
 	else:
-		_notify(site, player_ship, "병사 훈련 +%d XP" % int(round(xp_amount)))
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_training_xp", "병사 훈련 +{amount} XP", {"amount": int(round(xp_amount))}))
 	return true
 
 
@@ -332,7 +333,7 @@ static func _expand_crew_limit(site: Node, player_ship: Node3D, bonus: int) -> b
 		player_ship.call("_sync_player_crew_roster")
 	if player_ship.has_method("_update_crew_count"):
 		player_ship.call("_update_crew_count")
-	_notify(site, player_ship, "병사 정원 +%d" % add_count)
+	_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_capacity", "병사 정원 +{amount}", {"amount": add_count}))
 	return true
 
 
@@ -348,9 +349,9 @@ static func _restore_crew(site: Node, player_ship: Node3D, restore_count: int) -
 		else:
 			break
 	if restored > 0:
-		_notify(site, player_ship, "병사 구조 +%d" % restored)
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_rescue", "병사 구조 +{amount}", {"amount": restored}))
 	else:
-		_notify(site, player_ship, "병사 정원 가득")
+		_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_full", "병사 정원 가득"))
 	return true
 
 

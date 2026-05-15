@@ -17,6 +17,10 @@ class NavRepeater:
 	var _joypad_nav_x_latch: int = 0
 	var _joypad_nav_y_latch: int = 0
 
+	func reset() -> void:
+		_joypad_nav_x_latch = 0
+		_joypad_nav_y_latch = 0
+
 	func consume_event(event: InputEvent) -> Vector2i:
 		MenuInputHelper.observe_event(event)
 		if event is InputEventJoypadMotion:

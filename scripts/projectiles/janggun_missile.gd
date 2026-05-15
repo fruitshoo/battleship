@@ -1,5 +1,6 @@
 extends Area3D
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 장군전 투사체
@@ -242,15 +243,14 @@ func _splash_and_sink() -> void:
 	set_deferred("monitorable", false)
 	
 	# 바다에 떨어질 때 물 폭발 이펙트 생성
-	if water_explosion_scene and VfxBudget.allow_spawn(get_tree(), "water_explosion", global_position, 4, 70.0):
-		var pos = global_position
-		var explosion = ScenePool.acquire(get_tree(), water_explosion_scene)
-		if explosion.has_method("configure_as_splash"):
-			explosion.configure_as_splash()
-		explosion.position = Vector3(pos.x, 0.2, pos.z)
-		get_tree().root.add_child(explosion)
-		if explosion.has_method("pool_activate"):
-			explosion.pool_activate()
+	if water_explosion_scene:
+		var pos := global_position
+		pos = Vector3(pos.x, 0.2, pos.z)
+		var explosion := VfxSpawnHelper.acquire_world_node3d(get_tree(), water_explosion_scene, pos, "water_explosion", 4, 70.0)
+		if is_instance_valid(explosion):
+			if explosion.has_method("configure_as_splash"):
+				explosion.configure_as_splash()
+			VfxSpawnHelper.activate(explosion)
 	
 	# 물보라 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
@@ -285,6 +285,9 @@ func _finalize_release() -> void:
 	ScenePool.release(self)
 
 func _play_impact_vfx() -> void:
+	var impact_position := global_position
+	if not impact_position.is_finite():
+		return
 	var impact_dir := target_pos - start_pos
 	if impact_dir.length_squared() <= 0.001:
 		impact_dir = -global_basis.z
@@ -295,7 +298,7 @@ func _play_impact_vfx() -> void:
 		WoodSplinter.spawn_burst(
 			get_tree(),
 			wood_splinter_scene,
-			global_position + Vector3(0.0, 0.35, 0.0),
+			impact_position + Vector3(0.0, 0.35, 0.0),
 			splinter_damage,
 			impact_dir,
 			"cannon_hit_splinter",
@@ -304,19 +307,15 @@ func _play_impact_vfx() -> void:
 		)
 			
 	# 타격 이펙트
-	if impact_puff_scene and VfxBudget.allow_spawn(get_tree(), "hit_effect", global_position, 10, 100.0):
-		var smoke = impact_puff_scene.instantiate()
-		if smoke.has_method("set_intensity"):
-			smoke.set_intensity(1.18)
-		if smoke.has_method("set_budget_reserved"):
-			smoke.set_budget_reserved()
-		get_tree().root.add_child(smoke)
-		smoke.global_position = global_position
-		# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
-		var smoke_dir = Vector3.UP
-		smoke.global_basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
-		if smoke.has_method("pool_activate"):
-			smoke.pool_activate()
+	if impact_puff_scene:
+		var smoke := VfxSpawnHelper.acquire_world_node3d(get_tree(), impact_puff_scene, impact_position, "hit_effect", 10, 100.0)
+		if is_instance_valid(smoke):
+			if smoke.has_method("set_intensity"):
+				smoke.set_intensity(1.18)
+			# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
+			var smoke_dir = Vector3.UP
+			smoke.global_basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
+			VfxSpawnHelper.activate(smoke)
 	
 	# 피격 사운드: 묵직한 장군전 충격음 위에 목재 파열음을 겹친다.
 	var audio_manager = get_node_or_null("/root/AudioManager")

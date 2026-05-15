@@ -20,7 +20,9 @@ run/main_scene="res://scenes/main_menu.tscn"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="battleship"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.0313726, 0.0627451, 0.0862745, 1)
 
 [audio]
 

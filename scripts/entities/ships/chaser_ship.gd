@@ -599,7 +599,7 @@ func die() -> void:
 
 
 func _drop_floating_loot() -> void:
-	ChaserShipSupportHelper.drop_floating_loot(self, true, 20)
+	ChaserShipSupportHelper.drop_floating_loot(self, true, 0)
 
 func _spawn_enemy_drifter_xp_pickups() -> void:
 	ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(self)
@@ -1399,10 +1399,11 @@ func _show_boarding_start_feedback(target_ship: Node) -> void:
 			hud = cached_hud
 	if not is_instance_valid(hud):
 		return
+	var message := LocaleManager.t("hud.boarding.grapple_attached", "갈고리가 걸렸습니다! 갑판 방어!")
 	if hud.has_method("show_message"):
-		hud.show_message("갈고리가 걸렸습니다! 갑판 방어!", 1.8)
+		hud.show_message(message, 1.8)
 	elif hud.has_method("show_gust_warning_message"):
-		hud.show_gust_warning_message("갈고리가 걸렸습니다! 갑판 방어!", 1.8)
+		hud.show_gust_warning_message(message, 1.8)
 
 
 func _count_boarding_contact_defenders(target_ship: Node3D) -> int:

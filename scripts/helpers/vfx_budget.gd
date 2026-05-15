@@ -46,6 +46,7 @@ static func get_budget_scale() -> float:
 	combined -= ship_pressure * 0.18
 	combined -= soldier_pressure * 0.12
 	combined -= projectile_pressure * 0.22
+	combined *= _get_performance_vfx_scale()
 	_cached_budget_scale = clampf(combined, 0.35, 1.0)
 	return _cached_budget_scale
 
@@ -58,6 +59,12 @@ static func _pressure_from_count(count: int, soft_threshold: int, hard_window: i
 	if count <= soft_threshold:
 		return 0.0
 	return clampf(float(count - soft_threshold) / maxf(float(hard_window), 1.0), 0.0, 1.0)
+
+
+static func _get_performance_vfx_scale() -> float:
+	if is_instance_valid(SaveManager):
+		return clampf(float(SaveManager.performance_vfx_scale), 0.35, 1.0)
+	return 1.0
 
 static func _is_within_budget_distance(tree: SceneTree, position: Vector3, max_distance: float) -> bool:
 	if not is_instance_valid(tree):

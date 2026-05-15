@@ -10,7 +10,7 @@ var subtitle_label: Label = null
 var return_button: Button = null
 var _countdown: float = -1.0
 var _emitted: bool = false
-var _button_text: String = "메인 메뉴로"
+var _button_text: String = ""
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -43,7 +43,7 @@ func _ready() -> void:
 	return_button.process_mode = Node.PROCESS_MODE_ALWAYS
 	return_button.focus_mode = Control.FOCUS_ALL
 	return_button.custom_minimum_size = Vector2(220.0, 42.0)
-	return_button.text = "메인 메뉴로"
+	return_button.text = LocaleManager.t("game_over.return_main_menu", "메인 메뉴로")
 	NavalUiTheme.apply_hud_button(return_button, 15)
 	UiButtonAudio.wire_button(return_button)
 	return_button.pressed.connect(_request_return)
@@ -65,10 +65,10 @@ func _process(delta: float) -> void:
 	if _countdown <= 0.0:
 		_request_return()
 
-func show_overlay(subtitle: String, countdown: float, button_text: String = "메인 메뉴로") -> void:
+func show_overlay(subtitle: String, countdown: float, button_text: String = "") -> void:
 	_emitted = false
 	_countdown = countdown
-	_button_text = button_text
+	_button_text = button_text if not button_text.strip_edges().is_empty() else LocaleManager.t("game_over.return_main_menu", "메인 메뉴로")
 	if subtitle_label:
 		subtitle_label.text = subtitle
 		subtitle_label.visible = false

@@ -1,5 +1,6 @@
 extends Area3D
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
+const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const CRIT_EFFECT_DECK_MARGIN := 0.75
 
@@ -389,9 +390,15 @@ func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 				final_damage *= maxf(1.0, crit_multiplier)
 
 		var source_id = "singigeon"
-		target_node.take_damage(final_damage, global_position, source_id)
+		var crit_effect_position: Variant = null
+		var crit_hit_direction := Vector3.ZERO
 		if is_crit and target_node is Node3D:
-			_spawn_critical_hit_effect(target_node as Node3D)
+			var soldier_target := target_node as Node3D
+			crit_effect_position = _get_valid_critical_effect_position(soldier_target)
+			crit_hit_direction = soldier_target.global_position - start_pos
+		target_node.take_damage(final_damage, global_position, source_id)
+		if is_crit and crit_effect_position is Vector3:
+			_spawn_critical_hit_effect_at_position(crit_effect_position as Vector3, crit_hit_direction)
 	elif target_node.has_method("die"):
 		target_node.die()
 
@@ -488,18 +495,20 @@ func _spawn_critical_hit_effect(target: Node3D) -> void:
 	var effect_position_variant: Variant = _get_valid_critical_effect_position(target)
 	if not effect_position_variant is Vector3:
 		return
-	var effect_position := effect_position_variant as Vector3
-	var effect := ScenePool.acquire(get_tree(), SOLDIER_CRIT_HIT_SCENE) as Node3D
+	var hit_dir := target.global_position - start_pos
+	_spawn_critical_hit_effect_at_position(effect_position_variant as Vector3, hit_dir)
+
+
+func _spawn_critical_hit_effect_at_position(effect_position: Vector3, hit_direction: Vector3) -> void:
+	if not is_inside_tree() or not effect_position.is_finite():
+		return
+	var effect := VfxSpawnHelper.acquire_world_node3d(get_tree(), SOLDIER_CRIT_HIT_SCENE, effect_position)
 	if not is_instance_valid(effect):
 		return
-	get_tree().root.add_child(effect)
-	effect.global_position = effect_position
-	var hit_dir := target.global_position - start_pos
-	hit_dir.y = 0.0
-	if hit_dir.length_squared() > 0.001:
-		effect.global_basis = Basis.looking_at(hit_dir.normalized(), Vector3.UP)
-	if effect.has_method("pool_activate"):
-		effect.pool_activate()
+	hit_direction.y = 0.0
+	if hit_direction.length_squared() > 0.001:
+		effect.global_basis = Basis.looking_at(hit_direction.normalized(), Vector3.UP)
+	VfxSpawnHelper.activate(effect)
 
 
 func _get_valid_critical_effect_position(target: Node3D) -> Variant:

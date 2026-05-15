@@ -76,8 +76,15 @@ static func get_target_scan_load_multiplier() -> float:
 		multiplier += minf(0.28, float(soldier_count - TARGET_SCAN_LOAD_SOLDIER_SOFT_LIMIT) * 0.006)
 	if projectile_count > TARGET_SCAN_LOAD_PROJECTILE_SOFT_LIMIT:
 		multiplier += minf(0.45, float(projectile_count - TARGET_SCAN_LOAD_PROJECTILE_SOFT_LIMIT) * 0.015)
-	_target_scan_load_multiplier = clampf(multiplier, 1.0, 2.1)
+	multiplier *= _get_performance_cpu_interval_scale()
+	_target_scan_load_multiplier = clampf(multiplier, 1.0, 2.25)
 	return _target_scan_load_multiplier
+
+
+static func _get_performance_cpu_interval_scale() -> float:
+	if is_instance_valid(SaveManager) and SaveManager.has_method("get_performance_cpu_interval_scale"):
+		return float(SaveManager.call("get_performance_cpu_interval_scale"))
+	return 1.0
 
 
 static func get_valid_target_node(target: Variant) -> Node3D:

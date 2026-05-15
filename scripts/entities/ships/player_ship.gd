@@ -7,7 +7,7 @@ extends "res://scripts/entities/ships/base_ship.gd"
 var team: String = "player"
 
 # === 이동 관련 ===
-@export var rowing_speed: float = 4.8 # 노 젓기 체감 상향
+@export var rowing_speed: float = 3.8
 
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
@@ -38,15 +38,21 @@ const CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET := 0.46
 const CORPSE_CLEANUP_PICKUP_START_POSITION_META := "corpse_cleanup_pickup_start_position"
 const CORPSE_CLEANUP_PICKUP_START_ROTATION_META := "corpse_cleanup_pickup_start_rotation"
 const CORPSE_CLEANUP_THROW_ARC_META := "corpse_cleanup_throw_arc"
+const CORPSE_CLEANUP_STOW_POSE_META := "corpse_cleanup_stow_pose"
+const CORPSE_CLEANUP_STAIR_NODE_NAME := "panok_stair"
+const CORPSE_CLEANUP_STAIR_TOP_NODE_NAME := "CrewStairTop"
+const CORPSE_CLEANUP_STAIR_BOTTOM_NODE_NAME := "CrewStairBottom"
+const CORPSE_CLEANUP_STAIR_TOP_META := "corpse_cleanup_stair_top"
+const CORPSE_CLEANUP_STAIR_BOTTOM_META := "corpse_cleanup_stair_bottom"
 
 # === 러더(키) 관련 ===
 
-@export var rudder_speed: float = 120.0 # 러더 회전 속도 (60 -> 120 상향)
-@export var rudder_return_speed: float = 80.0 # 러더 자동 복귀 속도 (40 -> 80 상향)
-@export_range(0.5, 3.0, 0.05) var player_rudder_turn_authority: float = 1.35 # 플레이어 러더 회전 반응 보정
+@export var rudder_speed: float = 95.0
+@export var rudder_return_speed: float = 65.0
+@export_range(0.5, 3.0, 0.05) var player_rudder_turn_authority: float = 1.05 # 플레이어 러더 회전 반응 보정
 # === 둥실둥실 효과 및 육분의 ===
 
-@export var rudder_turn_speed: float = 120.0 # Seamanship에 의해 강화됨
+@export var rudder_turn_speed: float = 95.0 # Seamanship에 의해 강화됨
 
 @export var ship_type: String = "panokseon_player":
 	set(value):
@@ -101,6 +107,21 @@ var ramming_boost_charge: float = 1.0
 var ramming_boost_timer: float = 0.0
 var ramming_boost_input_was_pressed: bool = false
 var ramming_boost_blocked_message_timer: float = 0.0
+var ramming_boost_hit_registered: bool = false
+
+@export_group("Boarding Rope Resistance")
+@export_range(0.05, 1.0, 0.01) var boarding_rope_resist_first_gain: float = 0.10
+@export_range(0.05, 1.0, 0.01) var boarding_rope_resist_alternate_gain: float = 0.18
+@export_range(0.0, 0.4, 0.01) var boarding_rope_resist_repeat_gain: float = 0.02
+@export_range(0.1, 2.0, 0.05) var boarding_rope_resist_input_window: float = 0.65
+@export_range(0.0, 1.5, 0.05) var boarding_rope_resist_decay_rate: float = 0.30
+@export_range(0.0, 1.5, 0.05) var boarding_rope_resist_delay_on_alternate: float = 0.32
+@export_group("")
+var boarding_rope_resist_progress: float = 0.0
+var boarding_rope_resist_last_direction: int = 0
+var boarding_rope_resist_input_window_timer: float = 0.0
+var boarding_rope_resist_sfx_timer: float = 0.0
+var boarding_rope_resist_stick_latch_direction: int = 0
 
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
 @export_range(0, 1, 1) var captain_count: int = 1
@@ -155,6 +176,20 @@ static func _get_ships_cached(tree: SceneTree) -> Array:
 # === 병사 자동 보충 ===
 @export var crew_respawn_interval: float = 12.0 # 보충 주기 (초)
 var crew_respawn_timer: float = 0.0
+
+@export_group("Crew Stair")
+@export var crew_stair_node_name: String = CORPSE_CLEANUP_STAIR_NODE_NAME
+@export var crew_stair_top_node_name: String = CORPSE_CLEANUP_STAIR_TOP_NODE_NAME
+@export var crew_stair_bottom_node_name: String = CORPSE_CLEANUP_STAIR_BOTTOM_NODE_NAME
+@export var crew_stair_fallback_local_position: Vector3 = Vector3(0.0, 1.2, 2.93)
+@export var crew_stair_stand_offset: Vector3 = Vector3(0.0, 0.0, -0.65)
+@export var crew_stair_below_deck_drop: float = 1.25
+@export var crew_stair_fallback_descent_local_offset: Vector3 = Vector3(0.0, -1.25, -0.9)
+@export var crew_stair_descend_duration: float = 0.42
+@export var crew_stair_return_duration: float = 0.55
+@export var crew_stair_stow_duration: float = 0.48
+@export var crew_stair_respawn_offset: Vector3 = Vector3(0.0, 0.0, -0.38)
+@export_group("")
 
 # === 자동 공세 월선 (보수적 전술 판단) ===
 @export_group("Auto Raid")
@@ -343,6 +378,7 @@ func _physics_process(delta: float) -> void:
 	if is_player_controlled:
 		_handle_input(delta)
 	_update_ramming_boost(delta)
+	_update_boarding_rope_resistance(delta)
 	if _is_auto_sail_control_enabled():
 		_auto_adjust_sail(delta)
 	_update_sail_deployment(delta)
@@ -482,7 +518,7 @@ func _can_run_corpse_cleanup() -> bool:
 
 
 func _try_cleanup_enemy_corpse() -> void:
-	var corpse: Node3D = _find_cleanup_enemy_corpse()
+	var corpse: Node3D = _find_cleanup_corpse()
 	if not is_instance_valid(corpse):
 		return
 	var cleaner: Node3D = _find_corpse_cleanup_actor(corpse)
@@ -494,10 +530,25 @@ func _try_cleanup_enemy_corpse() -> void:
 	corpse.set_meta("corpse_cleanup_in_progress", true)
 	_set_corpse_cleanup_actor_action(cleaner, SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH)
 	_prepare_cleaner_for_corpse_cleanup(cleaner, corpse)
-	_throw_corpse_overboard(cleaner, corpse)
+	var corpse_team: String = corpse.get_team_tag() if corpse.has_method("get_team_tag") else str(corpse.get("team"))
+	if corpse_team == "player":
+		_stow_friendly_corpse_below_deck(cleaner, corpse)
+	else:
+		_throw_corpse_overboard(cleaner, corpse)
+
+
+func _find_cleanup_corpse() -> Node3D:
+	var friendly_corpse := _find_cleanup_corpse_by_team("player")
+	if is_instance_valid(friendly_corpse):
+		return friendly_corpse
+	return _find_cleanup_enemy_corpse()
 
 
 func _find_cleanup_enemy_corpse() -> Node3D:
+	return _find_cleanup_corpse_by_team("enemy")
+
+
+func _find_cleanup_corpse_by_team(target_team: String) -> Node3D:
 	for soldier in EntityRegistry.get_soldiers_by_ship(self):
 		if not is_instance_valid(soldier) or not (soldier is Node3D):
 			continue
@@ -506,7 +557,7 @@ func _find_cleanup_enemy_corpse() -> Node3D:
 		if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(soldier, null, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP):
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
-		if soldier_team != "enemy":
+		if soldier_team != target_team:
 			continue
 		if not PlayerSoldierStateHelper.is_dead_soldier(soldier):
 			continue
@@ -623,6 +674,69 @@ func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
 	tween.finished.connect(_finish_corpse_cleanup_throw.bind(corpse_id, cleaner_id))
 
 
+func _stow_friendly_corpse_below_deck(cleaner: Node3D, corpse: Node3D) -> void:
+	var stair_path: Dictionary = get_crew_stair_descent_points()
+	var stair_top: Vector3 = stair_path.get("top", get_crew_stair_global_position())
+	var stair_bottom: Vector3 = stair_path.get("bottom", stair_top + Vector3.DOWN * maxf(0.1, crew_stair_below_deck_drop))
+	var stair_top_local: Vector3 = stair_path.get("top_local", to_local(stair_top))
+	var stair_bottom_local: Vector3 = stair_path.get("bottom_local", to_local(stair_bottom))
+	var stair_stand_point: Vector3 = _get_corpse_cleanup_stair_stand_point(cleaner)
+	var pickup_point: Vector3 = _get_corpse_cleanup_pickup_point(cleaner, corpse)
+	var corpse_id: int = corpse.get_instance_id()
+	var cleaner_id: int = cleaner.get_instance_id()
+	var pickup_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, pickup_point)
+	var stair_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, stair_stand_point)
+	var below_deck_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, stair_bottom, true)
+	var pickup_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, pickup_point, stair_top)
+	var stair_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, stair_stand_point, stair_bottom)
+	var approach_seconds: float = _get_corpse_cleanup_walk_seconds(cleaner.global_position, pickup_point, cleaner)
+	var pickup_seconds: float = 0.22
+	var carry_seconds: float = _get_corpse_cleanup_walk_seconds(pickup_point, stair_stand_point, cleaner)
+
+	_face_corpse_cleanup_actor(cleaner, pickup_point)
+
+	var tween := create_tween()
+	tween.tween_property(cleaner, "position", pickup_actor_position, approach_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_corpse_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY))
+	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_pickup_pose_by_id").bind(corpse_id))
+	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_method(
+		Callable(self, "_apply_corpse_cleanup_payload_pickup").bind(corpse_id, cleaner_id, pickup_carry_rotation),
+		0.0,
+		1.0,
+		pickup_seconds
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, stair_top))
+	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_property(cleaner, "position", stair_actor_position, carry_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_method(
+		Callable(self, "_apply_corpse_cleanup_payload_follow").bind(corpse_id, cleaner_id, pickup_carry_rotation, stair_carry_rotation),
+		0.0,
+		1.0,
+		carry_seconds
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(Callable(self, "_store_corpse_cleanup_stair_path_by_id").bind(corpse_id, stair_top_local, stair_bottom_local))
+	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, stair_bottom))
+	tween.tween_property(cleaner, "position", below_deck_actor_position, maxf(0.08, crew_stair_descend_duration)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_method(
+		Callable(self, "_apply_corpse_cleanup_payload_follow").bind(corpse_id, cleaner_id, stair_carry_rotation, stair_carry_rotation),
+		0.0,
+		1.0,
+		maxf(0.08, crew_stair_descend_duration)
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(Callable(self, "_finish_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_stow_pose_by_id").bind(corpse_id))
+	tween.tween_method(
+		Callable(self, "_apply_corpse_cleanup_stow_below_deck").bind(corpse_id),
+		0.0,
+		1.0,
+		maxf(0.12, crew_stair_stow_duration)
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(cleaner, "position", stair_actor_position, maxf(0.08, crew_stair_return_duration)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(_finish_friendly_corpse_cleanup_stow.bind(corpse_id, cleaner_id))
+
+
 func _get_corpse_cleanup_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector3:
 	var corpse_local: Vector3 = to_local(corpse.global_position)
 	var cleaner_local: Vector3 = to_local(cleaner.global_position)
@@ -634,6 +748,15 @@ func _get_corpse_cleanup_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector
 	var local_point: Vector3 = corpse_local + approach_dir * 0.72
 	local_point = _clamp_corpse_cleanup_deck_local(local_point, 0.38)
 	var global_point: Vector3 = to_global(local_point)
+	global_point.y = cleaner.global_position.y
+	return global_point
+
+
+func _get_corpse_cleanup_stair_stand_point(cleaner: Node3D) -> Vector3:
+	var stair_path: Dictionary = get_crew_stair_descent_points()
+	var stair_local: Vector3 = stair_path.get("top_local", to_local(get_crew_stair_global_position()))
+	stair_local = _clamp_corpse_cleanup_deck_local(stair_local, 0.38)
+	var global_point: Vector3 = to_global(stair_local)
 	global_point.y = cleaner.global_position.y
 	return global_point
 
@@ -651,12 +774,13 @@ func _get_corpse_cleanup_rail_stand_point(cleaner: Node3D, corpse: Node3D, throw
 	return global_point
 
 
-func _get_corpse_cleanup_actor_local_target(cleaner: Node3D, global_target: Vector3) -> Vector3:
+func _get_corpse_cleanup_actor_local_target(cleaner: Node3D, global_target: Vector3, preserve_target_y: bool = false) -> Vector3:
 	var parent_3d := cleaner.get_parent() as Node3D
 	if not is_instance_valid(parent_3d):
 		return global_target
 	var local_target: Vector3 = parent_3d.to_local(global_target)
-	local_target.y = cleaner.position.y
+	if not preserve_target_y:
+		local_target.y = cleaner.position.y
 	return local_target
 
 
@@ -863,6 +987,50 @@ func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, cleaner_id
 		corpse_node.remove_meta(CORPSE_CLEANUP_THROW_ARC_META)
 
 
+func _capture_corpse_cleanup_stow_pose_by_id(corpse_id: int) -> void:
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
+		return
+	var fallback_bottom_local := to_local(get_crew_stair_global_position()) + crew_stair_fallback_descent_local_offset
+	var stair_bottom_local: Vector3 = corpse_node.get_meta(
+		CORPSE_CLEANUP_STAIR_BOTTOM_META,
+		fallback_bottom_local
+	)
+	corpse_node.set_meta(CORPSE_CLEANUP_STOW_POSE_META, {
+		"start_position": corpse_node.global_position,
+		"target_local_position": stair_bottom_local,
+		"start_rotation": corpse_node.rotation,
+	})
+
+
+func _apply_corpse_cleanup_stow_below_deck(progress: float, corpse_id: int) -> void:
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
+		return
+	var pose: Dictionary = corpse_node.get_meta(CORPSE_CLEANUP_STOW_POSE_META, {})
+	if pose.is_empty():
+		_capture_corpse_cleanup_stow_pose_by_id(corpse_id)
+		pose = corpse_node.get_meta(CORPSE_CLEANUP_STOW_POSE_META, {})
+	if pose.is_empty():
+		return
+	var t: float = smoothstep(0.0, 1.0, clampf(progress, 0.0, 1.0))
+	var start_position: Vector3 = pose.get("start_position", corpse_node.global_position)
+	var target_local_position: Vector3 = pose.get("target_local_position", to_local(get_crew_stair_global_position()))
+	var target_position: Vector3 = to_global(target_local_position)
+	corpse_node.global_position = start_position.lerp(target_position, t)
+	corpse_node.scale = corpse_node.scale.lerp(Vector3.ONE * 0.82, t)
+	if progress >= 1.0 and corpse_node.has_meta(CORPSE_CLEANUP_STOW_POSE_META):
+		corpse_node.remove_meta(CORPSE_CLEANUP_STOW_POSE_META)
+
+
+func _store_corpse_cleanup_stair_path_by_id(corpse_id: int, stair_top_local: Vector3, stair_bottom_local: Vector3) -> void:
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
+		return
+	corpse_node.set_meta(CORPSE_CLEANUP_STAIR_TOP_META, stair_top_local)
+	corpse_node.set_meta(CORPSE_CLEANUP_STAIR_BOTTOM_META, stair_bottom_local)
+
+
 func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
 	var local_pos: Vector3 = to_local(corpse.global_position)
 	var side_sign: float = 1.0 if local_pos.x >= 0.0 else -1.0
@@ -882,6 +1050,23 @@ func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
 		if corpse is Node3D:
 			_play_corpse_cleanup_splash((corpse as Node3D).global_position)
 		_grant_corpse_cleanup_xp()
+		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
+		corpse.queue_free()
+	if is_instance_valid(cleaner):
+		if cleaner.has_method("finish_corpse_cleanup_action"):
+			cleaner.call("finish_corpse_cleanup_action")
+		else:
+			SoldierActionHelper.finish_corpse_cleanup_action(cleaner)
+
+
+func _finish_friendly_corpse_cleanup_stow(corpse_id: int, cleaner_id: int) -> void:
+	var corpse := NodeContractHelper.get_instance_node(corpse_id)
+	var cleaner := NodeContractHelper.get_instance_node(cleaner_id)
+	if is_instance_valid(corpse):
+		if corpse.has_meta(CORPSE_CLEANUP_STAIR_TOP_META):
+			corpse.remove_meta(CORPSE_CLEANUP_STAIR_TOP_META)
+		if corpse.has_meta(CORPSE_CLEANUP_STAIR_BOTTOM_META):
+			corpse.remove_meta(CORPSE_CLEANUP_STAIR_BOTTOM_META)
 		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
 		corpse.queue_free()
 	if is_instance_valid(cleaner):
@@ -917,6 +1102,110 @@ func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
 				splash.call_deferred("pool_activate")
 	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
 		_cached_audio_manager.play_sfx("water_splash_small", splash_pos, randf_range(0.85, 1.15), 2.0)
+
+
+func get_crew_stair_global_position() -> Vector3:
+	var stair_node := find_child(crew_stair_node_name, true, false) as Node3D
+	if is_instance_valid(stair_node):
+		return stair_node.global_position
+	return to_global(crew_stair_fallback_local_position)
+
+
+func get_crew_stair_descent_points() -> Dictionary:
+	var marker_path := _get_authored_crew_stair_descent_points()
+	if not marker_path.is_empty():
+		return marker_path
+	var stair_node := find_child(crew_stair_node_name, true, false) as Node3D
+	if is_instance_valid(stair_node):
+		var mesh_instance := stair_node as MeshInstance3D
+		if is_instance_valid(mesh_instance) and is_instance_valid(mesh_instance.mesh):
+			var aabb: AABB = mesh_instance.mesh.get_aabb()
+			var min_corner: Vector3 = aabb.position
+			var max_corner: Vector3 = aabb.position + aabb.size
+			var local_top := Vector3(0.0, max_corner.y, min_corner.z)
+			var local_bottom := Vector3(0.0, min_corner.y, max_corner.z)
+			var top: Vector3 = mesh_instance.global_transform * local_top
+			var bottom: Vector3 = mesh_instance.global_transform * local_bottom
+			if top.y < bottom.y:
+				var swap := top
+				top = bottom
+				bottom = swap
+			var mesh_resolved_points := _resolve_crew_stair_descent_local_points(to_local(top), to_local(bottom))
+			var mesh_resolved_top_local: Vector3 = mesh_resolved_points.get("top_local", to_local(top))
+			var mesh_resolved_bottom_local: Vector3 = mesh_resolved_points.get("bottom_local", to_local(bottom))
+			return {
+				"top": to_global(mesh_resolved_top_local),
+				"bottom": to_global(mesh_resolved_bottom_local),
+				"top_local": mesh_resolved_top_local,
+				"bottom_local": mesh_resolved_bottom_local,
+			}
+		var stair_top := stair_node.global_position
+		var stair_bottom := stair_node.global_position + global_transform.basis * crew_stair_fallback_descent_local_offset
+		var node_resolved_points := _resolve_crew_stair_descent_local_points(to_local(stair_top), to_local(stair_bottom))
+		var node_resolved_top_local: Vector3 = node_resolved_points.get("top_local", to_local(stair_top))
+		var node_resolved_bottom_local: Vector3 = node_resolved_points.get("bottom_local", to_local(stair_bottom))
+		return {
+			"top": to_global(node_resolved_top_local),
+			"bottom": to_global(node_resolved_bottom_local),
+			"top_local": node_resolved_top_local,
+			"bottom_local": node_resolved_bottom_local,
+		}
+	var fallback_resolved_points := _resolve_crew_stair_descent_local_points(
+		crew_stair_fallback_local_position,
+		crew_stair_fallback_local_position + crew_stair_fallback_descent_local_offset
+	)
+	var fallback_resolved_top_local: Vector3 = fallback_resolved_points.get("top_local", crew_stair_fallback_local_position)
+	var fallback_resolved_bottom_local: Vector3 = fallback_resolved_points.get(
+		"bottom_local",
+		crew_stair_fallback_local_position + crew_stair_fallback_descent_local_offset
+	)
+	return {
+		"top": to_global(fallback_resolved_top_local),
+		"bottom": to_global(fallback_resolved_bottom_local),
+		"top_local": fallback_resolved_top_local,
+		"bottom_local": fallback_resolved_bottom_local,
+	}
+
+
+func _get_authored_crew_stair_descent_points() -> Dictionary:
+	var top_marker := find_child(crew_stair_top_node_name, true, false) as Node3D
+	var bottom_marker := find_child(crew_stair_bottom_node_name, true, false) as Node3D
+	if not is_instance_valid(top_marker) or not is_instance_valid(bottom_marker):
+		return {}
+	var top_local := to_local(top_marker.global_position)
+	var bottom_local := to_local(bottom_marker.global_position)
+	if top_local.y < bottom_local.y:
+		var swap := top_local
+		top_local = bottom_local
+		bottom_local = swap
+	return {
+		"top": to_global(top_local),
+		"bottom": to_global(bottom_local),
+		"top_local": top_local,
+		"bottom_local": bottom_local,
+	}
+
+
+func _resolve_crew_stair_descent_local_points(top_local: Vector3, bottom_local: Vector3) -> Dictionary:
+	var resolved_top := top_local
+	var resolved_bottom := bottom_local
+	var min_drop := maxf(0.35, crew_stair_below_deck_drop * 0.65)
+	if resolved_top.y - resolved_bottom.y < min_drop:
+		resolved_bottom.y = resolved_top.y - maxf(0.1, crew_stair_below_deck_drop)
+	var desired_z_drop := -absf(crew_stair_fallback_descent_local_offset.z)
+	if desired_z_drop < -0.01 and resolved_bottom.z > resolved_top.z + desired_z_drop * 0.35:
+		resolved_bottom.z = resolved_top.z + desired_z_drop
+	return {
+		"top_local": resolved_top,
+		"bottom_local": resolved_bottom,
+	}
+
+
+func get_crew_respawn_global_position() -> Vector3:
+	var local_pos: Vector3 = to_local(get_crew_stair_global_position()) + crew_stair_respawn_offset
+	local_pos = _clamp_corpse_cleanup_deck_local(local_pos, 0.32)
+	local_pos.y = float(deck_height) if "deck_height" in self else local_pos.y
+	return to_global(local_pos)
 
 func _update_auto_boarding_raid(delta: float) -> void:
 	PlayerShipCrewHelper.update_auto_boarding_raid(self, delta)
@@ -963,6 +1252,7 @@ func try_activate_ramming_boost() -> bool:
 		return false
 	ramming_boost_active = true
 	ramming_boost_timer = maxf(0.05, ramming_boost_duration)
+	ramming_boost_hit_registered = false
 	ramming_boost_charge = 0.0
 	var boosted_floor := maxf(min_ramming_speed + 0.45, max_speed * 0.72)
 	var boosted_cap := get_ramming_boost_target_speed()
@@ -978,6 +1268,8 @@ func _update_ramming_boost(delta: float) -> void:
 		ramming_boost_timer = maxf(0.0, ramming_boost_timer - delta)
 		if ramming_boost_timer <= 0.0:
 			ramming_boost_active = false
+			if not ramming_boost_hit_registered:
+				ramming_boost_charge = maxf(ramming_boost_charge, 0.35)
 		return
 	if ramming_boost_charge < 1.0:
 		ramming_boost_charge = minf(1.0, ramming_boost_charge + delta / maxf(0.1, ramming_boost_recharge_duration))
@@ -998,7 +1290,7 @@ func _show_ramming_boost_blocked_message() -> void:
 		return
 	ramming_boost_blocked_message_timer = 0.8
 	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
-		_cached_hud.show_message("돛을 완전히 접어야 충각 돌진 가능", 1.2)
+		_cached_hud.show_message(LocaleManager.t("hud.ram_boost.need_folded_masts", "돛을 완전히 접어야 충각 돌진 가능"), 1.2)
 
 
 func is_ramming_boost_active() -> bool:
@@ -1011,6 +1303,10 @@ func get_ramming_boost_charge_ratio() -> float:
 	return clampf(ramming_boost_charge, 0.0, 1.0)
 
 
+func should_show_ramming_boost_gauge() -> bool:
+	return is_ramming_boost_active() or _can_activate_ramming_boost_with_sail_state()
+
+
 func get_ramming_boost_target_speed() -> float:
 	return maxf(max_speed, min_ramming_speed) * maxf(1.0, ramming_boost_speed_multiplier)
 
@@ -1019,9 +1315,117 @@ func get_ramming_boost_turn_multiplier() -> float:
 	return ramming_boost_turn_multiplier if is_ramming_boost_active() else 1.0
 
 
+func notify_ramming_boost_hit() -> void:
+	if is_ramming_boost_active():
+		ramming_boost_hit_registered = true
+
+
 func get_ramming_damage_multiplier_value() -> float:
 	var boost_mult := ramming_boost_damage_multiplier if is_ramming_boost_active() else 1.0
 	return maxf(0.1, ramming_damage_multiplier) * boost_mult
+
+
+func try_resist_incoming_boarding_rope(direction: int) -> bool:
+	var attacker := _get_resistable_boarding_attacker()
+	if not is_instance_valid(attacker):
+		_reset_boarding_rope_resistance()
+		return false
+	if direction == 0:
+		return false
+	var normalized_direction := -1 if direction < 0 else 1
+	var alternated := boarding_rope_resist_last_direction != 0 \
+		and boarding_rope_resist_last_direction != normalized_direction \
+		and boarding_rope_resist_input_window_timer > 0.0
+	var gain := boarding_rope_resist_repeat_gain
+	if boarding_rope_resist_last_direction == 0 or boarding_rope_resist_input_window_timer <= 0.0:
+		gain = boarding_rope_resist_first_gain
+	elif alternated:
+		gain = boarding_rope_resist_alternate_gain
+		_delay_incoming_boarding_transfer(attacker, boarding_rope_resist_delay_on_alternate)
+		_play_rope_resist_tension_sfx(false)
+	boarding_rope_resist_progress = clampf(boarding_rope_resist_progress + gain, 0.0, 1.0)
+	if attacker.has_method("pulse_boarding_rope_feedback"):
+		var pulse_intensity := 0.42 if not alternated else 0.82
+		attacker.call("pulse_boarding_rope_feedback", pulse_intensity)
+	boarding_rope_resist_last_direction = normalized_direction
+	boarding_rope_resist_input_window_timer = boarding_rope_resist_input_window
+	if boarding_rope_resist_progress >= 1.0:
+		_break_incoming_boarding_rope(attacker)
+	return true
+
+
+func get_boarding_rope_resist_ratio() -> float:
+	return clampf(boarding_rope_resist_progress, 0.0, 1.0) if is_instance_valid(_get_resistable_boarding_attacker()) else 0.0
+
+
+func _update_boarding_rope_resistance(delta: float) -> void:
+	boarding_rope_resist_sfx_timer = maxf(0.0, boarding_rope_resist_sfx_timer - delta)
+	if not is_instance_valid(_get_resistable_boarding_attacker()):
+		_reset_boarding_rope_resistance()
+		return
+	boarding_rope_resist_input_window_timer = maxf(0.0, boarding_rope_resist_input_window_timer - delta)
+	if boarding_rope_resist_input_window_timer <= 0.0:
+		boarding_rope_resist_last_direction = 0
+	boarding_rope_resist_progress = maxf(0.0, boarding_rope_resist_progress - boarding_rope_resist_decay_rate * delta)
+
+
+func _get_resistable_boarding_attacker() -> Node3D:
+	var attacker := get_boarding_attacker_ship() if has_method("get_boarding_attacker_ship") else null
+	if not is_instance_valid(attacker):
+		return null
+	var attacker_team: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else str(attacker.get("team"))
+	if attacker_team != "enemy":
+		return null
+	if attacker.get("is_boarding") != true:
+		return null
+	if attacker.has_method("get_boarding_target_ship") and attacker.call("get_boarding_target_ship") != self:
+		return null
+	if attacker.has_method("has_boarding_rope_link_to") and attacker.call("has_boarding_rope_link_to", self) != true:
+		return null
+	return attacker as Node3D
+
+
+func _delay_incoming_boarding_transfer(attacker: Node3D, delay_seconds: float) -> void:
+	if not is_instance_valid(attacker) or delay_seconds <= 0.0:
+		return
+	if attacker.get("boarding_timer") != null:
+		attacker.set("boarding_timer", maxf(0.0, float(attacker.get("boarding_timer")) - delay_seconds))
+	if attacker.get("boarding_prep_timer") != null:
+		attacker.set("boarding_prep_timer", maxf(0.0, float(attacker.get("boarding_prep_timer")) - delay_seconds * 0.45))
+
+
+func _break_incoming_boarding_rope(attacker: Node3D) -> void:
+	if not is_instance_valid(attacker):
+		_reset_boarding_rope_resistance()
+		return
+	_play_rope_resist_tension_sfx(true)
+	if attacker.has_method("pulse_boarding_rope_feedback"):
+		attacker.call("pulse_boarding_rope_feedback", 1.0)
+	if attacker.has_method("_cancel_boarding"):
+		attacker.call("_cancel_boarding")
+	elif attacker.has_method("_clear_ropes"):
+		attacker.call("_clear_ropes")
+	if get_boarding_attacker_ship() == attacker:
+		clear_boarding_attacker_ship()
+	_reset_boarding_rope_resistance()
+
+
+func _reset_boarding_rope_resistance() -> void:
+	boarding_rope_resist_progress = 0.0
+	boarding_rope_resist_last_direction = 0
+	boarding_rope_resist_input_window_timer = 0.0
+
+
+func _play_rope_resist_tension_sfx(break_sound: bool) -> void:
+	if not is_instance_valid(_cached_audio_manager) or not _cached_audio_manager.has_method("play_sfx"):
+		return
+	if boarding_rope_resist_sfx_timer > 0.0 and not break_sound:
+		return
+	boarding_rope_resist_sfx_timer = 0.18
+	var sfx_key := "impact_wood" if break_sound else "mast_creak"
+	var pitch := randf_range(1.05, 1.18) if break_sound else randf_range(0.86, 0.98)
+	var volume := -1.5 if break_sound else -5.0
+	_cached_audio_manager.play_sfx(sfx_key, global_position, pitch, volume)
 
 
 ## 러더 조향 입력 처리

@@ -1,4 +1,6 @@
 extends Area3D
+
+const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 화통 (Fire Pot)
@@ -110,21 +112,18 @@ func _profiled_physics_process(delta: float) -> void:
 func explode() -> void:
 	if has_exploded: return
 	has_exploded = true
+	var explosion_position := global_position
 	_apply_area_damage()
 
 	# 1. 폭발 이펙트
 	if explosion_scene:
-		var expl = ScenePool.acquire(get_tree(), explosion_scene)
-		if expl is Node3D:
-			(expl as Node3D).position = global_position
-		get_tree().root.add_child.call_deferred(expl)
-		if expl.has_method("pool_activate"):
-			expl.call_deferred("pool_activate")
+		var expl := VfxSpawnHelper.acquire_world_node3d(get_tree(), explosion_scene, explosion_position)
+		VfxSpawnHelper.activate(expl)
 	
 	# 2. 사운드
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("explosion_small", global_position, randf_range(0.9, 1.2))
+		audio_manager.play_sfx("explosion_small", explosion_position, randf_range(0.9, 1.2))
 	
 	# 자신 삭제를 객체 풀 반납으로 변경
 	ScenePool.release(self)

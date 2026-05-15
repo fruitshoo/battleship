@@ -31,11 +31,13 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	
 	var is_crit = randf() < crit_chance
 	var final_damage = damage * (crit_multiplier if is_crit else 1.0)
+	var crit_effect_position: Variant = snapshot_critical_hit_effect_position(target) if is_crit else null
+	var crit_hit_direction: Vector3 = hit_pos - attacker.global_position
 	
 	if target.has_method("take_damage"):
 		target.take_damage(final_damage, attacker.global_position, "trident")
-		if is_crit:
-			spawn_critical_hit_effect(target, attacker)
+		if is_crit and crit_effect_position is Vector3:
+			spawn_critical_hit_effect_at_position(crit_effect_position as Vector3, crit_hit_direction)
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx("soldier_hit", hit_pos, randf_range(0.75, 0.95), 3.0 if is_crit else 0.0)
 			

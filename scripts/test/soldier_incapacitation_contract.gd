@@ -136,7 +136,8 @@ class MockSoldier:
 
 func _ready() -> void:
 	var failures: Array[String] = []
-	_verify_player_combat_damage_incapacitates(failures)
+	_verify_player_combat_damage_dies_by_default(failures)
+	_verify_player_combat_damage_incapacitates_when_enabled(failures)
 	_verify_defense_reduction_mitigates_player_damage(failures)
 	_verify_rest_recovery_is_slow_player_only(failures)
 	_verify_heal_full_recovers_incapacitated_player(failures)
@@ -178,16 +179,35 @@ func _make_soldier(team: String, ship: MockShip) -> MockSoldier:
 	return soldier
 
 
-func _verify_player_combat_damage_incapacitates(failures: Array[String]) -> void:
+func _verify_player_combat_damage_dies_by_default(failures: Array[String]) -> void:
 	var ship := _make_ship("player")
 	var soldier := _make_soldier("player", ship)
 
 	SoldierLifecycleHelper.take_damage(soldier, 20.0, Vector3.ZERO, "sword")
 
 	if soldier.current_state != soldier.State.DEAD:
+		failures.append("player soldier did not die from lethal combat damage")
+	if soldier.get_meta("incapacitated", false) == true:
+		failures.append("player soldier combat defeat should not auto-incapacitate by default")
+	if soldier.current_health != 0.0:
+		failures.append("dead player soldier health was not clamped to zero")
+	if soldier.is_in_group("soldiers"):
+		failures.append("dead player soldier remained in soldiers group")
+	if soldier.death_pose_count <= 0:
+		failures.append("dead player soldier did not play the death pose")
+
+
+func _verify_player_combat_damage_incapacitates_when_enabled(failures: Array[String]) -> void:
+	var ship := _make_ship("player")
+	var soldier := _make_soldier("player", ship)
+	soldier.set_meta("combat_incapacitation_chance", 1.0)
+
+	SoldierLifecycleHelper.take_damage(soldier, 20.0, Vector3.ZERO, "sword")
+
+	if soldier.current_state != soldier.State.DEAD:
 		failures.append("player soldier did not enter dead-state combat exclusion when incapacitated")
 	if soldier.get_meta("incapacitated", false) != true:
-		failures.append("player soldier combat defeat was not marked as incapacitated")
+		failures.append("enabled player soldier combat defeat was not marked as incapacitated")
 	if soldier.current_health != 0.0:
 		failures.append("incapacitated player soldier health was not clamped to zero")
 	if soldier.is_in_group("soldiers"):
@@ -252,6 +272,7 @@ func _verify_rest_recovery_is_slow_player_only(failures: Array[String]) -> void:
 func _verify_heal_full_recovers_incapacitated_player(failures: Array[String]) -> void:
 	var ship := _make_ship("player")
 	var soldier := _make_soldier("player", ship)
+	soldier.set_meta("combat_incapacitation_chance", 1.0)
 
 	SoldierLifecycleHelper.take_damage(soldier, 20.0, Vector3.ZERO, "sword")
 	SoldierLifecycleHelper.heal_full(soldier)
@@ -272,6 +293,7 @@ func _verify_recovery_uses_ship_medical_upgrade_stats(failures: Array[String]) -
 	var ship := _make_ship("player")
 	ship.set_meta("incapacitated_recovery_health_ratio", 0.6)
 	var soldier := _make_soldier("player", ship)
+	soldier.set_meta("combat_incapacitation_chance", 1.0)
 
 	SoldierLifecycleHelper.take_damage(soldier, 20.0, Vector3.ZERO, "sword")
 	SoldierLifecycleHelper._try_recover_incapacitated(soldier)
@@ -313,6 +335,7 @@ func _verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures: 
 	downed.current_health = 8.0
 	downed.global_position = Vector3.ZERO
 	helper.global_position = Vector3(0.65, 0.0, 0.0)
+	downed.set_meta("combat_incapacitation_chance", 1.0)
 
 	SoldierLifecycleHelper.take_damage(downed, 20.0, Vector3.ZERO, "sword")
 	var assist_started: bool = helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
@@ -382,6 +405,7 @@ func _verify_shipmate_assist_large_delta_does_not_instant_recover(failures: Arra
 	downed.current_health = 8.0
 	downed.global_position = Vector3.ZERO
 	helper.global_position = Vector3(0.65, 0.0, 0.0)
+	downed.set_meta("combat_incapacitation_chance", 1.0)
 
 	SoldierLifecycleHelper.take_damage(downed, 20.0, Vector3.ZERO, "sword")
 	helper._try_assist_incapacitated_ally(5.0, 0.72, 7.0)
@@ -420,6 +444,7 @@ func _verify_shipmate_assist_uses_standoff_without_pushing(failures: Array[Strin
 	downed.current_health = 8.0
 	downed.global_position = Vector3(3.7, 0.0, 0.0)
 	helper.global_position = Vector3(0.4, 0.0, 0.0)
+	downed.set_meta("combat_incapacitation_chance", 1.0)
 
 	SoldierLifecycleHelper.take_damage(downed, 20.0, Vector3.ZERO, "sword")
 	var target_pos: Vector3 = downed.global_position

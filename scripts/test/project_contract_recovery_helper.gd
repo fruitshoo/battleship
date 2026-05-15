@@ -73,7 +73,7 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		hull_before = float(player_ship.get("hull_hp"))
 	if player_ship.get("rowing_stamina") != null:
 		player_ship.set("rowing_stamina", 0.0)
-	loot.set("hull_repair_amount", 12.0)
+	loot.set("hull_repair_amount", 0.0)
 	loot.set("target_player", player_ship)
 	loot.call("_collect_by_proximity")
 	await _wait_frames(owner, 2)
@@ -84,8 +84,8 @@ static func _run_floating_loot_smoke(owner: Node, failures: Array[String], smoke
 		failures.append("recovery loot smoke did not grant score")
 	if int(level_manager.get("current_xp")) != xp_before:
 		failures.append("recovery loot smoke should no longer grant XP")
-	if player_ship.get("hull_hp") != null and float(player_ship.get("hull_hp")) <= hull_before:
-		failures.append("recovery loot smoke did not repair player hull")
+	if player_ship.get("hull_hp") != null and absf(float(player_ship.get("hull_hp")) - hull_before) > 0.01:
+		failures.append("recovery loot smoke should not repair player hull")
 
 
 static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:
@@ -110,17 +110,25 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 	var alive_before: int = 0
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var roster_before_ids := _get_player_roster_instance_ids(player_ship)
 	var xp_before: int = int(level_manager.get("current_xp")) if is_instance_valid(level_manager) and level_manager.get("current_xp") != null else 0
 	survivor.call("_try_collect", player_ship)
 	await _wait_frames(owner, 2)
 	var alive_after: int = alive_before
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_after = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var rescued_soldier := _find_new_player_roster_soldier(player_ship, roster_before_ids)
 
 	if survivor.get("is_collected") != true:
 		failures.append("recovery survivor smoke did not mark survivor collected")
 	if alive_after <= alive_before:
 		failures.append("recovery survivor smoke did not add crew")
+	if not is_instance_valid(rescued_soldier):
+		failures.append("recovery survivor smoke could not find rescued crew member")
+	elif rescued_soldier.get("current_health") != null and rescued_soldier.get("max_health") != null:
+		var rescued_health_ratio := float(rescued_soldier.get("current_health")) / maxf(1.0, float(rescued_soldier.get("max_health")))
+		if rescued_health_ratio > 0.5:
+			failures.append("recovery survivor smoke should add wounded crew, not full-health crew: %.2f" % rescued_health_ratio)
 	if is_instance_valid(level_manager) and level_manager.get("current_xp") != null and int(level_manager.get("current_xp")) <= xp_before:
 		failures.append("recovery survivor smoke did not grant rescue XP")
 

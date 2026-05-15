@@ -2,6 +2,7 @@
 extends Node3D
 
 enum WindMode { FREE_ROTATE, FIXED_FLUTTER }
+enum PinMode { LEFT, TOP, LEFT_AND_TOP }
 
 @export var flag_kind: String = "":
 	set(value):
@@ -33,6 +34,10 @@ enum WindMode { FREE_ROTATE, FIXED_FLUTTER }
 @export_range(0.0, 1.0, 0.01) var side_drag: float = 0.08:
 	set(value):
 		side_drag = value
+		_apply_material_settings()
+@export var pin_mode: PinMode = PinMode.LEFT:
+	set(value):
+		pin_mode = value
 		_apply_material_settings()
 @export_range(0.02, 1.0, 0.01) var wind_update_interval: float = 0.15
 @export_range(1.0, 20.0, 0.5) var wind_turn_speed: float = 8.0
@@ -100,6 +105,9 @@ func _capture_authored_material_settings() -> void:
 	var authored_side_drag = material.get_shader_parameter("side_drag")
 	if authored_side_drag != null:
 		side_drag = float(authored_side_drag)
+	var authored_pin_mode = material.get_shader_parameter("pin_mode")
+	if authored_pin_mode != null:
+		pin_mode = int(authored_pin_mode) as PinMode
 
 
 func set_flag_kind(kind: String) -> void:
@@ -157,6 +165,7 @@ func _apply_material_settings() -> void:
 	material.set_shader_parameter("wave_speed", wave_speed)
 	material.set_shader_parameter("wave_strength", wave_strength)
 	material.set_shader_parameter("side_drag", side_drag)
+	material.set_shader_parameter("pin_mode", int(pin_mode))
 
 
 func _ensure_panel_material(cloth: MeshInstance3D) -> ShaderMaterial:

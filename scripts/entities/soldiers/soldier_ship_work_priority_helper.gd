@@ -14,6 +14,7 @@ const TASK_SHIPHANDLING_STATION := "shiphandling_station"
 const TASK_SHIPHANDLING_ROWING := TASK_SHIPHANDLING_STATION
 const TASK_SHIPHANDLING_RUDDER := TASK_SHIPHANDLING_STATION
 const TASK_SHIPHANDLING_CRUISE := TASK_SHIPHANDLING_STATION
+const CREW_WORK_DIRECTIVES_ENABLED := false
 
 const PRIORITY_NONE := 0
 const PRIORITY_DECK_DEFENSE := 100
@@ -144,6 +145,8 @@ static func clear_active_ship_work_target(soldier) -> void:
 
 
 static func get_ship_work_directive(soldier) -> Dictionary:
+	if not CREW_WORK_DIRECTIVES_ENABLED:
+		return _none_directive()
 	var ship := _get_owned_ship(soldier)
 	if not _can_consider_deck_work(soldier, ship):
 		return _none_directive()
@@ -164,12 +167,15 @@ static func get_ship_work_directive(soldier) -> Dictionary:
 
 
 static func can_accept_immediate_work(soldier, task_name: String) -> bool:
+	var normalized_task := normalize_task_name(task_name)
+	if not CREW_WORK_DIRECTIVES_ENABLED and normalized_task != TASK_CORPSE_CLEANUP:
+		return false
 	var ship := _get_owned_ship(soldier)
 	if not _can_consider_deck_work(soldier, ship, true):
 		return false
-	if _has_conflicting_named_action(soldier, task_name):
+	if _has_conflicting_named_action(soldier, normalized_task):
 		return false
-	return int(get_task_priority(task_name)) > PRIORITY_NONE
+	return int(get_task_priority(normalized_task)) > PRIORITY_NONE
 
 
 static func score_worker_for_task(soldier, task_name: String, work_position: Vector3, max_distance_sq: float, work_anchor: Object = null, slot_key: String = "") -> float:
@@ -260,8 +266,15 @@ static func is_work_slot_reserved_for_other(work_anchor: Object, soldier = null,
 
 
 static func get_task_priority(task_name: String) -> int:
-	var definition := get_task_definition(task_name)
+	var normalized_task := normalize_task_name(task_name)
+	if not CREW_WORK_DIRECTIVES_ENABLED and normalized_task != TASK_CORPSE_CLEANUP:
+		return PRIORITY_NONE
+	var definition := get_task_definition(normalized_task)
 	return int(definition.get(KEY_PRIORITY, PRIORITY_NONE))
+
+
+static func are_crew_work_directives_enabled() -> bool:
+	return CREW_WORK_DIRECTIVES_ENABLED
 
 
 static func get_task_definition(task_name: String) -> Dictionary:
@@ -769,6 +782,8 @@ static func _store_active_ship_work_target(soldier, directive: Dictionary) -> vo
 
 
 static func _is_active_work_task_still_valid(soldier, ship: Node3D, task_name: String) -> bool:
+	if not CREW_WORK_DIRECTIVES_ENABLED:
+		return false
 	if not is_instance_valid(ship):
 		return false
 	var normalized_task := normalize_task_name(task_name)

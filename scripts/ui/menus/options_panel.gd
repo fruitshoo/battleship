@@ -31,10 +31,16 @@ signal closed
 
 var _focusable_controls: Array[Control] = []
 var _focused_control_index: int = 0
+var _content_scroll: ScrollContainer = null
+var _content_margin: MarginContainer = null
 var _language_row: VBoxContainer = null
 var _language_label: Label = null
 var _language_option: OptionButton = null
 var _syncing_language_option: bool = false
+var _performance_row: VBoxContainer = null
+var _performance_label: Label = null
+var _performance_option: OptionButton = null
+var _syncing_performance_option: bool = false
 var _sail_control_row: VBoxContainer = null
 var _sail_control_label: Label = null
 var _sail_control_option: OptionButton = null
@@ -51,7 +57,9 @@ var _nav_repeater := MenuInputHelper.NavRepeater.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_wrap_content_in_scroll_container()
 	_create_language_controls()
+	_create_performance_controls()
 	_create_sail_control_controls()
 	_create_control_scheme_controls()
 	_create_gamepad_confirm_controls()
@@ -67,14 +75,17 @@ func _ready() -> void:
 	sfx_slider.value = float(SaveManager.get_setting("sfx_volume", 0.85))
 	ui_slider.value = float(SaveManager.get_setting("ui_volume", 0.85))
 	screen_fx_check.button_pressed = SaveManager.get_setting("screen_edge_fx_enabled", true) == true
+	screen_fx_check.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	screen_fx_check.toggled.connect(_on_screen_fx_toggled)
 	screen_fx_slider.step = 0.05
 	screen_fx_slider.value = float(SaveManager.get_setting("screen_edge_fx_strength", 0.75))
 	screen_fx_slider.value_changed.connect(_on_screen_fx_strength_changed)
 	fullscreen_check.button_pressed = SaveManager.get_setting("fullscreen", false) == true
+	fullscreen_check.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 	back_button.pressed.connect(_on_back_pressed)
 	_populate_language_options()
+	_populate_performance_options()
 	_populate_sail_control_options()
 	_populate_control_scheme_options()
 	_populate_gamepad_confirm_options()
@@ -85,6 +96,36 @@ func _ready() -> void:
 		LocaleManager.locale_changed.connect(_on_locale_changed)
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
+
+
+func _wrap_content_in_scroll_container() -> void:
+	if not is_instance_valid(shell) or not is_instance_valid(content_box):
+		return
+	if content_box.get_parent() is MarginContainer and content_box.get_parent().get_parent() is ScrollContainer:
+		_content_margin = content_box.get_parent() as MarginContainer
+		_content_scroll = _content_margin.get_parent() as ScrollContainer
+		return
+	if content_box.get_parent() is ScrollContainer:
+		_content_scroll = content_box.get_parent() as ScrollContainer
+		return
+	if content_box.get_parent() != shell:
+		return
+	var content_index := content_box.get_index()
+	shell.remove_child(content_box)
+	_content_scroll = ScrollContainer.new()
+	_content_scroll.name = "ContentScroll"
+	_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_content_scroll.follow_focus = true
+	shell.add_child(_content_scroll)
+	shell.move_child(_content_scroll, content_index)
+	_content_margin = MarginContainer.new()
+	_content_margin.name = "ContentMargin"
+	_content_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_content_scroll.add_child(_content_margin)
+	_content_margin.add_child(content_box)
+	content_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
 func _create_language_controls() -> void:
@@ -148,8 +189,40 @@ func _create_sail_control_controls() -> void:
 	header.add_child(_sail_control_option)
 
 	content_box.add_child(_sail_control_row)
+	if is_instance_valid(_performance_row) and _performance_row.get_parent() == content_box:
+		content_box.move_child(_sail_control_row, _performance_row.get_index() + 1)
+
+
+func _create_performance_controls() -> void:
+	if is_instance_valid(_performance_option) or not is_instance_valid(content_box):
+		return
+	_performance_row = VBoxContainer.new()
+	_performance_row.name = "PerformanceRow"
+	_performance_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var header := HBoxContainer.new()
+	header.name = "PerformanceHeader"
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.alignment = BoxContainer.ALIGNMENT_CENTER
+	header.add_theme_constant_override("separation", 12)
+	_performance_row.add_child(header)
+
+	_performance_label = Label.new()
+	_performance_label.name = "PerformanceLabel"
+	_performance_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_performance_label)
+
+	_performance_option = OptionButton.new()
+	_performance_option.name = "PerformanceOption"
+	_performance_option.custom_minimum_size = Vector2(172, 34)
+	_performance_option.focus_mode = Control.FOCUS_ALL
+	_performance_option.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_performance_option.item_selected.connect(_on_performance_selected)
+	header.add_child(_performance_option)
+
+	content_box.add_child(_performance_row)
 	if is_instance_valid(_language_row) and _language_row.get_parent() == content_box:
-		content_box.move_child(_sail_control_row, _language_row.get_index() + 1)
+		content_box.move_child(_performance_row, _language_row.get_index() + 1)
 
 
 func _create_control_scheme_controls() -> void:
@@ -253,6 +326,30 @@ func _populate_sail_control_options() -> void:
 	_syncing_sail_control_option = false
 
 
+func _populate_performance_options() -> void:
+	if not is_instance_valid(_performance_option):
+		return
+	_syncing_performance_option = true
+	_performance_option.clear()
+	var modes: Array[String] = ["quality", "balanced", "performance"]
+	var selected_mode := str(SaveManager.get_setting("performance_preset", "quality"))
+	var selected_index := 0
+	for i in range(modes.size()):
+		var mode: String = modes[i]
+		var label_key := "options.performance_preset.%s" % mode
+		var fallback := "품질"
+		if mode == "balanced":
+			fallback = "균형"
+		elif mode == "performance":
+			fallback = "성능"
+		_performance_option.add_item(LocaleManager.t(label_key, fallback), i)
+		_performance_option.set_item_metadata(i, mode)
+		if mode == selected_mode:
+			selected_index = i
+	_performance_option.select(selected_index)
+	_syncing_performance_option = false
+
+
 func _populate_control_scheme_options() -> void:
 	if not is_instance_valid(_control_scheme_option):
 		return
@@ -308,6 +405,8 @@ func _apply_localized_text() -> void:
 		ui_label.text = LocaleManager.t("options.ui_volume", "UI")
 	if is_instance_valid(_language_label):
 		_language_label.text = LocaleManager.t("options.language", "언어")
+	if is_instance_valid(_performance_label):
+		_performance_label.text = LocaleManager.t("options.performance_preset", "성능 설정")
 	if is_instance_valid(_sail_control_label):
 		_sail_control_label.text = LocaleManager.t("options.sail_control", "돛 조절")
 	if is_instance_valid(_control_scheme_label):
@@ -327,6 +426,7 @@ func _apply_localized_text() -> void:
 
 func _on_locale_changed(_locale: String) -> void:
 	_populate_language_options()
+	_populate_performance_options()
 	_populate_sail_control_options()
 	_populate_control_scheme_options()
 	_populate_gamepad_confirm_options()
@@ -347,7 +447,7 @@ func _apply_theme() -> void:
 		)
 	if is_instance_valid(panel):
 		ModalMenuSkin.apply_modal_shell(panel, title_label, subtitle_label, true)
-	for label in [master_label, music_label, sfx_label, ui_label, _language_label, _sail_control_label, _control_scheme_label, _gamepad_confirm_label]:
+	for label in [master_label, music_label, sfx_label, ui_label, _language_label, _performance_label, _sail_control_label, _control_scheme_label, _gamepad_confirm_label]:
 		if not is_instance_valid(label):
 			continue
 		NavalUiTheme.style_body(label, 13)
@@ -361,6 +461,8 @@ func _apply_theme() -> void:
 		NavalUiTheme.apply_menu_toggle(fullscreen_check, 13)
 	if is_instance_valid(_language_option):
 		ModalMenuSkin.apply_action_button_theme(_language_option, false, true)
+	if is_instance_valid(_performance_option):
+		ModalMenuSkin.apply_action_button_theme(_performance_option, false, true)
 	if is_instance_valid(_sail_control_option):
 		ModalMenuSkin.apply_action_button_theme(_sail_control_option, false, true)
 	if is_instance_valid(_control_scheme_option):
@@ -392,11 +494,19 @@ func _apply_layout_density() -> void:
 		shell.add_theme_constant_override("separation", roundi(lerpf(14.0, 18.0, density)))
 	if is_instance_valid(content_box):
 		content_box.add_theme_constant_override("separation", roundi(lerpf(12.0, 14.0, density)))
+		content_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if is_instance_valid(_content_scroll):
+		_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_content_scroll.custom_minimum_size.y = 0.0
+	if is_instance_valid(_content_margin):
+		_content_margin.add_theme_constant_override("margin_right", roundi(lerpf(10.0, 16.0, density)))
+		_content_margin.add_theme_constant_override("margin_bottom", 2)
 	if is_instance_valid(title_label):
 		NavalUiTheme.style_display_title(title_label, roundi(lerpf(32.0, 40.0, density)))
 	if is_instance_valid(subtitle_label):
 		NavalUiTheme.style_caption(subtitle_label, roundi(lerpf(12.0, 13.0, density)), NavalUiTheme.TEXT_BODY)
-	for label in [master_label, music_label, sfx_label, ui_label, _language_label, _sail_control_label, _control_scheme_label, _gamepad_confirm_label]:
+	for label in [master_label, music_label, sfx_label, ui_label, _language_label, _performance_label, _sail_control_label, _control_scheme_label, _gamepad_confirm_label]:
 		if is_instance_valid(label):
 			NavalUiTheme.style_body(label, roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(screen_fx_label):
@@ -408,6 +518,9 @@ func _apply_layout_density() -> void:
 	if is_instance_valid(_language_option):
 		_language_option.custom_minimum_size = Vector2(roundf(lerpf(154.0, 172.0, density)), roundf(lerpf(32.0, 34.0, density)))
 		_language_option.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
+	if is_instance_valid(_performance_option):
+		_performance_option.custom_minimum_size = Vector2(roundf(lerpf(154.0, 172.0, density)), roundf(lerpf(32.0, 34.0, density)))
+		_performance_option.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
 	if is_instance_valid(_sail_control_option):
 		_sail_control_option.custom_minimum_size = Vector2(roundf(lerpf(154.0, 172.0, density)), roundf(lerpf(32.0, 34.0, density)))
 		_sail_control_option.add_theme_font_size_override("font_size", roundi(lerpf(12.0, 13.0, density)))
@@ -434,6 +547,7 @@ func _setup_focus_navigation() -> void:
 		sfx_slider,
 		ui_slider,
 		_language_option,
+		_performance_option,
 		_sail_control_option,
 		_control_scheme_option,
 		_gamepad_confirm_option,
@@ -449,6 +563,7 @@ func _setup_focus_navigation() -> void:
 		control.focus_mode = Control.FOCUS_ALL
 		control.focus_entered.connect(func():
 			_focused_control_index = i
+			_scroll_control_into_view(control)
 		)
 	call_deferred("_focus_first_control")
 
@@ -459,6 +574,7 @@ func _focus_first_control() -> void:
 		if is_instance_valid(control) and control.visible:
 			_focused_control_index = i
 			control.grab_focus()
+			_scroll_control_into_view(control)
 			return
 
 
@@ -472,7 +588,17 @@ func _move_focus_vertical(direction: int) -> void:
 		if is_instance_valid(control) and control.visible:
 			_focused_control_index = next_index
 			control.grab_focus()
+			_scroll_control_into_view(control)
 			return
+
+
+func _scroll_control_into_view(control: Control) -> void:
+	if not is_instance_valid(_content_scroll) or not is_instance_valid(control):
+		return
+	if not _content_scroll.is_ancestor_of(control):
+		return
+	if _content_scroll.has_method("ensure_control_visible"):
+		_content_scroll.call_deferred("ensure_control_visible", control)
 
 func _bind_slider(slider: HSlider, setting_key: String) -> void:
 	slider.value_changed.connect(func(value: float):
@@ -497,6 +623,14 @@ func _on_sail_control_selected(index: int) -> void:
 		return
 	var mode := str(_sail_control_option.get_item_metadata(index))
 	SaveManager.set_setting("sail_control_mode", mode, false)
+
+
+func _on_performance_selected(index: int) -> void:
+	if _syncing_performance_option or not is_instance_valid(_performance_option):
+		return
+	var mode := str(_performance_option.get_item_metadata(index))
+	SaveManager.set_setting("performance_preset", mode, false)
+	SaveManager.apply_settings()
 
 
 func _on_control_scheme_selected(index: int) -> void:
@@ -549,6 +683,12 @@ func _on_back_pressed() -> void:
 	queue_free()
 
 
+func _input(event: InputEvent) -> void:
+	if _handle_navigation_event(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if MenuInputHelper.is_cancel_event(event):
 		_on_back_pressed()
@@ -556,28 +696,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	var nav := _nav_repeater.consume_event(event)
-	if nav.y != 0:
-		_move_focus_vertical(nav.y)
-		if get_viewport():
-			get_viewport().set_input_as_handled()
-		return
-	if MenuInputHelper.is_navigation_axis_event(event):
+	if _handle_navigation_event(event):
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 		return
 
-	if _is_prev_event(event):
-		_move_focus_vertical(-1)
-		if get_viewport():
-			get_viewport().set_input_as_handled()
-	elif _is_next_event(event):
-		_move_focus_vertical(1)
-		if get_viewport():
-			get_viewport().set_input_as_handled()
-	elif _is_confirm_event(event):
+	if _is_confirm_event(event):
 		var focused := get_viewport().gui_get_focus_owner() if get_viewport() != null else null
 		if focused is CheckBox:
+			if _is_native_confirm_event(event):
+				if get_viewport():
+					get_viewport().set_input_as_handled()
+				return
 			UiButtonAudio.play_click()
 			(focused as CheckBox).button_pressed = not (focused as CheckBox).button_pressed
 			if get_viewport():
@@ -593,6 +723,58 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 
+func _handle_navigation_event(event: InputEvent) -> bool:
+	if _is_option_popup_open():
+		return false
+	var nav := _nav_repeater.consume_event(event)
+	if nav.x != 0:
+		_adjust_focused_horizontal(nav.x)
+		return true
+	if nav.y != 0:
+		_move_focus_vertical(nav.y)
+		return true
+	if MenuInputHelper.is_navigation_axis_event(event):
+		return true
+
+	if _is_prev_event(event):
+		_move_focus_vertical(-1)
+		return true
+	if _is_next_event(event):
+		_move_focus_vertical(1)
+		return true
+	return false
+
+
+func _adjust_focused_horizontal(direction: int) -> void:
+	var focused := get_viewport().gui_get_focus_owner() if get_viewport() != null else null
+	if focused is HSlider:
+		var slider := focused as HSlider
+		var step_size := slider.step if slider.step > 0.0 else 0.01
+		slider.value = clampf(slider.value + step_size * float(direction), slider.min_value, slider.max_value)
+		_scroll_control_into_view(slider)
+	elif focused is OptionButton:
+		_select_adjacent_option(focused as OptionButton, direction)
+
+
+func _select_adjacent_option(option: OptionButton, direction: int) -> void:
+	if not is_instance_valid(option) or option.item_count <= 0:
+		return
+	var next_index := posmod(option.selected + direction, option.item_count)
+	option.select(next_index)
+	option.item_selected.emit(next_index)
+	_scroll_control_into_view(option)
+
+
+func _is_option_popup_open() -> bool:
+	for option in [_language_option, _performance_option, _sail_control_option, _control_scheme_option, _gamepad_confirm_option]:
+		if not is_instance_valid(option):
+			continue
+		var popup := (option as OptionButton).get_popup()
+		if is_instance_valid(popup) and popup.visible:
+			return true
+	return false
+
+
 func _is_prev_event(event: InputEvent) -> bool:
 	return MenuInputHelper.is_up_event(event)
 
@@ -603,3 +785,14 @@ func _is_next_event(event: InputEvent) -> bool:
 
 func _is_confirm_event(event: InputEvent) -> bool:
 	return MenuInputHelper.is_confirm_event(event)
+
+
+func _is_native_confirm_event(event: InputEvent) -> bool:
+	if event is InputEventJoypadButton and event.is_action_pressed("ui_accept"):
+		return true
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		if not key_event.pressed or key_event.echo:
+			return false
+		return key_event.keycode == KEY_SPACE or key_event.keycode == KEY_ENTER or key_event.keycode == KEY_KP_ENTER
+	return false

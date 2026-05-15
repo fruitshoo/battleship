@@ -3,14 +3,14 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
 const BASE_SOLDIER_DAMAGE: float = 18.0
-const BASE_HULL_DAMAGE: float = 5.5
+const BASE_HULL_DAMAGE: float = 8.0
 const NODE_MUZZLE := "Muzzle"
 
 @export var shot_scene: PackedScene = preload("res://scenes/projectiles/small_cannonball.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
-@export var shoot_cooldown: float = 4.8
+@export var shoot_cooldown: float = 5.3
 @export var max_range: float = 22.0
-@export var projectile_speed: float = 58.0
+@export var projectile_speed: float = 36.0
 @export_range(0.05, 0.6, 0.01) var muzzle_smoke_scale: float = 0.18
 @export var fire_sfx: String = "musket_fire"
 

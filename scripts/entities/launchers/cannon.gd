@@ -298,9 +298,9 @@ func _get_reload_crew_station_local_position(slot_index: int) -> Vector3:
 
 
 func _get_reload_crew_cooldown_mult() -> float:
+	if is_instance_valid(_owner_ship) and _owner_ship.has_method("get_gunnery_reload_multiplier"):
+		return float(_owner_ship.call("get_gunnery_reload_multiplier"))
 	if not crew_operated_reload_enabled:
-		if is_instance_valid(_owner_ship) and _owner_ship.has_method("get_gunnery_reload_multiplier"):
-			return float(_owner_ship.call("get_gunnery_reload_multiplier"))
 		return 1.0
 	return 1.0 / maxf(0.05, get_reload_crew_speed_multiplier())
 

@@ -231,7 +231,7 @@ func _apply_background_fx() -> void:
 		Vector3(0.018, 0.024, 0.028)
 	)
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if _modal_open:
 		return
 	if MenuInputHelper.is_cancel_event(event):

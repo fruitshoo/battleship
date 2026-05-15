@@ -69,5 +69,5 @@
 ## Notes
 
 - `CC0`와 `own`으로 정리된 자산은 이 문서에서 제외했습니다.
-- 배포 직전에는 `/Users/shk/Godot/battleship/assets/audio/sfx/SFX_LICENSE.md`와 대조해서 누락이 없는지 확인하세요.
+- 배포 직전에는 `assets/audio/sfx/SFX_LICENSE.md`와 대조해서 누락이 없는지 확인하세요.
 - 볼륨 조정, 컷 편집, 포맷 변환 같은 수정이 있었다면 각 항목 아래에 `Modified` 문구를 덧붙여도 좋습니다.
