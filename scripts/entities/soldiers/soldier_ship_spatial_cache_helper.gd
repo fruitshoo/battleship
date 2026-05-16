@@ -31,6 +31,8 @@ static func get_ship_enemy_scan_data(soldier) -> Dictionary:
 	var owned_ship: Node3D = get_valid_node3d(soldier.owned_ship)
 	if owned_ship == null:
 		return {}
+	if NodeContractHelper.is_sinking_or_dying(owned_ship):
+		return {}
 	var current_frame: int = Engine.get_physics_frames()
 	var cache_key: String = _make_ship_enemy_scan_cache_key(owned_ship, str(soldier.team))
 	var cached_variant: Variant = _ship_enemy_scan_cache.get(cache_key, null)
@@ -116,6 +118,8 @@ static func _prune_ship_enemy_scan_cache(current_frame: int) -> void:
 static func get_ship_pair_geometry(soldier, other_ship: Node3D) -> Dictionary:
 	var owned_ship: Node3D = get_valid_node3d(soldier.owned_ship)
 	if owned_ship == null or not is_instance_valid(other_ship) or owned_ship == other_ship:
+		return {}
+	if NodeContractHelper.is_sinking_or_dying(owned_ship) or NodeContractHelper.is_sinking_or_dying(other_ship):
 		return {}
 	var current_frame: int = Engine.get_physics_frames()
 	var cache_key: String = _make_ship_pair_geometry_cache_key(owned_ship, other_ship)
@@ -239,6 +243,8 @@ static func get_ship_deck_bucket_candidates(ship: Node3D, team_name: String, loc
 
 static func _get_ship_deck_bucket_data(ship: Node3D) -> Dictionary:
 	if not is_instance_valid(ship):
+		return {}
+	if NodeContractHelper.is_sinking_or_dying(ship):
 		return {}
 	var current_frame: int = Engine.get_physics_frames()
 	var cache_key: int = ship.get_instance_id()

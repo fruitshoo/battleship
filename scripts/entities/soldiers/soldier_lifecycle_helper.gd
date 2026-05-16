@@ -4,6 +4,7 @@ class_name SoldierLifecycleHelper
 
 const BloodDeckDecalHelper = preload("res://scripts/effects/blood_deck_decal_helper.gd")
 const SoldierCaptainGuardHelper = preload("res://scripts/entities/soldiers/soldier_captain_guard_helper.gd")
+const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 
 const MELEE_DAMAGE_SOURCES := {
 	"sword": true,
@@ -86,6 +87,8 @@ static func get_ship_ranged_cover_defense_bonus(soldier, damage_source: String) 
 		return 0.0
 	if soldier.current_state == soldier.State.DEAD:
 		return 0.0
+	if SoldierDeckZoneHelper.is_roof(soldier):
+		return 0.0
 	var base_bonus: float = DEFAULT_SHIP_RANGED_COVER_DEFENSE_BONUS
 	if soldier.owned_ship.has_meta(SHIP_RANGED_COVER_BASE_DEFENSE_META):
 		base_bonus = maxf(0.0, float(soldier.owned_ship.get_meta(SHIP_RANGED_COVER_BASE_DEFENSE_META)))
@@ -132,6 +135,8 @@ static func _is_fighting_defender_on_owned_ship(soldier) -> bool:
 		return false
 	var target: Node = soldier.current_target
 	if SoldierStateHelper.is_dead_soldier(target):
+		return false
+	if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, target):
 		return false
 	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
 	if target_team == soldier.team:
@@ -186,6 +191,8 @@ static func _find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 			continue
 		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
 		if other_team == soldier.team:
+			continue
+		if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, other):
 			continue
 		var other_node := other as Node3D
 		var distance_sq: float = soldier.global_position.distance_squared_to(other_node.global_position)

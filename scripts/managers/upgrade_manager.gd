@@ -527,9 +527,7 @@ func _apply_crew_reserve(ship: Node3D, level: int) -> void:
 	if "crew_respawn_timer" in ship:
 		ship.crew_respawn_timer = minf(float(ship.crew_respawn_timer), float(ship.crew_respawn_interval))
 	if _level_matches(level, stats.get("instant_restore_levels", [])) and ship.has_method("get_alive_crew_count") and "max_crew_count" in ship:
-		var recovered_count := _recover_incapacitated_player_soldiers(ship)
-		if recovered_count <= 0 and int(ship.call("get_alive_crew_count")) < int(ship.max_crew_count) and ship.has_method("add_survivor"):
-			ship.add_survivor()
+		_recover_incapacitated_player_soldiers(ship)
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
 	print("[CrewReserve] 구호 Lv.%d (일으키기 %.2fs, 회복 %.0f%%)" % [level, assist_duration, assist_health_ratio * 100.0])
@@ -1126,7 +1124,7 @@ func _apply_gold(_ship: Node3D, _level: int) -> void:
 			if node.has_method("add_score"):
 				node.add_score(pts)
 				break
-	print("[Gold] 전리품! 골드 +%d" % pts)
+	print("[Points] 전리품! 포인트 +%d" % pts)
 
 func _apply_fleet_signal(ship: Node3D, _level: int) -> void:
 	if not is_instance_valid(ship):

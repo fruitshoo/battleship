@@ -3,12 +3,14 @@ class_name BaseShipBoardingHelper
 
 
 const SoldierBoardingPrepBarHelper = preload("res://scripts/entities/soldiers/soldier_boarding_prep_bar_helper.gd")
+const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 const BOARDING_LANDING_INSET := 0.45
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85
 const BOARDING_BREAK_DISTANCE_PAD := 2.2
 const BOARDING_WAVE_MAX_SIZE := 3
 const HOSTILE_BOARDING_WAVE_MAX_SIZE := 2
 const HOSTILE_BOARDING_CONTEST_MAX := 2
+const HOSTILE_ROOF_BOARDING_MAX_ATTACKERS := 1
 const BOARDING_LAUNCH_INSET := 0.18
 const BOARDING_LAUNCH_READY_MIN_RADIUS := 2.35
 const BOARDING_LAUNCH_READY_MAX_RADIUS := 3.55
@@ -16,6 +18,11 @@ const BOARDING_PREP_BAR_READY_RADIUS_PAD := 2.4
 const HOSTILE_BOARDING_TRAVEL_SPEED := 16.0
 const HOSTILE_BOARDING_TRAVEL_MIN := 0.36
 const HOSTILE_BOARDING_TRAVEL_MAX := 0.62
+const ROOF_BOARDING_TRAVEL_SPEED := 9.5
+const ROOF_BOARDING_TRAVEL_MIN := 0.68
+const ROOF_BOARDING_TRAVEL_MAX := 1.08
+const ROOF_BOARDING_JUMP_HEIGHT_MIN := 0.65
+const ROOF_BOARDING_JUMP_HEIGHT_MAX := 1.25
 const BOARDING_TRAVEL_SPEED := 17.0
 const BOARDING_TRAVEL_MIN := 0.32
 const BOARDING_TRAVEL_MAX := 0.58
@@ -272,7 +279,7 @@ static func _get_ship_team_tag(ship) -> String:
 	return "unknown"
 
 
-static func _count_target_defenders(ship, team_prop: String) -> int:
+static func _count_target_defenders(ship, team_prop: String, target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
 	if not is_instance_valid(ship.boarding_target):
 		return 0
 	var target_soldiers_node = NodeContractHelper.get_soldiers_container(ship.boarding_target)
@@ -282,12 +289,14 @@ static func _count_target_defenders(ship, team_prop: String) -> int:
 	for child in target_soldiers_node.get_children():
 		if SoldierStateHelper.is_dead_soldier(child):
 			continue
+		if not SoldierDeckZoneHelper.is_in_zone(child, target_zone):
+			continue
 		if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 			defenders_alive += 1
 	return defenders_alive
 
 
-static func _count_target_attackers(ship, team_prop: String) -> int:
+static func _count_target_attackers(ship, team_prop: String, target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
 	if not is_instance_valid(ship.boarding_target):
 		return 0
 	var target_soldiers_node = NodeContractHelper.get_soldiers_container(ship.boarding_target)
@@ -296,6 +305,8 @@ static func _count_target_attackers(ship, team_prop: String) -> int:
 	var attackers_alive := 0
 	for child in target_soldiers_node.get_children():
 		if SoldierStateHelper.is_dead_soldier(child):
+			continue
+		if not SoldierDeckZoneHelper.is_in_zone(child, target_zone):
 			continue
 		if child.has_method("get_team_tag") and child.get_team_tag() == team_prop:
 			attackers_alive += 1
@@ -337,18 +348,23 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		target_soldiers_node = ship.boarding_target
 
 	var team_prop = ship.get_team_tag() if ship.has_method("get_team_tag") else ("player" if "team" in ship and str(ship.get("team")) == "player" else "enemy")
+	var target_zone := _get_target_boarding_zone(ship, team_prop)
 	var defenders_alive = 0
 	var attackers_on_target_deck = 0
 	if target_soldiers_node:
 		for child in target_soldiers_node.get_children():
 			if SoldierStateHelper.is_dead_soldier(child):
 				continue
+			if not SoldierDeckZoneHelper.is_in_zone(child, target_zone):
+				continue
 			if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 				defenders_alive += 1
 			else:
 				attackers_on_target_deck += 1
-		var max_attackers_during_contest: int = _get_boarding_contest_limit(ship.boarding_target, team_prop, defenders_alive)
+		var max_attackers_during_contest: int = _get_boarding_contest_limit(ship.boarding_target, team_prop, defenders_alive, target_zone)
 		if defenders_alive > 0 and attackers_on_target_deck >= max_attackers_during_contest:
+			return false
+		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF and attackers_on_target_deck >= HOSTILE_ROOF_BOARDING_MAX_ATTACKERS:
 			return false
 
 	var s = null
@@ -401,10 +417,16 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		s.global_position = start_global
 
 		var jump_offset := _get_nearest_deck_landing_local(ship.boarding_target, start_global)
+		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF and ship.boarding_target.has_method("get_roof_boarding_landing_local"):
+			jump_offset = ship.boarding_target.call("get_roof_boarding_landing_local", start_global)
 		var start_local_pos: Vector3 = s.position
 		var horiz_dist: float = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
 		var jump_height: float = clampf(maxf(1.35, horiz_dist * 0.22), 1.35, 2.35)
 		var travel_time: float = _get_boarding_transfer_travel_time(horiz_dist, team_prop, ship.boarding_target)
+		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+			jump_height = clampf(maxf(ROOF_BOARDING_JUMP_HEIGHT_MIN, horiz_dist * 0.12), ROOF_BOARDING_JUMP_HEIGHT_MIN, ROOF_BOARDING_JUMP_HEIGHT_MAX)
+			travel_time = clampf(horiz_dist / ROOF_BOARDING_TRAVEL_SPEED, ROOF_BOARDING_TRAVEL_MIN, ROOF_BOARDING_TRAVEL_MAX)
+			SoldierDeckZoneHelper.set_roof_boarder(s, true)
 
 		var tween = s.create_tween()
 		tween.set_parallel(true)
@@ -462,23 +484,31 @@ static func _get_boarding_wave_size(ship) -> int:
 	var ready_boarders := _count_ready_boarders(ship, team_prop)
 	if ready_boarders <= 0:
 		return 1
-	var target_defenders := _count_target_defenders(ship, team_prop)
-	var target_attackers := _count_target_attackers(ship, team_prop)
+	var target_zone := _get_target_boarding_zone(ship, team_prop)
+	var target_defenders := _count_target_defenders(ship, team_prop, target_zone)
+	var target_attackers := _count_target_attackers(ship, team_prop, target_zone)
 	var open_contest_slots := ready_boarders
-	var wave_limit := _get_boarding_wave_limit(ship, team_prop)
-	if target_defenders > 0:
-		var contest_limit := _get_boarding_contest_limit(ship.boarding_target, team_prop, target_defenders)
+	var wave_limit := _get_boarding_wave_limit(ship, team_prop, target_zone)
+	if target_defenders > 0 or target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+		var contest_limit := _get_boarding_contest_limit(ship.boarding_target, team_prop, target_defenders, target_zone)
 		open_contest_slots = maxi(0, contest_limit - target_attackers)
-	return clampi(mini(ready_boarders, open_contest_slots), 1, wave_limit)
+	var allowed_boarders := mini(ready_boarders, open_contest_slots)
+	if allowed_boarders <= 0:
+		return 0
+	return clampi(allowed_boarders, 1, wave_limit)
 
 
-static func _get_boarding_wave_limit(ship, team_prop: String) -> int:
+static func _get_boarding_wave_limit(ship, team_prop: String, target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
+	if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+		return HOSTILE_ROOF_BOARDING_MAX_ATTACKERS
 	var slot_penalty := _get_defender_boarding_slot_penalty(ship.boarding_target if is_instance_valid(ship) else null, team_prop)
 	var base_limit := HOSTILE_BOARDING_WAVE_MAX_SIZE if _is_hostile_boarding_player(ship.boarding_target if is_instance_valid(ship) else null, team_prop) else BOARDING_WAVE_MAX_SIZE
 	return maxi(1, base_limit - slot_penalty)
 
 
-static func _get_boarding_contest_limit(target_ship: Node, attacker_team: String, defender_count: int) -> int:
+static func _get_boarding_contest_limit(target_ship: Node, attacker_team: String, defender_count: int, target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
+	if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+		return HOSTILE_ROOF_BOARDING_MAX_ATTACKERS
 	var contest_max := HOSTILE_BOARDING_CONTEST_MAX if _is_hostile_boarding_player(target_ship, attacker_team) else 4
 	var base_limit := maxi(2, mini(contest_max, defender_count))
 	var slot_penalty := _get_defender_boarding_slot_penalty(target_ship, attacker_team)
@@ -487,6 +517,18 @@ static func _get_boarding_contest_limit(target_ship: Node, attacker_team: String
 
 static func _is_hostile_boarding_player(target_ship: Node, attacker_team: String) -> bool:
 	return attacker_team == "enemy" and is_instance_valid(target_ship) and _get_ship_team_tag(target_ship) == "player"
+
+
+static func _is_hostile_roof_boarding_target(target_ship: Node, attacker_team: String) -> bool:
+	return _is_hostile_boarding_player(target_ship, attacker_team) \
+		and target_ship.has_method("is_roof_boarding_enabled") \
+		and target_ship.call("is_roof_boarding_enabled") == true
+
+
+static func _get_target_boarding_zone(ship, team_prop: String) -> String:
+	if is_instance_valid(ship) and _is_hostile_roof_boarding_target(ship.boarding_target, team_prop):
+		return SoldierDeckZoneHelper.ZONE_ROOF
+	return SoldierDeckZoneHelper.ZONE_MAIN
 
 
 static func _get_defender_boarding_slot_penalty(target_ship: Node, attacker_team: String) -> int:
@@ -565,7 +607,10 @@ static func _finish_transfer_landing(soldier_id: int, target_ship_id: int, landi
 		return
 	var target_ship := NodeContractHelper.get_instance_node3d(target_ship_id)
 	if is_instance_valid(target_ship):
-		soldier.position = _clamp_deck_landing_local(target_ship, landing_local)
+		if SoldierDeckZoneHelper.is_roof(soldier) and target_ship.has_method("clamp_roof_boarding_landing_local"):
+			soldier.position = target_ship.call("clamp_roof_boarding_landing_local", landing_local)
+		else:
+			soldier.position = _clamp_deck_landing_local(target_ship, landing_local)
 	_finish_soldier_boarding_jump_pose(soldier, "on_deck")
 
 
@@ -629,6 +674,8 @@ static func _find_nearest_hostile_soldier(boarder: Node3D, target_ship: Node3D, 
 			continue
 		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else str(other.get("team"))
 		if other_team == boarder_team:
+			continue
+		if not SoldierDeckZoneHelper.can_share_combat_zone(boarder, other):
 			continue
 		var other_node := other as Node3D
 		var distance_sq: float = boarder.global_position.distance_squared_to(other_node.global_position)

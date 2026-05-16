@@ -6,7 +6,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 
 const TASK_NONE := "none"
 const TASK_DECK_DEFENSE := "deck_defense"
-const TASK_CORPSE_CLEANUP := "corpse_cleanup"
+const TASK_CARGO_TRANSPORT := "cargo_transport"
 const TASK_CANNON_RELOAD := "cannon_reload"
 const TASK_RIGGING_REPAIR := "rigging_repair"
 const TASK_GUNNERY_STATION := "gunnery_station"
@@ -18,7 +18,7 @@ const CREW_WORK_DIRECTIVES_ENABLED := false
 
 const PRIORITY_NONE := 0
 const PRIORITY_DECK_DEFENSE := 100
-const PRIORITY_CORPSE_CLEANUP := 80
+const PRIORITY_CARGO_TRANSPORT := 80
 const PRIORITY_CANNON_RELOAD := 70
 const PRIORITY_RIGGING_REPAIR := 62
 const PRIORITY_GUNNERY_STATION := PRIORITY_NONE
@@ -35,7 +35,7 @@ const KEY_PREEMPTS_ROUTINE := "preempts_routine"
 const KEY_LOCAL_TARGET := "local_target"
 
 const PHASE_EMERGENCY := "emergency"
-const PHASE_CLEANUP := "cleanup"
+const PHASE_TRANSPORT := "transport"
 const PHASE_WEAPON_SUPPORT := "weapon_support"
 const PHASE_REPAIR := "repair"
 const PHASE_BATTLE_STATION := "battle_station"
@@ -43,7 +43,7 @@ const PHASE_SHIPHANDLING := "shiphandling"
 
 const TASK_PRIORITY_TABLE := [
 	{KEY_TASK: TASK_DECK_DEFENSE, KEY_PRIORITY: PRIORITY_DECK_DEFENSE, KEY_PHASE: PHASE_EMERGENCY, KEY_RUNTIME: "combat_ai", KEY_REASON: "hostiles on deck", KEY_PREEMPTS_ROUTINE: true},
-	{KEY_TASK: TASK_CORPSE_CLEANUP, KEY_PRIORITY: PRIORITY_CORPSE_CLEANUP, KEY_PHASE: PHASE_CLEANUP, KEY_RUNTIME: "player_ship", KEY_REASON: "clear enemy corpse from allied deck", KEY_PREEMPTS_ROUTINE: true},
+	{KEY_TASK: TASK_CARGO_TRANSPORT, KEY_PRIORITY: PRIORITY_CARGO_TRANSPORT, KEY_PHASE: PHASE_TRANSPORT, KEY_RUNTIME: "player_ship", KEY_REASON: "transport deck payload from allied deck", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_CANNON_RELOAD, KEY_PRIORITY: PRIORITY_CANNON_RELOAD, KEY_PHASE: PHASE_WEAPON_SUPPORT, KEY_RUNTIME: "cannon_reload", KEY_REASON: "weapon reload support", KEY_PREEMPTS_ROUTINE: true},
 	{KEY_TASK: TASK_SHIPHANDLING_STATION, KEY_PRIORITY: PRIORITY_SHIPHANDLING_STATION, KEY_PHASE: PHASE_SHIPHANDLING, KEY_RUNTIME: "ship_duty", KEY_REASON: "shiphandling station", KEY_PREEMPTS_ROUTINE: false},
 ]
@@ -168,7 +168,7 @@ static func get_ship_work_directive(soldier) -> Dictionary:
 
 static func can_accept_immediate_work(soldier, task_name: String) -> bool:
 	var normalized_task := normalize_task_name(task_name)
-	if not CREW_WORK_DIRECTIVES_ENABLED and normalized_task != TASK_CORPSE_CLEANUP:
+	if not CREW_WORK_DIRECTIVES_ENABLED and normalized_task != TASK_CARGO_TRANSPORT:
 		return false
 	var ship := _get_owned_ship(soldier)
 	if not _can_consider_deck_work(soldier, ship, true):
@@ -267,7 +267,7 @@ static func is_work_slot_reserved_for_other(work_anchor: Object, soldier = null,
 
 static func get_task_priority(task_name: String) -> int:
 	var normalized_task := normalize_task_name(task_name)
-	if not CREW_WORK_DIRECTIVES_ENABLED and normalized_task != TASK_CORPSE_CLEANUP:
+	if not CREW_WORK_DIRECTIVES_ENABLED and normalized_task != TASK_CARGO_TRANSPORT:
 		return PRIORITY_NONE
 	var definition := get_task_definition(normalized_task)
 	return int(definition.get(KEY_PRIORITY, PRIORITY_NONE))
@@ -314,7 +314,7 @@ static func get_role_affinity_for_task(soldier, task_name: String) -> float:
 		if role == "general" or role == "fire_pot":
 			return 0.9
 		return 0.7
-	if normalized_task == TASK_CORPSE_CLEANUP:
+	if normalized_task == TASK_CARGO_TRANSPORT:
 		if role == "general" or role == "spearman":
 			return 0.85
 		return 0.6

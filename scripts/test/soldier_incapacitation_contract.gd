@@ -341,8 +341,8 @@ func _verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures: 
 	var assist_started: bool = helper._try_assist_incapacitated_ally(0.6, 0.72, 7.0)
 	if helper.get_named_action() != SoldierActionHelper.ACTION_INCAPACITATED_ASSIST:
 		failures.append("shipmate assist recovery did not enter the revive assist action")
-	if SoldierActionHelper.get_action_animation_name(helper) != SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY:
-		failures.append("shipmate assist recovery did not reuse the corpse cleanup carry animation")
+	if SoldierActionHelper.get_action_animation_name(helper) != SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY:
+		failures.append("shipmate assist recovery did not reuse the cargo transport carry animation")
 	if helper.get_carry_payload() != downed:
 		failures.append("shipmate assist recovery did not bind the downed ally as a temporary pickup payload")
 	var assist_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_INCAPACITATED_ASSIST)

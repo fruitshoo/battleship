@@ -326,9 +326,9 @@
 			}
 		},
 		"gold": {
-			"name": "골드",
+			"name": "포인트",
 			"category": 4,
-			"description": "골드 +10",
+			"description": "포인트 +10",
 			"max_level": 99,
 			"color": "ffd84c",
 			"stats": {

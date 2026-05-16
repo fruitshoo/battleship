@@ -1,9 +1,11 @@
 extends RefCounted
 
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
+const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 
 const ATTACK_COOLDOWN_TEMPO_MULT := 1.12
 const SHIP_RANGED_ATTACKER_RATIO := 0.5
+const SOLDIER_TARGET_MAX_VERTICAL_DELTA := 2.6
 
 
 static func perform_special_attack(soldier, target: Node3D) -> void:
@@ -14,11 +16,45 @@ static func perform_special_attack(soldier, target: Node3D) -> void:
 
 
 static func perform_attack(soldier) -> void:
+	if not is_instance_valid(soldier):
+		return
+	var owned_ship: Node = soldier.get("owned_ship")
+	if NodeContractHelper.is_sinking_or_dying(owned_ship):
+		soldier.current_target = null
+		if soldier.has_method("_change_state"):
+			soldier._change_state(soldier.State.IDLE)
+		return
 	if not is_instance_valid(soldier.current_target):
 		return
 	if SoldierStateHelper.is_dead_soldier(soldier.current_target):
 		soldier.current_target = null
 		return
+	var target: Node3D = soldier.current_target if soldier.current_target is Node3D else null
+	if is_instance_valid(target) and target.is_inside_tree():
+		var target_ship: Node = null
+		if target.has_method("get_owned_ship_node"):
+			var owned_node: Variant = target.call("get_owned_ship_node")
+			target_ship = owned_node if is_instance_valid(owned_node) and owned_node is Node else null
+		elif target.get("owned_ship") != null:
+			var owned_value: Variant = target.get("owned_ship")
+			target_ship = owned_value if is_instance_valid(owned_value) and owned_value is Node else null
+		if NodeContractHelper.is_sinking_or_dying(target_ship):
+			soldier.current_target = null
+			if soldier.has_method("_change_state"):
+				soldier._change_state(soldier.State.IDLE)
+			return
+		if target.is_in_group("soldiers"):
+			if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, target):
+				soldier.current_target = null
+				if soldier.has_method("_change_state"):
+					soldier._change_state(soldier.State.IDLE)
+				return
+			var vertical_delta := absf(soldier.global_position.y - target.global_position.y)
+			if vertical_delta > SOLDIER_TARGET_MAX_VERTICAL_DELTA and not SoldierDeckZoneHelper.can_ignore_vertical_delta(soldier, target):
+				soldier.current_target = null
+				if soldier.has_method("_change_state"):
+					soldier._change_state(soldier.State.IDLE)
+				return
 
 	if soldier.current_weapon and soldier.current_weapon.has_method("attack"):
 		soldier.current_weapon.attack(soldier.current_target, soldier)

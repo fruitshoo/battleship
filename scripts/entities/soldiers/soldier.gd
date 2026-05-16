@@ -6,6 +6,7 @@ const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_vis
 const SoldierCombatHelper = preload("res://scripts/entities/soldiers/soldier_combat_helper.gd")
 const SoldierHealthBarHelper = preload("res://scripts/entities/soldiers/soldier_health_bar_helper.gd")
 const SoldierCaptainGuardHelper = preload("res://scripts/entities/soldiers/soldier_captain_guard_helper.gd")
+const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
 const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
@@ -1206,6 +1207,8 @@ func _is_outside_owned_ship_deck(margin: float = 0.0) -> bool:
 	if not is_instance_valid(owned_ship):
 		return false
 	var local_pos: Vector3 = owned_ship.to_local(global_position)
+	if SoldierDeckZoneHelper.is_roof(self) and owned_ship.has_method("is_roof_local_position_in_bounds"):
+		return owned_ship.call("is_roof_local_position_in_bounds", local_pos) == true
 	var half_ext := _get_ship_deck_half_extents(owned_ship)
 	var half_width := half_ext.x
 	if owned_ship.has_method("get_deck_half_width_at_z"):
@@ -1325,6 +1328,9 @@ func _is_valid_enemy_target(target: Node3D) -> bool:
 		return false
 	if SoldierStateHelper.is_dead_soldier(target):
 		return false
+	var target_ship: Node3D = _get_target_owned_ship_node(target)
+	if NodeContractHelper.is_sinking_or_dying(target_ship):
+		return false
 	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
 	return target_team != team
 
@@ -1353,6 +1359,8 @@ func find_nearest_hostile_on_owned_ship() -> Node3D:
 func _find_nearest_owned_ship_hostile_fallback() -> Node3D:
 	if not is_instance_valid(owned_ship):
 		return null
+	if NodeContractHelper.is_sinking_or_dying(owned_ship):
+		return null
 	var candidates: Array = EntityRegistry.get_soldiers_by_ship(owned_ship)
 	if candidates.is_empty() and owned_ship.has_method("get_soldiers_container"):
 		var soldiers_node: Node = owned_ship.call("get_soldiers_container")
@@ -1365,6 +1373,9 @@ func _find_nearest_owned_ship_hostile_fallback() -> Node3D:
 		if other == self or not is_instance_valid(other):
 			continue
 		if SoldierStateHelper.is_dead_soldier(other):
+			continue
+		var other_ship: Node3D = _get_target_owned_ship_node(other)
+		if NodeContractHelper.is_sinking_or_dying(other_ship):
 			continue
 		if other.has_method("get_team_tag"):
 			if other.call("get_team_tag") == team:
@@ -1603,24 +1614,24 @@ func get_carry_payload_kind() -> String:
 	return SoldierActionHelper.get_carry_payload_kind(self)
 
 
-func begin_corpse_cleanup_action(action_name: String = "") -> void:
+func begin_cargo_transport_action(action_name: String = "") -> void:
 	if action_name.is_empty():
-		action_name = SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH
-	SoldierActionHelper.begin_corpse_cleanup_action(self, action_name)
+		action_name = SoldierActionHelper.ACTION_CARGO_TRANSPORT_APPROACH
+	SoldierActionHelper.begin_cargo_transport_action(self, action_name)
 
 
-func finish_corpse_cleanup_action() -> void:
-	SoldierActionHelper.finish_corpse_cleanup_action(self)
+func finish_cargo_transport_action() -> void:
+	SoldierActionHelper.finish_cargo_transport_action(self)
 	if current_state == State.DEAD:
 		_play_death_pose()
 
 
-func play_corpse_cleanup_carry_animation() -> void:
-	SoldierActionHelper.begin_corpse_cleanup_action(self, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY)
+func play_cargo_transport_carry_animation() -> void:
+	SoldierActionHelper.begin_cargo_transport_action(self, SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY)
 
 
-func finish_corpse_cleanup_carry_animation() -> void:
-	finish_corpse_cleanup_action()
+func finish_cargo_transport_carry_animation() -> void:
+	finish_cargo_transport_action()
 
 ## 적군 도선병 약탈 및 방화 처리 (초당 DoT 데미지)
 func _update_boarding_chaos(delta: float) -> void:
@@ -1696,7 +1707,7 @@ func _begin_incapacitated_assist_action(assist_target: Node3D) -> void:
 	begin_named_action(
 		SoldierActionHelper.ACTION_INCAPACITATED_ASSIST,
 		false,
-		SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY
+		SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY
 	)
 	set_meta(INCAPACITATED_ASSIST_PICKUP_START_POSITION_META, assist_target.global_position)
 	var assist_ship := _get_incapacitated_assist_ship(assist_target)

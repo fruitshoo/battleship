@@ -1,7 +1,7 @@
 extends Node
 
 ## 세이브 매니저 (Save Manager)
-## 골드 및 영구 업그레이드 데이터 저장/로드
+## 포인트 및 영구 업그레이드 데이터 저장/로드
 
 const InputSettingsHelper = preload("res://scripts/helpers/input_settings_helper.gd")
 const SAVE_PATH = "user://save_data.cfg"
@@ -48,7 +48,7 @@ func save_game() -> void:
 		var backup_err = config.save(BACKUP_SAVE_PATH)
 		if backup_err != OK:
 			push_warning("SaveManager: 백업 저장 실패 (error code: %d)" % backup_err)
-		print("[Save] 게임 저장 완료 (Gold: %d)" % gold)
+		print("[Save] 게임 저장 완료 (Points: %d)" % gold)
 
 func load_game() -> void:
 	var config = ConfigFile.new()
@@ -56,7 +56,7 @@ func load_game() -> void:
 	
 	if err == OK:
 		_apply_loaded_config(config)
-		print("[Load] 게임 로드 완료 (Gold: %d)" % gold)
+		print("[Load] 게임 로드 완료 (Points: %d)" % gold)
 	elif err == ERR_FILE_NOT_FOUND:
 		print("[Load] 저장된 파일이 없습니다. 초기 상태로 시작합니다.")
 		_reset_to_defaults()
@@ -67,7 +67,7 @@ func load_game() -> void:
 		var backup_err = backup_config.load(BACKUP_SAVE_PATH)
 		if backup_err == OK:
 			_apply_loaded_config(backup_config)
-			print("[Load] 백업 세이브 로드 완료 (Gold: %d)" % gold)
+			print("[Load] 백업 세이브 로드 완료 (Points: %d)" % gold)
 		else:
 			push_warning("SaveManager: 백업 세이브도 로드 실패 (error code: %d). 기본값으로 시작하되 파일은 덮어쓰지 않습니다." % backup_err)
 			_reset_to_defaults()

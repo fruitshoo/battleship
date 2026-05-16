@@ -9,9 +9,9 @@ static func add_score(lm: Node, points: int) -> void:
 	lm.score_changed.emit(lm.current_score)
 
 	if is_instance_valid(SaveManager):
-		var gold_gain: int = max(0, points)
-		if gold_gain > 0:
-			SaveManager.add_gold(gold_gain)
+		var point_gain: int = max(0, points)
+		if point_gain > 0:
+			SaveManager.add_gold(point_gain)
 
 	if lm.hud:
 		lm.hud.update_score(lm.current_score)

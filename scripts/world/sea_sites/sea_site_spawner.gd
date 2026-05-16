@@ -14,6 +14,7 @@ const DEFAULT_STATIC_SITE_SCENE_PATHS: Array[String] = [
 @export var max_active_sites: int = 3
 @export var initial_spawn_delay: float = 18.0
 @export var spawn_interval: float = 58.0
+@export_range(0.0, 1.0, 0.01) var drifting_supply_spawn_chance: float = 0.2
 @export var min_spawn_distance: float = 62.0
 @export var max_spawn_distance: float = 118.0
 @export var despawn_distance: float = 190.0
@@ -198,12 +199,20 @@ func _pick_site_scene() -> PackedScene:
 	var scenes: Array = static_site_scenes
 	if scenes.is_empty() and use_default_static_site_scenes:
 		scenes = _load_default_static_site_scenes()
+	if _should_spawn_drifting_supply():
+		return drifting_supply_site_scene
 	if scenes.is_empty():
 		return drifting_supply_site_scene
 	var site_scene: Variant = scenes.pick_random()
 	if site_scene is PackedScene:
 		return site_scene as PackedScene
 	return drifting_supply_site_scene
+
+
+func _should_spawn_drifting_supply() -> bool:
+	if not is_instance_valid(drifting_supply_site_scene):
+		return false
+	return randf() < clampf(drifting_supply_spawn_chance, 0.0, 1.0)
 
 
 func _load_default_static_site_scenes() -> Array[PackedScene]:

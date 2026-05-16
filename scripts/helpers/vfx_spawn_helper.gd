@@ -40,6 +40,17 @@ static func acquire_world_node3d(
 	return node_3d
 
 
+static func orient_world_node3d(node: Node3D, world_position: Vector3, look_direction: Vector3 = Vector3.ZERO) -> void:
+	if not is_instance_valid(node) or not world_position.is_finite():
+		return
+	var next_transform := node.global_transform
+	next_transform.origin = world_position
+	look_direction.y = 0.0
+	if look_direction.length_squared() > 0.001:
+		next_transform.basis = Basis.looking_at(look_direction.normalized(), Vector3.UP)
+	node.global_transform = next_transform
+
+
 static func activate(node: Node) -> void:
 	if is_instance_valid(node) and node.has_method("pool_activate"):
 		node.call("pool_activate")

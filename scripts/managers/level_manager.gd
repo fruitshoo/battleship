@@ -33,7 +33,7 @@ signal score_changed(new_score: int)
 @export var bonus_xp_per_soldier_kill: int = 1 ## 적 병사 처치 시 추가 XP
 @export var drowned_soldier_kill_xp_reward: int = 3 ## 적 병사를 수장시켰을 때 획득 XP
 @export var drowned_soldier_kill_bonus_xp_reward: int = 0 ## 적 병사를 수장시켰을 때 추가 XP
-@export var corpse_cleanup_xp_reward: int = 1 ## 갑판 시체 정리 완료 시 획득 XP
+@export var cargo_transport_xp_reward: int = 1 ## 갑판 운반 완료 시 획득 XP
 @export var melee_kill_xp_bonus: int = 2 ## 백병전(검/창/작살) 처치 시 추가 XP
 @export var melee_kill_bonus_xp: int = 1 ## 백병전(검/창/작살) 처치 시 추가 보너스 XP
 @export var boarding_capture_score_reward: int = 25 ## 나포 성공 시 추가 골드
@@ -292,10 +292,10 @@ func _apply_reward_rules_root(root: Dictionary) -> void:
 		drowned_soldier_kill_xp_reward = int(soldier_drowned.get("xp", drowned_soldier_kill_xp_reward))
 		drowned_soldier_kill_bonus_xp_reward = _get_bonus_xp_value(soldier_drowned, drowned_soldier_kill_bonus_xp_reward)
 
-	var corpse_cleanup_variant: Variant = root.get("corpse_cleanup", {})
-	if typeof(corpse_cleanup_variant) == TYPE_DICTIONARY:
-		var corpse_cleanup: Dictionary = corpse_cleanup_variant as Dictionary
-		corpse_cleanup_xp_reward = _get_bonus_xp_value(corpse_cleanup, corpse_cleanup_xp_reward)
+	var cargo_transport_variant: Variant = root.get("cargo_transport", root.get("corpse_cleanup", {}))
+	if typeof(cargo_transport_variant) == TYPE_DICTIONARY:
+		var cargo_transport: Dictionary = cargo_transport_variant as Dictionary
+		cargo_transport_xp_reward = _get_bonus_xp_value(cargo_transport, cargo_transport_xp_reward)
 
 	var melee_variant: Variant = root.get("melee_bonus", {})
 	if typeof(melee_variant) == TYPE_DICTIONARY:

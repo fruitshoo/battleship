@@ -1,7 +1,7 @@
 extends Node3D
 
 
-@export_enum("splash", "small", "sink", "corpse_cleanup", "ship_collision") var preset: String = "splash"
+@export_enum("splash", "small", "sink", "overboard_disposal", "ship_collision") var preset: String = "splash"
 @export var lock_to_waterline: bool = true
 @export_range(-1.0, 1.0, 0.01) var waterline_y: float = 0.05
 
@@ -100,10 +100,14 @@ func configure_as_sink() -> void:
 		_apply_preset()
 
 
-func configure_as_corpse_cleanup() -> void:
-	preset = "corpse_cleanup"
+func configure_as_overboard_disposal() -> void:
+	preset = "overboard_disposal"
 	if is_node_ready():
 		_apply_preset()
+
+
+func configure_as_corpse_cleanup() -> void:
+	configure_as_overboard_disposal()
 
 
 func set_intensity(scale_value: float) -> void:
@@ -196,8 +200,10 @@ func _apply_preset() -> void:
 			_apply_small_preset()
 		"sink":
 			_apply_sink_preset()
+		"overboard_disposal":
+			_apply_overboard_disposal_preset()
 		"corpse_cleanup":
-			_apply_corpse_cleanup_preset()
+			_apply_overboard_disposal_preset()
 		"ship_collision":
 			_apply_ship_collision_preset()
 		_:
@@ -324,10 +330,10 @@ func _apply_small_preset() -> void:
 	_configure_droplets(6, 0.44, 1.9 * intensity, 4.2 * intensity, 0.025, 0.065 * size_scale)
 
 
-func _apply_corpse_cleanup_preset() -> void:
+func _apply_overboard_disposal_preset() -> void:
 	var intensity := _intensity_scale
 	var size_scale := lerpf(0.58, 0.92, inverse_lerp(0.4, 1.2, intensity))
-	_budget_key_value = "corpse_cleanup_splash"
+	_budget_key_value = "overboard_disposal_splash"
 	_budget_limit_value = 8
 	_budget_distance_value = -1.0
 	_waterline_lift = 0.06

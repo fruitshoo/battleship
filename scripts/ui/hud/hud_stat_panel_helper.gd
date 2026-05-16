@@ -218,7 +218,6 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 		"icon": "groups",
 		"rows": [
 			{"icon": "group", "label": "생존 / 정원", "value": "%d / %d" % [int(crew_stats.get("alive_count", 0)), int(_get_int(ship, "max_crew_count", 0))]},
-			{"icon": "schedule", "label": "보충 시간", "value": "%.1fs" % _get_float(ship, "crew_respawn_interval", 0.0)},
 			{"icon": "badge", "label": "편성", "value": "일%d 화%d 연%d" % [
 				int(crew_stats.get("general_count", 0)),
 				int(crew_stats.get("fire_pot_count", 0)),

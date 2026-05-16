@@ -7,17 +7,17 @@ class_name SupportShip
 
 const SupportSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
-const SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META := "support_corpse_cleanup_in_progress"
+const SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META := "support_overboard_disposal_in_progress"
 
-@export_group("Post Combat Cleanup")
-@export var support_corpse_cleanup_enabled: bool = true
-@export_range(0.5, 12.0, 0.25) var support_corpse_cleanup_delay: float = 3.0
-@export_range(0.5, 8.0, 0.25) var support_corpse_cleanup_interval: float = 2.5
-@export_range(0.2, 1.5, 0.05) var support_corpse_cleanup_throw_duration: float = 0.45
-@export_range(0.2, 2.5, 0.05) var support_corpse_cleanup_throw_height: float = 0.65
+@export_group("Overboard Disposal")
+@export var support_overboard_disposal_enabled: bool = true
+@export_range(0.5, 12.0, 0.25) var support_overboard_disposal_delay: float = 3.0
+@export_range(0.5, 8.0, 0.25) var support_overboard_disposal_interval: float = 2.5
+@export_range(0.2, 1.5, 0.05) var support_overboard_disposal_throw_duration: float = 0.45
+@export_range(0.2, 2.5, 0.05) var support_overboard_disposal_throw_height: float = 0.65
 @export_group("")
-var _support_corpse_cleanup_timer: float = 0.0
-var _support_corpse_cleanup_peace_timer: float = 0.0
+var _support_overboard_disposal_timer: float = 0.0
+var _support_overboard_disposal_peace_timer: float = 0.0
 
 func _ready() -> void:
 	team = "player"
@@ -40,7 +40,7 @@ func _process(delta: float) -> void:
 		return
 	sync_sail_furl_with_flagship(delta)
 	super._process(delta)
-	_update_support_corpse_cleanup(delta)
+	_update_support_overboard_disposal(delta)
 
 
 func set_sail_furled(furled: bool) -> void:
@@ -178,36 +178,36 @@ func _reconcile_support_crew_count(target_count: int) -> void:
 		_spawn_one_soldier(team)
 
 
-func _update_support_corpse_cleanup(delta: float) -> void:
-	if not support_corpse_cleanup_enabled:
+func _update_support_overboard_disposal(delta: float) -> void:
+	if not support_overboard_disposal_enabled:
 		return
-	if not _can_run_support_corpse_cleanup():
-		_support_corpse_cleanup_peace_timer = 0.0
-		_support_corpse_cleanup_timer = 0.0
-		return
-
-	_support_corpse_cleanup_peace_timer += delta
-	if _support_corpse_cleanup_peace_timer < support_corpse_cleanup_delay:
+	if not _can_run_support_overboard_disposal():
+		_support_overboard_disposal_peace_timer = 0.0
+		_support_overboard_disposal_timer = 0.0
 		return
 
-	_support_corpse_cleanup_timer -= delta
-	if _support_corpse_cleanup_timer > 0.0:
+	_support_overboard_disposal_peace_timer += delta
+	if _support_overboard_disposal_peace_timer < support_overboard_disposal_delay:
 		return
-	_support_corpse_cleanup_timer = support_corpse_cleanup_interval
-	_try_cleanup_support_enemy_corpse()
+
+	_support_overboard_disposal_timer -= delta
+	if _support_overboard_disposal_timer > 0.0:
+		return
+	_support_overboard_disposal_timer = support_overboard_disposal_interval
+	_try_dispose_support_overboard_payload()
 
 
-func _can_run_support_corpse_cleanup() -> bool:
+func _can_run_support_overboard_disposal() -> bool:
 	if not is_inside_tree():
 		return false
 	if is_sinking or is_dying or is_derelict:
 		return false
 	if deck_is_contested or deck_is_overrun:
 		return false
-	return _has_alive_support_cleanup_actor()
+	return _has_alive_support_disposal_actor()
 
 
-func _has_alive_support_cleanup_actor() -> bool:
+func _has_alive_support_disposal_actor() -> bool:
 	for soldier in EntityRegistry.get_soldiers_by_ship(self):
 		if not is_instance_valid(soldier):
 			continue
@@ -220,19 +220,19 @@ func _has_alive_support_cleanup_actor() -> bool:
 	return false
 
 
-func _try_cleanup_support_enemy_corpse() -> void:
-	var corpse: Node3D = _find_support_cleanup_enemy_corpse()
-	if not is_instance_valid(corpse):
+func _try_dispose_support_overboard_payload() -> void:
+	var payload: Node3D = _find_support_overboard_disposal_payload()
+	if not is_instance_valid(payload):
 		return
-	corpse.set_meta(SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META, true)
-	_throw_support_corpse_overboard(corpse)
+	payload.set_meta(SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META, true)
+	_throw_support_payload_overboard(payload)
 
 
-func _find_support_cleanup_enemy_corpse() -> Node3D:
+func _find_support_overboard_disposal_payload() -> Node3D:
 	for soldier in EntityRegistry.get_soldiers_by_ship(self):
 		if not is_instance_valid(soldier) or not (soldier is Node3D):
 			continue
-		if soldier.get_meta(SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META, false) == true:
+		if soldier.get_meta(SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META, false) == true:
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != "enemy":
@@ -245,11 +245,11 @@ func _find_support_cleanup_enemy_corpse() -> Node3D:
 	return null
 
 
-func _throw_support_corpse_overboard(corpse: Node3D) -> void:
-	var corpse_id: int = corpse.get_instance_id()
-	var start_position: Vector3 = corpse.global_position
-	var target_position: Vector3 = _get_support_corpse_cleanup_throw_target(corpse)
-	var start_rotation: Vector3 = corpse.rotation
+func _throw_support_payload_overboard(payload: Node3D) -> void:
+	var payload_id: int = payload.get_instance_id()
+	var start_position: Vector3 = payload.global_position
+	var target_position: Vector3 = _get_support_overboard_disposal_throw_target(payload)
+	var start_rotation: Vector3 = payload.rotation
 	var target_rotation: Vector3 = start_rotation + Vector3(
 		randf_range(1.1, 2.0),
 		randf_range(-0.8, 0.8),
@@ -259,16 +259,16 @@ func _throw_support_corpse_overboard(corpse: Node3D) -> void:
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)
 	tween.tween_method(
-		Callable(self, "_apply_support_corpse_cleanup_throw_arc").bind(corpse_id, start_position, target_position, start_rotation, target_rotation),
+		Callable(self, "_apply_support_overboard_disposal_throw_arc").bind(payload_id, start_position, target_position, start_rotation, target_rotation),
 		0.0,
 		1.0,
-		maxf(0.1, support_corpse_cleanup_throw_duration)
+		maxf(0.1, support_overboard_disposal_throw_duration)
 	)
-	tween.finished.connect(_finish_support_corpse_cleanup.bind(corpse_id, target_position))
+	tween.finished.connect(_finish_support_overboard_disposal.bind(payload_id, target_position))
 
 
-func _get_support_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
-	var local_pos: Vector3 = to_local(corpse.global_position)
+func _get_support_overboard_disposal_throw_target(payload: Node3D) -> Vector3:
+	var local_pos: Vector3 = to_local(payload.global_position)
 	var half_extents: Vector2 = get_deck_half_extents()
 	var side_sign := 1.0 if local_pos.x >= 0.0 else -1.0
 	var target_local := Vector3(
@@ -281,42 +281,42 @@ func _get_support_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
 	return target_global
 
 
-func _apply_support_corpse_cleanup_throw_arc(
+func _apply_support_overboard_disposal_throw_arc(
 	progress: float,
-	corpse_id: int,
+	payload_id: int,
 	start_position: Vector3,
 	target_position: Vector3,
 	start_rotation: Vector3,
 	target_rotation: Vector3
 ) -> void:
-	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
-	if not is_instance_valid(corpse_node):
+	var payload_node := NodeContractHelper.get_instance_node3d(payload_id)
+	if not is_instance_valid(payload_node):
 		return
 	var arc_position := start_position.lerp(target_position, progress)
-	arc_position.y += sin(progress * PI) * support_corpse_cleanup_throw_height
-	corpse_node.global_position = arc_position
-	corpse_node.rotation = start_rotation.lerp(target_rotation, progress)
+	arc_position.y += sin(progress * PI) * support_overboard_disposal_throw_height
+	payload_node.global_position = arc_position
+	payload_node.rotation = start_rotation.lerp(target_rotation, progress)
 
 
-func _finish_support_corpse_cleanup(corpse_id: int, splash_position: Vector3) -> void:
-	var corpse_node := NodeContractHelper.get_instance_node(corpse_id)
-	if not is_instance_valid(corpse_node):
+func _finish_support_overboard_disposal(payload_id: int, splash_position: Vector3) -> void:
+	var payload_node := NodeContractHelper.get_instance_node(payload_id)
+	if not is_instance_valid(payload_node):
 		return
-	_play_support_corpse_cleanup_splash(splash_position)
-	if corpse_node.has_meta(SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META):
-		corpse_node.remove_meta(SUPPORT_CORPSE_CLEANUP_IN_PROGRESS_META)
-	corpse_node.queue_free()
+	_play_support_overboard_disposal_splash(splash_position)
+	if payload_node.has_meta(SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META):
+		payload_node.remove_meta(SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META)
+	payload_node.queue_free()
 
 
-func _play_support_corpse_cleanup_splash(splash_position: Vector3) -> void:
+func _play_support_overboard_disposal_splash(splash_position: Vector3) -> void:
 	if is_instance_valid(water_splash_scene):
 		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
 		if is_instance_valid(splash):
 			get_tree().root.add_child(splash)
 			if splash is Node3D:
 				(splash as Node3D).global_position = Vector3(splash_position.x, base_y + 0.05, splash_position.z)
-			if splash.has_method("configure_as_corpse_cleanup"):
-				splash.configure_as_corpse_cleanup()
+			if splash.has_method("configure_as_overboard_disposal"):
+				splash.configure_as_overboard_disposal()
 			elif splash.has_method("configure_as_small"):
 				splash.configure_as_small()
 			if splash.has_method("pool_activate"):

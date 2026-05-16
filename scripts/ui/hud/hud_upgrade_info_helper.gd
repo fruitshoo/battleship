@@ -197,7 +197,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 		"supply":
 			return "선체 회복 +%d" % int(stats.get("hull_heal", 20.0))
 		"gold":
-			return "골드 +%d" % int(stats.get("score_add", 50))
+			return "포인트 +%d" % int(stats.get("score_add", 50))
 	return ""
 
 static func _format_ramming_stat_text(stats: Dictionary, fallback_damage_mult: float, fallback_knockback_mult: float) -> String:

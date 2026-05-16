@@ -49,41 +49,41 @@ const CARRY_PAYLOAD_DEFINITIONS := {
 	},
 }
 
-const ACTION_CORPSE_CLEANUP_APPROACH := "corpse_cleanup_approach"
-const ACTION_CORPSE_CLEANUP_CARRY := "corpse_cleanup_carry"
-const ACTION_CORPSE_CLEANUP_THROW := "corpse_cleanup_throw"
+const ACTION_CARGO_TRANSPORT_APPROACH := "cargo_transport_approach"
+const ACTION_CARGO_TRANSPORT_CARRY := "cargo_transport_carry"
+const ACTION_CARGO_TRANSPORT_THROW := "cargo_transport_throw"
 const ACTION_CANNON_RELOAD := "cannon_reload"
 const ACTION_INCAPACITATED_ASSIST := "incapacitated_assist"
 const ACTION_DEF_NAME := "name"
 const ACTION_DEF_FAMILY := "family"
 const ACTION_DEF_LOCKS_AI := "locks_ai"
 const ACTION_DEF_ANIMATION := "animation"
-const ACTION_FAMILY_CORPSE_CLEANUP := "corpse_cleanup"
+const ACTION_FAMILY_CARGO_TRANSPORT := "cargo_transport"
 const ACTION_FAMILY_WEAPON_SUPPORT := "weapon_support"
 const ACTION_FAMILY_MEDICAL_SUPPORT := "medical_support"
-const CORPSE_CLEANUP_ACTIONS := {
-	ACTION_CORPSE_CLEANUP_APPROACH: true,
-	ACTION_CORPSE_CLEANUP_CARRY: true,
-	ACTION_CORPSE_CLEANUP_THROW: true,
+const CARGO_TRANSPORT_ACTIONS := {
+	ACTION_CARGO_TRANSPORT_APPROACH: true,
+	ACTION_CARGO_TRANSPORT_CARRY: true,
+	ACTION_CARGO_TRANSPORT_THROW: true,
 }
 const ACTION_DEFINITIONS := {
-	ACTION_CORPSE_CLEANUP_APPROACH: {
-		ACTION_DEF_NAME: ACTION_CORPSE_CLEANUP_APPROACH,
-		ACTION_DEF_FAMILY: ACTION_FAMILY_CORPSE_CLEANUP,
+	ACTION_CARGO_TRANSPORT_APPROACH: {
+		ACTION_DEF_NAME: ACTION_CARGO_TRANSPORT_APPROACH,
+		ACTION_DEF_FAMILY: ACTION_FAMILY_CARGO_TRANSPORT,
 		ACTION_DEF_LOCKS_AI: true,
-		ACTION_DEF_ANIMATION: ACTION_CORPSE_CLEANUP_APPROACH,
+		ACTION_DEF_ANIMATION: ACTION_CARGO_TRANSPORT_APPROACH,
 	},
-	ACTION_CORPSE_CLEANUP_CARRY: {
-		ACTION_DEF_NAME: ACTION_CORPSE_CLEANUP_CARRY,
-		ACTION_DEF_FAMILY: ACTION_FAMILY_CORPSE_CLEANUP,
+	ACTION_CARGO_TRANSPORT_CARRY: {
+		ACTION_DEF_NAME: ACTION_CARGO_TRANSPORT_CARRY,
+		ACTION_DEF_FAMILY: ACTION_FAMILY_CARGO_TRANSPORT,
 		ACTION_DEF_LOCKS_AI: true,
-		ACTION_DEF_ANIMATION: ACTION_CORPSE_CLEANUP_CARRY,
+		ACTION_DEF_ANIMATION: ACTION_CARGO_TRANSPORT_CARRY,
 	},
-	ACTION_CORPSE_CLEANUP_THROW: {
-		ACTION_DEF_NAME: ACTION_CORPSE_CLEANUP_THROW,
-		ACTION_DEF_FAMILY: ACTION_FAMILY_CORPSE_CLEANUP,
+	ACTION_CARGO_TRANSPORT_THROW: {
+		ACTION_DEF_NAME: ACTION_CARGO_TRANSPORT_THROW,
+		ACTION_DEF_FAMILY: ACTION_FAMILY_CARGO_TRANSPORT,
 		ACTION_DEF_LOCKS_AI: true,
-		ACTION_DEF_ANIMATION: ACTION_CORPSE_CLEANUP_THROW,
+		ACTION_DEF_ANIMATION: ACTION_CARGO_TRANSPORT_THROW,
 	},
 	ACTION_CANNON_RELOAD: {
 		ACTION_DEF_NAME: ACTION_CANNON_RELOAD,
@@ -95,7 +95,7 @@ const ACTION_DEFINITIONS := {
 		ACTION_DEF_NAME: ACTION_INCAPACITATED_ASSIST,
 		ACTION_DEF_FAMILY: ACTION_FAMILY_MEDICAL_SUPPORT,
 		ACTION_DEF_LOCKS_AI: false,
-		ACTION_DEF_ANIMATION: ACTION_CORPSE_CLEANUP_CARRY,
+		ACTION_DEF_ANIMATION: ACTION_CARGO_TRANSPORT_CARRY,
 	},
 }
 
@@ -140,15 +140,15 @@ static func finish_action(soldier, action_name: String = "") -> bool:
 	return true
 
 
-static func begin_corpse_cleanup_action(soldier, action_name: String) -> bool:
+static func begin_cargo_transport_action(soldier, action_name: String) -> bool:
 	var normalized_action := normalize_action_name(action_name)
-	if not CORPSE_CLEANUP_ACTIONS.has(normalized_action):
-		normalized_action = ACTION_CORPSE_CLEANUP_APPROACH
+	if not CARGO_TRANSPORT_ACTIONS.has(normalized_action):
+		normalized_action = ACTION_CARGO_TRANSPORT_APPROACH
 	return begin_known_action(soldier, normalized_action)
 
 
-static func finish_corpse_cleanup_action(soldier) -> bool:
-	if not is_corpse_cleanup_action(soldier):
+static func finish_cargo_transport_action(soldier) -> bool:
+	if not is_cargo_transport_action(soldier):
 		return false
 	return finish_action(soldier)
 
@@ -176,8 +176,8 @@ static func get_action_animation_name(soldier) -> String:
 	return str(soldier.get_meta(ACTION_ANIMATION_META, ""))
 
 
-static func is_corpse_cleanup_action(soldier) -> bool:
-	return CORPSE_CLEANUP_ACTIONS.has(get_action_name(soldier))
+static func is_cargo_transport_action(soldier) -> bool:
+	return CARGO_TRANSPORT_ACTIONS.has(get_action_name(soldier))
 
 
 static func get_action_definition(action_name: String) -> Dictionary:

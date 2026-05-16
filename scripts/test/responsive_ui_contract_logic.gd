@@ -6,6 +6,8 @@ const OPTIONS_PANEL_SCENE := preload("res://scenes/ui/options_panel.tscn")
 const UPGRADE_UI_SCENE := preload("res://scenes/ui/upgrade_ui.tscn")
 const META_UPGRADE_UI_SCENE := preload("res://scenes/ui/meta_upgrade_ui.tscn")
 const SHIP_CONTROL_PANEL_SCENE := preload("res://scenes/ui/ship_control_panel.tscn")
+const RESULT_SCREEN_SCENE := preload("res://scenes/ui/result_screen.tscn")
+const RunResultStoreScript = preload("res://scripts/ui/results/run_result_store.gd")
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 
 const VIEWPORT_SIZES := [
@@ -29,6 +31,7 @@ static func run_contract(owner: Node, failures: Array[String]) -> void:
 		await _run_upgrade_ui_check(owner, failures, effective_size)
 		await _run_meta_upgrade_check(owner, failures, effective_size)
 		await _run_ship_control_check(owner, failures, effective_size)
+		await _run_result_screen_check(owner, failures, effective_size)
 	if window != null and original_size != Vector2i.ZERO:
 		await _resize_window(owner, original_size)
 
@@ -138,6 +141,36 @@ static func _run_ship_control_check(owner: Node, failures: Array[String], viewpo
 		failures
 	)
 	ship_control.queue_free()
+	await _wait_frames(owner, 1)
+
+
+static func _run_result_screen_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	RunResultStoreScript.set_latest_result({
+		"title": "결과",
+		"outcome": "최종 보스 격침",
+		"survived_seconds": 600.0,
+		"gold": 3905,
+		"level": 32,
+		"ships_sunk": 99,
+		"ships_derelicted": 2,
+		"soldiers_killed": 526,
+		"crew_alive": 7,
+		"crew_capacity": 7,
+		"defeated_ship_rows": [
+			{"id": "kobayabune", "sunk": 43, "derelicted": 2, "defeated": 43},
+			{"id": "sekibune_cannon", "sunk": 24, "derelicted": 0, "defeated": 24},
+			{"id": "sekibune", "sunk": 23, "derelicted": 0, "defeated": 23},
+			{"id": "atakebune", "sunk": 9, "derelicted": 0, "defeated": 9},
+		],
+	})
+	var result_screen := RESULT_SCREEN_SCENE.instantiate()
+	owner.add_child(result_screen)
+	await _wait_frames(owner, 2)
+	_expect_control_within_viewport(result_screen.get_node_or_null("Content") as Control, viewport_size, failures, "result screen content")
+	_expect_control_within_viewport(result_screen.get_node_or_null("ButtonBlock") as Control, viewport_size, failures, "result screen buttons")
+	_expect_button_audio_wired(result_screen, failures, "result screen")
+	result_screen.queue_free()
+	RunResultStoreScript.clear()
 	await _wait_frames(owner, 1)
 
 

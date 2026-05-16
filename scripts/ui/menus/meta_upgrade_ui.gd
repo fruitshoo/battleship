@@ -280,7 +280,7 @@ func _on_viewport_size_changed() -> void:
 
 
 func update_ui() -> void:
-	gold_label.text = LocaleManager.t("meta.gold", "보유 골드 {gold} G", {"gold": SaveManager.gold})
+	gold_label.text = LocaleManager.t("meta.gold", "보유 포인트 {gold} P", {"gold": SaveManager.gold})
 	_ensure_valid_category()
 	_clear_children(category_list)
 	_clear_children(upgrade_list)
@@ -514,7 +514,7 @@ func _create_upgrade_row(id: String) -> Button:
 		price_label.text = "MAX"
 		price_label.add_theme_color_override("font_color", Color(0.72, 0.90, 0.52))
 	else:
-		price_label.text = "%d G" % cost
+		price_label.text = "%d P" % cost
 		price_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD if affordable else NavalUiTheme.TEXT_MUTED)
 	layout.add_child(price_label)
 
@@ -625,7 +625,7 @@ func _update_detail_panel() -> void:
 		buy_button.text = "MAX"
 		buy_button.disabled = true
 	else:
-		cost_label.text = LocaleManager.t("meta.cost", "비용 {cost} G", {"cost": cost})
+		cost_label.text = LocaleManager.t("meta.cost", "비용 {cost} P", {"cost": cost})
 		cost_label.add_theme_color_override("font_color", NavalUiTheme.TEXT_GOLD if SaveManager.gold >= cost else NavalUiTheme.TEXT_MUTED)
 		buy_button.text = LocaleManager.t("meta.buy", "구입")
 		buy_button.disabled = SaveManager.gold < cost

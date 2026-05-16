@@ -32,18 +32,19 @@ const PLAYER_FALLBACK_HULL_HP := 200.0
 const PLAYER_START_NODE_NAME := "PlayerStart"
 const PLAYER_RUNTIME_FLOATING_OFFSET := 1.35
 const PLAYER_RUNTIME_DECK_HEIGHT := 0.5
-const CORPSE_CLEANUP_CARRY_FORWARD_OFFSET := 0.08
-const CORPSE_CLEANUP_CARRY_SIDE_OFFSET := 0.08
-const CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET := 0.46
-const CORPSE_CLEANUP_PICKUP_START_POSITION_META := "corpse_cleanup_pickup_start_position"
-const CORPSE_CLEANUP_PICKUP_START_ROTATION_META := "corpse_cleanup_pickup_start_rotation"
-const CORPSE_CLEANUP_THROW_ARC_META := "corpse_cleanup_throw_arc"
-const CORPSE_CLEANUP_STOW_POSE_META := "corpse_cleanup_stow_pose"
-const CORPSE_CLEANUP_STAIR_NODE_NAME := "panok_stair"
-const CORPSE_CLEANUP_STAIR_TOP_NODE_NAME := "CrewStairTop"
-const CORPSE_CLEANUP_STAIR_BOTTOM_NODE_NAME := "CrewStairBottom"
-const CORPSE_CLEANUP_STAIR_TOP_META := "corpse_cleanup_stair_top"
-const CORPSE_CLEANUP_STAIR_BOTTOM_META := "corpse_cleanup_stair_bottom"
+const CARGO_TRANSPORT_CARRY_FORWARD_OFFSET := 0.08
+const CARGO_TRANSPORT_CARRY_SIDE_OFFSET := 0.08
+const CARGO_TRANSPORT_CARRY_HEIGHT_OFFSET := 0.46
+const CARGO_TRANSPORT_PICKUP_START_POSITION_META := "cargo_transport_pickup_start_position"
+const CARGO_TRANSPORT_PICKUP_START_ROTATION_META := "cargo_transport_pickup_start_rotation"
+const CARGO_TRANSPORT_THROW_ARC_META := "cargo_transport_throw_arc"
+const CARGO_TRANSPORT_STOW_POSE_META := "cargo_transport_stow_pose"
+const CARGO_TRANSPORT_STAIR_NODE_NAME := "panok_stair"
+const CARGO_TRANSPORT_STAIR_TOP_NODE_NAME := "CrewStairTop"
+const CARGO_TRANSPORT_STAIR_BOTTOM_NODE_NAME := "CrewStairBottom"
+const CARGO_TRANSPORT_STAIR_TOP_META := "cargo_transport_stair_top"
+const CARGO_TRANSPORT_STAIR_BOTTOM_META := "cargo_transport_stair_bottom"
+const ROOF_CARGO_TRANSPORT_ARC_META := "roof_cargo_transport_arc"
 
 # === 러더(키) 관련 ===
 
@@ -132,13 +133,13 @@ var boarding_rope_resist_stick_latch_direction: int = 0
 @export var support_fleet_respawn_interval: float = 30.0
 var support_fleet_respawn_timer: float = 0.0
 
-@export_group("Post Combat Cleanup")
-@export var corpse_cleanup_enabled: bool = true
-@export_range(0.5, 12.0, 0.25) var corpse_cleanup_delay: float = 3.0
-@export_range(0.5, 8.0, 0.25) var corpse_cleanup_interval: float = 2.25
-@export_range(0.2, 2.0, 0.05) var corpse_cleanup_throw_duration: float = 0.65
-var corpse_cleanup_timer: float = 0.0
-var corpse_cleanup_peace_timer: float = 0.0
+@export_group("Deck Cargo Transport")
+@export var cargo_transport_enabled: bool = true
+@export_range(0.5, 12.0, 0.25) var cargo_transport_delay: float = 3.0
+@export_range(0.5, 8.0, 0.25) var cargo_transport_interval: float = 2.25
+@export_range(0.2, 2.0, 0.05) var cargo_transport_throw_duration: float = 0.65
+var cargo_transport_timer: float = 0.0
+var cargo_transport_peace_timer: float = 0.0
 
 @onready var ship_audio: AudioStreamPlayer3D = $ShipAudio
 
@@ -173,14 +174,15 @@ static func _get_ships_cached(tree: SceneTree) -> Array:
 	return _cached_ships
 
 
-# === 병사 자동 보충 ===
-@export var crew_respawn_interval: float = 12.0 # 보충 주기 (초)
+# === 병사 보충 ===
+@export var auto_crew_respawn_enabled: bool = false
+@export var crew_respawn_interval: float = 12.0 # 자동 보충이 켜졌을 때의 보충 주기 (초)
 var crew_respawn_timer: float = 0.0
 
 @export_group("Crew Stair")
-@export var crew_stair_node_name: String = CORPSE_CLEANUP_STAIR_NODE_NAME
-@export var crew_stair_top_node_name: String = CORPSE_CLEANUP_STAIR_TOP_NODE_NAME
-@export var crew_stair_bottom_node_name: String = CORPSE_CLEANUP_STAIR_BOTTOM_NODE_NAME
+@export var crew_stair_node_name: String = CARGO_TRANSPORT_STAIR_NODE_NAME
+@export var crew_stair_top_node_name: String = CARGO_TRANSPORT_STAIR_TOP_NODE_NAME
+@export var crew_stair_bottom_node_name: String = CARGO_TRANSPORT_STAIR_BOTTOM_NODE_NAME
 @export var crew_stair_fallback_local_position: Vector3 = Vector3(0.0, 1.2, 2.93)
 @export var crew_stair_stand_offset: Vector3 = Vector3(0.0, 0.0, -0.65)
 @export var crew_stair_below_deck_drop: float = 1.25
@@ -270,7 +272,7 @@ func _ready() -> void:
 	
 	_cache_references()
 	if not _probe_flag_enabled("BATTLESHIP_SKIP_PLAYER_CREW_SYNC"):
-		_sync_player_crew_roster()
+		_sync_player_crew_roster(true)
 	if not has_meta("base_support_fleet_limit"):
 		set_meta("base_support_fleet_limit", support_fleet_limit)
 	if not has_meta("base_support_fleet_respawn_interval"):
@@ -396,7 +398,7 @@ func _physics_process(delta: float) -> void:
 	_update_crew_respawn(delta)
 	_update_auto_boarding_raid(delta)
 	_update_fire_pot_logic(delta)
-	_update_corpse_cleanup(delta)
+	_update_cargo_transport(delta)
 	PhysicsProfiler.end("player_support_boarding", support_profile_start)
 	
 	if is_boarding:
@@ -440,6 +442,9 @@ func _get_offscreen_ally_spawn_position() -> Vector3:
 
 ## 병사 자동 보충 로직
 func _update_crew_respawn(delta: float) -> void:
+	if not auto_crew_respawn_enabled:
+		crew_respawn_timer = 0.0
+		return
 	if is_sinking: return
 	if deck_is_contested:
 		return
@@ -486,26 +491,26 @@ func _has_nearby_enemy_pressure_for_respawn() -> bool:
 			return true
 	return false
 
-func _update_corpse_cleanup(delta: float) -> void:
-	if not corpse_cleanup_enabled:
+func _update_cargo_transport(delta: float) -> void:
+	if not cargo_transport_enabled:
 		return
-	if not _can_run_corpse_cleanup():
-		corpse_cleanup_peace_timer = 0.0
-		corpse_cleanup_timer = 0.0
-		return
-
-	corpse_cleanup_peace_timer += delta
-	if corpse_cleanup_peace_timer < corpse_cleanup_delay:
+	if not _can_run_cargo_transport():
+		cargo_transport_peace_timer = 0.0
+		cargo_transport_timer = 0.0
 		return
 
-	corpse_cleanup_timer -= delta
-	if corpse_cleanup_timer > 0.0:
+	cargo_transport_peace_timer += delta
+	if cargo_transport_peace_timer < cargo_transport_delay:
 		return
-	corpse_cleanup_timer = corpse_cleanup_interval
+
+	cargo_transport_timer -= delta
+	if cargo_transport_timer > 0.0:
+		return
+	cargo_transport_timer = cargo_transport_interval
 	_try_cleanup_enemy_corpse()
 
 
-func _can_run_corpse_cleanup() -> bool:
+func _can_run_cargo_transport() -> bool:
 	if is_sinking or is_dying or is_derelict:
 		return false
 	if deck_is_contested or deck_is_overrun:
@@ -521,20 +526,23 @@ func _try_cleanup_enemy_corpse() -> void:
 	var corpse: Node3D = _find_cleanup_corpse()
 	if not is_instance_valid(corpse):
 		return
-	var cleaner: Node3D = _find_corpse_cleanup_actor(corpse)
+	var corpse_team: String = corpse.get_team_tag() if corpse.has_method("get_team_tag") else str(corpse.get("team"))
+	if corpse_team != "player" and _is_roof_corpse(corpse):
+		_throw_roof_payload_overboard(corpse)
+		return
+	var cleaner: Node3D = _find_cargo_transport_actor(corpse)
 	if not is_instance_valid(cleaner):
 		return
-	if not SoldierShipWorkPriorityHelper.reserve_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP, corpse_cleanup_throw_duration + 4.0):
+	if not SoldierShipWorkPriorityHelper.reserve_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT, cargo_transport_throw_duration + 4.0):
 		return
 
-	corpse.set_meta("corpse_cleanup_in_progress", true)
-	_set_corpse_cleanup_actor_action(cleaner, SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH)
-	_prepare_cleaner_for_corpse_cleanup(cleaner, corpse)
-	var corpse_team: String = corpse.get_team_tag() if corpse.has_method("get_team_tag") else str(corpse.get("team"))
+	corpse.set_meta("cargo_transport_in_progress", true)
+	_set_cargo_transport_actor_action(cleaner, SoldierActionHelper.ACTION_CARGO_TRANSPORT_APPROACH)
+	_prepare_cleaner_for_cargo_transport(cleaner, corpse)
 	if corpse_team == "player":
 		_stow_friendly_corpse_below_deck(cleaner, corpse)
 	else:
-		_throw_corpse_overboard(cleaner, corpse)
+		_throw_payload_overboard(cleaner, corpse)
 
 
 func _find_cleanup_corpse() -> Node3D:
@@ -548,13 +556,17 @@ func _find_cleanup_enemy_corpse() -> Node3D:
 	return _find_cleanup_corpse_by_team("enemy")
 
 
+func _is_roof_corpse(corpse: Node3D) -> bool:
+	return SoldierDeckZoneHelper.is_roof(corpse)
+
+
 func _find_cleanup_corpse_by_team(target_team: String) -> Node3D:
 	for soldier in EntityRegistry.get_soldiers_by_ship(self):
 		if not is_instance_valid(soldier) or not (soldier is Node3D):
 			continue
-		if soldier.get_meta("corpse_cleanup_in_progress", false) == true:
+		if soldier.get_meta("cargo_transport_in_progress", false) == true:
 			continue
-		if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(soldier, null, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP):
+		if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(soldier, null, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT):
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != target_team:
@@ -567,18 +579,18 @@ func _find_cleanup_corpse_by_team(target_team: String) -> Node3D:
 	return null
 
 
-func _find_corpse_cleanup_actor(corpse: Node3D) -> Node3D:
+func _find_cargo_transport_actor(corpse: Node3D) -> Node3D:
 	var best: Node3D = null
 	var best_distance_sq: float = INF
 	for soldier in EntityRegistry.get_soldiers_by_ship(self):
 		if not is_instance_valid(soldier) or not (soldier is Node3D):
 			continue
-		if _is_corpse_cleanup_actor_busy(soldier):
+		if _is_cargo_transport_actor_busy(soldier):
 			continue
 		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
 		if soldier_team != "player":
 			continue
-		if not SoldierShipWorkPriorityHelper.can_accept_immediate_work(soldier, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP):
+		if not SoldierShipWorkPriorityHelper.can_accept_immediate_work(soldier, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT):
 			continue
 		if PlayerSoldierStateHelper.is_dead_soldier(soldier):
 			continue
@@ -590,11 +602,11 @@ func _find_corpse_cleanup_actor(corpse: Node3D) -> Node3D:
 	return best
 
 
-func _prepare_cleaner_for_corpse_cleanup(cleaner: Node3D, corpse: Node3D) -> void:
+func _prepare_cleaner_for_cargo_transport(cleaner: Node3D, corpse: Node3D) -> void:
 	if "current_target" in cleaner:
 		cleaner.set("current_target", null)
 	if "attack_timer" in cleaner:
-		cleaner.set("attack_timer", maxf(float(cleaner.get("attack_timer")), corpse_cleanup_throw_duration + 2.0))
+		cleaner.set("attack_timer", maxf(float(cleaner.get("attack_timer")), cargo_transport_throw_duration + 2.0))
 	if "velocity" in cleaner:
 		cleaner.set("velocity", Vector3.ZERO)
 	if cleaner.has_method("_change_state"):
@@ -604,7 +616,7 @@ func _prepare_cleaner_for_corpse_cleanup(cleaner: Node3D, corpse: Node3D) -> voi
 		cleaner.look_at(look_target, Vector3.UP)
 
 
-func _is_corpse_cleanup_actor_busy(soldier) -> bool:
+func _is_cargo_transport_actor_busy(soldier) -> bool:
 	if not is_instance_valid(soldier):
 		return true
 	if soldier.has_method("has_named_action"):
@@ -612,66 +624,83 @@ func _is_corpse_cleanup_actor_busy(soldier) -> bool:
 	return SoldierActionHelper.has_action(soldier)
 
 
-func _set_corpse_cleanup_actor_action(cleaner: Node3D, action_name: String) -> void:
+func _set_cargo_transport_actor_action(cleaner: Node3D, action_name: String) -> void:
 	if not is_instance_valid(cleaner):
 		return
-	if cleaner.has_method("begin_corpse_cleanup_action"):
-		cleaner.call("begin_corpse_cleanup_action", action_name)
+	if cleaner.has_method("begin_cargo_transport_action"):
+		cleaner.call("begin_cargo_transport_action", action_name)
 	else:
-		SoldierActionHelper.begin_corpse_cleanup_action(cleaner, action_name)
+		SoldierActionHelper.begin_cargo_transport_action(cleaner, action_name)
 
 
-func _throw_corpse_overboard(cleaner: Node3D, corpse: Node3D) -> void:
-	var throw_target: Vector3 = _get_corpse_cleanup_throw_target(corpse)
-	var pickup_point: Vector3 = _get_corpse_cleanup_pickup_point(cleaner, corpse)
-	var rail_stand_point: Vector3 = _get_corpse_cleanup_rail_stand_point(cleaner, corpse, throw_target)
+func _throw_payload_overboard(cleaner: Node3D, corpse: Node3D) -> void:
+	var throw_target: Vector3 = _get_cargo_transport_throw_target(corpse)
+	var pickup_point: Vector3 = _get_cargo_transport_pickup_point(cleaner, corpse)
+	var rail_stand_point: Vector3 = _get_cargo_transport_rail_stand_point(cleaner, corpse, throw_target)
 	var corpse_id: int = corpse.get_instance_id()
 	var cleaner_id: int = cleaner.get_instance_id()
-	var pickup_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, pickup_point)
-	var rail_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, rail_stand_point)
-	var pickup_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, pickup_point, throw_target)
-	var rail_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, rail_stand_point, throw_target)
-	var approach_seconds: float = _get_corpse_cleanup_walk_seconds(cleaner.global_position, pickup_point, cleaner)
+	var pickup_actor_position: Vector3 = _get_cargo_transport_actor_local_target(cleaner, pickup_point)
+	var rail_actor_position: Vector3 = _get_cargo_transport_actor_local_target(cleaner, rail_stand_point)
+	var pickup_carry_rotation: Vector3 = _get_cargo_transport_carry_rotation(corpse, pickup_point, throw_target)
+	var rail_carry_rotation: Vector3 = _get_cargo_transport_carry_rotation(corpse, rail_stand_point, throw_target)
+	var approach_seconds: float = _get_cargo_transport_walk_seconds(cleaner.global_position, pickup_point, cleaner)
 	var pickup_seconds: float = 0.22
-	var carry_seconds: float = _get_corpse_cleanup_walk_seconds(pickup_point, rail_stand_point, cleaner)
+	var carry_seconds: float = _get_cargo_transport_walk_seconds(pickup_point, rail_stand_point, cleaner)
 	var windup_seconds: float = 0.14
-	var throw_seconds: float = maxf(0.25, corpse_cleanup_throw_duration * randf_range(1.05, 1.18))
+	var throw_seconds: float = maxf(0.25, cargo_transport_throw_duration * randf_range(1.05, 1.18))
 
-	_face_corpse_cleanup_actor(cleaner, pickup_point)
+	_face_cargo_transport_actor(cleaner, pickup_point)
 
 	var tween := create_tween()
 	tween.tween_property(cleaner, "position", pickup_actor_position, approach_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_corpse_by_id").bind(cleaner_id, corpse_id))
-	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY))
-	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_pickup_pose_by_id").bind(corpse_id))
-	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_face_cargo_transport_corpse_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_set_cargo_transport_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY))
+	tween.tween_callback(Callable(self, "_capture_cargo_transport_pickup_pose_by_id").bind(corpse_id))
+	tween.tween_callback(Callable(self, "_begin_cargo_transport_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_payload_pickup").bind(corpse_id, cleaner_id, pickup_carry_rotation),
+		Callable(self, "_apply_cargo_transport_payload_pickup").bind(corpse_id, cleaner_id, pickup_carry_rotation),
 		0.0,
 		1.0,
 		pickup_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, rail_stand_point))
-	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_face_cargo_transport_actor_by_id").bind(cleaner_id, rail_stand_point))
+	tween.tween_callback(Callable(self, "_begin_cargo_transport_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_property(cleaner, "position", rail_actor_position, carry_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.parallel().tween_method(
-		Callable(self, "_apply_corpse_cleanup_payload_follow").bind(corpse_id, cleaner_id, pickup_carry_rotation, rail_carry_rotation),
+		Callable(self, "_apply_cargo_transport_payload_follow").bind(corpse_id, cleaner_id, pickup_carry_rotation, rail_carry_rotation),
 		0.0,
 		1.0,
 		carry_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_throw_target_by_id").bind(cleaner_id, corpse_id))
-	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_THROW))
-	tween.tween_callback(Callable(self, "_finish_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_face_cargo_transport_throw_target_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_set_cargo_transport_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CARGO_TRANSPORT_THROW))
+	tween.tween_callback(Callable(self, "_finish_cargo_transport_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_interval(windup_seconds)
-	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_throw_arc_by_id").bind(corpse_id, cleaner_id))
+	tween.tween_callback(Callable(self, "_capture_cargo_transport_throw_arc_by_id").bind(corpse_id, cleaner_id))
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_throw_arc").bind(corpse_id, cleaner_id),
+		Callable(self, "_apply_cargo_transport_throw_arc").bind(corpse_id, cleaner_id),
 		0.0,
 		1.0,
 		throw_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.finished.connect(_finish_corpse_cleanup_throw.bind(corpse_id, cleaner_id))
+	tween.finished.connect(_finish_cargo_transport_throw.bind(corpse_id, cleaner_id))
+
+
+func _throw_roof_payload_overboard(corpse: Node3D) -> void:
+	if not is_instance_valid(corpse):
+		return
+	corpse.set_meta("cargo_transport_in_progress", true)
+	var corpse_id: int = corpse.get_instance_id()
+	_capture_roof_cargo_transport_throw_arc(corpse)
+	var throw_seconds: float = maxf(0.28, cargo_transport_throw_duration * randf_range(0.95, 1.12))
+	var tween := create_tween()
+	tween.tween_method(
+		Callable(self, "_apply_roof_cargo_transport_throw_arc").bind(corpse_id),
+		0.0,
+		1.0,
+		throw_seconds
+	).set_trans(Tween.TRANS_LINEAR)
+	tween.finished.connect(_finish_roof_cargo_transport_throw.bind(corpse_id))
 
 
 func _stow_friendly_corpse_below_deck(cleaner: Node3D, corpse: Node3D) -> void:
@@ -680,64 +709,64 @@ func _stow_friendly_corpse_below_deck(cleaner: Node3D, corpse: Node3D) -> void:
 	var stair_bottom: Vector3 = stair_path.get("bottom", stair_top + Vector3.DOWN * maxf(0.1, crew_stair_below_deck_drop))
 	var stair_top_local: Vector3 = stair_path.get("top_local", to_local(stair_top))
 	var stair_bottom_local: Vector3 = stair_path.get("bottom_local", to_local(stair_bottom))
-	var stair_stand_point: Vector3 = _get_corpse_cleanup_stair_stand_point(cleaner)
-	var pickup_point: Vector3 = _get_corpse_cleanup_pickup_point(cleaner, corpse)
+	var stair_stand_point: Vector3 = _get_cargo_transport_stair_stand_point(cleaner)
+	var pickup_point: Vector3 = _get_cargo_transport_pickup_point(cleaner, corpse)
 	var corpse_id: int = corpse.get_instance_id()
 	var cleaner_id: int = cleaner.get_instance_id()
-	var pickup_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, pickup_point)
-	var stair_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, stair_stand_point)
-	var below_deck_actor_position: Vector3 = _get_corpse_cleanup_actor_local_target(cleaner, stair_bottom, true)
-	var pickup_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, pickup_point, stair_top)
-	var stair_carry_rotation: Vector3 = _get_corpse_cleanup_carry_rotation(corpse, stair_stand_point, stair_bottom)
-	var approach_seconds: float = _get_corpse_cleanup_walk_seconds(cleaner.global_position, pickup_point, cleaner)
+	var pickup_actor_position: Vector3 = _get_cargo_transport_actor_local_target(cleaner, pickup_point)
+	var stair_actor_position: Vector3 = _get_cargo_transport_actor_local_target(cleaner, stair_stand_point)
+	var below_deck_actor_position: Vector3 = _get_cargo_transport_actor_local_target(cleaner, stair_bottom, true)
+	var pickup_carry_rotation: Vector3 = _get_cargo_transport_carry_rotation(corpse, pickup_point, stair_top)
+	var stair_carry_rotation: Vector3 = _get_cargo_transport_carry_rotation(corpse, stair_stand_point, stair_bottom)
+	var approach_seconds: float = _get_cargo_transport_walk_seconds(cleaner.global_position, pickup_point, cleaner)
 	var pickup_seconds: float = 0.22
-	var carry_seconds: float = _get_corpse_cleanup_walk_seconds(pickup_point, stair_stand_point, cleaner)
+	var carry_seconds: float = _get_cargo_transport_walk_seconds(pickup_point, stair_stand_point, cleaner)
 
-	_face_corpse_cleanup_actor(cleaner, pickup_point)
+	_face_cargo_transport_actor(cleaner, pickup_point)
 
 	var tween := create_tween()
 	tween.tween_property(cleaner, "position", pickup_actor_position, approach_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_corpse_by_id").bind(cleaner_id, corpse_id))
-	tween.tween_callback(Callable(self, "_set_corpse_cleanup_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY))
-	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_pickup_pose_by_id").bind(corpse_id))
-	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_face_cargo_transport_corpse_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_set_cargo_transport_action_by_id").bind(cleaner_id, SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY))
+	tween.tween_callback(Callable(self, "_capture_cargo_transport_pickup_pose_by_id").bind(corpse_id))
+	tween.tween_callback(Callable(self, "_begin_cargo_transport_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_payload_pickup").bind(corpse_id, cleaner_id, pickup_carry_rotation),
+		Callable(self, "_apply_cargo_transport_payload_pickup").bind(corpse_id, cleaner_id, pickup_carry_rotation),
 		0.0,
 		1.0,
 		pickup_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, stair_top))
-	tween.tween_callback(Callable(self, "_begin_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_face_cargo_transport_actor_by_id").bind(cleaner_id, stair_top))
+	tween.tween_callback(Callable(self, "_begin_cargo_transport_carry_payload_by_id").bind(cleaner_id, corpse_id))
 	tween.tween_property(cleaner, "position", stair_actor_position, carry_seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.parallel().tween_method(
-		Callable(self, "_apply_corpse_cleanup_payload_follow").bind(corpse_id, cleaner_id, pickup_carry_rotation, stair_carry_rotation),
+		Callable(self, "_apply_cargo_transport_payload_follow").bind(corpse_id, cleaner_id, pickup_carry_rotation, stair_carry_rotation),
 		0.0,
 		1.0,
 		carry_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.tween_callback(Callable(self, "_store_corpse_cleanup_stair_path_by_id").bind(corpse_id, stair_top_local, stair_bottom_local))
-	tween.tween_callback(Callable(self, "_face_corpse_cleanup_actor_by_id").bind(cleaner_id, stair_bottom))
+	tween.tween_callback(Callable(self, "_store_cargo_transport_stair_path_by_id").bind(corpse_id, stair_top_local, stair_bottom_local))
+	tween.tween_callback(Callable(self, "_face_cargo_transport_actor_by_id").bind(cleaner_id, stair_bottom))
 	tween.tween_property(cleaner, "position", below_deck_actor_position, maxf(0.08, crew_stair_descend_duration)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_method(
-		Callable(self, "_apply_corpse_cleanup_payload_follow").bind(corpse_id, cleaner_id, stair_carry_rotation, stair_carry_rotation),
+		Callable(self, "_apply_cargo_transport_payload_follow").bind(corpse_id, cleaner_id, stair_carry_rotation, stair_carry_rotation),
 		0.0,
 		1.0,
 		maxf(0.08, crew_stair_descend_duration)
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.tween_callback(Callable(self, "_finish_corpse_cleanup_carry_payload_by_id").bind(cleaner_id, corpse_id))
-	tween.tween_callback(Callable(self, "_capture_corpse_cleanup_stow_pose_by_id").bind(corpse_id))
+	tween.tween_callback(Callable(self, "_finish_cargo_transport_carry_payload_by_id").bind(cleaner_id, corpse_id))
+	tween.tween_callback(Callable(self, "_capture_cargo_transport_stow_pose_by_id").bind(corpse_id))
 	tween.tween_method(
-		Callable(self, "_apply_corpse_cleanup_stow_below_deck").bind(corpse_id),
+		Callable(self, "_apply_cargo_transport_stow_below_deck").bind(corpse_id),
 		0.0,
 		1.0,
 		maxf(0.12, crew_stair_stow_duration)
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_property(cleaner, "position", stair_actor_position, maxf(0.08, crew_stair_return_duration)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.finished.connect(_finish_friendly_corpse_cleanup_stow.bind(corpse_id, cleaner_id))
+	tween.finished.connect(_finish_friendly_cargo_transport_stow.bind(corpse_id, cleaner_id))
 
 
-func _get_corpse_cleanup_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector3:
+func _get_cargo_transport_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector3:
 	var corpse_local: Vector3 = to_local(corpse.global_position)
 	var cleaner_local: Vector3 = to_local(cleaner.global_position)
 	var approach_dir: Vector3 = cleaner_local - corpse_local
@@ -746,22 +775,22 @@ func _get_corpse_cleanup_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector
 		approach_dir = Vector3(-1.0 if corpse_local.x >= 0.0 else 1.0, 0.0, 0.0)
 	approach_dir = approach_dir.normalized()
 	var local_point: Vector3 = corpse_local + approach_dir * 0.72
-	local_point = _clamp_corpse_cleanup_deck_local(local_point, 0.38)
+	local_point = _clamp_cargo_transport_deck_local(local_point, 0.38)
 	var global_point: Vector3 = to_global(local_point)
 	global_point.y = cleaner.global_position.y
 	return global_point
 
 
-func _get_corpse_cleanup_stair_stand_point(cleaner: Node3D) -> Vector3:
+func _get_cargo_transport_stair_stand_point(cleaner: Node3D) -> Vector3:
 	var stair_path: Dictionary = get_crew_stair_descent_points()
 	var stair_local: Vector3 = stair_path.get("top_local", to_local(get_crew_stair_global_position()))
-	stair_local = _clamp_corpse_cleanup_deck_local(stair_local, 0.38)
+	stair_local = _clamp_cargo_transport_deck_local(stair_local, 0.38)
 	var global_point: Vector3 = to_global(stair_local)
 	global_point.y = cleaner.global_position.y
 	return global_point
 
 
-func _get_corpse_cleanup_rail_stand_point(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
+func _get_cargo_transport_rail_stand_point(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
 	var local_pos: Vector3 = to_local(corpse.global_position)
 	var local_throw: Vector3 = to_local(throw_target)
 	var side_sign: float = 1.0 if local_throw.x >= 0.0 else -1.0
@@ -774,7 +803,7 @@ func _get_corpse_cleanup_rail_stand_point(cleaner: Node3D, corpse: Node3D, throw
 	return global_point
 
 
-func _get_corpse_cleanup_actor_local_target(cleaner: Node3D, global_target: Vector3, preserve_target_y: bool = false) -> Vector3:
+func _get_cargo_transport_actor_local_target(cleaner: Node3D, global_target: Vector3, preserve_target_y: bool = false) -> Vector3:
 	var parent_3d := cleaner.get_parent() as Node3D
 	if not is_instance_valid(parent_3d):
 		return global_target
@@ -784,7 +813,7 @@ func _get_corpse_cleanup_actor_local_target(cleaner: Node3D, global_target: Vect
 	return local_target
 
 
-func _get_corpse_cleanup_carry_rotation(corpse: Node3D, actor_position: Vector3, throw_target: Vector3) -> Vector3:
+func _get_cargo_transport_carry_rotation(corpse: Node3D, actor_position: Vector3, throw_target: Vector3) -> Vector3:
 	var to_rail: Vector3 = throw_target - actor_position
 	to_rail.y = 0.0
 	if to_rail.length_squared() <= 0.001:
@@ -795,14 +824,14 @@ func _get_corpse_cleanup_carry_rotation(corpse: Node3D, actor_position: Vector3,
 	return Vector3(deg_to_rad(8.0), yaw, side_roll)
 
 
-func _get_corpse_cleanup_walk_seconds(from_position: Vector3, to_position: Vector3, cleaner: Node3D) -> float:
+func _get_cargo_transport_walk_seconds(from_position: Vector3, to_position: Vector3, cleaner: Node3D) -> float:
 	var planar_delta: Vector3 = to_position - from_position
 	planar_delta.y = 0.0
 	var move_speed_value: float = float(cleaner.get("move_speed")) if cleaner.get("move_speed") != null else 3.0
 	return clampf(planar_delta.length() / maxf(move_speed_value * 1.05, 0.1), 0.18, 1.45)
 
 
-func _clamp_corpse_cleanup_deck_local(local_point: Vector3, inset: float) -> Vector3:
+func _clamp_cargo_transport_deck_local(local_point: Vector3, inset: float) -> Vector3:
 	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
 	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
 	local_point.x = clampf(local_point.x, -deck_half_width + inset, deck_half_width - inset)
@@ -810,7 +839,7 @@ func _clamp_corpse_cleanup_deck_local(local_point: Vector3, inset: float) -> Vec
 	return local_point
 
 
-func _face_corpse_cleanup_actor(cleaner: Node3D, look_position: Vector3) -> void:
+func _face_cargo_transport_actor(cleaner: Node3D, look_position: Vector3) -> void:
 	if not is_instance_valid(cleaner):
 		return
 	var look_target := Vector3(look_position.x, cleaner.global_position.y, look_position.z)
@@ -818,50 +847,50 @@ func _face_corpse_cleanup_actor(cleaner: Node3D, look_position: Vector3) -> void
 		cleaner.look_at(look_target, Vector3.UP)
 
 
-func _face_corpse_cleanup_actor_by_id(cleaner_id: int, look_position: Vector3) -> void:
+func _face_cargo_transport_actor_by_id(cleaner_id: int, look_position: Vector3) -> void:
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	if is_instance_valid(cleaner):
-		_face_corpse_cleanup_actor(cleaner, look_position)
+		_face_cargo_transport_actor(cleaner, look_position)
 
 
-func _face_corpse_cleanup_corpse_by_id(cleaner_id: int, corpse_id: int) -> void:
+func _face_cargo_transport_corpse_by_id(cleaner_id: int, corpse_id: int) -> void:
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
 	if is_instance_valid(cleaner) and is_instance_valid(corpse):
-		_face_corpse_cleanup_actor(cleaner, corpse.global_position)
+		_face_cargo_transport_actor(cleaner, corpse.global_position)
 
 
-func _face_corpse_cleanup_throw_target_by_id(cleaner_id: int, corpse_id: int) -> void:
+func _face_cargo_transport_throw_target_by_id(cleaner_id: int, corpse_id: int) -> void:
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
 	if is_instance_valid(cleaner) and is_instance_valid(corpse):
-		_face_corpse_cleanup_actor(cleaner, _get_corpse_cleanup_throw_target(corpse))
+		_face_cargo_transport_actor(cleaner, _get_cargo_transport_throw_target(corpse))
 
 
-func _set_corpse_cleanup_action_by_id(cleaner_id: int, action_name: String) -> void:
+func _set_cargo_transport_action_by_id(cleaner_id: int, action_name: String) -> void:
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	if is_instance_valid(cleaner):
-		_set_corpse_cleanup_actor_action(cleaner, action_name)
+		_set_cargo_transport_actor_action(cleaner, action_name)
 
 
-func _begin_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
+func _begin_cargo_transport_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
 	if is_instance_valid(cleaner) and is_instance_valid(corpse):
-		_begin_corpse_cleanup_carry_payload(cleaner, corpse)
+		_begin_cargo_transport_carry_payload(cleaner, corpse)
 
 
-func _capture_corpse_cleanup_pickup_pose_by_id(corpse_id: int) -> void:
+func _capture_cargo_transport_pickup_pose_by_id(corpse_id: int) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	if not is_instance_valid(corpse_node):
 		return
-	corpse_node.set_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META, corpse_node.global_position)
-	corpse_node.set_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META, corpse_node.rotation)
+	corpse_node.set_meta(CARGO_TRANSPORT_PICKUP_START_POSITION_META, corpse_node.global_position)
+	corpse_node.set_meta(CARGO_TRANSPORT_PICKUP_START_ROTATION_META, corpse_node.rotation)
 
 
-func _begin_corpse_cleanup_carry_payload(cleaner: Node3D, corpse: Node3D) -> void:
+func _begin_cargo_transport_carry_payload(cleaner: Node3D, corpse: Node3D) -> void:
 	var side_sign := 1.0 if to_local(cleaner.global_position).x >= 0.0 else -1.0
-	var offset_overrides := _get_corpse_cleanup_carry_payload_offsets()
+	var offset_overrides := _get_cargo_transport_carry_payload_offsets()
 	if cleaner.has_method("begin_typed_carry_payload"):
 		cleaner.call(
 			"begin_typed_carry_payload",
@@ -880,15 +909,15 @@ func _begin_corpse_cleanup_carry_payload(cleaner: Node3D, corpse: Node3D) -> voi
 		)
 
 
-func _get_corpse_cleanup_carry_payload_offsets() -> Dictionary:
+func _get_cargo_transport_carry_payload_offsets() -> Dictionary:
 	return {
-		SoldierActionHelper.PAYLOAD_DEF_FORWARD_OFFSET: CORPSE_CLEANUP_CARRY_FORWARD_OFFSET,
-		SoldierActionHelper.PAYLOAD_DEF_SIDE_OFFSET: CORPSE_CLEANUP_CARRY_SIDE_OFFSET,
-		SoldierActionHelper.PAYLOAD_DEF_HEIGHT_OFFSET: CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET,
+		SoldierActionHelper.PAYLOAD_DEF_FORWARD_OFFSET: CARGO_TRANSPORT_CARRY_FORWARD_OFFSET,
+		SoldierActionHelper.PAYLOAD_DEF_SIDE_OFFSET: CARGO_TRANSPORT_CARRY_SIDE_OFFSET,
+		SoldierActionHelper.PAYLOAD_DEF_HEIGHT_OFFSET: CARGO_TRANSPORT_CARRY_HEIGHT_OFFSET,
 	}
 
 
-func _finish_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
+func _finish_cargo_transport_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
 	if is_instance_valid(cleaner):
@@ -898,11 +927,11 @@ func _finish_corpse_cleanup_carry_payload_by_id(cleaner_id: int, corpse_id: int)
 			SoldierActionHelper.finish_carry_payload(cleaner, corpse)
 
 
-func _get_corpse_cleanup_throw_origin(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
-	return _get_corpse_cleanup_throw_origin_from_actor_position(cleaner.global_position, corpse, throw_target)
+func _get_cargo_transport_throw_origin(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
+	return _get_cargo_transport_throw_origin_from_actor_position(cleaner.global_position, corpse, throw_target)
 
 
-func _get_corpse_cleanup_throw_origin_from_actor_position(actor_position: Vector3, corpse: Node3D, throw_target: Vector3) -> Vector3:
+func _get_cargo_transport_throw_origin_from_actor_position(actor_position: Vector3, corpse: Node3D, throw_target: Vector3) -> Vector3:
 	var to_rail: Vector3 = throw_target - actor_position
 	to_rail.y = 0.0
 	if to_rail.length_squared() <= 0.001:
@@ -916,22 +945,22 @@ func _get_corpse_cleanup_throw_origin_from_actor_position(actor_position: Vector
 	return origin
 
 
-func _apply_corpse_cleanup_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, target_rotation: Vector3) -> void:
+func _apply_cargo_transport_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, target_rotation: Vector3) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	if not is_instance_valid(corpse_node) or not is_instance_valid(cleaner):
 		return
-	var start_position: Vector3 = corpse_node.get_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META, corpse_node.global_position)
-	var start_rotation: Vector3 = corpse_node.get_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META, corpse_node.rotation)
+	var start_position: Vector3 = corpse_node.get_meta(CARGO_TRANSPORT_PICKUP_START_POSITION_META, corpse_node.global_position)
+	var start_rotation: Vector3 = corpse_node.get_meta(CARGO_TRANSPORT_PICKUP_START_ROTATION_META, corpse_node.rotation)
 	SoldierActionHelper.apply_carry_payload_pickup(cleaner, corpse_node, progress, start_position, start_rotation, target_rotation)
 	if progress >= 1.0:
-		if corpse_node.has_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META):
-			corpse_node.remove_meta(CORPSE_CLEANUP_PICKUP_START_POSITION_META)
-		if corpse_node.has_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META):
-			corpse_node.remove_meta(CORPSE_CLEANUP_PICKUP_START_ROTATION_META)
+		if corpse_node.has_meta(CARGO_TRANSPORT_PICKUP_START_POSITION_META):
+			corpse_node.remove_meta(CARGO_TRANSPORT_PICKUP_START_POSITION_META)
+		if corpse_node.has_meta(CARGO_TRANSPORT_PICKUP_START_ROTATION_META):
+			corpse_node.remove_meta(CARGO_TRANSPORT_PICKUP_START_ROTATION_META)
 
 
-func _apply_corpse_cleanup_payload_follow(progress: float, corpse_id: int, cleaner_id: int, start_rotation: Vector3, target_rotation: Vector3) -> void:
+func _apply_cargo_transport_payload_follow(progress: float, corpse_id: int, cleaner_id: int, start_rotation: Vector3, target_rotation: Vector3) -> void:
 	var corpse := NodeContractHelper.get_instance_node3d(corpse_id)
 	var cleaner := NodeContractHelper.get_instance_node3d(cleaner_id)
 	if not is_instance_valid(corpse) or not is_instance_valid(cleaner):
@@ -939,17 +968,17 @@ func _apply_corpse_cleanup_payload_follow(progress: float, corpse_id: int, clean
 	SoldierActionHelper.apply_carry_payload_follow(cleaner, corpse, progress, start_rotation, target_rotation)
 
 
-func _capture_corpse_cleanup_throw_arc_by_id(corpse_id: int, cleaner_id: int) -> void:
+func _capture_cargo_transport_throw_arc_by_id(corpse_id: int, cleaner_id: int) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	var cleaner_node := NodeContractHelper.get_instance_node3d(cleaner_id)
 	if not is_instance_valid(corpse_node) or not is_instance_valid(cleaner_node):
 		return
-	var throw_target: Vector3 = _get_corpse_cleanup_throw_target(corpse_node)
-	var throw_origin: Vector3 = _get_corpse_cleanup_throw_origin(cleaner_node, corpse_node, throw_target)
+	var throw_target: Vector3 = _get_cargo_transport_throw_target(corpse_node)
+	var throw_origin: Vector3 = _get_cargo_transport_throw_origin(cleaner_node, corpse_node, throw_target)
 	var start_position: Vector3 = corpse_node.global_position
 	var arc_control: Vector3 = throw_origin.lerp(throw_target, 0.52)
 	arc_control.y = maxf(maxf(start_position.y, throw_origin.y), throw_target.y) + randf_range(1.85, 2.45)
-	corpse_node.set_meta(CORPSE_CLEANUP_THROW_ARC_META, {
+	corpse_node.set_meta(CARGO_TRANSPORT_THROW_ARC_META, {
 		"start_position": start_position,
 		"arc_control": arc_control,
 		"throw_target": throw_target,
@@ -958,13 +987,13 @@ func _capture_corpse_cleanup_throw_arc_by_id(corpse_id: int, cleaner_id: int) ->
 	})
 
 
-func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, cleaner_id: int) -> void:
+func _apply_cargo_transport_throw_arc(progress: float, corpse_id: int, cleaner_id: int) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	if not is_instance_valid(corpse_node):
 		return
-	if not corpse_node.has_meta(CORPSE_CLEANUP_THROW_ARC_META):
-		_capture_corpse_cleanup_throw_arc_by_id(corpse_id, cleaner_id)
-	var arc_data: Dictionary = corpse_node.get_meta(CORPSE_CLEANUP_THROW_ARC_META, {})
+	if not corpse_node.has_meta(CARGO_TRANSPORT_THROW_ARC_META):
+		_capture_cargo_transport_throw_arc_by_id(corpse_id, cleaner_id)
+	var arc_data: Dictionary = corpse_node.get_meta(CARGO_TRANSPORT_THROW_ARC_META, {})
 	if arc_data.is_empty():
 		return
 	var start_position: Vector3 = arc_data.get("start_position", corpse_node.global_position)
@@ -983,34 +1012,80 @@ func _apply_corpse_cleanup_throw_arc(progress: float, corpse_id: int, cleaner_id
 		lerp_angle(start_rotation.y, spin_rotation.y, eased_t),
 		lerp_angle(start_rotation.z, spin_rotation.z, eased_t)
 	)
-	if progress >= 1.0 and corpse_node.has_meta(CORPSE_CLEANUP_THROW_ARC_META):
-		corpse_node.remove_meta(CORPSE_CLEANUP_THROW_ARC_META)
+	if progress >= 1.0 and corpse_node.has_meta(CARGO_TRANSPORT_THROW_ARC_META):
+		corpse_node.remove_meta(CARGO_TRANSPORT_THROW_ARC_META)
 
 
-func _capture_corpse_cleanup_stow_pose_by_id(corpse_id: int) -> void:
+func _capture_roof_cargo_transport_throw_arc(corpse: Node3D) -> void:
+	if not is_instance_valid(corpse):
+		return
+	var start_position: Vector3 = corpse.global_position
+	var throw_target: Vector3 = _get_roof_cargo_transport_throw_target(corpse)
+	var arc_control: Vector3 = start_position.lerp(throw_target, 0.48)
+	arc_control.y = maxf(start_position.y, throw_target.y) + randf_range(1.45, 2.05)
+	corpse.set_meta(ROOF_CARGO_TRANSPORT_ARC_META, {
+		"start_position": start_position,
+		"arc_control": arc_control,
+		"throw_target": throw_target,
+		"start_rotation": corpse.rotation,
+		"spin_rotation": corpse.rotation + Vector3(randf_range(1.6, 2.7), randf_range(-0.9, 0.9), randf_range(-1.6, 1.6)),
+	})
+
+
+func _apply_roof_cargo_transport_throw_arc(progress: float, corpse_id: int) -> void:
+	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
+	if not is_instance_valid(corpse_node):
+		return
+	var arc_data: Dictionary = corpse_node.get_meta(ROOF_CARGO_TRANSPORT_ARC_META, {})
+	if arc_data.is_empty():
+		_capture_roof_cargo_transport_throw_arc(corpse_node)
+		arc_data = corpse_node.get_meta(ROOF_CARGO_TRANSPORT_ARC_META, {})
+	if arc_data.is_empty():
+		return
+	var start_position: Vector3 = arc_data.get("start_position", corpse_node.global_position)
+	var arc_control: Vector3 = arc_data.get("arc_control", start_position)
+	var throw_target: Vector3 = arc_data.get("throw_target", start_position)
+	var start_rotation: Vector3 = arc_data.get("start_rotation", corpse_node.rotation)
+	var spin_rotation: Vector3 = arc_data.get("spin_rotation", start_rotation)
+	var t: float = clampf(progress, 0.0, 1.0)
+	var eased_t: float = smoothstep(0.0, 1.0, t)
+	var arc_pos: Vector3 = start_position * ((1.0 - t) * (1.0 - t)) \
+		+ arc_control * (2.0 * (1.0 - t) * t) \
+		+ throw_target * (t * t)
+	corpse_node.global_position = arc_pos
+	corpse_node.rotation = Vector3(
+		lerp_angle(start_rotation.x, spin_rotation.x, eased_t),
+		lerp_angle(start_rotation.y, spin_rotation.y, eased_t),
+		lerp_angle(start_rotation.z, spin_rotation.z, eased_t)
+	)
+	if progress >= 1.0 and corpse_node.has_meta(ROOF_CARGO_TRANSPORT_ARC_META):
+		corpse_node.remove_meta(ROOF_CARGO_TRANSPORT_ARC_META)
+
+
+func _capture_cargo_transport_stow_pose_by_id(corpse_id: int) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	if not is_instance_valid(corpse_node):
 		return
 	var fallback_bottom_local := to_local(get_crew_stair_global_position()) + crew_stair_fallback_descent_local_offset
 	var stair_bottom_local: Vector3 = corpse_node.get_meta(
-		CORPSE_CLEANUP_STAIR_BOTTOM_META,
+		CARGO_TRANSPORT_STAIR_BOTTOM_META,
 		fallback_bottom_local
 	)
-	corpse_node.set_meta(CORPSE_CLEANUP_STOW_POSE_META, {
+	corpse_node.set_meta(CARGO_TRANSPORT_STOW_POSE_META, {
 		"start_position": corpse_node.global_position,
 		"target_local_position": stair_bottom_local,
 		"start_rotation": corpse_node.rotation,
 	})
 
 
-func _apply_corpse_cleanup_stow_below_deck(progress: float, corpse_id: int) -> void:
+func _apply_cargo_transport_stow_below_deck(progress: float, corpse_id: int) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	if not is_instance_valid(corpse_node):
 		return
-	var pose: Dictionary = corpse_node.get_meta(CORPSE_CLEANUP_STOW_POSE_META, {})
+	var pose: Dictionary = corpse_node.get_meta(CARGO_TRANSPORT_STOW_POSE_META, {})
 	if pose.is_empty():
-		_capture_corpse_cleanup_stow_pose_by_id(corpse_id)
-		pose = corpse_node.get_meta(CORPSE_CLEANUP_STOW_POSE_META, {})
+		_capture_cargo_transport_stow_pose_by_id(corpse_id)
+		pose = corpse_node.get_meta(CARGO_TRANSPORT_STOW_POSE_META, {})
 	if pose.is_empty():
 		return
 	var t: float = smoothstep(0.0, 1.0, clampf(progress, 0.0, 1.0))
@@ -1019,19 +1094,19 @@ func _apply_corpse_cleanup_stow_below_deck(progress: float, corpse_id: int) -> v
 	var target_position: Vector3 = to_global(target_local_position)
 	corpse_node.global_position = start_position.lerp(target_position, t)
 	corpse_node.scale = corpse_node.scale.lerp(Vector3.ONE * 0.82, t)
-	if progress >= 1.0 and corpse_node.has_meta(CORPSE_CLEANUP_STOW_POSE_META):
-		corpse_node.remove_meta(CORPSE_CLEANUP_STOW_POSE_META)
+	if progress >= 1.0 and corpse_node.has_meta(CARGO_TRANSPORT_STOW_POSE_META):
+		corpse_node.remove_meta(CARGO_TRANSPORT_STOW_POSE_META)
 
 
-func _store_corpse_cleanup_stair_path_by_id(corpse_id: int, stair_top_local: Vector3, stair_bottom_local: Vector3) -> void:
+func _store_cargo_transport_stair_path_by_id(corpse_id: int, stair_top_local: Vector3, stair_bottom_local: Vector3) -> void:
 	var corpse_node := NodeContractHelper.get_instance_node3d(corpse_id)
 	if not is_instance_valid(corpse_node):
 		return
-	corpse_node.set_meta(CORPSE_CLEANUP_STAIR_TOP_META, stair_top_local)
-	corpse_node.set_meta(CORPSE_CLEANUP_STAIR_BOTTOM_META, stair_bottom_local)
+	corpse_node.set_meta(CARGO_TRANSPORT_STAIR_TOP_META, stair_top_local)
+	corpse_node.set_meta(CARGO_TRANSPORT_STAIR_BOTTOM_META, stair_bottom_local)
 
 
-func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
+func _get_cargo_transport_throw_target(corpse: Node3D) -> Vector3:
 	var local_pos: Vector3 = to_local(corpse.global_position)
 	var side_sign: float = 1.0 if local_pos.x >= 0.0 else -1.0
 	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
@@ -1043,57 +1118,81 @@ func _get_corpse_cleanup_throw_target(corpse: Node3D) -> Vector3:
 	return global_target
 
 
-func _finish_corpse_cleanup_throw(corpse_id: int, cleaner_id: int) -> void:
+func _get_roof_cargo_transport_throw_target(corpse: Node3D) -> Vector3:
+	var local_pos: Vector3 = to_local(corpse.global_position)
+	var side_sign: float = 1.0 if local_pos.x >= 0.0 else -1.0
+	if absf(local_pos.x) < 0.25:
+		side_sign = 1.0 if randf() >= 0.5 else -1.0
+	var roof_half_width: float = maxf(1.35, minf(_hull_half_extents.x * 0.55, _hull_half_extents.x))
+	var roof_half_length: float = maxf(2.0, _hull_half_extents.y * 0.68)
+	local_pos.x = side_sign * (roof_half_width + randf_range(2.4, 3.5))
+	local_pos.z = clampf(local_pos.z + randf_range(-0.25, 0.25), -roof_half_length, roof_half_length)
+	var global_target: Vector3 = to_global(local_pos)
+	global_target.y = 0.05
+	return global_target
+
+
+func _finish_cargo_transport_throw(corpse_id: int, cleaner_id: int) -> void:
 	var corpse := NodeContractHelper.get_instance_node(corpse_id)
 	var cleaner := NodeContractHelper.get_instance_node(cleaner_id)
 	if is_instance_valid(corpse):
 		if corpse is Node3D:
-			_play_corpse_cleanup_splash((corpse as Node3D).global_position)
-		_grant_corpse_cleanup_xp()
-		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
+			_play_overboard_disposal_splash((corpse as Node3D).global_position)
+		_grant_cargo_transport_xp()
+		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT)
 		corpse.queue_free()
 	if is_instance_valid(cleaner):
-		if cleaner.has_method("finish_corpse_cleanup_action"):
-			cleaner.call("finish_corpse_cleanup_action")
+		if cleaner.has_method("finish_cargo_transport_action"):
+			cleaner.call("finish_cargo_transport_action")
 		else:
-			SoldierActionHelper.finish_corpse_cleanup_action(cleaner)
+			SoldierActionHelper.finish_cargo_transport_action(cleaner)
 
 
-func _finish_friendly_corpse_cleanup_stow(corpse_id: int, cleaner_id: int) -> void:
+func _finish_roof_cargo_transport_throw(corpse_id: int) -> void:
+	var corpse := NodeContractHelper.get_instance_node(corpse_id)
+	if not is_instance_valid(corpse):
+		return
+	if corpse is Node3D:
+		_play_overboard_disposal_splash((corpse as Node3D).global_position)
+	_grant_cargo_transport_xp()
+	corpse.queue_free()
+
+
+func _finish_friendly_cargo_transport_stow(corpse_id: int, cleaner_id: int) -> void:
 	var corpse := NodeContractHelper.get_instance_node(corpse_id)
 	var cleaner := NodeContractHelper.get_instance_node(cleaner_id)
 	if is_instance_valid(corpse):
-		if corpse.has_meta(CORPSE_CLEANUP_STAIR_TOP_META):
-			corpse.remove_meta(CORPSE_CLEANUP_STAIR_TOP_META)
-		if corpse.has_meta(CORPSE_CLEANUP_STAIR_BOTTOM_META):
-			corpse.remove_meta(CORPSE_CLEANUP_STAIR_BOTTOM_META)
-		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP)
+		if corpse.has_meta(CARGO_TRANSPORT_STAIR_TOP_META):
+			corpse.remove_meta(CARGO_TRANSPORT_STAIR_TOP_META)
+		if corpse.has_meta(CARGO_TRANSPORT_STAIR_BOTTOM_META):
+			corpse.remove_meta(CARGO_TRANSPORT_STAIR_BOTTOM_META)
+		SoldierShipWorkPriorityHelper.release_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT)
 		corpse.queue_free()
 	if is_instance_valid(cleaner):
-		if cleaner.has_method("finish_corpse_cleanup_action"):
-			cleaner.call("finish_corpse_cleanup_action")
+		if cleaner.has_method("finish_cargo_transport_action"):
+			cleaner.call("finish_cargo_transport_action")
 		else:
-			SoldierActionHelper.finish_corpse_cleanup_action(cleaner)
+			SoldierActionHelper.finish_cargo_transport_action(cleaner)
 
 
-func _grant_corpse_cleanup_xp() -> void:
+func _grant_cargo_transport_xp() -> void:
 	if not is_instance_valid(_cached_level_manager) or not _cached_level_manager.has_method("add_bonus_xp"):
 		return
-	var xp_reward: int = max(0, int(_cached_level_manager.get("corpse_cleanup_xp_reward")))
+	var xp_reward: int = max(0, int(_cached_level_manager.get("cargo_transport_xp_reward")))
 	if xp_reward <= 0:
 		return
 	_cached_level_manager.add_bonus_xp(xp_reward)
 
 
-func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
+func _play_overboard_disposal_splash(splash_pos: Vector3) -> void:
 	if water_splash_scene:
 		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
 		if is_instance_valid(splash):
 			get_tree().root.add_child(splash)
 			if splash is Node3D:
 				(splash as Node3D).global_position = Vector3(splash_pos.x, 0.05, splash_pos.z)
-			if splash.has_method("configure_as_corpse_cleanup"):
-				splash.configure_as_corpse_cleanup()
+			if splash.has_method("configure_as_overboard_disposal"):
+				splash.configure_as_overboard_disposal()
 			elif splash.has_method("configure_as_splash"):
 				splash.configure_as_splash()
 			elif splash.has_method("configure_as_small"):
@@ -1105,6 +1204,9 @@ func _play_corpse_cleanup_splash(splash_pos: Vector3) -> void:
 
 
 func get_crew_stair_global_position() -> Vector3:
+	var marker_path := _get_authored_crew_stair_descent_points()
+	if not marker_path.is_empty():
+		return marker_path.get("top", to_global(crew_stair_fallback_local_position))
 	var stair_node := find_child(crew_stair_node_name, true, false) as Node3D
 	if is_instance_valid(stair_node):
 		return stair_node.global_position
@@ -1202,8 +1304,9 @@ func _resolve_crew_stair_descent_local_points(top_local: Vector3, bottom_local: 
 
 
 func get_crew_respawn_global_position() -> Vector3:
-	var local_pos: Vector3 = to_local(get_crew_stair_global_position()) + crew_stair_respawn_offset
-	local_pos = _clamp_corpse_cleanup_deck_local(local_pos, 0.32)
+	var stair_path := get_crew_stair_descent_points()
+	var local_pos: Vector3 = stair_path.get("top_local", to_local(get_crew_stair_global_position())) + crew_stair_respawn_offset
+	local_pos = _clamp_cargo_transport_deck_local(local_pos, 0.32)
 	local_pos.y = float(deck_height) if "deck_height" in self else local_pos.y
 	return to_global(local_pos)
 
@@ -1228,8 +1331,12 @@ func _get_soldier_role(soldier: Node) -> String:
 func _spawn_player_soldier(soldiers_node: Node, role: String) -> Node:
 	return PlayerShipCrewHelper.spawn_player_soldier(self, soldiers_node, role)
 
-func _sync_player_crew_roster() -> void:
-	PlayerShipCrewHelper.sync_player_crew_roster(self)
+func _sync_player_crew_roster(allow_spawn_missing: bool = false) -> void:
+	var initial_sync_done := bool(get_meta("player_crew_initial_roster_synced", false))
+	var can_spawn_missing := allow_spawn_missing or not initial_sync_done
+	PlayerShipCrewHelper.sync_player_crew_roster(self, can_spawn_missing)
+	if not initial_sync_done:
+		set_meta("player_crew_initial_roster_synced", true)
 
 ## 키보드 입력 처리
 func _handle_input(delta: float) -> void:

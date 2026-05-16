@@ -252,7 +252,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"supply":
 			return "선체 회복 +%d" % int(s.get("hull_heal", 20))
 		"gold":
-			return "골드 +%d" % int(s.get("score_add", 50))
+			return "포인트 +%d" % int(s.get("score_add", 50))
 
 	if next_level > 1 and upgrade_id not in ["supply", "gold"]:
 		return LocaleManager.data_text(data, upgrade_id, "upgrade", "description", "") + " (Lv.%d)" % next_level

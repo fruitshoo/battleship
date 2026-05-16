@@ -592,8 +592,39 @@ func is_combat_disabled() -> bool:
 func are_weapons_disabled() -> bool:
 	return is_combat_disabled() or deck_is_overrun
 
-func can_be_boarded_by(_attacker_ship: Node = null) -> bool:
-	return not blocks_boarding
+func can_be_boarded_by(attacker_ship: Node = null) -> bool:
+	if not blocks_boarding:
+		return true
+	return can_be_roof_boarded_by(attacker_ship)
+
+func can_be_roof_boarded_by(attacker_ship: Node = null) -> bool:
+	if not is_roof_boarding_enabled():
+		return false
+	if get_team_tag() != "player":
+		return false
+	if not is_instance_valid(attacker_ship):
+		return false
+	var attacker_team: String = attacker_ship.get_team_tag() if attacker_ship.has_method("get_team_tag") else str(attacker_ship.get("team"))
+	return attacker_team == "enemy"
+
+func is_roof_boarding_enabled() -> bool:
+	var type_name := get_ship_type_value().strip_edges().to_lower()
+	if not (type_name.contains("geobukseon") or type_name.contains("turtle")):
+		return false
+	return not ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_BOARDING_POINTS).is_empty()
+
+func get_roof_boarding_landing_local(approach_global: Vector3) -> Vector3:
+	var fallback := Vector3(0.0, maxf(deck_height + 1.1, 1.7), 0.0)
+	return _get_nearest_authoring_marker_local(ShipAuthoringHelper.ROOF_BOARDING_POINTS, approach_global, fallback)
+
+func clamp_roof_boarding_landing_local(local_position: Vector3) -> Vector3:
+	return _clamp_roof_local_position(local_position)
+
+func is_roof_local_position_in_bounds(local_position: Vector3) -> bool:
+	if not is_roof_boarding_enabled():
+		return false
+	var clamped := _clamp_roof_local_position(local_position)
+	return local_position.distance_squared_to(clamped) <= 0.04
 
 func get_hull_hp_value() -> float:
 	return hull_hp
@@ -752,9 +783,9 @@ func enforce_dead_body_limit() -> void:
 			continue
 		if BaseShipSoldierStateHelper.is_incapacitated_soldier(soldier):
 			continue
-		if soldier.get_meta("corpse_cleanup_in_progress", false) == true:
+		if soldier.get_meta("cargo_transport_in_progress", false) == true:
 			continue
-		if soldier.get_meta("support_corpse_cleanup_in_progress", false) == true:
+		if soldier.get_meta("support_overboard_disposal_in_progress", false) == true:
 			continue
 		bodies.append(soldier)
 
@@ -1324,6 +1355,45 @@ func replace_preview_crew_role(from_role: String, to_role: String = "general") -
 func set_preview_deck_light_enabled(enabled: bool) -> void:
 	enable_deck_light = enabled
 	_refresh_deck_light()
+
+
+func _get_nearest_authoring_marker_local(container_name: String, reference_global: Vector3, fallback_local: Vector3) -> Vector3:
+	var markers := ShipAuthoringHelper.get_authoring_markers(self, container_name)
+	if markers.is_empty():
+		return fallback_local
+	var best_marker: Node3D = null
+	var best_distance_sq := INF
+	for marker in markers:
+		if not is_instance_valid(marker):
+			continue
+		var distance_sq := marker.global_position.distance_squared_to(reference_global)
+		if distance_sq < best_distance_sq:
+			best_distance_sq = distance_sq
+			best_marker = marker
+	if not is_instance_valid(best_marker):
+		return fallback_local
+	return to_local(best_marker.global_position)
+
+
+func _clamp_roof_local_position(local_position: Vector3) -> Vector3:
+	var markers := ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_SURFACE_POINTS)
+	if markers.is_empty():
+		markers = ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_BOARDING_POINTS)
+	if markers.is_empty():
+		return local_position
+	var half_ext := Vector2(1.6, 3.6)
+	var roof_y := local_position.y
+	for marker in markers:
+		var local_marker := to_local(marker.global_position)
+		half_ext.x = maxf(half_ext.x, absf(local_marker.x))
+		half_ext.y = maxf(half_ext.y, absf(local_marker.z))
+		roof_y = local_marker.y
+	return Vector3(
+		clampf(local_position.x, -half_ext.x - 0.25, half_ext.x + 0.25),
+		roof_y,
+		clampf(local_position.z, -half_ext.y - 0.35, half_ext.y + 0.35)
+	)
+
 
 ## 병사가 사망할 때마다 호출되어, 배의 폐선 여부를 이벤트 방식으로 검사
 func check_derelict_status() -> void:

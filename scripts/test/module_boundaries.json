@@ -155,6 +155,10 @@
       "layer": "entities/soldiers/soldier_captain_guard_helper.gd",
       "responsibility": "Owns player captain protection rules and warning-ring rendering when the captain is guarded or exposed."
     },
+    "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd": {
+      "layer": "entities/soldiers/soldier_deck_zone_helper.gd",
+      "responsibility": "Owns shared soldier combat-deck zone metadata, roof boarder flags, and zone compatibility predicates used by boarding, targeting, and cleanup."
+    },
     "res://scripts/entities/soldiers/soldier_combat_helper.gd": {
       "layer": "entities/soldiers/soldier_combat_helper.gd",
       "responsibility": "Owns the current soldier combat helper responsibilities; update this baseline when moving behavior across module boundaries."
@@ -917,7 +921,7 @@
       ]
     },
     "res://scripts/entities/ships/base_ship_boarding_helper.gd": {
-      "count": 40,
+      "count": 42,
       "functions": [
         "process_boarding_common",
         "_uses_limited_rope_visuals",
@@ -945,6 +949,8 @@
         "_get_boarding_wave_limit",
         "_get_boarding_contest_limit",
         "_is_hostile_boarding_player",
+        "_is_hostile_roof_boarding_target",
+        "_get_target_boarding_zone",
         "_get_defender_boarding_slot_penalty",
         "_get_random_deck_landing_local",
         "_get_nearest_deck_landing_local",
@@ -1311,7 +1317,7 @@
         "add_respawn_crew",
         "_add_player_crew",
         "_apply_survivor_join_condition",
-        "_place_respawn_crew_at_stair",
+        "_stage_crew_join_from_lower_deck",
         "_get_crew_add_log_tag",
         "_apply_initial_crew_slot_layout",
         "_get_next_player_crew_spawn_transform",
@@ -1758,13 +1764,13 @@
         "begin_action",
         "begin_known_action",
         "finish_action",
-        "begin_corpse_cleanup_action",
-        "finish_corpse_cleanup_action",
+        "begin_cargo_transport_action",
+        "finish_cargo_transport_action",
         "has_action",
         "is_action_ai_locked",
         "get_action_name",
         "get_action_animation_name",
-        "is_corpse_cleanup_action",
+        "is_cargo_transport_action",
         "get_action_definition",
         "get_action_rows",
         "get_action_family",
@@ -1858,6 +1864,22 @@
         "_ensure_warning_root",
         "_make_ring_mesh",
         "_make_ring_material"
+      ]
+    },
+    "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd": {
+      "count": 11,
+      "functions": [
+        "get_zone",
+        "set_zone",
+        "clear_zone",
+        "is_in_zone",
+        "is_roof",
+        "can_share_combat_zone",
+        "can_ignore_vertical_delta",
+        "_is_same_ship_roof_combat_pair",
+        "_get_owned_ship_node",
+        "is_roof_boarder",
+        "set_roof_boarder"
       ]
     },
     "res://scripts/entities/soldiers/soldier_combat_helper.gd": {
@@ -2165,10 +2187,11 @@
       ]
     },
     "res://scripts/helpers/vfx_spawn_helper.gd": {
-      "count": 3,
+      "count": 4,
       "functions": [
         "snapshot_world_position",
         "acquire_world_node3d",
+        "orient_world_node3d",
         "activate"
       ]
     },
@@ -2469,7 +2492,7 @@
       ]
     },
     "res://scripts/test/project_contract_recovery_helper.gd": {
-      "count": 28,
+      "count": 29,
       "functions": [
         "run_recovery_effect_contract_smoke",
         "_run_floating_loot_smoke",
@@ -2492,6 +2515,7 @@
         "_get_player_crew_training_total",
         "_run_survivor_overcap_does_not_expand_respawn_target",
         "_run_incapacitated_captain_blocks_duplicate_respawn",
+        "_run_roster_sync_does_not_replace_dead_crew",
         "_find_player_captain",
         "_count_player_captains_in_roster",
         "_get_player_roster_instance_ids",
@@ -2599,7 +2623,7 @@
       "functions": [
         "run_scene_wiring_contract_smoke",
         "_run_player_ship_runtime_safety_contract",
-        "_run_player_corpse_cleanup_sequence_contract",
+        "_run_player_cargo_transport_sequence_contract",
         "_validate_soldier_action_definition_catalog",
         "_run_transparent_vfx_render_priority_contract",
         "_expect_file_contains",
@@ -3231,6 +3255,11 @@
       "to": "res://scripts/entities/soldiers/soldier_boarding_prep_bar_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/entities/soldiers/soldier_deck_zone_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd",
+      "reason": "Boarding transfer and contest limits use the shared deck-zone owner to keep roof/main-deck rules consistent."
+    },
     "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/support_fleet_formation_helper.gd": {
       "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
       "to": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
@@ -3276,6 +3305,11 @@
       "to": "res://scripts/entities/soldiers/soldier_visual_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
+    "res://scripts/entities/soldiers/soldier_combat_helper.gd|res://scripts/entities/soldiers/soldier_deck_zone_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_combat_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd",
+      "reason": "Soldier combat targeting uses the shared deck-zone owner to prevent roof and main-deck units from attacking through geometry."
+    },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/effects/blood_deck_decal_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
       "to": "res://scripts/effects/blood_deck_decal_helper.gd",
@@ -3286,10 +3320,20 @@
       "to": "res://scripts/entities/soldiers/soldier_captain_guard_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
+    "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd|res://scripts/entities/soldiers/soldier_deck_zone_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd",
+      "reason": "Soldier damage, cover, and boarding chaos checks use the shared deck-zone owner for roof/main-deck separation."
+    },
     "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
       "to": "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
+    },
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd|res://scripts/entities/soldiers/soldier_deck_zone_helper.gd": {
+      "from": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd",
+      "reason": "Soldier ship targeting and deck clamping use the shared deck-zone owner for roof/main-deck placement rules."
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd|res://scripts/entities/soldiers/soldier_action_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd",

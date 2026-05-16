@@ -10,6 +10,8 @@ const BOARDING_ANCHORS := "BoardingAnchors"
 const CANNON_SLOTS := "CannonSlots"
 const WEAPON_SLOTS := "WeaponSlots"
 const CREW_SLOTS := "CrewSlots"
+const ROOF_BOARDING_POINTS := "RoofBoardingPoints"
+const ROOF_SURFACE_POINTS := "RoofSurfacePoints"
 const DECK_AREA := "DeckArea"
 const DECK_AREA_POINTS := "Points"
 const DECK_AREA_END_WIDTH_RATIO := 0.28
@@ -46,6 +48,8 @@ static func build_summary(ship: Node) -> Dictionary:
 		CANNON_SLOTS: get_authoring_markers(ship, CANNON_SLOTS).size(),
 		WEAPON_SLOTS: get_authoring_markers(ship, WEAPON_SLOTS).size(),
 		CREW_SLOTS: get_authoring_markers(ship, CREW_SLOTS).size(),
+		ROOF_BOARDING_POINTS: get_authoring_markers(ship, ROOF_BOARDING_POINTS).size(),
+		ROOF_SURFACE_POINTS: get_authoring_markers(ship, ROOF_SURFACE_POINTS).size(),
 		DECK_AREA: 1 if _get_authoring_container(ship, DECK_AREA) != null else 0,
 	}
 	if "auto_fit_collision_to_hull" in ship and ship.get("auto_fit_collision_to_hull") != null:
@@ -92,6 +96,8 @@ static func validate_ship_authoring(ship: Node, label: String, failures: Array[S
 	_validate_marker_container(ship, CANNON_SLOTS, label, failures)
 	_validate_marker_container(ship, WEAPON_SLOTS, label, failures)
 	_validate_marker_container(ship, CREW_SLOTS, label, failures)
+	_validate_marker_container(ship, ROOF_BOARDING_POINTS, label, failures)
+	_validate_marker_container(ship, ROOF_SURFACE_POINTS, label, failures)
 
 	if ship.has_method("get_ship_authoring_summary"):
 		var exposed_summary = ship.call("get_ship_authoring_summary")

@@ -9,7 +9,7 @@
 
 [node name="MaengseonHull" type="Node3D" unique_id=1901274189]
 
-[node name="ScaleRoot" type="Node3D" parent="."]
+[node name="ScaleRoot" type="Node3D" parent="." unique_id=2013068621]
 
 [node name="Hull" parent="ScaleRoot" unique_id=39870899 instance=ExtResource("1_v2f7j")]
 transform = Transform3D(-0.7, 0, 6.119594e-08, 0, 0.7, 0, -6.119594e-08, 0, -0.7, 0, 0, 0)
@@ -40,17 +40,17 @@ transform = Transform3D(0.84, 0, 0, 0, 0.84, 0, 0, 0, 0.84, 0, 0, 0)
 script = ExtResource("5_mawut")
 
 [node name="DeckArea" type="Node3D" parent="ScaleRoot/Authoring" unique_id=123855860]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.12, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 script = ExtResource("deck_area_authoring")
 metadata/use_authored_deck_area = true
 
 [node name="Points" type="Node3D" parent="ScaleRoot/Authoring/DeckArea" unique_id=1292132076]
 
 [node name="BowLeft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1157795089]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.574, -0.25, -4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.574, 0, -4.05)
 
 [node name="BowRight" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=981686482]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.574, -0.25, -3.975)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.574, 0, -3.975)
 
 [node name="RightForward" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=742672429]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.25, -1.944)
@@ -59,10 +59,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.25, -1.944)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, -0.25, 1.944)
 
 [node name="SternRight" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1631842930]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, -0.25, 4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 0, 4.05)
 
 [node name="SternLeft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=1573761640]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7, -0.25, 4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7, 0, 4.05)
 
 [node name="LeftAft" type="Marker3D" parent="ScaleRoot/Authoring/DeckArea/Points" unique_id=382728486]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, -0.25, 1.944)

@@ -2,6 +2,7 @@ extends RefCounted
 class_name SoldierShipHelper
 
 const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
+const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 
 const CROSS_SHIP_MUSTER_CACHE_TARGET_ID_META := "cross_ship_muster_cache_target_id"
 const CROSS_SHIP_MUSTER_CACHE_LOCAL_META := "cross_ship_muster_cache_local"
@@ -10,6 +11,8 @@ const CROSS_SHIP_MUSTER_CACHE_TTL_MSEC := 420
 
 
 static func find_nearest_enemy(soldier) -> Node3D:
+	if NodeContractHelper.is_sinking_or_dying(soldier.get("owned_ship")):
+		return null
 	var home_ship: Variant = soldier.get("home_ship")
 	var is_player_boarder: bool = soldier.team == "player" and is_instance_valid(home_ship) and home_ship != soldier.owned_ship
 	var ship_scan_data: Dictionary = SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(soldier)
@@ -38,7 +41,12 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			continue
 		if SoldierStateHelper.is_dead_soldier(other):
 			continue
+		var other_owned_ship = other.get_owned_ship_node() if other.has_method("get_owned_ship_node") else other.get("owned_ship")
+		if NodeContractHelper.is_sinking_or_dying(other_owned_ship):
+			continue
 		if other.get_team_tag() == soldier.team:
+			continue
+		if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, other):
 			continue
 
 		var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
@@ -81,6 +89,9 @@ static func find_nearest_enemy(soldier) -> Node3D:
 				continue
 			if SoldierStateHelper.is_dead_soldier(other) or other.get_team_tag() == soldier.team:
 				continue
+			var cross_owned_ship = other.get_owned_ship_node() if other.has_method("get_owned_ship_node") else other.get("owned_ship")
+			if NodeContractHelper.is_sinking_or_dying(cross_owned_ship):
+				continue
 			var pos_diff_xz := Vector2(soldier.global_position.x - other.global_position.x, soldier.global_position.z - other.global_position.z)
 			var dist_sq_xz: float = pos_diff_xz.length_squared()
 			if dist_sq_xz > detection_range_sq:
@@ -118,6 +129,8 @@ static func find_nearest_enemy(soldier) -> Node3D:
 static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 	if not is_instance_valid(soldier.owned_ship):
 		return null
+	if NodeContractHelper.is_sinking_or_dying(soldier.owned_ship):
+		return null
 	var nearest: Node3D = null
 	var nearest_distance_sq: float = INF
 	var detection_range_sq: float = soldier.detection_range * soldier.detection_range
@@ -129,7 +142,12 @@ static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 			continue
 		if SoldierStateHelper.is_dead_soldier(other):
 			continue
+		var other_owned_ship = other.get_owned_ship_node() if other.has_method("get_owned_ship_node") else other.get("owned_ship")
+		if NodeContractHelper.is_sinking_or_dying(other_owned_ship):
+			continue
 		if other.get_team_tag() == soldier.team:
+			continue
+		if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, other):
 			continue
 		var dist_sq_xz := Vector2(
 			soldier.global_position.x - other.global_position.x,
@@ -386,6 +404,8 @@ static func keep_within_owned_ship_bounds(soldier) -> void:
 
 
 static func get_clamped_ship_deck_local(soldier, ship: Node3D, local_position: Vector3) -> Vector3:
+	if SoldierDeckZoneHelper.is_roof(soldier) and ship.has_method("clamp_roof_boarding_landing_local"):
+		return ship.call("clamp_roof_boarding_landing_local", local_position)
 	var d_height: float = ship.get("deck_height") if "deck_height" in ship else 0.4
 	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, ship)
 	var clamped_z := clampf(local_position.z, -half_ext.y, half_ext.y)

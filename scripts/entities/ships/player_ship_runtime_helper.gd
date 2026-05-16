@@ -9,9 +9,10 @@ const SUPPORT_ASSIST_EVAL_TIMER_META := "support_assist_eval_timer"
 const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 const SUPPORT_JOIN_STAGE_META := "support_join_stage"
 const CONTROL_SCHEME_SCREEN := "screen"
-const SCREEN_STEER_FULL_ANGLE_DEG := 95.0
-const SCREEN_STEER_SOFT_ZONE_DEG := 16.0
-const SCREEN_STEER_SPEED_DAMPING := 0.035
+const SCREEN_STEER_FULL_ANGLE_DEG := 125.0
+const SCREEN_STEER_SOFT_ZONE_DEG := 28.0
+const SCREEN_STEER_SPEED_DAMPING := 0.12
+const SCREEN_STEER_MAX_OUTPUT := 0.82
 const SCREEN_INPUT_DEADZONE := 0.08
 const RAM_BOOST_TRIGGER_THRESHOLD := 0.45
 const ROPE_RESIST_STICK_THRESHOLD := 0.62
@@ -156,8 +157,8 @@ static func _calculate_screen_relative_steer(ship, angle_deg: float) -> float:
 	var steer := clampf(angle_deg / SCREEN_STEER_FULL_ANGLE_DEG, -1.0, 1.0)
 	var soft_ratio := smoothstep(0.0, SCREEN_STEER_SOFT_ZONE_DEG, abs_angle)
 	var speed_ratio := clampf(absf(float(ship.current_speed)) / maxf(float(ship.max_speed), 0.1), 0.0, 1.4)
-	var damping := clampf(1.0 - speed_ratio * SCREEN_STEER_SPEED_DAMPING, 0.78, 1.0)
-	return steer * soft_ratio * damping
+	var damping := clampf(1.0 - speed_ratio * SCREEN_STEER_SPEED_DAMPING, 0.72, 1.0)
+	return clampf(steer * soft_ratio * damping, -SCREEN_STEER_MAX_OUTPUT, SCREEN_STEER_MAX_OUTPUT)
 
 
 static func toggle_fleet_formation(ship) -> void:
@@ -324,5 +325,5 @@ static func replenish_crew(ship, soldier_scene: PackedScene) -> void:
 			child.queue_free()
 		elif not is_player:
 			continue
-	ship._sync_player_crew_roster()
+	ship._sync_player_crew_roster(true)
 	print("[Crew] 병사 보충 완료! (현재: %d/%d)" % [ship.max_crew_count, ship.max_crew_count])

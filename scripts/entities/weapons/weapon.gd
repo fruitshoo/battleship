@@ -58,9 +58,7 @@ func spawn_critical_hit_effect_at_position(effect_position: Vector3, hit_directi
 	var effect := VfxSpawnHelper.acquire_world_node3d(get_tree(), SOLDIER_CRIT_HIT_SCENE, effect_position)
 	if not is_instance_valid(effect):
 		return
-	hit_direction.y = 0.0
-	if hit_direction.length_squared() > 0.001:
-		effect.global_basis = Basis.looking_at(hit_direction.normalized(), Vector3.UP)
+	VfxSpawnHelper.orient_world_node3d(effect, effect_position, hit_direction)
 	VfxSpawnHelper.activate(effect)
 
 

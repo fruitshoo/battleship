@@ -35,7 +35,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.2888665997993982
+shader_parameter/damage_seed = 0.36810431293881646
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -43,7 +43,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 277934531227014
+metadata/mast_owner_id = 4154038805107
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_gvf0h"]
 render_priority = 20
@@ -64,7 +64,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.6389167502507522
+shader_parameter/damage_seed = 0.39317953861584753
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -72,7 +72,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 277934699046391
+metadata/mast_owner_id = 4154256862990
 
 [node name="GeobukseonHull" type="Node3D" unique_id=1045646202]
 
@@ -222,6 +222,42 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.55, 3.65)
 [node name="CrewSternRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=334507481]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.55, 3.65)
 
+[node name="CrewStair" type="Node3D" parent="ScaleRoot/Authoring"]
+
+[node name="CrewStairTop" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.035096, 3.4)
+
+[node name="CrewStairBottom" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.405096, 1.84)
+
+[node name="RoofBoardingPoints" type="Node3D" parent="ScaleRoot/Authoring" unique_id=745677455]
+
+[node name="RoofForwardLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=2057516810]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.85, -4.04)
+
+[node name="RoofForwardRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=1753779328]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.85, -4.04)
+
+[node name="RoofMidLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=2087043343]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.85, 0)
+
+[node name="RoofMidRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=1593090928]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.85, 0)
+
+[node name="RoofRearLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=130114094]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4, 0.85, 4.307)
+
+[node name="RoofRearRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=384765222]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 0.85, 4.307)
+
+[node name="RoofSurfacePoints" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1159433645]
+
+[node name="SurfaceLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofSurfacePoints" unique_id=1308895608]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.6, -0.4)
+
+[node name="SurfaceRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofSurfacePoints" unique_id=2083514722]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.6, -0.4)
+
 [node name="Masts" type="Node3D" parent="ScaleRoot" unique_id=1994548284]
 
 [node name="MastPivot_01" type="Node3D" parent="ScaleRoot/Masts" unique_id=1204061809]
@@ -233,7 +269,10 @@ fold_duration = 2.2
 [node name="Mast" parent="ScaleRoot/Masts/MastPivot_01" unique_id=1732171799 instance=ExtResource("2_mast_scene")]
 transform = Transform3D(0.92, 0, 0, 0, 0.92, 0, 0, 0, 0.92, 0, 0, 0)
 
-[node name="SailVisual" parent="ScaleRoot/Masts/MastPivot_01/Mast" index="1" unique_id=1842287473]
+[node name="MastMesh" parent="ScaleRoot/Masts/MastPivot_01/Mast" index="0" unique_id=1409497674]
+visible = false
+
+[node name="SailVisual" parent="ScaleRoot/Masts/MastPivot_01/Mast" index="2" unique_id=1842287473]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.758852, 0)
 
 [node name="SailMesh" parent="ScaleRoot/Masts/MastPivot_01/Mast/SailVisual" index="0" unique_id=1903760530]
@@ -256,7 +295,10 @@ stow_target_path = NodePath("../MastStowTarget_02")
 [node name="Mast2" parent="ScaleRoot/Masts/MastPivot_02" unique_id=969026686 instance=ExtResource("2_mast_scene")]
 transform = Transform3D(0.92, 0, 0, 0, 0.92, 0, 0, 0, 0.92, 0, 0, 0)
 
-[node name="SailVisual" parent="ScaleRoot/Masts/MastPivot_02/Mast2" index="1" unique_id=1842287473]
+[node name="MastMesh" parent="ScaleRoot/Masts/MastPivot_02/Mast2" index="0" unique_id=1409497674]
+visible = false
+
+[node name="SailVisual" parent="ScaleRoot/Masts/MastPivot_02/Mast2" index="2" unique_id=1842287473]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.758852, 0)
 
 [node name="SailMesh" parent="ScaleRoot/Masts/MastPivot_02/Mast2/SailVisual" index="0" unique_id=1903760530]
@@ -284,7 +326,7 @@ transform = Transform3D(0.99128693, 0, 0.13172007, 0, 1, 0, -0.13172007, 0, 0.99
 transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 1.7868049, 2.5545678, -4.7895)
 
 [node name="SmokeEffect" parent="ScaleRoot" unique_id=1847126054 instance=ExtResource("15_lukdh")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.943425, -6.059725)
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 2.943425, -6.059725)
 
 [editable path="ScaleRoot/Masts/MastPivot_01/Mast"]
 [editable path="ScaleRoot/Masts/MastPivot_01/Mast/SailVisual/Flag"]

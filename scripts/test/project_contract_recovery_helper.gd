@@ -41,6 +41,7 @@ static func run_recovery_effect_contract_smoke(owner: Node, failures: Array[Stri
 	await _run_sea_site_spawner_contract(owner, failures, smoke_root, player_ship)
 	await _run_sea_decor_contract(owner, failures, smoke_root, player_ship)
 	await _run_treasure_chest_smoke(owner, failures, smoke_root, player_ship, level_manager)
+	await _run_roster_sync_does_not_replace_dead_crew(owner, failures, player_ship)
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)
@@ -484,6 +485,7 @@ static func _run_sea_site_spawner_contract(owner: Node, failures: Array[String],
 	spawner.set_script(SeaSiteSpawnerScript)
 	spawner.set("enabled", false)
 	spawner.set("_player", player_ship)
+	spawner.set("drifting_supply_spawn_chance", 0.0)
 	smoke_root.add_child(spawner)
 	await _wait_frames(owner, 1)
 
@@ -519,6 +521,17 @@ static func _run_sea_site_spawner_contract(owner: Node, failures: Array[String],
 		if absf(site.global_position.y) > 0.05:
 			failures.append("recovery sea site spawner spawned site off waterline: %.2f" % site.global_position.y)
 		site.queue_free()
+		await _wait_frames(owner, 1)
+
+	spawner.set("drifting_supply_spawn_chance", 1.0)
+	var supply_site := spawner.call("debug_spawn_site", 44.0, 0.0) as Node3D
+	await _wait_frames(owner, 1)
+	if not is_instance_valid(supply_site):
+		failures.append("recovery sea site spawner failed to spawn forced drifting supply")
+	else:
+		if not supply_site.is_in_group("drifting_supply_site"):
+			failures.append("recovery sea site spawner did not honor forced drifting supply chance")
+		supply_site.queue_free()
 
 	spawner.queue_free()
 	await _wait_frames(owner, 1)
@@ -744,6 +757,32 @@ static func _run_incapacitated_captain_blocks_duplicate_respawn(owner: Node, fai
 		failures.append("recovery respawn created duplicate captain while original captain was incapacitated: %d" % captains_after_respawn)
 	if captains_after_recovery != 1:
 		failures.append("recovery captain count was not normalized after incapacitated captain recovered: %d" % captains_after_recovery)
+
+
+static func _run_roster_sync_does_not_replace_dead_crew(owner: Node, failures: Array[String], player_ship: Node3D) -> void:
+	if not player_ship.has_method("_sync_player_crew_roster"):
+		return
+	var victim: Node = null
+	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
+		if _counts_as_player_roster_member(soldier):
+			victim = soldier
+			break
+	if not is_instance_valid(victim):
+		return
+	var before_ids := _get_player_roster_instance_ids(player_ship)
+	var before_count: int = before_ids.size()
+	SoldierLifecycleHelper.die(victim)
+	await _wait_frames(owner, 2)
+	player_ship.call("_sync_player_crew_roster")
+	await _wait_frames(owner, 2)
+	var after_ids := _get_player_roster_instance_ids(player_ship)
+	var after_count: int = after_ids.size()
+	if after_count >= before_count:
+		failures.append("recovery roster sync replaced a dead crew member without survivor/respawn")
+	for id in after_ids.keys():
+		if not before_ids.has(id):
+			failures.append("recovery roster sync spawned unexpected crew id %s after death" % str(id))
+			break
 
 
 static func _find_player_captain(player_ship: Node3D) -> Node:

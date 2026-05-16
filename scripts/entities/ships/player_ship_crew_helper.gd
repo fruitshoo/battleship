@@ -8,6 +8,7 @@ const AUTO_RAID_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_AUTO_RAID
 const SURVIVOR_JOIN_HEALTH_RATIO: float = 0.35
 const SURVIVOR_JOIN_MIN_HEALTH: float = 8.0
 const SURVIVOR_JOIN_HEALTH_BAR_DURATION: float = 2.4
+const CREW_STAIR_ARRIVAL_ACTION := "crew_stair_arrival"
 
 static func get_desired_player_captain_count(ship) -> int:
 	return clampi(int(ship.captain_count), 0, maxi(0, int(ship.max_crew_count)))
@@ -93,7 +94,7 @@ static func get_player_roster_count(ship) -> int:
 			count += 1
 	return count
 
-static func sync_player_crew_roster(ship) -> void:
+static func sync_player_crew_roster(ship, allow_spawn_missing: bool = true) -> void:
 	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return
@@ -136,8 +137,15 @@ static func sync_player_crew_roster(ship) -> void:
 			extra_captain.set_meta("crew_role", ship.CREW_ROLE_GENERAL)
 		roster_by_role[ship.CREW_ROLE_GENERAL].append(extra_captain)
 	for _i in range(max(0, desired_captains - roster_captains.size())):
-		var captain = spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
-		roster_captains.append(captain)
+		if roster_by_role[ship.CREW_ROLE_GENERAL].size() > 0:
+			var promoted = roster_by_role[ship.CREW_ROLE_GENERAL].pop_back()
+			set_captain_state(ship, promoted, true)
+			roster_captains.append(promoted)
+		elif allow_spawn_missing:
+			var captain = spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
+			roster_captains.append(captain)
+		else:
+			break
 	for role in [ship.CREW_ROLE_SPEARMAN, ship.CREW_ROLE_REPEATING_CROSSBOW, ship.CREW_ROLE_SINGIGEON, ship.CREW_ROLE_FIRE_POT]:
 		var shortage = int(desired.get(role, 0)) - roster_by_role[role].size()
 		while shortage > 0 and roster_by_role[ship.CREW_ROLE_GENERAL].size() > 0:
@@ -150,6 +158,8 @@ static func sync_player_crew_roster(ship) -> void:
 			shortage -= 1
 	for role in [ship.CREW_ROLE_SPEARMAN, ship.CREW_ROLE_REPEATING_CROSSBOW, ship.CREW_ROLE_SINGIGEON, ship.CREW_ROLE_FIRE_POT, ship.CREW_ROLE_GENERAL]:
 		var missing = int(desired.get(role, 0)) - roster_by_role[role].size()
+		if not allow_spawn_missing:
+			continue
 		for _i in range(max(0, missing)):
 			spawn_player_soldier(ship, soldiers_node, role)
 
@@ -205,10 +215,10 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 
 	if current_captains < desired_captains:
 		var captain := spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
-		if source == "respawn":
-			_place_respawn_crew_at_stair(ship, soldiers_node, captain)
 		if source == "survivor":
 			_apply_survivor_join_condition(captain)
+		if source == "respawn" or source == "survivor":
+			_stage_crew_join_from_lower_deck(ship, soldiers_node, captain)
 		var captain_message: String = "생존자 구조: 장군 복귀" if source == "survivor" else "병사 보충: 장군 복귀"
 		print("[%s] 장군 1명이 복귀했습니다. (현재: %d/%d)" % [_get_crew_add_log_tag(source), alive_count + 1, ship.max_crew_count])
 		if ship._cached_hud and ship._cached_hud.has_method("show_message"):
@@ -228,10 +238,10 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 	if not found_slot and not allow_over_capacity:
 		return false
 	var new_crew := spawn_player_soldier(ship, soldiers_node, role_to_add)
-	if source == "respawn":
-		_place_respawn_crew_at_stair(ship, soldiers_node, new_crew)
 	if source == "survivor":
 		_apply_survivor_join_condition(new_crew)
+	if source == "respawn" or source == "survivor":
+		_stage_crew_join_from_lower_deck(ship, soldiers_node, new_crew)
 
 	var crew_message: String = "생존자 구조 완료!" if source == "survivor" else "병사 보충 완료!"
 	print("[%s] 아군 병사 1명 합류. (현재: %d/%d)" % [_get_crew_add_log_tag(source), alive_count + 1, ship.max_crew_count])
@@ -257,23 +267,48 @@ static func _apply_survivor_join_condition(soldier: Node) -> void:
 		soldier.set("rest_recovery_delay_timer", 0.0)
 
 
-static func _place_respawn_crew_at_stair(ship, soldiers_node: Node, soldier: Node) -> void:
+static func _stage_crew_join_from_lower_deck(ship, soldiers_node: Node, soldier: Node) -> void:
 	var soldier_3d := soldier as Node3D
 	var soldiers_node_3d := soldiers_node as Node3D
 	if not is_instance_valid(soldier_3d) or not is_instance_valid(soldiers_node_3d):
 		return
 	if not is_instance_valid(ship) or not ship.has_method("get_crew_respawn_global_position"):
 		return
-	var spawn_global: Vector3 = ship.call("get_crew_respawn_global_position")
-	soldier_3d.global_position = spawn_global
+	var target_global: Vector3 = ship.call("get_crew_respawn_global_position")
+	var start_global: Vector3 = target_global
+	if ship.has_method("get_crew_stair_descent_points"):
+		var stair_path: Dictionary = ship.call("get_crew_stair_descent_points")
+		var bottom_global: Vector3 = stair_path.get("bottom", target_global)
+		var bottom_local: Vector3 = ship.to_local(bottom_global) if ship is Node3D else bottom_global
+		var respawn_offset: Vector3 = ship.get("crew_stair_respawn_offset") if ship.get("crew_stair_respawn_offset") != null else Vector3.ZERO
+		if ship is Node3D:
+			start_global = ship.to_global(bottom_local + respawn_offset)
+		else:
+			start_global = bottom_global
+	soldier_3d.global_position = start_global
 	var look_forward := Vector3.FORWARD
 	var ship_3d := ship as Node3D
 	if is_instance_valid(ship_3d):
 		look_forward = -ship_3d.global_transform.basis.z
-	var look_target: Vector3 = spawn_global + look_forward
-	look_target.y = spawn_global.y
-	if not spawn_global.is_equal_approx(look_target):
+	var look_target: Vector3 = target_global
+	if start_global.distance_squared_to(target_global) <= 0.01:
+		look_target = start_global + look_forward
+	look_target.y = start_global.y
+	if not start_global.is_equal_approx(look_target):
 		soldier_3d.look_at(look_target, Vector3.UP)
+	if soldier.has_method("begin_named_action"):
+		soldier.call("begin_named_action", CREW_STAIR_ARRIVAL_ACTION, true, CREW_STAIR_ARRIVAL_ACTION)
+	var target_local := soldiers_node_3d.to_local(target_global)
+	var travel_distance := start_global.distance_to(target_global)
+	var arrival_duration: float = clampf(travel_distance / 2.6, 0.42, 1.1)
+	var tween := soldier_3d.create_tween()
+	tween.tween_property(soldier_3d, "position", target_local, arrival_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(func() -> void:
+		if not is_instance_valid(soldier):
+			return
+		if soldier.has_method("finish_named_action"):
+			soldier.call("finish_named_action", CREW_STAIR_ARRIVAL_ACTION)
+	)
 	if soldier.get("ally_health_bar_visible_timer") != null:
 		soldier.set("ally_health_bar_visible_timer", 1.4)
 

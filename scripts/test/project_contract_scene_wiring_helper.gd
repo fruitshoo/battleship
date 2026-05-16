@@ -223,7 +223,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 
 	_run_main_player_effect_scene_wiring_pass(failures)
 	await _run_player_ship_runtime_safety_contract(owner, failures, wait_frames_after_attach)
-	_run_player_corpse_cleanup_sequence_contract(failures)
+	_run_player_cargo_transport_sequence_contract(failures)
 	_run_transparent_vfx_render_priority_contract(failures)
 	await _run_player_cannon_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_boarding_anchor_authoring_contract(owner, failures, wait_frames_after_attach)
@@ -458,75 +458,75 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 	await _wait_frames(owner, 1)
 
 
-static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]) -> void:
+static func _run_player_cargo_transport_sequence_contract(failures: Array[String]) -> void:
 	var player_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/player_ship.gd")
 	if player_ship_source.is_empty():
-		failures.append("player corpse cleanup contract could not read player_ship.gd")
+		failures.append("player cargo transport contract could not read player_ship.gd")
 		return
-	if not player_ship_source.contains("_get_corpse_cleanup_pickup_point"):
-		failures.append("player corpse cleanup should move the actor to the corpse before pickup")
-	if not player_ship_source.contains("_get_corpse_cleanup_rail_stand_point"):
-		failures.append("player corpse cleanup should move the actor to a rail stand point before throwing")
-	if not player_ship_source.contains("_get_corpse_cleanup_actor_local_target"):
-		failures.append("player corpse cleanup should move the actor in parent-local coordinates")
+	if not player_ship_source.contains("_get_cargo_transport_pickup_point"):
+		failures.append("player cargo transport should move the actor to the payload before pickup")
+	if not player_ship_source.contains("_get_cargo_transport_rail_stand_point"):
+		failures.append("player cargo transport should move the actor to a rail stand point before throwing")
+	if not player_ship_source.contains("_get_cargo_transport_actor_local_target"):
+		failures.append("player cargo transport should move the actor in parent-local coordinates")
 	if player_ship_source.contains("tween.tween_property(cleaner, \"global_position\""):
-		failures.append("player corpse cleanup actor should not tween global_position off the moving ship")
-	if not player_ship_source.contains("_get_corpse_cleanup_carry_rotation"):
-		failures.append("player corpse cleanup should rotate the corpse into a carried pose")
-	if not player_ship_source.contains("_begin_corpse_cleanup_carry_payload_by_id"):
-		failures.append("player corpse cleanup should begin a reusable carry payload")
-	if not player_ship_source.contains("_apply_corpse_cleanup_payload_follow"):
-		failures.append("player corpse cleanup should keep the corpse following the carry payload anchor")
+		failures.append("player cargo transport actor should not tween global_position off the moving ship")
+	if not player_ship_source.contains("_get_cargo_transport_carry_rotation"):
+		failures.append("player cargo transport should rotate the payload into a carried pose")
+	if not player_ship_source.contains("_begin_cargo_transport_carry_payload_by_id"):
+		failures.append("player cargo transport should begin a reusable carry payload")
+	if not player_ship_source.contains("_apply_cargo_transport_payload_follow"):
+		failures.append("player cargo transport should keep the payload following the carry anchor")
 	if not player_ship_source.contains("CARRY_PAYLOAD_KIND_CORPSE"):
-		failures.append("player corpse cleanup should tag the carried payload kind")
+		failures.append("player cargo transport should tag the carried payload kind")
 	if player_ship_source.contains("tween.tween_property(corpse, \"global_position\", rail_carry_position"):
-		failures.append("player corpse cleanup should not use a fixed rail carry point instead of the carry anchor")
-	if not player_ship_source.contains("_set_corpse_cleanup_action_by_id"):
-		failures.append("player corpse cleanup should name actor actions during cleanup")
-	if not player_ship_source.contains("SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH"):
-		failures.append("player corpse cleanup should name the approach action")
-	if not player_ship_source.contains("SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY"):
-		failures.append("player corpse cleanup should name the carry action")
-	if not player_ship_source.contains("SoldierActionHelper.ACTION_CORPSE_CLEANUP_THROW"):
-		failures.append("player corpse cleanup should name the throw action")
-	if not player_ship_source.contains("SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP"):
-		failures.append("player corpse cleanup should choose actors through the ship work priority system")
-	if player_ship_source.contains("corpse_cleanup_busy"):
-		failures.append("player corpse cleanup should use the soldier action naming system instead of a cleanup-specific busy meta")
-	if not player_ship_source.contains("CORPSE_CLEANUP_CARRY_FORWARD_OFFSET := 0.08"):
-		failures.append("player corpse cleanup carry forward offset should keep the corpse close to the actor")
-	if not player_ship_source.contains("CORPSE_CLEANUP_CARRY_SIDE_OFFSET := 0.08"):
-		failures.append("player corpse cleanup carry side offset should keep the corpse close to the actor")
-	if not player_ship_source.contains("CORPSE_CLEANUP_CARRY_HEIGHT_OFFSET := 0.46"):
-		failures.append("player corpse cleanup carry height offset should avoid telekinetic carry spacing")
-	if not player_ship_source.contains("_get_corpse_cleanup_carry_payload_offsets"):
-		failures.append("player corpse cleanup should feed carry offsets through payload definitions")
+		failures.append("player cargo transport should not use a fixed rail carry point instead of the carry anchor")
+	if not player_ship_source.contains("_set_cargo_transport_action_by_id"):
+		failures.append("player cargo transport should name actor actions during transport")
+	if not player_ship_source.contains("SoldierActionHelper.ACTION_CARGO_TRANSPORT_APPROACH"):
+		failures.append("player cargo transport should name the approach action")
+	if not player_ship_source.contains("SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY"):
+		failures.append("player cargo transport should name the carry action")
+	if not player_ship_source.contains("SoldierActionHelper.ACTION_CARGO_TRANSPORT_THROW"):
+		failures.append("player cargo transport should name the throw action")
+	if not player_ship_source.contains("SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT"):
+		failures.append("player cargo transport should choose actors through the ship work priority system")
+	if player_ship_source.contains("cargo_transport_busy"):
+		failures.append("player cargo transport should use the soldier action naming system instead of a transport-specific busy meta")
+	if not player_ship_source.contains("CARGO_TRANSPORT_CARRY_FORWARD_OFFSET := 0.08"):
+		failures.append("player cargo transport carry forward offset should keep the payload close to the actor")
+	if not player_ship_source.contains("CARGO_TRANSPORT_CARRY_SIDE_OFFSET := 0.08"):
+		failures.append("player cargo transport carry side offset should keep the payload close to the actor")
+	if not player_ship_source.contains("CARGO_TRANSPORT_CARRY_HEIGHT_OFFSET := 0.46"):
+		failures.append("player cargo transport carry height offset should avoid telekinetic carry spacing")
+	if not player_ship_source.contains("_get_cargo_transport_carry_payload_offsets"):
+		failures.append("player cargo transport should feed carry offsets through payload definitions")
 	if not player_ship_source.contains("begin_typed_carry_payload"):
-		failures.append("player corpse cleanup should use typed carry payload definitions")
-	if not player_ship_source.contains("_capture_corpse_cleanup_pickup_pose_by_id"):
-		failures.append("player corpse cleanup should capture the corpse pickup pose at pickup time")
+		failures.append("player cargo transport should use typed carry payload definitions")
+	if not player_ship_source.contains("_capture_cargo_transport_pickup_pose_by_id"):
+		failures.append("player cargo transport should capture the payload pickup pose at pickup time")
 	if player_ship_source.contains("var pickup_start_position: Vector3 = corpse.global_position"):
-		failures.append("player corpse cleanup should not cache pickup start global_position before the actor approaches")
-	if not player_ship_source.contains("_capture_corpse_cleanup_throw_arc_by_id"):
-		failures.append("player corpse cleanup should capture the throw arc at throw time")
-	if player_ship_source.contains("_apply_corpse_cleanup_throw_arc\").bind(corpse_id, throw_origin"):
-		failures.append("player corpse cleanup should not bind a stale throw origin before rail carry completes")
-	if not player_ship_source.contains("_grant_corpse_cleanup_xp"):
-		failures.append("player corpse cleanup should reward cleanup XP only after the corpse is thrown overboard")
-	if not player_ship_source.contains("corpse_cleanup_xp_reward"):
-		failures.append("player corpse cleanup XP reward should be LevelManager-configured")
+		failures.append("player cargo transport should not cache pickup start global_position before the actor approaches")
+	if not player_ship_source.contains("_capture_cargo_transport_throw_arc_by_id"):
+		failures.append("player cargo transport should capture the throw arc at throw time")
+	if player_ship_source.contains("_apply_cargo_transport_throw_arc\").bind(corpse_id, throw_origin"):
+		failures.append("player cargo transport should not bind a stale throw origin before rail carry completes")
+	if not player_ship_source.contains("_grant_cargo_transport_xp"):
+		failures.append("player cargo transport should reward transport XP only after the payload is delivered")
+	if not player_ship_source.contains("cargo_transport_xp_reward"):
+		failures.append("player cargo transport XP reward should be LevelManager-configured")
 	var approach_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", pickup_actor_position")
-	var pickup_index := player_ship_source.find("_apply_corpse_cleanup_payload_pickup")
+	var pickup_index := player_ship_source.find("_apply_cargo_transport_payload_pickup")
 	var carry_index := player_ship_source.find("tween.tween_property(cleaner, \"position\", rail_actor_position")
-	var throw_index := player_ship_source.find("_apply_corpse_cleanup_throw_arc")
+	var throw_index := player_ship_source.find("_apply_cargo_transport_throw_arc")
 	if approach_index == -1 or pickup_index == -1 or carry_index == -1 or throw_index == -1:
-		failures.append("player corpse cleanup sequence is missing approach/pickup/carry/throw steps")
+		failures.append("player cargo transport sequence is missing approach/pickup/carry/throw steps")
 	elif not (approach_index < pickup_index and pickup_index < carry_index and carry_index < throw_index):
-		failures.append("player corpse cleanup sequence should be approach -> pickup -> rail carry -> throw")
+		failures.append("player cargo transport sequence should be approach -> pickup -> rail carry -> throw")
 
 	var soldier_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier.gd")
 	if soldier_source.is_empty():
-		failures.append("player corpse cleanup contract could not read soldier.gd")
+		failures.append("player cargo transport contract could not read soldier.gd")
 		return
 	if not soldier_source.contains("SoldierActionHelper.is_action_ai_locked(self)"):
 		failures.append("named soldier actions should lock regular AI when requested")
@@ -538,11 +538,11 @@ static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]
 		failures.append("soldier should expose typed carry payload entry points")
 	if not soldier_source.contains("get_carry_payload_kind"):
 		failures.append("soldier should expose the active carried payload kind")
-	if soldier_source.contains("corpse_cleanup_busy"):
+	if soldier_source.contains("cargo_transport_busy"):
 		failures.append("soldier AI lock should use the reusable action naming system")
 	var action_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_action_helper.gd")
 	if action_source.is_empty():
-		failures.append("player corpse cleanup contract could not read soldier_action_helper.gd")
+		failures.append("player cargo transport contract could not read soldier_action_helper.gd")
 		return
 	if not action_source.contains("ACTION_NAME_META"):
 		failures.append("soldier action helper should store the active action name")
@@ -552,12 +552,12 @@ static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]
 		failures.append("soldier action helper should expose an action definition catalog")
 	if not action_source.contains("static func begin_known_action"):
 		failures.append("soldier action helper should provide a catalog-backed begin API")
-	if not action_source.contains("ACTION_CORPSE_CLEANUP_APPROACH"):
-		failures.append("soldier action helper should name corpse cleanup approach")
-	if not action_source.contains("ACTION_CORPSE_CLEANUP_CARRY"):
-		failures.append("soldier action helper should name corpse cleanup carry")
-	if not action_source.contains("ACTION_CORPSE_CLEANUP_THROW"):
-		failures.append("soldier action helper should name corpse cleanup throw")
+	if not action_source.contains("ACTION_CARGO_TRANSPORT_APPROACH"):
+		failures.append("soldier action helper should name cargo transport approach")
+	if not action_source.contains("ACTION_CARGO_TRANSPORT_CARRY"):
+		failures.append("soldier action helper should name cargo transport carry")
+	if not action_source.contains("ACTION_CARGO_TRANSPORT_THROW"):
+		failures.append("soldier action helper should name cargo transport throw")
 	if not action_source.contains("CARRY_ANCHOR_NAME"):
 		failures.append("soldier action helper should expose a reusable carry anchor name")
 	if not action_source.contains("static func get_or_create_carry_anchor"):
@@ -587,10 +587,10 @@ static func _run_player_corpse_cleanup_sequence_contract(failures: Array[String]
 	_validate_soldier_action_definition_catalog(failures)
 	var visual_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 	if visual_source.is_empty():
-		failures.append("player corpse cleanup contract could not read soldier_visual_helper.gd")
+		failures.append("player cargo transport contract could not read soldier_visual_helper.gd")
 		return
 	if visual_source.contains("target_position := rest_position + Vector3(0.0, -0.04, -0.06)"):
-		failures.append("corpse cleanup carry animation should not lower the actor pose without real animation")
+		failures.append("cargo transport carry animation should not lower the actor pose without real animation")
 
 
 static func _validate_soldier_action_definition_catalog(failures: Array[String]) -> void:
@@ -611,26 +611,26 @@ static func _validate_soldier_action_definition_catalog(failures: Array[String])
 		if str(row.get(SoldierActionHelper.ACTION_DEF_ANIMATION, "")).strip_edges().is_empty():
 			failures.append("soldier action definition %s missing animation name" % action_name)
 	var required_actions: Array[String] = [
-		SoldierActionHelper.ACTION_CORPSE_CLEANUP_APPROACH,
-		SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY,
-		SoldierActionHelper.ACTION_CORPSE_CLEANUP_THROW,
+		SoldierActionHelper.ACTION_CARGO_TRANSPORT_APPROACH,
+		SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY,
+		SoldierActionHelper.ACTION_CARGO_TRANSPORT_THROW,
 		SoldierActionHelper.ACTION_CANNON_RELOAD,
 	]
 	for action_name in required_actions:
 		if not actions.has(action_name):
 			failures.append("soldier action definition missing action: %s" % action_name)
-	if SoldierActionHelper.get_action_family(SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY) != SoldierActionHelper.ACTION_FAMILY_CORPSE_CLEANUP:
-		failures.append("soldier action definition corpse carry family mismatch")
+	if SoldierActionHelper.get_action_family(SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY) != SoldierActionHelper.ACTION_FAMILY_CARGO_TRANSPORT:
+		failures.append("soldier action definition cargo transport carry family mismatch")
 	if SoldierActionHelper.get_action_family(SoldierActionHelper.ACTION_CANNON_RELOAD) != SoldierActionHelper.ACTION_FAMILY_WEAPON_SUPPORT:
 		failures.append("soldier action definition cannon reload family mismatch")
-	var carry_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY)
+	var carry_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY)
 	if carry_definition.get(SoldierActionHelper.ACTION_DEF_LOCKS_AI, false) != true:
-		failures.append("soldier action definition corpse carry should lock AI")
+		failures.append("soldier action definition cargo transport carry should lock AI")
 	var reload_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_CANNON_RELOAD)
 	if reload_definition.get(SoldierActionHelper.ACTION_DEF_LOCKS_AI, true) != false:
 		failures.append("soldier action definition cannon reload should not lock AI")
-	if SoldierActionHelper.get_default_animation_name(SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY) != SoldierActionHelper.ACTION_CORPSE_CLEANUP_CARRY:
-		failures.append("soldier action definition corpse carry animation name mismatch")
+	if SoldierActionHelper.get_default_animation_name(SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY) != SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY:
+		failures.append("soldier action definition cargo transport carry animation name mismatch")
 
 
 static func _run_transparent_vfx_render_priority_contract(failures: Array[String]) -> void:
@@ -2937,7 +2937,7 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 		return
 	for token in [
 		"TASK_DECK_DEFENSE",
-		"TASK_CORPSE_CLEANUP",
+		"TASK_CARGO_TRANSPORT",
 		"TASK_CANNON_RELOAD",
 		"TASK_SHIPHANDLING_STATION",
 		"static func get_ship_work_directive",
@@ -3016,7 +3016,7 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 			failures.append("soldier ship work priority getter mismatch for %s" % task_name)
 	var expected_order: Array[String] = [
 		SoldierShipWorkPriorityHelper.TASK_DECK_DEFENSE,
-		SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP,
+		SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT,
 		SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD,
 		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_STATION,
 	]
@@ -3028,8 +3028,8 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 		var lower: String = expected_order[index + 1]
 		if priorities.has(higher) and priorities.has(lower) and int(priorities[higher]) <= int(priorities[lower]):
 			failures.append("soldier ship work priority order invalid: %s should outrank %s" % [higher, lower])
-	if SoldierShipWorkPriorityHelper.get_task_phase(SoldierShipWorkPriorityHelper.TASK_CORPSE_CLEANUP) != SoldierShipWorkPriorityHelper.PHASE_CLEANUP:
-		failures.append("soldier ship work priority corpse cleanup phase mismatch")
+	if SoldierShipWorkPriorityHelper.get_task_phase(SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT) != SoldierShipWorkPriorityHelper.PHASE_TRANSPORT:
+		failures.append("soldier ship work priority cargo transport phase mismatch")
 	if priorities.has(SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION):
 		failures.append("routine gunnery station should not remain in the active ship work priority table")
 	if SoldierShipWorkPriorityHelper.get_task_priority(SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION) != SoldierShipWorkPriorityHelper.PRIORITY_NONE:

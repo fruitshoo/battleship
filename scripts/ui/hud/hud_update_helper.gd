@@ -31,8 +31,8 @@ static func update_level(hud, val: int) -> void:
 
 static func update_score(hud, val: int) -> void:
 	if hud.score_label:
-		var total_gold = SaveManager.gold if is_instance_valid(SaveManager) else val
-		hud.score_label.text = "금 %d · 총 %d" % [val, total_gold]
+		var total_points = SaveManager.gold if is_instance_valid(SaveManager) else val
+		hud.score_label.text = "포인트 %d · 총 %d" % [val, total_points]
 
 static func update_combat_stats(hud, ship_sunk: int, ships_derelicted: int, soldiers_killed: int, _soldiers_slain: int, _soldiers_drowned: int) -> void:
 	var destroyed_ships: int = ship_sunk + ships_derelicted

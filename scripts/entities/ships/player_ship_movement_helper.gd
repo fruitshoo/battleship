@@ -156,7 +156,7 @@ static func update_steering(ship, delta: float) -> void:
 	var motion_speed := absf(ship.current_speed)
 	if motion_speed < 0.1:
 		return
-	var speed_ratio = motion_speed / ship.max_speed
+	var speed_ratio = clampf(motion_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 	var turn_authority: float = float(ship.player_rudder_turn_authority) if "player_rudder_turn_authority" in ship else 1.0
 	if ship.current_speed < 0.0 and "reverse_rudder_turn_authority_mult" in ship:
 		turn_authority *= float(ship.reverse_rudder_turn_authority_mult)
