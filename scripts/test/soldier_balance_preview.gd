@@ -369,8 +369,6 @@ func _normalize_preview_soldier_stats(soldier: Node) -> void:
 		soldier.set("attack_damage", 12.0)
 	if soldier.has_meta("defense_flat_bonus"):
 		soldier.remove_meta("defense_flat_bonus")
-	if soldier.has_meta("defense_reduction"):
-		soldier.remove_meta("defense_reduction")
 	if soldier.has_meta("damage_multiplier"):
 		soldier.remove_meta("damage_multiplier")
 	if soldier.has_method("_update_weapon_stats"):

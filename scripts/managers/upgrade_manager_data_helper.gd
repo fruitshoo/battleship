@@ -174,11 +174,13 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "무기 피해 +%.0f%%" % [next_level * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0]
 		"crew_defense":
 			var defense_bonus: float = next_level * float(s.get("defense_add_per_lv", 1.0))
-			var damage_reduction: float = clampf(float(next_level) * float(s.get("damage_reduction_per_lv", 0.04)), 0.0, float(s.get("max_damage_reduction", 0.22)))
-			return "병사 방어력 +%.0f | 받는 피해 -%.0f%%" % [defense_bonus, damage_reduction * 100.0]
+			return "병사 방어력 +%.0f" % defense_bonus
 		"hull_defense":
 			if level_matches(next_level, s.get("def_levels", [])):
-				return "방어력 +%.1f" % float(s.get("def_add", 1.0))
+				return "선체 방어력 +%.1f | 병사 원거리 엄폐 +%.1f" % [
+					float(s.get("def_add", 1.0)),
+					float(s.get("crew_ranged_cover_defense_add_per_lv", 0.0)),
+				]
 			return "방어 보강"
 		"hull":
 			var hp_add := float(s.get("hp_add_per_lv", 15.0))
@@ -190,7 +192,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 		"sailing":
 			var sailing_parts: Array[String] = []
 			if level_matches(next_level, s.get("speed_levels", [])):
-				sailing_parts.append("돛 최고 속도 +%.0f" % float(s.get("speed_add", 1.0)))
+				sailing_parts.append("돛 최고 속도 +%.1f" % float(s.get("speed_add", 1.0)))
 			if level_matches(next_level, s.get("efficiency_levels", [])):
 				sailing_parts.append("풍력 효율 +%d%%" % int(round((float(s.get("efficiency_mult", 1.08)) - 1.0) * 100.0)))
 			if level_matches(next_level, s.get("turn_levels", [])):
@@ -234,7 +236,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				return "획득 반경 +%.1fm" % float(s.get("radius_add", 2.0))
 			return "획득 반경 강화"
 		"geobukseon":
-			return "기함 거북선화 | 도선 면역 | 정면 포문 2문 | 측면 포문 4문 | %s" % format_ramming_stat_text(s, 1.2, 1.0)
+			var min_hull_ratio := clampf(float(s.get("transform_hull_min_ratio", 0.5)), 0.0, 1.0)
+			return "기함 거북선화 | 선체 최소 %.0f%% 회복 | 도선 면역 | 정면 포문 2문 | 측면 포문 4문 | %s" % [min_hull_ratio * 100.0, format_ramming_stat_text(s, 1.2, 1.0)]
 		"ballista":
 			var ballista_damage: float = s.get("base_damage", 45.0) + (next_level - 1) * s.get("damage_per_lv", 15.0)
 			var pierce: int = int(s.get("base_pierce", 3) + (next_level - 1) * s.get("pierce_per_lv", 1))

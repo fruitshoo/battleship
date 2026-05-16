@@ -624,11 +624,6 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 	var defense_flat_bonus: float = defense_lv * float(defense_stats.get("defense_add_per_lv", 1.0))
 	damage_bonus_pct += _get_soldier_site_bonus_total(soldier, "crew_damage_pct")
 	defense_flat_bonus += _get_soldier_site_bonus_total(soldier, "crew_defense_add")
-	var defense_reduction: float = clampf(
-		defense_lv * float(defense_stats.get("damage_reduction_per_lv", 0.0)),
-		0.0,
-		float(defense_stats.get("max_damage_reduction", 0.22))
-	)
 	soldier.set_meta("damage_bonus_pct", damage_bonus_pct)
 	if soldier.has_meta("attack_flat_bonus"):
 		soldier.remove_meta("attack_flat_bonus")
@@ -636,7 +631,6 @@ func _apply_current_stats_to_soldier(soldier: Node) -> void:
 		soldier.remove_meta("spear_damage_bonus_pct")
 	soldier.set_meta("spear_damage_add", spear_damage_add)
 	soldier.set_meta("defense_flat_bonus", defense_flat_bonus)
-	soldier.set_meta("defense_reduction", defense_reduction)
 	if soldier.has_meta("damage_multiplier"):
 		soldier.remove_meta("damage_multiplier")
 	
@@ -671,7 +665,7 @@ func _apply_hull_defense(ship: Node3D, _level: int) -> void:
 			if int(level_entry) <= def_lv:
 				defense_bonus += float(s.get("def_add", 2.0))
 		ship.hull_defense = base_defense + defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
-	ship.set_meta("crew_ranged_cover_defense_bonus", float(def_lv) * float(s.get("crew_ranged_cover_defense_add_per_lv", 0.4)))
+	ship.set_meta("crew_ranged_cover_defense_bonus", float(def_lv) * float(s.get("crew_ranged_cover_defense_add_per_lv", 0.5)))
 	if "hull_hp" in ship and "max_hull_hp" in ship:
 		ship.hull_hp = minf(ship.hull_hp, ship.max_hull_hp)
 
@@ -828,9 +822,24 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 	if ship.has_method("_sync_player_crew_roster"):
 		ship.call("_sync_player_crew_roster")
 
+	_apply_geobukseon_transform_heal(ship, stats)
 	_sync_player_cannon_layout(ship, maxi(1, int(current_levels.get("cannon", 1))))
 	_play_geobukseon_transform_sfx(ship)
 	print("[Geobukseon] 기함을 거북선으로 변경했습니다. 도선 면역, 측면 포문 전용")
+
+func _apply_geobukseon_transform_heal(ship: Node3D, stats: Dictionary) -> void:
+	if not is_instance_valid(ship):
+		return
+	if not ("hull_hp" in ship and "max_hull_hp" in ship):
+		return
+	var max_hull := maxf(1.0, float(ship.max_hull_hp))
+	var before := clampf(float(ship.hull_hp), 0.0, max_hull)
+	var min_ratio := clampf(float(stats.get("transform_hull_min_ratio", 0.5)), 0.0, 1.0)
+	var after := maxf(before, max_hull * min_ratio)
+	ship.hull_hp = minf(max_hull, after)
+	var hud = ship._find_hud() if ship.has_method("_find_hud") else null
+	if hud and hud.has_method("update_hull_hp"):
+		hud.update_hull_hp(ship.hull_hp, ship.max_hull_hp)
 
 func _play_geobukseon_transform_sfx(ship: Node3D) -> void:
 	if not is_instance_valid(ship):
@@ -1324,7 +1333,7 @@ func _apply_shared_hull_upgrade_to_fleet_ship(ship: Node3D) -> void:
 			if int(level_entry) <= lv:
 				defense_bonus += float(s.get("def_add", 2.0))
 		ship.hull_defense = base_defense + defense_bonus + SeaSiteRewardHelper.get_site_bonus_total(ship, "hull_defense_add")
-		ship.set_meta("crew_ranged_cover_defense_bonus", float(lv) * float(s.get("crew_ranged_cover_defense_add_per_lv", 0.4)))
+		ship.set_meta("crew_ranged_cover_defense_bonus", float(lv) * float(s.get("crew_ranged_cover_defense_add_per_lv", 0.5)))
 
 	if "hull_regen_rate" in ship:
 		var repair_lv: int = int(current_levels.get("hull_repair", 0))

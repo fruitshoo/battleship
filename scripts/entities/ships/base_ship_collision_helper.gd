@@ -47,6 +47,7 @@ const RAMMING_BOOST_ASSIST_MIN_SPEED_RATIO := 0.68
 const RAMMING_BOOST_IMPACT_BRAKE := 0.42
 const RAMMING_LETHAL_IMPACT_BRAKE := 0.58
 const RAMMING_BOOST_BACK_IMPULSE := 1.15
+const RAMMING_BOOST_KNOCKBACK_MULT := 1.35
 const RAMMING_LETHAL_VFX_SPEED_MULT := 1.28
 const HEAD_ON_ESCAPE_RUDDER_DEADZONE := 5.0
 const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
@@ -883,6 +884,8 @@ static func _apply_ramming_knockback(victim, attacker: Node3D, impact_speed: flo
 	var knockback_mult := clampf(float(knockback_mult_variant), 0.0, 3.0)
 	if knockback_mult <= 0.0:
 		return
+	if _is_ramming_boost_attacker(attacker):
+		knockback_mult *= RAMMING_BOOST_KNOCKBACK_MULT
 	dir_to_attacker.y = 0.0
 	if dir_to_attacker.length_squared() <= 0.0001:
 		return

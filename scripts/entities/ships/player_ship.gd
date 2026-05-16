@@ -7,7 +7,7 @@ extends "res://scripts/entities/ships/base_ship.gd"
 var team: String = "player"
 
 # === 이동 관련 ===
-@export var rowing_speed: float = 3.8
+@export var rowing_speed: float = 2.8
 
 
 const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
@@ -97,11 +97,11 @@ var rowing_locked: bool = false
 @export_group("Ramming Boost")
 @export_range(0.4, 3.0, 0.05) var ramming_boost_duration: float = 1.35
 @export_range(4.0, 45.0, 0.5) var ramming_boost_recharge_duration: float = 18.0
-@export_range(1.0, 2.0, 0.05) var ramming_boost_speed_multiplier: float = 1.35
-@export_range(1.0, 6.0, 0.1) var ramming_boost_acceleration_multiplier: float = 3.2
-@export_range(0.0, 8.0, 0.1) var ramming_boost_impulse_speed: float = 2.8
+@export_range(1.0, 2.0, 0.05) var ramming_boost_speed_multiplier: float = 1.55
+@export_range(1.0, 6.0, 0.1) var ramming_boost_acceleration_multiplier: float = 3.8
+@export_range(0.0, 8.0, 0.1) var ramming_boost_impulse_speed: float = 3.4
 @export_range(0.2, 1.0, 0.05) var ramming_boost_turn_multiplier: float = 0.68
-@export_range(1.0, 4.0, 0.05) var ramming_boost_damage_multiplier: float = 2.0
+@export_range(1.0, 4.0, 0.05) var ramming_boost_damage_multiplier: float = 2.6
 @export_group("")
 var ramming_boost_active: bool = false
 var ramming_boost_charge: float = 1.0

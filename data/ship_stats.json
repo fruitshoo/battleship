@@ -228,7 +228,7 @@
 		"panokseon_player_default": {
 			"hull_scene": "res://scenes/ships/hulls/panok_hull.tscn",
 			"hull_hp": 270,
-			"move_speed": 6.0,
+			"move_speed": 5.2,
 			"hull_defense": 1.0,
 			"crew_ranged_cover_defense": 2.0,
 			"ship_mass_scale": 1.75,
@@ -247,7 +247,7 @@
 		"geobukseon_player_default": {
 			"hull_scene": "res://scenes/ships/hulls/geobukseon_hull.tscn",
 			"hull_hp": 300,
-			"move_speed": 6.0,
+			"move_speed": 5.2,
 			"hull_defense": 2.0,
 			"crew_ranged_cover_defense": 3.0,
 			"blocks_boarding": true,

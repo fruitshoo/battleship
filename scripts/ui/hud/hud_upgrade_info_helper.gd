@@ -4,8 +4,8 @@ const PLAYER_CANNON_BASE_DAMAGE := 22.0
 const PLAYER_CANNON_BASE_RANGE := 24.0
 const PLAYER_CANNON_BASE_COOLDOWN := 3.2
 const PLAYER_HULL_BASE_HP := 200.0
-const PLAYER_BASE_MAX_SPEED := 6.0
-const PLAYER_ROWING_BASE_SPEED := 3.8
+const PLAYER_BASE_MAX_SPEED := 5.2
+const PLAYER_ROWING_BASE_SPEED := 2.8
 const PLAYER_ROWING_BASE_ACCEL := 1.0
 const PLAYER_RAMMING_BOOST_RECHARGE := 18.0
 const PLAYER_MAX_ROWING_STAMINA := 100.0
@@ -113,7 +113,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "데미지 %.0f | 관통 %d명" % [dmg, pierce]
 		"hull_defense":
 			var hull_stats := _calculate_hull_defense_stats(level, stats)
-			return "방어력 %.1f" % hull_stats["defense"]
+			return "선체 방어력 +%.1f | 병사 원거리 엄폐 +%.1f" % [hull_stats["defense"], hull_stats["crew_ranged_cover_defense"]]
 		"hull":
 			var hp_add := float(stats.get("hp_add_per_lv", 15.0)) * float(level)
 			var ram_pct := float(stats.get("ramming_damage_pct_per_lv", 0.07)) * float(level) * 100.0
@@ -123,7 +123,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "선체 자동 수리 %.1f/s" % repair_rate
 		"sailing":
 			var sailing_stats := _calculate_sailing_stats(level, stats)
-			return "돛 최고속 +%.0f | 풍력 효율 +%d%% | 돛 회전 +%d%% | 전환 +%d%%" % [
+			return "돛 최고속 +%.1f | 풍력 효율 +%d%% | 돛 회전 +%d%% | 전환 +%d%%" % [
 				float(sailing_stats["max_speed"]) - PLAYER_BASE_MAX_SPEED,
 				_percent_delta_from_ratio(float(sailing_stats["efficiency"]) / PLAYER_SAIL_EFFICIENCY),
 				_percent_delta_from_ratio(float(sailing_stats["turn_speed"]) / PLAYER_SAIL_TURN_SPEED),
@@ -140,7 +140,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var supply_stats := _calculate_supply_bonus_stats(level, stats)
 			return "획득 반경 %.1fm" % supply_stats["pickup_radius"]
 		"geobukseon":
-			return "기함 거북선화 | 도선 면역 | 정면 포문 2문 | 측면 포문 4문 | %s" % _format_ramming_stat_text(stats, 1.2, 1.0)
+			var min_hull_ratio := clampf(float(stats.get("transform_hull_min_ratio", 0.5)), 0.0, 1.0)
+			return "기함 거북선화 | 선체 최소 %.0f%% 회복 | 도선 면역 | 정면 포문 2문 | 측면 포문 4문 | %s" % [min_hull_ratio * 100.0, _format_ramming_stat_text(stats, 1.2, 1.0)]
 		"fleet_signal":
 			var signal_fleet_limit := SupportFleetCannonRules.get_support_fleet_limit_for_current_levels(preview_levels, upgrades_data)
 			var slot_summary := SupportFleetCannonRules.get_support_slot_summary_for_current_levels(preview_levels, upgrades_data)
@@ -175,8 +176,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "무기 피해 +%.0f%% | 근접 %.1f | 활 %.1f" % [damage_bonus_pct * 100.0, melee_damage, bow_damage]
 		"crew_defense":
 			var defense_bonus := float(stats.get("defense_add_per_lv", 1.0)) * level
-			var damage_reduction := clampf(float(stats.get("damage_reduction_per_lv", 0.04)) * level, 0.0, float(stats.get("max_damage_reduction", 0.22)))
-			return "병사 방어력 +%.0f | 받는 피해 -%.0f%%" % [defense_bonus, damage_reduction * 100.0]
+			return "병사 방어력 +%.0f" % defense_bonus
 		"fire_pot":
 			var throwers = int(UpgradeManager.get_specialist_unit_count("fire_pot", level)) if is_instance_valid(UpgradeManager) and UpgradeManager.has_method("get_specialist_unit_count") else 0
 			var fp_dmg = stats.get("base_damage", 15.0) + (level - 1) * stats.get("damage_per_lv", 5.0)
@@ -349,8 +349,10 @@ static func _calculate_hull_defense_stats(level: int, stats: Dictionary) -> Dict
 	for current_level in range(1, level + 1):
 		if _level_matches(current_level, stats.get("def_levels", [])):
 			defense += float(stats.get("def_add", 2.0))
+	var crew_ranged_cover_defense := float(level) * float(stats.get("crew_ranged_cover_defense_add_per_lv", 0.0))
 	return {
 		"defense": defense,
+		"crew_ranged_cover_defense": crew_ranged_cover_defense,
 	}
 
 static func _calculate_supply_bonus_stats(level: int, stats: Dictionary) -> Dictionary:

@@ -138,7 +138,6 @@ func _ready() -> void:
 	var failures: Array[String] = []
 	_verify_player_combat_damage_dies_by_default(failures)
 	_verify_player_combat_damage_incapacitates_when_enabled(failures)
-	_verify_defense_reduction_mitigates_player_damage(failures)
 	_verify_rest_recovery_is_slow_player_only(failures)
 	_verify_heal_full_recovers_incapacitated_player(failures)
 	_verify_recovery_uses_ship_medical_upgrade_stats(failures)
@@ -214,19 +213,6 @@ func _verify_player_combat_damage_incapacitates_when_enabled(failures: Array[Str
 		failures.append("incapacitated player soldier remained in soldiers group")
 	if soldier.death_pose_count <= 0:
 		failures.append("incapacitated player soldier did not play the downed pose")
-
-
-func _verify_defense_reduction_mitigates_player_damage(failures: Array[String]) -> void:
-	var ship := _make_ship("player")
-	var soldier := _make_soldier("player", ship)
-	soldier.current_health = 100.0
-	soldier.max_health = 100.0
-	soldier.set_meta("defense_reduction", 0.2)
-
-	SoldierLifecycleHelper.take_damage(soldier, 10.0, Vector3.ZERO, "sword")
-
-	if not is_equal_approx(soldier.current_health, 92.0):
-		failures.append("defense reduction did not mitigate player soldier damage: %.2f" % soldier.current_health)
 
 
 func _verify_rest_recovery_is_slow_player_only(failures: Array[String]) -> void:

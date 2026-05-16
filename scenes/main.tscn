@@ -70,7 +70,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0006620884, 0.024617195, -
 [node name="PlayerStart" type="Marker3D" parent="." unique_id=1116289824]
 
 [node name="PlayerShip" parent="." unique_id=2118299445 instance=ExtResource("10_choun")]
-rowing_speed = 4.8
+rowing_speed = 2.8
 rudder_speed = 120.0
 rudder_return_speed = 80.0
 player_rudder_turn_authority = 1.35

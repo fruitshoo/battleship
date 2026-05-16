@@ -36,12 +36,7 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 	if soldier.has_meta("defense_flat_bonus"):
 		defense_bonus = maxf(0.0, float(soldier.get_meta("defense_flat_bonus")))
 	defense_bonus += get_ship_ranged_cover_defense_bonus(soldier, damage_source)
-	var mitigated_damage: float = maxf(amount - (soldier.defense + defense_bonus), 1.0)
-	var quality_reduction: float = 0.0
-	if soldier.has_meta("defense_reduction"):
-		quality_reduction = clampf(float(soldier.get_meta("defense_reduction")), 0.0, 0.9)
-	var total_reduction: float = clampf(quality_reduction, 0.0, 0.9)
-	var final_damage: float = maxf(mitigated_damage * (1.0 - total_reduction), 1.0)
+	var final_damage: float = maxf(amount - (soldier.defense + defense_bonus), 1.0)
 	final_damage = SoldierCaptainGuardHelper.apply_damage_protection(soldier, final_damage)
 	if final_damage > 0.001:
 		soldier.current_health -= final_damage
