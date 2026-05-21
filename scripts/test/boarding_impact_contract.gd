@@ -1,7 +1,9 @@
 extends Node
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
-const AttackerScript = preload("res://scripts/test/chaser_isolation_boarding_collision.gd")
-const ChaserShipScript = preload("res://scripts/entities/ships/chaser_ship.gd")
+const AttackerScript = preload("res://scripts/test/ai_ship_isolation_boarding_collision.gd")
+const AIShipScript = preload("res://scripts/entities/ships/ai_ship.gd")
+const AIShipBoardingHelper = preload("res://scripts/entities/ships/ai_ship_boarding_helper.gd")
 const PlayerShipMovementHelper = preload("res://scripts/entities/ships/player_ship_movement_helper.gd")
 
 
@@ -293,7 +295,7 @@ func _verify_bow_to_side_boarding_stores_side_anchor(failures: Array[String]) ->
 	var pair := _build_bow_to_side_contact_pair()
 	var attacker: Node = pair["attacker"]
 	var target: Node3D = pair["target"]
-	ChaserShipBoardingHelper.store_boarding_contact_anchor(attacker, target)
+	AIShipBoardingHelper.store_boarding_contact_anchor(attacker, target)
 	if not attacker.has_meta("boarding_contact_anchor_local"):
 		failures.append("bow-to-side contact did not store a contact anchor")
 		return
@@ -317,7 +319,7 @@ func _verify_guarded_collision_records_contact_anchor(failures: Array[String]) -
 	attacker.global_position = Vector3(5.0, 0.0, 0.0)
 	attacker.rotation = Vector3(0.0, PI * 0.5, 0.0)
 
-	ChaserShipBoardingHelper.emit_guarded_collision(attacker, target, 0.0)
+	AIShipBoardingHelper.emit_guarded_collision(attacker, target, 0.0)
 	if not attacker._has_recent_boarding_impact(target):
 		failures.append("guarded collision did not mark a recent boarding impact")
 	if not attacker.has_meta("boarding_contact_anchor_local"):
@@ -369,8 +371,8 @@ func _verify_player_crew_takes_reduced_ramming_aoe(failures: Array[String]) -> v
 
 
 func _verify_enemy_boarding_latch_bonus_is_scoped(failures: Array[String]) -> void:
-	var enemy_ship: Node = ChaserShipScript.new()
-	var player_ship: Node = ChaserShipScript.new()
+	var enemy_ship: Node = AIShipScript.new()
+	var player_ship: Node = AIShipScript.new()
 	enemy_ship.set("team", "enemy")
 	player_ship.set("team", "player")
 
@@ -578,7 +580,7 @@ func _verify_hostile_support_contact_uses_collision_feedback(failures: Array[Str
 	add_child(support)
 	enemy.team = "enemy"
 	support.team = "player"
-	ShipAllyRoleHelper.mark_support_ship(support)
+	PlayerFleetRoleHelper.mark_support_ship(support)
 
 	if not BaseShipCollisionHelper._is_hostile_support_contact(enemy, support):
 		failures.append("enemy-to-support contact should be classified as hostile support contact")
@@ -657,21 +659,22 @@ func _verify_boarding_pull_velocity_is_integrated_once(failures: Array[String]) 
 	if not player_source.contains("_calculate_boarding_pull_velocity(delta)"):
 		failures.append("player movement lost accumulated boarding pull velocity")
 
-	var ai_source := FileAccess.get_file_as_string("res://scripts/entities/ships/chaser_ship_ai_helper.gd")
+	var ai_source := FileAccess.get_file_as_string("res://scripts/entities/ships/ai_ship_runtime_helper.gd")
 	if ai_source.contains("_calculate_boarding_pull() * delta"):
-		failures.append("chaser movement should use accumulated boarding pull velocity")
+		failures.append("AI ship movement should use accumulated boarding pull velocity")
 	if not ai_source.contains("_calculate_boarding_pull_velocity(delta)"):
-		failures.append("chaser movement lost accumulated boarding pull velocity")
+		failures.append("AI ship movement lost accumulated boarding pull velocity")
 
-	var boarding_source := FileAccess.get_file_as_string("res://scripts/entities/ships/chaser_ship_boarding_helper.gd")
+	var boarding_source := FileAccess.get_file_as_string("res://scripts/entities/ships/ai_ship_boarding_helper.gd")
 	if boarding_source.contains("pull_velocity * delta") or boarding_source.contains("pull_force * delta"):
 		failures.append("boarding pull velocity should not be multiplied by delta twice")
 	if not boarding_source.contains("_calculate_boarding_pull_velocity(delta)"):
 		failures.append("boarding motion lost accumulated boarding pull velocity")
 
-	var base_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/base_ship.gd")
-	if not base_ship_source.contains("_clear_ropes(false)"):
+	var rope_visual_source := FileAccess.get_file_as_string("res://scripts/entities/ships/base_ship_boarding_rope_visual_helper.gd")
+	if not rope_visual_source.contains("clear_ropes(ship, false)"):
 		failures.append("rope refresh should preserve boarding pull velocity")
+	var base_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/base_ship.gd")
 	if not base_ship_source.contains("func _clear_ropes(reset_pull_velocity: bool = true)"):
 		failures.append("rope clear should explicitly reset boarding pull velocity by default")
 

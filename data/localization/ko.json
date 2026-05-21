@@ -106,7 +106,7 @@
 	"upgrade.janggun.name": "장군전",
 	"upgrade.janggun.description": "대포 포문에서 느리게 장전되는 장군전을 추가 발사",
 	"upgrade.singigeon.name": "신기전",
-	"upgrade.singigeon.description": "활 공격 시 일정 확률로 신기전을 발사하고 적 병사를 밀쳐냄. 고레벨에서 낙수 가능",
+	"upgrade.singigeon.description": "활 공격이 일정 확률로 강화되어 적 병사에게 큰 피해",
 	"upgrade.fire_pot.name": "화통",
 	"upgrade.fire_pot.description": "전투 중 기존 병사에게 화통 투척을 맡기고 착화 확률 강화",
 	"upgrade.repeating_crossbow.name": "연노",

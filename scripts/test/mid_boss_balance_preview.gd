@@ -125,8 +125,8 @@ func _prepare_player() -> void:
 	if _player_ship.has_method("_sync_player_crew_roster"):
 		_player_ship.call("_sync_player_crew_roster")
 	for _index in range(support_fleet_limit):
-		if _player_ship.has_method("_spawn_or_repair_ally"):
-			_player_ship.call("_spawn_or_repair_ally")
+			if _player_ship.has_method("_spawn_or_repair_support_ship"):
+				_player_ship.call("_spawn_or_repair_support_ship")
 
 
 func _spawn_mid_boss() -> void:

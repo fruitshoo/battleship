@@ -1,11 +1,15 @@
 extends RefCounted
 class_name ProjectContractRuntimeHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 
 const FIRE_EFFECT_SCENE_PATH := "res://scenes/effects/fire_effect.tscn"
 const AUTHORING_PALETTE_DATA_PATH := "res://data/authoring_palette.json"
 const AUTHORING_INTENT_FAMILY_ENEMY_RUNTIME := "enemy_runtime"
 const AUTHORING_INTENT_FAMILY_SUPPORT_RUNTIME := "support_runtime"
+const AIShipNavigationHelper = preload("res://scripts/entities/ships/ai_ship_navigation_helper.gd")
+const AIShipSupportHelper = preload("res://scripts/entities/ships/ai_ship_support_helper.gd")
 const PlayerShipScript = preload("res://scripts/entities/ships/player_ship.gd")
 const RAMMING_BOOST_ANGLE_SHIP_TYPES := [
 	"kobayabune_melee",
@@ -246,7 +250,7 @@ static func _run_ramming_boost_assist_contract(owner: Node, failures: Array[Stri
 	player.current_speed = 4.25
 	player.min_ramming_speed = 6.0
 	player.global_position = Vector3.ZERO
-	ShipAllyRoleHelper.mark_player_flagship(player)
+	PlayerFleetRoleHelper.mark_player_flagship(player)
 
 	var enemy := MockRammingAssistShip.new()
 	root.add_child(enemy)
@@ -324,7 +328,7 @@ static func _run_ramming_boost_lethal_feedback_contract(owner: Node, failures: A
 	attacker.current_speed = 9.0
 	attacker.min_ramming_speed = 6.0
 	attacker.global_position = Vector3(0.0, 0.0, 0.0)
-	ShipAllyRoleHelper.mark_player_flagship(attacker)
+	PlayerFleetRoleHelper.mark_player_flagship(attacker)
 
 	var victim := MockRammingDamageVictim.new()
 	root.add_child(victim)
@@ -663,7 +667,7 @@ static func _validate_support_assist_authoring_intent(failures: Array[String], m
 	attacker.team = "enemy"
 	attacker.global_position = Vector3(4.0, 0.0, 0.0)
 
-	var nav: Dictionary = ChaserShipMinionHelper._build_support_assist_navigation(support, attacker, 0)
+	var nav: Dictionary = AIShipSupportHelper._build_support_assist_navigation(support, attacker, 0)
 	var expected_mode := str(movement_entry.get("mode", "support_assist")).strip_edges()
 	if ShipMovementIntent.get_mode(nav) != expected_mode:
 		failures.append("authoring support_assist navigation mode mismatch: %s" % ShipMovementIntent.get_mode(nav))
@@ -1072,7 +1076,7 @@ static func _validate_authoring_spawned_ship(failures: Array[String], ship: Node
 	if expected_retreat_distance >= 0.0 and absf(ShipCombatModeHelper.retreat_distance(ship) - expected_retreat_distance) > 0.05:
 		failures.append("%s retreat distance override mismatch" % label)
 	if is_instance_valid(ship.get("target")):
-		var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, ship.get("target"))
+		var nav: Dictionary = AIShipNavigationHelper.build_navigation(ship, ship.get("target"))
 		if ShipMovementIntent.get_mode(nav) != expected_movement_mode:
 			failures.append("%s navigation movement mode mismatch: %s" % [label, ShipMovementIntent.get_mode(nav)])
 		var desired_speed := ShipMovementIntent.get_desired_speed_mult(nav)

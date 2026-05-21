@@ -35,7 +35,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.36810431293881646
+shader_parameter/damage_seed = 0.037111334002006016
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -43,7 +43,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 4154038805107
+metadata/mast_owner_id = 134490341062614
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_gvf0h"]
 render_priority = 20
@@ -64,7 +64,7 @@ shader_parameter/flip_v = false
 shader_parameter/sail_damage = 0.0
 shader_parameter/burn_amount = 0.0
 shader_parameter/hole_alpha_strength = 1.0
-shader_parameter/damage_seed = 0.39317953861584753
+shader_parameter/damage_seed = 0.6449348044132397
 shader_parameter/burn_edge_emission_color = Color(0.46, 0.1, 0.04, 1)
 shader_parameter/burn_core_emission_color = Color(0.72, 0.24, 0.08, 1)
 shader_parameter/burn_edge_emission_strength = 0.28
@@ -72,7 +72,7 @@ shader_parameter/deform_bounds_min = Vector3(-1.7500002, -3.5, 0)
 shader_parameter/deform_bounds_size = Vector3(3.5000005, 7.0000005, 0.001)
 shader_parameter/bottom_width_scale = 1.0
 shader_parameter/sail_deployed_ratio = 1.0
-metadata/mast_owner_id = 4154256862990
+metadata/mast_owner_id = 134490559221775
 
 [node name="GeobukseonHull" type="Node3D" unique_id=1045646202]
 
@@ -222,12 +222,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.55, 3.65)
 [node name="CrewSternRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=334507481]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.55, 3.65)
 
-[node name="CrewStair" type="Node3D" parent="ScaleRoot/Authoring"]
+[node name="CrewStair" type="Node3D" parent="ScaleRoot/Authoring" unique_id=795886926]
 
-[node name="CrewStairTop" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair"]
+[node name="CrewStairTop" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair" unique_id=145811237]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.035096, 3.4)
 
-[node name="CrewStairBottom" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair"]
+[node name="CrewStairBottom" type="Marker3D" parent="ScaleRoot/Authoring/CrewStair" unique_id=928167076]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.405096, 1.84)
 
 [node name="RoofBoardingPoints" type="Node3D" parent="ScaleRoot/Authoring" unique_id=745677455]

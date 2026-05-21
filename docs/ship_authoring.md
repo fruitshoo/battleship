@@ -241,12 +241,17 @@ animation name. Corpse cleanup currently names `corpse_cleanup_approach`,
 pose, so visual animation can be added later without changing the gameplay
 sequence. Cannon reload uses the same catalog through `cannon_reload`.
 
-`ShipAllyRoleHelper` owns allied ship roles. `player_flagship`,
-`support_fleet`, and `captured_minion` are separate roles even when old runtime
-paths still use the `captured_minion` group as a shared ally-minion bucket.
-Only `captured_minion` consumes capture slots; support ships can share the
-legacy bucket for AI discovery without reducing the player's captured-ship
-capacity.
+`PlayerFleetRoleHelper` owns player fleet ship roles. `player_flagship`,
+`support_fleet`, and `captured_minion` are separate roles. Runtime support ships
+use the `support_ship` group and support registry; the `captured_minion` group
+and registry are reserved for the hidden legacy capture flow. New code should
+prefer the `legacy_captured_ship` helper/registry names and leave
+`captured_minion` as compatibility vocabulary. Only legacy captured ships consume
+capture slots. `ShipAllyRoleHelper` remains as a temporary compatibility alias
+for old references, and the old `ally_role` methods forward to the newer
+fleet-role API. Support profile `ship_type` values such as `maengseon_ally` and
+`panokseon_ally` are also legacy ids; rename them only with saved-data, tests,
+and upgrade/profile fixtures migrated in the same change.
 
 ## Root Structure
 
@@ -336,7 +341,7 @@ The current boss hull uses:
 ## Support Ship Template
 
 Player support ships use `res://scenes/ships/support_ship.tscn`. The scene uses
-`support_ship.gd`, which inherits the existing `ChaserShip` behavior but fixes
+`support_ship.gd`, which inherits the AI ship behavior but fixes
 the ship identity as a player support-fleet ship. Support spawning should
 instantiate this scene directly instead of borrowing `enemy_ship.tscn` and
 overriding hidden properties in code.

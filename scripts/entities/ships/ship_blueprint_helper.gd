@@ -156,7 +156,7 @@ static func build_crew_composition(stats: Dictionary) -> Array[String]:
 	return crew
 
 
-static func apply_chaser_stats(ship, stats: Dictionary) -> void:
+static func apply_ai_ship_stats(ship, stats: Dictionary) -> void:
 	if not is_instance_valid(ship):
 		return
 	if stats.has("hull_hp"):

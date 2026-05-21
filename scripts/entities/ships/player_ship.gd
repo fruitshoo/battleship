@@ -6,11 +6,11 @@ extends "res://scripts/entities/ships/base_ship.gd"
 
 var team: String = "player"
 
-# === 이동 관련 ===
+@export_category("Player Ship")
+@export_group("Movement / Rudder")
 @export var rowing_speed: float = 2.8
 
 
-const CHASER_SHIP_SCRIPT = preload("res://scripts/entities/ships/chaser_ship.gd")
 const SOLDIER_SCENE = preload("res://scenes/entities/soldiers/soldier.tscn")
 const PLAYER_DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
 const PLAYER_DEFAULT_WATER_SPLASH_SCENE = preload("res://scenes/effects/water_blast.tscn")
@@ -21,6 +21,7 @@ const PlayerShipCrewHelper = preload("res://scripts/entities/ships/player_ship_c
 const PlayerShipMovementHelper = preload("res://scripts/entities/ships/player_ship_movement_helper.gd")
 const PlayerShipSinkHelper = preload("res://scripts/entities/ships/player_ship_sink_helper.gd")
 const PlayerShipRuntimeHelper = preload("res://scripts/entities/ships/player_ship_runtime_helper.gd")
+const PlayerShipCargoTransportHelper = preload("res://scripts/entities/ships/player_ship_cargo_transport_helper.gd")
 const PlayerShipAuxHelper = preload("res://scripts/entities/ships/player_ship_aux_helper.gd")
 const PlayerSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
@@ -46,15 +47,12 @@ const CARGO_TRANSPORT_STAIR_TOP_META := "cargo_transport_stair_top"
 const CARGO_TRANSPORT_STAIR_BOTTOM_META := "cargo_transport_stair_bottom"
 const ROOF_CARGO_TRANSPORT_ARC_META := "roof_cargo_transport_arc"
 
-# === 러더(키) 관련 ===
-
 @export var rudder_speed: float = 95.0
 @export var rudder_return_speed: float = 65.0
 @export_range(0.5, 3.0, 0.05) var player_rudder_turn_authority: float = 1.05 # 플레이어 러더 회전 반응 보정
-# === 둥실둥실 효과 및 육분의 ===
-
 @export var rudder_turn_speed: float = 95.0 # Seamanship에 의해 강화됨
 
+@export_group("Identity / Hull")
 @export var ship_type: String = "panokseon_player":
 	set(value):
 		ship_type = value
@@ -62,15 +60,15 @@ const ROOF_CARGO_TRANSPORT_ARC_META := "roof_cargo_transport_arc"
 			_update_editor_hull()
 
 @export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/panok_hull.tscn")
+@export var is_player_controlled: bool = true
 @export var has_sextant: bool = false # Sextant 아이템 소지 여부
 
-# === 노 젓기 ===
+@export_group("Sail Handling")
 var is_rowing: bool = false
 var rowing_direction: int = 1
 var rowing_locked: bool = false
 @export var sail_turn_speed: float = 60.0
 @export var sail_efficiency_mult: float = 1.0
-@export_group("Sail Handling")
 @export var sail_furled: bool = false
 @export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
 @export_range(0.25, 8.0, 0.05) var sail_furl_rate: float = 0.55
@@ -81,16 +79,15 @@ var rowing_locked: bool = false
 @export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 1.0
 @export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.78
 @export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
-@export_group("")
+
+@export_group("Rowing / Reverse")
 @export var max_rowing_stamina: float = 100.0
-@export var rowing_stamina: float = 100.0
+var rowing_stamina: float = 100.0
 @export var rowing_acceleration_mult: float = 1.0
 @export_range(0.1, 0.6, 0.05) var reverse_rowing_speed_ratio: float = 0.35
 @export_range(0.2, 1.2, 0.05) var reverse_rowing_acceleration_mult: float = 0.70
 @export_range(0.2, 1.0, 0.05) var reverse_rudder_turn_authority_mult: float = 0.65
-@export_range(0.5, 2.0, 0.05) var reverse_rowing_stamina_cost_mult: float = 1.05
 @export_range(0.05, 0.9, 0.01) var exhausted_rowing_speed_ratio: float = 0.12
-@export_range(0.05, 1.0, 0.01) var rowing_exhaustion_recover_ratio: float = 0.25
 @export var stamina_drain_rate: float = 6.0
 @export var stamina_recovery_rate: float = 8.5
 
@@ -124,11 +121,14 @@ var boarding_rope_resist_input_window_timer: float = 0.0
 var boarding_rope_resist_sfx_timer: float = 0.0
 var boarding_rope_resist_stick_latch_direction: int = 0
 
+@export_group("Crew / Captain")
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
 @export_range(0, 1, 1) var captain_count: int = 1
 @export_range(1.0, 3.0, 0.05) var captain_health_multiplier: float = 1.65
 @export_range(1.0, 3.0, 0.05) var captain_attack_multiplier: float = 1.4
 @export_range(0.0, 10.0, 0.5) var captain_defense_bonus: float = 2.0
+
+@export_group("Support Fleet")
 @export var support_fleet_limit: int = 1
 @export var support_fleet_respawn_interval: float = 30.0
 var support_fleet_respawn_timer: float = 0.0
@@ -174,7 +174,7 @@ static func _get_ships_cached(tree: SceneTree) -> Array:
 	return _cached_ships
 
 
-# === 병사 보충 ===
+@export_group("Crew Respawn Compatibility")
 @export var auto_crew_respawn_enabled: bool = false
 @export var crew_respawn_interval: float = 12.0 # 자동 보충이 켜졌을 때의 보충 주기 (초)
 var crew_respawn_timer: float = 0.0
@@ -193,8 +193,7 @@ var crew_respawn_timer: float = 0.0
 @export var crew_stair_respawn_offset: Vector3 = Vector3(0.0, 0.0, -0.38)
 @export_group("")
 
-# === 자동 공세 월선 (보수적 전술 판단) ===
-@export_group("Auto Raid")
+@export_group("Auto Raid Compatibility")
 @export var auto_raid_enabled: bool = false
 @export_range(0.1, 2.0, 0.05) var auto_raid_eval_interval: float = 0.35
 @export_range(1, 3, 1) var auto_raid_max_boarders: int = 2
@@ -210,7 +209,6 @@ var manual_boarding_target: Node3D = null
 var fire_pot_cooldown_timer: float = 0.0
 var fire_pot_scene: PackedScene = preload("res://scenes/projectiles/fire_pot.tscn")
 
-var boarding_scan_timer: float = 0.0
 const CREW_ROLE_GENERAL := "general"
 const CREW_ROLE_SPEARMAN := "spearman"
 const CREW_ROLE_FIRE_POT := "fire_pot"
@@ -222,7 +220,7 @@ func _update_editor_hull() -> void:
 	_cache_hull_references(self)
 
 func _ready() -> void:
-	set_ally_ship_role("player_flagship")
+	set_player_fleet_role("player_flagship")
 	if Engine.is_editor_hint():
 		# 에디터용 Hull이 이미 있다면 중복 생성 방지
 		var has_hull = false
@@ -352,10 +350,6 @@ func _process(_delta: float) -> void:
 	_update_fire_effect()
 
 
-# === 제어 관련 ===
-@export var is_player_controlled: bool = true
-
-
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint(): return
 	if is_sinking or is_dying:
@@ -431,14 +425,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				
 		pass
 
-func _spawn_or_repair_ally() -> void:
-	PlayerShipSupportHelper.spawn_or_repair_ally(self)
+func _spawn_or_repair_support_ship() -> void:
+	PlayerShipSupportHelper.spawn_or_repair_support_ship(self)
 
 func _get_support_fleet_ships() -> Array:
 	return PlayerShipSupportHelper.get_support_fleet_ships(self)
 
-func _get_offscreen_ally_spawn_position() -> Vector3:
-	return PlayerShipSupportHelper.get_offscreen_ally_spawn_position(self)
+func _get_offscreen_support_spawn_position() -> Vector3:
+	return PlayerShipSupportHelper.get_offscreen_support_spawn_position(self)
 
 ## 병사 자동 보충 로직
 func _update_crew_respawn(delta: float) -> void:
@@ -492,145 +486,47 @@ func _has_nearby_enemy_pressure_for_respawn() -> bool:
 	return false
 
 func _update_cargo_transport(delta: float) -> void:
-	if not cargo_transport_enabled:
-		return
-	if not _can_run_cargo_transport():
-		cargo_transport_peace_timer = 0.0
-		cargo_transport_timer = 0.0
-		return
-
-	cargo_transport_peace_timer += delta
-	if cargo_transport_peace_timer < cargo_transport_delay:
-		return
-
-	cargo_transport_timer -= delta
-	if cargo_transport_timer > 0.0:
-		return
-	cargo_transport_timer = cargo_transport_interval
-	_try_cleanup_enemy_corpse()
+	PlayerShipCargoTransportHelper.update_cargo_transport(self, delta)
 
 
 func _can_run_cargo_transport() -> bool:
-	if is_sinking or is_dying or is_derelict:
-		return false
-	if deck_is_contested or deck_is_overrun:
-		return false
-	if is_boarding:
-		return false
-	if _has_nearby_enemy_pressure_for_respawn():
-		return false
-	return true
+	return PlayerShipCargoTransportHelper.can_run_cargo_transport(self)
 
 
 func _try_cleanup_enemy_corpse() -> void:
-	var corpse: Node3D = _find_cleanup_corpse()
-	if not is_instance_valid(corpse):
-		return
-	var corpse_team: String = corpse.get_team_tag() if corpse.has_method("get_team_tag") else str(corpse.get("team"))
-	if corpse_team != "player" and _is_roof_corpse(corpse):
-		_throw_roof_payload_overboard(corpse)
-		return
-	var cleaner: Node3D = _find_cargo_transport_actor(corpse)
-	if not is_instance_valid(cleaner):
-		return
-	if not SoldierShipWorkPriorityHelper.reserve_work_slot(corpse, cleaner, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT, cargo_transport_throw_duration + 4.0):
-		return
-
-	corpse.set_meta("cargo_transport_in_progress", true)
-	_set_cargo_transport_actor_action(cleaner, SoldierActionHelper.ACTION_CARGO_TRANSPORT_APPROACH)
-	_prepare_cleaner_for_cargo_transport(cleaner, corpse)
-	if corpse_team == "player":
-		_stow_friendly_corpse_below_deck(cleaner, corpse)
-	else:
-		_throw_payload_overboard(cleaner, corpse)
+	PlayerShipCargoTransportHelper.try_cleanup_corpse(self)
 
 
 func _find_cleanup_corpse() -> Node3D:
-	var friendly_corpse := _find_cleanup_corpse_by_team("player")
-	if is_instance_valid(friendly_corpse):
-		return friendly_corpse
-	return _find_cleanup_enemy_corpse()
+	return PlayerShipCargoTransportHelper.find_cleanup_corpse(self)
 
 
 func _find_cleanup_enemy_corpse() -> Node3D:
-	return _find_cleanup_corpse_by_team("enemy")
+	return PlayerShipCargoTransportHelper.find_cleanup_enemy_corpse(self)
 
 
 func _is_roof_corpse(corpse: Node3D) -> bool:
-	return SoldierDeckZoneHelper.is_roof(corpse)
+	return PlayerShipCargoTransportHelper.is_roof_corpse(corpse)
 
 
 func _find_cleanup_corpse_by_team(target_team: String) -> Node3D:
-	for soldier in EntityRegistry.get_soldiers_by_ship(self):
-		if not is_instance_valid(soldier) or not (soldier is Node3D):
-			continue
-		if soldier.get_meta("cargo_transport_in_progress", false) == true:
-			continue
-		if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(soldier, null, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT):
-			continue
-		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
-		if soldier_team != target_team:
-			continue
-		if not PlayerSoldierStateHelper.is_dead_soldier(soldier):
-			continue
-		if PlayerSoldierStateHelper.is_incapacitated_soldier(soldier):
-			continue
-		return soldier as Node3D
-	return null
+	return PlayerShipCargoTransportHelper.find_cleanup_corpse_by_team(self, target_team)
 
 
 func _find_cargo_transport_actor(corpse: Node3D) -> Node3D:
-	var best: Node3D = null
-	var best_distance_sq: float = INF
-	for soldier in EntityRegistry.get_soldiers_by_ship(self):
-		if not is_instance_valid(soldier) or not (soldier is Node3D):
-			continue
-		if _is_cargo_transport_actor_busy(soldier):
-			continue
-		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
-		if soldier_team != "player":
-			continue
-		if not SoldierShipWorkPriorityHelper.can_accept_immediate_work(soldier, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT):
-			continue
-		if PlayerSoldierStateHelper.is_dead_soldier(soldier):
-			continue
-		var soldier_node := soldier as Node3D
-		var distance_sq: float = soldier_node.global_position.distance_squared_to(corpse.global_position)
-		if distance_sq < best_distance_sq:
-			best_distance_sq = distance_sq
-			best = soldier_node
-	return best
+	return PlayerShipCargoTransportHelper.find_cargo_transport_actor(self, corpse)
 
 
 func _prepare_cleaner_for_cargo_transport(cleaner: Node3D, corpse: Node3D) -> void:
-	if "current_target" in cleaner:
-		cleaner.set("current_target", null)
-	if "attack_timer" in cleaner:
-		cleaner.set("attack_timer", maxf(float(cleaner.get("attack_timer")), cargo_transport_throw_duration + 2.0))
-	if "velocity" in cleaner:
-		cleaner.set("velocity", Vector3.ZERO)
-	if cleaner.has_method("_change_state"):
-		cleaner.call("_change_state", 0)
-	var look_target := Vector3(corpse.global_position.x, cleaner.global_position.y, corpse.global_position.z)
-	if not cleaner.global_position.is_equal_approx(look_target):
-		cleaner.look_at(look_target, Vector3.UP)
+	PlayerShipCargoTransportHelper.prepare_cleaner(self, cleaner, corpse)
 
 
 func _is_cargo_transport_actor_busy(soldier) -> bool:
-	if not is_instance_valid(soldier):
-		return true
-	if soldier.has_method("has_named_action"):
-		return bool(soldier.call("has_named_action"))
-	return SoldierActionHelper.has_action(soldier)
+	return PlayerShipCargoTransportHelper.is_actor_busy(soldier)
 
 
 func _set_cargo_transport_actor_action(cleaner: Node3D, action_name: String) -> void:
-	if not is_instance_valid(cleaner):
-		return
-	if cleaner.has_method("begin_cargo_transport_action"):
-		cleaner.call("begin_cargo_transport_action", action_name)
-	else:
-		SoldierActionHelper.begin_cargo_transport_action(cleaner, action_name)
+	PlayerShipCargoTransportHelper.set_actor_action(cleaner, action_name)
 
 
 func _throw_payload_overboard(cleaner: Node3D, corpse: Node3D) -> void:
@@ -767,84 +663,35 @@ func _stow_friendly_corpse_below_deck(cleaner: Node3D, corpse: Node3D) -> void:
 
 
 func _get_cargo_transport_pickup_point(cleaner: Node3D, corpse: Node3D) -> Vector3:
-	var corpse_local: Vector3 = to_local(corpse.global_position)
-	var cleaner_local: Vector3 = to_local(cleaner.global_position)
-	var approach_dir: Vector3 = cleaner_local - corpse_local
-	approach_dir.y = 0.0
-	if approach_dir.length_squared() <= 0.001:
-		approach_dir = Vector3(-1.0 if corpse_local.x >= 0.0 else 1.0, 0.0, 0.0)
-	approach_dir = approach_dir.normalized()
-	var local_point: Vector3 = corpse_local + approach_dir * 0.72
-	local_point = _clamp_cargo_transport_deck_local(local_point, 0.38)
-	var global_point: Vector3 = to_global(local_point)
-	global_point.y = cleaner.global_position.y
-	return global_point
+	return PlayerShipCargoTransportHelper.get_pickup_point(self, cleaner, corpse)
 
 
 func _get_cargo_transport_stair_stand_point(cleaner: Node3D) -> Vector3:
-	var stair_path: Dictionary = get_crew_stair_descent_points()
-	var stair_local: Vector3 = stair_path.get("top_local", to_local(get_crew_stair_global_position()))
-	stair_local = _clamp_cargo_transport_deck_local(stair_local, 0.38)
-	var global_point: Vector3 = to_global(stair_local)
-	global_point.y = cleaner.global_position.y
-	return global_point
+	return PlayerShipCargoTransportHelper.get_stair_stand_point(self, cleaner)
 
 
 func _get_cargo_transport_rail_stand_point(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
-	var local_pos: Vector3 = to_local(corpse.global_position)
-	var local_throw: Vector3 = to_local(throw_target)
-	var side_sign: float = 1.0 if local_throw.x >= 0.0 else -1.0
-	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
-	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
-	local_pos.x = side_sign * maxf(0.3, deck_half_width - 0.58)
-	local_pos.z = clampf(local_pos.z, -deck_half_length + 0.32, deck_half_length - 0.32)
-	var global_point: Vector3 = to_global(local_pos)
-	global_point.y = cleaner.global_position.y
-	return global_point
+	return PlayerShipCargoTransportHelper.get_rail_stand_point(self, cleaner, corpse, throw_target)
 
 
 func _get_cargo_transport_actor_local_target(cleaner: Node3D, global_target: Vector3, preserve_target_y: bool = false) -> Vector3:
-	var parent_3d := cleaner.get_parent() as Node3D
-	if not is_instance_valid(parent_3d):
-		return global_target
-	var local_target: Vector3 = parent_3d.to_local(global_target)
-	if not preserve_target_y:
-		local_target.y = cleaner.position.y
-	return local_target
+	return PlayerShipCargoTransportHelper.get_actor_local_target(cleaner, global_target, preserve_target_y)
 
 
 func _get_cargo_transport_carry_rotation(corpse: Node3D, actor_position: Vector3, throw_target: Vector3) -> Vector3:
-	var to_rail: Vector3 = throw_target - actor_position
-	to_rail.y = 0.0
-	if to_rail.length_squared() <= 0.001:
-		return corpse.rotation + Vector3(deg_to_rad(8.0), 0.0, deg_to_rad(6.0))
-	to_rail = to_rail.normalized()
-	var yaw := atan2(to_rail.x, to_rail.z)
-	var side_roll := deg_to_rad(18.0 if to_local(actor_position).x >= 0.0 else -18.0)
-	return Vector3(deg_to_rad(8.0), yaw, side_roll)
+	return PlayerShipCargoTransportHelper.get_carry_rotation(self, corpse, actor_position, throw_target)
 
 
 func _get_cargo_transport_walk_seconds(from_position: Vector3, to_position: Vector3, cleaner: Node3D) -> float:
-	var planar_delta: Vector3 = to_position - from_position
-	planar_delta.y = 0.0
-	var move_speed_value: float = float(cleaner.get("move_speed")) if cleaner.get("move_speed") != null else 3.0
-	return clampf(planar_delta.length() / maxf(move_speed_value * 1.05, 0.1), 0.18, 1.45)
+	return PlayerShipCargoTransportHelper.get_walk_seconds(from_position, to_position, cleaner)
 
 
 func _clamp_cargo_transport_deck_local(local_point: Vector3, inset: float) -> Vector3:
-	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
-	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
-	local_point.x = clampf(local_point.x, -deck_half_width + inset, deck_half_width - inset)
-	local_point.z = clampf(local_point.z, -deck_half_length + inset, deck_half_length - inset)
-	return local_point
+	return PlayerShipCargoTransportHelper.clamp_deck_local(self, local_point, inset)
 
 
 func _face_cargo_transport_actor(cleaner: Node3D, look_position: Vector3) -> void:
-	if not is_instance_valid(cleaner):
-		return
-	var look_target := Vector3(look_position.x, cleaner.global_position.y, look_position.z)
-	if not cleaner.global_position.is_equal_approx(look_target):
-		cleaner.look_at(look_target, Vector3.UP)
+	PlayerShipCargoTransportHelper.face_actor(cleaner, look_position)
 
 
 func _face_cargo_transport_actor_by_id(cleaner_id: int, look_position: Vector3) -> void:
@@ -910,11 +757,7 @@ func _begin_cargo_transport_carry_payload(cleaner: Node3D, corpse: Node3D) -> vo
 
 
 func _get_cargo_transport_carry_payload_offsets() -> Dictionary:
-	return {
-		SoldierActionHelper.PAYLOAD_DEF_FORWARD_OFFSET: CARGO_TRANSPORT_CARRY_FORWARD_OFFSET,
-		SoldierActionHelper.PAYLOAD_DEF_SIDE_OFFSET: CARGO_TRANSPORT_CARRY_SIDE_OFFSET,
-		SoldierActionHelper.PAYLOAD_DEF_HEIGHT_OFFSET: CARGO_TRANSPORT_CARRY_HEIGHT_OFFSET,
-	}
+	return PlayerShipCargoTransportHelper.get_transport_payload_offsets()
 
 
 func _finish_cargo_transport_carry_payload_by_id(cleaner_id: int, corpse_id: int) -> void:
@@ -928,21 +771,11 @@ func _finish_cargo_transport_carry_payload_by_id(cleaner_id: int, corpse_id: int
 
 
 func _get_cargo_transport_throw_origin(cleaner: Node3D, corpse: Node3D, throw_target: Vector3) -> Vector3:
-	return _get_cargo_transport_throw_origin_from_actor_position(cleaner.global_position, corpse, throw_target)
+	return PlayerShipCargoTransportHelper.get_throw_origin(cleaner, corpse, throw_target)
 
 
 func _get_cargo_transport_throw_origin_from_actor_position(actor_position: Vector3, corpse: Node3D, throw_target: Vector3) -> Vector3:
-	var to_rail: Vector3 = throw_target - actor_position
-	to_rail.y = 0.0
-	if to_rail.length_squared() <= 0.001:
-		to_rail = corpse.global_position - actor_position
-		to_rail.y = 0.0
-	if to_rail.length_squared() <= 0.001:
-		to_rail = Vector3.RIGHT
-	to_rail = to_rail.normalized()
-	var origin := actor_position + to_rail * 0.62
-	origin.y = maxf(corpse.global_position.y, actor_position.y + 0.48)
-	return origin
+	return PlayerShipCargoTransportHelper.get_throw_origin_from_actor_position(actor_position, corpse, throw_target)
 
 
 func _apply_cargo_transport_payload_pickup(progress: float, corpse_id: int, cleaner_id: int, target_rotation: Vector3) -> void:
@@ -1107,29 +940,11 @@ func _store_cargo_transport_stair_path_by_id(corpse_id: int, stair_top_local: Ve
 
 
 func _get_cargo_transport_throw_target(corpse: Node3D) -> Vector3:
-	var local_pos: Vector3 = to_local(corpse.global_position)
-	var side_sign: float = 1.0 if local_pos.x >= 0.0 else -1.0
-	var deck_half_width: float = maxf(1.8, _hull_half_extents.x * deck_bounds_ratio)
-	var deck_half_length: float = maxf(2.5, _hull_half_extents.y * deck_bounds_ratio)
-	local_pos.x = side_sign * (deck_half_width + randf_range(3.0, 4.2))
-	local_pos.z = clampf(local_pos.z, -deck_half_length, deck_half_length)
-	var global_target: Vector3 = to_global(local_pos)
-	global_target.y = 0.05
-	return global_target
+	return PlayerShipCargoTransportHelper.get_throw_target(self, corpse)
 
 
 func _get_roof_cargo_transport_throw_target(corpse: Node3D) -> Vector3:
-	var local_pos: Vector3 = to_local(corpse.global_position)
-	var side_sign: float = 1.0 if local_pos.x >= 0.0 else -1.0
-	if absf(local_pos.x) < 0.25:
-		side_sign = 1.0 if randf() >= 0.5 else -1.0
-	var roof_half_width: float = maxf(1.35, minf(_hull_half_extents.x * 0.55, _hull_half_extents.x))
-	var roof_half_length: float = maxf(2.0, _hull_half_extents.y * 0.68)
-	local_pos.x = side_sign * (roof_half_width + randf_range(2.4, 3.5))
-	local_pos.z = clampf(local_pos.z + randf_range(-0.25, 0.25), -roof_half_length, roof_half_length)
-	var global_target: Vector3 = to_global(local_pos)
-	global_target.y = 0.05
-	return global_target
+	return PlayerShipCargoTransportHelper.get_roof_throw_target(self, corpse)
 
 
 func _finish_cargo_transport_throw(corpse_id: int, cleaner_id: int) -> void:
@@ -1176,31 +991,11 @@ func _finish_friendly_cargo_transport_stow(corpse_id: int, cleaner_id: int) -> v
 
 
 func _grant_cargo_transport_xp() -> void:
-	if not is_instance_valid(_cached_level_manager) or not _cached_level_manager.has_method("add_bonus_xp"):
-		return
-	var xp_reward: int = max(0, int(_cached_level_manager.get("cargo_transport_xp_reward")))
-	if xp_reward <= 0:
-		return
-	_cached_level_manager.add_bonus_xp(xp_reward)
+	PlayerShipCargoTransportHelper.grant_xp(self)
 
 
 func _play_overboard_disposal_splash(splash_pos: Vector3) -> void:
-	if water_splash_scene:
-		var splash = ScenePool.acquire(get_tree(), water_splash_scene)
-		if is_instance_valid(splash):
-			get_tree().root.add_child(splash)
-			if splash is Node3D:
-				(splash as Node3D).global_position = Vector3(splash_pos.x, 0.05, splash_pos.z)
-			if splash.has_method("configure_as_overboard_disposal"):
-				splash.configure_as_overboard_disposal()
-			elif splash.has_method("configure_as_splash"):
-				splash.configure_as_splash()
-			elif splash.has_method("configure_as_small"):
-				splash.configure_as_small()
-			if splash.has_method("pool_activate"):
-				splash.call_deferred("pool_activate")
-	if is_instance_valid(_cached_audio_manager) and _cached_audio_manager.has_method("play_sfx"):
-		_cached_audio_manager.play_sfx("water_splash_small", splash_pos, randf_range(0.85, 1.15), 2.0)
+	PlayerShipCargoTransportHelper.play_overboard_disposal_splash(self, splash_pos)
 
 
 func get_crew_stair_global_position() -> Vector3:

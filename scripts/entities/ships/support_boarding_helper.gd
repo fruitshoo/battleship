@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SupportBoardingHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 
 const SUPPORT_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_SUPPORT_ATTACK
 const SUPPORT_RESCUE_BOARDING_PURPOSE := ShipBoardingMetaHelper.PURPOSE_SUPPORT_RESCUE
@@ -91,7 +93,7 @@ static func _get_support_rescue_boarding_ships(player_ship: Node) -> Array[Node]
 	for support_ship in EntityRegistry.get_ships_by_team("player"):
 		if not is_instance_valid(support_ship) or support_ship == player_ship:
 			continue
-		if not ShipAllyRoleHelper.is_support_ship(support_ship):
+		if not PlayerFleetRoleHelper.is_support_ship(support_ship):
 			continue
 		if support_ship.get("is_boarding") != true:
 			continue
@@ -110,7 +112,7 @@ static func _get_support_attack_boarding_ships(target_ship: Node) -> Array[Node]
 	for support_ship in EntityRegistry.get_ships_by_team("player"):
 		if not is_instance_valid(support_ship):
 			continue
-		if not ShipAllyRoleHelper.is_support_ship(support_ship):
+		if not PlayerFleetRoleHelper.is_support_ship(support_ship):
 			continue
 		if support_ship.get("is_boarding") != true:
 			continue
@@ -167,7 +169,7 @@ static func _is_support_rescue_boarder_on_player_ship(soldier: Node, player_ship
 	if not (home_ship is Node):
 		return false
 	var home_node := home_ship as Node
-	if not ShipAllyRoleHelper.is_support_ship(home_node):
+	if not PlayerFleetRoleHelper.is_support_ship(home_node):
 		return false
 	if home_node.get("is_sinking") == true or home_node.get("is_dying") == true:
 		return false

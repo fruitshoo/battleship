@@ -1,5 +1,5 @@
 @tool
-extends "res://scripts/entities/ships/chaser_ship.gd"
+extends "res://scripts/entities/ships/ai_ship.gd"
 class_name SupportShip
 
 ## Player support fleet ship.
@@ -8,7 +8,14 @@ class_name SupportShip
 const SupportSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META := "support_overboard_disposal_in_progress"
+const SUPPORT_RETREATING_META := "support_retreating"
 
+@export_group("Retreat")
+@export var support_retreat_enabled: bool = true
+@export_range(8.0, 120.0, 1.0, "suffix:s") var support_retreat_duration: float = 45.0
+@export_range(10.0, 220.0, 1.0, "suffix:m") var support_retreat_exit_distance: float = 92.0
+@export_range(2.0, 18.0, 0.1, "suffix:s") var support_retreat_exit_duration: float = 8.5
+@export_range(0.05, 1.0, 0.05) var support_return_hull_ratio: float = 1.0
 @export_group("Overboard Disposal")
 @export var support_overboard_disposal_enabled: bool = true
 @export_range(0.5, 12.0, 0.25) var support_overboard_disposal_delay: float = 3.0
@@ -16,6 +23,9 @@ const SUPPORT_OVERBOARD_DISPOSAL_IN_PROGRESS_META := "support_overboard_disposal
 @export_range(0.2, 1.5, 0.05) var support_overboard_disposal_throw_duration: float = 0.45
 @export_range(0.2, 2.5, 0.05) var support_overboard_disposal_throw_height: float = 0.65
 @export_group("")
+var support_retreating: bool = false
+var _support_retreat_timer: float = 0.0
+var _support_retreat_tween: Tween = null
 var _support_overboard_disposal_timer: float = 0.0
 var _support_overboard_disposal_peace_timer: float = 0.0
 
@@ -23,7 +33,7 @@ func _ready() -> void:
 	team = "player"
 	if ship_type.strip_edges().is_empty() or ship_type == "sekibune_melee":
 		ship_type = "maengseon_ally"
-	set_ally_ship_role("support_fleet")
+	set_player_fleet_role("support_fleet")
 	if Engine.is_editor_hint():
 		_remove_runtime_generated_hulls()
 		_cache_hull_references(self)
@@ -31,16 +41,190 @@ func _ready() -> void:
 		return
 	limbo_ai_pilot_tree_path = ShipLimboAIPilot.resolve_tree_path(self, limbo_ai_pilot_tree_path)
 	super._ready()
-	set_ally_ship_role("support_fleet")
+	set_player_fleet_role("support_fleet")
 	sync_sail_furl_with_flagship(0.0, true)
 
 
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
+	if support_retreating:
+		_update_support_retreat(delta)
+		return
 	sync_sail_furl_with_flagship(delta)
 	super._process(delta)
 	_update_support_overboard_disposal(delta)
+
+
+func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
+	if support_retreating:
+		return
+	super.take_damage(amount, hit_position, damage_source)
+
+
+func die() -> void:
+	if support_retreat_enabled and not support_retreating:
+		_begin_support_retreat()
+		return
+	super.die()
+
+
+func is_combat_disabled() -> bool:
+	return support_retreating or super.is_combat_disabled()
+
+
+func is_sinking_or_dying() -> bool:
+	return support_retreating or super.is_sinking_or_dying()
+
+
+func is_support_retreating() -> bool:
+	return support_retreating
+
+
+func _begin_support_retreat() -> void:
+	support_retreating = true
+	_support_retreat_timer = 0.0
+	set_meta(SUPPORT_RETREATING_META, true)
+	BaseShipStatusHelper.clear_fire_effect(self)
+	is_boarding = false
+	boarding_target = null
+	boarding_attacker = null
+	deck_is_contested = false
+	deck_is_overrun = false
+	boarding_capture_progress = 0.0
+	target = null
+	leaking_rate = 0.0
+	hull_hp = 0.0
+	_clear_ropes()
+	_set_contact_areas_enabled(false)
+	_set_wake_state(false)
+	current_speed = maxf(current_speed, move_speed * 0.7)
+	_set_support_actor_nodes_active(false)
+	if is_instance_valid(_support_retreat_tween):
+		_support_retreat_tween.kill()
+	_support_retreat_tween = create_tween()
+	_support_retreat_tween.tween_property(self, "global_position", _get_support_retreat_exit_position(), support_retreat_exit_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_support_retreat_tween.tween_callback(func() -> void:
+		if is_instance_valid(self) and support_retreating:
+			visible = false
+	)
+	print("[Support] 지원함이 전선에서 이탈했습니다.")
+
+
+func _update_support_retreat(delta: float) -> void:
+	_support_retreat_timer += delta
+	if _support_retreat_timer < support_retreat_duration:
+		return
+	_return_from_support_retreat()
+
+
+func _return_from_support_retreat() -> void:
+	if is_instance_valid(_support_retreat_tween):
+		_support_retreat_tween.kill()
+	_support_retreat_tween = null
+	support_retreating = false
+	if has_meta(SUPPORT_RETREATING_META):
+		remove_meta(SUPPORT_RETREATING_META)
+	is_dying = false
+	is_sinking = false
+	is_derelict = false
+	is_boarding = false
+	deck_is_contested = false
+	deck_is_overrun = false
+	boarding_capture_progress = 0.0
+	global_position = _get_support_return_position()
+	_restore_support_crew_after_retreat()
+	visible = true
+	_set_support_actor_nodes_active(true)
+	_set_contact_areas_enabled(true)
+	hull_hp = max_hull_hp * clampf(support_return_hull_ratio, 0.05, 1.0)
+	current_speed = maxf(float(current_speed), float(move_speed) * 0.6)
+	_last_ai_speed = current_speed
+	var flagship := _get_support_flagship()
+	if is_instance_valid(flagship):
+		target = flagship
+		look_at(flagship.global_position + (-flagship.global_transform.basis.z * 50.0), Vector3.UP)
+	set_meta("support_joining", true)
+	set_meta("support_join_stage", 0)
+	sync_sail_furl_with_flagship(0.0, true)
+	print("[Support] 지원함이 수리 후 복귀했습니다. HP %.0f" % hull_hp)
+
+
+func _restore_support_crew_after_retreat() -> void:
+	var soldiers_node := get_soldiers_container()
+	if not is_instance_valid(soldiers_node):
+		return
+	var roster_count := 0
+	for child in soldiers_node.get_children():
+		if not is_instance_valid(child):
+			continue
+		var soldier_team: String = child.get_team_tag() if child.has_method("get_team_tag") else str(child.get("team"))
+		var should_remove := soldier_team != "player" or SupportSoldierStateHelper.is_dead_soldier(child)
+		if should_remove:
+			soldiers_node.remove_child(child)
+			child.queue_free()
+			continue
+		if _counts_as_player_fleet_roster_soldier_node(child):
+			roster_count += 1
+
+	var target_count := _get_player_fleet_crew_respawn_target_count()
+	while roster_count < target_count:
+		_spawn_one_soldier("player")
+		roster_count += 1
+	reset_player_fleet_crew_respawn_timer()
+
+
+func _get_support_retreat_exit_position() -> Vector3:
+	var flagship := _get_support_flagship()
+	var away := global_transform.basis.z
+	away.y = 0.0
+	if is_instance_valid(flagship):
+		away = global_position - flagship.global_position
+		away.y = 0.0
+	if away.length_squared() <= 0.0001:
+		away = global_transform.basis.z
+		away.y = 0.0
+	if away.length_squared() <= 0.0001:
+		away = Vector3.BACK
+	away = away.normalized()
+	var exit_pos := global_position + away * support_retreat_exit_distance
+	exit_pos.y = 0.0
+	return exit_pos
+
+
+func _get_support_return_position() -> Vector3:
+	var flagship := _get_support_flagship()
+	if not is_instance_valid(flagship):
+		var fallback := global_position
+		fallback.y = 0.0
+		return fallback
+	var forward: Vector3 = -flagship.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.0001:
+		forward = Vector3.FORWARD
+	else:
+		forward = forward.normalized()
+	var right := forward.cross(Vector3.UP).normalized()
+	var return_pos: Vector3 = flagship.global_position - forward * 78.0 + right * randf_range(-20.0, 20.0)
+	return_pos.y = 0.0
+	return return_pos
+
+
+func _get_support_flagship() -> Node3D:
+	var flagship := SupportFleetStateHelper.get_support_owner_flagship(self)
+	if not is_instance_valid(flagship) and is_instance_valid(target):
+		flagship = target
+	return flagship
+
+
+func _set_support_actor_nodes_active(active: bool) -> void:
+	for soldier in EntityRegistry.get_soldiers_by_ship(self):
+		if not is_instance_valid(soldier):
+			continue
+		if soldier is Node3D:
+			(soldier as Node3D).visible = active
+		soldier.set_process(active)
+		soldier.set_physics_process(active)
 
 
 func set_sail_furled(furled: bool) -> void:
@@ -110,7 +294,7 @@ func _get_target_sail_deployment_ratio() -> float:
 	return 1.0
 
 
-func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
+func refresh_support_fleet_profile_runtime(profile: Dictionary = {}) -> void:
 	if Engine.is_editor_hint() or not is_inside_tree():
 		return
 
@@ -118,16 +302,17 @@ func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
 	var previous_hull_ratio: float = clampf(float(hull_hp) / previous_max_hull_hp, 0.0, 1.0)
 	var previous_speed: float = float(current_speed)
 	var previous_target: Node3D = target if is_instance_valid(target) else null
-	var desired_crew_count: int = maxi(1, int(initial_crew_count))
+	var profile_crew_count: int = int(profile.get("crew_count", 0))
+	var desired_crew_count: int = maxi(1, profile_crew_count) if profile_crew_count > 0 else maxi(1, int(initial_crew_count))
 	var soldiers_node := get_soldiers_container()
-	if is_instance_valid(soldiers_node):
+	if profile_crew_count <= 0 and is_instance_valid(soldiers_node):
 		desired_crew_count = maxi(1, soldiers_node.get_child_count())
 
 	var stats := load_ship_stats(ship_type)
 	if stats.is_empty():
 		return
 
-	ShipBlueprintHelper.apply_chaser_stats(self, stats)
+	ShipBlueprintHelper.apply_ai_ship_stats(self, stats)
 	_load_enemy_crew_composition_from_stats(stats)
 	_apply_combat_profile_from_stats(stats)
 	_apply_formation_role_profile()
@@ -142,6 +327,7 @@ func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
 		_equip_ship_weapons("player", true)
 
 	initial_crew_count = clampi(desired_crew_count, 1, max(1, max_crew))
+	set_player_fleet_crew_target_count(initial_crew_count)
 	_reconcile_support_crew_count(initial_crew_count)
 	hull_hp = minf(max_hull_hp, maxf(1.0, max_hull_hp * previous_hull_ratio))
 	current_speed = previous_speed
@@ -151,10 +337,13 @@ func refresh_support_fleet_profile_runtime(_profile: Dictionary = {}) -> void:
 	elif has_method("_find_player"):
 		_find_player()
 
-	set_ally_ship_role("support_fleet")
+	set_player_fleet_role("support_fleet")
 	if has_method("add_to_group"):
-		add_to_group("captured_minion")
-	EntityRegistry.register_captured_minion(self)
+		add_to_group("support_ship")
+		if is_in_group("captured_minion"):
+			remove_from_group("captured_minion")
+	EntityRegistry.register_support_ship(self)
+	EntityRegistry.unregister_legacy_captured_ship(self)
 	_apply_minion_visuals()
 	_refresh_deck_light()
 

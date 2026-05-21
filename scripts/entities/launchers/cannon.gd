@@ -4,6 +4,8 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
 const CANNON_RELOAD_TEMPO_MULT := 1.10
+const PLAYER_CANNON_CRIT_CHANCE := 0.05
+const PLAYER_CANNON_CRIT_MULTIPLIER := 1.5
 const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 
 ## 함포 (Cannon)
@@ -78,8 +80,8 @@ func _update_cached_stats() -> void:
 	_cached_range_mult = 1.0
 	_cached_cd_mult = 1.0
 	_cached_dmg_mult = 1.0
-	_cached_crit_chance = 0.0
-	_cached_crit_multiplier = 1.5
+	_cached_crit_chance = PLAYER_CANNON_CRIT_CHANCE
+	_cached_crit_multiplier = PLAYER_CANNON_CRIT_MULTIPLIER
 	_cached_projectile_speed = _get_projectile_speed()
 	if team != "player":
 		return

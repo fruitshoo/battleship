@@ -1,5 +1,7 @@
 @tool
-extends "res://scripts/test/chaser_isolation_runtime_methods.gd"
+extends "res://scripts/test/ai_ship_isolation_runtime_methods.gd"
+
+const AIShipLifecycleHelper = preload("res://scripts/entities/ships/ai_ship_lifecycle_helper.gd")
 
 var leaking_rate: float = 0.0
 var _leak_tick_timer: float = 0.0
@@ -51,7 +53,7 @@ func _update_leaking_damage(delta: float) -> void:
 func _update_enemy_fire_pot_logic(delta: float) -> void:
 	if not can_use_fire_pot_attack():
 		return
-	ChaserShipSupportHelper.update_enemy_fire_pot_logic(self, delta)
+	AIShipLifecycleHelper.update_enemy_fire_pot_logic(self, delta)
 
 
 func _auto_adjust_sail(delta: float) -> void:

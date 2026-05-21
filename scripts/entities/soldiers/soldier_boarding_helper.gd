@@ -2,7 +2,7 @@ extends RefCounted
 class_name SoldierBoardingHelper
 
 
-const BOARDING_LANDING_INSET := 0.45
+const BOARDING_LANDING_INSET := 0.58
 const BOARDING_WAR_CRY_SFX := "boarding_war_cry"
 const BOARDING_WAR_CRY_MIN_INTERVAL_MS := 650
 const BOARDING_WAR_CRY_RALLY_INTERVAL_MS := 1250

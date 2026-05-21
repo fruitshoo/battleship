@@ -60,6 +60,27 @@ Use `--write` only for the safe codemod step.
 Use `--contract-sweep` when you want the wrapper to finish by running the project contract harness.
 Use `--strict` when you want the audit step to fail on any legacy-pattern hits.
 
+## `export_windows_release.sh`
+
+Exports the Windows preset and names the output using `project.godot`'s `config/version`.
+
+Examples:
+
+```bash
+bash scripts/dev/export_windows_release.sh
+GODOT_BIN=/Applications/Godot.app/Contents/MacOS/Godot bash scripts/dev/export_windows_release.sh
+bash scripts/dev/export_windows_release.sh "Windows Desktop"
+```
+
+Output convention:
+
+```text
+exports/windows-v{version}/Battleship-v{version}.exe
+exports/Battleship-v{version}-windows.zip
+```
+
+See `docs/versioning.md` for the bump rules.
+
 ## `soldier_balance_report.py`
 
 Quick balance report for current soldier health, damage, defense, and rough TTK bands.

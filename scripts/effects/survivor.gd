@@ -1,4 +1,5 @@
 extends Area3D
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
@@ -258,7 +259,18 @@ func _hide_rescue_call() -> void:
 
 
 func _find_target_player() -> void:
-	target_player = FieldItemHelper.find_closest_player_ship(self, _get_current_magnet_radius())
+	var search_radius := _get_current_magnet_radius()
+	var closest_dist := INF
+	var closest_ship: Node3D = null
+	for candidate in EntityRegistry.get_ships_by_team("player"):
+		var player_ship := candidate as Node3D
+		if not _is_valid_rescue_ship(player_ship):
+			continue
+		var dist := global_position.distance_to(player_ship.global_position)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest_ship = player_ship
+	target_player = closest_ship if closest_dist <= search_radius * 1.5 else null
 
 
 func _get_current_magnet_radius() -> float:
@@ -268,13 +280,13 @@ func _get_current_magnet_radius() -> float:
 func _on_body_entered(body: Node3D) -> void:
 	if is_collected: return
 	var ship = _get_ship_from_node(body)
-	if ship and ship.is_in_group("player"):
+	if _is_valid_rescue_ship(ship):
 		_try_collect(ship)
 
 func _on_area_entered(area: Area3D) -> void:
 	if is_collected: return
 	var ship = _get_ship_from_node(area)
-	if ship and ship.is_in_group("player"):
+	if _is_valid_rescue_ship(ship):
 		_try_collect(ship)
 
 func _collect_by_proximity() -> void:
@@ -300,7 +312,7 @@ func _get_ship_rescue_anchor(ship: Node3D, lift_to_deck: bool) -> Vector3:
 
 func _try_collect(player_ship: Node3D) -> void:
 	if is_collected: return
-	if not is_instance_valid(player_ship) or not player_ship.has_method("add_survivor"):
+	if not _is_valid_rescue_ship(player_ship) or not player_ship.has_method("add_survivor"):
 		return
 	if not _is_close_enough_to_collect(player_ship):
 		target_player = player_ship
@@ -310,6 +322,20 @@ func _try_collect(player_ship: Node3D) -> void:
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)
 	_finish_collection(player_ship)
+
+
+func _is_valid_rescue_ship(ship: Node) -> bool:
+	if not is_instance_valid(ship) or not (ship is Node3D):
+		return false
+	if NodeContractHelper.is_sinking_or_dying(ship):
+		return false
+	if PlayerFleetRoleHelper.is_support_ship(ship):
+		return false
+	if PlayerFleetRoleHelper.is_player_flagship(ship):
+		return true
+	if ship.has_method("is_player_controlled_ship") and ship.call("is_player_controlled_ship") == true:
+		return true
+	return ship.get("is_player_controlled") == true
 
 
 func _finish_collection(player_ship: Node3D) -> void:

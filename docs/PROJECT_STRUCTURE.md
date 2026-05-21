@@ -173,7 +173,7 @@ scripts/
 대표 파일:
 - [base_ship.gd](/Users/shk/Godot/battleship/scripts/entities/ships/base_ship.gd)
 - [player_ship.gd](/Users/shk/Godot/battleship/scripts/entities/ships/player_ship.gd)
-- [chaser_ship.gd](/Users/shk/Godot/battleship/scripts/entities/ships/chaser_ship.gd)
+- [ai_ship.gd](/Users/shk/Godot/battleship/scripts/entities/ships/ai_ship.gd)
 - [boss_ship.gd](/Users/shk/Godot/battleship/scripts/entities/ships/boss_ship.gd)
 - [soldier.gd](/Users/shk/Godot/battleship/scripts/entities/soldiers/soldier.gd)
 

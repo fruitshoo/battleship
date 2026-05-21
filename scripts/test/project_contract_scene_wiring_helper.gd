@@ -1,6 +1,10 @@
 extends RefCounted
 class_name ProjectContractSceneWiringHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
+const AIShipScript = preload("res://scripts/entities/ships/ai_ship.gd")
+
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
 const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 
@@ -40,7 +44,7 @@ const AUTHORING_BLOCK_ACTION_TYPES := [
 const AUTHORING_BLOCK_AUTHORING_KEYS := ["combat_profile", "movement_intent"]
 
 
-class MockAllyRoleShip:
+class MockLegacyShipRoleShip:
 	extends Node3D
 
 	var team: String = "player"
@@ -171,7 +175,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 			"label": "support ship fallback",
 			"team": "player",
 			"player_controlled": false,
-			"groups": ["player", "ships", "captured_minion"],
+			"groups": ["player", "ships", "support_ship"],
 			"required_nodes": ["ProximityArea", "HitArea", "Soldiers", "CollisionVisualizer"],
 			"forbidden_nodes": [],
 			"require_hull": true,
@@ -183,7 +187,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 			"label": "support maengseon ship",
 			"team": "player",
 			"player_controlled": false,
-			"groups": ["player", "ships", "captured_minion"],
+			"groups": ["player", "ships", "support_ship"],
 			"required_nodes": ["MaengseonHull", "ProximityArea", "HitArea", "Soldiers", "CollisionVisualizer"],
 			"forbidden_nodes": [],
 			"require_hull": true,
@@ -195,7 +199,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 			"label": "support panokseon ship",
 			"team": "player",
 			"player_controlled": false,
-			"groups": ["player", "ships", "captured_minion"],
+			"groups": ["player", "ships", "support_ship"],
 			"required_nodes": ["PanokseonHull", "ProximityArea", "HitArea", "Soldiers", "CollisionVisualizer"],
 			"forbidden_nodes": [],
 			"require_hull": true,
@@ -229,7 +233,8 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	await _run_player_boarding_anchor_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_crew_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_support_ship_spawn_template_contract(owner, failures, wait_frames_after_attach)
-	_run_ship_ally_role_contract(failures)
+	_run_legacy_ship_role_contract(failures)
+	_run_player_fleet_role_api_contract(failures)
 	_run_hull_authoring_marker_contract(failures)
 	_run_enemy_boarding_sail_ai_contract(failures)
 	_run_ship_blueprint_weapon_loadout_contract(failures)
@@ -884,11 +889,11 @@ static func _run_support_ship_spawn_template_contract(owner: Node, failures: Arr
 	await _wait_frames(owner, wait_frames_after_attach)
 
 	player_ship.set("support_fleet_limit", 1)
-	if not player_ship.has_method("_spawn_or_repair_ally"):
+	if not player_ship.has_method("_spawn_or_repair_support_ship"):
 		failures.append("support ship spawn template missing player spawn method")
 		wrapper.queue_free()
 		return
-	player_ship.call("_spawn_or_repair_ally")
+	player_ship.call("_spawn_or_repair_support_ship")
 	await _wait_frames(owner, wait_frames_after_attach + 8)
 
 	var spawned_support: Node = null
@@ -910,10 +915,10 @@ static func _run_support_ship_spawn_template_contract(owner: Node, failures: Arr
 		failures.append("support ship spawn team should be player")
 	if spawned_support.get_meta("support_fleet_ship", false) != true:
 		failures.append("support ship spawn missing support_fleet_ship meta")
-	if not spawned_support.has_method("get_ally_ship_role") or str(spawned_support.call("get_ally_ship_role")) != ShipAllyRoleHelper.ROLE_SUPPORT_FLEET:
+	if not spawned_support.has_method("get_player_fleet_role") or str(spawned_support.call("get_player_fleet_role")) != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
 		failures.append("support ship spawn should be tagged as support_fleet role")
-	if ShipAllyRoleHelper.is_captured_minion(spawned_support):
-		failures.append("support ship spawn should not consume captured-minion role slots")
+	if PlayerFleetRoleHelper.is_legacy_captured_ship(spawned_support):
+		failures.append("support ship spawn should not consume legacy capture role slots")
 	if not spawned_support.has_method("sync_sail_furl_with_flagship"):
 		failures.append("support ship should mirror flagship sail furl state")
 	else:
@@ -960,67 +965,123 @@ static func _run_support_ship_spawn_template_contract(owner: Node, failures: Arr
 	await _wait_frames(owner, 1)
 
 
-static func _run_ship_ally_role_contract(failures: Array[String]) -> void:
-	var rows := ShipAllyRoleHelper.get_role_rows()
+static func _run_legacy_ship_role_contract(failures: Array[String]) -> void:
+	if ShipAllyRoleHelper.ROLE_SUPPORT_FLEET != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
+		failures.append("legacy ShipAllyRoleHelper alias should expose support role constants")
+	var legacy_api_ship := MockLegacyShipRoleShip.new()
+	PlayerFleetRoleHelper.set_ally_role(legacy_api_ship, PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET)
+	if PlayerFleetRoleHelper.get_ally_role(legacy_api_ship) != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
+		failures.append("legacy ally role API should forward to player fleet role state")
+	PlayerFleetRoleHelper.clear_ally_role(legacy_api_ship)
+	if PlayerFleetRoleHelper.get_fleet_role(legacy_api_ship) != PlayerFleetRoleHelper.ROLE_NONE:
+		failures.append("legacy clear ally role API should clear player fleet role state")
+	legacy_api_ship.free()
+	var legacy_meta_ship := MockLegacyShipRoleShip.new()
+	legacy_meta_ship.set_meta(PlayerFleetRoleHelper.LEGACY_ALLY_ROLE_META, PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET)
+	if PlayerFleetRoleHelper.get_fleet_role(legacy_meta_ship) != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
+		failures.append("legacy ally role metadata should still resolve during migration")
+	PlayerFleetRoleHelper.set_fleet_role(legacy_meta_ship, PlayerFleetRoleHelper.ROLE_PLAYER_FLAGSHIP)
+	if legacy_meta_ship.has_meta(PlayerFleetRoleHelper.LEGACY_ALLY_ROLE_META):
+		failures.append("set_fleet_role should remove legacy ally role metadata")
+	if PlayerFleetRoleHelper.get_fleet_role(legacy_meta_ship) != PlayerFleetRoleHelper.ROLE_PLAYER_FLAGSHIP:
+		failures.append("new player fleet role metadata should win after migration write")
+	legacy_meta_ship.free()
+
+	var rows := PlayerFleetRoleHelper.get_role_rows()
 	if rows.is_empty():
-		failures.append("ship ally role contract role table should not be empty")
+		failures.append("legacy ship role contract role table should not be empty")
 	var roles: Dictionary = {}
 	for row in rows:
-		var role_name := str(row.get(ShipAllyRoleHelper.ROLE_DEF_NAME, "")).strip_edges()
+		var role_name := str(row.get(PlayerFleetRoleHelper.ROLE_DEF_NAME, "")).strip_edges()
 		if role_name.is_empty():
-			failures.append("ship ally role contract row missing role name")
+			failures.append("legacy ship role contract row missing role name")
 			continue
 		if roles.has(role_name):
-			failures.append("ship ally role contract duplicate role: %s" % role_name)
+			failures.append("legacy ship role contract duplicate role: %s" % role_name)
 		roles[role_name] = row
-		if str(row.get(ShipAllyRoleHelper.ROLE_DEF_TEAM, "")).strip_edges().is_empty():
-			failures.append("ship ally role contract %s missing team" % role_name)
+		if str(row.get(PlayerFleetRoleHelper.ROLE_DEF_TEAM, "")).strip_edges().is_empty():
+			failures.append("legacy ship role contract %s missing team" % role_name)
 	for role_name in [
-		ShipAllyRoleHelper.ROLE_PLAYER_FLAGSHIP,
-		ShipAllyRoleHelper.ROLE_SUPPORT_FLEET,
-		ShipAllyRoleHelper.ROLE_CAPTURED_MINION,
+		PlayerFleetRoleHelper.ROLE_PLAYER_FLAGSHIP,
+		PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET,
+		PlayerFleetRoleHelper.ROLE_CAPTURED_MINION,
 	]:
 		if not roles.has(role_name):
-			failures.append("ship ally role contract missing role: %s" % role_name)
-	if ShipAllyRoleHelper.role_consumes_capture_slot(ShipAllyRoleHelper.ROLE_PLAYER_FLAGSHIP):
+			failures.append("legacy ship role contract missing role: %s" % role_name)
+	if PlayerFleetRoleHelper.role_consumes_capture_slot(PlayerFleetRoleHelper.ROLE_PLAYER_FLAGSHIP):
 		failures.append("player flagship should not consume capture slots")
-	if ShipAllyRoleHelper.role_consumes_capture_slot(ShipAllyRoleHelper.ROLE_SUPPORT_FLEET):
+	if PlayerFleetRoleHelper.role_consumes_capture_slot(PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET):
 		failures.append("support fleet should not consume capture slots")
-	if not ShipAllyRoleHelper.role_consumes_capture_slot(ShipAllyRoleHelper.ROLE_CAPTURED_MINION):
-		failures.append("captured minion should consume capture slots")
+	if not PlayerFleetRoleHelper.role_consumes_capture_slot(PlayerFleetRoleHelper.ROLE_CAPTURED_MINION):
+		failures.append("legacy captured ship should consume capture slots")
 
-	var support := MockAllyRoleShip.new()
-	ShipAllyRoleHelper.mark_support_ship(support)
+	var support := MockLegacyShipRoleShip.new()
+	PlayerFleetRoleHelper.mark_support_ship(support)
 	support.add_to_group("captured_minion")
-	if ShipAllyRoleHelper.get_ally_role(support) != ShipAllyRoleHelper.ROLE_SUPPORT_FLEET:
+	if PlayerFleetRoleHelper.get_fleet_role(support) != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
 		failures.append("explicit support role should win over legacy captured_minion group")
-	if ShipAllyRoleHelper.ship_consumes_capture_slot(support):
+	if PlayerFleetRoleHelper.ship_consumes_capture_slot(support):
 		failures.append("support role should not consume capture slot even when legacy grouped")
 
-	var legacy_support := MockAllyRoleShip.new()
-	legacy_support.set_meta(ShipAllyRoleHelper.LEGACY_SUPPORT_META, true)
-	if ShipAllyRoleHelper.get_ally_role(legacy_support) != ShipAllyRoleHelper.ROLE_SUPPORT_FLEET:
+	var legacy_support := MockLegacyShipRoleShip.new()
+	legacy_support.set_meta(PlayerFleetRoleHelper.LEGACY_SUPPORT_META, true)
+	if PlayerFleetRoleHelper.get_fleet_role(legacy_support) != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
 		failures.append("legacy support meta should resolve to support_fleet")
 
-	var captured := MockAllyRoleShip.new()
+	var captured := MockLegacyShipRoleShip.new()
 	captured.add_to_group("captured_minion")
-	if ShipAllyRoleHelper.get_ally_role(captured) != ShipAllyRoleHelper.ROLE_CAPTURED_MINION:
+	if PlayerFleetRoleHelper.get_fleet_role(captured) != PlayerFleetRoleHelper.ROLE_CAPTURED_MINION:
 		failures.append("captured_minion group should resolve to captured role")
-	if not ShipAllyRoleHelper.ship_consumes_capture_slot(captured):
+	if not PlayerFleetRoleHelper.ship_consumes_capture_slot(captured):
 		failures.append("captured role should consume capture slot")
 
-	var flagship := MockAllyRoleShip.new()
+	var flagship := MockLegacyShipRoleShip.new()
 	flagship.is_player_controlled = true
-	if ShipAllyRoleHelper.get_ally_role(flagship) != ShipAllyRoleHelper.ROLE_PLAYER_FLAGSHIP:
+	if PlayerFleetRoleHelper.get_fleet_role(flagship) != PlayerFleetRoleHelper.ROLE_PLAYER_FLAGSHIP:
 		failures.append("player controlled ship should resolve to flagship role")
 
 	var role_ships: Array = [support, legacy_support, captured, flagship]
-	if ShipAllyRoleHelper.count_capture_slot_minions(role_ships) != 1:
-		failures.append("ship ally role capture slot count should include only captured minions")
+	if PlayerFleetRoleHelper.count_capture_slot_ships(role_ships) != 1:
+		failures.append("legacy ship role capture slot count should include only legacy captured ships")
+	if not PlayerFleetRoleHelper.is_legacy_captured_ship(captured):
+		failures.append("legacy captured ship predicate should identify captured_minion role")
+	if not PlayerFleetRoleHelper.is_captured_minion(captured):
+		failures.append("captured_minion wrapper should keep old contracts working")
+	if PlayerFleetRoleHelper.count_legacy_captured_ships(role_ships) != 1:
+		failures.append("legacy captured ship count should include only legacy captured ships")
+	if PlayerFleetRoleHelper.count_capture_slot_minions(role_ships) != 1:
+		failures.append("capture slot minion wrapper should keep old contracts working")
 	for ship_variant in role_ships:
 		var ship := ship_variant as Node
 		if is_instance_valid(ship):
 			ship.free()
+
+
+static func _run_player_fleet_role_api_contract(failures: Array[String]) -> void:
+	var base_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/base_ship.gd")
+	if base_ship_source.is_empty():
+		failures.append("player fleet role API contract could not read base_ship.gd")
+	else:
+		if not base_ship_source.contains("func set_player_fleet_role"):
+			failures.append("BaseShip should expose set_player_fleet_role")
+		if not base_ship_source.contains("func get_player_fleet_role"):
+			failures.append("BaseShip should expose get_player_fleet_role")
+		if not base_ship_source.contains("Legacy compatibility wrappers"):
+			failures.append("BaseShip legacy ally role wrappers should be explicitly documented")
+
+	var scene_paths := [
+		"res://scenes/ships/player_ship.tscn",
+		"res://scenes/ships/support_ship.tscn",
+		"res://scenes/ships/support_maengseon_ship.tscn",
+		"res://scenes/ships/support_panokseon_ship.tscn",
+	]
+	for scene_path in scene_paths:
+		var scene_source := FileAccess.get_file_as_string(scene_path)
+		if scene_source.is_empty():
+			failures.append("player fleet role API contract could not read %s" % scene_path)
+			continue
+		if scene_source.contains("metadata/ally_ship_role"):
+			failures.append("%s should use metadata/player_fleet_role instead of legacy ally_ship_role" % scene_path)
 
 
 static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void:
@@ -1153,11 +1214,11 @@ static func _run_enemy_boarding_sail_ai_contract(failures: Array[String]) -> voi
 	var target := Node3D.new()
 	target.global_position = Vector3.ZERO
 
-	var boarder := ChaserShip.new()
+	var boarder := AIShipScript.new()
 	boarder.ship_type = "sekibune_melee"
 	boarder.team = "enemy"
 	boarder.allow_boarding = true
-	boarder.combat_role = ChaserShip.CombatRole.CHARGER
+	boarder.combat_role = AIShipScript.CombatRole.CHARGER
 	boarder.target = target
 	boarder.global_position = Vector3(float(boarder.get("boarding_sail_furl_distance")) - 1.0, 0.0, 0.0)
 	boarder.call("_update_boarding_sail_furl", 0.25)
@@ -1171,11 +1232,11 @@ static func _run_enemy_boarding_sail_ai_contract(failures: Array[String]) -> voi
 	if boarder.get("sail_furled") == true:
 		failures.append("sekibune boarding AI should unfurl after staying outside the reset range")
 
-	var gunner := ChaserShip.new()
+	var gunner := AIShipScript.new()
 	gunner.ship_type = "sekibune_cannon"
 	gunner.team = "enemy"
 	gunner.allow_boarding = false
-	gunner.combat_role = ChaserShip.CombatRole.GUNNER
+	gunner.combat_role = AIShipScript.CombatRole.GUNNER
 	gunner.target = target
 	gunner.global_position = Vector3(float(gunner.get("boarding_sail_furl_distance")) - 1.0, 0.0, 0.0)
 	gunner.call("_update_boarding_sail_furl", 0.25)

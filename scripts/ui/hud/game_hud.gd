@@ -85,7 +85,7 @@ var debug_ship_config_value: Label = null
 var debug_enemy_fleet_value: Label = null
 var debug_ship_ai_value: Label = null
 var debug_enemy_ai_value: Label = null
-var debug_ally_ai_value: Label = null
+var debug_support_ai_value: Label = null
 var debug_support_fleet_value: Label = null
 var debug_player_soldier_ai_value: Label = null
 var debug_enemy_soldier_ai_value: Label = null
@@ -99,6 +99,7 @@ var debug_environment_value: Label = null
 var debug_collision_value: Label = null
 var debug_distance_value: Label = null
 var debug_draw_channels_value: Label = null
+var debug_capture_status_value: Label = null
 var debug_authoring_palette_preview_value: Label = null
 var debug_authoring_palette_selected_value: Label = null
 var debug_authoring_palette_assembly_value: Label = null
@@ -176,6 +177,8 @@ var _debug_modal_previous_paused: bool = false
 var _debug_modal_previous_layer: int = 0
 var _debug_modal_previous_process_mode: ProcessMode = Node.PROCESS_MODE_INHERIT
 var _performance_overlay_refresh_left: float = 0.0
+var trailer_clean_hud_enabled: bool = false
+var _trailer_clean_hud_visibility_snapshot: Dictionary = {}
 
 # Upgrade slot UI
 var weapon_container: Container = null
@@ -246,6 +249,10 @@ func _ready() -> void:
 	call_deferred("_refresh_owned_item_icons")
 
 func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+	var root := get_tree().root if get_tree() != null else null
+	if root != null and root.has_meta("debug_free_camera_active"):
+		root.remove_meta("debug_free_camera_active")
 	_set_debug_modal_active(false)
 	HudStatPanelHelper._set_stat_modal_active(self, false)
 
@@ -478,6 +485,10 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _handle_debug_capture_shortcut(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
 	if _is_performance_overlay_toggle_event(event):
 		_toggle_performance_overlay()
 		if get_viewport():
@@ -575,6 +586,118 @@ func _toggle_performance_overlay() -> void:
 		performance_overlay_panel.visible = show_performance_overlay
 	_performance_overlay_refresh_left = 0.0
 	_update_performance_overlay(999.0)
+
+
+func _handle_debug_capture_shortcut(event: InputEvent) -> bool:
+	if not OS.is_debug_build():
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.is_echo():
+		return false
+	if not key_event.ctrl_pressed or not key_event.shift_pressed or key_event.alt_pressed or key_event.meta_pressed:
+		return false
+	var keycode := key_event.physical_keycode if key_event.physical_keycode != 0 else key_event.keycode
+	match keycode:
+		KEY_C:
+			_toggle_debug_free_camera()
+			return true
+		KEY_H:
+			_toggle_trailer_clean_hud()
+			return true
+		KEY_1:
+			_set_debug_time_scale(0.25)
+			return true
+		KEY_2:
+			_set_debug_time_scale(0.5)
+			return true
+		KEY_3, KEY_0:
+			_set_debug_time_scale(1.0)
+			return true
+	return false
+
+
+func _get_debug_camera() -> Camera3D:
+	var viewport := get_viewport()
+	if viewport != null:
+		var active_camera := viewport.get_camera_3d()
+		if is_instance_valid(active_camera):
+			return active_camera
+	var root := get_tree().root if get_tree() != null else null
+	return root.find_child("Camera3D", true, false) as Camera3D if root != null else null
+
+
+func _toggle_debug_free_camera() -> void:
+	var camera := _get_debug_camera()
+	if not is_instance_valid(camera):
+		show_gust_warning_message("디버그 카메라 없음", 0.9)
+		return
+	if camera.has_method("toggle_debug_free_camera"):
+		camera.call("toggle_debug_free_camera")
+	_sync_debug_tools_panel_state()
+
+
+func _reset_debug_camera_to_follow() -> void:
+	var camera := _get_debug_camera()
+	if is_instance_valid(camera) and camera.has_method("reset_debug_camera_to_follow"):
+		camera.call("reset_debug_camera_to_follow")
+	_sync_debug_tools_panel_state()
+
+
+func _set_debug_time_scale(scale: float) -> void:
+	if not OS.is_debug_build():
+		return
+	Engine.time_scale = clampf(scale, 0.05, 2.0)
+	_sync_debug_tools_panel_state()
+
+
+func _toggle_trailer_clean_hud() -> void:
+	_set_trailer_clean_hud_enabled(not trailer_clean_hud_enabled)
+
+
+func _set_trailer_clean_hud_enabled(enabled: bool) -> void:
+	if trailer_clean_hud_enabled == enabled:
+		return
+	trailer_clean_hud_enabled = enabled
+	_apply_trailer_clean_hud_visibility()
+	_sync_debug_tools_panel_state()
+
+
+func _apply_trailer_clean_hud_visibility() -> void:
+	if trailer_clean_hud_enabled:
+		_trailer_clean_hud_visibility_snapshot.clear()
+		for child in get_children():
+			var control := child as CanvasItem
+			if not is_instance_valid(control) or _is_debug_capture_overlay_child(child):
+				continue
+			_trailer_clean_hud_visibility_snapshot[child.get_instance_id()] = control.visible
+			control.visible = false
+		return
+	for child in get_children():
+		var control := child as CanvasItem
+		if not is_instance_valid(control):
+			continue
+		var instance_id := child.get_instance_id()
+		if _trailer_clean_hud_visibility_snapshot.has(instance_id):
+			control.visible = bool(_trailer_clean_hud_visibility_snapshot[instance_id])
+	_trailer_clean_hud_visibility_snapshot.clear()
+
+
+func _is_debug_capture_overlay_child(child: Node) -> bool:
+	return child == debug_backdrop \
+		or child == sail_debug_panel \
+		or child == performance_overlay_panel
+
+
+func get_debug_capture_status_text() -> String:
+	var camera := _get_debug_camera()
+	var free_camera := false
+	if is_instance_valid(camera) and camera.get("debug_free_camera_active") != null:
+		free_camera = bool(camera.get("debug_free_camera_active"))
+	return "카메라: %s / HUD: %s / 시간: %.2fx" % [
+		"자유" if free_camera else "추적",
+		"숨김" if trailer_clean_hud_enabled else "표시",
+		Engine.time_scale
+	]
 
 
 func _update_performance_overlay(delta: float) -> void:

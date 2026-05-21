@@ -2,6 +2,7 @@
 extends BTAction
 class_name BTShipSetNavigationHint
 
+const ShipAIPerceptionHelper = preload("res://scripts/ai/limbo/ship_ai_perception_helper.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 @export var intent_var: StringName = ShipAILimboKeys.VAR_INTENT
@@ -34,19 +35,22 @@ func _tick(_delta: float) -> Status:
 	var stance := str(blackboard.get_var(stance_var, "")).strip_edges()
 	if stance.is_empty():
 		return SUCCESS
-	if _can_board(agent_3d) and not _is_gunner(agent_3d) and ShipCombatModeHelper.can_be_boarded(target, agent_3d):
+	var is_gunner := ShipAIPerceptionHelper.is_ship_gunner(agent_3d)
+	var can_board := ShipAIPerceptionHelper.can_ship_board(agent_3d)
+	if can_board and not is_gunner and ShipCombatModeHelper.can_be_boarded(target, agent_3d):
 		return SUCCESS
 
-	var target_pos := _get_led_target_position(agent_3d, target)
+	var snapshot := ShipAIPerceptionHelper.build_engagement_snapshot(agent_3d, target, default_preferred_range, default_range_tolerance, default_retreat_range)
+	var target_pos: Vector3 = snapshot.get(ShipAIPerceptionHelper.KEY_LED_TARGET_POSITION, target.global_position)
 	var to_target := target_pos - agent_3d.global_position
 	to_target.y = 0.0
 	if to_target.length_squared() <= 0.001:
 		to_target = -agent_3d.global_transform.basis.z
 	var dir_to_target := to_target.normalized()
-	var target_distance := agent_3d.global_position.distance_to(target.global_position)
-	var preferred_range := _get_preferred_range(agent_3d)
-	var range_tolerance := _get_range_tolerance(agent_3d)
-	var retreat_range := _get_retreat_range(agent_3d)
+	var target_distance := float(snapshot.get(ShipAIPerceptionHelper.KEY_TARGET_DISTANCE, 0.0))
+	var preferred_range := float(snapshot.get(ShipAIPerceptionHelper.KEY_PREFERRED_RANGE, default_preferred_range))
+	var range_tolerance := float(snapshot.get(ShipAIPerceptionHelper.KEY_RANGE_TOLERANCE, default_range_tolerance))
+	var retreat_range := float(snapshot.get(ShipAIPerceptionHelper.KEY_RETREAT_RANGE, default_retreat_range))
 	var pressure := clampf(float(blackboard.get_var(pressure_var, 0.0)), 0.0, 1.0)
 	var range_intent := str(blackboard.get_var(intent_var, ShipAILimboKeys.INTENT_ENGAGE))
 
@@ -61,7 +65,7 @@ func _tick(_delta: float) -> Status:
 		ShipAILimboKeys.STANCE_WITHDRAW:
 			var retreat_step: float = maxf(retreat_range - target_distance + 4.5, 4.5)
 			desired_point = agent_3d.global_position - dir_to_target * retreat_step
-			heading_point = target.global_position if _is_gunner(agent_3d) else desired_point
+			heading_point = target.global_position if is_gunner else desired_point
 			speed_mult = 0.88
 			mode = "limbo_withdraw"
 		ShipAILimboKeys.STANCE_CLOSE_DISTANCE:
@@ -139,70 +143,6 @@ func _clear_navigation_hint(agent_3d: Node3D) -> void:
 	]:
 		if agent_3d.has_meta(key):
 			agent_3d.remove_meta(key)
-
-
-func _is_gunner(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("is_gunner_role"):
-		return agent_3d.call("is_gunner_role") == true
-	if "combat_role" in agent_3d:
-		return int(agent_3d.get("combat_role")) == 1
-	return false
-
-
-func _can_board(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("can_board_targets"):
-		return agent_3d.call("can_board_targets") == true
-	if "allow_boarding" in agent_3d:
-		return agent_3d.get("allow_boarding") == true
-	return false
-
-
-func _get_preferred_range(agent_3d: Node3D) -> float:
-	if agent_3d.has_method("get_preferred_engagement_range"):
-		return maxf(0.0, float(agent_3d.call("get_preferred_engagement_range")))
-	if "preferred_combat_range" in agent_3d:
-		return maxf(0.0, float(agent_3d.get("preferred_combat_range")))
-	return maxf(0.0, default_preferred_range)
-
-
-func _get_range_tolerance(agent_3d: Node3D) -> float:
-	if agent_3d.has_method("get_engagement_range_tolerance"):
-		return maxf(0.0, float(agent_3d.call("get_engagement_range_tolerance")))
-	if "combat_range_tolerance" in agent_3d:
-		return maxf(0.0, float(agent_3d.get("combat_range_tolerance")))
-	return maxf(0.0, default_range_tolerance)
-
-
-func _get_retreat_range(agent_3d: Node3D) -> float:
-	if agent_3d.has_method("get_retreat_engagement_distance"):
-		return maxf(0.0, float(agent_3d.call("get_retreat_engagement_distance")))
-	if "retreat_distance" in agent_3d:
-		return maxf(0.0, float(agent_3d.get("retreat_distance")))
-	return maxf(0.0, default_retreat_range)
-
-
-func _get_current_speed(node: Node3D) -> float:
-	if node.has_method("get_current_speed_value"):
-		return maxf(0.0, float(node.call("get_current_speed_value")))
-	if "current_speed" in node:
-		return maxf(0.0, float(node.get("current_speed")))
-	return 0.0
-
-
-func _get_led_target_position(agent_3d: Node3D, target: Node3D) -> Vector3:
-	var target_pos := target.global_position
-	var target_distance := agent_3d.global_position.distance_to(target.global_position)
-	if target_distance < 25.0:
-		return target_pos
-	var target_speed := _get_current_speed(target)
-	if target_speed <= 0.0:
-		return target_pos
-	var agent_speed := 1.0
-	if "move_speed" in agent_3d:
-		agent_speed = maxf(1.0, float(agent_3d.get("move_speed")))
-	var lead_forward := Vector3(-sin(target.rotation.y), 0.0, -cos(target.rotation.y))
-	var time_to_reach := minf(target_distance / agent_speed, 3.0)
-	return target_pos + lead_forward * target_speed * time_to_reach
 
 
 func _get_orbit_dir(agent_3d: Node3D, dir_to_target: Vector3) -> Vector3:

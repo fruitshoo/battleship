@@ -97,10 +97,7 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var base_damage := float(stats.get("base_damage", 2.5))
 			var personnel_mult := float(stats.get("personnel_damage_mult", 5.0))
 			var rocket_damage := base_damage * (1.0 + 0.15 * float(level))
-			var knockback := float(stats.get("base_knockback_speed", 9.0)) + float(level - 1) * float(stats.get("knockback_speed_per_lv", 0.0))
-			var overboard_level := int(stats.get("overboard_knockback_level", 4))
-			var knockback_note := "낙수 가능" if level >= overboard_level else "밀침 %.0f" % knockback
-			return "활 공격 %.0f%% | 대병 %.0f | %s | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, rocket_damage * personnel_mult, knockback_note, float(proc_stats.get("cooldown", 1.0))]
+			return "활 공격 %.0f%% | 대병 %.0f | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, rocket_damage * personnel_mult, float(proc_stats.get("cooldown", 1.0))]
 		"janggun":
 			var janggun_cooldown := maxf(
 				float(stats.get("min_cooldown", 9.0)),

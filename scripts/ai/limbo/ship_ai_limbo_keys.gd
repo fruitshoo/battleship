@@ -18,6 +18,8 @@ const VAR_BOARDING_INTENT := &"ship_boarding_intent"
 const VAR_SUPPORT_MODE := &"ship_support_mode"
 const VAR_SUPPORT_TARGET := &"ship_support_target"
 const VAR_SUPPORT_REASON := &"ship_support_reason"
+# Legacy captured-ship blackboard variables. Support fleet AI uses the SUPPORT
+# keys above; keep these names stable for the hidden capture flow and old trees.
 const VAR_ALLY_MODE := &"ship_ally_mode"
 const VAR_ALLY_TARGET := &"ship_ally_target"
 const VAR_ALLY_REASON := &"ship_ally_reason"
@@ -52,6 +54,7 @@ const META_SUPPORT_MODE := "limbo_ai_support_mode"
 const META_SUPPORT_TARGET_ID := "limbo_ai_support_target_id"
 const META_SUPPORT_FRAME := "limbo_ai_support_frame"
 const META_SUPPORT_REASON := "limbo_ai_support_reason"
+# Legacy captured-ship meta keys. Do not reuse for new support concepts.
 const META_ALLY_MODE := "limbo_ai_ally_mode"
 const META_ALLY_TARGET_ID := "limbo_ai_ally_target_id"
 const META_ALLY_FRAME := "limbo_ai_ally_frame"
@@ -89,6 +92,7 @@ const SUPPORT_MODE_SCREEN_THREAT := "screen_threat"
 const SUPPORT_MODE_BREACH_BOSS := "breach_boss"
 const SUPPORT_MODE_REGROUP := "regroup"
 
+# Legacy captured-ship modes paired with META_ALLY_*.
 const ALLY_MODE_FOLLOW_FLAGSHIP := "follow_flagship"
 const ALLY_MODE_GUARD_THREAT := "guard_threat"
 const ALLY_MODE_REGROUP := "regroup"

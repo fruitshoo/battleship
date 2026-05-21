@@ -94,22 +94,20 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 			focus_reason = "%s -> %s" % [focus_reason, focused_enemy_ai_ship.name]
 		var enemy_snapshot: Dictionary = focused_enemy_ai_ship.call("get_debug_ship_state_snapshot") if is_instance_valid(focused_enemy_ai_ship) and focused_enemy_ai_ship.has_method("get_debug_ship_state_snapshot") else {}
 		hud.debug_enemy_ai_value.text = _format_limbo_panel_text("적선 AI", focused_enemy_ai_ship, enemy_snapshot, focus_reason)
-	if is_instance_valid(hud.debug_ally_ai_value):
-		var nearest_ally_ai_ship := _find_nearest_player_limbo_ship(hud)
-		var ally_snapshot: Dictionary = nearest_ally_ai_ship.call("get_debug_ship_state_snapshot") if is_instance_valid(nearest_ally_ai_ship) and nearest_ally_ai_ship.has_method("get_debug_ship_state_snapshot") else {}
-		var ally_limbo: Dictionary = ally_snapshot.get("limbo", {})
-		var support_mode := str(ally_limbo.get("support_mode", "")).strip_edges()
-		var ally_mode := str(ally_limbo.get("ally_mode", "")).strip_edges()
-		var ally_focus_reason := "rescue run" if support_mode == ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP else "screen threat" if support_mode == ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT or ally_mode == ShipAILimboKeys.ALLY_MODE_GUARD_THREAT else "escort flagship" if support_mode == ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP or ally_mode == ShipAILimboKeys.ALLY_MODE_FOLLOW_FLAGSHIP else "regroup" if support_mode == ShipAILimboKeys.SUPPORT_MODE_REGROUP or ally_mode == ShipAILimboKeys.ALLY_MODE_REGROUP else ""
-		var ally_focus_target_id := 0
-		if is_instance_valid(nearest_ally_ai_ship):
-			ally_focus_target_id = int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0)) if not support_mode.is_empty() else int(nearest_ally_ai_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
-		var ally_focus_target := NodeContractHelper.get_instance_node3d(ally_focus_target_id) if ally_focus_target_id > 0 else null
-		if not is_instance_valid(ally_focus_target) and not ally_focus_reason.is_empty() and (ally_focus_reason == "escort flagship" or ally_focus_reason == "rescue run"):
-			ally_focus_target = player_ship
-		if not ally_focus_reason.is_empty() and is_instance_valid(ally_focus_target):
-			ally_focus_reason = "%s -> %s" % [ally_focus_reason, ally_focus_target.name]
-		hud.debug_ally_ai_value.text = _format_limbo_panel_text("아군 AI", nearest_ally_ai_ship, ally_snapshot, ally_focus_reason)
+	if is_instance_valid(hud.debug_support_ai_value):
+		var nearest_support_ai_ship := _find_nearest_player_limbo_ship(hud)
+		var support_snapshot: Dictionary = nearest_support_ai_ship.call("get_debug_ship_state_snapshot") if is_instance_valid(nearest_support_ai_ship) and nearest_support_ai_ship.has_method("get_debug_ship_state_snapshot") else {}
+		var support_limbo: Dictionary = support_snapshot.get("limbo", {})
+		var support_mode := str(support_limbo.get("support_mode", "")).strip_edges()
+		var legacy_capture_mode := str(support_limbo.get("legacy_capture_mode", "")).strip_edges()
+		var support_focus_reason := "rescue run" if support_mode == ShipAILimboKeys.SUPPORT_MODE_RESCUE_FLAGSHIP else "screen threat" if support_mode == ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT or legacy_capture_mode == ShipAILimboKeys.ALLY_MODE_GUARD_THREAT else "escort flagship" if support_mode == ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP or legacy_capture_mode == ShipAILimboKeys.ALLY_MODE_FOLLOW_FLAGSHIP else "regroup" if support_mode == ShipAILimboKeys.SUPPORT_MODE_REGROUP or legacy_capture_mode == ShipAILimboKeys.ALLY_MODE_REGROUP else ""
+		var support_focus_target_id := int(support_limbo.get("support_target_id", 0)) if not support_mode.is_empty() else int(support_limbo.get("legacy_capture_target_id", 0))
+		var support_focus_target := NodeContractHelper.get_instance_node3d(support_focus_target_id) if support_focus_target_id > 0 else null
+		if not is_instance_valid(support_focus_target) and not support_focus_reason.is_empty() and (support_focus_reason == "escort flagship" or support_focus_reason == "rescue run"):
+			support_focus_target = player_ship
+		if not support_focus_reason.is_empty() and is_instance_valid(support_focus_target):
+			support_focus_reason = "%s -> %s" % [support_focus_reason, support_focus_target.name]
+		hud.debug_support_ai_value.text = _format_limbo_panel_text("지원함 AI", nearest_support_ai_ship, support_snapshot, support_focus_reason)
 	if is_instance_valid(hud.debug_support_fleet_value):
 		hud.debug_support_fleet_value.text = _format_support_fleet_panel_text(player_ship)
 	if is_instance_valid(hud.debug_player_soldier_ai_value):
@@ -164,8 +162,8 @@ static func refill_player_crew_for_debug(hud) -> void:
 static func spawn_support_ship_for_debug(hud) -> void:
 	if not _ensure_player_ship(hud):
 		return
-	if hud.player_ship.has_method("_spawn_or_repair_ally"):
-		hud.player_ship.call("_spawn_or_repair_ally")
+	if hud.player_ship.has_method("_spawn_or_repair_support_ship"):
+		hud.player_ship.call("_spawn_or_repair_support_ship")
 		hud.show_gust_warning_message("지원함 호출", 0.7)
 static func stop_player_ship_for_debug(hud) -> void:
 	if not _ensure_player_ship(hud):
@@ -313,7 +311,7 @@ static func _format_limbo_panel_text(label: String, ship: Node3D, ship_snapshot:
 	var tree_name := tree_path.get_file().get_basename() if not tree_path.is_empty() else "-"
 	var primary_mode: String = str(limbo.get("support_mode", "")).strip_edges()
 	if primary_mode.is_empty():
-		primary_mode = str(limbo.get("ally_mode", "")).strip_edges()
+		primary_mode = str(limbo.get("legacy_capture_mode", "")).strip_edges()
 	if primary_mode.is_empty():
 		primary_mode = str(limbo.get("stance", "")).strip_edges()
 	var action_intent: String = str(limbo.get("weapon_intent", "")).strip_edges()
@@ -342,7 +340,7 @@ static func _format_limbo_panel_text(label: String, ship: Node3D, ship_snapshot:
 		details.append("%.1fm" % target_distance)
 	var reason := str(limbo.get("support_reason", "")).strip_edges()
 	if reason.is_empty():
-		reason = str(limbo.get("ally_reason", "")).strip_edges()
+		reason = str(limbo.get("legacy_capture_reason", "")).strip_edges()
 	match reason:
 		"formation_hold": reason = "hold line"
 		"outside_recall": reason = "too far"

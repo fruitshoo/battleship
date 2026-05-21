@@ -33,6 +33,8 @@ var _current_enemy_latch_mode: String = ""
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().paused = false
 	call_deferred("_configure_preview")
 
 
@@ -135,6 +137,8 @@ func _run_scenarios() -> void:
 			])
 
 		while _scenario_running:
+			if get_tree().paused:
+				get_tree().paused = false
 			await get_tree().process_frame
 			_current_scenario_elapsed = (Time.get_ticks_usec() - _current_scenario_started_usec) / 1000000.0
 			if _is_current_scenario_finished():
@@ -171,6 +175,7 @@ func _setup_scenario(scenario: Dictionary) -> void:
 	_current_enemy_latch_mode = ""
 	await get_tree().process_frame
 	_reset_player_ship_runtime()
+	await _restore_player_crew_for_scenario()
 	_configure_player_runtime(scenario)
 	_configure_enemy_runtime(scenario)
 	await get_tree().process_frame
@@ -275,6 +280,21 @@ func _reset_player_ship_runtime() -> void:
 		_current_player_ship.call("_sync_player_crew_roster")
 	if _current_player_ship.has_method("check_derelict_status"):
 		_current_player_ship.call("check_derelict_status")
+
+
+func _restore_player_crew_for_scenario() -> void:
+	if not is_instance_valid(_current_player_ship):
+		return
+	for soldier in EntityRegistry.get_soldiers_by_ship(_current_player_ship):
+		if is_instance_valid(soldier):
+			soldier.queue_free()
+	await get_tree().process_frame
+	if "captain_count" in _current_player_ship:
+		_current_player_ship.set("captain_count", 0)
+	_current_player_ship.set_meta("player_crew_initial_roster_synced", false)
+	if _current_player_ship.has_method("_sync_player_crew_roster"):
+		_current_player_ship.call("_sync_player_crew_roster", true)
+	await get_tree().process_frame
 
 
 func _configure_player_runtime(scenario: Dictionary) -> void:

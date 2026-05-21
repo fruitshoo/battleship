@@ -1,4 +1,4 @@
-extends "res://scripts/entities/ships/chaser_ship.gd"
+extends "res://scripts/entities/ships/ai_ship.gd"
 class_name EnemyGunnerShip
 
 

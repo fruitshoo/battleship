@@ -1,5 +1,7 @@
 extends RefCounted
-class_name ChaserShipBoardingHelper
+class_name AIShipBoardingHelper
+
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 
 const BOARDING_MOTION_SETTLE_DURATION := 1.35
@@ -361,4 +363,4 @@ static func _is_support_fleet_pair(ship, other_ship: Node3D) -> bool:
 		return false
 	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
-	return ShipAllyRoleHelper.is_support_ship(ship) and ShipAllyRoleHelper.is_support_ship(other_ship)
+	return PlayerFleetRoleHelper.is_support_ship(ship) and PlayerFleetRoleHelper.is_support_ship(other_ship)

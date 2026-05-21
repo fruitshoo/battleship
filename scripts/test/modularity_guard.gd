@@ -3,6 +3,7 @@ extends Node
 const REGISTRY_PATH := "res://scripts/test/module_boundaries.json"
 const SCRIPTS_ROOT := "res://scripts"
 const HELPER_SUFFIX := "_helper.gd"
+const LIMBO_META_ACCESS_SIGNATURE := "ShipAILimboKeys.META_"
 const SCENE_CONTRACT_ALLOWED_OWNERS := {
 	"res://scripts/entities/ships/base_ship.gd": true,
 	"res://scripts/helpers/node_contract_helper.gd": true,
@@ -114,6 +115,7 @@ func _run_guard() -> void:
 	_check_helper_dependency_boundaries(helper_paths, registered_helpers, registry, violations, watchlist, notices)
 	_check_coordinate_pooling_hazards(script_paths, registry, violations, watchlist, notices)
 	_check_scene_contract_encapsulation(script_paths, violations)
+	_check_limbo_meta_access_boundaries(script_paths, registry, violations)
 
 	print("[ModularityGuard] registered_helpers=%d actual_helpers=%d debt=%d watchlist=%d notices=%d violations=%d" % [
 		registered_helpers.size(),
@@ -574,6 +576,31 @@ func _check_scene_contract_encapsulation(script_paths: Array[String], violations
 func _has_scene_contract_test_marker(text: String) -> bool:
 	for line in text.split("\n"):
 		if str(line).strip_edges() == SCENE_CONTRACT_TEST_OPT_IN_MARKER:
+			return true
+	return false
+
+
+func _check_limbo_meta_access_boundaries(script_paths: Array[String], registry: Dictionary, violations: Array[String]) -> void:
+	var allowlist: Dictionary = registry.get("limbo_meta_access_allowlist", {})
+	var allowed_paths: Dictionary = {}
+	for raw_path in allowlist.get("paths", []):
+		allowed_paths[str(raw_path)] = true
+	var allowed_prefixes: Array[String] = []
+	for raw_prefix in allowlist.get("prefixes", []):
+		allowed_prefixes.append(str(raw_prefix))
+
+	for path in script_paths:
+		var text := FileAccess.get_file_as_string(path)
+		if not text.contains(LIMBO_META_ACCESS_SIGNATURE):
+			continue
+		if allowed_paths.has(path) or _path_matches_any_prefix(path, allowed_prefixes):
+			continue
+		violations.append("%s reads ShipAILimboKeys META directly; route gameplay/debug consumers through ShipAIIntentHelper or add an explicit allowlist reason." % path)
+
+
+func _path_matches_any_prefix(path: String, prefixes: Array[String]) -> bool:
+	for prefix in prefixes:
+		if path.begins_with(prefix):
 			return true
 	return false
 

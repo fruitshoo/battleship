@@ -9,6 +9,7 @@ const SHIP_PAIR_GEOMETRY_PRUNE_INTERVAL := 30
 const SHIP_DECK_BUCKET_CACHE_FRAME_WINDOW := 2
 const SHIP_DECK_BUCKET_PRUNE_INTERVAL := 30
 const SHIP_DECK_BUCKET_CELL_SIZE := 2.4
+const CROSS_SHIP_CONTACT_EDGE_INSET := 0.32
 
 static var _ship_enemy_scan_cache: Dictionary = {}
 static var _ship_enemy_scan_cache_last_prune_frame: int = -1000
@@ -154,12 +155,14 @@ static func _build_ship_pair_geometry(soldier, owned_ship: Node3D, other_ship: N
 	var contact_local := Vector3.ZERO
 	if use_side_edge:
 		var x_sign: float = 1.0 if other_local.x >= 0.0 else -1.0
-		contact_local.x = x_sign * my_half_ext.x
+		var safe_half_x: float = maxf(0.08, my_half_ext.x - minf(CROSS_SHIP_CONTACT_EDGE_INSET, maxf(0.0, my_half_ext.x - 0.08)))
+		contact_local.x = x_sign * safe_half_x
 		contact_local.z = clampf(other_local.z, -my_half_ext.y * contact_span_ratio, my_half_ext.y * contact_span_ratio)
 	else:
 		var z_sign: float = 1.0 if other_local.z >= 0.0 else -1.0
 		contact_local.x = clampf(other_local.x, -my_half_ext.x * contact_span_ratio, my_half_ext.x * contact_span_ratio)
-		contact_local.z = z_sign * my_half_ext.y
+		var safe_half_z: float = maxf(0.08, my_half_ext.y - minf(CROSS_SHIP_CONTACT_EDGE_INSET, maxf(0.0, my_half_ext.y - 0.08)))
+		contact_local.z = z_sign * safe_half_z
 
 	var ship_diff_xz := Vector2(
 		owned_ship.global_position.x - other_ship.global_position.x,

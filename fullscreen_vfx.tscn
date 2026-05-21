@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://d2khyedfgvw5f"]
+
+[ext_resource type="Shader" uid="uid://d3pi8ki8up4t6" path="res://fullscreen_basic.tres" id="1_ecnvh"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ecnvh"]
+render_priority = 0
+shader = ExtResource("1_ecnvh")
+
+[sub_resource type="QuadMesh" id="QuadMesh_xsag0"]
+
+[node name="Node3D" type="Node3D" unique_id=1024911423]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1849289729]
+material_override = SubResource("ShaderMaterial_ecnvh")
+mesh = SubResource("QuadMesh_xsag0")

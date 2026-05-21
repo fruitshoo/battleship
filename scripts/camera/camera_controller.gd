@@ -28,6 +28,12 @@ extends Camera3D
 @export_range(2.0, 28.0, 0.5) var gamepad_zoom_speed: float = 14.0
 @export_range(0.0, 0.6, 0.01) var gamepad_camera_deadzone: float = 0.16
 
+@export_group("Debug Free Camera")
+@export var debug_free_camera_speed: float = 18.0
+@export var debug_free_camera_fast_multiplier: float = 3.0
+@export_range(0.2, 4.0, 0.05) var debug_free_camera_mouse_sensitivity: float = 1.0
+@export_range(0.2, 4.0, 0.05) var debug_free_camera_keyboard_rotation_speed: float = 1.4
+
 @export_group("Fog Settings")
 @export_range(0.0, 300.0) var fog_begin_min: float = 90.0
 @export_range(0.0, 600.0) var fog_end_min: float = 240.0
@@ -60,6 +66,9 @@ var shake_duration: float = 0.0
 var _last_zoom: float = -1.0 # 마지막으로 포그가 업데이트된 줌 레벨
 var audio_listener: AudioListener3D
 var _sail_occlusion_update_left: float = 0.0
+var debug_free_camera_active: bool = false
+var _debug_free_camera_yaw: float = 0.0
+var _debug_free_camera_pitch: float = 0.0
 
 func _ready() -> void:
 	if target_path:
@@ -86,6 +95,15 @@ func _get_initial_zoom() -> float:
 	return offset.length()
 
 func _input(event: InputEvent) -> void:
+	if debug_free_camera_active:
+		if event is InputEventMouseMotion and (Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)):
+			_debug_free_camera_yaw -= event.relative.x * rotation_sensitivity * debug_free_camera_mouse_sensitivity
+			_debug_free_camera_pitch -= event.relative.y * rotation_sensitivity * debug_free_camera_mouse_sensitivity
+			_debug_free_camera_pitch = clamp(_debug_free_camera_pitch, -PI / 2.0 + 0.05, PI / 2.0 - 0.05)
+			_apply_debug_free_camera_rotation()
+			get_viewport().set_input_as_handled()
+		return
+
 	# 마우스 휠로 줌
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -111,6 +129,10 @@ func _input(event: InputEvent) -> void:
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0) # 땅 밑으로 안 가게 제한
 
 func _physics_process(delta: float) -> void:
+	if debug_free_camera_active:
+		_update_debug_free_camera(delta)
+		return
+
 	if not is_instance_valid(target):
 		return
 	
@@ -175,6 +197,89 @@ func _update_gamepad_camera_input(delta: float) -> void:
 	elif absf(rotate_y) > gamepad_camera_deadzone:
 		_cam_rotation.y -= rotate_y * gamepad_rotation_speed * delta
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
+
+
+func set_debug_free_camera_active(active: bool) -> void:
+	if not OS.is_debug_build() and active:
+		return
+	if debug_free_camera_active == active:
+		return
+	debug_free_camera_active = active
+	var root := get_tree().root if get_tree() != null else null
+	if root != null:
+		if active:
+			root.set_meta("debug_free_camera_active", true)
+		elif root.has_meta("debug_free_camera_active"):
+			root.remove_meta("debug_free_camera_active")
+	if active:
+		var rot := global_transform.basis.get_euler()
+		_debug_free_camera_pitch = rot.x
+		_debug_free_camera_yaw = rot.y
+		if is_instance_valid(audio_listener):
+			audio_listener.position = Vector3.ZERO
+	else:
+		if is_instance_valid(target):
+			_smoothed_look_target = target.global_position
+
+
+func toggle_debug_free_camera() -> void:
+	set_debug_free_camera_active(not debug_free_camera_active)
+
+
+func reset_debug_camera_to_follow() -> void:
+	set_debug_free_camera_active(false)
+	current_zoom = _get_initial_zoom()
+	target_zoom = current_zoom
+	if is_instance_valid(target):
+		_smoothed_look_target = target.global_position
+		global_position = _smoothed_look_target + global_transform.basis * Vector3(0, 0, current_zoom)
+
+
+func _update_debug_free_camera(delta: float) -> void:
+	var scale := maxf(Engine.time_scale, 0.001)
+	var real_delta := delta / scale
+	var move := Vector3.ZERO
+	var forward := -global_basis.z.normalized()
+	var right := global_basis.x.normalized()
+	if Input.is_key_pressed(KEY_W):
+		move += forward
+	if Input.is_key_pressed(KEY_S):
+		move -= forward
+	if Input.is_key_pressed(KEY_D):
+		move += right
+	if Input.is_key_pressed(KEY_A):
+		move -= right
+	if Input.is_key_pressed(KEY_E):
+		move += Vector3.UP
+	if Input.is_key_pressed(KEY_Q):
+		move -= Vector3.UP
+	if move.length_squared() > 0.001:
+		var speed := debug_free_camera_speed
+		if Input.is_key_pressed(KEY_SHIFT):
+			speed *= debug_free_camera_fast_multiplier
+		global_position += move.normalized() * speed * real_delta
+
+	var rotate_x := 0.0
+	var rotate_y := 0.0
+	if Input.is_key_pressed(KEY_RIGHT):
+		rotate_x -= 1.0
+	if Input.is_key_pressed(KEY_LEFT):
+		rotate_x += 1.0
+	if Input.is_key_pressed(KEY_DOWN):
+		rotate_y -= 1.0
+	if Input.is_key_pressed(KEY_UP):
+		rotate_y += 1.0
+	if absf(rotate_x) > 0.01 or absf(rotate_y) > 0.01:
+		_debug_free_camera_yaw += rotate_x * debug_free_camera_keyboard_rotation_speed * real_delta
+		_debug_free_camera_pitch += rotate_y * debug_free_camera_keyboard_rotation_speed * real_delta
+		_debug_free_camera_pitch = clamp(_debug_free_camera_pitch, -PI / 2.0 + 0.05, PI / 2.0 - 0.05)
+		_apply_debug_free_camera_rotation()
+
+	_update_dynamic_fog()
+
+
+func _apply_debug_free_camera_rotation() -> void:
+	rotation = Vector3(_debug_free_camera_pitch, _debug_free_camera_yaw, 0.0)
 
 func _update_sail_occlusion_fade(delta: float) -> void:
 	if not sail_occlusion_fade_enabled:

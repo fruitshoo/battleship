@@ -1,5 +1,6 @@
 extends Area3D
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const ShipDamageDecalHelper = preload("res://scripts/effects/ship_damage_decal_helper.gd")
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
@@ -8,6 +9,8 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 
 @export var speed: float = 18.0
 @export var damage: float = 15.0 # 즉발 데미지
+@export_range(0.0, 1.0, 0.01) var crit_chance: float = 0.05
+@export_range(1.0, 4.0, 0.05) var crit_multiplier: float = 1.5
 @export var dot_damage: float = 3.0 # 누수 데미지 (초당 3.0)
 @export var speed_debuff: float = 0.7 # 속도 30% 감소
 @export var turn_debuff: float = 0.6 # 선회 40% 감소
@@ -28,6 +31,7 @@ var target_ship: Node3D = null
 var janggun_lv: int = 0
 var team: String = "player"
 var _is_releasing: bool = false
+var _pending_critical_hit: bool = false
 
 const MIN_CLOSE_FLIGHT_DURATION := 0.22
 const MIN_LONG_FLIGHT_DURATION := 0.55
@@ -64,6 +68,7 @@ func pool_reset() -> void:
 	is_stuck = false
 	is_sinking = false
 	_is_releasing = false
+	_pending_critical_hit = false
 	progress = 0.0
 	target_ship = null
 	visible = false
@@ -93,6 +98,7 @@ func _begin_flight() -> void:
 	is_stuck = false
 	is_sinking = false
 	_is_releasing = false
+	_pending_critical_hit = false
 	progress = 0.0
 	target_ship = null
 	visible = true
@@ -163,8 +169,9 @@ func _on_hit(target: Node) -> void:
 		var target_is_sinking = NodeContractHelper.is_sinking_or_dying(ship)
 		if target_is_sinking:
 			return # 침몰 중인 배엔 데미지도 스플래시도 넣지 않고 통과 (또는 다른 처리)
+		_pending_critical_hit = team == "player" and randf() < crit_chance
 		global_position = _resolve_visible_ship_impact_position(ship)
-		_play_impact_vfx() # 임팩트 이펙트 재생
+		_play_impact_vfx(ship) # 임팩트 이펙트 재생
 		_stick_to_ship(ship)
 		
 		# 장군전은 중형 투사체라 흔들림을 대장군전급으로 키우지 않는다.
@@ -178,8 +185,9 @@ func _stick_to_ship(ship: Node3D) -> void:
 	
 	# 데미지 주기
 	if ship.has_method("take_damage"):
-		var source_id = "janggun" if team == "player" else ""
-		ship.take_damage(damage, global_position, source_id)
+		var source_id = _build_damage_source_id(_pending_critical_hit)
+		var final_damage := damage * (crit_multiplier if _pending_critical_hit else 1.0)
+		ship.take_damage(final_damage, global_position, source_id)
 	
 	# 물리/충돌 끄기
 	set_deferred("monitoring", false)
@@ -218,6 +226,12 @@ func _resolve_visible_ship_impact_position(ship: Node3D) -> Vector3:
 		visible_ceiling_y = maxf(0.55, float(ship.get("deck_height")) + SHIP_IMPACT_VERTICAL_OFFSET + SHIP_IMPACT_HEIGHT_PAD)
 	local_impact.y = clampf(local_impact.y, 0.2, visible_ceiling_y)
 	return ship.to_global(local_impact)
+
+
+func _build_damage_source_id(is_crit: bool) -> String:
+	if team == "player":
+		return "janggun%s" % ("_crit" if is_crit else "")
+	return "enemy_janggun%s" % ("_crit" if is_crit else "")
 
 func _unstick() -> void:
 	if is_instance_valid(target_ship) and target_ship.has_method("remove_stuck_object"):
@@ -284,17 +298,20 @@ func _finalize_release() -> void:
 		return
 	ScenePool.release(self)
 
-func _play_impact_vfx() -> void:
+func _play_impact_vfx(hit_ship: Node3D = null) -> void:
 	var impact_position := global_position
 	if not impact_position.is_finite():
 		return
+	if is_instance_valid(hit_ship):
+		var source_id := _build_damage_source_id(_pending_critical_hit)
+		ShipDamageDecalHelper.try_spawn_from_ship_hit(hit_ship, damage * (crit_multiplier if _pending_critical_hit else 1.0), impact_position, source_id)
 	var impact_dir := target_pos - start_pos
 	if impact_dir.length_squared() <= 0.001:
 		impact_dir = -global_basis.z
 
 	# 나무 파편 이펙트
 	if wood_splinter_scene:
-		var splinter_damage := damage + 8.0
+		var splinter_damage := damage * (1.18 if _pending_critical_hit else 1.0) + 8.0
 		WoodSplinter.spawn_burst(
 			get_tree(),
 			wood_splinter_scene,
@@ -311,7 +328,7 @@ func _play_impact_vfx() -> void:
 		var smoke := VfxSpawnHelper.acquire_world_node3d(get_tree(), impact_puff_scene, impact_position, "hit_effect", 10, 100.0)
 		if is_instance_valid(smoke):
 			if smoke.has_method("set_intensity"):
-				smoke.set_intensity(1.18)
+				smoke.set_intensity(1.34 if _pending_critical_hit else 1.18)
 			# Basis.looking_at은 타겟 벡터가 0이면 오류가 나므로 가드 추가
 			var smoke_dir = Vector3.UP
 			smoke.global_basis = Basis.looking_at(smoke_dir, Vector3.FORWARD)
@@ -321,7 +338,7 @@ func _play_impact_vfx() -> void:
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx("heavy_missle_impact", global_position, randf_range(0.94, 1.05), -1.0)
-		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.82, 0.96), 1.5)
+		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.76, 0.92), 3.0 if _pending_critical_hit else 1.5)
 
 func _play_launch_vfx() -> void:
 	# 화면 흔들림

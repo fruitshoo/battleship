@@ -4,7 +4,8 @@ extends RefCounted
 static var _ships: Array[Node] = []
 static var _soldiers: Array[Node] = []
 static var _projectiles: Array[Node] = []
-static var _captured_minions: Array[Node] = []
+static var _legacy_captured_ships: Array[Node] = []
+static var _support_ships: Array[Node] = []
 static var _soldiers_by_ship: Dictionary = {}
 static var _ships_by_team: Dictionary = {}
 static var _soldiers_by_team: Dictionary = {}
@@ -21,6 +22,8 @@ static func register_ship(ship: Node) -> void:
 static func unregister_ship(ship: Node) -> void:
 	_unregister_team_bucket(_ships_by_team, ship, str(ship.get("team")))
 	_unregister_node(_ships, ship)
+	unregister_legacy_captured_ship(ship)
+	unregister_support_ship(ship)
 
 
 static func register_soldier(soldier: Node) -> void:
@@ -62,23 +65,61 @@ static func get_ships() -> Array:
 
 
 static func register_captured_minion(ship: Node) -> void:
+	register_legacy_captured_ship(ship)
+
+
+static func register_legacy_captured_ship(ship: Node) -> void:
 	if not is_instance_valid(ship):
 		return
-	if not _captured_minions.has(ship):
-		_captured_minions.append(ship)
+	unregister_support_ship(ship)
+	if not _legacy_captured_ships.has(ship):
+		_legacy_captured_ships.append(ship)
 
 
 static func unregister_captured_minion(ship: Node) -> void:
-	_unregister_node(_captured_minions, ship)
+	unregister_legacy_captured_ship(ship)
+
+
+static func unregister_legacy_captured_ship(ship: Node) -> void:
+	_unregister_node(_legacy_captured_ships, ship)
 
 
 static func get_captured_minions() -> Array:
-	return _compact_nodes(_captured_minions)
+	return get_legacy_captured_ships()
+
+
+static func get_legacy_captured_ships() -> Array:
+	return _compact_nodes(_legacy_captured_ships)
 
 
 static func count_captured_minions() -> int:
-	_compact_nodes_in_place(_captured_minions)
-	return _captured_minions.size()
+	return count_legacy_captured_ships()
+
+
+static func count_legacy_captured_ships() -> int:
+	_compact_nodes_in_place(_legacy_captured_ships)
+	return _legacy_captured_ships.size()
+
+
+static func register_support_ship(ship: Node) -> void:
+	if not is_instance_valid(ship):
+		return
+	unregister_legacy_captured_ship(ship)
+	if not _support_ships.has(ship):
+		_support_ships.append(ship)
+
+
+static func unregister_support_ship(ship: Node) -> void:
+	_unregister_node(_support_ships, ship)
+
+
+static func get_support_ships() -> Array:
+	return _compact_nodes(_support_ships)
+
+
+static func count_support_ships() -> int:
+	_compact_nodes_in_place(_support_ships)
+	return _support_ships.size()
 
 
 static func get_soldiers() -> Array:

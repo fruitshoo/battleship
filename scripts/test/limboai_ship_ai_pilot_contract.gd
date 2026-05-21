@@ -1,4 +1,5 @@
 extends Node
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 # @scene_contract_encapsulated
 
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
@@ -11,6 +12,7 @@ const ENEMY_FIREPOT_PILOT_TREE_PATH := "res://resources/ai/limbo/enemy_firepot_a
 const BOSS_PILOT_TREE_PATH := "res://resources/ai/limbo/boss_ship_ai_pilot.tres"
 const SUPPORT_PILOT_TREE_PATH := "res://resources/ai/limbo/support_ship_ai_pilot.tres"
 const CAPTURED_MINION_PILOT_TREE_PATH := "res://resources/ai/limbo/captured_minion_ai_pilot.tres"
+const LEGACY_CAPTURE_PILOT_TREE_PATH := CAPTURED_MINION_PILOT_TREE_PATH
 const CONTRACT_META_STALE_FRAMES := 8
 const LIMBO_ACTIVE_SHIP_SCENE_PATHS := {
 	"res://scenes/ships/enemy_base_ship.tscn": ENEMY_BOARDER_PILOT_TREE_PATH,
@@ -204,8 +206,8 @@ func _run_contract() -> void:
 	support_ship.team = "player"
 	support_ship.position = Vector3(-16.0, 0.0, 0.0)
 	add_child(support_ship)
-	ShipAllyRoleHelper.mark_player_flagship(player_ship)
-	ShipAllyRoleHelper.mark_support_ship(support_ship)
+	PlayerFleetRoleHelper.mark_player_flagship(player_ship)
+	PlayerFleetRoleHelper.mark_support_ship(support_ship)
 	EntityRegistry.register_ship(support_ship)
 
 	await _verify_support_pilot_mode(
@@ -417,14 +419,14 @@ func _run_contract() -> void:
 		support_ship.remove_meta("support_squadron_slot_role")
 
 	var captured_ship := MockShip.new()
-	captured_ship.name = "LimboPilotCapturedMinion"
+	captured_ship.name = "LimboPilotLegacyCapturedShip"
 	captured_ship.team = "player"
 	captured_ship.position = Vector3(-12.0, 0.0, 0.0)
 	add_child(captured_ship)
-	ShipAllyRoleHelper.mark_captured_minion(captured_ship)
+	PlayerFleetRoleHelper.mark_legacy_captured_ship(captured_ship)
 	EntityRegistry.register_ship(captured_ship)
 
-	await _verify_captured_minion_pilot_mode(
+	await _verify_legacy_captured_ship_pilot_mode(
 		captured_ship,
 		player_ship,
 		enemy_ship,
@@ -436,7 +438,7 @@ func _run_contract() -> void:
 		Vector3(120.0, 0.0, 0.0),
 		false
 	)
-	await _verify_captured_minion_pilot_mode(
+	await _verify_legacy_captured_ship_pilot_mode(
 		captured_ship,
 		player_ship,
 		enemy_ship,
@@ -448,7 +450,7 @@ func _run_contract() -> void:
 		Vector3(18.0, 0.0, 0.0),
 		false
 	)
-	await _verify_captured_minion_pilot_mode(
+	await _verify_legacy_captured_ship_pilot_mode(
 		captured_ship,
 		player_ship,
 		enemy_ship,
@@ -460,7 +462,7 @@ func _run_contract() -> void:
 		Vector3(32.0, 0.0, 0.0),
 		true
 	)
-	await _verify_captured_minion_pilot_mode(
+	await _verify_legacy_captured_ship_pilot_mode(
 		captured_ship,
 		player_ship,
 		enemy_ship,
@@ -788,49 +790,49 @@ func _verify_support_pilot_mode(
 		_fail("support pilot should not publish launcher weapon intent")
 
 
-func _verify_captured_minion_pilot_mode(
-	captured_ship: MockShip,
+func _verify_legacy_captured_ship_pilot_mode(
+	legacy_captured_ship: MockShip,
 	player_ship: MockShip,
 	enemy_ship: MockShip,
 	expected_mode: String,
 	expected_reason: String,
-	expected_ally_target: Node3D,
+	expected_legacy_capture_target: Node3D,
 	captured_position: Vector3,
 	player_position: Vector3,
 	enemy_position: Vector3,
 	enemy_boarding_flagship: bool
 ) -> void:
-	captured_ship.position = captured_position
+	legacy_captured_ship.position = captured_position
 	player_ship.position = player_position
 	enemy_ship.position = enemy_position
 	enemy_ship.boarding_target = player_ship if enemy_boarding_flagship else null
-	captured_ship.limbo_ai_pilot_enabled = true
-	captured_ship.target = null
+	legacy_captured_ship.limbo_ai_pilot_enabled = true
+	legacy_captured_ship.target = null
 
-	ShipLimboAIPilot.tick(captured_ship, 0.016, CAPTURED_MINION_PILOT_TREE_PATH)
+	ShipLimboAIPilot.tick(legacy_captured_ship, 0.016, LEGACY_CAPTURE_PILOT_TREE_PATH)
 	await get_tree().process_frame
-	ShipLimboAIPilot.tick(captured_ship, 0.016, CAPTURED_MINION_PILOT_TREE_PATH)
+	ShipLimboAIPilot.tick(legacy_captured_ship, 0.016, LEGACY_CAPTURE_PILOT_TREE_PATH)
 	await get_tree().process_frame
 
-	var flagship_target_id := int(captured_ship.get_meta(ShipAILimboKeys.META_TARGET_ID, 0))
+	var flagship_target_id := int(legacy_captured_ship.get_meta(ShipAILimboKeys.META_TARGET_ID, 0))
 	if flagship_target_id != player_ship.get_instance_id():
-		_fail("captured pilot flagship target mismatch: %d expected %d" % [flagship_target_id, player_ship.get_instance_id()])
-	if captured_ship.target != player_ship:
-		_fail("captured pilot should keep the flagship as the ship target")
-	var mode := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, ""))
+		_fail("legacy captured pilot flagship target mismatch: %d expected %d" % [flagship_target_id, player_ship.get_instance_id()])
+	if legacy_captured_ship.target != player_ship:
+		_fail("legacy captured pilot should keep the flagship as the ship target")
+	var mode := str(legacy_captured_ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, ""))
 	if mode != expected_mode:
-		_fail("captured pilot mode mismatch: %s expected %s" % [mode, expected_mode])
-	var ally_target_id := int(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
-	if ally_target_id != expected_ally_target.get_instance_id():
-		_fail("captured pilot ally target mismatch: %d expected %d" % [ally_target_id, expected_ally_target.get_instance_id()])
-	var ally_frame := int(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_FRAME, -1000000))
-	if Engine.get_physics_frames() - ally_frame > CONTRACT_META_STALE_FRAMES:
-		_fail("captured pilot frame is stale: %d" % ally_frame)
-	var reason := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges()
+		_fail("legacy captured pilot mode mismatch: %s expected %s" % [mode, expected_mode])
+	var legacy_capture_target_id := int(legacy_captured_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
+	if legacy_capture_target_id != expected_legacy_capture_target.get_instance_id():
+		_fail("legacy captured pilot target mismatch: %d expected %d" % [legacy_capture_target_id, expected_legacy_capture_target.get_instance_id()])
+	var legacy_capture_frame := int(legacy_captured_ship.get_meta(ShipAILimboKeys.META_ALLY_FRAME, -1000000))
+	if Engine.get_physics_frames() - legacy_capture_frame > CONTRACT_META_STALE_FRAMES:
+		_fail("legacy captured pilot frame is stale: %d" % legacy_capture_frame)
+	var reason := str(legacy_captured_ship.get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges()
 	if reason.is_empty():
-		_fail("captured pilot reason is missing")
+		_fail("legacy captured pilot reason is missing")
 	elif reason != expected_reason:
-		_fail("captured pilot reason mismatch: %s expected %s" % [reason, expected_reason])
+		_fail("legacy captured pilot reason mismatch: %s expected %s" % [reason, expected_reason])
 
 
 func _assert_limboai_classes_registered() -> void:
@@ -855,9 +857,9 @@ func _verify_capture_enables_limbo_defaults() -> void:
 	if captured_ship.get("limbo_ai_pilot_enabled") != true:
 		_fail("captured ship should enable LimboAI after capture")
 	var tree_path := str(captured_ship.get("limbo_ai_pilot_tree_path")).strip_edges()
-	if tree_path != CAPTURED_MINION_PILOT_TREE_PATH:
-		_fail("captured ship LimboAI tree mismatch: %s expected %s" % [tree_path, CAPTURED_MINION_PILOT_TREE_PATH])
-	EntityRegistry.unregister_captured_minion(captured_ship)
+	if tree_path != LEGACY_CAPTURE_PILOT_TREE_PATH:
+		_fail("legacy captured ship LimboAI tree mismatch: %s expected %s" % [tree_path, LEGACY_CAPTURE_PILOT_TREE_PATH])
+	EntityRegistry.unregister_legacy_captured_ship(captured_ship)
 	EntityRegistry.unregister_ship(captured_ship)
 	captured_ship.queue_free()
 	await get_tree().process_frame

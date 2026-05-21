@@ -25,11 +25,6 @@ const CRIT_EFFECT_DECK_MARGIN := 0.75
 @export var max_homing_distance: float = 14.0
 @export var allow_retarget: bool = false
 @export var prefer_personnel_targets: bool = false
-@export var soldier_knockback_speed: float = 9.0
-@export var soldier_knockback_duration: float = 0.34
-@export var soldier_knockback_allows_overboard: bool = false
-@export var soldier_knockback_upward_speed: float = 0.0
-@export var soldier_knockback_arc_bonus: float = 0.035
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 2.0
 @export_range(0.03, 0.3) var retarget_scan_interval: float = 0.08
@@ -106,20 +101,9 @@ func pool_reset() -> void:
 	_collision_check_left = 0.0
 	_last_collision_check_pos = global_position
 	_face_velocity(true)
-	_update_rocket_trail_enabled(_should_enable_rocket_trail())
 
 func restart_flight() -> void:
 	pool_reset()
-	
-	# 발사 사운드 재생 (01, 02, 03 무작위 선택)
-	var audio_manager = get_node_or_null("/root/AudioManager")
-	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		var rand = randf()
-		var sfx_name = "rocket_launch_01"
-		if rand > 0.66: sfx_name = "rocket_launch_03"
-		elif rand > 0.33: sfx_name = "rocket_launch_02"
-		
-		audio_manager.play_sfx(sfx_name, global_position, randf_range(0.9, 1.1))
 	
 func _physics_process(delta: float) -> void:
 	var profile_start := PhysicsFrameProfiler.begin()
@@ -206,24 +190,6 @@ func _face_velocity(force: bool = false) -> void:
 	if absf(dir.y) > 0.999:
 		up_vec = Vector3.RIGHT
 	look_at(look_target, up_vec)
-
-func _should_enable_rocket_trail() -> bool:
-	var enable_trail := VfxBudget.allow_spawn(get_tree(), "rocket_trail", global_position, 8, 75.0)
-	if VfxBudget.get_continuous_effect_scale() <= 0.42:
-		enable_trail = false
-	return enable_trail
-
-func _update_rocket_trail_enabled(enabled: bool) -> void:
-	var trail_root := get_node_or_null("RocketTrail")
-	if not is_instance_valid(trail_root):
-		return
-	trail_root.visible = enabled
-	if trail_root is GPUParticles3D:
-		(trail_root as GPUParticles3D).emitting = enabled
-		return
-	for child in trail_root.find_children("*", "GPUParticles3D", true, false):
-		if child is GPUParticles3D:
-			(child as GPUParticles3D).emitting = enabled
 
 func _should_run_collision_check(prev_pos: Vector3, delta: float) -> bool:
 	_collision_check_left -= delta
@@ -409,13 +375,6 @@ func _finish_flight(primary_target: Node3D = null) -> void:
 
 	if is_instance_valid(primary_target):
 		_apply_damage(primary_target, 1.0)
-		_apply_soldier_knockback(primary_target)
-
-	_update_rocket_trail_enabled(false)
-	
-	var audio_manager = get_node_or_null("/root/AudioManager")
-	if is_instance_valid(primary_target) and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("impact_wood", global_position, randf_range(0.7, 0.9))
 
 
 func _draw_rocket_impact_debug(primary_target: Node3D) -> void:
@@ -431,62 +390,6 @@ func _debug_hit_label(target: Variant) -> String:
 	if target is Node:
 		return (target as Node).name
 	return "hit"
-
-
-func _apply_soldier_knockback(target: Node3D) -> void:
-	if not _is_valid_soldier_target(target):
-		return
-	var knockback_dir := _velocity.normalized()
-	knockback_dir.y = 0.0
-	if knockback_dir.length_squared() <= 0.0001:
-		knockback_dir = (target.global_position - start_pos)
-		knockback_dir.y = 0.0
-	if knockback_dir.length_squared() <= 0.0001:
-		return
-	var allow_overboard := soldier_knockback_allows_overboard and _should_allow_soldier_overboard(target, knockback_dir)
-	var upward_speed := soldier_knockback_upward_speed
-	if allow_overboard:
-		upward_speed += clampf(soldier_knockback_speed * soldier_knockback_arc_bonus, 0.25, 0.75)
-	if target.has_method("apply_external_knockback"):
-		target.apply_external_knockback(
-			knockback_dir,
-			soldier_knockback_speed,
-			soldier_knockback_duration,
-			allow_overboard,
-			upward_speed
-		)
-	else:
-		target.velocity += knockback_dir.normalized() * soldier_knockback_speed
-
-
-func _should_allow_soldier_overboard(target: Node3D, knockback_dir: Vector3) -> bool:
-	if not is_instance_valid(target):
-		return false
-	var ship: Node3D = target.get_owned_ship_node() if target.has_method("get_owned_ship_node") else null
-	if not is_instance_valid(ship):
-		return false
-	var half_ext := Vector2(2.0, 3.0)
-	if ship.has_method("get_deck_half_extents"):
-		var extents: Variant = ship.call("get_deck_half_extents")
-		if extents is Vector2:
-			half_ext = extents
-	var local_pos := ship.to_local(target.global_position)
-	var local_dir := ship.to_local(target.global_position + knockback_dir.normalized()) - local_pos
-	local_dir.y = 0.0
-	if local_dir.length_squared() <= 0.0001:
-		return false
-	local_dir = local_dir.normalized()
-	var projected_distance := soldier_knockback_speed * soldier_knockback_duration * 0.45
-	var projected_local := local_pos + local_dir * projected_distance
-	if absf(projected_local.x) > half_ext.x or absf(projected_local.z) > half_ext.y:
-		return _is_knockback_outward(local_pos, local_dir)
-	return false
-
-
-func _is_knockback_outward(local_pos: Vector3, local_dir: Vector3) -> bool:
-	var outward_x := signf(local_pos.x) * local_dir.x
-	var outward_z := signf(local_pos.z) * local_dir.z
-	return maxf(outward_x, outward_z) > 0.12
 
 
 func _spawn_critical_hit_effect(target: Node3D) -> void:

@@ -150,10 +150,7 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
 			var rocket_damage: float = rocket_base_damage * (1.0 + 0.15 * float(next_level))
 			var personnel_damage: float = rocket_damage * float(s.get("personnel_damage_mult", 5.0))
-			var knockback: float = float(s.get("base_knockback_speed", 9.0)) + float(next_level - 1) * float(s.get("knockback_speed_per_lv", 0.0))
-			var overboard_level: int = int(s.get("overboard_knockback_level", 4))
-			var knockback_note := "낙수 가능" if next_level >= overboard_level else "밀침 %.0f" % knockback
-			return "활 공격 %.0f%% | 대병 %.0f | %s | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, knockback_note, float(proc_stats.get("cooldown", 1.0))]
+			return "활 공격 %.0f%% | 대병 %.0f | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, float(proc_stats.get("cooldown", 1.0))]
 		"crew_numbers":
 			var damage_add := float(next_level) * float(s.get("damage_add_per_lv", 1.0))
 			return "장창 피해 +%.0f" % damage_add

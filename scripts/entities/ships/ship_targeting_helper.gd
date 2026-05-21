@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShipTargetingHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 
 const PLAYER_FLAGSHIP_TARGET_WEIGHT := 0.8
 const PLAYER_SUPPORT_TARGET_WEIGHT := 1.08
@@ -26,11 +28,11 @@ static func is_ship_targetable(node: Node) -> bool:
 
 
 static func is_player_controlled_ship(node: Node) -> bool:
-	return ShipAllyRoleHelper.is_player_flagship(node)
+	return PlayerFleetRoleHelper.is_player_flagship(node)
 
 
 static func is_support_fleet_ship(node: Node) -> bool:
-	return ShipAllyRoleHelper.is_support_ship(node)
+	return PlayerFleetRoleHelper.is_support_ship(node)
 
 
 static func _select_controlled_player(players: Array, requester: Node) -> Node3D:
@@ -59,9 +61,9 @@ static func _select_weighted_player_target(players: Array, requester: Node) -> N
 		if not is_instance_valid(candidate_3d):
 			continue
 		var score: float = requester_3d.global_position.distance_squared_to(candidate_3d.global_position)
-		if ShipAllyRoleHelper.is_player_flagship(candidate):
+		if PlayerFleetRoleHelper.is_player_flagship(candidate):
 			score *= PLAYER_FLAGSHIP_TARGET_WEIGHT
-		elif ShipAllyRoleHelper.is_support_ship(candidate):
+		elif PlayerFleetRoleHelper.is_support_ship(candidate):
 			score *= PLAYER_SUPPORT_TARGET_WEIGHT
 		if score < closest_score:
 			closest_score = score

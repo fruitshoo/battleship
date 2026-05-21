@@ -1,5 +1,6 @@
 extends Area3D
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const ShipDamageDecalHelper = preload("res://scripts/effects/ship_damage_decal_helper.gd")
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
@@ -132,9 +133,11 @@ func _finalize_release() -> void:
 		return
 	ScenePool.release(self)
 
-func _spawn_effects(_is_crit: bool, impact_position: Vector3) -> void:
+func _spawn_effects(_is_crit: bool, impact_position: Vector3, hit_ship: Node3D = null, applied_damage: float = 0.0, damage_source_id: String = "") -> void:
 	if not impact_position.is_finite():
 		return
+	if is_instance_valid(hit_ship):
+		ShipDamageDecalHelper.try_spawn_from_ship_hit(hit_ship, maxf(applied_damage, damage), impact_position, damage_source_id)
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if not is_instance_valid(audio_manager): return
 	
@@ -342,7 +345,7 @@ func _check_hit(target: Node) -> void:
 			ship.take_damage(final_damage, impact_position, source_id)
 		
 		_draw_projectile_marker("HIT %s" % ship.name, Color(1.0, 0.22, 0.1, 0.98))
-		_spawn_effects(is_crit, impact_position)
+		_spawn_effects(is_crit, impact_position, ship, final_damage, source_id)
 		_release_self()
 	else:
 		# 침몰 중인 함선에 맞은 거면 무시 (부자연스러운 물폭발 방지)

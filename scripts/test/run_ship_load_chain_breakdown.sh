@@ -8,12 +8,13 @@ probe_scene="res://scenes/test/scene_load_probe.tscn"
 
 declare -a targets=(
 	"base_ship_script|res://scripts/entities/ships/base_ship.gd"
-	"chaser_ship_script|res://scripts/entities/ships/chaser_ship.gd"
+	"ai_ship_script|res://scripts/entities/ships/ai_ship.gd"
+	"chaser_ship_alias|res://scripts/entities/ships/chaser_ship.gd"
 	"player_ship_script|res://scripts/entities/ships/player_ship.gd"
 	"enemy_base_ship_scene|res://scenes/ships/enemy_base_ship.tscn"
 	"enemy_runtime_ship_scene|res://scenes/ships/enemy_ship.tscn"
 	"player_ship_scene|res://scenes/ships/player_ship.tscn"
-	"chaser_support_helper|res://scripts/entities/ships/chaser_ship_support_helper.gd"
+	"ai_ship_lifecycle_helper|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd"
 	"cannon_enemy_light_scene|res://scenes/entities/launchers/cannon_enemy_light.tscn"
 	"sekibune_hull_scene|res://scenes/ships/hulls/sekibune_hull.tscn"
 )

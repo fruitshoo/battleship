@@ -1,5 +1,7 @@
 @tool
-extends "res://scripts/test/chaser_isolation_runtime_methods.gd"
+extends "res://scripts/test/ai_ship_isolation_runtime_methods.gd"
+
+const AIShipRuntimeHelper = preload("res://scripts/entities/ships/ai_ship_runtime_helper.gd")
 
 var separation_timer: float = 0.0
 var logic_timer: float = 0.0
@@ -30,11 +32,11 @@ static func get_ships_cached(_tree: SceneTree) -> Array:
 
 
 func _physics_process(delta: float) -> void:
-	ChaserShipAiHelper.process_physics(self, delta)
+	AIShipRuntimeHelper.process_physics(self, delta)
 
 
 func _update_logic_throttled() -> void:
-	ChaserShipAiHelper.update_logic_throttled(self)
+	AIShipRuntimeHelper.update_logic_throttled(self)
 
 
 func _configure_ai_logic_throttle() -> void:

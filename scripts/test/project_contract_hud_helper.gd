@@ -1,6 +1,7 @@
 extends RefCounted
 class_name ProjectContractHudHelper
 
+const AIShipNavigationHelper = preload("res://scripts/entities/ships/ai_ship_navigation_helper.gd")
 const LevelManagerProgressionHelper = preload("res://scripts/managers/level_manager_progression_helper.gd")
 const AUTHORING_SCENARIO_TRIGGER_USER_PATH := "user://authoring_palette_scenario_trigger.json"
 const AUTHORING_SCENARIO_PRESETS_USER_PATH := "user://authoring_palette_scenario_presets.json"
@@ -126,10 +127,10 @@ static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_s
 	_run_hud_boarding_state_check(hud, player_ship, target_ship, failures)
 	_run_hud_capture_state_check(hud, player_ship, failures)
 	var support_ship: Node3D = null
-	if player_ship.has_method("_spawn_or_repair_ally") and player_ship.has_method("_get_support_fleet_ships"):
+	if player_ship.has_method("_spawn_or_repair_support_ship") and player_ship.has_method("_get_support_fleet_ships"):
 		if "support_fleet_limit" in player_ship:
 			player_ship.set("support_fleet_limit", maxi(1, int(player_ship.get("support_fleet_limit"))))
-		player_ship.call("_spawn_or_repair_ally")
+		player_ship.call("_spawn_or_repair_support_ship")
 		await _wait_frames(owner, wait_frames_after_spawn + 2)
 		var support_ships: Array = player_ship.call("_get_support_fleet_ships")
 		support_ship = support_ships[0] as Node3D if not support_ships.is_empty() else null
@@ -368,10 +369,10 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 		failures.append("hud smoke enemy debug AI label missing")
 	elif not hud.debug_enemy_ai_value.text.contains("적선 AI"):
 		failures.append("hud smoke enemy debug AI text mismatch")
-	if not is_instance_valid(hud.debug_ally_ai_value):
-		failures.append("hud smoke ally debug AI label missing")
-	elif not hud.debug_ally_ai_value.text.contains("아군 AI"):
-		failures.append("hud smoke ally debug AI text mismatch")
+	if not is_instance_valid(hud.debug_support_ai_value):
+		failures.append("hud smoke support debug AI label missing")
+	elif not hud.debug_support_ai_value.text.contains("지원함 AI"):
+		failures.append("hud smoke support debug AI text mismatch")
 	if not is_instance_valid(hud.debug_player_soldier_ai_value):
 		failures.append("hud smoke player soldier debug AI label missing")
 	elif not hud.debug_player_soldier_ai_value.text.contains("아군 병사 AI"):
@@ -507,13 +508,13 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 		support_ship.set_meta(ShipAILimboKeys.META_SUPPORT_REASON, "debug_rescue")
 		if hud.has_method("_sync_ship_debug_panel_from_player"):
 			hud.call("_sync_ship_debug_panel_from_player")
-		if is_instance_valid(hud.debug_ally_ai_value):
-			if not hud.debug_ally_ai_value.text.contains(support_ship.name):
-				failures.append("hud smoke ally AI did not surface support ship")
-			elif not hud.debug_ally_ai_value.text.contains("focus rescue run -> %s" % player_ship.name):
-				failures.append("hud smoke ally AI did not label rescue focus")
-			elif hud.debug_ally_ai_value.text.contains("debug_rescue"):
-				failures.append("hud smoke ally AI leaked internal rescue reason")
+		if is_instance_valid(hud.debug_support_ai_value):
+			if not hud.debug_support_ai_value.text.contains(support_ship.name):
+				failures.append("hud smoke support AI did not surface support ship")
+			elif not hud.debug_support_ai_value.text.contains("focus rescue run -> %s" % player_ship.name):
+				failures.append("hud smoke support AI did not label rescue focus")
+			elif hud.debug_support_ai_value.text.contains("debug_rescue"):
+				failures.append("hud smoke support AI leaked internal rescue reason")
 	player_ship.set("is_sinking", false)
 	player_ship.set("is_dying", false)
 	player_ship.set("boarding_target", null)
@@ -1195,7 +1196,7 @@ static func _validate_authoring_runtime_enemy(ship: Node3D, failures: Array[Stri
 		failures.append("hud authoring palette harness %s retreat distance mismatch" % label)
 	var target := ship.get("target") as Node3D
 	if is_instance_valid(target):
-		var nav := ChaserShipNavigationHelper.build_navigation(ship, target)
+		var nav := AIShipNavigationHelper.build_navigation(ship, target)
 		if ShipMovementIntent.get_mode(nav) != "side":
 			failures.append("hud authoring palette harness %s navigation mode mismatch: %s" % [label, ShipMovementIntent.get_mode(nav)])
 		var desired_speed := ShipMovementIntent.get_desired_speed_mult(nav)

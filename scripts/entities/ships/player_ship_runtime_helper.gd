@@ -19,6 +19,12 @@ const ROPE_RESIST_STICK_THRESHOLD := 0.62
 const ROPE_RESIST_STICK_NEUTRAL := 0.28
 
 static func handle_input(ship, delta: float) -> void:
+	if _is_debug_free_camera_active(ship):
+		ship.steer(0.0, delta)
+		if ship.is_rowing:
+			ship.set_rowing(false)
+		ship.set("ramming_boost_input_was_pressed", false)
+		return
 	if Input.is_action_just_pressed("toggle_sail_furl") and ship.has_method("toggle_sail_furl"):
 		ship.toggle_sail_furl()
 	if _is_ramming_boost_just_pressed(ship) and ship.has_method("try_activate_ramming_boost"):
@@ -37,6 +43,15 @@ static func handle_input(ship, delta: float) -> void:
 		_handle_screen_relative_navigation(ship, delta)
 	else:
 		_handle_ship_relative_navigation(ship, delta)
+
+
+static func _is_debug_free_camera_active(ship) -> bool:
+	if not OS.is_debug_build() or not is_instance_valid(ship):
+		return false
+	var tree: SceneTree = ship.get_tree()
+	if tree == null or tree.root == null:
+		return false
+	return bool(tree.root.get_meta("debug_free_camera_active", false))
 
 
 static func _is_ramming_boost_just_pressed(ship) -> bool:

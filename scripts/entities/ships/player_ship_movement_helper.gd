@@ -145,7 +145,8 @@ static func update_movement(ship, delta: float) -> void:
 	velocity += ship._calculate_boarding_pull_velocity(delta)
 	velocity += ship.consume_collision_impulse_velocity(delta)
 	velocity += ship._calculate_collision_repulsion() * delta
-	ship.position += velocity * delta
+	var prev_pos: Vector3 = ship.global_position
+	ship.global_position = BaseShipCollisionHelper.apply_movement_collision_guards(ship, prev_pos, prev_pos + velocity * delta, null, maxf(absf(ship.current_speed), velocity.length()))
 	var motion_speed := absf(ship.current_speed)
 	var wake_active = motion_speed > 0.5 or sep.length() > 0.2
 	var wake_speed_ratio = clampf(motion_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)

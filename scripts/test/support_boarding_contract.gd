@@ -1,4 +1,5 @@
 extends Node
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 const CannonScript = preload("res://scripts/entities/launchers/cannon.gd")
@@ -9,6 +10,8 @@ const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fl
 const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
 const SoldierShipSpatialCacheHelper = preload("res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd")
 const ShipAILimboKeys = preload("res://scripts/ai/limbo/ship_ai_limbo_keys.gd")
+const AIShipBoardingHelper = preload("res://scripts/entities/ships/ai_ship_boarding_helper.gd")
+const AIShipSupportHelper = preload("res://scripts/entities/ships/ai_ship_support_helper.gd")
 
 
 class MockTargetShip:
@@ -374,7 +377,7 @@ func _ready() -> void:
 	_verify_overrun_deck_suppresses_ship_weapons(failures)
 	_verify_player_deck_emergency_speeds_support_assist(failures)
 	_verify_soldier_retargets_hostile_boarder_on_owned_ship(failures)
-	_verify_soldier_targets_boarder_on_distressed_ally_ship(failures)
+	_verify_soldier_targets_boarder_on_distressed_support_ship(failures)
 	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
 	_verify_player_crew_speaks_when_ship_is_burning(failures)
 	_verify_rowing_speech_uses_single_crew_label(failures)
@@ -401,7 +404,7 @@ func _verify_support_ship_rejects_enemy_boarding_link(failures: Array[String]) -
 	add_child(target)
 	target.global_position = Vector3(8.0, 0.0, 0.0)
 
-	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, target, 0.1)
+	var started: bool = AIShipSupportHelper._try_start_support_boarding(support, target, 0.1)
 
 	if started == true or support.is_boarding == true:
 		failures.append("support ship should not start enemy boarding links")
@@ -430,7 +433,7 @@ func _verify_support_ship_rejects_enemy_boarding_even_in_contact(failures: Array
 	add_child(target)
 	target.global_position = Vector3(11.2, 0.0, 0.0)
 
-	var started_far: bool = ChaserShipMinionHelper._try_start_support_boarding(support, target, 0.1)
+	var started_far: bool = AIShipSupportHelper._try_start_support_boarding(support, target, 0.1)
 	if started_far == true or support.is_boarding == true:
 		failures.append("support ship should not start enemy boarding outside contact range")
 
@@ -438,7 +441,7 @@ func _verify_support_ship_rejects_enemy_boarding_even_in_contact(failures: Array
 	support.side_boarding = false
 	support.head_on_boarding = true
 	support.cleanup_boarding = true
-	var started_cleanup: bool = ChaserShipMinionHelper._try_start_support_boarding(support, target, 0.1)
+	var started_cleanup: bool = AIShipSupportHelper._try_start_support_boarding(support, target, 0.1)
 	if started_cleanup == true or support.is_boarding == true:
 		failures.append("support ship should keep rejecting enemy boarding even after contact becomes valid")
 	if support.has_meta("boarding_contact_mode"):
@@ -469,11 +472,11 @@ func _verify_support_ship_rescues_overrun_player_deck(failures: Array[String]) -
 	enemy_attacker.global_position = Vector3(8.4, 0.0, 2.0)
 	player.set_boarding_attacker_ship(enemy_attacker)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != player:
 		failures.append("support ship did not select overrun player deck as rescue target")
 
-	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	var started: bool = AIShipSupportHelper._try_start_support_boarding(support, player, 0.1)
 	if started != true or support.boarding_target != player:
 		failures.append("support ship did not start rescue boarding onto overrun player deck")
 	if str(support.get_meta("boarding_purpose", "")) != SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE:
@@ -507,11 +510,11 @@ func _verify_support_ship_rescues_contested_player_deck(failures: Array[String])
 	enemy_attacker.global_position = Vector3(4.0, 0.0, 0.0)
 	EntityRegistry.register_ship(enemy_attacker)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != player:
 		failures.append("support ship did not prioritize contested player deck rescue")
 
-	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	var started: bool = AIShipSupportHelper._try_start_support_boarding(support, player, 0.1)
 	if started != true or support.boarding_target != player:
 		failures.append("support ship did not start rescue boarding onto contested player deck")
 	if str(support.get_meta("boarding_purpose", "")) != SupportBoardingHelper.SUPPORT_RESCUE_BOARDING_PURPOSE:
@@ -538,7 +541,7 @@ func _verify_support_ship_recalls_from_far_for_overrun_player_deck(failures: Arr
 	player.deck_hostile_boarder_count = 3
 	support.target = player
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != player:
 		failures.append("support ship did not emergency-recall from far distance to overrun player deck")
 
@@ -568,7 +571,7 @@ func _verify_support_ship_interrupts_attack_boarding_for_rescue(failures: Array[
 	enemy_target.global_position = Vector3(6.0, 0.0, 1.5)
 	support.boarding_target = enemy_target
 
-	var interrupted: bool = ChaserShipMinionHelper.try_interrupt_boarding_for_flagship_rescue(support)
+	var interrupted: bool = AIShipSupportHelper.try_interrupt_boarding_for_flagship_rescue(support)
 	if interrupted != true:
 		failures.append("support ship did not interrupt attack boarding for flagship rescue")
 	if support.cancel_calls != 1 or support.is_boarding == true:
@@ -600,7 +603,7 @@ func _verify_support_enemy_boarding_cancels_without_rescue(failures: Array[Strin
 	enemy_target.global_position = Vector3(6.0, 0.0, 1.5)
 	support.boarding_target = enemy_target
 
-	var canceled: bool = ChaserShipMinionHelper.try_interrupt_boarding_for_flagship_rescue(support)
+	var canceled: bool = AIShipSupportHelper.try_interrupt_boarding_for_flagship_rescue(support)
 	if canceled != true:
 		failures.append("support ship did not cancel legacy enemy boarding when no rescue was active")
 	if support.cancel_calls != 1 or support.is_boarding == true:
@@ -630,7 +633,7 @@ func _verify_support_rescue_boarding_relaxes_bad_alignment(failures: Array[Strin
 	player.deck_hostile_boarder_count = 2
 	support.target = player
 
-	var started: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	var started: bool = AIShipSupportHelper._try_start_support_boarding(support, player, 0.1)
 	if started != true or support.boarding_target != player:
 		failures.append("support rescue boarding stayed in assist mode when close but not side-aligned")
 	if str(support.get_meta("boarding_contact_mode", "")) != "cleanup":
@@ -657,12 +660,12 @@ func _verify_support_rescue_waits_until_boarding_motion_range(failures: Array[St
 	player.deck_hostile_boarder_count = 2
 	support.target = player
 
-	var started_far: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	var started_far: bool = AIShipSupportHelper._try_start_support_boarding(support, player, 0.1)
 	if started_far == true or support.is_boarding == true:
 		failures.append("support rescue boarding started before boarding motion range and can freeze outside contact")
 
 	player.global_position = Vector3(8.8, 0.0, 0.0)
-	var started_close: bool = ChaserShipMinionHelper._try_start_support_boarding(support, player, 0.1)
+	var started_close: bool = AIShipSupportHelper._try_start_support_boarding(support, player, 0.1)
 	if started_close != true or support.boarding_target != player:
 		failures.append("support rescue boarding did not start once inside boarding motion range")
 
@@ -688,7 +691,7 @@ func _verify_support_hold_formation_ignores_normal_threats(failures: Array[Strin
 	enemy.global_position = Vector3(12.0, 0.0, 0.0)
 	EntityRegistry.register_ship(enemy)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != null:
 		failures.append("support hold formation selected a normal threat")
 	if support.has_meta("support_assist_target_id"):
@@ -718,7 +721,7 @@ func _verify_support_hold_formation_allows_boarding_attacker(failures: Array[Str
 	enemy_attacker.global_position = Vector3(10.0, 0.0, 0.0)
 	player.set_boarding_attacker_ship(enemy_attacker)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != enemy_attacker:
 		failures.append("support hold formation ignored the player boarding attacker")
 
@@ -747,7 +750,7 @@ func _verify_panokseon_free_assist_holds_line_against_normal_threats(failures: A
 	enemy.global_position = Vector3(10.0, 0.0, 0.0)
 	EntityRegistry.register_ship(enemy)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != null:
 		failures.append("panokseon free assist should keep formation instead of chasing normal threats")
 	if support.has_meta("support_assist_target_id"):
@@ -779,7 +782,7 @@ func _verify_panokseon_free_assist_allows_flagship_boarding_attacker(failures: A
 	enemy_attacker.global_position = Vector3(11.0, 0.0, 0.0)
 	player.set_boarding_attacker_ship(enemy_attacker)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != enemy_attacker:
 		failures.append("panokseon free assist should still screen the flagship boarding attacker")
 
@@ -811,7 +814,7 @@ func _verify_panokseon_limbo_screen_threat_keeps_line_for_normal_threats(failure
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_FRAME, Engine.get_physics_frames())
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_MODE, ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT)
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, enemy.get_instance_id())
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != null:
 		failures.append("panokseon free assist limbo screen threat should keep following the flagship for normal threats")
 	if support.has_meta("support_assist_target_id"):
@@ -846,14 +849,14 @@ func _verify_support_limbo_modes_drive_assist_execution(failures: Array[String])
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_FRAME, Engine.get_physics_frames())
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_MODE, ShipAILimboKeys.SUPPORT_MODE_FOLLOW_FLAGSHIP)
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, player.get_instance_id())
-	var selected_follow: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected_follow: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected_follow != null:
 		failures.append("support assist executor should respect follow mode instead of overriding with boarding attacker")
 
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_FRAME, Engine.get_physics_frames())
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_MODE, ShipAILimboKeys.SUPPORT_MODE_SCREEN_THREAT)
 	support.set_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, enemy_attacker.get_instance_id())
-	var selected_screen: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected_screen: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected_screen != enemy_attacker:
 		failures.append("support assist executor did not honor limbo screen threat mode target")
 
@@ -881,12 +884,12 @@ func _verify_support_ship_tracks_flagship_manual_boss_breach(failures: Array[Str
 	boss.add_to_group("boss")
 	player.manual_boarding_target = boss
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != null:
 		failures.append("support ship should ignore flagship manual boss pressure when no real rescue threat exists")
-	if ChaserShipMinionHelper._is_support_boss_breach_target(support, boss):
+	if AIShipSupportHelper._is_support_boss_breach_target(support, boss):
 		failures.append("support ship should not classify flagship manual boss pressure as boss breach anymore")
-	var started_breach_boarding: bool = ChaserShipMinionHelper._try_start_support_boarding(support, boss, 0.1)
+	var started_breach_boarding: bool = AIShipSupportHelper._try_start_support_boarding(support, boss, 0.1)
 	if started_breach_boarding == true or support.is_boarding == true:
 		failures.append("support ship should not hook onto boss decks under artillery doctrine")
 
@@ -962,9 +965,9 @@ func _verify_support_chain_goal_formation_variants(failures: Array[String]) -> v
 
 	support_a.set_meta("support_squadron_slot_role", "screen_lead")
 	_set_support_formation(support_a, 0)
-	var role_column_offset: Vector3 = ChaserShipMinionHelper._get_minion_offset(support_a, 0, true)
+	var role_column_offset: Vector3 = AIShipSupportHelper._get_support_offset(support_a, 0, true)
 	_set_support_formation(support_a, 1)
-	var role_wing_offset: Vector3 = ChaserShipMinionHelper._get_minion_offset(support_a, 0, true)
+	var role_wing_offset: Vector3 = AIShipSupportHelper._get_support_offset(support_a, 0, true)
 	if role_column_offset.z < 12.5:
 		failures.append("support column offset should keep a clearer trailing gap behind the flagship")
 	if role_column_offset.z <= role_wing_offset.z + 2.5:
@@ -1147,18 +1150,18 @@ func _verify_heavy_support_join_speed_slows_near_final_slot(failures: Array[Stri
 	panokseon.move_speed = 3.8
 
 	var player_speed := 4.0
-	var far_speed := ChaserShipMinionHelper._calculate_support_join_speed(
+	var far_speed := AIShipSupportHelper._calculate_support_join_speed(
 		panokseon,
 		player_speed,
 		44.0,
-		ChaserShipMinionHelper.SUPPORT_JOIN_STAGE_FINAL_SLOT,
+		AIShipSupportHelper.SUPPORT_JOIN_STAGE_FINAL_SLOT,
 		true
 	)
-	var near_speed := ChaserShipMinionHelper._calculate_support_join_speed(
+	var near_speed := AIShipSupportHelper._calculate_support_join_speed(
 		panokseon,
 		player_speed,
 		7.0,
-		ChaserShipMinionHelper.SUPPORT_JOIN_STAGE_FINAL_SLOT,
+		AIShipSupportHelper.SUPPORT_JOIN_STAGE_FINAL_SLOT,
 		true
 	)
 	if far_speed <= near_speed + 1.5:
@@ -1189,7 +1192,7 @@ func _verify_support_assist_navigation_prefers_owner_flagship_lane(failures: Arr
 	support.target = decoy_target
 	SupportFleetStateHelper.assign_support_ship_to_flagship(support, owner_flagship)
 
-	var nav := ChaserShipMinionHelper._build_support_assist_navigation(support, assist_target, 0)
+	var nav := AIShipSupportHelper._build_support_assist_navigation(support, assist_target, 0)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, Vector3.ZERO)
 	if desired_point.distance_to(owner_flagship.global_position) >= desired_point.distance_to(decoy_target.global_position):
 		failures.append("support assist navigation should lane around the owner flagship instead of the drifted runtime target")
@@ -1225,8 +1228,8 @@ func _verify_support_free_assist_uses_stable_role_lanes(failures: Array[String])
 	screen_right.set_meta("support_fleet_slot_index", 2)
 	SupportFleetStateHelper.assign_support_ship_to_flagship(screen_right, owner_flagship)
 
-	var nav_left := ChaserShipMinionHelper._build_support_assist_navigation(screen_left, assist_target, 0)
-	var nav_right := ChaserShipMinionHelper._build_support_assist_navigation(screen_right, assist_target, 1)
+	var nav_left := AIShipSupportHelper._build_support_assist_navigation(screen_left, assist_target, 0)
+	var nav_right := AIShipSupportHelper._build_support_assist_navigation(screen_right, assist_target, 1)
 	var player_forward: Vector3 = -owner_flagship.global_transform.basis.z
 	player_forward.y = 0.0
 	player_forward = player_forward.normalized() if player_forward.length_squared() > 0.001 else Vector3.FORWARD
@@ -1238,7 +1241,7 @@ func _verify_support_free_assist_uses_stable_role_lanes(failures: Array[String])
 		failures.append("support free assist should keep screen ships on opposite role lanes after formation-hold toggle")
 	if float(screen_left.get_meta("support_assist_lane_side", 0.0)) >= 0.0 or float(screen_right.get_meta("support_assist_lane_side", 0.0)) <= 0.0:
 		failures.append("support free assist lane side meta should be role-stable instead of current-position based")
-	if ChaserShipMinionHelper._get_support_assist_separation_radius(screen_left, screen_right) <= ChaserShipMinionHelper.SUPPORT_ASSIST_SEPARATION_RADIUS:
+	if AIShipSupportHelper._get_support_assist_separation_radius(screen_left, screen_right) <= AIShipSupportHelper.SUPPORT_ASSIST_SEPARATION_RADIUS:
 		failures.append("support free assist separation radius should include hull clearance padding")
 
 	screen_right.queue_free()
@@ -1289,17 +1292,17 @@ func _verify_support_free_assist_softly_distributes_targets(failures: Array[Stri
 	alternate_enemy.global_position = Vector3(16.0, 0.0, 0.0)
 	EntityRegistry.register_ship(alternate_enemy)
 
-	var selected_a: Node3D = ChaserShipMinionHelper._get_support_assist_target(support_a, player, 0.1)
-	var selected_b: Node3D = ChaserShipMinionHelper._get_support_assist_target(support_b, player, 0.1)
+	var selected_a: Node3D = AIShipSupportHelper._get_support_assist_target(support_a, player, 0.1)
+	var selected_b: Node3D = AIShipSupportHelper._get_support_assist_target(support_b, player, 0.1)
 	if selected_a != near_enemy:
 		failures.append("first support free assist should still prefer the nearest valid threat; selected=%s" % [selected_a.name if is_instance_valid(selected_a) else "null"])
 	if selected_b != alternate_enemy:
 		failures.append("second support free assist should prefer an alternate threat once the nearest target is already assigned; selected=%s" % [selected_b.name if is_instance_valid(selected_b) else "null"])
-	var near_penalty: float = ChaserShipMinionHelper._get_support_assist_assignment_penalty(
+	var near_penalty: float = AIShipSupportHelper._get_support_assist_assignment_penalty(
 		support_b,
 		player,
 		near_enemy,
-		ChaserShipMinionHelper.SUPPORT_ASSIST_LEASH_DISTANCE,
+		AIShipSupportHelper.SUPPORT_ASSIST_LEASH_DISTANCE,
 		false,
 		false,
 		false,
@@ -1338,7 +1341,7 @@ func _verify_support_boss_breach_navigation_stages_from_flagship_lane(failures: 
 	boss.add_to_group("boss")
 	player.manual_boarding_target = boss
 
-	var nav := ChaserShipMinionHelper._build_support_assist_navigation(support, boss, 0)
+	var nav := AIShipSupportHelper._build_support_assist_navigation(support, boss, 0)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, Vector3.ZERO)
 	if desired_point.distance_to(boss.global_position) <= 6.0:
 		failures.append("support boss pressure navigation should keep a visible stand-off from the boss hull")
@@ -1368,14 +1371,14 @@ func _verify_support_free_assist_recalls_near_player(failures: Array[String]) ->
 	enemy.global_position = Vector3(12.0, 0.0, 0.0)
 	EntityRegistry.register_ship(enemy)
 
-	var selected: Node3D = ChaserShipMinionHelper._get_support_assist_target(support, player, 0.1)
+	var selected: Node3D = AIShipSupportHelper._get_support_assist_target(support, player, 0.1)
 	if selected != null:
 		failures.append("support free assist stayed in combat after exceeding player soft recall distance")
 	if support.has_meta("support_assist_target_id"):
 		failures.append("support free assist kept target lock after player soft recall")
-	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false) < 0.78:
+	if AIShipSupportHelper._get_support_assist_rowing_wind_floor(false) < 0.78:
 		failures.append("support free assist rowing wind floor is too weak for player follow")
-	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.20:
+	if AIShipSupportHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.20:
 		failures.append("support free assist rowing speed bonus is too weak at follow distance")
 
 	EntityRegistry.unregister_ship(enemy)
@@ -1470,7 +1473,7 @@ func _verify_derelict_disposal_waits_while_player_deck_is_contested(failures: Ar
 	var player := MockTransferShip.new()
 	add_child(player)
 	player.team = "player"
-	ShipAllyRoleHelper.mark_player_flagship(player)
+	PlayerFleetRoleHelper.mark_player_flagship(player)
 	player.global_position = Vector3.ZERO
 	player.deck_is_contested = true
 	player.deck_hostile_boarder_count = 1
@@ -1497,7 +1500,7 @@ func _verify_derelict_disposal_waits_while_player_deck_is_contested(failures: Ar
 	if derelict.get_meta("derelict_contact_waiting_for_deck_melee", false) == true:
 		failures.append("derelict disposal should clear deck melee waiting meta after melee ends")
 
-	ShipAllyRoleHelper.clear_ally_role(player)
+	PlayerFleetRoleHelper.clear_fleet_role(player)
 	player.queue_free()
 	derelict.queue_free()
 
@@ -1506,7 +1509,7 @@ func _verify_derelict_disposal_waits_for_affiliated_boarder_cleanup(failures: Ar
 	var player := MockTransferShip.new()
 	add_child(player)
 	player.team = "player"
-	ShipAllyRoleHelper.mark_player_flagship(player)
+	PlayerFleetRoleHelper.mark_player_flagship(player)
 	player.global_position = Vector3.ZERO
 
 	var derelict := MockTransferShip.new()
@@ -1542,7 +1545,7 @@ func _verify_derelict_disposal_waits_for_affiliated_boarder_cleanup(failures: Ar
 	if derelict.get_meta("derelict_contact_waiting_for_boarder_cleanup", false) == true:
 		failures.append("derelict disposal should clear waiting meta after affiliated boarder cleanup")
 
-	ShipAllyRoleHelper.clear_ally_role(player)
+	PlayerFleetRoleHelper.clear_fleet_role(player)
 	player.queue_free()
 	derelict.queue_free()
 
@@ -1786,7 +1789,7 @@ func _verify_player_support_boarding_cancels_when_target_is_missing(failures: Ar
 	support.is_boarding = true
 	support.boarding_target = null
 
-	ChaserShipBoardingHelper.process_boarding(support, 0.1)
+	AIShipBoardingHelper.process_boarding(support, 0.1)
 
 	if support.cancel_calls != 1:
 		failures.append("player support ship did not cancel missing-target boarding")
@@ -1830,22 +1833,22 @@ func _verify_player_deck_emergency_speeds_support_assist(failures: Array[String]
 	add_child(attacker)
 	attacker.global_position = Vector3(4.0, 0.0, 0.0)
 
-	var normal_nav: Dictionary = ChaserShipMinionHelper._build_support_assist_navigation(support, attacker, 0)
+	var normal_nav: Dictionary = AIShipSupportHelper._build_support_assist_navigation(support, attacker, 0)
 	player.deck_is_overrun = true
 	player.deck_hostile_boarder_count = 2
-	var emergency_nav: Dictionary = ChaserShipMinionHelper._build_support_assist_navigation(support, attacker, 0)
+	var emergency_nav: Dictionary = AIShipSupportHelper._build_support_assist_navigation(support, attacker, 0)
 
 	if float(emergency_nav.get("desired_speed_mult", 0.0)) <= float(normal_nav.get("desired_speed_mult", 0.0)):
 		failures.append("player deck emergency did not increase support assist desired speed")
 	if emergency_nav.get("permit_sprint") != true:
 		failures.append("player deck emergency did not mark support assist as sprint-capable")
-	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false) < 0.65:
+	if AIShipSupportHelper._get_support_assist_rowing_wind_floor(false) < 0.65:
 		failures.append("support assist rowing wind floor is too weak for free combat")
-	if ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(true) <= ChaserShipMinionHelper._get_support_assist_rowing_wind_floor(false):
+	if AIShipSupportHelper._get_support_assist_rowing_wind_floor(true) <= AIShipSupportHelper._get_support_assist_rowing_wind_floor(false):
 		failures.append("support emergency assist did not increase rowing wind floor")
-	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.05:
+	if AIShipSupportHelper._get_support_assist_rowing_speed_multiplier(42.0, false) <= 1.05:
 		failures.append("support assist rowing speed multiplier is too weak at distance")
-	if ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, true) <= ChaserShipMinionHelper._get_support_assist_rowing_speed_multiplier(42.0, false):
+	if AIShipSupportHelper._get_support_assist_rowing_speed_multiplier(42.0, true) <= AIShipSupportHelper._get_support_assist_rowing_speed_multiplier(42.0, false):
 		failures.append("support emergency assist did not increase rowing speed multiplier")
 
 	attacker.queue_free()
@@ -1907,18 +1910,18 @@ func _verify_soldier_retargets_hostile_boarder_on_owned_ship(failures: Array[Str
 	player_ship.queue_free()
 
 
-func _verify_soldier_targets_boarder_on_distressed_ally_ship(failures: Array[String]) -> void:
+func _verify_soldier_targets_boarder_on_distressed_support_ship(failures: Array[String]) -> void:
 	var player_ship := MockTargetShip.new()
 	add_child(player_ship)
 	player_ship.team = "player"
 	player_ship.global_position = Vector3.ZERO
 
-	var ally_ship := MockTargetShip.new()
-	add_child(ally_ship)
-	ally_ship.team = "player"
-	ally_ship.global_position = Vector3(9.0, 0.0, 0.0)
-	ally_ship.deck_is_contested = true
-	ally_ship.deck_hostile_boarder_count = 1
+	var support_ship := MockTargetShip.new()
+	add_child(support_ship)
+	support_ship.team = "player"
+	support_ship.global_position = Vector3(9.0, 0.0, 0.0)
+	support_ship.deck_is_contested = true
+	support_ship.deck_hostile_boarder_count = 1
 
 	var enemy_ship := MockTargetShip.new()
 	add_child(enemy_ship)
@@ -1935,7 +1938,7 @@ func _verify_soldier_targets_boarder_on_distressed_ally_ship(failures: Array[Str
 	var boarder := MockCombatSoldier.new()
 	add_child(boarder)
 	boarder.team = "enemy"
-	boarder.owned_ship = ally_ship
+	boarder.owned_ship = support_ship
 	boarder.global_position = Vector3(9.0, 0.0, 0.0)
 
 	var remote_enemy := MockCombatSoldier.new()
@@ -1945,7 +1948,7 @@ func _verify_soldier_targets_boarder_on_distressed_ally_ship(failures: Array[Str
 	remote_enemy.global_position = Vector3(18.0, 0.0, 0.0)
 
 	EntityRegistry.register_ship(player_ship)
-	EntityRegistry.register_ship(ally_ship)
+	EntityRegistry.register_ship(support_ship)
 	EntityRegistry.register_ship(enemy_ship)
 	EntityRegistry.register_soldier(defender)
 	EntityRegistry.register_soldier(boarder)
@@ -1953,24 +1956,24 @@ func _verify_soldier_targets_boarder_on_distressed_ally_ship(failures: Array[Str
 
 	var scan_data := SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(defender)
 	var distress_ships: Array = scan_data.get("nearby_ally_distress_ships", [])
-	if not distress_ships.has(ally_ship):
-		failures.append("soldier targeting scan did not include distressed ally ship")
+	if not distress_ships.has(support_ship):
+		failures.append("soldier targeting scan did not include distressed support ship")
 
 	var nearest := SoldierShipHelper.find_nearest_enemy(defender)
 	if nearest != boarder:
-		failures.append("soldier targeting did not select enemy boarder on distressed ally ship")
+		failures.append("soldier targeting did not select enemy boarder on distressed support ship")
 
 	EntityRegistry.unregister_soldier(remote_enemy)
 	EntityRegistry.unregister_soldier(boarder)
 	EntityRegistry.unregister_soldier(defender)
 	EntityRegistry.unregister_ship(enemy_ship)
-	EntityRegistry.unregister_ship(ally_ship)
+	EntityRegistry.unregister_ship(support_ship)
 	EntityRegistry.unregister_ship(player_ship)
 	remote_enemy.queue_free()
 	boarder.queue_free()
 	defender.queue_free()
 	enemy_ship.queue_free()
-	ally_ship.queue_free()
+	support_ship.queue_free()
 	player_ship.queue_free()
 
 

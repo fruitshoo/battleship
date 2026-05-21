@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SupportFleetFormationHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
 const SUPPORT_FLEET_SQUADRON_META := "support_squadron_id"
@@ -606,7 +608,7 @@ static func _is_screen_role(role_name: String) -> bool:
 static func _is_heavy_center_role(ship: Node3D, role_name: String) -> bool:
 	if role_name == ROLE_ARTILLERY_LEAD or role_name == ROLE_ARMORED_GUARD:
 		return true
-	return ShipAllyRoleHelper.is_heavy_support(ship)
+	return PlayerFleetRoleHelper.is_heavy_support(ship)
 
 
 static func _get_flagship_turn_clearance_blend(ship) -> float:
@@ -632,7 +634,7 @@ static func _get_flagship_turn_side(ship) -> float:
 
 
 static func _should_follow_flagship_directly(ship, role_name: String) -> bool:
-	return role_name == ROLE_ARTILLERY_LEAD or role_name == ROLE_ARMORED_GUARD or ShipAllyRoleHelper.is_heavy_support(ship)
+	return role_name == ROLE_ARTILLERY_LEAD or role_name == ROLE_ARMORED_GUARD or PlayerFleetRoleHelper.is_heavy_support(ship)
 
 
 static func _is_named_support_role(role_name: String) -> bool:

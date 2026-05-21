@@ -17,11 +17,15 @@ const DEFAULT_PANOKSEON_UNLOCK_LEVEL := 1
 const DEFAULT_GEOBUKSEON_UNLOCK_UPGRADE_ID := "geobukseon_upgrade"
 const DEFAULT_GEOBUKSEON_UNLOCK_LEVEL := 1
 
+# The profile ship_type values still use older *_ally ids because upgrade,
+# harness, and scene data reference them directly. Treat them as support profile
+# ids until a migration updates saved/test fixture data together.
 const SUPPORT_PROFILES := {
 	PROFILE_MAENGSEON_SCREEN: {
 		"id": PROFILE_MAENGSEON_SCREEN,
 		"ship_type": "maengseon_ally",
 		"role": "screen_rescue",
+		"crew_count": 4,
 		"ship_scene_path": SUPPORT_MAENGSEON_SCENE_PATH,
 		"hull_scene": MAENGSEON_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
@@ -30,6 +34,7 @@ const SUPPORT_PROFILES := {
 		"id": PROFILE_PANOKSEON_ESCORT,
 		"ship_type": "panokseon_ally",
 		"role": "artillery_escort",
+		"crew_count": 6,
 		"ship_scene_path": SUPPORT_PANOKSEON_SCENE_PATH,
 		"hull_scene": PANOK_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
@@ -38,6 +43,7 @@ const SUPPORT_PROFILES := {
 		"id": PROFILE_GEOBUKSEON_GUARD,
 		"ship_type": "geobukseon_ally",
 		"role": "armored_guard",
+		"crew_count": 6,
 		"ship_scene_path": SUPPORT_GENERIC_SCENE_PATH,
 		"hull_scene": GEOBUKSEON_HULL_SCENE,
 		"cannon_scene": JOSEON_CANNON_SCENE,
@@ -208,13 +214,17 @@ static func get_profile_cannon_scene(profile: Dictionary) -> PackedScene:
 	return cannon_scene as PackedScene if cannon_scene is PackedScene else JOSEON_CANNON_SCENE
 
 
-static func profile_matches_runtime_ship(profile: Dictionary, ally) -> bool:
-	if not is_instance_valid(ally):
+static func get_profile_crew_count(profile: Dictionary) -> int:
+	return maxi(1, int(profile.get("crew_count", 4)))
+
+
+static func profile_matches_runtime_ship(profile: Dictionary, support_ship) -> bool:
+	if not is_instance_valid(support_ship):
 		return false
 	var desired_profile_id := get_profile_id(profile)
 	var desired_ship_type := get_profile_ship_type(profile)
-	var current_profile_id := str(ally.get_meta("support_fleet_profile", ""))
-	var current_ship_type := str(ally.get("ship_type"))
+	var current_profile_id := str(support_ship.get_meta("support_fleet_profile", ""))
+	var current_ship_type := str(support_ship.get("ship_type"))
 	if current_profile_id != desired_profile_id:
 		return false
 	if current_ship_type != desired_ship_type:
@@ -222,15 +232,24 @@ static func profile_matches_runtime_ship(profile: Dictionary, ally) -> bool:
 	return true
 
 
-static func apply_support_fleet_profile(ally, profile: Dictionary) -> void:
-	if not is_instance_valid(ally):
+static func apply_support_fleet_profile(support_ship, profile: Dictionary) -> void:
+	if not is_instance_valid(support_ship):
 		return
-	if "ship_type" in ally:
-		ally.ship_type = get_profile_ship_type(profile)
-	if "hull_scene" in ally:
-		ally.hull_scene = get_profile_hull_scene(profile)
-	if "cannon_scene" in ally:
-		ally.cannon_scene = get_profile_cannon_scene(profile)
+	if "ship_type" in support_ship:
+		support_ship.ship_type = get_profile_ship_type(profile)
+	if "hull_scene" in support_ship:
+		support_ship.hull_scene = get_profile_hull_scene(profile)
+	if "cannon_scene" in support_ship:
+		support_ship.cannon_scene = get_profile_cannon_scene(profile)
+	var crew_count := get_profile_crew_count(profile)
+	if "initial_crew_count" in support_ship:
+		support_ship.initial_crew_count = crew_count
+	if "max_crew" in support_ship:
+		support_ship.max_crew = maxi(int(support_ship.max_crew), crew_count)
+	if support_ship.has_method("set_player_fleet_crew_target_count"):
+		support_ship.call("set_player_fleet_crew_target_count", crew_count)
+	elif "max_minion_crew" in support_ship:
+		support_ship.max_minion_crew = crew_count
 
 
 static func _build_profile_for_slot(slot: Dictionary, slot_index: int) -> Dictionary:

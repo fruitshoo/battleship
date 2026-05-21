@@ -8,4 +8,5 @@
 
 /build/windows/
 /build/releases/
+/exports/
 *.uid

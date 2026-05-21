@@ -13,6 +13,8 @@ const AUTHORING_DATA_PATCH_USER_PATH := "user://authoring_palette_data_patch.jso
 const PALETTE_PRESET_FALLBACK_ID := "palette_queue"
 const SHOW_AUTHORING_PALETTE_TAB_SETTING := "battleship/debug/show_authoring_palette_tab"
 const SHOW_AUTHORING_PALETTE_TAB_ENV := "BATTLESHIP_SHOW_AUTHORING_PALETTE"
+const SHOW_ADVANCED_DEBUG_TABS_SETTING := "battleship/debug/show_advanced_tabs"
+const SHOW_ADVANCED_DEBUG_TABS_ENV := "BATTLESHIP_SHOW_ADVANCED_DEBUG"
 const DEBUG_PANEL_SIZE := Vector2(920.0, 560.0)
 const DEBUG_PANEL_MIN_SIZE := Vector2(760.0, 460.0)
 
@@ -100,14 +102,16 @@ static func setup_debug_panel(hud) -> void:
 	debug_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	modal_box.add_child(debug_tabs)
 
-	_add_environment_section(hud, debug_tabs)
-	_add_debug_draw_section(hud, debug_tabs)
+	_add_capture_section(hud, debug_tabs)
 	_add_spawn_section(hud, debug_tabs)
 	if is_authoring_palette_tab_visible():
 		_add_authoring_palette_section(hud, debug_tabs)
-	_add_misc_section(hud, debug_tabs)
 	_add_ship_section(hud, debug_tabs)
-	_add_sail_section(hud, debug_tabs)
+	_add_misc_section(hud, debug_tabs)
+	_add_environment_section(hud, debug_tabs)
+	if is_advanced_debug_tab_visible():
+		_add_debug_draw_section(hud, debug_tabs)
+		_add_sail_section(hud, debug_tabs)
 
 	hud.add_child(hud.sail_debug_panel)
 	hud.sail_debug_panel.anchor_left = 0.5
@@ -130,6 +134,13 @@ static func is_authoring_palette_tab_visible() -> bool:
 	if ProjectSettings.has_setting(SHOW_AUTHORING_PALETTE_TAB_SETTING):
 		return bool(ProjectSettings.get_setting(SHOW_AUTHORING_PALETTE_TAB_SETTING))
 	var env_value := OS.get_environment(SHOW_AUTHORING_PALETTE_TAB_ENV).strip_edges().to_lower()
+	return ["1", "true", "yes", "on"].has(env_value)
+
+
+static func is_advanced_debug_tab_visible() -> bool:
+	if ProjectSettings.has_setting(SHOW_ADVANCED_DEBUG_TABS_SETTING):
+		return bool(ProjectSettings.get_setting(SHOW_ADVANCED_DEBUG_TABS_SETTING))
+	var env_value := OS.get_environment(SHOW_ADVANCED_DEBUG_TABS_ENV).strip_edges().to_lower()
 	return ["1", "true", "yes", "on"].has(env_value)
 
 
@@ -299,11 +310,13 @@ static func sync_debug_tools_panel_state(hud) -> void:
 			draw_status,
 			DebugDrawBridge.get_channel_status_text()
 		]
+	if is_instance_valid(hud.debug_capture_status_value) and hud.has_method("get_debug_capture_status_text"):
+		hud.debug_capture_status_value.text = str(hud.call("get_debug_capture_status_text"))
 	hud._sync_ship_debug_panel_from_player()
 
 
 static func _add_environment_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("환경", false)
+	var section: Dictionary = create_debug_section("월드", false)
 	panel_box.add_child(section["root"])
 
 	var status := Label.new()
@@ -422,8 +435,75 @@ static func _toggle_debug_draw_channel(hud, channel: String) -> void:
 	hud._sync_debug_tools_panel_state()
 
 
+static func _add_capture_section(hud, panel_box: Control) -> void:
+	var section: Dictionary = create_debug_section("촬영", false)
+	panel_box.add_child(section["root"])
+	var columns := create_debug_columns(section["body"], 2)
+	var camera_group := create_debug_group(columns[0], "카메라 / HUD")
+	var time_group := create_debug_group(columns[1], "시간")
+
+	var status := Label.new()
+	status.text = "카메라: - / HUD: - / 시간: -"
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_body(status, 11)
+	camera_group.add_child(status)
+	hud.debug_capture_status_value = status
+
+	var hint := Label.new()
+	hint.text = "단축키: Ctrl+Shift+C 자유 카메라, Ctrl+Shift+H HUD 숨김, Ctrl+Shift+1/2/3 슬로모션/복귀"
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(hint, 10)
+	camera_group.add_child(hint)
+
+	var camera_row := HBoxContainer.new()
+	camera_row.add_theme_constant_override("separation", 4)
+	camera_group.add_child(camera_row)
+	camera_row.add_child(create_debug_action_button("자유 카메라", func() -> void:
+		if hud.has_method("_toggle_debug_free_camera"):
+			hud.call("_toggle_debug_free_camera")
+	))
+	camera_row.add_child(create_debug_action_button("추적 복귀", func() -> void:
+		if hud.has_method("_reset_debug_camera_to_follow"):
+			hud.call("_reset_debug_camera_to_follow")
+	))
+
+	var hud_row := HBoxContainer.new()
+	hud_row.add_theme_constant_override("separation", 4)
+	camera_group.add_child(hud_row)
+	hud_row.add_child(create_debug_action_button("HUD 숨김", func() -> void:
+		if hud.has_method("_set_trailer_clean_hud_enabled"):
+			hud.call("_set_trailer_clean_hud_enabled", true)
+	))
+	hud_row.add_child(create_debug_action_button("HUD 표시", func() -> void:
+		if hud.has_method("_set_trailer_clean_hud_enabled"):
+			hud.call("_set_trailer_clean_hud_enabled", false)
+	))
+
+	var time_row := HBoxContainer.new()
+	time_row.add_theme_constant_override("separation", 4)
+	time_group.add_child(time_row)
+	time_row.add_child(create_debug_action_button("0.25x", func() -> void:
+		if hud.has_method("_set_debug_time_scale"):
+			hud.call("_set_debug_time_scale", 0.25)
+	))
+	time_row.add_child(create_debug_action_button("0.5x", func() -> void:
+		if hud.has_method("_set_debug_time_scale"):
+			hud.call("_set_debug_time_scale", 0.5)
+	))
+	time_row.add_child(create_debug_action_button("1.0x", func() -> void:
+		if hud.has_method("_set_debug_time_scale"):
+			hud.call("_set_debug_time_scale", 1.0)
+	))
+
+	var time_hint := Label.new()
+	time_hint.text = "자유 카메라: WASD 이동, Q/E 상하, Shift 고속, 우클릭 드래그 또는 방향키 회전"
+	time_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(time_hint, 10)
+	time_group.add_child(time_hint)
+
+
 static func _add_spawn_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("생성", false)
+	var section: Dictionary = create_debug_section("스폰", false)
 	panel_box.add_child(section["root"])
 	var columns := create_debug_columns(section["body"], 2)
 	var enemy_group := create_debug_group(columns[0], "적 함선")
@@ -2645,12 +2725,12 @@ static func _palette_entry_has_tag(entry: Dictionary, tag_name: String) -> bool:
 
 
 static func _add_misc_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("진행", false)
+	var section: Dictionary = create_debug_section("진행/결과", false)
 	panel_box.add_child(section["root"])
 	var columns := create_debug_columns(section["body"], 2)
-	var progression_group := create_debug_group(columns[0], "성장 / 보상")
-	var result_group := create_debug_group(columns[1], "결과 / 화면")
-	var diagnostics_group := create_debug_group(columns[1], "전투 진단")
+	var progression_group := create_debug_group(columns[0], "런 상태 / 보상")
+	var result_group := create_debug_group(columns[1], "화면 전환")
+	var diagnostics_group := create_debug_group(columns[1], "진단")
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
@@ -2729,14 +2809,14 @@ static func _add_misc_section(hud, panel_box: Control) -> void:
 
 
 static func _add_ship_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("함선", false)
+	var section: Dictionary = create_debug_section("플레이어", false)
 	panel_box.add_child(section["root"])
 	var columns := create_debug_columns(section["body"], 2)
-	var status_group := create_debug_group(columns[0], "상태 모니터")
-	var damage_group := create_debug_group(columns[0], "피해 시뮬레이션")
-	var action_group := create_debug_group(columns[1], "즉시 조작")
-	var crew_group := create_debug_group(columns[1], "승선 / 지원")
-	var stat_group := create_debug_group(columns[1], "함선 스탯")
+	var status_group := create_debug_group(columns[0], "상태")
+	var damage_group := create_debug_group(columns[0], "피해")
+	var action_group := create_debug_group(columns[1], "조작")
+	var crew_group := create_debug_group(columns[1], "선원 / 지원")
+	var stat_group := create_debug_group(columns[1], "스탯")
 
 	var ship_status := Label.new()
 	ship_status.text = "함선 상태: -"
@@ -2770,12 +2850,12 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	status_group.add_child(enemy_ai_status)
 	hud.debug_enemy_ai_value = enemy_ai_status
 
-	var ally_ai_status := Label.new()
-	ally_ai_status.text = "아군 AI: -"
-	ally_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	NavalUiTheme.style_muted(ally_ai_status, 10)
-	status_group.add_child(ally_ai_status)
-	hud.debug_ally_ai_value = ally_ai_status
+	var support_ai_status := Label.new()
+	support_ai_status.text = "지원함 AI: -"
+	support_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	NavalUiTheme.style_muted(support_ai_status, 10)
+	status_group.add_child(support_ai_status)
+	hud.debug_support_ai_value = support_ai_status
 
 	var support_fleet_status := Label.new()
 	support_fleet_status.text = "지원함 진형: -"
@@ -2915,7 +2995,7 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 
 
 static func _add_sail_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("돛", true)
+	var section: Dictionary = create_debug_section("돛 피해", true)
 	panel_box.add_child(section["root"])
 
 	var damage_row: Dictionary = create_slider_row("Damage")

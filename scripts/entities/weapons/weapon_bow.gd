@@ -62,7 +62,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		if s_speed > 0.1:
 			var s_dir = - ship.global_transform.basis.z.normalized()
 			
-			# chaser_ship의 move_dir가 있다면 그것을 사용
+			# AI/support ships may expose a smoothed move direction for leading.
 			if ship.has_method("get_move_direction_value"):
 				s_dir = ship.get_move_direction_value()
 				
@@ -179,19 +179,6 @@ func _launch_singigeon_proc_rocket(target: Node3D, attacker: Node3D, team_name: 
 		rocket.damage = float(stats.get("base_damage", 2.5))
 	if "personnel_damage_mult" in rocket:
 		rocket.personnel_damage_mult = float(stats.get("personnel_damage_mult", 6.0))
-	if "soldier_knockback_speed" in rocket:
-		rocket.soldier_knockback_speed = float(stats.get("base_knockback_speed", 9.0)) + float(singigeon_level - 1) * float(stats.get("knockback_speed_per_lv", 0.0))
-	if "soldier_knockback_duration" in rocket:
-		rocket.soldier_knockback_duration = float(stats.get("base_knockback_duration", 0.34)) + float(singigeon_level - 1) * float(stats.get("knockback_duration_per_lv", 0.0))
-	var overboard_level := int(stats.get("overboard_knockback_level", 4))
-	var allows_overboard := singigeon_level >= overboard_level
-	if "soldier_knockback_allows_overboard" in rocket:
-		rocket.soldier_knockback_allows_overboard = allows_overboard
-	if "soldier_knockback_upward_speed" in rocket:
-		rocket.soldier_knockback_upward_speed = 0.0
-		if allows_overboard:
-			rocket.soldier_knockback_upward_speed = float(stats.get("overboard_upward_speed", 1.7)) \
-				+ float(maxi(0, singigeon_level - overboard_level)) * float(stats.get("overboard_upward_speed_per_lv", 0.25))
 	if "crit_chance" in rocket:
 		rocket.crit_chance = attacker.get_crit_chance_value() if attacker.has_method("get_crit_chance_value") else 0.1
 	if "crit_multiplier" in rocket:
@@ -229,10 +216,6 @@ func _launch_singigeon_proc_rocket(target: Node3D, attacker: Node3D, team_name: 
 		rocket.restart_flight()
 	if rocket.global_position.distance_squared_to(current_target_pos) > 0.0001:
 		rocket.look_at(current_target_pos, Vector3.UP)
-
-	var audio_manager = attacker.get_node_or_null("/root/AudioManager")
-	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("rocket_launch", attacker.global_position, randf_range(0.92, 1.06))
 	return true
 
 func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:

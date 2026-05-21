@@ -1,7 +1,7 @@
 extends Node
 # @scene_contract_encapsulated
 
-const ShipScript = preload("res://scripts/test/chaser_isolation_boarding_collision.gd")
+const ShipScript = preload("res://scripts/test/ai_ship_isolation_boarding_collision.gd")
 
 
 class MockMast:

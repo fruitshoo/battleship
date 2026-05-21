@@ -2,6 +2,7 @@
 extends BTAction
 class_name BTShipSetBoardingIntent
 
+const ShipAIPerceptionHelper = preload("res://scripts/ai/limbo/ship_ai_perception_helper.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 @export var boarding_intent_var: StringName = ShipAILimboKeys.VAR_BOARDING_INTENT
@@ -27,7 +28,7 @@ func _tick(_delta: float) -> Status:
 	if not _should_publish_boarding_intent(agent_3d):
 		return SUCCESS
 
-	var target_distance := agent_3d.global_position.distance_to(target.global_position)
+	var target_distance := ShipAIPerceptionHelper.get_target_distance(agent_3d, target)
 	var attempt_distance := _get_boarding_attempt_distance(agent_3d, target)
 	var boarding_intent := ShipAILimboKeys.BOARDING_READY if target_distance <= attempt_distance else ShipAILimboKeys.BOARDING_APPROACH
 
@@ -53,36 +54,12 @@ func _clear_boarding_intent(agent_3d: Node3D) -> void:
 
 
 func _should_publish_boarding_intent(agent_3d: Node3D) -> bool:
-	if not _is_enemy_team(agent_3d):
+	if not ShipAIPerceptionHelper.is_enemy_ship(agent_3d):
 		return false
-	if not _can_board(agent_3d):
+	if not ShipAIPerceptionHelper.can_ship_board(agent_3d):
 		return false
-	return not _is_gunner(agent_3d)
+	return not ShipAIPerceptionHelper.is_ship_gunner(agent_3d)
 
 
 func _get_boarding_attempt_distance(agent_3d: Node3D, target: Node3D) -> float:
 	return ShipContactGeometry.get_boarding_attempt_distance(agent_3d, target, default_boarding_break_distance)
-
-
-func _is_enemy_team(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("get_team_tag"):
-		return str(agent_3d.call("get_team_tag")) == "enemy"
-	if "team" in agent_3d:
-		return str(agent_3d.get("team")) == "enemy"
-	return true
-
-
-func _is_gunner(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("is_gunner_role"):
-		return agent_3d.call("is_gunner_role") == true
-	if "combat_role" in agent_3d:
-		return int(agent_3d.get("combat_role")) == 1
-	return false
-
-
-func _can_board(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("can_board_targets"):
-		return agent_3d.call("can_board_targets") == true
-	if "allow_boarding" in agent_3d:
-		return agent_3d.get("allow_boarding") == true
-	return false

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://deprw2k61rllc"]
 
-[ext_resource type="Script" uid="uid://bygufl84wr52c" path="res://scripts/entities/ships/chaser_ship.gd" id="1_chaser"]
+[ext_resource type="Script" path="res://scripts/entities/ships/ai_ship.gd" id="1_ai_ship"]
 [ext_resource type="PackedScene" uid="uid://bbrb610a2rv1j" path="res://scenes/ships/hulls/kobayabune_hull.tscn" id="2_73pna"]
 [ext_resource type="PackedScene" uid="uid://bykgjn3jeng2p" path="res://scenes/entities/soldiers/soldier.tscn" id="2_soldier"]
 [ext_resource type="Script" uid="uid://wk1geoexedkc" path="res://scripts/helpers/collision_visualizer.gd" id="sys_vis_script"]
@@ -13,7 +13,7 @@ size = Vector3(3.12, 2.6000001, 7.92)
 size = Vector3(2.52, 2.4, 7.12)
 
 [node name="EnemyBaseShip" type="Node3D" unique_id=2138341481 groups=["enemy"]]
-script = ExtResource("1_chaser")
+script = ExtResource("1_ai_ship")
 move_speed = 4.2
 initial_crew_count = 5
 hull_scene = ExtResource("2_73pna")

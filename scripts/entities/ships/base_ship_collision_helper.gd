@@ -1,6 +1,8 @@
 extends RefCounted
 class_name BaseShipCollisionHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const COLLISION_REPULSION_CACHE_FRAME_META := "collision_repulsion_cache_frame"
 const COLLISION_REPULSION_CACHE_FORCE_META := "collision_repulsion_cache_force"
@@ -51,6 +53,12 @@ const RAMMING_BOOST_KNOCKBACK_MULT := 1.35
 const RAMMING_LETHAL_VFX_SPEED_MULT := 1.28
 const HEAD_ON_ESCAPE_RUDDER_DEADZONE := 5.0
 const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
+const MOVEMENT_GUARD_BROAD_PHASE_SCALE := 1.18
+const MOVEMENT_GUARD_BROAD_PHASE_PAD := 1.8
+const MOVEMENT_GUARD_DEFAULT_SAFE_RATIO := 0.98
+const MOVEMENT_GUARD_ENGAGEMENT_SAFE_RATIO := 0.92
+const MOVEMENT_GUARD_SUPPORT_SAFE_RATIO := 0.84
+const MOVEMENT_GUARD_MAX_CHECKS := 8
 
 static var _last_contact_sfx_msec_by_pair: Dictionary = {}
 static var _last_contact_vfx_msec_by_pair: Dictionary = {}
@@ -288,6 +296,133 @@ static func _get_collision_neighbors_cached(current_frame: int) -> Array:
 		_cached_collision_neighbors = EntityRegistry.get_ships()
 		_cached_collision_neighbors_frame = current_frame
 	return _cached_collision_neighbors
+
+
+static func apply_movement_collision_guards(ship, prev_pos: Vector3, proposed_pos: Vector3, excluded_ship: Node3D = null, impact_speed_hint: float = 0.0) -> Vector3:
+	if not is_instance_valid(ship) or ship.get_meta("derelict_nonblocking", false) == true:
+		return proposed_pos
+	var corrected_pos := proposed_pos
+	var ship_team: String = NodeContractHelper.get_team_tag(ship, "")
+	var ship_guard_radius := _get_movement_guard_broad_radius(ship)
+	var checked_count := 0
+	for other_variant in _get_collision_neighbors_cached(Engine.get_physics_frames()):
+		var other := other_variant as Node3D
+		if other == ship or not is_instance_valid(other) or other == excluded_ship:
+			continue
+		if NodeContractHelper.is_sinking_or_dying(other) or other.get_meta("derelict_nonblocking", false) == true:
+			continue
+		var offset := corrected_pos - other.global_position
+		offset.y = 0.0
+		var broad_probe := (ship_guard_radius + _get_movement_guard_broad_radius(other)) * MOVEMENT_GUARD_BROAD_PHASE_SCALE + MOVEMENT_GUARD_BROAD_PHASE_PAD
+		if offset.length_squared() > broad_probe * broad_probe:
+			continue
+		var safe_ratio := _get_movement_guard_safe_ratio(ship, other)
+		var safe_probe: float = float(ship.get_collision_distance_to(other)) * maxf(safe_ratio, 1.08)
+		if offset.length_squared() > safe_probe * safe_probe:
+			continue
+		var other_team: String = NodeContractHelper.get_team_tag(other, "")
+		var emit_collision_event := not ship_team.is_empty() and not other_team.is_empty() and ship_team != other_team
+		corrected_pos = apply_single_movement_collision_guard(ship, other, prev_pos, corrected_pos, safe_ratio, impact_speed_hint, emit_collision_event)
+		checked_count += 1
+		if checked_count >= MOVEMENT_GUARD_MAX_CHECKS:
+			break
+	return corrected_pos
+
+
+static func apply_single_movement_collision_guard(ship, other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = MOVEMENT_GUARD_DEFAULT_SAFE_RATIO, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:
+	if not is_instance_valid(ship) or not is_instance_valid(other_ship):
+		return proposed_pos
+	if NodeContractHelper.is_sinking_or_dying(other_ship) or other_ship.get_meta("derelict_nonblocking", false) == true:
+		return proposed_pos
+	var target_pos := other_ship.global_position
+	var safe_dist: float = ship.get_collision_distance_to(other_ship) * safe_ratio
+	if safe_dist <= 0.01:
+		return proposed_pos
+
+	var from_2d := Vector2(prev_pos.x - target_pos.x, prev_pos.z - target_pos.z)
+	var to_2d := Vector2(proposed_pos.x - target_pos.x, proposed_pos.z - target_pos.z)
+	var move_2d := to_2d - from_2d
+	var a := move_2d.dot(move_2d)
+	if a > 0.00001:
+		var b := 2.0 * from_2d.dot(move_2d)
+		var c := from_2d.dot(from_2d) - safe_dist * safe_dist
+		if c > 0.0:
+			var disc := b * b - 4.0 * a * c
+			if disc >= 0.0:
+				var t := (-b - sqrt(disc)) / (2.0 * a)
+				if t >= 0.0 and t <= 1.0:
+					var hit_t := maxf(0.0, t - 0.02)
+					var hit_pos := prev_pos.lerp(proposed_pos, hit_t)
+					var correction := _get_movement_guard_correction(ship, other_ship, hit_pos, safe_dist)
+					hit_pos += correction * get_guard_correction_share(ship, other_ship, correction.length())
+					_emit_movement_guarded_collision(ship, other_ship, impact_speed_hint, emit_collision_event)
+					return hit_pos
+
+	var diff := proposed_pos - target_pos
+	diff.y = 0.0
+	var dist := diff.length()
+	if dist < safe_dist:
+		var correction := _get_movement_guard_correction(ship, other_ship, proposed_pos, safe_dist)
+		proposed_pos += correction * get_guard_correction_share(ship, other_ship, correction.length())
+		_emit_movement_guarded_collision(ship, other_ship, impact_speed_hint, emit_collision_event)
+	return proposed_pos
+
+
+static func _get_movement_guard_correction(ship, other_ship: Node3D, pos: Vector3, safe_dist: float) -> Vector3:
+	var diff := pos - other_ship.global_position
+	diff.y = 0.0
+	var normal := diff.normalized() if diff.length_squared() > 0.0001 else _get_collision_guard_forward_flat(ship)
+	var target_pos := pos
+	target_pos.x = other_ship.global_position.x + normal.x * safe_dist
+	target_pos.z = other_ship.global_position.z + normal.z * safe_dist
+	return target_pos - pos
+
+
+static func _emit_movement_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: float, emit_collision_event: bool) -> void:
+	if not emit_collision_event or not is_instance_valid(ship) or not is_instance_valid(other_ship):
+		return
+	var min_ramming_speed := 4.0
+	if ship.get("min_ramming_speed") != null:
+		min_ramming_speed = float(ship.get("min_ramming_speed")) * 0.72
+	var impact_speed := maxf(impact_speed_hint, min_ramming_speed)
+	try_spawn_strong_collision_effects(ship, other_ship, impact_speed)
+	if ship.has_method("apply_ramming_damage"):
+		ship.call("apply_ramming_damage", other_ship, impact_speed)
+	if other_ship.has_method("apply_ramming_damage"):
+		other_ship.call("apply_ramming_damage", ship, impact_speed)
+	if ship.get("current_speed") != null:
+		var mass_ratio := get_ship_mass_scale(other_ship) / maxf(get_ship_mass_scale(ship), 0.1)
+		var max_speed_after_contact := 0.0
+		if ship.get("max_speed") != null:
+			max_speed_after_contact = maxf(0.0, float(ship.get("max_speed")) * clampf(0.36 + (1.0 / maxf(mass_ratio, 0.25)) * 0.18, 0.38, 0.72))
+		ship.set("current_speed", minf(float(ship.get("current_speed")), max_speed_after_contact))
+
+
+static func _get_movement_guard_safe_ratio(ship, other_ship: Node3D) -> float:
+	if _is_player_support_pair(ship, other_ship):
+		return MOVEMENT_GUARD_SUPPORT_SAFE_RATIO
+	if is_instance_valid(ship) and ship.has_method("_is_engagement_pair") and ship.call("_is_engagement_pair", other_ship):
+		return MOVEMENT_GUARD_ENGAGEMENT_SAFE_RATIO
+	return MOVEMENT_GUARD_DEFAULT_SAFE_RATIO
+
+
+static func _get_movement_guard_broad_radius(ship: Node) -> float:
+	if ship is Node3D:
+		var half := ShipContactGeometry.get_soft_collision_half_extents(ship as Node3D)
+		return maxf(0.5, maxf(half.x, half.y))
+	var base_radius := NodeContractHelper.get_base_collision_radius_value(ship)
+	var width_mult := NodeContractHelper.get_collision_width_multiplier_value(ship)
+	var length_mult := NodeContractHelper.get_collision_length_multiplier_value(ship)
+	return maxf(0.5, base_radius * maxf(width_mult, length_mult))
+
+
+static func _get_collision_guard_forward_flat(ship: Node) -> Vector3:
+	if ship is Node3D:
+		var fwd := -(ship as Node3D).global_transform.basis.z
+		fwd.y = 0.0
+		if fwd.length_squared() > 0.0001:
+			return fwd.normalized()
+	return Vector3.FORWARD
 
 static func _is_backing_out_of_head_on(ship) -> bool:
 	if not is_instance_valid(ship):
@@ -748,10 +883,10 @@ static func _is_player_support_pair(ship, other_ship: Node3D) -> bool:
 		return false
 	if (ship.has_method("is_player_team") and not ship.is_player_team()) or (other_ship.has_method("is_player_team") and not other_ship.is_player_team()):
 		return false
-	var ship_is_support: bool = ShipAllyRoleHelper.is_support_ship(ship)
-	var other_is_support: bool = ShipAllyRoleHelper.is_support_ship(other_ship)
-	var ship_is_player: bool = ShipAllyRoleHelper.is_player_flagship(ship)
-	var other_is_player: bool = ShipAllyRoleHelper.is_player_flagship(other_ship)
+	var ship_is_support: bool = PlayerFleetRoleHelper.is_support_ship(ship)
+	var other_is_support: bool = PlayerFleetRoleHelper.is_support_ship(other_ship)
+	var ship_is_player: bool = PlayerFleetRoleHelper.is_player_flagship(ship)
+	var other_is_player: bool = PlayerFleetRoleHelper.is_player_flagship(other_ship)
 	return (ship_is_support and other_is_player) or (other_is_support and ship_is_player)
 
 
@@ -762,7 +897,7 @@ static func _is_hostile_support_contact(ship, other_ship: Node3D) -> bool:
 	var other_team := NodeContractHelper.get_team_tag(other_ship, "")
 	if ship_team.is_empty() or other_team.is_empty() or ship_team == other_team:
 		return false
-	return ShipAllyRoleHelper.is_support_ship(ship) or ShipAllyRoleHelper.is_support_ship(other_ship)
+	return PlayerFleetRoleHelper.is_support_ship(ship) or PlayerFleetRoleHelper.is_support_ship(other_ship)
 
 
 static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> void:

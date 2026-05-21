@@ -4,7 +4,8 @@ class_name BaseShipBoardingHelper
 
 const SoldierBoardingPrepBarHelper = preload("res://scripts/entities/soldiers/soldier_boarding_prep_bar_helper.gd")
 const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
-const BOARDING_LANDING_INSET := 0.45
+const BOARDING_LANDING_INSET := 0.58
+const BOARDING_LANDING_CLAMP_INSET := 0.24
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85
 const BOARDING_BREAK_DISTANCE_PAD := 2.2
 const BOARDING_WAVE_MAX_SIZE := 3
@@ -373,15 +374,15 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 	if soldiers_node:
 		var soldiers = soldiers_node.get_children()
 		var enemy_count_on_deck = 0
-		var ally_count_on_deck = 0
+		var friendly_count_on_deck = 0
 		for child in soldiers:
 			if SoldierStateHelper.is_alive_soldier(child):
 				if child.has_method("get_team_tag") and child.get_team_tag() != team_prop:
 					enemy_count_on_deck += 1
 				else:
-					ally_count_on_deck += 1
+					friendly_count_on_deck += 1
 
-			if enemy_count_on_deck > 0 and ally_count_on_deck <= enemy_count_on_deck:
+			if enemy_count_on_deck > 0 and friendly_count_on_deck <= enemy_count_on_deck:
 				return false
 
 		var nearest_boarder_distance_sq: float = INF
@@ -542,10 +543,12 @@ static func _get_defender_boarding_slot_penalty(target_ship: Node, attacker_team
 static func _get_random_deck_landing_local(target_ship: Node3D) -> Vector3:
 	var target_half_ext := _get_target_deck_half_extents(target_ship)
 	var target_deck_h := _get_target_deck_height(target_ship)
+	var safe_half_x: float = maxf(0.08, target_half_ext.x - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.x - 0.08)))
+	var safe_half_z: float = maxf(0.08, target_half_ext.y - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.y - 0.08)))
 	return Vector3(
-		randf_range(-target_half_ext.x, target_half_ext.x),
+		randf_range(-safe_half_x, safe_half_x),
 		target_deck_h,
-		randf_range(-target_half_ext.y, target_half_ext.y)
+		randf_range(-safe_half_z, safe_half_z)
 	)
 
 
@@ -633,10 +636,12 @@ static func _apply_boarding_transfer_damage(soldier_id: int, target_ship_id: int
 static func _clamp_deck_landing_local(target_ship: Node3D, landing_local: Vector3) -> Vector3:
 	var target_half_ext := _get_target_deck_half_extents(target_ship)
 	var target_deck_h := _get_target_deck_height(target_ship)
+	var safe_half_x: float = maxf(0.08, target_half_ext.x - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.x - 0.08)))
+	var safe_half_z: float = maxf(0.08, target_half_ext.y - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.y - 0.08)))
 	return Vector3(
-		clampf(landing_local.x, -target_half_ext.x, target_half_ext.x),
+		clampf(landing_local.x, -safe_half_x, safe_half_x),
 		target_deck_h,
-		clampf(landing_local.z, -target_half_ext.y, target_half_ext.y)
+		clampf(landing_local.z, -safe_half_z, safe_half_z)
 	)
 
 

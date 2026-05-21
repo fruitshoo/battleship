@@ -320,8 +320,8 @@ func _prepare_support_fleet_screen() -> void:
 		return
 	if "support_fleet_limit" in _current_player_ship:
 		_current_player_ship.set("support_fleet_limit", maxi(1, int(_current_player_ship.get("support_fleet_limit"))))
-	if _current_player_ship.has_method("_spawn_or_repair_ally"):
-		_current_player_ship.call("_spawn_or_repair_ally")
+	if _current_player_ship.has_method("_spawn_or_repair_support_ship"):
+		_current_player_ship.call("_spawn_or_repair_support_ship")
 
 
 func _strip_recovery_pickups() -> void:

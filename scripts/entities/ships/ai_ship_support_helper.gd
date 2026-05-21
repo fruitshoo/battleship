@@ -1,8 +1,12 @@
 extends RefCounted
-class_name ChaserShipMinionHelper
+class_name AIShipSupportHelper
+
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
+const AIShipRuntimeHelper = preload("res://scripts/entities/ships/ai_ship_runtime_helper.gd")
+const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 
 const SUPPORT_FORMATION_SPACING := 10.0
 const SUPPORT_COLUMN_FORMATION_SPACING := 14.0
@@ -121,24 +125,24 @@ const SUPPORT_ASSIST_TARGET_SHARE_LEASH_PAD := 18.0
 const SUPPORT_BOARDING_CONTACT_PAD := 0.85
 const SUPPORT_RESCUE_BOARDING_START_PAD := SUPPORT_BOARDING_CONTACT_PAD
 const SUPPORT_LIMBO_PILOT_STALE_FRAMES := 8
-const ALLY_LIMBO_PILOT_STALE_FRAMES := 8
-const ALLY_GUARD_TARGET_ID_META := "ally_guard_target_id"
-const ALLY_GUARD_LANE_SIDE_META := "ally_guard_lane_side"
-const ALLY_GUARD_SEPARATION_RADIUS := 9.0
-const ALLY_GUARD_SEPARATION_FORCE := 0.9
-const ALLY_GUARD_SPEED_RESPONSE := 1.72
-const ALLY_GUARD_ROWING_WIND_FLOOR := 0.78
+const LEGACY_CAPTURE_LIMBO_PILOT_STALE_FRAMES := 8
+const LEGACY_CAPTURE_GUARD_TARGET_ID_META := "legacy_capture_guard_target_id"
+const LEGACY_CAPTURE_GUARD_LANE_SIDE_META := "legacy_capture_guard_lane_side"
+const LEGACY_CAPTURE_GUARD_SEPARATION_RADIUS := 9.0
+const LEGACY_CAPTURE_GUARD_SEPARATION_FORCE := 0.9
+const LEGACY_CAPTURE_GUARD_SPEED_RESPONSE := 1.72
+const LEGACY_CAPTURE_GUARD_ROWING_WIND_FLOOR := 0.78
 
 static var _support_roster_cache_frame: int = -1
 static var _support_roster_cache: Dictionary = {}
 
-static func continue_minion_motion(ship, delta: float) -> void:
+static func continue_support_motion(ship, delta: float) -> void:
 	if delta <= 0.0 or not is_instance_valid(ship):
 		return
-	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
-	var is_captured_minion: bool = ShipAllyRoleHelper.is_captured_minion(ship) and not is_support_ship
-	if not is_support_ship and not is_captured_minion:
-		ship._update_minion_ai_idle_visuals()
+	var is_support_ship: bool = PlayerFleetRoleHelper.is_support_ship(ship)
+	var is_legacy_captured_ship: bool = PlayerFleetRoleHelper.is_legacy_captured_ship(ship) and not is_support_ship
+	if not is_support_ship and not is_legacy_captured_ship:
+		ship._update_support_ai_idle_visuals()
 		return
 
 	var movement_target: Node3D = _get_support_flagship(ship) if is_support_ship else (ship.target as Node3D if is_instance_valid(ship.target) else null)
@@ -152,7 +156,7 @@ static func continue_minion_motion(ship, delta: float) -> void:
 		ship.rotation.y -= deg_to_rad(actual_turn)
 
 		var wind_floor := SUPPORT_JOIN_ROWING_WIND_FLOOR if is_support_ship and ship.get_meta("support_joining", false) == true else 0.6
-		var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor)
+		var wind_mult: float = AIShipRuntimeHelper._calculate_sail_drive_multiplier(ship, wind_floor)
 		var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
 		var velocity: Vector3 = forward_vec * speed * wind_mult
 		velocity += ship.separation_force
@@ -173,10 +177,10 @@ static func continue_minion_motion(ship, delta: float) -> void:
 	ship._apply_bobbing_effect()
 	ship._set_wake_state(speed > 0.4, clampf(speed / maxf(float(ship.max_speed), 0.01), 0.0, 1.0), 0.0, 0.0)
 
-static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) -> void:
+static func process_support_ai(ship, delta: float, motion_delta: float = -1.0) -> void:
 	var step_delta: float = delta if motion_delta < 0.0 else maxf(motion_delta, 0.0)
-	var is_support_ship: bool = ShipAllyRoleHelper.is_support_ship(ship)
-	var is_captured_minion: bool = ShipAllyRoleHelper.is_captured_minion(ship) and not is_support_ship
+	var is_support_ship: bool = PlayerFleetRoleHelper.is_support_ship(ship)
+	var is_legacy_captured_ship: bool = PlayerFleetRoleHelper.is_legacy_captured_ship(ship) and not is_support_ship
 	var movement_target: Node3D = _get_support_flagship(ship) if is_support_ship else (ship.target as Node3D if is_instance_valid(ship.target) else null)
 	if not is_instance_valid(movement_target) or _is_ship_disabled(movement_target):
 		ship._find_player()
@@ -190,12 +194,12 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 		_record_support_anchor(ship, movement_target)
 		_record_support_trail_point(movement_target)
 
-	var minions: Array = _get_minion_roster(ship, is_support_ship)
+	var minions: Array = _get_support_roster(ship, is_support_ship)
 	var my_index: int = minions.find(ship)
 	if my_index == -1:
 		my_index = 0
 
-	var offset: Vector3 = _get_minion_offset(ship, my_index, is_support_ship)
+	var offset: Vector3 = _get_support_offset(ship, my_index, is_support_ship)
 	var player_fwd: Vector3 = -movement_target.global_transform.basis.z
 	player_fwd.y = 0.0
 	if player_fwd.length_squared() <= 0.0001:
@@ -229,7 +233,7 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 	var support_assist_target: Node3D = null
 	var support_formation_value: int = SupportFleetStateHelper.get_effective_formation(ship) if is_support_ship else 0
 	var is_spread_support_formation: bool = is_support_ship and support_formation_value != 0
-	var is_heavy_support: bool = is_support_ship and ShipAllyRoleHelper.is_heavy_support(ship)
+	var is_heavy_support: bool = is_support_ship and PlayerFleetRoleHelper.is_heavy_support(ship)
 	var support_column_turn_blend: float = 0.0
 	var support_column_turn_angle: float = 0.0
 	var support_column_turn_mode: bool = false
@@ -237,9 +241,9 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 	var support_pre_avoid_brake_mult: float = 1.0
 	var support_pre_avoid_hazard: float = 0.0
 	var support_pre_avoid_lateral: float = 0.0
-	var ally_limbo_payload := _get_recent_ally_limbo_payload(ship) if is_captured_minion else {}
-	var ally_limbo_mode := str(ally_limbo_payload.get("mode", "")).strip_edges()
-	var ally_guard_target := ally_limbo_payload.get("target", null) as Node3D
+	var legacy_capture_limbo_payload := _get_recent_legacy_capture_limbo_payload(ship) if is_legacy_captured_ship else {}
+	var legacy_capture_limbo_mode := str(legacy_capture_limbo_payload.get("mode", "")).strip_edges()
+	var legacy_capture_guard_target := legacy_capture_limbo_payload.get("target", null) as Node3D
 
 	var to_target_vec = target_pos - ship.global_position
 	var direction = to_target_vec.normalized()
@@ -317,12 +321,12 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 			return
 		_process_support_assist_ai(ship, delta, support_assist_target, minions, my_index, step_delta)
 		return
-	if is_captured_minion and ally_limbo_mode == ShipAILimboKeys.ALLY_MODE_GUARD_THREAT and is_instance_valid(ally_guard_target):
-		_process_captured_guard_ai(ship, delta, ally_guard_target, minions, my_index, step_delta)
+	if is_legacy_captured_ship and legacy_capture_limbo_mode == ShipAILimboKeys.ALLY_MODE_GUARD_THREAT and is_instance_valid(legacy_capture_guard_target):
+		_process_captured_guard_ai(ship, delta, legacy_capture_guard_target, minions, my_index, step_delta)
 		return
 
 	var target_final_speed = player_speed
-	var ally_regrouping: bool = is_captured_minion and ally_limbo_mode == ShipAILimboKeys.ALLY_MODE_REGROUP
+	var legacy_capture_regrouping: bool = is_legacy_captured_ship and legacy_capture_limbo_mode == ShipAILimboKeys.ALLY_MODE_REGROUP
 	if is_joining_support:
 		var join_stage := int(ship.get_meta(SUPPORT_JOIN_STAGE_META, SUPPORT_JOIN_STAGE_FINAL_SLOT))
 		target_final_speed = _calculate_support_join_speed(ship, float(player_speed), dist_to_target, join_stage, is_heavy_support)
@@ -340,7 +344,7 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 		)
 		target_final_speed = float(speed_step.get("target_speed", target_final_speed))
 		support_slot_lateral_error = float(speed_step.get("slot_lateral_error", support_slot_lateral_error))
-	elif ally_regrouping:
+	elif legacy_capture_regrouping:
 		target_final_speed = maxf(player_speed + 2.4, ship.move_speed * 1.55)
 	elif dist_to_player < 10.0:
 		target_final_speed = 0.0
@@ -387,7 +391,7 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 		target_final_speed = float(turn_brake_step.get("target_speed", target_final_speed))
 		support_turn_angle = float(turn_brake_step.get("turn_angle", support_turn_angle))
 
-	var speed_response: float = SUPPORT_SPEED_RESPONSE if is_support_ship else (1.55 if ally_regrouping else 1.2)
+	var speed_response: float = SUPPORT_SPEED_RESPONSE if is_support_ship else (1.55 if legacy_capture_regrouping else 1.2)
 	ship._last_ai_speed = lerp(ship._last_ai_speed, target_final_speed, delta * speed_response)
 	var final_move_speed = ship._last_ai_speed
 	ship.current_speed = maxf(final_move_speed, 0.0)
@@ -433,7 +437,7 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 			ship.rotation.y = lerp_angle(ship.rotation.y, player_head_rot, step_delta * 3.0)
 
 	var wind_floor := SUPPORT_JOIN_ROWING_WIND_FLOOR if is_support_ship and is_joining_support else 0.6
-	var wind_mult = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor)
+	var wind_mult = AIShipRuntimeHelper._calculate_sail_drive_multiplier(ship, wind_floor)
 	final_move_speed *= wind_mult
 	var forward_vec = Vector3(-sin(ship.rotation.y), 0, -cos(ship.rotation.y))
 	var velocity = forward_vec * final_move_speed
@@ -468,8 +472,8 @@ static func process_minion_ai(ship, delta: float, motion_delta: float = -1.0) ->
 		ship.set_meta("support_debug_pre_avoid_lateral", support_pre_avoid_lateral)
 		ShipBoardingMetaHelper.set_support_debug_mode(ship, ShipBoardingMetaHelper.SUPPORT_DEBUG_TRAIL)
 		_draw_support_limbo_debug(ship)
-	elif is_captured_minion:
-		_draw_ally_limbo_debug(ship)
+	elif is_legacy_captured_ship:
+		_draw_legacy_capture_limbo_debug(ship)
 
 static func _build_support_formation_step(
 	ship,
@@ -917,7 +921,7 @@ static func _process_support_assist_ai(ship, delta: float, assist_target: Node3D
 		assist_target,
 		desired_point,
 		maxf(maxf(ship.current_speed, float(ship._last_ai_speed)), _get_ship_speed(assist_target, 0.0)),
-		ShipAllyRoleHelper.is_heavy_support(ship)
+		PlayerFleetRoleHelper.is_heavy_support(ship)
 	)
 	var pre_avoidance_offset: Vector3 = pre_avoidance.get("position_offset", Vector3.ZERO)
 	if pre_avoidance_offset.length_squared() > 0.001:
@@ -1030,9 +1034,9 @@ static func _process_captured_guard_ai(ship, delta: float, guard_target: Node3D,
 		delta,
 		target_rotation_y,
 		desired_speed,
-		ALLY_GUARD_SPEED_RESPONSE + (0.18 if emergency_guard else 0.0),
+		LEGACY_CAPTURE_GUARD_SPEED_RESPONSE + (0.18 if emergency_guard else 0.0),
 		1.35 if emergency_guard else 1.2,
-		ALLY_GUARD_ROWING_WIND_FLOOR,
+		LEGACY_CAPTURE_GUARD_ROWING_WIND_FLOOR,
 		close_turn_factor,
 		0.74 if emergency_guard else 0.62,
 		local_sep,
@@ -1046,7 +1050,7 @@ static func _process_captured_guard_ai(ship, delta: float, guard_target: Node3D,
 		false,
 		step_delta
 	)
-	_draw_ally_limbo_debug(ship)
+	_draw_legacy_capture_limbo_debug(ship)
 
 
 static func _apply_role_navigation_motion(
@@ -1091,7 +1095,7 @@ static func _apply_role_navigation_motion(
 		actual_turn = clamp(actual_turn, -max_turn_this_frame, max_turn_this_frame)
 		ship.rotation.y -= deg_to_rad(actual_turn)
 
-	var wind_mult: float = ChaserShipAiHelper._calculate_sail_drive_multiplier(ship, wind_floor) * ship.get_shiphandling_multiplier()
+	var wind_mult: float = AIShipRuntimeHelper._calculate_sail_drive_multiplier(ship, wind_floor) * ship.get_shiphandling_multiplier()
 	var forward_vec: Vector3 = Vector3(-sin(ship.rotation.y), 0.0, -cos(ship.rotation.y))
 	var velocity: Vector3 = forward_vec * ship.current_speed * wind_mult
 	velocity += local_sep
@@ -1144,7 +1148,7 @@ static func _try_start_support_boarding(ship, assist_target: Node3D, delta: floa
 static func try_interrupt_boarding_for_flagship_rescue(ship) -> bool:
 	if not is_instance_valid(ship):
 		return false
-	if not ShipAllyRoleHelper.is_support_ship(ship):
+	if not PlayerFleetRoleHelper.is_support_ship(ship):
 		return false
 	if ship.get_team_tag() != "player":
 		return false
@@ -1184,7 +1188,7 @@ static func try_interrupt_boarding_for_flagship_rescue(ship) -> bool:
 static func _can_support_board_target(ship, assist_target: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
 		return false
-	if not ShipAllyRoleHelper.is_support_ship(ship):
+	if not PlayerFleetRoleHelper.is_support_ship(ship):
 		return false
 	if ship.get_team_tag() != "player":
 		return false
@@ -1425,16 +1429,16 @@ static func _build_captured_guard_navigation(ship, guard_target: Node3D, my_inde
 		flagship_right = flagship_right.normalized()
 
 	var target_id: int = guard_target.get_instance_id()
-	var current_target_id: int = int(ship.get_meta(ALLY_GUARD_TARGET_ID_META, 0))
-	var lane_side: float = float(ship.get_meta(ALLY_GUARD_LANE_SIDE_META, 0.0))
+	var current_target_id: int = int(ship.get_meta(LEGACY_CAPTURE_GUARD_TARGET_ID_META, 0))
+	var lane_side: float = float(ship.get_meta(LEGACY_CAPTURE_GUARD_LANE_SIDE_META, 0.0))
 	if current_target_id != target_id or absf(lane_side) < 0.5:
 		var rel_to_guard: Vector3 = ship.global_position - guard_target.global_position
 		rel_to_guard.y = 0.0
 		lane_side = signf(rel_to_guard.dot(flagship_right))
 		if absf(lane_side) < 0.5:
 			lane_side = 1.0 if (my_index % 2) == 0 else -1.0
-		ship.set_meta(ALLY_GUARD_LANE_SIDE_META, lane_side)
-	ship.set_meta(ALLY_GUARD_TARGET_ID_META, target_id)
+		ship.set_meta(LEGACY_CAPTURE_GUARD_LANE_SIDE_META, lane_side)
+	ship.set_meta(LEGACY_CAPTURE_GUARD_TARGET_ID_META, target_id)
 
 	var pair_index: int = int(floor(float(my_index) / 2.0))
 	var collision_distance: float = ship.get_collision_distance_to(guard_target)
@@ -1474,7 +1478,7 @@ static func _build_captured_guard_navigation(ship, guard_target: Node3D, my_inde
 		desired_speed_mult,
 		is_boarding_flagship,
 		dir_to_target,
-		"ally_guard"
+		"legacy_capture_guard"
 	)
 
 static func _calculate_support_assist_separation(ship, minions: Array, assist_target: Node3D) -> Vector3:
@@ -1513,7 +1517,7 @@ static func _get_support_assist_separation_radius(ship, other_ship: Node3D) -> f
 		SUPPORT_ASSIST_SEPARATION_RADIUS,
 		ShipContactGeometry.get_collision_distance_between(ship, other_ship) + SUPPORT_ASSIST_SEPARATION_PAD
 	)
-	if ShipAllyRoleHelper.is_heavy_support(ship) or ShipAllyRoleHelper.is_heavy_support(other_ship):
+	if PlayerFleetRoleHelper.is_heavy_support(ship) or PlayerFleetRoleHelper.is_heavy_support(other_ship):
 		separation_radius += SUPPORT_ASSIST_PANOKSEON_SEPARATION_EXTRA_PAD
 	return separation_radius
 
@@ -1527,10 +1531,10 @@ static func _calculate_captured_guard_separation(ship, minions: Array, guard_tar
 		var offset: Vector3 = ship.global_position - other.global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
-		if dist <= 0.1 or dist >= ALLY_GUARD_SEPARATION_RADIUS:
+		if dist <= 0.1 or dist >= LEGACY_CAPTURE_GUARD_SEPARATION_RADIUS:
 			continue
-		var strength: float = pow((ALLY_GUARD_SEPARATION_RADIUS - dist) / ALLY_GUARD_SEPARATION_RADIUS, 2.0)
-		force += offset.normalized() * strength * ALLY_GUARD_SEPARATION_FORCE
+		var strength: float = pow((LEGACY_CAPTURE_GUARD_SEPARATION_RADIUS - dist) / LEGACY_CAPTURE_GUARD_SEPARATION_RADIUS, 2.0)
+		force += offset.normalized() * strength * LEGACY_CAPTURE_GUARD_SEPARATION_FORCE
 		count += 1
 	if is_instance_valid(guard_target):
 		var target_offset: Vector3 = ship.global_position - guard_target.global_position
@@ -1539,11 +1543,11 @@ static func _calculate_captured_guard_separation(ship, minions: Array, guard_tar
 		var collision_dist: float = ship.get_collision_distance_to(guard_target)
 		if target_dist > 0.1 and target_dist < collision_dist + 1.6:
 			var strength: float = (collision_dist + 1.6 - target_dist) / maxf(collision_dist + 1.6, 0.001)
-			force += target_offset.normalized() * strength * ALLY_GUARD_SEPARATION_FORCE
+			force += target_offset.normalized() * strength * LEGACY_CAPTURE_GUARD_SEPARATION_FORCE
 			count += 1
 	return force / max(count, 1)
 
-static func _get_minion_roster(ship, support_only: bool) -> Array:
+static func _get_support_roster(ship, support_only: bool) -> Array:
 	var roster_flagship: Node3D = SupportFleetStateHelper.get_support_owner_flagship(ship) if support_only else null
 	if support_only:
 		var current_frame: int = Engine.get_physics_frames()
@@ -1555,18 +1559,18 @@ static func _get_minion_roster(ship, support_only: bool) -> Array:
 			return _support_roster_cache[cache_key]
 
 	var roster: Array = []
-	var all_minions: Array = ship.get_minions_cached(ship.get_tree())
-	for minion in all_minions:
-		if not is_instance_valid(minion):
+	var roster_candidates: Array = ship.get_support_ships_cached(ship.get_tree()) if support_only else ship.get_minions_cached(ship.get_tree())
+	for candidate_ship in roster_candidates:
+		if not is_instance_valid(candidate_ship):
 			continue
-		var is_roster_support := ShipAllyRoleHelper.is_support_ship(minion)
+		var is_roster_support := PlayerFleetRoleHelper.is_support_ship(candidate_ship)
 		if support_only and not is_roster_support:
 			continue
 		if not support_only and is_roster_support:
 			continue
-		if support_only and is_instance_valid(roster_flagship) and not SupportFleetStateHelper.is_support_owned_by_flagship(minion, roster_flagship):
+		if support_only and is_instance_valid(roster_flagship) and not SupportFleetStateHelper.is_support_owned_by_flagship(candidate_ship, roster_flagship):
 			continue
-		roster.append(minion)
+		roster.append(candidate_ship)
 	if support_only:
 		roster.sort_custom(func(a, b):
 			var order_a: int = int(a.get_meta(SUPPORT_FLEET_ORDER_META, a.get_instance_id()))
@@ -1581,7 +1585,7 @@ static func _get_minion_roster(ship, support_only: bool) -> Array:
 		_support_roster_cache[support_cache_key] = roster
 	return roster
 
-static func _get_minion_offset(ship, my_index: int, is_support_ship: bool) -> Vector3:
+static func _get_support_offset(ship, my_index: int, is_support_ship: bool) -> Vector3:
 	if is_support_ship:
 		var support_spacing: float = SUPPORT_COLUMN_FORMATION_SPACING if SupportFleetStateHelper.get_effective_formation(ship) == SupportFleetFormationHelper.FORMATION_COLUMN else SUPPORT_FORMATION_SPACING
 		return SupportFleetFormationHelper.get_support_fleet_offset(ship, my_index, support_spacing)
@@ -1803,7 +1807,7 @@ static func _get_support_assist_assignment_penalty(
 		var support_ship := allied_ship as Node3D
 		if not is_instance_valid(support_ship) or support_ship == ship:
 			continue
-		if not ShipAllyRoleHelper.is_support_ship(support_ship):
+		if not PlayerFleetRoleHelper.is_support_ship(support_ship):
 			continue
 		if _is_ship_disabled(support_ship):
 			continue
@@ -1845,7 +1849,7 @@ static func _is_player_deck_emergency(player_ship: Node3D) -> bool:
 static func _is_support_rescue_target(ship, assist_target: Node3D) -> bool:
 	if not is_instance_valid(ship) or not is_instance_valid(assist_target):
 		return false
-	if not ShipAllyRoleHelper.is_support_ship(ship):
+	if not PlayerFleetRoleHelper.is_support_ship(ship):
 		return false
 	if not is_instance_valid(ship.target) or assist_target != ship.target:
 		return false
@@ -1893,40 +1897,38 @@ static func _get_support_flagship(ship) -> Node3D:
 static func _get_recent_support_limbo_payload(ship) -> Dictionary:
 	if not is_instance_valid(ship):
 		return {}
-	if ship.get("limbo_ai_pilot_enabled") != true:
+	var support_intent := ShipAIIntentHelper.get_limbo_support_intent(ship, SUPPORT_LIMBO_PILOT_STALE_FRAMES)
+	if support_intent.is_empty():
 		return {}
-	var frame := int(ship.get_meta(ShipAILimboKeys.META_SUPPORT_FRAME, -1000000))
-	if Engine.get_physics_frames() - frame > SUPPORT_LIMBO_PILOT_STALE_FRAMES:
-		return {}
-	var target_id := int(ship.get_meta(ShipAILimboKeys.META_SUPPORT_TARGET_ID, 0))
+	var target_id := int(support_intent.get(ShipAIIntentHelper.KEY_TARGET_ID, 0))
 	var support_target: Node3D = null
 	if target_id != 0:
 		support_target = NodeContractHelper.get_instance_node3d(target_id)
 	return {
-		"mode": str(ship.get_meta(ShipAILimboKeys.META_SUPPORT_MODE, "")).strip_edges(),
+		"mode": str(support_intent.get(ShipAIIntentHelper.KEY_MODE, "")).strip_edges(),
 		"target": support_target,
-		"frame": frame,
+		"frame": int(support_intent.get(ShipAIIntentHelper.KEY_FRAME, -1000000)),
+		"reason": str(support_intent.get(ShipAIIntentHelper.KEY_REASON, "")).strip_edges(),
 	}
 
 
-static func _get_recent_ally_limbo_payload(ship) -> Dictionary:
+static func _get_recent_legacy_capture_limbo_payload(ship) -> Dictionary:
 	if not is_instance_valid(ship):
 		return {}
-	if ship.get("limbo_ai_pilot_enabled") != true:
+	if not PlayerFleetRoleHelper.is_legacy_captured_ship(ship) or PlayerFleetRoleHelper.is_support_ship(ship):
 		return {}
-	if not ShipAllyRoleHelper.is_captured_minion(ship) or ShipAllyRoleHelper.is_support_ship(ship):
+	var legacy_capture_intent := ShipAIIntentHelper.get_limbo_legacy_capture_intent(ship, LEGACY_CAPTURE_LIMBO_PILOT_STALE_FRAMES)
+	if legacy_capture_intent.is_empty():
 		return {}
-	var frame := int(ship.get_meta(ShipAILimboKeys.META_ALLY_FRAME, -1000000))
-	if Engine.get_physics_frames() - frame > ALLY_LIMBO_PILOT_STALE_FRAMES:
-		return {}
-	var target_id := int(ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
-	var ally_target: Node3D = null
+	var target_id := int(legacy_capture_intent.get(ShipAIIntentHelper.KEY_TARGET_ID, 0))
+	var legacy_capture_target: Node3D = null
 	if target_id != 0:
-		ally_target = NodeContractHelper.get_instance_node3d(target_id)
+		legacy_capture_target = NodeContractHelper.get_instance_node3d(target_id)
 	return {
-		"mode": str(ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, "")).strip_edges(),
-		"target": ally_target,
-		"frame": frame,
+		"mode": str(legacy_capture_intent.get(ShipAIIntentHelper.KEY_MODE, "")).strip_edges(),
+		"target": legacy_capture_target,
+		"frame": int(legacy_capture_intent.get(ShipAIIntentHelper.KEY_FRAME, -1000000)),
+		"reason": str(legacy_capture_intent.get(ShipAIIntentHelper.KEY_REASON, "")).strip_edges(),
 	}
 
 
@@ -1940,7 +1942,7 @@ static func _draw_support_limbo_debug(ship) -> void:
 	if mode.is_empty():
 		return
 	var support_target := payload.get("target", null) as Node3D
-	var reason := str(ship.get_meta(ShipAILimboKeys.META_SUPPORT_REASON, "")).strip_edges()
+	var reason := str(payload.get("reason", "")).strip_edges()
 	var color := _get_support_limbo_color(mode)
 	var label := "LimboAI support:%s\nreason:%s target:%s" % [
 		mode,
@@ -1953,27 +1955,27 @@ static func _draw_support_limbo_debug(ship) -> void:
 		DebugDrawBridge.draw_marker(support_target.global_position, color, mode, 0.0, 0.22, 1.7)
 
 
-static func _draw_ally_limbo_debug(ship) -> void:
+static func _draw_legacy_capture_limbo_debug(ship) -> void:
 	if not DebugDrawBridge.is_channel_enabled(DebugDrawBridge.CHANNEL_AI_INTENT) or not DebugDrawBridge.can_draw():
 		return
 	if not (ship is Node3D):
 		return
-	var payload := _get_recent_ally_limbo_payload(ship)
+	var payload := _get_recent_legacy_capture_limbo_payload(ship)
 	var mode := str(payload.get("mode", "")).strip_edges()
 	if mode.is_empty():
 		return
-	var ally_target := payload.get("target", null) as Node3D
-	var reason := str(ship.get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges()
-	var color := _get_ally_limbo_color(mode)
-	var label := "LimboAI ally:%s\nreason:%s target:%s" % [
+	var legacy_capture_target := payload.get("target", null) as Node3D
+	var reason := str(payload.get("reason", "")).strip_edges()
+	var color := _get_legacy_capture_limbo_color(mode)
+	var label := "LimboAI legacy-capture:%s\nreason:%s target:%s" % [
 		mode,
 		reason if not reason.is_empty() else "-",
-		ally_target.name if is_instance_valid(ally_target) else "-",
+		legacy_capture_target.name if is_instance_valid(legacy_capture_target) else "-",
 	]
 	DebugDrawBridge.draw_text(ship.global_position + Vector3.UP * 3.8, label, color, 0.0, 14)
-	if is_instance_valid(ally_target):
-		DebugDrawBridge.draw_line_raised(ship.global_position, ally_target.global_position, 2.05, color, 0.0, 0.026)
-		DebugDrawBridge.draw_marker(ally_target.global_position, color, mode, 0.0, 0.18, 1.35)
+	if is_instance_valid(legacy_capture_target):
+		DebugDrawBridge.draw_line_raised(ship.global_position, legacy_capture_target.global_position, 2.05, color, 0.0, 0.026)
+		DebugDrawBridge.draw_marker(legacy_capture_target.global_position, color, mode, 0.0, 0.18, 1.35)
 
 
 static func _get_support_limbo_color(mode: String) -> Color:
@@ -1990,7 +1992,7 @@ static func _get_support_limbo_color(mode: String) -> Color:
 			return Color(0.78, 1.0, 0.38, 0.94)
 
 
-static func _get_ally_limbo_color(mode: String) -> Color:
+static func _get_legacy_capture_limbo_color(mode: String) -> Color:
 	match mode:
 		ShipAILimboKeys.ALLY_MODE_GUARD_THREAT:
 			return Color(1.0, 0.68, 0.18, 0.92)
@@ -2062,7 +2064,7 @@ static func _calculate_support_pre_avoidance(
 		predicted_diff.y = 0.0
 		var predicted_dist: float = predicted_diff.length()
 		var safe_distance: float = ShipContactGeometry.get_collision_distance_between(ship, candidate_ship) + SUPPORT_PRE_AVOID_TRIGGER_PAD
-		if is_heavy_support or ShipAllyRoleHelper.is_heavy_support(candidate_ship):
+		if is_heavy_support or PlayerFleetRoleHelper.is_heavy_support(candidate_ship):
 			safe_distance += SUPPORT_PRE_AVOID_PANOKSEON_EXTRA_PAD
 		var trigger_distance: float = safe_distance * 1.12
 		if predicted_dist >= trigger_distance:

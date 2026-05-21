@@ -3,9 +3,17 @@
   "max_helper_lines": 360,
   "max_known_warning_lines": 12,
   "helpers": {
+    "res://scripts/ai/limbo/ship_ai_perception_helper.gd": {
+      "layer": "ai/limbo/ship_ai_perception_helper.gd",
+      "responsibility": "Owns ship AI perception accessors used by LimboAI tasks, including team, role, boarding capability, hull pressure inputs, engagement ranges, speed, and target lead sampling without owning behavior-tree decisions or execution."
+    },
     "res://scripts/effects/blood_deck_decal_helper.gd": {
       "layer": "effects/blood_deck_decal_helper.gd",
       "responsibility": "Owns soldier-hit blood stain decal spawning, deck-local placement, ship-scoped decal caps, and VFX budget checks."
+    },
+    "res://scripts/effects/ship_damage_decal_helper.gd": {
+      "layer": "effects/ship_damage_decal_helper.gd",
+      "responsibility": "Owns ship-hit scorch and hole decal spawning, deck-local placement, ship-scoped decal caps, and VFX budget checks."
     },
     "res://scripts/effects/field_item_helper.gd": {
       "layer": "effects/field_item_helper.gd",
@@ -19,6 +27,10 @@
       "layer": "entities/ships/base_ship_boarding_helper.gd",
       "responsibility": "Owns the current base ship boarding helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
+    "res://scripts/entities/ships/base_ship_boarding_rope_visual_helper.gd": {
+      "layer": "entities/ships/base_ship_boarding_rope_visual_helper.gd",
+      "responsibility": "Owns base ship boarding rope and hook visual spawning, anchor placement, material feedback, and cleanup."
+    },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
       "layer": "entities/ships/base_ship_collision_helper.gd",
       "responsibility": "Owns ship collision physics feedback, guard correction shares, head-on escape assistance, ramming knockback, and contact VFX/SFX throttling."
@@ -26,6 +38,18 @@
     "res://scripts/entities/ships/base_ship_crew_helper.gd": {
       "layer": "entities/ships/base_ship_crew_helper.gd",
       "responsibility": "Owns the current base ship crew helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/base_ship_damage_helper.gd": {
+      "layer": "entities/ships/base_ship_damage_helper.gd",
+      "responsibility": "Owns base ship hull damage application, damage logging, weapon damage accounting, derelict sink triggers, and hit splinter feedback."
+    },
+    "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd": {
+      "layer": "entities/ships/base_ship_debug_snapshot_helper.gd",
+      "responsibility": "Owns base ship debug-state snapshot assembly for debug panels and diagnostics."
+    },
+    "res://scripts/entities/ships/base_ship_hull_bounds_helper.gd": {
+      "layer": "entities/ships/base_ship_hull_bounds_helper.gd",
+      "responsibility": "Owns base ship hull mesh bounds scanning, collision auto-fit, and HitArea/ProximityArea shape/layer synchronization."
     },
     "res://scripts/entities/ships/base_ship_rudder_helper.gd": {
       "layer": "entities/ships/base_ship_rudder_helper.gd",
@@ -39,29 +63,45 @@
       "layer": "entities/ships/base_ship_visual_helper.gd",
       "responsibility": "Owns the current base ship visual helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
-    "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
-      "layer": "entities/ships/chaser_ship_ai_helper.gd",
-      "responsibility": "Owns chaser/support physics AI execution, logic and separation throttles, sail-drive motion math, load-aware update intervals, and AI debug intent drawing."
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
+      "layer": "entities/ships/ai_ship_runtime_helper.gd",
+      "responsibility": "Owns AI ship physics execution, logic and separation throttles, sail-drive motion math, load-aware update intervals, and AI debug intent drawing."
     },
-    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
-      "layer": "entities/ships/chaser_ship_boarding_helper.gd",
-      "responsibility": "Owns chaser boarding motion, latch/contact hold, ship collision guards, neighbor broad-phase checks, and boarding collision softening."
+    "res://scripts/entities/ships/ai_ship_boarding_helper.gd": {
+      "layer": "entities/ships/ai_ship_boarding_helper.gd",
+      "responsibility": "Owns AI ship boarding motion, latch/contact hold, ship collision guards, neighbor broad-phase checks, and boarding collision softening."
     },
-    "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
-      "layer": "entities/ships/chaser_ship_minion_helper.gd",
-      "responsibility": "Owns chaser minion, support assist, support joining, captured guard, and allied escort execution, including free-assist lane deconfliction and speed smoothing."
+    "res://scripts/entities/ships/ai_ship_loadout_helper.gd": {
+      "layer": "entities/ships/ai_ship_loadout_helper.gd",
+      "responsibility": "Owns AI ship crew composition, soldier spawning, crew slot placement, cannon loadout instantiation, and capture-team child retagging."
     },
-    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
-      "layer": "entities/ships/chaser_ship_navigation_helper.gd",
-      "responsibility": "Owns the current chaser ship navigation helper responsibilities; update this baseline when moving behavior across module boundaries."
+    "res://scripts/entities/ships/ai_ship_support_helper.gd": {
+      "layer": "entities/ships/ai_ship_support_helper.gd",
+      "responsibility": "Owns AI support ship behavior, including support assist, support joining, legacy captured-ship guard, escort execution, lane deconfliction, and speed smoothing."
     },
-    "res://scripts/entities/ships/chaser_ship_support_helper.gd": {
-      "layer": "entities/ships/chaser_ship_support_helper.gd",
-      "responsibility": "Owns the current chaser ship support helper responsibilities; update this baseline when moving behavior across module boundaries."
+    "res://scripts/entities/ships/ai_ship_navigation_helper.gd": {
+      "layer": "entities/ships/ai_ship_navigation_helper.gd",
+      "responsibility": "Owns AI ship navigation intents, boarding approach selection, gunner spacing, boss escort movement, and authoring movement previews."
+    },
+    "res://scripts/entities/ships/ai_ship_profile_helper.gd": {
+      "layer": "entities/ships/ai_ship_profile_helper.gd",
+      "responsibility": "Owns AI ship combat profile defaults, stats overrides, formation-role tuning, and profile accessor synchronization."
+    },
+    "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd": {
+      "layer": "entities/ships/ai_ship_lifecycle_helper.gd",
+      "responsibility": "Owns AI ship lifecycle side effects, including fire-pot logic, derelict transitions, loot drops, drifter XP pickups, survivor evacuation, and offscreen despawn."
+    },
+    "res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "layer": "entities/ships/ship_ai_intent_helper.gd",
+      "responsibility": "Owns the ship AI intent contract that converts fresh LimboAI metadata into execution-layer intent dictionaries without owning movement, combat, boarding, or support execution."
     },
     "res://scripts/entities/ships/player_ship_aux_helper.gd": {
       "layer": "entities/ships/player_ship_aux_helper.gd",
       "responsibility": "Owns the current player ship aux helper responsibilities; update this baseline when moving behavior across module boundaries."
+    },
+    "res://scripts/entities/ships/player_ship_cargo_transport_helper.gd": {
+      "layer": "entities/ships/player_ship_cargo_transport_helper.gd",
+      "responsibility": "Owns player ship cargo and corpse transport eligibility, actor selection, deck target geometry, disposal splash, and transport XP accounting."
     },
     "res://scripts/entities/ships/player_ship_crew_helper.gd": {
       "layer": "entities/ships/player_ship_crew_helper.gd",
@@ -87,9 +127,13 @@
       "layer": "entities/ships/player_ship_support_squadron_helper.gd",
       "responsibility": "Owns support fleet squadron slot profile resolution and support archetype application."
     },
+    "res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "layer": "entities/ships/player_fleet_role_helper.gd",
+      "responsibility": "Owns player-fleet ship role classification, including flagship, support fleet, and legacy captured-ship compatibility."
+    },
     "res://scripts/entities/ships/ship_ally_role_helper.gd": {
       "layer": "entities/ships/ship_ally_role_helper.gd",
-      "responsibility": "Owns the current ship ally role helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Temporary compatibility alias for PlayerFleetRoleHelper while old scenes, tests, and cached references migrate."
     },
     "res://scripts/entities/ships/ship_authoring_helper.gd": {
       "layer": "entities/ships/ship_authoring_helper.gd",
@@ -165,7 +209,7 @@
     },
     "res://scripts/entities/soldiers/soldier_health_bar_helper.gd": {
       "layer": "entities/soldiers/soldier_health_bar_helper.gd",
-      "responsibility": "Owns ally soldier health bar rendering near the deck, including visibility rules, fill geometry, color state, and cleanup."
+      "responsibility": "Owns player-team soldier health bar rendering near the deck, including visibility rules, fill geometry, color state, and cleanup."
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
       "layer": "entities/soldiers/soldier_lifecycle_helper.gd",
@@ -390,14 +434,14 @@
   },
   "large_helper_exceptions": {
     "res://scripts/entities/ships/base_ship_boarding_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/entities/ships/base_ship_collision_helper.gd": "Collision DebugDraw instrumentation extends the existing collision owner; split only with a dedicated collision debug extraction.",
+    "res://scripts/entities/ships/base_ship_collision_helper.gd": "Collision helper owns shared ship-contact response, ramming feedback, DebugDraw collision instrumentation, and movement guard correction; split only with a dedicated collision system extraction.",
     "res://scripts/entities/ships/base_ship_crew_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/base_ship_status_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
-    "res://scripts/entities/ships/chaser_ship_ai_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": "Boarding collision guard grew slightly beyond the default line budget after neighbor broad-radius extraction; split only with a focused boarding-geometry owner change.",
-    "res://scripts/entities/ships/chaser_ship_minion_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/entities/ships/chaser_ship_support_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd": "AI ship runtime still owns physics execution, sail-drive math, and AI throttling; split only with a dedicated runtime owner-boundary change.",
+    "res://scripts/entities/ships/ai_ship_boarding_helper.gd": "Boarding collision guard grew slightly beyond the default line budget after neighbor broad-radius extraction; split only with a focused boarding-geometry owner change.",
+    "res://scripts/entities/ships/ai_ship_support_helper.gd": "AI support helper owns support assist, support joining, legacy captured-ship guard, escort execution, lane deconfliction, and speed smoothing; split only with a dedicated support behavior owner-boundary change.",
+    "res://scripts/entities/ships/ai_ship_navigation_helper.gd": "AI ship navigation still owns several approach modes after rename; split only with a dedicated navigation owner-boundary change.",
+    "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd": "AI ship lifecycle helper owns fire-pot logic, derelict transitions, loot drops, survivor evacuation, and offscreen despawn; split only with a dedicated lifecycle owner-boundary change.",
     "res://scripts/entities/ships/player_ship_crew_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/ship_authoring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/support_fleet_formation_helper.gd": "Support fleet formation helper owns mixed-role offset, anchor, trail, generated extra-slot lanes, and join-staging geometry; split only with a dedicated formation-geometry extraction.",
@@ -414,7 +458,7 @@
     "res://scripts/test/project_contract_runtime_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/test/project_contract_scene_wiring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/test/project_contract_support_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/ui/hud/hud_debug_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
+    "res://scripts/ui/hud/hud_debug_panel_helper.gd": "Debug panel helper owns debug modal tabs, including capture/trailer controls; split only with a dedicated debug-tools owner-boundary change.",
     "res://scripts/ui/hud/hud_ship_debug_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
     "res://scripts/ui/hud/hud_stat_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/ui/hud/hud_update_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
@@ -422,6 +466,8 @@
     "res://scripts/world/sea_sites/sea_site_reward_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor."
   },
   "thin_helper_exceptions": {
+    "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd": "Small debug adapter keeps dynamic debug snapshot assembly out of BaseShip while avoiding gameplay ownership changes.",
+    "res://scripts/entities/ships/ship_ally_role_helper.gd": "Temporary compatibility alias for PlayerFleetRoleHelper; remove after old references are fully migrated.",
     "res://scripts/entities/ships/player_ship_aux_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
     "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
     "res://scripts/helpers/input_settings_helper.gd": "Small policy helper centralizes face-button layout remapping so menu/gameplay settings do not edit InputMap directly.",
@@ -461,32 +507,32 @@
     {
       "name": "_calculate_broad_sail_drive",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
         "res://scripts/entities/ships/player_ship_movement_helper.gd"
       ],
-      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
+      "reason": "Player and AI ship movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
     },
     {
       "name": "_calculate_sail_trim_quality",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
         "res://scripts/entities/ships/player_ship_movement_helper.gd"
       ],
-      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
+      "reason": "Player and AI ship movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
     },
     {
       "name": "_calculate_wind_speed_multiplier",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
         "res://scripts/entities/ships/player_ship_movement_helper.gd"
       ],
-      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
+      "reason": "Player and AI ship movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper."
     },
     {
       "name": "_can_board",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+        "res://scripts/entities/ships/ai_ship_navigation_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
@@ -517,8 +563,8 @@
     {
       "name": "_get_effective_boarding_distance",
       "paths": [
-        "res://scripts/entities/ships/base_ship_boarding_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_boarding_helper.gd"
+        "res://scripts/entities/ships/ai_ship_boarding_helper.gd",
+        "res://scripts/entities/ships/base_ship_boarding_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
@@ -542,9 +588,9 @@
       "name": "_get_performance_cpu_interval_scale",
       "paths": [
         "res://scripts/entities/launchers/launcher_combat_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd"
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd"
       ],
-      "reason": "Launcher and chaser AI helpers each apply the same performance preset scale inside different update loops; share only if performance policy moves to a common helper."
+      "reason": "Launcher and AI ship runtime helpers each apply the same performance preset scale inside different update loops; share only if performance policy moves to a common helper."
     },
     {
       "name": "_get_root",
@@ -573,15 +619,15 @@
     {
       "name": "_get_target_deck_half_extents",
       "paths": [
-        "res://scripts/entities/ships/base_ship_boarding_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_boarding_helper.gd"
+        "res://scripts/entities/ships/ai_ship_boarding_helper.gd",
+        "res://scripts/entities/ships/base_ship_boarding_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
     {
       "name": "_get_team_tag",
       "paths": [
-        "res://scripts/entities/ships/ship_ally_role_helper.gd",
+        "res://scripts/entities/ships/player_fleet_role_helper.gd",
         "res://scripts/entities/ships/ship_targeting_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
@@ -614,8 +660,8 @@
     {
       "name": "_is_gunner",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+        "res://scripts/entities/ships/ai_ship_navigation_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
@@ -630,23 +676,23 @@
     {
       "name": "_is_sinking_or_dying",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+        "res://scripts/entities/ships/ai_ship_navigation_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
     {
       "name": "_is_true",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+        "res://scripts/entities/ships/ai_ship_navigation_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
     {
       "name": "_is_world_position_offscreen",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+        "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
         "res://scripts/entities/ships/player_ship_support_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
@@ -678,8 +724,8 @@
     {
       "name": "_target_ship",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
-        "res://scripts/entities/ships/chaser_ship_navigation_helper.gd"
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+        "res://scripts/entities/ships/ai_ship_navigation_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
@@ -730,7 +776,7 @@
     {
       "name": "calculate_separation",
       "paths": [
-        "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
+        "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
         "res://scripts/entities/ships/player_ship_movement_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
@@ -795,7 +841,7 @@
     {
       "name": "normalize_role_name",
       "paths": [
-        "res://scripts/entities/ships/ship_ally_role_helper.gd",
+        "res://scripts/entities/ships/player_fleet_role_helper.gd",
         "res://scripts/entities/ships/ship_combat_mode_helper.gd"
       ],
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
@@ -849,8 +895,8 @@
     },
     {
       "id": "ship_ai_throttle_boundary",
-      "owner": "res://scripts/entities/ships/chaser_ship_ai_helper.gd",
-      "invariant": "Chaser/support AI load multipliers, logic intervals, and separation throttles should stay near process_physics so performance buckets remain meaningful."
+      "owner": "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+      "invariant": "AI ship load multipliers, logic intervals, and separation throttles should stay near process_physics so performance buckets remain meaningful."
     },
     {
       "id": "support_lane_side_boundary",
@@ -859,7 +905,36 @@
     }
   ],
   "scenario_matrix_path": "res://scenes/test/runtime_scenario_matrix.json",
+  "limbo_meta_access_allowlist": {
+    "paths": [
+      "res://scripts/ai/limbo/ship_limbo_ai_pilot.gd",
+      "res://scripts/entities/ships/ship_ai_intent_helper.gd"
+    ],
+    "prefixes": [
+      "res://scripts/ai/limbo/tasks/",
+      "res://scripts/test/"
+    ]
+  },
   "helper_static_function_baselines": {
+    "res://scripts/ai/limbo/ship_ai_perception_helper.gd": {
+      "count": 14,
+      "functions": [
+        "build_engagement_snapshot",
+        "get_target_distance",
+        "get_hull_ratio",
+        "get_ship_team_tag",
+        "is_enemy_ship",
+        "is_ship_gunner",
+        "can_ship_board",
+        "can_ship_use_fire_pot_attack",
+        "get_orbit_preferred_range",
+        "get_preferred_range",
+        "get_range_tolerance",
+        "get_retreat_range",
+        "get_current_speed",
+        "get_led_target_position"
+      ]
+    },
     "res://scripts/effects/blood_deck_decal_helper.gd": {
       "count": 19,
       "functions": [
@@ -882,6 +957,24 @@
         "_clamp_to_deck",
         "_is_inside_deck",
         "_get_spill_offset_local"
+      ]
+    },
+    "res://scripts/effects/ship_damage_decal_helper.gd": {
+      "count": 13,
+      "functions": [
+        "try_spawn_from_ship_hit",
+        "_should_spawn_ship_damage_for_source",
+        "_get_or_create_ship_damage_decal_root",
+        "_make_ship_damage_decal",
+        "_make_plane",
+        "_make_projection_decal",
+        "_get_decal_size",
+        "_pick_texture",
+        "_trim_old_ship_damage_decals",
+        "_get_ship_decal_deck_height",
+        "_clamp_ship_damage_to_deck",
+        "_get_ship_decal_deck_half_extents",
+        "_get_ship_decal_half_width_at_z"
       ]
     },
     "res://scripts/effects/field_item_helper.gd": {
@@ -967,14 +1060,37 @@
         "_finish_soldier_boarding_jump_pose"
       ]
     },
+    "res://scripts/entities/ships/base_ship_boarding_rope_visual_helper.gd": {
+      "count": 11,
+      "functions": [
+        "spawn_ropes",
+        "update_ropes",
+        "pulse_feedback",
+        "get_visual_resist_ratio",
+        "get_source_anchor_local",
+        "get_target_anchor_global",
+        "get_target_deck_half_extents",
+        "get_local_anchor_height",
+        "clear_ropes",
+        "_update_rope_material",
+        "_update_hook_material"
+      ]
+    },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
-      "count": 41,
+      "count": 48,
       "functions": [
         "get_ship_mass_scale",
         "get_collision_movement_share",
         "get_guard_correction_share",
         "calculate_collision_repulsion",
         "_get_collision_neighbors_cached",
+        "apply_movement_collision_guards",
+        "apply_single_movement_collision_guard",
+        "_get_movement_guard_correction",
+        "_emit_movement_guarded_collision",
+        "_get_movement_guard_safe_ratio",
+        "_get_movement_guard_broad_radius",
+        "_get_collision_guard_forward_flat",
         "_is_backing_out_of_head_on",
         "_get_head_on_escape_side",
         "_spawn_ship_contact_vfx",
@@ -1049,6 +1165,42 @@
         "_is_dead_soldier_node"
       ]
     },
+    "res://scripts/entities/ships/base_ship_damage_helper.gd": {
+      "count": 8,
+      "functions": [
+        "apply_hull_damage",
+        "get_final_hull_damage",
+        "is_contested_hull_damage_source",
+        "_log_damage_if_enabled",
+        "_sink_derelict_if_needed",
+        "_record_player_weapon_damage_if_needed",
+        "_spawn_damage_splinters_if_ready",
+        "_get_splinter_position"
+      ]
+    },
+    "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd": {
+      "count": 1,
+      "functions": [
+        "build_debug_ship_state_snapshot"
+      ]
+    },
+    "res://scripts/entities/ships/base_ship_hull_bounds_helper.gd": {
+      "count": 12,
+      "functions": [
+        "refresh_collision_bounds_from_hull",
+        "sync_contact_area_shapes_from_hull",
+        "get_contact_area_height",
+        "fit_contact_area_box_shape",
+        "sync_contact_area_layers",
+        "set_contact_areas_enabled",
+        "set_contact_area_enabled",
+        "get_opposing_team_collision_layer",
+        "compute_hull_half_extents",
+        "collect_hull_bounds_mesh_instances",
+        "is_excluded_hull_bounds_mesh_name",
+        "get_hull_bounds_aabb_corners"
+      ]
+    },
     "res://scripts/entities/ships/base_ship_rudder_helper.gd": {
       "count": 7,
       "functions": [
@@ -1111,7 +1263,7 @@
         "set_wake_state"
       ]
     },
-    "res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "count": 33,
       "functions": [
         "_is_true",
@@ -1149,7 +1301,7 @@
         "update_wave_sounds"
       ]
     },
-    "res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+    "res://scripts/entities/ships/ai_ship_boarding_helper.gd": {
       "count": 16,
       "functions": [
         "process_boarding",
@@ -1170,11 +1322,27 @@
         "_is_support_fleet_pair"
       ]
     },
-    "res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
+    "res://scripts/entities/ships/ai_ship_loadout_helper.gd": {
+      "count": 11,
+      "functions": [
+        "load_enemy_crew_composition_from_stats",
+        "get_next_enemy_soldier_type",
+        "configure_spawned_soldier",
+        "setup_soldiers",
+        "setup_soldiers_staggered",
+        "spawn_one_soldier",
+        "get_next_crew_spawn_transform",
+        "equip_ship_weapons",
+        "update_children_team_for_capture",
+        "remove_all_cannons",
+        "recursive_remove_cannons"
+      ]
+    },
+    "res://scripts/entities/ships/ai_ship_support_helper.gd": {
       "count": 50,
       "functions": [
-        "continue_minion_motion",
-        "process_minion_ai",
+        "continue_support_motion",
+        "process_support_ai",
         "_build_support_formation_step",
         "_apply_support_column_turn_assist",
         "_build_support_join_step",
@@ -1201,8 +1369,8 @@
         "_calculate_support_assist_separation",
         "_get_support_assist_separation_radius",
         "_calculate_captured_guard_separation",
-        "_get_minion_roster",
-        "_get_minion_offset",
+        "_get_support_roster",
+        "_get_support_offset",
         "_get_support_assist_target",
         "_get_support_assist_assignment_penalty",
         "_is_player_deck_emergency",
@@ -1212,11 +1380,11 @@
         "_is_support_formation_hold_enabled",
         "_get_support_flagship",
         "_get_recent_support_limbo_payload",
-        "_get_recent_ally_limbo_payload",
+        "_get_recent_legacy_capture_limbo_payload",
         "_draw_support_limbo_debug",
-        "_draw_ally_limbo_debug",
+        "_draw_legacy_capture_limbo_debug",
         "_get_support_limbo_color",
-        "_get_ally_limbo_color",
+        "_get_legacy_capture_limbo_color",
         "_set_support_assist_target_lock",
         "_clear_support_assist_target_lock",
         "_calculate_support_pre_avoidance",
@@ -1225,7 +1393,7 @@
         "_record_support_trail_point"
       ]
     },
-    "res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "res://scripts/entities/ships/ai_ship_navigation_helper.gd": {
       "count": 36,
       "functions": [
         "_is_true",
@@ -1266,7 +1434,19 @@
         "build_navigation"
       ]
     },
-    "res://scripts/entities/ships/chaser_ship_support_helper.gd": {
+    "res://scripts/entities/ships/ai_ship_profile_helper.gd": {
+      "count": 7,
+      "functions": [
+        "apply_default_combat_profile_for_ship_type",
+        "apply_combat_profile_from_stats",
+        "sync_combat_profile_from_role_accessors",
+        "apply_formation_role_profile",
+        "_apply_charger_profile",
+        "_apply_gunner_profile",
+        "_apply_range_profile"
+      ]
+    },
+    "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd": {
       "count": 22,
       "functions": [
         "update_enemy_fire_pot_logic",
@@ -1293,11 +1473,59 @@
         "evacuate_soldiers_to_home"
       ]
     },
+    "res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "count": 12,
+      "functions": [
+        "from_limbo_meta",
+        "get_limbo_navigation_intent",
+        "get_limbo_weapon_intent",
+        "get_limbo_special_intent",
+        "get_limbo_boarding_intent",
+        "get_limbo_support_intent",
+        "get_limbo_legacy_capture_intent",
+        "allows_boarding_attempt",
+        "should_hold_weapon_fire",
+        "allows_special_fire_pot",
+        "_is_limbo_enabled",
+        "_is_fresh"
+      ]
+    },
     "res://scripts/entities/ships/player_ship_aux_helper.gd": {
       "count": 2,
       "functions": [
         "add_stuck_object",
         "remove_stuck_object"
+      ]
+    },
+    "res://scripts/entities/ships/player_ship_cargo_transport_helper.gd": {
+      "count": 26,
+      "functions": [
+        "update_cargo_transport",
+        "can_run_cargo_transport",
+        "try_cleanup_corpse",
+        "find_cleanup_corpse",
+        "find_cleanup_enemy_corpse",
+        "is_roof_corpse",
+        "find_cleanup_corpse_by_team",
+        "find_cargo_transport_actor",
+        "prepare_cleaner",
+        "is_actor_busy",
+        "set_actor_action",
+        "get_pickup_point",
+        "get_stair_stand_point",
+        "get_rail_stand_point",
+        "get_actor_local_target",
+        "get_carry_rotation",
+        "get_walk_seconds",
+        "clamp_deck_local",
+        "face_actor",
+        "get_transport_payload_offsets",
+        "get_throw_origin",
+        "get_throw_origin_from_actor_position",
+        "get_throw_target",
+        "get_roof_throw_target",
+        "grant_xp",
+        "play_overboard_disposal_splash"
       ]
     },
     "res://scripts/entities/ships/player_ship_crew_helper.gd": {
@@ -1380,9 +1608,10 @@
       ]
     },
     "res://scripts/entities/ships/player_ship_runtime_helper.gd": {
-      "count": 18,
+      "count": 19,
       "functions": [
         "handle_input",
+        "_is_debug_free_camera_active",
         "_is_ramming_boost_just_pressed",
         "_get_rope_resist_input_direction",
         "_get_rope_resist_stick_latch",
@@ -1416,7 +1645,7 @@
     "res://scripts/entities/ships/player_ship_support_helper.gd": {
       "count": 16,
       "functions": [
-        "spawn_or_repair_ally",
+        "spawn_or_repair_support_ship",
         "resolve_support_fleet_profile",
         "refresh_support_fleet_composition",
         "_get_upgrade_manager",
@@ -1429,13 +1658,13 @@
         "_find_matching_unoccupied_slot",
         "_find_first_unoccupied_slot",
         "get_support_fleet_ships",
-        "get_offscreen_ally_spawn_position",
+        "get_offscreen_support_spawn_position",
         "update_support_fleet_respawn",
         "_is_world_position_offscreen"
       ]
     },
     "res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
-      "count": 20,
+      "count": 21,
       "functions": [
         "resolve_support_fleet_profile_for_levels",
         "get_support_slot_plan_for_levels",
@@ -1451,6 +1680,7 @@
         "get_profile_hull_scene",
         "get_profile_ship_scene",
         "get_profile_cannon_scene",
+        "get_profile_crew_count",
         "profile_matches_runtime_ship",
         "apply_support_fleet_profile",
         "_build_profile_for_slot",
@@ -1459,14 +1689,18 @@
         "_get_geobukseon_squadron_stats"
       ]
     },
-    "res://scripts/entities/ships/ship_ally_role_helper.gd": {
-      "count": 23,
+    "res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "count": 31,
       "functions": [
+        "set_fleet_role",
         "set_ally_role",
         "mark_player_flagship",
         "mark_support_ship",
         "mark_captured_minion",
+        "mark_legacy_captured_ship",
+        "clear_fleet_role",
         "clear_ally_role",
+        "get_fleet_role",
         "get_ally_role",
         "is_player_flagship",
         "is_support_ship",
@@ -1474,18 +1708,26 @@
         "is_geobukseon_support",
         "is_heavy_support",
         "is_captured_minion",
+        "is_legacy_captured_ship",
+        "is_player_fleet_ship",
         "is_player_owned_ship",
         "ship_consumes_capture_slot",
         "role_consumes_capture_slot",
         "get_role_definition",
         "get_role_rows",
         "count_captured_minions",
+        "count_legacy_captured_ships",
         "count_capture_slot_minions",
+        "count_capture_slot_ships",
         "normalize_role_name",
         "_has_legacy_support_flag",
         "_is_player_controlled_property",
         "_get_team_tag"
       ]
+    },
+    "res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "count": 0,
+      "functions": []
     },
     "res://scripts/entities/ships/ship_authoring_helper.gd": {
       "count": 31,
@@ -1537,7 +1779,7 @@
         "get_hull_scene_path",
         "load_hull_scene",
         "build_crew_composition",
-        "apply_chaser_stats",
+        "apply_ai_ship_stats",
         "apply_boss_stats"
       ]
     },
@@ -2619,7 +2861,7 @@
       ]
     },
     "res://scripts/test/project_contract_scene_wiring_helper.gd": {
-      "count": 99,
+      "count": 100,
       "functions": [
         "run_scene_wiring_contract_smoke",
         "_run_player_ship_runtime_safety_contract",
@@ -2633,7 +2875,8 @@
         "_run_player_boarding_anchor_authoring_contract",
         "_run_player_crew_slot_authoring_contract",
         "_run_support_ship_spawn_template_contract",
-        "_run_ship_ally_role_contract",
+        "_run_legacy_ship_role_contract",
+        "_run_player_fleet_role_api_contract",
         "_run_hull_authoring_marker_contract",
         "_run_enemy_boarding_sail_ai_contract",
         "_run_ship_blueprint_weapon_loadout_contract",
@@ -2731,7 +2974,7 @@
         "_run_support_wing_join_geometry_contract",
         "_run_support_rescue_emergency_smoke",
         "_run_support_boss_breach_smoke",
-        "_run_captured_minion_guard_smoke",
+        "_run_legacy_capture_guard_smoke",
         "_run_support_panokseon_upgrade_smoke",
         "_run_support_signal_level_two_limit_smoke",
         "_run_support_shared_cannon_cap_smoke",
@@ -2775,10 +3018,11 @@
       ]
     },
     "res://scripts/ui/hud/hud_debug_panel_helper.gd": {
-      "count": 134,
+      "count": 136,
       "functions": [
         "setup_debug_panel",
         "is_authoring_palette_tab_visible",
+        "is_advanced_debug_tab_visible",
         "handle_debug_panel_keyboard_input",
         "grab_initial_debug_focus",
         "clear_debug_focus",
@@ -2796,6 +3040,7 @@
         "_add_environment_section",
         "_add_debug_draw_section",
         "_toggle_debug_draw_channel",
+        "_add_capture_section",
         "_add_spawn_section",
         "_add_authoring_palette_section",
         "load_authoring_palette",
@@ -3260,13 +3505,58 @@
       "to": "res://scripts/entities/soldiers/soldier_deck_zone_helper.gd",
       "reason": "Boarding transfer and contest limits use the shared deck-zone owner to keep roof/main-deck rules consistent."
     },
-    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/support_fleet_formation_helper.gd": {
-      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd|res://scripts/entities/ships/ai_ship_navigation_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ai_ship_navigation_helper.gd",
+      "reason": "AI ship runtime orchestration owns update cadence and delegates movement intent construction to the AI ship navigation helper."
+    },
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd|res://scripts/entities/ships/ai_ship_support_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ai_ship_support_helper.gd",
+      "reason": "AI ship runtime delegates support and legacy captured-ship behavior interrupts to the support behavior owner."
+    },
+    "res://scripts/entities/ships/ai_ship_support_helper.gd|res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+      "reason": "Support and captured-ship motion reuses AI ship sail-drive math while support behavior remains in its current owner."
+    },
+    "res://scripts/entities/launchers/launcher_combat_helper.gd|res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "from": "res://scripts/entities/launchers/launcher_combat_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ai_intent_helper.gd",
+      "reason": "Launcher combat readiness consumes the LimboAI weapon intent bridge without taking ownership of AI decision metadata."
+    },
+    "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ai_intent_helper.gd",
+      "reason": "AI ship lifecycle special-attack execution consumes the LimboAI intent bridge while lifecycle side effects stay in the lifecycle owner."
+    },
+    "res://scripts/entities/ships/ai_ship_navigation_helper.gd|res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_navigation_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ai_intent_helper.gd",
+      "reason": "AI ship navigation consumes the LimboAI navigation intent bridge while movement intent construction stays in the navigation owner."
+    },
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd|res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ai_intent_helper.gd",
+      "reason": "AI ship runtime consumes the LimboAI intent bridge for boarding gates and debug text while physics execution stays in the runtime owner."
+    },
+    "res://scripts/entities/ships/ai_ship_support_helper.gd|res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ai_intent_helper.gd",
+      "reason": "AI support behavior consumes the LimboAI support and legacy-capture intent bridge while support execution stays in the support owner."
+    },
+    "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd|res://scripts/entities/ships/ship_ai_intent_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd",
+      "to": "res://scripts/entities/ships/ship_ai_intent_helper.gd",
+      "reason": "Ship debug snapshots consume the shared LimboAI intent bridge so debug panels do not reinterpret AI metadata independently."
+    },
+    "res://scripts/entities/ships/ai_ship_support_helper.gd|res://scripts/entities/ships/support_fleet_formation_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_support_helper.gd",
       "to": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
-    "res://scripts/entities/ships/chaser_ship_minion_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
-      "from": "res://scripts/entities/ships/chaser_ship_minion_helper.gd",
+    "res://scripts/entities/ships/ai_ship_support_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_support_helper.gd",
       "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
@@ -3280,6 +3570,26 @@
       "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
+    "res://scripts/entities/ships/player_ship_cargo_transport_helper.gd|res://scripts/entities/soldiers/soldier_action_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_cargo_transport_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_action_helper.gd",
+      "reason": "Cargo transport helper uses the shared soldier action owner for carry payload offsets and named cargo transport actions."
+    },
+    "res://scripts/test/project_contract_hud_helper.gd|res://scripts/entities/ships/ai_ship_navigation_helper.gd": {
+      "from": "res://scripts/test/project_contract_hud_helper.gd",
+      "to": "res://scripts/entities/ships/ai_ship_navigation_helper.gd",
+      "reason": "HUD contract tests exercise AI ship navigation preview behavior directly after the AI ship navigation helper rename."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/ai_ship_support_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ai_ship_support_helper.gd",
+      "reason": "Runtime contract tests exercise support assist navigation behavior directly after the support helper rename."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/ai_ship_navigation_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/ai_ship_navigation_helper.gd",
+      "reason": "Runtime contract tests exercise AI ship navigation preview behavior directly after the AI ship navigation helper rename."
+    },
     "res://scripts/entities/ships/support_fleet_cannon_helper.gd|res://scripts/entities/ships/player_ship_support_squadron_helper.gd": {
       "from": "res://scripts/entities/ships/support_fleet_cannon_helper.gd",
       "to": "res://scripts/entities/ships/player_ship_support_squadron_helper.gd",
@@ -3290,10 +3600,80 @@
       "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
     },
-    "res://scripts/entities/ships/support_fleet_state_helper.gd|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+    "res://scripts/entities/ships/support_fleet_state_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
       "from": "res://scripts/entities/ships/support_fleet_state_helper.gd",
-      "to": "res://scripts/entities/ships/ship_ally_role_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
+    },
+    "res://scripts/entities/ships/ai_ship_boarding_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "AI ship boarding guards need player-fleet role classification while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "AI ship lifecycle logic needs support-role checks while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/ai_ship_runtime_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "AI runtime filtering needs support-role checks while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/ai_ship_support_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Support behavior needs support and legacy captured role checks while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/base_ship_collision_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_collision_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Collision response differentiates flagship and support ships while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/base_ship_status_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_status_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Status cleanup needs support-role checks while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/player_ship_support_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/player_ship_support_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Support spawning owns support-role assignment while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/ship_targeting_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/ship_targeting_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Targeting needs flagship and support weighting while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/support_boarding_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/support_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Support boarding filters support ships while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/entities/ships/support_fleet_formation_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/entities/ships/support_fleet_formation_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Support formation sizing needs heavy-support role checks while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/helpers/node_contract_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/helpers/node_contract_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Node contract helper centralizes player-flagship checks while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/test/project_contract_runtime_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/test/project_contract_runtime_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Runtime contracts exercise player-fleet role assignment while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/test/project_contract_scene_wiring_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/test/project_contract_scene_wiring_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Scene wiring contracts validate player-fleet role tables while the new helper class is explicitly preloaded for deterministic headless parses."
+    },
+    "res://scripts/test/project_contract_support_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/test/project_contract_support_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Support contracts validate support role registration while the new helper class is explicitly preloaded for deterministic headless parses."
     },
     "res://scripts/entities/soldiers/soldier_ai_helper.gd|res://scripts/entities/soldiers/soldier_combat_helper.gd": {
       "from": "res://scripts/entities/soldiers/soldier_ai_helper.gd",
@@ -3429,33 +3809,33 @@
       "signature": "survivor.set_deferred(\"global_position\", spawn_pos)",
       "recommended_action": "Keep world/local coordinate and pooling behavior explicit; snapshot world transforms before deferred release or reparenting."
     },
-    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|loot.set_deferred(\"global_position\", spawn_pos)": {
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|loot.set_deferred(\"global_position\", spawn_pos)": {
       "kind": "deferred_global_position_after_deferred_add",
-      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "path": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
       "signature": "loot.set_deferred(\"global_position\", spawn_pos)",
       "recommended_action": "Keep world/local coordinate and pooling behavior explicit; snapshot world transforms before deferred release or reparenting."
     },
-    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|pickup.set_deferred(\"global_position\", spawn_pos)": {
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|pickup.set_deferred(\"global_position\", spawn_pos)": {
       "kind": "deferred_global_position_after_deferred_add",
-      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "path": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
       "signature": "pickup.set_deferred(\"global_position\", spawn_pos)",
       "recommended_action": "Keep world/local coordinate and pooling behavior explicit; snapshot world transforms before deferred release or reparenting."
     },
-    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|pot.set_deferred(\"global_position\", start_pos)": {
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|pot.set_deferred(\"global_position\", start_pos)": {
       "kind": "deferred_global_position_after_deferred_add",
-      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "path": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
       "signature": "pot.set_deferred(\"global_position\", start_pos)",
       "recommended_action": "Keep world/local coordinate and pooling behavior explicit; snapshot world transforms before deferred release or reparenting."
     },
-    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|survivor.set_deferred(\"global_position\", spawn_pos)": {
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|survivor.set_deferred(\"global_position\", spawn_pos)": {
       "kind": "deferred_global_position_after_deferred_add",
-      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "path": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
       "signature": "survivor.set_deferred(\"global_position\", spawn_pos)",
       "recommended_action": "Keep world/local coordinate and pooling behavior explicit; snapshot world transforms before deferred release or reparenting."
     },
-    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/chaser_ship_support_helper.gd|survivor.set_deferred(\"global_position\", survivor_pos)": {
+    "deferred_global_position_after_deferred_add|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd|survivor.set_deferred(\"global_position\", survivor_pos)": {
       "kind": "deferred_global_position_after_deferred_add",
-      "path": "res://scripts/entities/ships/chaser_ship_support_helper.gd",
+      "path": "res://scripts/entities/ships/ai_ship_lifecycle_helper.gd",
       "signature": "survivor.set_deferred(\"global_position\", survivor_pos)",
       "recommended_action": "Keep world/local coordinate and pooling behavior explicit; snapshot world transforms before deferred release or reparenting."
     },
@@ -3662,22 +4042,22 @@
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
     },
-    "duplicate_static_function|_calculate_broad_sail_drive|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
-      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
+    "duplicate_static_function|_calculate_broad_sail_drive|res://scripts/entities/ships/ai_ship_runtime_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player and AI ship movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
       "priority": "known-local-adapter",
-      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and chaser movement are refactored together."
+      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and AI ship movement are refactored together."
     },
-    "duplicate_static_function|_calculate_sail_trim_quality|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
-      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
+    "duplicate_static_function|_calculate_sail_trim_quality|res://scripts/entities/ships/ai_ship_runtime_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player and AI ship movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
       "priority": "known-local-adapter",
-      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and chaser movement are refactored together."
+      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and AI ship movement are refactored together."
     },
-    "duplicate_static_function|_calculate_wind_speed_multiplier|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
-      "reason": "Player and chaser movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
+    "duplicate_static_function|_calculate_wind_speed_multiplier|res://scripts/entities/ships/ai_ship_runtime_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player and AI ship movement each keep local sail-drive math because they own different execution loops; consolidate only with a deliberate shared sail-drive helper.",
       "priority": "known-local-adapter",
-      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and chaser movement are refactored together."
+      "recommended_action": "Move duplicated sail-drive math into a shared ship sail-drive helper if player and AI ship movement are refactored together."
     },
-    "duplicate_static_function|_can_board|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "duplicate_static_function|_can_board|res://scripts/entities/ships/ai_ship_navigation_helper.gd,res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3697,7 +4077,7 @@
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|_get_effective_boarding_distance|res://scripts/entities/ships/base_ship_boarding_helper.gd,res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+    "duplicate_static_function|_get_effective_boarding_distance|res://scripts/entities/ships/ai_ship_boarding_helper.gd,res://scripts/entities/ships/base_ship_boarding_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3712,8 +4092,8 @@
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|_get_performance_cpu_interval_scale|res://scripts/entities/launchers/launcher_combat_helper.gd,res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
-      "reason": "Launcher and chaser AI helpers each apply the same performance preset scale inside different update loops; share only if performance policy moves to a common helper.",
+    "duplicate_static_function|_get_performance_cpu_interval_scale|res://scripts/entities/launchers/launcher_combat_helper.gd,res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
+      "reason": "Launcher and AI ship runtime helpers each apply the same performance preset scale inside different update loops; share only if performance policy moves to a common helper.",
       "priority": "medium",
       "recommended_action": "Rename or consolidate only during a focused owner-boundary cleanup."
     },
@@ -3732,12 +4112,12 @@
       "priority": "known-local-adapter",
       "recommended_action": "Consolidate the soldier level adapter if a broader soldier stat contract owner is introduced."
     },
-    "duplicate_static_function|_get_target_deck_half_extents|res://scripts/entities/ships/base_ship_boarding_helper.gd,res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+    "duplicate_static_function|_get_target_deck_half_extents|res://scripts/entities/ships/ai_ship_boarding_helper.gd,res://scripts/entities/ships/base_ship_boarding_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|_get_team_tag|res://scripts/entities/ships/ship_ally_role_helper.gd,res://scripts/entities/ships/ship_targeting_helper.gd": {
+    "duplicate_static_function|_get_team_tag|res://scripts/entities/ships/player_fleet_role_helper.gd,res://scripts/entities/ships/ship_targeting_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3757,7 +4137,7 @@
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|_is_gunner|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "duplicate_static_function|_is_gunner|res://scripts/entities/ships/ai_ship_navigation_helper.gd,res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3767,17 +4147,17 @@
       "priority": "medium",
       "recommended_action": "Rename or consolidate only during a focused owner-boundary cleanup."
     },
-    "duplicate_static_function|_is_sinking_or_dying|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "duplicate_static_function|_is_sinking_or_dying|res://scripts/entities/ships/ai_ship_navigation_helper.gd,res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|_is_true|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "duplicate_static_function|_is_true|res://scripts/entities/ships/ai_ship_navigation_helper.gd,res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|_is_world_position_offscreen|res://scripts/entities/ships/chaser_ship_support_helper.gd,res://scripts/entities/ships/player_ship_support_helper.gd": {
+    "duplicate_static_function|_is_world_position_offscreen|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd,res://scripts/entities/ships/player_ship_support_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3797,7 +4177,7 @@
       "priority": "medium",
       "recommended_action": "Rename or consolidate only during a focused owner-boundary cleanup."
     },
-    "duplicate_static_function|_target_ship|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "duplicate_static_function|_target_ship|res://scripts/entities/ships/ai_ship_navigation_helper.gd,res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3827,7 +4207,7 @@
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|calculate_separation|res://scripts/entities/ships/chaser_ship_ai_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
+    "duplicate_static_function|calculate_separation|res://scripts/entities/ships/ai_ship_runtime_helper.gd,res://scripts/entities/ships/player_ship_movement_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3867,7 +4247,7 @@
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
     },
-    "duplicate_static_function|normalize_role_name|res://scripts/entities/ships/ship_ally_role_helper.gd,res://scripts/entities/ships/ship_combat_mode_helper.gd": {
+    "duplicate_static_function|normalize_role_name|res://scripts/entities/ships/player_fleet_role_helper.gd,res://scripts/entities/ships/ship_combat_mode_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
       "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
@@ -3907,27 +4287,27 @@
       "priority": "baseline",
       "recommended_action": "Reduce or remove this exception during the next focused owner-boundary cleanup."
     },
-    "large_helper|res://scripts/entities/ships/chaser_ship_ai_helper.gd": {
+    "large_helper|res://scripts/entities/ships/ai_ship_runtime_helper.gd": {
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
     },
-    "large_helper|res://scripts/entities/ships/chaser_ship_boarding_helper.gd": {
+    "large_helper|res://scripts/entities/ships/ai_ship_boarding_helper.gd": {
       "reason": "Boarding collision guard grew slightly beyond the default line budget after neighbor broad-radius extraction; split only with a focused boarding-geometry owner change.",
       "priority": "baseline",
-      "recommended_action": "Extract boarding geometry and neighbor broad-phase logic only if chaser boarding collision guard code grows again."
+      "recommended_action": "Extract boarding geometry and neighbor broad-phase logic only if AI ship boarding collision guard code grows again."
     },
-    "large_helper|res://scripts/entities/ships/chaser_ship_minion_helper.gd": {
+    "large_helper|res://scripts/entities/ships/ai_ship_support_helper.gd": {
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
     },
-    "large_helper|res://scripts/entities/ships/chaser_ship_navigation_helper.gd": {
+    "large_helper|res://scripts/entities/ships/ai_ship_navigation_helper.gd": {
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
     },
-    "large_helper|res://scripts/entities/ships/chaser_ship_support_helper.gd": {
+    "large_helper|res://scripts/entities/ships/ai_ship_lifecycle_helper.gd": {
       "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
@@ -4046,6 +4426,16 @@
       "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "thin_helper|res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd": {
+      "reason": "Small debug adapter keeps dynamic debug snapshot assembly out of BaseShip while avoiding gameplay ownership changes.",
+      "priority": "low",
+      "recommended_action": "Merge into a broader debug-state owner only if more ship debug snapshot behavior accumulates."
+    },
+    "thin_helper|res://scripts/entities/ships/ship_ally_role_helper.gd": {
+      "reason": "Temporary compatibility alias for PlayerFleetRoleHelper while old references migrate.",
+      "priority": "low",
+      "recommended_action": "Remove the alias and this exception after all saved scenes, tests, and cached references use PlayerFleetRoleHelper."
     },
     "thin_helper|res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
       "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",

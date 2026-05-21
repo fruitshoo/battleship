@@ -39,9 +39,9 @@ Scene/Spawner
 | 대상 | 진입점 | 주 책임 |
 | --- | --- | --- |
 | 플레이어 함선 | `scripts/entities/ships/player_ship.gd` | 입력, 조타, 돛/노, 지원함 소환/관리, 자동 도선 스캔 |
-| 일반 적선 | `scripts/entities/ships/chaser_ship.gd` | 추적선 기본 상태, LimboAI tick, 적/아군 분기, 공통 AI 호출 |
-| 적선 AI 실행 | `scripts/entities/ships/chaser_ship_ai_helper.gd` | 타겟 확인, 분리력, 항법, 도선 시도, 이동/충돌 guard |
-| 지원함/나포함 | `scripts/entities/ships/chaser_ship_minion_helper.gd` | 호위진, 합류, 구조, 위협 차단, 재집결 |
+| 일반 적선 | `scripts/entities/ships/ai_ship.gd` | 추적선 기본 상태, LimboAI tick, 적/지원함 분기, 공통 AI 호출 |
+| 적선 AI 실행 | `scripts/entities/ships/ai_ship_runtime_helper.gd` | 타겟 확인, 분리력, 항법, 도선 시도, 이동/충돌 guard |
+| 지원함/legacy 나포함 | `scripts/entities/ships/ai_ship_support_helper.gd` | 호위진, 합류, 구조, 위협 차단, 재집결 |
 | 지원함 역할/대형 | `scripts/entities/ships/support_fleet_formation_helper.gd` | 슬롯, 좌우 배치, 열/익형 대형, 회전 시 따라갈 위치 |
 | 지원함 상태 | `scripts/entities/ships/support_fleet_state_helper.gd` | 현재 대형/역할 상태 해석 |
 | 보스 | `scripts/entities/ships/boss_ship.gd` | 별도 선회/거리 유지 AI, 보스 전용 LimboAI, 공통 상태/충돌 사용 |
@@ -49,15 +49,16 @@ Scene/Spawner
 
 ## 적선 흐름
 
-일반 적선은 대부분 `ChaserShip`에서 시작해서 `ChaserShipAiHelper`로 내려간다.
+일반 적선은 대부분 `AIShip`에서 시작해서 `AIShipRuntimeHelper`로 내려간다.
+`ChaserShip` 이름은 기존 씬/테스트 호환을 위한 alias로만 남겨둔다.
 
 ```text
-ChaserShip._physics_process(delta)
+AIShip._physics_process(delta)
   -> _update_limbo_ai_pilot(delta)
-  -> ChaserShipAiHelper.process_physics(self, delta)
+  -> AIShipRuntimeHelper.process_physics(self, delta)
 ```
 
-`ChaserShipAiHelper.process_physics` 안에서는 대략 아래 순서로 움직인다.
+`AIShipRuntimeHelper.process_physics` 안에서는 대략 아래 순서로 움직인다.
 
 ```text
 process_physics
@@ -67,9 +68,9 @@ process_physics
   -> crew allocation 갱신
   -> throttled logic update
   -> team == player 이면 지원함/나포함 경로로 분기
-  -> 도선 중이면 ChaserShipBoardingHelper.process_boarding
+  -> 도선 중이면 AIShipBoardingHelper.process_boarding
   -> 타겟 없으면 정지
-  -> ChaserShipNavigationHelper.build_navigation
+  -> AIShipNavigationHelper.build_navigation
   -> 도선 가능 거리/각도/충돌 확인
   -> 조타, 속도, 돛/바람 보정
   -> collision repulsion, boarding pull, impulse 합산
@@ -78,30 +79,30 @@ process_physics
 ```
 
 중요한 점:
-- `ChaserShipAiHelper`는 "적선 전용"처럼 보이지만, `team == player` 분기 때문에 지원함/나포함도 여기서 갈라진다.
+- `AIShipRuntimeHelper`는 "적선 전용"처럼 보이지만, `team == player` 분기 때문에 지원함/legacy 나포함도 여기서 갈라진다.
 - 그래서 이 파일을 단순히 적 AI로만 생각하면 나중에 지원함 동작을 깨뜨리기 쉽다.
 
-## 지원함과 나포함 흐름
+## 지원함과 Legacy 나포함 흐름
 
-지원함/나포함도 기본적으로 `ChaserShip` 계열이다.
+지원함과 legacy 나포함도 기본적으로 `AIShip` 계열이다.
 
 ```text
-ChaserShipAiHelper.process_physics
+AIShipRuntimeHelper.process_physics
   -> team == "player"
-    -> ChaserShip._process_minion_ai
-      -> ChaserShipMinionHelper.process_minion_ai
+    -> AIShip._process_support_ai
+      -> AIShipSupportHelper.process_support_ai
 ```
 
-`ChaserShipMinionHelper`는 아래 성격의 일을 한꺼번에 맡고 있다.
+`AIShipSupportHelper`는 아래 성격의 일을 한꺼번에 맡고 있다.
 - 플레이어 또는 기함 찾기
 - 호위진 슬롯 계산
 - 새로 합류한 지원함의 합류 단계 처리
 - 회전 중 열/익형 대형 보정
 - 위협 감지, 구조, 차단, 재집결
-- 나포함의 guard/regroup 행동
+- legacy 나포함의 guard/regroup 행동
 
 대형 위치 계산 자체는 `SupportFleetFormationHelper` 쪽으로 빠져 있다.
-즉 `ChaserShipMinionHelper`는 "상황 판단과 실행", `SupportFleetFormationHelper`는 "어디에 있어야 하는가"에 가깝다.
+즉 `AIShipSupportHelper`는 "상황 판단과 실행", `SupportFleetFormationHelper`는 "어디에 있어야 하는가"에 가깝다.
 
 ## LimboAI의 위치
 
@@ -114,6 +115,10 @@ ShipLimboAIPilot.tick
   -> 기존 helper들이 meta를 읽어서 실행
 ```
 
+현재 계약은 두 단계로 나뉜다.
+- `ShipAIPerceptionHelper`: BT 태스크 안에서 필요한 관측값을 읽는다. 예를 들어 팀, 포격선 역할, 도선 가능 여부, 선체 비율, 교전 거리, 예측 타겟 위치를 여기서 얻는다.
+- `ShipAIIntentHelper`: BT가 쓴 meta를 실행층이 읽을 수 있는 intent dictionary로 바꾼다. gameplay/debug 쪽에서는 `ShipAILimboKeys.META_*`를 직접 읽지 않고 이 helper를 통과한다.
+
 대표적으로 읽히는 값:
 - `META_TARGET_ID`
 - `META_INTENT`
@@ -124,27 +129,28 @@ ShipLimboAIPilot.tick
 - `META_WEAPON_INTENT`
 - `META_BOARDING_INTENT`
 - `META_SUPPORT_MODE`
-- `META_ALLY_MODE`
+- `META_ALLY_MODE` (legacy capture meta)
 
 이 값들은 아래 쪽에서 사용된다.
-- `ChaserShipNavigationHelper`: 이동 목표와 조타 힌트
-- `ChaserShipAiHelper`: 도선 의도와 AI 디버그 표시
+- `AIShipNavigationHelper`: 이동 목표와 조타 힌트
+- `AIShipRuntimeHelper`: 도선 의도와 AI 디버그 표시
 - `LauncherCombatHelper`: 발사/사격 의도
-- `ChaserShipSupportHelper`: 화공 등 특수 공격 의도
-- `ChaserShipMinionHelper`: 지원함/나포함 모드
+- `AIShipLifecycleHelper`: 화공 등 특수 공격 의도
+- `AIShipSupportHelper`: 지원함/legacy 나포함 모드
 - `BossShip`: 보스 거리 유지, 선회, 압박 단계
 
 따라서 LimboAI를 바꿀 때는 "행동 결정"이 바뀌는지, "기존 실행층이 읽는 meta 계약"이 깨지는지를 같이 봐야 한다.
+BT 태스크의 관측 로직은 perception helper에, 실행층의 meta 해석은 intent helper에 두는 것이 현재 기준선이다.
 
 ## 전투 역할
 
 | 역할 | 대표 파일 | 특징 |
 | --- | --- | --- |
-| 근접 적선 | `enemy_melee_ship.gd`, `chaser_ship.gd` | 접근, 충돌 확인, 측면/정면/마무리 도선 |
-| 원거리 적선 | `enemy_gunner_ship.gd`, `chaser_ship.gd` | 거리 유지, 포격, 도선 비활성 |
-| 화공 계열 | `enemy_firepot_ship.gd`, `chaser_ship_support_helper.gd` | 특수 공격 의도와 쿨다운 처리 |
-| 지원함 | `support_ship.gd`, `chaser_ship_minion_helper.gd` | 플레이어 호위, 슬롯 유지, 구조/차단 |
-| 나포함 | `chaser_ship.gd`의 `capture_ship` 이후 | 플레이어 팀으로 전환, 나포함 역할, 추종/호위 |
+| 근접 적선 | `enemy_melee_ship.gd`, `ai_ship.gd` | 접근, 충돌 확인, 측면/정면/마무리 도선 |
+| 원거리 적선 | `enemy_gunner_ship.gd`, `ai_ship.gd` | 거리 유지, 포격, 도선 비활성 |
+| 화공 계열 | `enemy_firepot_ship.gd`, `ai_ship_lifecycle_helper.gd` | 특수 공격 의도와 쿨다운 처리 |
+| 지원함 | `support_ship.gd`, `ai_ship_support_helper.gd` | 플레이어 호위, 슬롯 유지, 구조/차단 |
+| legacy 나포함 | `ai_ship.gd`의 `capture_ship` 이후 | 플레이어 팀으로 전환, 나포함 역할, 추종/호위 |
 | 보스 | `boss_ship.gd` | 별도 선회 AI, 보스 전용 BehaviorTree, 보스 HUD |
 
 ## 공통 시스템
@@ -156,7 +162,7 @@ ShipLimboAIPilot.tick
 | 선체 접촉 치수 | `scripts/entities/ships/ship_contact_geometry.gd` | 충돌/도선 거리용 half extents, directional radius |
 | 충돌/충격 | `scripts/entities/ships/base_ship_collision_helper.gd` | 충돌 이벤트, 밀림, 충돌 피해, 이펙트/SFX |
 | 공통 도선 상태 | `scripts/entities/ships/base_ship_boarding_helper.gd` | 밧줄, boarding link, 공통 도선 tick |
-| 적선 도선 실행 | `scripts/entities/ships/chaser_ship_boarding_helper.gd` | 접근 유지, latch, collision guard |
+| 적선 도선 실행 | `scripts/entities/ships/ai_ship_boarding_helper.gd` | 접근 유지, latch, collision guard |
 | 전투 모드 판정 | `scripts/entities/ships/ship_combat_mode_helper.gd` | gunner/charger, boarding 가능 여부 |
 | 선원 배치 | `scripts/entities/ships/base_ship_crew_helper.gd` | 선원 슬롯, 배 위 병사 관리 |
 | 병사 AI | `scripts/entities/soldiers/soldier_ai_helper.gd` | 병사 목표/상태 행동 |
@@ -178,7 +184,7 @@ ShipLimboAIPilot.tick
 - LimboAI 판단 tick
 - 타겟 재탐색
 - 함선 간 separation 재계산
-- 지원함/나포함의 무거운 대형 계산
+- 지원함/legacy 나포함의 무거운 대형 계산
 - 주변 위협 평가
 
 ### 이벤트 중심에 가까운 것
@@ -190,7 +196,7 @@ ShipLimboAIPilot.tick
 - 병사 생성/사망/복귀
 
 성능 문제가 생겼을 때는 "전체 AI가 느리다"보다 먼저 어느 bucket이 커졌는지 봐야 한다.
-최근에는 `chaser_ai_process_total`, `support_minion_ai`, `soldier_limbo_ai`, `soldier_state_wander` 같은 profiler label이 특히 중요했다.
+최근에는 `ai_ship_process_total`, `support_ai`, `soldier_limbo_ai`, `soldier_state_wander` 같은 profiler label이 특히 중요했다.
 
 ## 안전하게 고치는 순서
 
@@ -202,6 +208,8 @@ ShipLimboAIPilot.tick
 
 우선 확인할 테스트:
 - `scripts/test/run_limboai_ship_ai_pilot_contract.sh`
+- `scripts/test/run_ship_ai_perception_helper_contract.sh`
+- `scripts/test/run_ship_ai_intent_helper_contract.sh`
 - `scripts/test/run_boarding_contracts.sh`
 - `scripts/test/run_project_contract_sweep.sh`
 - `scripts/test/run_modularity_guard_suite.sh`
@@ -211,8 +219,8 @@ ShipLimboAIPilot.tick
 
 낮은 위험도부터:
 
-1. `ChaserShipAiHelper` 상단에 enemy/support/captured 분기 요약 주석 추가
-2. `ChaserShipMinionHelper` 내부를 formation, assist, join, guard 섹션으로 더 명확히 접기
+1. `AIShipRuntimeHelper` 상단에 enemy/support/captured 분기 요약 주석 추가
+2. `AIShipSupportHelper` 내부를 formation, assist, join, guard 섹션으로 더 명확히 접기
 3. LimboAI meta 이름과 읽는 위치를 작은 표로 별도 문서화
 4. 공통 tick interval 계산만 작은 helper로 분리
 5. 충분히 테스트가 쌓인 뒤에만 파일 이동/이름 변경 검토

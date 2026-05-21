@@ -7,27 +7,28 @@
 [ext_resource type="PackedScene" uid="uid://dhmvxxlj2uy8p" path="res://scenes/effects/ship_wake_trail.tscn" id="wake_trail_scene"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0dgdr"]
-size = Vector3(4.9634237, 3.2, 12.992475)
+size = Vector3(6.643149, 3.2, 12.992475)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_r4bi8"]
-size = Vector3(4.363424, 3, 12.192474)
+size = Vector3(6.043149, 3, 12.192474)
 
 [node name="PlayerShip" type="Node3D" unique_id=2118299445]
 script = ExtResource("1")
 max_crew_count = 6
 base_collision_radius = 6.056237
-width_multiplier = 0.3536373943476224
+width_multiplier = 0.49231468759964886
 floating_offset = 0.85
 fire_pot_ignition_chance = 0.45
 fire_pot_burn_duration = 7.0
 floating_loot_drop_chance = 0.65
-metadata/ally_ship_role = "player_flagship"
+metadata/player_fleet_role = "player_flagship"
 
 [node name="ProximityArea" type="Area3D" parent="." unique_id=244065699 groups=["ship_proximity"]]
 collision_layer = 2
 collision_mask = 2
 
 [node name="ProximityShape" type="CollisionShape3D" parent="ProximityArea" unique_id=195625510]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 shape = SubResource("BoxShape3D_0dgdr")
 
 [node name="HitArea" type="Area3D" parent="." unique_id=195625511 groups=["ship_hitbox"]]
@@ -35,7 +36,7 @@ collision_layer = 2
 collision_mask = 0
 
 [node name="HitShape" type="CollisionShape3D" parent="HitArea" unique_id=956424441]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 shape = SubResource("BoxShape3D_r4bi8")
 
 [node name="Soldiers" type="Node3D" parent="." unique_id=351081976]

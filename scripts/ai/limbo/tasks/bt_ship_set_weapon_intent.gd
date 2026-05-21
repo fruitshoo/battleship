@@ -2,6 +2,7 @@
 extends BTAction
 class_name BTShipSetWeaponIntent
 
+const ShipAIPerceptionHelper = preload("res://scripts/ai/limbo/ship_ai_perception_helper.gd")
 
 @export var target_var: StringName = ShipAILimboKeys.VAR_TARGET
 @export var range_intent_var: StringName = ShipAILimboKeys.VAR_INTENT
@@ -31,7 +32,7 @@ func _tick(_delta: float) -> Status:
 	var stance := str(blackboard.get_var(stance_var, "")).strip_edges()
 	var range_intent := str(blackboard.get_var(range_intent_var, ShipAILimboKeys.INTENT_ENGAGE)).strip_edges()
 	var pressure := clampf(float(blackboard.get_var(pressure_var, 0.0)), 0.0, 1.0)
-	var target_distance := agent_3d.global_position.distance_to(target.global_position)
+	var target_distance := ShipAIPerceptionHelper.get_target_distance(agent_3d, target)
 	_publish_special_attack_intent(agent_3d, target, target_distance)
 	if not _should_publish_weapon_intent(agent_3d, target):
 		return SUCCESS
@@ -76,7 +77,7 @@ func _clear_blackboard_intents() -> void:
 
 
 func _publish_special_attack_intent(agent_3d: Node3D, target: Node3D, target_distance: float) -> void:
-	if not _can_use_fire_pot_attack(agent_3d):
+	if not ShipAIPerceptionHelper.can_ship_use_fire_pot_attack(agent_3d):
 		return
 	var special_intent := _get_fire_pot_intent(target_distance)
 	blackboard.set_var(special_attack_intent_var, special_intent)
@@ -95,38 +96,8 @@ func _get_fire_pot_intent(target_distance: float) -> String:
 
 
 func _should_publish_weapon_intent(agent_3d: Node3D, target: Node3D) -> bool:
-	if not _is_enemy_team(agent_3d):
+	if not ShipAIPerceptionHelper.is_enemy_ship(agent_3d):
 		return false
-	if _can_board(agent_3d) and not _is_gunner(agent_3d) and ShipCombatModeHelper.can_be_boarded(target, agent_3d):
+	if ShipAIPerceptionHelper.can_ship_board(agent_3d) and not ShipAIPerceptionHelper.is_ship_gunner(agent_3d) and ShipCombatModeHelper.can_be_boarded(target, agent_3d):
 		return false
 	return true
-
-
-func _is_enemy_team(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("get_team_tag"):
-		return str(agent_3d.call("get_team_tag")) == "enemy"
-	if "team" in agent_3d:
-		return str(agent_3d.get("team")) == "enemy"
-	return true
-
-
-func _is_gunner(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("is_gunner_role"):
-		return agent_3d.call("is_gunner_role") == true
-	if "combat_role" in agent_3d:
-		return int(agent_3d.get("combat_role")) == 1
-	return false
-
-
-func _can_board(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("can_board_targets"):
-		return agent_3d.call("can_board_targets") == true
-	if "allow_boarding" in agent_3d:
-		return agent_3d.get("allow_boarding") == true
-	return false
-
-
-func _can_use_fire_pot_attack(agent_3d: Node3D) -> bool:
-	if agent_3d.has_method("can_use_fire_pot_attack"):
-		return agent_3d.call("can_use_fire_pot_attack") == true
-	return false

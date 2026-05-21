@@ -97,17 +97,17 @@ func _assert_profile_resolution() -> void:
 
 
 func _assert_profile_application() -> void:
-	var ally := SUPPORT_SHIP_SCENE.instantiate()
-	if not is_instance_valid(ally):
+	var support_ship := SUPPORT_SHIP_SCENE.instantiate()
+	if not is_instance_valid(support_ship):
 		_record_failure("cannot_instantiate_support_ship")
 		return
 
 	var profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1}, FLEET_UPGRADES, 1)
-	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, profile)
-	_assert_equal("applied_ship_type", ally.get("ship_type"), "panokseon_ally")
-	_assert_equal("applied_hull_scene", _scene_path(ally.get("hull_scene")), "res://scenes/ships/hulls/panok_hull.tscn")
-	_assert_equal("applied_cannon_scene", _scene_path(ally.get("cannon_scene")), "res://scenes/entities/launchers/cannon_joseon.tscn")
-	ally.free()
+	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(support_ship, profile)
+	_assert_equal("applied_ship_type", support_ship.get("ship_type"), "panokseon_ally")
+	_assert_equal("applied_hull_scene", _scene_path(support_ship.get("hull_scene")), "res://scenes/ships/hulls/panok_hull.tscn")
+	_assert_equal("applied_cannon_scene", _scene_path(support_ship.get("cannon_scene")), "res://scenes/entities/launchers/cannon_joseon.tscn")
+	support_ship.free()
 
 
 func _assert_upgrade_manager_limit() -> void:

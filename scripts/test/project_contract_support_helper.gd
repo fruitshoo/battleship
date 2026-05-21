@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ProjectContractSupportHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SupportFleetFormationHelper = preload("res://scripts/entities/ships/support_fleet_formation_helper.gd")
 const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
@@ -41,7 +43,7 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		smoke_root.queue_free()
 		await _wait_frames(owner, 1)
 		return
-	if not player_ship.has_method("_spawn_or_repair_ally") or not player_ship.has_method("_get_support_fleet_ships"):
+	if not player_ship.has_method("_spawn_or_repair_support_ship") or not player_ship.has_method("_get_support_fleet_ships"):
 		failures.append("support fleet smoke missing player ship support helpers")
 		smoke_root.queue_free()
 		await _wait_frames(owner, 1)
@@ -52,8 +54,8 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 
 	_run_support_wing_join_geometry_contract(failures, smoke_root, player_ship)
 
-	var captured_before: int = EntityRegistry.count_captured_minions()
-	var capture_slots_before: int = ShipAllyRoleHelper.count_capture_slot_minions(EntityRegistry.get_captured_minions())
+	var support_registry_before: int = EntityRegistry.count_support_ships()
+	var capture_slots_before: int = PlayerFleetRoleHelper.count_capture_slot_ships(EntityRegistry.get_legacy_captured_ships())
 	_request_support_spawn(player_ship, failures, "support_contract_initial_spawn")
 	await _wait_frames(owner, wait_frames_after_spawn + 2)
 
@@ -74,23 +76,25 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 	var support_team: String = str(support_ship.get("team"))
 	if support_team != "player":
 		failures.append("support fleet smoke team mismatch: %s" % support_team)
-	if not player_ship.has_method("get_ally_ship_role") or str(player_ship.call("get_ally_ship_role")) != ShipAllyRoleHelper.ROLE_PLAYER_FLAGSHIP:
+	if not player_ship.has_method("get_player_fleet_role") or str(player_ship.call("get_player_fleet_role")) != PlayerFleetRoleHelper.ROLE_PLAYER_FLAGSHIP:
 		failures.append("support fleet smoke player ship should be tagged as player_flagship")
-	if not support_ship.has_method("get_ally_ship_role") or str(support_ship.call("get_ally_ship_role")) != ShipAllyRoleHelper.ROLE_SUPPORT_FLEET:
+	if not support_ship.has_method("get_player_fleet_role") or str(support_ship.call("get_player_fleet_role")) != PlayerFleetRoleHelper.ROLE_SUPPORT_FLEET:
 		failures.append("support fleet smoke support ship should be tagged as support_fleet")
-	if ShipAllyRoleHelper.is_captured_minion(support_ship):
-		failures.append("support fleet smoke support ship should not consume captured-minion role slots")
-	if not support_ship.is_in_group("captured_minion"):
-		failures.append("support fleet smoke missing captured_minion group")
+	if PlayerFleetRoleHelper.is_legacy_captured_ship(support_ship):
+		failures.append("support fleet smoke support ship should not consume legacy capture role slots")
+	if not support_ship.is_in_group("support_ship"):
+		failures.append("support fleet smoke missing support_ship group")
 	if support_ship.get_meta("support_fleet_ship", false) != true:
 		failures.append("support fleet smoke missing support_fleet_ship meta")
 	if int(support_ship.get_meta("support_fleet_owner_id", 0)) != player_ship.get_instance_id():
 		failures.append("support fleet smoke support ship owner mismatch")
-	if EntityRegistry.count_captured_minions() <= captured_before:
-		failures.append("support fleet smoke did not increase captured minion count")
-	if not EntityRegistry.get_captured_minions().has(support_ship):
-		failures.append("support fleet smoke support ship missing from registry bucket")
-	if ShipAllyRoleHelper.count_capture_slot_minions(EntityRegistry.get_captured_minions()) != capture_slots_before:
+	if EntityRegistry.count_support_ships() <= support_registry_before:
+		failures.append("support fleet smoke did not increase support ship registry count")
+	if not EntityRegistry.get_support_ships().has(support_ship):
+		failures.append("support fleet smoke support ship missing from support registry bucket")
+	if EntityRegistry.get_legacy_captured_ships().has(support_ship):
+		failures.append("support fleet smoke support ship should not enter legacy captured registry bucket")
+	if PlayerFleetRoleHelper.count_capture_slot_ships(EntityRegistry.get_legacy_captured_ships()) != capture_slots_before:
 		failures.append("support fleet smoke support ship should not consume capture slots")
 
 	_run_support_shared_cannon_cap_smoke(failures, support_ship)
@@ -132,7 +136,7 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		await _run_support_rescue_emergency_smoke(owner, failures, player_ship, support_ship, spawner, wait_frames_after_spawn)
 		await _run_support_boss_breach_smoke(owner, failures, player_ship, support_ship, spawner, wait_frames_after_spawn)
 		await _run_support_boss_breach_smoke(owner, failures, player_ship, support_ship, spawner, wait_frames_after_spawn, true)
-		await _run_captured_minion_guard_smoke(owner, failures, player_ship, spawner, wait_frames_after_spawn)
+		await _run_legacy_capture_guard_smoke(owner, failures, player_ship, spawner, wait_frames_after_spawn)
 
 	var support_before_idle_pos: Vector3 = support_ship.global_position
 	support_ship.set("target", null)
@@ -405,16 +409,16 @@ static func _run_support_boss_breach_smoke(owner: Node, failures: Array[String],
 	await _wait_frames(owner, 1)
 
 
-static func _run_captured_minion_guard_smoke(owner: Node, failures: Array[String], player_ship: Node3D, spawner: Node, wait_frames_after_spawn: int) -> void:
+static func _run_legacy_capture_guard_smoke(owner: Node, failures: Array[String], player_ship: Node3D, spawner: Node, wait_frames_after_spawn: int) -> void:
 	if not is_instance_valid(owner) or not is_instance_valid(player_ship) or not is_instance_valid(spawner):
 		return
 	var captured_ship := spawner.call("debug_spawn_ship", "kobayabune_melee", 20.0, -12.0) as Node3D
 	await _wait_frames(owner, wait_frames_after_spawn)
 	if not is_instance_valid(captured_ship):
-		failures.append("support fleet smoke captured minion spawn failed")
+		failures.append("support fleet smoke legacy captured ship spawn failed")
 		return
 	if not captured_ship.has_method("capture_ship"):
-		failures.append("support fleet smoke captured minion missing capture_ship")
+		failures.append("support fleet smoke legacy captured ship missing capture_ship")
 		EntityRegistry.unregister_ship(captured_ship)
 		captured_ship.queue_free()
 		await _wait_frames(owner, 1)
@@ -425,7 +429,7 @@ static func _run_captured_minion_guard_smoke(owner: Node, failures: Array[String
 	await _wait_frames(owner, wait_frames_after_spawn)
 	if not is_instance_valid(guard_threat):
 		failures.append("support fleet smoke guard threat spawn failed")
-		EntityRegistry.unregister_captured_minion(captured_ship)
+		EntityRegistry.unregister_legacy_captured_ship(captured_ship)
 		EntityRegistry.unregister_ship(captured_ship)
 		captured_ship.queue_free()
 		await _wait_frames(owner, 1)
@@ -448,26 +452,26 @@ static func _run_captured_minion_guard_smoke(owner: Node, failures: Array[String
 		guard_threat.set("_last_ai_speed", 0.0)
 	await _wait_frames(owner, wait_frames_after_spawn + 6)
 	if captured_ship.get("limbo_ai_pilot_enabled") != true:
-		failures.append("support fleet smoke captured minion did not enable LimboAI after capture")
-	var ally_mode := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, "")).strip_edges()
-	if ally_mode != ShipAILimboKeys.ALLY_MODE_GUARD_THREAT:
-		failures.append("support fleet smoke captured minion did not enter guard threat mode")
-	var ally_target_id := int(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
-	if ally_target_id != guard_threat.get_instance_id():
-		failures.append("support fleet smoke captured minion guard target mismatch")
-	var ally_reason := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges()
-	if ally_reason != "flagship_boarder":
-		failures.append("support fleet smoke captured minion guard reason mismatch: %s" % ally_reason)
+		failures.append("support fleet smoke legacy captured ship did not enable LimboAI after capture")
+	var legacy_capture_mode := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_MODE, "")).strip_edges()
+	if legacy_capture_mode != ShipAILimboKeys.ALLY_MODE_GUARD_THREAT:
+		failures.append("support fleet smoke legacy captured ship did not enter guard threat mode")
+	var legacy_capture_target_id := int(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_TARGET_ID, 0))
+	if legacy_capture_target_id != guard_threat.get_instance_id():
+		failures.append("support fleet smoke legacy captured ship guard target mismatch")
+	var legacy_capture_reason := str(captured_ship.get_meta(ShipAILimboKeys.META_ALLY_REASON, "")).strip_edges()
+	if legacy_capture_reason != "flagship_boarder":
+		failures.append("support fleet smoke legacy captured ship guard reason mismatch: %s" % legacy_capture_reason)
 	var captured_end_forward_offset: float = (captured_ship.global_position - player_ship.global_position).dot(player_forward)
 	var captured_travel_distance: float = captured_ship.global_position.distance_to(captured_start_position)
 	var guard_end_distance: float = captured_ship.global_position.distance_to(guard_threat.global_position)
 	if captured_travel_distance < 0.35:
-		failures.append("support fleet smoke captured minion did not move to intercept threat")
+		failures.append("support fleet smoke legacy captured ship did not move to intercept threat")
 	elif captured_end_forward_offset <= captured_start_forward_offset + 0.45 and guard_end_distance >= guard_start_distance - 0.2:
-		failures.append("support fleet smoke captured minion did not advance toward flagship boarder")
+		failures.append("support fleet smoke legacy captured ship did not advance toward flagship boarder")
 	EntityRegistry.unregister_ship(guard_threat)
 	guard_threat.queue_free()
-	EntityRegistry.unregister_captured_minion(captured_ship)
+	EntityRegistry.unregister_legacy_captured_ship(captured_ship)
 	EntityRegistry.unregister_ship(captured_ship)
 	captured_ship.queue_free()
 	await _wait_frames(owner, 1)
@@ -565,7 +569,7 @@ static func _run_support_signal_level_two_limit_smoke(owner: Node, failures: Arr
 			failures.append("support fleet smoke signal Lv2 second support ship profile mismatch")
 
 		if is_instance_valid(lead_support):
-			EntityRegistry.unregister_captured_minion(lead_support)
+			EntityRegistry.unregister_support_ship(lead_support)
 			EntityRegistry.unregister_ship(lead_support)
 			lead_support.queue_free()
 			await _wait_frames(owner, 2)

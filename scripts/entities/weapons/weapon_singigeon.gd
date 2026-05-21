@@ -13,10 +13,6 @@ var _cached_spawn_parent: Node = null
 var _upgrade_base_damage: float = 2.5
 var _owner_damage_bonus_pct: float = 0.0
 var _upgrade_level: int = 1
-var _soldier_knockback_speed: float = 9.0
-var _soldier_knockback_duration: float = 0.34
-var _soldier_knockback_allows_overboard: bool = false
-var _soldier_knockback_upward_speed: float = 0.0
 
 func _ready() -> void:
 	attack_range = max_range
@@ -70,14 +66,6 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 		rocket.damage = damage
 	if "personnel_damage_mult" in rocket:
 		rocket.personnel_damage_mult = personnel_damage_mult
-	if "soldier_knockback_speed" in rocket:
-		rocket.soldier_knockback_speed = _soldier_knockback_speed
-	if "soldier_knockback_duration" in rocket:
-		rocket.soldier_knockback_duration = _soldier_knockback_duration
-	if "soldier_knockback_allows_overboard" in rocket:
-		rocket.soldier_knockback_allows_overboard = _soldier_knockback_allows_overboard
-	if "soldier_knockback_upward_speed" in rocket:
-		rocket.soldier_knockback_upward_speed = _soldier_knockback_upward_speed
 	if "crit_chance" in rocket:
 		rocket.crit_chance = attacker.get_crit_chance_value() if attacker.has_method("get_crit_chance_value") else 0.1
 	if "crit_multiplier" in rocket:
@@ -128,16 +116,6 @@ func _apply_upgrade_stats() -> void:
 		personnel_damage_mult = float(stats.get("personnel_damage_mult", 6.0))
 		attack_cooldown = maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(_upgrade_level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 		projectile_speed = float(stats.get("projectile_speed", 32.0))
-		_soldier_knockback_speed = float(stats.get("base_knockback_speed", 9.0)) \
-			+ float(_upgrade_level - 1) * float(stats.get("knockback_speed_per_lv", 0.0))
-		_soldier_knockback_duration = float(stats.get("base_knockback_duration", 0.34)) \
-			+ float(_upgrade_level - 1) * float(stats.get("knockback_duration_per_lv", 0.0))
-		var overboard_level := int(stats.get("overboard_knockback_level", 4))
-		_soldier_knockback_allows_overboard = _upgrade_level >= overboard_level
-		_soldier_knockback_upward_speed = 0.0
-		if _soldier_knockback_allows_overboard:
-			_soldier_knockback_upward_speed = float(stats.get("overboard_upward_speed", 1.7)) \
-				+ float(maxi(0, _upgrade_level - overboard_level)) * float(stats.get("overboard_upward_speed_per_lv", 0.25))
 	_apply_effective_damage()
 
 func _apply_effective_damage() -> void:

@@ -3,6 +3,8 @@ extends "res://scripts/entities/ships/base_ship.gd"
 const BossSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
 const PhysicsProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const AIShipLifecycleHelper = preload("res://scripts/entities/ships/ai_ship_lifecycle_helper.gd")
+const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -494,20 +496,23 @@ func _update_limbo_ai_pilot(delta: float) -> void:
 func _get_limbo_range_intent() -> String:
 	if not limbo_ai_pilot_enabled:
 		return ""
-	return str(get_meta(ShipAILimboKeys.META_INTENT, ""))
+	var intent := ShipAIIntentHelper.from_limbo_meta(self)
+	return str(intent.get(ShipAIIntentHelper.KEY_RANGE_INTENT, ""))
 
 
 func _get_limbo_stance() -> String:
 	if not limbo_ai_pilot_enabled:
 		return ""
-	return str(get_meta(ShipAILimboKeys.META_STANCE, ""))
+	var intent := ShipAIIntentHelper.from_limbo_meta(self)
+	return str(intent.get(ShipAIIntentHelper.KEY_STANCE, ""))
 
 
 func _apply_limbo_pilot_modifiers() -> void:
 	if _base_move_speed <= 0.0:
 		_cache_limbo_base_combat_values()
-	var pressure := clampf(float(get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
-	var stance := _get_limbo_stance()
+	var intent := ShipAIIntentHelper.from_limbo_meta(self)
+	var pressure := clampf(float(intent.get(ShipAIIntentHelper.KEY_PRESSURE, 0.0)), 0.0, 1.0)
+	var stance := str(intent.get(ShipAIIntentHelper.KEY_STANCE, ""))
 	var stance_speed_mult := 1.0
 	if stance == ShipAILimboKeys.STANCE_DESPERATE_PUSH:
 		stance_speed_mult = 1.06
@@ -567,18 +572,13 @@ func _auto_adjust_sail(delta: float) -> void:
 
 
 func _get_limbo_navigation_hint(target_node: Node3D) -> Dictionary:
-	if not limbo_ai_pilot_enabled or not is_instance_valid(target_node):
+	var nav_hint := ShipAIIntentHelper.get_limbo_navigation_intent(self, target_node)
+	if nav_hint.is_empty():
 		return {}
-	var nav_target_id := int(get_meta(ShipAILimboKeys.META_NAV_TARGET_ID, 0))
-	if nav_target_id != target_node.get_instance_id():
-		return {}
-	var nav_frame := int(get_meta(ShipAILimboKeys.META_NAV_FRAME, -1000000))
-	if Engine.get_physics_frames() - nav_frame > 4:
-		return {}
-	var nav_mode := str(get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges()
+	var nav_mode := str(nav_hint.get(ShipAIIntentHelper.KEY_MODE, "")).strip_edges()
 	if nav_mode.is_empty() or nav_mode == "limbo_bombard":
 		return {}
-	var desired_value: Variant = get_meta(ShipAILimboKeys.META_NAV_DESIRED_POINT, null)
+	var desired_value: Variant = nav_hint.get(ShipAIIntentHelper.KEY_DESIRED_POINT, null)
 	if not (desired_value is Vector3):
 		return {}
 	var desired_point: Vector3 = desired_value
@@ -588,25 +588,30 @@ func _get_limbo_navigation_hint(target_node: Node3D) -> Dictionary:
 		return {}
 	return {
 		"move_dir": move_vector.normalized(),
-		"speed_mult": float(get_meta(ShipAILimboKeys.META_NAV_SPEED_MULT, 1.0)),
+		"speed_mult": float(nav_hint.get(ShipAIIntentHelper.KEY_SPEED_MULT, 1.0)),
 		"mode": nav_mode,
 		"desired_point": desired_point,
-		"heading_point": get_meta(ShipAILimboKeys.META_NAV_HEADING_POINT, desired_point),
+		"heading_point": nav_hint.get(ShipAIIntentHelper.KEY_HEADING_POINT, desired_point),
 	}
 
 
 func _draw_limbo_ai_debug() -> void:
 	if not DebugDrawBridge.is_channel_enabled(DebugDrawBridge.CHANNEL_AI_INTENT) or not DebugDrawBridge.can_draw():
 		return
-	var stance := _get_limbo_stance()
-	var range_intent := _get_limbo_range_intent()
-	var phase := str(get_meta(ShipAILimboKeys.META_PRESSURE_PHASE, ShipAILimboKeys.PHASE_STABLE))
-	var pressure := clampf(float(get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
-	var target_distance := float(get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, 0.0))
-	var nav_mode := str(get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges()
-	var weapon_intent := str(get_meta(ShipAILimboKeys.META_WEAPON_INTENT, "")).strip_edges()
-	var special_intent := str(get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, "")).strip_edges()
-	var boarding_intent := str(get_meta(ShipAILimboKeys.META_BOARDING_INTENT, "")).strip_edges()
+	var intent := ShipAIIntentHelper.from_limbo_meta(self, target)
+	var stance := str(intent.get(ShipAIIntentHelper.KEY_STANCE, ""))
+	var range_intent := str(intent.get(ShipAIIntentHelper.KEY_RANGE_INTENT, ""))
+	var phase := str(intent.get(ShipAIIntentHelper.KEY_PRESSURE_PHASE, ShipAILimboKeys.PHASE_STABLE))
+	var pressure := clampf(float(intent.get(ShipAIIntentHelper.KEY_PRESSURE, 0.0)), 0.0, 1.0)
+	var target_distance := float(intent.get(ShipAIIntentHelper.KEY_TARGET_DISTANCE, 0.0))
+	var nav_data: Variant = intent.get(ShipAIIntentHelper.KEY_NAV, {})
+	var weapon_data: Variant = intent.get(ShipAIIntentHelper.KEY_WEAPON, {})
+	var special_data: Variant = intent.get(ShipAIIntentHelper.KEY_SPECIAL, {})
+	var boarding_data: Variant = intent.get(ShipAIIntentHelper.KEY_BOARDING, {})
+	var nav_mode := str(nav_data.get(ShipAIIntentHelper.KEY_MODE, "")).strip_edges() if nav_data is Dictionary else ""
+	var weapon_intent := str(weapon_data.get(ShipAIIntentHelper.KEY_INTENT, "")).strip_edges() if weapon_data is Dictionary else ""
+	var special_intent := str(special_data.get(ShipAIIntentHelper.KEY_INTENT, "")).strip_edges() if special_data is Dictionary else ""
+	var boarding_intent := str(boarding_data.get(ShipAIIntentHelper.KEY_INTENT, "")).strip_edges() if boarding_data is Dictionary else ""
 	var color := _get_limbo_stance_color(stance)
 	var label := "LimboAI %s\nrange:%s weapon:%s special:%s board:%s\nphase:%s p:%.2f dist:%.1f nav:%s" % [
 		stance if not stance.is_empty() else "-",
@@ -664,7 +669,7 @@ func die() -> void:
 	
 	# ✅ 배 위의 아군(player) 병사를 Survivor로 전환 (침몰 전 처리)
 	_evacuate_player_soldiers_as_survivors()
-	ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(self)
+	AIShipLifecycleHelper.spawn_enemy_drifter_xp_pickups(self)
 	
 	# 침몰 시작 시 타겟 그룹에서 제외
 	if is_in_group("enemy"):
@@ -813,7 +818,7 @@ func _drop_treasure_chest() -> void:
 
 
 func _drop_floating_xp_loot() -> void:
-	ChaserShipSupportHelper.drop_floating_loot(self, true, 0)
+	AIShipLifecycleHelper.drop_floating_loot(self, true, 0)
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:

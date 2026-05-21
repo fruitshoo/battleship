@@ -1,6 +1,7 @@
 extends Node
 
 const EnemyDrifterScene = preload("res://scenes/effects/enemy_drifter_xp.tscn")
+const AIShipLifecycleHelper = preload("res://scripts/entities/ships/ai_ship_lifecycle_helper.gd")
 
 
 class MockLevelManager:
@@ -99,7 +100,7 @@ func _verify_sinking_enemy_soldier_bonus_xp_is_deferred_to_pickup(failures: Arra
 		soldier._cached_level_manager = lm
 		soldiers_node.add_child(soldier)
 
-	var spawned := ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(ship)
+	var spawned := AIShipLifecycleHelper.spawn_enemy_drifter_xp_pickups(ship)
 	await get_tree().process_frame
 	if spawned != 2:
 		failures.append("expected 2 drifter pickups for 5 sinking soldiers, got %d" % spawned)
@@ -154,7 +155,7 @@ func _verify_each_sinking_enemy_count_spawns_pickup(failures: Array[String]) -> 
 			soldier._cached_level_manager = lm
 			soldiers_node.add_child(soldier)
 
-		var spawned := ChaserShipSupportHelper.spawn_enemy_drifter_xp_pickups(ship)
+		var spawned := AIShipLifecycleHelper.spawn_enemy_drifter_xp_pickups(ship)
 		await get_tree().process_frame
 		var expected_pickups: int = mini(4, ceili(float(soldier_count) / 3.0))
 		if spawned != expected_pickups:

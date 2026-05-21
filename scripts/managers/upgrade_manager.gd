@@ -1,5 +1,6 @@
 @tool
 extends Node
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 const UpgradeManagerItemHelper = preload("res://scripts/managers/upgrade_manager_item_helper.gd")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
 const SeaSiteRewardHelper = preload("res://scripts/world/sea_sites/sea_site_reward_helper.gd")
@@ -198,7 +199,7 @@ func _is_fleet_progress_available() -> bool:
 	for upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
 		if int(current_levels.get(upgrade_id, 0)) > 0:
 			return true
-	return EntityRegistry.count_captured_minions() > 0
+	return EntityRegistry.count_support_ships() > 0 or EntityRegistry.count_legacy_captured_ships() > 0
 
 
 func _is_fleet_ship_progress_available() -> bool:
@@ -439,11 +440,12 @@ func apply_upgrade(upgrade_id: String) -> void:
 	
 	upgrade_applied.emit(upgrade_id, new_level)
 	
-	# 함대 업그레이드인 경우 현재 활성화된 모든 미니언에 즉시 적용
+	# 함대 업그레이드인 경우 현재 활성화된 지원함과 legacy 나포함에 즉시 적용
 	if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS or upgrade_id in ["cannon", "front_cannon", "hull", "hull_defense", "hull_repair"]:
-		var minions = EntityRegistry.get_captured_minions()
-		for m in minions:
-			apply_fleet_upgrades_to_ship(m)
+		var fleet_ships: Array = EntityRegistry.get_support_ships()
+		fleet_ships.append_array(EntityRegistry.get_legacy_captured_ships())
+		for fleet_ship in fleet_ships:
+			apply_fleet_upgrades_to_ship(fleet_ship)
 	if upgrade_id == "boarding_resist":
 		_apply_boarding_resist_to_player_fleet(new_level)
 	
@@ -1376,8 +1378,8 @@ func reconcile_support_fleet(ship: Node3D, _reason: String = "", options: Dictio
 			should_spawn = true
 	if options.get("spawn_if_limit_increased", false) == true and state.get("support_limit_increased", false):
 		should_spawn = true
-	if should_spawn and ship.has_method("_spawn_or_repair_ally"):
-		ship.call_deferred("_spawn_or_repair_ally")
+	if should_spawn and ship.has_method("_spawn_or_repair_support_ship"):
+		ship.call_deferred("_spawn_or_repair_support_ship")
 		state["spawn_requested"] = true
 	return state
 
@@ -1403,7 +1405,7 @@ func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 		var upgrade_bonus: int = _get_support_fleet_limit_upgrade_bonus()
 		var squadron_bonus: int = PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, UPGRADES)
 		ship.support_fleet_limit = base_limit + upgrade_bonus + squadron_bonus
-	if ShipAllyRoleHelper.is_player_flagship(ship):
+	if PlayerFleetRoleHelper.is_player_flagship(ship):
 		PlayerShipSupportHelper.refresh_support_fleet_composition(ship)
 	return {
 		"support_fleet_respawn_interval": float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else previous_respawn_interval,

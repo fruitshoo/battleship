@@ -175,6 +175,14 @@ When adding a new harness:
   Script: `scripts/test/modularity_guard.gd`
   Registry: `scripts/test/module_boundaries.json`
   Wrapper: `scripts/test/run_modularity_guard_suite.sh`
+- `ship_ai_perception_helper_contract.tscn`
+  Focused contract for LimboAI ship perception reads: team, role, boarding capability, hull ratio, engagement ranges, speed, distance, and target lead sampling.
+  Script: `scripts/test/ship_ai_perception_helper_contract.gd`
+  Wrapper: `scripts/test/run_ship_ai_perception_helper_contract.sh`
+- `ship_ai_intent_helper_contract.tscn`
+  Focused contract for converting fresh LimboAI ship metadata into execution-layer intent dictionaries without direct gameplay meta reads.
+  Script: `scripts/test/ship_ai_intent_helper_contract.gd`
+  Wrapper: `scripts/test/run_ship_ai_intent_helper_contract.sh`
 
 ## Helper Scripts
 
@@ -266,12 +274,12 @@ When adding a new harness:
   Uses the generic scene load probe to compare `player_ship.tscn` load-only versus instantiate leak totals.
   Useful for separating scene resource leak from runtime bootstrap leak.
 - `scripts/test/run_ship_load_chain_breakdown.sh`
-  Uses the generic load probe to compare ship script/scene resources such as `base_ship.gd`, `chaser_ship.gd`, `player_ship.gd`, and a few preload candidates.
+  Uses the generic load probe to compare ship script/scene resources such as `base_ship.gd`, `ai_ship.gd`, `player_ship.gd`, and a few preload candidates.
   Useful for spotting whether leak budget is coming from a script preload chain or from an individual referenced scene.
-- `scripts/test/run_chaser_script_isolation.sh`
-  Compares lightweight `extends base_ship` isolation scripts against the real `chaser_ship.gd`.
-  Also includes `process_loop`, `ai_core`, `process_ai`, `capture_minion`, `boarding_collision`, and `late_combined` buckets for narrowing the leak to specific late-method clusters.
-  Useful for checking whether the leak comes from helper preloads, top-level declarations, or a specific method family inside the full chaser script.
+- `scripts/test/run_ai_ship_script_isolation.sh`
+  Compares lightweight `extends base_ship` isolation scripts against the real `ai_ship.gd` runtime script.
+  Also includes `process_loop`, `ai_core`, `process_ai`, `legacy_capture`, `boarding_collision`, and `late_combined` buckets for narrowing the leak to specific late-method clusters.
+  Useful for checking whether the leak comes from helper preloads, top-level declarations, or a specific method family inside the full AI ship script.
 
 - `cannon_crew_reload_contract.tscn`
   Script: `scripts/test/cannon_crew_reload_contract.gd`

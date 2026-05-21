@@ -1,7 +1,12 @@
 extends RefCounted
-class_name ChaserShipAiHelper
+class_name AIShipRuntimeHelper
+
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const AIShipNavigationHelper = preload("res://scripts/entities/ships/ai_ship_navigation_helper.gd")
+const AIShipSupportHelper = preload("res://scripts/entities/ships/ai_ship_support_helper.gd")
+const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 
 static var _cached_ships_list: Array = []
 static var _last_ships_cache_frame: int = -1
@@ -9,7 +14,6 @@ static var _cached_load_counts_frame: int = -1
 static var _cached_ship_count: int = 0
 static var _cached_soldier_count: int = 0
 static var _cached_projectile_count: int = 0
-const LIMBO_AI_BOARDING_INTENT_STALE_FRAMES := 4
 const SAIL_DOWNWIND_START := -0.45
 const SAIL_DOWNWIND_FULL := 0.78
 const SAIL_TAILWIND_BONUS_START := 0.45
@@ -39,14 +43,14 @@ const WIND_STRENGTH_DEFAULT_MIN := 0.72
 const WIND_STRENGTH_DEFAULT_MAX := 0.88
 const WIND_SPEED_MULT_MIN := 0.92
 const WIND_SPEED_MULT_MAX := 1.08
-const NAV_CACHE_META := "chaser_ai_nav_cache"
-const NAV_CACHE_TARGET_ID_META := "chaser_ai_nav_cache_target_id"
-const NAV_CACHE_TIMER_META := "chaser_ai_nav_cache_timer"
-const NAV_CACHE_SHIP_POS_META := "chaser_ai_nav_cache_ship_pos"
-const NAV_CACHE_TARGET_POS_META := "chaser_ai_nav_cache_target_pos"
-const BOARDING_WINDOW_CACHE_META := "chaser_ai_boarding_window_cache"
-const BOARDING_WINDOW_TARGET_ID_META := "chaser_ai_boarding_window_target_id"
-const BOARDING_WINDOW_TIMER_META := "chaser_ai_boarding_window_timer"
+const NAV_CACHE_META := "ai_ship_nav_cache"
+const NAV_CACHE_TARGET_ID_META := "ai_ship_nav_cache_target_id"
+const NAV_CACHE_TIMER_META := "ai_ship_nav_cache_timer"
+const NAV_CACHE_SHIP_POS_META := "ai_ship_nav_cache_ship_pos"
+const NAV_CACHE_TARGET_POS_META := "ai_ship_nav_cache_target_pos"
+const BOARDING_WINDOW_CACHE_META := "ai_ship_boarding_window_cache"
+const BOARDING_WINDOW_TARGET_ID_META := "ai_ship_boarding_window_target_id"
+const BOARDING_WINDOW_TIMER_META := "ai_ship_boarding_window_timer"
 const NAV_CACHE_REBUILD_DISTANCE_SQ := 2.25
 
 static func _is_true(value: Variant) -> bool:
@@ -301,7 +305,7 @@ static func calculate_separation(ship) -> Vector3:
 static func _get_navigation_cached(ship, current_target: Node3D, delta: float, raw_dist_to_target: float) -> Dictionary:
 	var interval := _get_navigation_cache_interval(ship, raw_dist_to_target)
 	if interval <= 0.0:
-		return ChaserShipNavigationHelper.build_navigation(ship, current_target)
+		return AIShipNavigationHelper.build_navigation(ship, current_target)
 
 	var target_id := current_target.get_instance_id()
 	var cached_target_id := int(ship.get_meta(NAV_CACHE_TARGET_ID_META, 0))
@@ -317,7 +321,7 @@ static func _get_navigation_cached(ship, current_target: Node3D, delta: float, r
 		ship.set_meta(NAV_CACHE_TIMER_META, timer)
 		return cached_nav_variant
 
-	var nav := ChaserShipNavigationHelper.build_navigation(ship, current_target)
+	var nav := AIShipNavigationHelper.build_navigation(ship, current_target)
 	ship.set_meta(NAV_CACHE_META, nav)
 	ship.set_meta(NAV_CACHE_TARGET_ID_META, target_id)
 	ship.set_meta(NAV_CACHE_TIMER_META, interval + randf_range(0.0, interval * 0.18))
@@ -392,7 +396,7 @@ static func process_physics(ship, delta: float) -> void:
 	ship.separation_timer -= delta
 	if ship.separation_timer <= 0.0:
 		ship.separation_timer = _get_separation_update_interval(ship)
-		if ship.team == "player" and ShipAllyRoleHelper.is_support_ship(ship):
+		if ship.team == "player" and PlayerFleetRoleHelper.is_support_ship(ship):
 			ship.separation_force = Vector3.ZERO
 		else:
 			ship.separation_force = calculate_separation(ship)
@@ -435,16 +439,16 @@ static func process_physics(ship, delta: float) -> void:
 	if do_logic_update:
 		var logic_profile_start := PhysicsFrameProfiler.begin()
 		update_logic_throttled(ship)
-		PhysicsFrameProfiler.end("chaser_logic_update", logic_profile_start)
+		PhysicsFrameProfiler.end("ai_ship_logic_update", logic_profile_start)
 
 	if ship.get_team_tag() == "player":
 		if ship.is_boarding:
-			if ChaserShipMinionHelper.try_interrupt_boarding_for_flagship_rescue(ship):
-				ship._process_minion_ai(delta)
+			if AIShipSupportHelper.try_interrupt_boarding_for_flagship_rescue(ship):
+				ship._process_support_ai(delta)
 				return
 			ship._process_boarding(delta)
 			return
-		ship._process_minion_ai(delta)
+		ship._process_support_ai(delta)
 		return
 
 	if ship.is_boarding:
@@ -459,7 +463,7 @@ static func process_physics(ship, delta: float) -> void:
 
 	var nav_profile_start := PhysicsFrameProfiler.begin()
 	var nav := _get_navigation_cached(ship, current_target, delta, raw_dist_to_target)
-	PhysicsFrameProfiler.end("chaser_navigation", nav_profile_start)
+	PhysicsFrameProfiler.end("ai_ship_navigation", nav_profile_start)
 	var target_pos: Vector3 = ShipMovementIntent.get_target_pos(nav, current_target.global_position)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, current_target.global_position)
 	var heading_point: Vector3 = ShipMovementIntent.get_heading_point(nav, desired_point)
@@ -477,14 +481,7 @@ static func process_physics(ship, delta: float) -> void:
 		boarding_attempt_distance = float(boarding_window.get("attempt_distance", 0.0))
 		target_can_be_boarded = bool(boarding_window.get("target_can_be_boarded", false))
 	if can_attempt_boarding and target_can_be_boarded and dist_to_target <= boarding_attempt_distance:
-		var can_use_limbo_boarding_intent := true
-		if ship.get("limbo_ai_pilot_enabled") == true:
-			var boarding_frame := int(ship.get_meta(ShipAILimboKeys.META_BOARDING_FRAME, -1000000))
-			if Engine.get_physics_frames() - boarding_frame <= LIMBO_AI_BOARDING_INTENT_STALE_FRAMES:
-				var boarding_target_id := int(ship.get_meta(ShipAILimboKeys.META_BOARDING_TARGET_ID, 0))
-				var boarding_intent := str(ship.get_meta(ShipAILimboKeys.META_BOARDING_INTENT, "")).strip_edges()
-				can_use_limbo_boarding_intent = boarding_target_id == current_target.get_instance_id() and boarding_intent == ShipAILimboKeys.BOARDING_READY
-		if can_use_limbo_boarding_intent:
+		if ShipAIIntentHelper.allows_boarding_attempt(ship, current_target):
 			var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
 			var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
 			var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
@@ -501,14 +498,14 @@ static func process_physics(ship, delta: float) -> void:
 				if ship.has_method("_board_ship"):
 					ship.call("_board_ship", current_target)
 					if ship.is_boarding:
-						PhysicsFrameProfiler.end("chaser_boarding_attempt", boarding_profile_start)
+						PhysicsFrameProfiler.end("ai_ship_boarding_attempt", boarding_profile_start)
 						ship._process_boarding(delta)
 						return
 		elif ship.has_method("_decay_boarding_latch"):
 			ship.call("_decay_boarding_latch", current_target, delta)
 	elif ship.has_method("_decay_boarding_latch"):
 		ship.call("_decay_boarding_latch", current_target, delta)
-	PhysicsFrameProfiler.end("chaser_boarding_attempt", boarding_profile_start)
+	PhysicsFrameProfiler.end("ai_ship_boarding_attempt", boarding_profile_start)
 
 	var motion_profile_start := PhysicsFrameProfiler.begin()
 	var move_vector = desired_point - ship.global_position
@@ -581,7 +578,7 @@ static func process_physics(ship, delta: float) -> void:
 	velocity += ship.consume_collision_impulse_velocity(delta)
 	var repulsion_profile_start := PhysicsFrameProfiler.begin()
 	var collision_repulsion = ship._calculate_collision_repulsion()
-	PhysicsFrameProfiler.end("chaser_motion_collision_repulsion", repulsion_profile_start)
+	PhysicsFrameProfiler.end("ai_ship_motion_collision_repulsion", repulsion_profile_start)
 	if not _is_gunner(ship) and target_can_be_boarded and dist_to_target < ship.max_boarding_distance + 1.2:
 		var to_target_flat = ship.target.global_position - ship.global_position
 		to_target_flat.y = 0.0
@@ -590,7 +587,7 @@ static func process_physics(ship, delta: float) -> void:
 			if approach_dot > 0.3:
 				collision_repulsion *= 0.35
 	velocity += collision_repulsion * delta
-	PhysicsFrameProfiler.end("chaser_motion_math", motion_profile_start)
+	PhysicsFrameProfiler.end("ai_ship_motion_math", motion_profile_start)
 	_draw_ai_intent_debug(
 		ship,
 		current_target,
@@ -618,7 +615,7 @@ static func process_physics(ship, delta: float) -> void:
 	if is_instance_valid(current_target):
 		next_pos = ship._apply_ship_collision_guard(current_target, prev_pos, next_pos, 0.88, velocity.length())
 	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, current_target)
-	PhysicsFrameProfiler.end("chaser_collision_guards", guard_profile_start)
+	PhysicsFrameProfiler.end("ai_ship_collision_guards", guard_profile_start)
 	ship.global_position = next_pos
 
 	var visual_profile_start := PhysicsFrameProfiler.begin()
@@ -629,7 +626,7 @@ static func process_physics(ship, delta: float) -> void:
 	if not ship.is_dying:
 		ship.rotation.z += ship.tilt_offset
 	ship._set_wake_state(ship.current_speed > 0.4, clampf(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0), 0.0, 0.0)
-	PhysicsFrameProfiler.end("chaser_visual_status", visual_profile_start)
+	PhysicsFrameProfiler.end("ai_ship_visual_status", visual_profile_start)
 
 
 static func _draw_ai_intent_debug(
@@ -725,16 +722,20 @@ static func _get_limbo_debug_text(ship) -> String:
 		return ""
 	if ship.get("limbo_ai_pilot_enabled") != true:
 		return ""
-	var stance := str(ship.get_meta(ShipAILimboKeys.META_STANCE, ""))
-	var range_intent := str(ship.get_meta(ShipAILimboKeys.META_INTENT, ""))
-	var phase := str(ship.get_meta(ShipAILimboKeys.META_PRESSURE_PHASE, ""))
-	var weapon_intent := str(ship.get_meta(ShipAILimboKeys.META_WEAPON_INTENT, ""))
-	var special_intent := str(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, ""))
-	var boarding_intent := str(ship.get_meta(ShipAILimboKeys.META_BOARDING_INTENT, ""))
+	var intent := ShipAIIntentHelper.from_limbo_meta(ship)
+	var stance := str(intent.get(ShipAIIntentHelper.KEY_STANCE, ""))
+	var range_intent := str(intent.get(ShipAIIntentHelper.KEY_RANGE_INTENT, ""))
+	var phase := str(intent.get(ShipAIIntentHelper.KEY_PRESSURE_PHASE, ""))
+	var weapon_data: Variant = intent.get(ShipAIIntentHelper.KEY_WEAPON, {})
+	var special_data: Variant = intent.get(ShipAIIntentHelper.KEY_SPECIAL, {})
+	var boarding_data: Variant = intent.get(ShipAIIntentHelper.KEY_BOARDING, {})
+	var weapon_intent := str(weapon_data.get(ShipAIIntentHelper.KEY_INTENT, "")).strip_edges() if weapon_data is Dictionary else ""
+	var special_intent := str(special_data.get(ShipAIIntentHelper.KEY_INTENT, "")).strip_edges() if special_data is Dictionary else ""
+	var boarding_intent := str(boarding_data.get(ShipAIIntentHelper.KEY_INTENT, "")).strip_edges() if boarding_data is Dictionary else ""
 	if stance.is_empty() and range_intent.is_empty() and phase.is_empty() and weapon_intent.is_empty() and special_intent.is_empty() and boarding_intent.is_empty():
 		return ""
-	var pressure := clampf(float(ship.get_meta(ShipAILimboKeys.META_PRESSURE, 0.0)), 0.0, 1.0)
-	var distance := float(ship.get_meta(ShipAILimboKeys.META_TARGET_DISTANCE, 0.0))
+	var pressure := clampf(float(intent.get(ShipAIIntentHelper.KEY_PRESSURE, 0.0)), 0.0, 1.0)
+	var distance := float(intent.get(ShipAIIntentHelper.KEY_TARGET_DISTANCE, 0.0))
 	return "\nLimboAI %s | range:%s | weapon:%s | special:%s | board:%s | phase:%s | p:%.2f | %.1fm" % [
 		stance if not stance.is_empty() else "-",
 		range_intent if not range_intent.is_empty() else "-",

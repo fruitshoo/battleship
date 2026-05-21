@@ -1,5 +1,8 @@
 extends RefCounted
-class_name ChaserShipSupportHelper
+class_name AIShipLifecycleHelper
+
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 
 const DEFAULT_ENEMY_DRIFTER_XP_SCENE = preload("res://scenes/effects/enemy_drifter_xp.tscn")
 const DERELICT_NONBLOCKING_DELAY: float = 1.25
@@ -24,7 +27,6 @@ const ENEMY_FIRE_POT_MAX_RANGE: float = 14.0
 const ENEMY_FIRE_POT_DAMAGE: float = 11.0
 const ENEMY_FIRE_POT_RADIUS: float = 1.75
 const ENEMY_FIRE_POT_TARGET_SPREAD: float = 0.95
-const LIMBO_AI_SPECIAL_ATTACK_INTENT_STALE_FRAMES := 4
 const ENEMY_DRIFTER_XP_ACCOUNTED_META := "enemy_drifter_xp_accounted"
 const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
 const ENEMY_DRIFTER_SOLDIERS_PER_PICKUP := 3
@@ -57,15 +59,8 @@ static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 		return
 	if ship.is_boarding:
 		return
-	if ship.get("limbo_ai_pilot_enabled") == true:
-		var special_frame := int(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_FRAME, -1000000))
-		if Engine.get_physics_frames() - special_frame <= LIMBO_AI_SPECIAL_ATTACK_INTENT_STALE_FRAMES:
-			var special_target_id := int(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_TARGET_ID, 0))
-			var special_intent := str(ship.get_meta(ShipAILimboKeys.META_SPECIAL_ATTACK_INTENT, "")).strip_edges()
-			if special_target_id != target.get_instance_id():
-				return
-			if not special_intent.is_empty() and special_intent != ShipAILimboKeys.SPECIAL_FIRE_POT_READY:
-				return
+	if not ShipAIIntentHelper.allows_special_fire_pot(ship, target):
+		return
 	var dist: float = ship.global_position.distance_to(target.global_position)
 	if dist < ENEMY_FIRE_POT_MIN_RANGE or dist > ENEMY_FIRE_POT_MAX_RANGE:
 		return
@@ -498,7 +493,7 @@ static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_ove
 	ship.get_tree().root.add_child.call_deferred(loot)
 	loot.set_deferred("global_position", spawn_pos)
 
-	if ship.survivor_scene and randf() < 0.3:
+	if not PlayerFleetRoleHelper.is_support_ship(ship) and ship.survivor_scene and randf() < 0.3:
 		var survivor = ScenePool.acquire(ship.get_tree(), ship.survivor_scene)
 		var s_offset = Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
 		var survivor_pos = ship.global_position + s_offset
@@ -508,6 +503,8 @@ static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_ove
 
 
 static func evacuate_player_soldiers_as_survivors(ship) -> void:
+	if PlayerFleetRoleHelper.is_support_ship(ship):
+		return
 	if not ship.survivor_scene:
 		return
 	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)

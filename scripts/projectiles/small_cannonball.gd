@@ -4,6 +4,7 @@ const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.tscn")
 const DEFAULT_SHIP_IMPACT_PUFF_SCENE = preload("res://scenes/effects/impact_puff.tscn")
+const ShipDamageDecalHelper = preload("res://scripts/effects/ship_damage_decal_helper.gd")
 const DEFAULT_WOOD_SPLINTER_SCENE = preload("res://scenes/effects/wood_splinter.tscn")
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
@@ -175,6 +176,7 @@ func _resolve_ship_impact_position(ship: Node3D, hit_position: Vector3) -> Vecto
 func _spawn_ship_hit_feedback(ship: Node3D, impact_position: Vector3) -> void:
 	if not is_inside_tree() or not is_instance_valid(ship):
 		return
+	ShipDamageDecalHelper.try_spawn_from_ship_hit(ship, damage, impact_position, damage_source)
 	var effect_position := impact_position + Vector3(0.0, SHIP_HIT_FEEDBACK_Y_OFFSET, 0.0)
 	_spawn_ship_impact_puff(ship, effect_position)
 	_spawn_ship_impact_splinters(ship, effect_position, impact_position - global_position)

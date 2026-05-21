@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://dhyvrlyy7yrm0" path="res://scripts/projectiles/singigeon_rocket.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://wdr6kfrgumfw" path="res://assets/models/props/singijeon/singijeon.glb" id="2_model"]
-[ext_resource type="PackedScene" uid="uid://cgnuyvb15fep1" path="res://scenes/effects/singigeon_rocket_trail.tscn" id="3_trail"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_col"]
 size = Vector3(0.15, 0.15, 0.8)
@@ -20,6 +19,3 @@ transform = Transform3D(0.22, 0, 0, 0, 0.22, 0, 0, 0, 0.22, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=476615349]
 shape = SubResource("BoxShape_col")
-
-[node name="RocketTrail" parent="." unique_id=788387067 instance=ExtResource("3_trail")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.48)

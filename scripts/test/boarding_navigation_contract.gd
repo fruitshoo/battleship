@@ -1,6 +1,9 @@
 extends Node
 # @scene_contract_encapsulated
 
+const AIShipNavigationHelper = preload("res://scripts/entities/ships/ai_ship_navigation_helper.gd")
+const AIShipBoardingHelper = preload("res://scripts/entities/ships/ai_ship_boarding_helper.gd")
+
 
 
 class MockShip:
@@ -118,7 +121,7 @@ func _verify_bow_sector_keeps_front_navigation(failures: Array[String]) -> void:
 	ship.set_meta("boarding_side_sign", 1.0)
 	ship.set_meta("post_impact_follow_timer", 2.1)
 
-	var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, target)
+	var nav: Dictionary = AIShipNavigationHelper.build_navigation(ship, target)
 	var mode: String = str(ship.get_meta("boarding_approach_mode", ""))
 	if mode != "front":
 		failures.append("bow-sector approach should stay front, got %s" % mode)
@@ -141,7 +144,7 @@ func _verify_true_side_still_uses_side_navigation(failures: Array[String]) -> vo
 	ship.global_position = target.global_position + forward * 1.2 + right * 8.4
 	ship.rotation.y = target.rotation.y + PI
 
-	ChaserShipNavigationHelper.build_navigation(ship, target)
+	AIShipNavigationHelper.build_navigation(ship, target)
 	var mode: String = str(ship.get_meta("boarding_approach_mode", ""))
 	if mode != "side":
 		failures.append("true side approach should remain side, got %s" % mode)
@@ -161,7 +164,7 @@ func _verify_head_on_boarding_holds_contact_anchor(failures: Array[String]) -> v
 
 	var start_local: Vector3 = target.to_local(ship.global_position)
 	for _index in range(12):
-		ChaserShipBoardingHelper.process_boarding(ship, 0.1)
+		AIShipBoardingHelper.process_boarding(ship, 0.1)
 	var end_local: Vector3 = target.to_local(ship.global_position)
 
 	if absf(end_local.z) > absf(start_local.z) + 0.1:
@@ -190,7 +193,7 @@ func _verify_limbo_navigation_hint_offsets_gunner(failures: Array[String]) -> vo
 	target.global_position = Vector3.ZERO
 	_set_limbo_nav_hint(ship, target, Vector3(18.0, 0.0, 4.8), target.global_position, 0.46, false, "limbo_orbit_pressure")
 
-	var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, target)
+	var nav: Dictionary = AIShipNavigationHelper.build_navigation(ship, target)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav)
 	if desired_point.distance_to(ship.global_position) < 2.0:
 		failures.append("Limbo navigation hint should offset gunner desired point")
@@ -213,7 +216,7 @@ func _verify_limbo_navigation_hint_speeds_gunner(failures: Array[String]) -> voi
 	target.global_position = Vector3.ZERO
 	_set_limbo_nav_hint(ship, target, Vector3(18.0, 0.0, 0.0), target.global_position, 1.10, true, "limbo_close_distance")
 
-	var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, target)
+	var nav: Dictionary = AIShipNavigationHelper.build_navigation(ship, target)
 	var desired_speed := ShipMovementIntent.get_desired_speed_mult(nav)
 	if desired_speed < 1.05:
 		failures.append("Limbo navigation hint should speed gunner approach: %.3f" % desired_speed)
@@ -231,7 +234,7 @@ func _verify_limbo_navigation_hint_does_not_break_close_boarding(failures: Array
 	target.global_position = Vector3.ZERO
 	_set_limbo_nav_hint(ship, target, Vector3(32.0, 0.0, 0.0), Vector3(32.0, 0.0, 0.0), 0.95, false, "limbo_withdraw")
 
-	var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, target)
+	var nav: Dictionary = AIShipNavigationHelper.build_navigation(ship, target)
 	var desired_distance := ShipMovementIntent.get_desired_point(nav).distance_to(target.global_position)
 	if desired_distance > ship.global_position.distance_to(target.global_position) + 1.0:
 		failures.append("Limbo navigation hint should not override close boarding navigation: %.2f" % desired_distance)
@@ -247,7 +250,7 @@ func _verify_unboardable_target_uses_standoff_navigation(failures: Array[String]
 	ship.set_meta("boarding_approach_mode", "side")
 	ship.set_meta("boarding_side_sign", 1.0)
 
-	var nav: Dictionary = ChaserShipNavigationHelper.build_navigation(ship, target)
+	var nav: Dictionary = AIShipNavigationHelper.build_navigation(ship, target)
 	if ship.has_meta("boarding_approach_mode") or ship.has_meta("boarding_side_sign"):
 		failures.append("unboardable target should clear stale boarding navigation meta")
 	if ShipMovementIntent.get_mode(nav) != "unboardable_standoff":

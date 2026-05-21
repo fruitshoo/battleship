@@ -1,6 +1,7 @@
 extends RefCounted
-class_name ChaserShipNavigationHelper
+class_name AIShipNavigationHelper
 
+const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 
 const META_AUTHORING_MOVEMENT_MODE := "enemy_authoring_movement_mode"
 const META_AUTHORING_MOVEMENT_SPEED_MIN := "enemy_authoring_movement_speed_min"
@@ -667,24 +668,17 @@ static func build_navigation(ship, target_node: Node3D) -> Dictionary:
 
 	if ship.get("limbo_ai_pilot_enabled") == true:
 		var boarding_nav_locked: bool = _can_board(ship) and target_can_be_boarded and dist_to_target <= ship.boarding_break_distance + 1.5
-		var nav_hint_target_id := int(ship.get_meta(ShipAILimboKeys.META_NAV_TARGET_ID, 0))
-		var nav_hint_frame := int(ship.get_meta(ShipAILimboKeys.META_NAV_FRAME, -1000000))
-		var nav_hint_is_current := Engine.get_physics_frames() - nav_hint_frame <= 4
-		var nav_hint_matches_target := nav_hint_target_id == target_node.get_instance_id()
-		if not boarding_nav_locked and nav_hint_is_current and nav_hint_matches_target:
-			var hint_desired_point: Variant = ship.get_meta(ShipAILimboKeys.META_NAV_DESIRED_POINT, null)
-			var hint_heading_point: Variant = ship.get_meta(ShipAILimboKeys.META_NAV_HEADING_POINT, null)
-			var hint_speed_mult: Variant = ship.get_meta(ShipAILimboKeys.META_NAV_SPEED_MULT, null)
-			var hint_permit_sprint: Variant = ship.get_meta(ShipAILimboKeys.META_NAV_PERMIT_SPRINT, null)
-			var hint_mode := str(ship.get_meta(ShipAILimboKeys.META_NAV_MODE, "")).strip_edges()
-			if hint_desired_point is Vector3:
-				desired_point = hint_desired_point
-			if hint_heading_point is Vector3:
-				heading_point = hint_heading_point
-			if hint_speed_mult != null:
-				desired_speed_mult = maxf(desired_speed_mult, float(hint_speed_mult))
-			if hint_permit_sprint != null:
-				permit_sprint = hint_permit_sprint == true
+		var nav_hint := ShipAIIntentHelper.get_limbo_navigation_intent(ship, target_node)
+		if not boarding_nav_locked and not nav_hint.is_empty():
+			if nav_hint.has(ShipAIIntentHelper.KEY_DESIRED_POINT):
+				desired_point = nav_hint[ShipAIIntentHelper.KEY_DESIRED_POINT]
+			if nav_hint.has(ShipAIIntentHelper.KEY_HEADING_POINT):
+				heading_point = nav_hint[ShipAIIntentHelper.KEY_HEADING_POINT]
+			if nav_hint.has(ShipAIIntentHelper.KEY_SPEED_MULT):
+				desired_speed_mult = maxf(desired_speed_mult, float(nav_hint[ShipAIIntentHelper.KEY_SPEED_MULT]))
+			if nav_hint.has(ShipAIIntentHelper.KEY_PERMIT_SPRINT):
+				permit_sprint = nav_hint[ShipAIIntentHelper.KEY_PERMIT_SPRINT] == true
+			var hint_mode := str(nav_hint.get(ShipAIIntentHelper.KEY_MODE, "")).strip_edges()
 			if not hint_mode.is_empty():
 				movement_mode = hint_mode
 

@@ -1,8 +1,8 @@
 extends RefCounted
 class_name LauncherCombatHelper
 
+const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 
-const LIMBO_AI_WEAPON_INTENT_STALE_FRAMES := 4
 const TARGET_SCAN_LOAD_SHIP_SOFT_LIMIT := 12
 const TARGET_SCAN_LOAD_SOLDIER_SOFT_LIMIT := 60
 const TARGET_SCAN_LOAD_PROJECTILE_SOFT_LIMIT := 18
@@ -45,11 +45,8 @@ static func is_owner_combat_ready(owner_ship: Node) -> bool:
 	if owner_ship.has_method("is_combat_disabled") and owner_ship.is_combat_disabled():
 		return false
 	if owner_ship.get("limbo_ai_pilot_enabled") == true and NodeContractHelper.get_team_tag(owner_ship, "") == "enemy":
-		var weapon_frame := int(owner_ship.get_meta(ShipAILimboKeys.META_WEAPON_FRAME, -1000000))
-		if Engine.get_physics_frames() - weapon_frame <= LIMBO_AI_WEAPON_INTENT_STALE_FRAMES:
-			var weapon_intent := str(owner_ship.get_meta(ShipAILimboKeys.META_WEAPON_INTENT, "")).strip_edges()
-			if weapon_intent == ShipAILimboKeys.WEAPON_HOLD_FIRE:
-				return false
+		if ShipAIIntentHelper.should_hold_weapon_fire(owner_ship):
+			return false
 	return owner_ship.get("deck_is_overrun") != true
 
 

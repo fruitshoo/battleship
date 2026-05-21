@@ -1,4 +1,5 @@
 extends RefCounted
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 const SUPPORT_SHIP_SCENE = preload("res://scenes/ships/support_ship.tscn")
 const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
@@ -13,8 +14,8 @@ const SUPPORT_JOIN_STAGE_META := "support_join_stage"
 const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 const SITE_BONUS_COUNTS_META := "sea_site_bonus_counts"
 
-static func spawn_or_repair_ally(ship) -> void:
-	if not ShipAllyRoleHelper.is_player_flagship(ship):
+static func spawn_or_repair_support_ship(ship) -> void:
+	if not PlayerFleetRoleHelper.is_player_flagship(ship):
 		return
 	SupportFleetStateHelper.initialize_flagship_state(ship)
 	var support_ships: Array = get_support_fleet_ships(ship)
@@ -60,39 +61,42 @@ static func spawn_or_repair_ally(ship) -> void:
 		support_scene = SUPPORT_SHIP_SCENE
 	if not support_scene:
 		return
-	var ally = support_scene.instantiate()
-	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(ally, support_profile)
+	var support_ship = support_scene.instantiate()
+	PlayerShipSupportSquadronHelper.apply_support_fleet_profile(support_ship, support_profile)
 	var next_support_order: int = int(ship.get_meta(SUPPORT_FLEET_NEXT_ORDER_META, 0))
-	_configure_support_ship_instance(ally, ship, support_profile, support_slot, next_support_order, true)
-	_copy_site_bonuses_from_flagship(ship, ally)
+	_configure_support_ship_instance(support_ship, ship, support_profile, support_slot, next_support_order, true)
+	_copy_site_bonuses_from_flagship(ship, support_ship)
 
-	ship.get_parent().add_child(ally)
+	ship.get_parent().add_child(support_ship)
 
 	var forward: Vector3 = -ship.global_transform.basis.z
-	var spawn_pos: Vector3 = get_offscreen_ally_spawn_position(ship)
-	ally.global_position = spawn_pos
-	ally.look_at(ship.global_position + forward * 50.0, Vector3.UP)
+	var spawn_pos: Vector3 = get_offscreen_support_spawn_position(ship)
+	support_ship.global_position = spawn_pos
+	support_ship.look_at(ship.global_position + forward * 50.0, Vector3.UP)
 	ship.set_meta(SUPPORT_FLEET_NEXT_ORDER_META, next_support_order + 1)
 
 	if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
-		ship._cached_audio_manager.play_sfx("support_foghorn", ally.global_position)
+		ship._cached_audio_manager.play_sfx("support_foghorn", support_ship.global_position)
 
-	if ally.has_method("set_team"):
-		ally.set_team("player")
-	if ally.has_method("add_to_group"):
-		ally.add_to_group("captured_minion")
-	EntityRegistry.register_captured_minion(ally)
-	if "target" in ally:
-		ally.target = ship
-	if ally.has_method("_find_player"):
-		ally._find_player()
-	if "current_speed" in ally:
-		ally.current_speed = maxf(float(ship.get("current_speed")), float(ally.get("move_speed")) * 0.6)
-	if "_last_ai_speed" in ally:
-		ally._last_ai_speed = ally.current_speed
+	if support_ship.has_method("set_team"):
+		support_ship.set_team("player")
+	if support_ship.has_method("add_to_group"):
+		support_ship.add_to_group("support_ship")
+		if support_ship.is_in_group("captured_minion"):
+			support_ship.remove_from_group("captured_minion")
+	EntityRegistry.register_support_ship(support_ship)
+	EntityRegistry.unregister_legacy_captured_ship(support_ship)
+	if "target" in support_ship:
+		support_ship.target = ship
+	if support_ship.has_method("_find_player"):
+		support_ship._find_player()
+	if "current_speed" in support_ship:
+		support_ship.current_speed = maxf(float(ship.get("current_speed")), float(support_ship.get("move_speed")) * 0.6)
+	if "_last_ai_speed" in support_ship:
+		support_ship._last_ai_speed = support_ship.current_speed
 	var new_support_upgrade_manager = _get_upgrade_manager(ship)
 	if is_instance_valid(new_support_upgrade_manager) and new_support_upgrade_manager.has_method("apply_fleet_upgrades_to_ship"):
-		new_support_upgrade_manager.apply_fleet_upgrades_to_ship(ally)
+		new_support_upgrade_manager.apply_fleet_upgrades_to_ship(support_ship)
 
 	print("[Summon] 정규군 함선을 소환했습니다! profile=%s squadron=%s slot=%s" % [
 		str(support_profile.get("id", "unknown")),
@@ -112,7 +116,7 @@ static func resolve_support_fleet_profile(ship, support_slot: int = 0) -> Dictio
 	return PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels(current_levels, upgrades, support_slot)
 
 static func refresh_support_fleet_composition(ship) -> void:
-	if not ShipAllyRoleHelper.is_player_flagship(ship):
+	if not PlayerFleetRoleHelper.is_player_flagship(ship):
 		return
 	SupportFleetStateHelper.initialize_flagship_state(ship)
 	var support_ships: Array = get_support_fleet_ships(ship)
@@ -184,34 +188,34 @@ static func _copy_site_bonuses_from_flagship(flagship, support_ship) -> void:
 static func _get_support_repair_fraction(_ship) -> float:
 	return 0.2
 
-static func _configure_support_ship_instance(ally, flagship, support_profile: Dictionary, support_slot: int, support_order: int, joining_support: bool) -> void:
-	if not is_instance_valid(ally):
+static func _configure_support_ship_instance(support_ship, flagship, support_profile: Dictionary, support_slot: int, support_order: int, joining_support: bool) -> void:
+	if not is_instance_valid(support_ship):
 		return
-	if ally.has_method("set_team"):
-		ally.set_team("player")
+	if support_ship.has_method("set_team"):
+		support_ship.set_team("player")
 	else:
-		ally.team = "player"
-	ally.set_meta("support_joining", joining_support)
+		support_ship.team = "player"
+	support_ship.set_meta("support_joining", joining_support)
 	if joining_support:
-		ally.set_meta(SUPPORT_JOIN_STAGE_META, 0)
-		ally.set_meta("defer_initial_crew_setup", true)
-	elif ally.has_meta("defer_initial_crew_setup"):
-		ally.remove_meta("defer_initial_crew_setup")
-		if ally.has_meta(SUPPORT_JOIN_STAGE_META):
-			ally.remove_meta(SUPPORT_JOIN_STAGE_META)
-	ShipAllyRoleHelper.mark_support_ship(ally)
-	SupportFleetStateHelper.assign_support_ship_to_flagship(ally, flagship)
-	_apply_support_profile_meta(ally, support_profile, support_slot, support_order)
+		support_ship.set_meta(SUPPORT_JOIN_STAGE_META, 0)
+		support_ship.set_meta("defer_initial_crew_setup", true)
+	elif support_ship.has_meta("defer_initial_crew_setup"):
+		support_ship.remove_meta("defer_initial_crew_setup")
+		if support_ship.has_meta(SUPPORT_JOIN_STAGE_META):
+			support_ship.remove_meta(SUPPORT_JOIN_STAGE_META)
+	PlayerFleetRoleHelper.mark_support_ship(support_ship)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(support_ship, flagship)
+	_apply_support_profile_meta(support_ship, support_profile, support_slot, support_order)
 
-static func _apply_support_profile_meta(ally, support_profile: Dictionary, support_slot: int, support_order: int) -> void:
-	if not is_instance_valid(ally):
+static func _apply_support_profile_meta(support_ship, support_profile: Dictionary, support_slot: int, support_order: int) -> void:
+	if not is_instance_valid(support_ship):
 		return
-	ally.set_meta(SUPPORT_FLEET_SLOT_INDEX_META, support_slot)
-	ally.set_meta(SUPPORT_FLEET_PROFILE_META, PlayerShipSupportSquadronHelper.get_profile_id(support_profile))
-	ally.set_meta(SUPPORT_FLEET_ROLE_META, str(support_profile.get("role", "")))
-	ally.set_meta(SUPPORT_FLEET_SQUADRON_META, str(support_profile.get("squadron_id", "")))
-	ally.set_meta(SUPPORT_FLEET_SLOT_ROLE_META, str(support_profile.get("slot_role", "")))
-	ally.set_meta(SUPPORT_FLEET_ORDER_META, support_order)
+	support_ship.set_meta(SUPPORT_FLEET_SLOT_INDEX_META, support_slot)
+	support_ship.set_meta(SUPPORT_FLEET_PROFILE_META, PlayerShipSupportSquadronHelper.get_profile_id(support_profile))
+	support_ship.set_meta(SUPPORT_FLEET_ROLE_META, str(support_profile.get("role", "")))
+	support_ship.set_meta(SUPPORT_FLEET_SQUADRON_META, str(support_profile.get("squadron_id", "")))
+	support_ship.set_meta(SUPPORT_FLEET_SLOT_ROLE_META, str(support_profile.get("slot_role", "")))
+	support_ship.set_meta(SUPPORT_FLEET_ORDER_META, support_order)
 
 static func _build_runtime_slot_assignments(ship, support_ships: Array) -> Dictionary:
 	var assignments: Dictionary = {}
@@ -240,13 +244,13 @@ static func _build_runtime_slot_assignments(ship, support_ships: Array) -> Dicti
 
 	return assignments
 
-static func _get_runtime_support_profile_id(ally) -> String:
-	if not is_instance_valid(ally):
+static func _get_runtime_support_profile_id(support_ship) -> String:
+	if not is_instance_valid(support_ship):
 		return PlayerShipSupportSquadronHelper.PROFILE_MAENGSEON_SCREEN
-	var profile_id := str(ally.get_meta(SUPPORT_FLEET_PROFILE_META, "")).strip_edges()
+	var profile_id := str(support_ship.get_meta(SUPPORT_FLEET_PROFILE_META, "")).strip_edges()
 	if not profile_id.is_empty():
 		return profile_id
-	return PlayerShipSupportSquadronHelper.PROFILE_PANOKSEON_ESCORT if str(ally.get("ship_type")) == "panokseon_ally" else PlayerShipSupportSquadronHelper.PROFILE_MAENGSEON_SCREEN
+	return PlayerShipSupportSquadronHelper.PROFILE_PANOKSEON_ESCORT if str(support_ship.get("ship_type")) == "panokseon_ally" else PlayerShipSupportSquadronHelper.PROFILE_MAENGSEON_SCREEN
 
 static func _find_matching_unoccupied_slot(ship, profile_id: String, preferred_slot: int, occupied_slots: Dictionary, slot_count: int) -> int:
 	if preferred_slot >= 0 and not occupied_slots.has(preferred_slot):
@@ -272,16 +276,17 @@ static func _find_first_unoccupied_slot(preferred_slot: int, occupied_slots: Dic
 static func get_support_fleet_ships(ship) -> Array:
 	SupportFleetStateHelper.initialize_flagship_state(ship)
 	var support_ships: Array = []
-	for minion in EntityRegistry.get_ships_by_team("player"):
-		if not is_instance_valid(minion):
+	for support_ship in EntityRegistry.get_support_ships():
+		if not is_instance_valid(support_ship):
 			continue
-		if not ShipAllyRoleHelper.is_support_ship(minion):
+		if not PlayerFleetRoleHelper.is_support_ship(support_ship):
 			continue
-		if minion.has_method("is_combat_disabled") and minion.is_combat_disabled():
+		var retreating: bool = support_ship.has_method("is_support_retreating") and support_ship.call("is_support_retreating") == true
+		if not retreating and support_ship.has_method("is_combat_disabled") and support_ship.is_combat_disabled():
 			continue
-		if not SupportFleetStateHelper.is_support_owned_by_flagship(minion, ship):
+		if not SupportFleetStateHelper.is_support_owned_by_flagship(support_ship, ship):
 			continue
-		support_ships.append(minion)
+		support_ships.append(support_ship)
 	support_ships.sort_custom(func(a, b):
 		var order_a: int = int(a.get_meta(SUPPORT_FLEET_ORDER_META, a.get_instance_id()))
 		var order_b: int = int(b.get_meta(SUPPORT_FLEET_ORDER_META, b.get_instance_id()))
@@ -293,7 +298,7 @@ static func get_support_fleet_ships(ship) -> Array:
 	)
 	return support_ships
 
-static func get_offscreen_ally_spawn_position(ship) -> Vector3:
+static func get_offscreen_support_spawn_position(ship) -> Vector3:
 	var forward_dir: Vector3 = -ship.global_transform.basis.z
 	forward_dir.y = 0.0
 	if forward_dir.length_squared() <= 0.0001:
@@ -342,7 +347,7 @@ static func update_support_fleet_respawn(ship, delta: float) -> void:
 	ship.support_fleet_respawn_timer += delta
 	if ship.support_fleet_respawn_timer >= ship.support_fleet_respawn_interval:
 		ship.support_fleet_respawn_timer = 0.0
-		spawn_or_repair_ally(ship)
+		spawn_or_repair_support_ship(ship)
 
 static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, world_pos: Vector3) -> bool:
 	if cam.is_position_behind(world_pos):

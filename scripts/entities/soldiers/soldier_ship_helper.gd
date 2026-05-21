@@ -8,6 +8,8 @@ const CROSS_SHIP_MUSTER_CACHE_TARGET_ID_META := "cross_ship_muster_cache_target_
 const CROSS_SHIP_MUSTER_CACHE_LOCAL_META := "cross_ship_muster_cache_local"
 const CROSS_SHIP_MUSTER_CACHE_EXPIRES_AT_META := "cross_ship_muster_cache_expires_at_msec"
 const CROSS_SHIP_MUSTER_CACHE_TTL_MSEC := 420
+const CROSS_SHIP_CONTACT_EDGE_INSET := 0.32
+const DECK_BOUNDS_EDGE_INSET := 0.24
 
 
 static func find_nearest_enemy(soldier) -> Node3D:
@@ -229,12 +231,14 @@ static func get_cross_ship_contact_point_local(soldier, other_ship: Node3D) -> V
 
 	if use_side_edge:
 		var x_sign: float = 1.0 if other_local.x >= 0.0 else -1.0
-		contact_local.x = x_sign * half_ext.x
+		var safe_half_x: float = maxf(0.08, half_ext.x - minf(CROSS_SHIP_CONTACT_EDGE_INSET, maxf(0.0, half_ext.x - 0.08)))
+		contact_local.x = x_sign * safe_half_x
 		contact_local.z = clampf(other_local.z, -half_ext.y * contact_span_ratio, half_ext.y * contact_span_ratio)
 	else:
 		var z_sign: float = 1.0 if other_local.z >= 0.0 else -1.0
 		contact_local.x = clampf(other_local.x, -half_ext.x * contact_span_ratio, half_ext.x * contact_span_ratio)
-		contact_local.z = z_sign * half_ext.y
+		var safe_half_z: float = maxf(0.08, half_ext.y - minf(CROSS_SHIP_CONTACT_EDGE_INSET, maxf(0.0, half_ext.y - 0.08)))
+		contact_local.z = z_sign * safe_half_z
 
 	return contact_local
 
@@ -408,12 +412,14 @@ static func get_clamped_ship_deck_local(soldier, ship: Node3D, local_position: V
 		return ship.call("clamp_roof_boarding_landing_local", local_position)
 	var d_height: float = ship.get("deck_height") if "deck_height" in ship else 0.4
 	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, ship)
-	var clamped_z := clampf(local_position.z, -half_ext.y, half_ext.y)
+	var safe_half_z := maxf(0.08, half_ext.y - minf(DECK_BOUNDS_EDGE_INSET, maxf(0.0, half_ext.y - 0.08)))
+	var clamped_z := clampf(local_position.z, -safe_half_z, safe_half_z)
 	var half_width := half_ext.x
 	if ship.has_method("get_deck_half_width_at_z"):
 		half_width = maxf(0.08, float(ship.call("get_deck_half_width_at_z", clamped_z)))
+	var safe_half_width := maxf(0.08, half_width - minf(DECK_BOUNDS_EDGE_INSET, maxf(0.0, half_width - 0.08)))
 	return Vector3(
-		clampf(local_position.x, -half_width, half_width),
+		clampf(local_position.x, -safe_half_width, safe_half_width),
 		d_height,
 		clamped_z
 	)

@@ -324,11 +324,11 @@ func _raise_upgrade_level(upgrade_manager: Node, upgrade_id: String, target_leve
 func _spawn_support_probe_fleet(player: Node3D) -> void:
 	if support_probe_support_limit <= 0:
 		return
-	if not player.has_method("_spawn_or_repair_ally"):
+	if not player.has_method("_spawn_or_repair_support_ship"):
 		return
 	var guard := 0
 	while _get_support_probe_support_ships().size() < support_probe_support_limit and guard < support_probe_support_limit + 2:
-		player.call("_spawn_or_repair_ally")
+		player.call("_spawn_or_repair_support_ship")
 		guard += 1
 	_configure_support_probe_supports(player)
 

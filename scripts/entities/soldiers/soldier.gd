@@ -1,4 +1,5 @@
 extends CharacterBody3D
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 const SoldierWeaponHelper = preload("res://scripts/entities/soldiers/soldier_weapon_helper.gd")
 const SoldierAiHelper = preload("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
@@ -1997,13 +1998,13 @@ func _finish_cannon_reload_pose() -> void:
 func _check_ranged_combat() -> void:
 	SoldierCombatHelper.check_ranged_combat(self)
 
-func _is_support_or_captured_ship_crew() -> bool:
+func _is_player_fleet_ai_ship_crew() -> bool:
 	if not is_instance_valid(owned_ship):
 		return false
-	return ShipAllyRoleHelper.is_support_ship(owned_ship) or ShipAllyRoleHelper.is_captured_minion(owned_ship)
+	return PlayerFleetRoleHelper.is_support_ship(owned_ship) or PlayerFleetRoleHelper.is_legacy_captured_ship(owned_ship)
 
 func _is_passive_ally_ship_crew() -> bool:
-	if not _is_support_or_captured_ship_crew():
+	if not _is_player_fleet_ai_ship_crew():
 		return false
 	if _is_jumping:
 		return false
@@ -2027,7 +2028,7 @@ func _is_passive_ally_ship_crew() -> bool:
 func _allow_cross_ship_enemy_scan() -> bool:
 	if not is_instance_valid(owned_ship):
 		return true
-	if ShipAllyRoleHelper.is_player_flagship(owned_ship):
+	if PlayerFleetRoleHelper.is_player_flagship(owned_ship):
 		return true
 	var scan_data := SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(self)
 	var distress_ships: Array = scan_data.get("nearby_ally_distress_ships", [])

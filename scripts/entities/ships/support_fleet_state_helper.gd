@@ -1,7 +1,7 @@
 extends RefCounted
 class_name SupportFleetStateHelper
 
-const ShipAllyRoleHelper = preload("res://scripts/entities/ships/ship_ally_role_helper.gd")
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 const SUPPORT_FLEET_OWNER_ID_META := "support_fleet_owner_id"
 const SUPPORT_FLEET_FORMATION_META := "support_fleet_formation"
@@ -89,7 +89,7 @@ static func is_support_owned_by_flagship(support_ship, flagship) -> bool:
 static func get_effective_formation(ship) -> int:
 	if not is_instance_valid(ship):
 		return FORMATION_COLUMN
-	if ship.has_meta(SUPPORT_FLEET_FORMATION_META) and not ShipAllyRoleHelper.is_player_flagship(ship):
+	if ship.has_meta(SUPPORT_FLEET_FORMATION_META) and not PlayerFleetRoleHelper.is_player_flagship(ship):
 		return normalize_formation_value(int(ship.get_meta(SUPPORT_FLEET_FORMATION_META, FORMATION_COLUMN)))
 	var owner_ship := get_support_owner_flagship(ship)
 	if is_instance_valid(owner_ship):
@@ -100,7 +100,7 @@ static func get_effective_formation(ship) -> int:
 static func is_effective_hold_enabled(ship) -> bool:
 	if not is_instance_valid(ship):
 		return false
-	if ship.has_meta(SUPPORT_HOLD_FORMATION_META) and not ShipAllyRoleHelper.is_player_flagship(ship):
+	if ship.has_meta(SUPPORT_HOLD_FORMATION_META) and not PlayerFleetRoleHelper.is_player_flagship(ship):
 		return ship.get_meta(SUPPORT_HOLD_FORMATION_META, true) == true
 	var owner_ship := get_support_owner_flagship(ship)
 	if is_instance_valid(owner_ship):

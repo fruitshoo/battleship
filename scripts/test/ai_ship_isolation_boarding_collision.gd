@@ -1,5 +1,8 @@
 @tool
-extends "res://scripts/test/chaser_isolation_runtime_methods.gd"
+extends "res://scripts/test/ai_ship_isolation_runtime_methods.gd"
+
+const AIShipRuntimeHelper = preload("res://scripts/entities/ships/ai_ship_runtime_helper.gd")
+const AIShipBoardingHelper = preload("res://scripts/entities/ships/ai_ship_boarding_helper.gd")
 
 var has_rammed: bool = false
 var leaking_rate: float = 0.0
@@ -32,27 +35,27 @@ func _has_recent_boarding_impact(target_ship: Node3D) -> bool:
 
 
 func _process_boarding(delta: float) -> void:
-	ChaserShipBoardingHelper.process_boarding(self, delta)
+	AIShipBoardingHelper.process_boarding(self, delta)
 
 
 func _apply_neighbor_ship_guards(prev_pos: Vector3, proposed_pos: Vector3, excluded_ship: Node3D = null) -> Vector3:
-	return ChaserShipBoardingHelper.apply_neighbor_ship_guards(self, prev_pos, proposed_pos, excluded_ship)
+	return AIShipBoardingHelper.apply_neighbor_ship_guards(self, prev_pos, proposed_pos, excluded_ship)
 
 
 func _apply_ship_collision_guard(other_ship: Node3D, prev_pos: Vector3, proposed_pos: Vector3, safe_ratio: float = 0.94, impact_speed_hint: float = 0.0, emit_collision_event: bool = true) -> Vector3:
-	return ChaserShipBoardingHelper.apply_ship_collision_guard(self, other_ship, prev_pos, proposed_pos, safe_ratio, impact_speed_hint, emit_collision_event)
+	return AIShipBoardingHelper.apply_ship_collision_guard(self, other_ship, prev_pos, proposed_pos, safe_ratio, impact_speed_hint, emit_collision_event)
 
 
 func _emit_guarded_collision(other_ship: Node3D, impact_speed_hint: float) -> void:
-	ChaserShipBoardingHelper.emit_guarded_collision(self, other_ship, impact_speed_hint)
+	AIShipBoardingHelper.emit_guarded_collision(self, other_ship, impact_speed_hint)
 
 
 func _soften_collision_speed() -> void:
-	ChaserShipBoardingHelper.soften_collision_speed(self)
+	AIShipBoardingHelper.soften_collision_speed(self)
 
 
 func _find_player() -> void:
-	ChaserShipAiHelper.find_player(self)
+	AIShipRuntimeHelper.find_player(self)
 
 
 func _on_body_entered(body: Node3D) -> void:

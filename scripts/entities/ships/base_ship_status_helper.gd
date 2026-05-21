@@ -1,6 +1,8 @@
 extends RefCounted
 class_name BaseShipStatusHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fire_crackling.ogg")
 const FIRE_EFFECT_RANDOM_OFFSET_META := "fire_effect_random_offset"
 const FIRE_EFFECT_RANDOM_SCALE_META := "fire_effect_random_scale"
@@ -128,7 +130,7 @@ static func check_derelict_status(ship) -> void:
 				break
 
 	if all_crew_dead and ship.has_method("_become_derelict"):
-		if ShipAllyRoleHelper.is_support_ship(ship):
+		if PlayerFleetRoleHelper.is_support_ship(ship):
 			return
 		ship.call("_become_derelict")
 

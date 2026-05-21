@@ -2,6 +2,7 @@
 extends BTAction
 class_name BTShipSetPressurePhase
 
+const ShipAIPerceptionHelper = preload("res://scripts/ai/limbo/ship_ai_perception_helper.gd")
 
 @export var phase_var: StringName = ShipAILimboKeys.VAR_PRESSURE_PHASE
 @export var pressure_var: StringName = ShipAILimboKeys.VAR_PRESSURE
@@ -19,7 +20,7 @@ func _tick(_delta: float) -> Status:
 	if not is_instance_valid(agent):
 		return FAILURE
 
-	var hull_ratio := _get_hull_ratio(agent)
+	var hull_ratio := ShipAIPerceptionHelper.get_hull_ratio(agent)
 	var phase := ShipAILimboKeys.PHASE_STABLE
 	var pressure := 0.0
 	if hull_ratio <= desperate_ratio:
@@ -35,18 +36,3 @@ func _tick(_delta: float) -> Status:
 	agent.set_meta(ShipAILimboKeys.META_PRESSURE_PHASE, phase)
 	agent.set_meta(ShipAILimboKeys.META_PRESSURE, pressure)
 	return SUCCESS
-
-
-func _get_hull_ratio(ship: Node) -> float:
-	if ship.has_method("get_hull_ratio"):
-		return clampf(float(ship.call("get_hull_ratio")), 0.0, 1.0)
-
-	var max_hull := 0.0
-	var hull := 0.0
-	if ship.get("max_hull_hp") != null:
-		max_hull = float(ship.get("max_hull_hp"))
-	if ship.get("hull_hp") != null:
-		hull = float(ship.get("hull_hp"))
-	if max_hull <= 0.0:
-		return 1.0
-	return clampf(hull / max_hull, 0.0, 1.0)

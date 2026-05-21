@@ -1,6 +1,8 @@
 extends RefCounted
 class_name NodeContractHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 const SHIP_NODE_SOLDIERS := "Soldiers"
 const SHIP_NODE_PROXIMITY_AREA := "ProximityArea"
 const SHIP_NODE_HIT_AREA := "HitArea"
@@ -309,4 +311,4 @@ static func get_collision_length_multiplier_value(node: Node) -> float:
 
 
 static func is_player_controlled_ship(node: Node) -> bool:
-	return ShipAllyRoleHelper.is_player_flagship(node)
+	return PlayerFleetRoleHelper.is_player_flagship(node)

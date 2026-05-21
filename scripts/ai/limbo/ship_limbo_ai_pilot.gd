@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShipLimboAIPilot
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 
 const DEFAULT_TREE_PATH := "res://resources/ai/limbo/ship_ai_pilot_skeleton.tres"
 const ENEMY_GUNNER_TREE_PATH := "res://resources/ai/limbo/enemy_gunner_ai_pilot.tres"
@@ -9,6 +11,7 @@ const ENEMY_FIREPOT_TREE_PATH := "res://resources/ai/limbo/enemy_firepot_ai_pilo
 const BOSS_TREE_PATH := "res://resources/ai/limbo/boss_ship_ai_pilot.tres"
 const SUPPORT_TREE_PATH := "res://resources/ai/limbo/support_ship_ai_pilot.tres"
 const CAPTURED_MINION_TREE_PATH := "res://resources/ai/limbo/captured_minion_ai_pilot.tres"
+const LEGACY_CAPTURE_TREE_PATH := CAPTURED_MINION_TREE_PATH
 const PLAYER_NODE_NAME := "LimboAIPilotPlayer"
 const META_LAST_STATUS := "limbo_ai_last_status"
 const META_LAST_ERROR := "limbo_ai_last_error"
@@ -50,10 +53,10 @@ static func resolve_tree_path(ship: Node, behavior_tree_path: String = DEFAULT_T
 
 	var team_tag := _get_team_tag(ship)
 	if team_tag == "player":
-		if ShipAllyRoleHelper.is_support_ship(ship):
+		if PlayerFleetRoleHelper.is_support_ship(ship):
 			return SUPPORT_TREE_PATH
-		if ShipAllyRoleHelper.is_captured_minion(ship):
-			return CAPTURED_MINION_TREE_PATH
+		if PlayerFleetRoleHelper.is_legacy_captured_ship(ship):
+			return LEGACY_CAPTURE_TREE_PATH
 	elif team_tag == "enemy" and ship.has_method("is_gunner_role"):
 		return ENEMY_GUNNER_TREE_PATH if ship.call("is_gunner_role") == true else ENEMY_BOARDER_TREE_PATH
 	return requested_path
