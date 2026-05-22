@@ -141,9 +141,8 @@ func _spawn_effects(_is_crit: bool, impact_position: Vector3, hit_ship: Node3D =
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if not is_instance_valid(audio_manager): return
 	
-	# 나무 부서지는 소리 재생
 	if audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("impact_wood", impact_position, randf_range(0.9, 1.1))
+		audio_manager.play_sfx("cannon_hit", impact_position, randf_range(0.94, 1.06))
 
 	# 타격 연기는 별도 budget을 사용해야 동시에 보여도 막히지 않는다.
 	if impact_smoke_scene:

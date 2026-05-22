@@ -293,7 +293,7 @@ static func _run_ramming_boost_refund_contract(failures: Array[String]) -> void:
 	player.max_speed = 9.0
 	player.min_ramming_speed = 6.0
 	player.ramming_boost_duration = 0.2
-	player.ramming_boost_recharge_duration = 18.0
+	player.ramming_boost_recharge_duration = 12.0
 	player.ramming_boost_charge = 1.0
 
 	if not player.try_activate_ramming_boost():

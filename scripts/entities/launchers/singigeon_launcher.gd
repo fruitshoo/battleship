@@ -188,7 +188,7 @@ func fire(target: Node3D, cooldown_override: float = -1.0) -> void:
 		# 발사 사운드
 		var audio_manager = get_node_or_null("/root/AudioManager")
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx("rocket_launch", global_position)
+			audio_manager.play_sfx("singigeon_launch", global_position)
 		
 		# 연사 간격
 		await get_tree().create_timer(burst_interval).timeout

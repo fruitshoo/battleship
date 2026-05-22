@@ -2,7 +2,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
-const BASE_SOLDIER_DAMAGE: float = 18.0
+const BASE_SOLDIER_DAMAGE: float = 12.0
 const BASE_HULL_DAMAGE: float = 8.0
 const NODE_MUZZLE := "Muzzle"
 
@@ -13,6 +13,11 @@ const NODE_MUZZLE := "Muzzle"
 @export var projectile_speed: float = 36.0
 @export_range(0.05, 0.6, 0.01) var muzzle_smoke_scale: float = 0.18
 @export var fire_sfx: String = "musket_fire"
+@export var ballistic_trace_enabled: bool = true
+@export_range(1.0, 18.0, 0.5) var ballistic_trace_max_length: float = 7.5
+@export_range(0.01, 0.16, 0.005) var ballistic_trace_width: float = 0.035
+@export_range(0.03, 0.18, 0.01) var ballistic_trace_lifetime: float = 0.08
+@export var ballistic_trace_color: Color = Color(1.0, 0.78, 0.36, 0.68)
 
 var _owner_damage_bonus_pct: float = 0.0
 var _cached_spawn_parent: Node = null
@@ -60,6 +65,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	target_pos += (local_velocity + ship_velocity) * travel_time * 0.65
 	target_pos.x += randf_range(-0.18, 0.18)
 	target_pos.z += randf_range(-0.18, 0.18)
+	_spawn_ballistic_trace(attacker, spawn_pos, target_pos)
 	_spawn_muzzle_effect(attacker, spawn_pos, target_pos)
 	_play_fire_sfx(attacker, spawn_pos)
 
@@ -113,6 +119,83 @@ func _spawn_muzzle_effect(attacker: Node3D, spawn_pos: Vector3, target_pos: Vect
 		smoke.pool_activate()
 	else:
 		_activate_plain_muzzle_smoke(smoke, tree)
+
+
+func _spawn_ballistic_trace(attacker: Node3D, spawn_pos: Vector3, target_pos: Vector3) -> void:
+	if not ballistic_trace_enabled or not is_instance_valid(attacker):
+		return
+	var tree := attacker.get_tree()
+	if not is_instance_valid(tree):
+		return
+	if not spawn_pos.is_finite() or not target_pos.is_finite():
+		return
+	var trace_vector := target_pos - spawn_pos
+	var distance := trace_vector.length()
+	if distance <= 0.1:
+		return
+	if not VfxBudget.allow_spawn(tree, "daecheolpo_trace", spawn_pos, 10, 90.0):
+		return
+
+	var direction := trace_vector / distance
+	var start := spawn_pos + direction * 0.22
+	var length := minf(distance, ballistic_trace_max_length) * randf_range(0.82, 1.08)
+	var end := start + direction * length
+	var center := start.lerp(end, 0.5)
+
+	var mesh := BoxMesh.new()
+	var width := ballistic_trace_width * randf_range(0.78, 1.18)
+	mesh.size = Vector3(width, width, maxf(0.1, length))
+
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.no_depth_test = false
+	material.albedo_color = _jitter_trace_color(ballistic_trace_color)
+	material.emission_enabled = true
+	material.emission = Color(material.albedo_color.r, material.albedo_color.g, material.albedo_color.b, 1.0)
+	material.emission_energy_multiplier = 0.65
+	material.render_priority = 18
+
+	var trace := MeshInstance3D.new()
+	trace.name = "DaecheolpoTrace"
+	trace.mesh = mesh
+	trace.material_override = material
+	trace.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	trace.extra_cull_margin = 0.5
+
+	var parent := _resolve_spawn_parent(tree)
+	parent.add_child(trace)
+	trace.global_transform = Transform3D(_trace_basis(direction), center)
+
+	var fade_color := material.albedo_color
+	fade_color.a = 0.0
+	var tween := trace.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(material, "albedo_color", fade_color, ballistic_trace_lifetime)
+	tween.tween_property(trace, "scale", Vector3(0.2, 0.2, 1.0), ballistic_trace_lifetime)
+	tween.set_parallel(false)
+	tween.tween_callback(trace.queue_free)
+
+
+func _trace_basis(direction: Vector3) -> Basis:
+	var dir := direction.normalized()
+	if dir.is_zero_approx():
+		dir = Vector3.FORWARD
+	var up := Vector3.UP
+	if absf(dir.dot(up)) > 0.96:
+		up = Vector3.RIGHT
+	return Basis.looking_at(dir, up)
+
+
+func _jitter_trace_color(base_color: Color) -> Color:
+	return Color(
+		clampf(base_color.r * randf_range(0.92, 1.12), 0.0, 1.4),
+		clampf(base_color.g * randf_range(0.88, 1.08), 0.0, 1.4),
+		clampf(base_color.b * randf_range(0.78, 1.06), 0.0, 1.2),
+		clampf(base_color.a * randf_range(0.78, 1.0), 0.0, 1.0)
+	)
 
 
 func _play_fire_sfx(attacker: Node3D, spawn_pos: Vector3) -> void:

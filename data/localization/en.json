@@ -132,7 +132,7 @@
 	"upgrade.supply_bonus.name": "Supply",
 	"upgrade.supply_bonus.description": "Increases pickup range for floating loot, survivors, and drifting enemy soldiers",
 	"upgrade.geobukseon.name": "Geobukseon",
-	"upgrade.geobukseon.description": "Converts the flagship into a boarding-proof geobukseon, restores hull to at least 50%, adds 2 forward cannons, 4 side cannons, and +100% ramming damage",
+	"upgrade.geobukseon.description": "Converts the flagship into a boarding-proof geobukseon, restores hull to at least 50%, adds 2 forward cannons, 4 side cannons, +100% ramming damage, and +33% ram boost recharge",
 	"upgrade.supply.name": "Recovery",
 	"upgrade.supply.description": "Instantly restores hull",
 	"upgrade.gold.name": "Points",

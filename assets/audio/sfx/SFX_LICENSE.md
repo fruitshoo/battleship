@@ -23,6 +23,11 @@
 | sfx_boss_medieval_horn_cc0.ogg |CC0|https://freesound.org/people/klavo1985/sounds/402753/|
 | sfx_cannon_fire.ogg |CC0|https://freesound.org/people/SamsterBirdies/sounds/581599/|
 | sfx_cannon_fire_02.ogg |CC0|https://freesound.org/people/gerainsan/sounds/457044/|
+| sfx_cannon_fire_blast_03.ogg |UNVERIFIED|https://freesound.org/people/modusmogulus/sounds/737321/|
+| sfx_cannon_hit_01.ogg |CC0|https://freesound.org/people/Nox_Sound/sounds/560510/|
+| sfx_cannon_hit_02.ogg |CC0|https://freesound.org/people/Nox_Sound/sounds/560510/|
+| sfx_cannon_hit_03.ogg |CC0|https://freesound.org/people/Nox_Sound/sounds/560510/|
+| sfx_crit_flesh_soft_impact.ogg |UNVERIFIED|https://freesound.org/people/daswaff/sounds/743678/|
 | sfx_explosion_impact.ogg |Attribution 4.0|https://freesound.org/people/Artninja/sounds/750822/|
 | sfx_epic_drum_cc0.ogg |CC0|https://freesound.org/s/328009/|
 | sfx_fire_crackling.ogg |CC0|https://freesound.org/people/StevenMyat_/sounds/676385/|
@@ -47,6 +52,9 @@
 | sfx_rocket_launch_01.ogg |CC0|https://freesound.org/people/LukaCafuka/sounds/750685/|
 | sfx_rocket_launch_02.ogg |CC0|https://freesound.org/people/LukaCafuka/sounds/750684/|
 | sfx_rocket_launch_03.ogg |CC0|https://freesound.org/people/ReadeOnly/sounds/186933/|
+| sfx_rocket_launch_whoosh_01.ogg |UNVERIFIED|https://freesound.org/people/selector/sounds/250200/|
+| sfx_rocket_launch_whoosh_02.ogg |UNVERIFIED|https://freesound.org/people/selector/sounds/250200/|
+| sfx_rocket_launch_whoosh_03.ogg |UNVERIFIED|https://freesound.org/people/selector/sounds/250200/|
 | sfx_sail_canvas_01.ogg |CC0|https://freesound.org/s/711122/|
 | sfx_sail_canvas_02.ogg |CC0|https://freesound.org/s/711122/|
 | sfx_sail_canvas_03.ogg |CC0|https://freesound.org/s/711122/|
@@ -56,6 +64,7 @@
 | sfx_sail_canvas_07.ogg |CC0|https://freesound.org/s/711122/|
 | sfx_sail_canvas_08.ogg |CC0|https://freesound.org/s/711122/|
 | sfx_ship_sink_bubbles_cc0.ogg |CC0|https://freesound.org/people/pillwave/sounds/423959/|
+| sfx_ship_collision_smash.ogg |CC0|https://freesound.org/people/egomassive/sounds/536777/|
 | sfx_soldier_die_1.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_soldier_die_2.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|
 | sfx_soldier_die_3.ogg |CC0|https://freesound.org/people/rockittt/sounds/442288/|

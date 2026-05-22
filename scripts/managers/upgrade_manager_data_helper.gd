@@ -20,7 +20,11 @@ static func format_ramming_stat_text(stats: Dictionary, fallback_damage_mult: fl
 	var knockback_mult := float(stats.get("ramming_knockback_multiplier", fallback_knockback_mult))
 	var damage_pct := int(round((damage_mult - 1.0) * 100.0))
 	var knockback_pct := int(round(knockback_mult * 100.0))
-	return "충각 피해 +%d%% | 밀어냄 강도 %d%%" % [damage_pct, knockback_pct]
+	var parts: Array[String] = ["충각 피해 +%d%%" % damage_pct, "밀어냄 강도 %d%%" % knockback_pct]
+	if stats.has("ram_boost_recharge_mult"):
+		var recharge_bonus := int(round((1.0 / maxf(0.01, float(stats.get("ram_boost_recharge_mult", 1.0))) - 1.0) * 100.0))
+		parts.append("충각 회복 +%d%%" % recharge_bonus)
+	return " | ".join(parts)
 
 static func get_specialist_unit_count(upgrades: Dictionary, current_levels: Dictionary, upgrade_id: String, level: int = -1) -> int:
 	if upgrade_id not in upgrades:
@@ -147,9 +151,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			return "포문 장군전 재장전 %.1f초 | 화염/둔화 강화" % janggun_cooldown
 		"singigeon":
 			var proc_stats := get_singigeon_proc_stats(upgrades, current_levels, next_level)
-			var rocket_base_damage: float = float(s.get("base_damage", 2.5))
-			var rocket_damage: float = rocket_base_damage * (1.0 + 0.15 * float(next_level))
-			var personnel_damage: float = rocket_damage * float(s.get("personnel_damage_mult", 5.0))
+			var rocket_damage: float = float(s.get("base_damage", 12.0)) + float(maxi(0, next_level - 1)) * float(s.get("damage_per_lv", 2.0))
+			var personnel_damage: float = rocket_damage * float(s.get("personnel_damage_mult", 1.0))
 			return "활 공격 %.0f%% | 대병 %.0f | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, float(proc_stats.get("cooldown", 1.0))]
 		"crew_numbers":
 			var damage_add := float(next_level) * float(s.get("damage_add_per_lv", 1.0))

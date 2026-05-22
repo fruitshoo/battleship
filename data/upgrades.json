@@ -77,8 +77,9 @@
 				"ship_proc_cooldown": 1.0,
 				"proc_pity_add_per_miss": 0.015,
 				"proc_pity_max_bonus": 0.06,
-				"base_damage": 2.5,
-				"personnel_damage_mult": 6.0,
+				"base_damage": 12.0,
+				"damage_per_lv": 2.0,
+				"personnel_damage_mult": 1.0,
 				"base_cooldown": 5.0,
 				"cooldown_reduce_per_lv": 0.35,
 				"projectile_speed": 32.0
@@ -272,7 +273,7 @@
 				"accel_mult": 1.18,
 				"ram_boost_recharge_levels": [1, 2, 3, 4, 5],
 				"ram_boost_recharge_mult": 0.92,
-				"ram_boost_min_recharge_duration": 10.5
+				"ram_boost_min_recharge_duration": 8.0
 			}
 		},
 		"supply_bonus": {
@@ -291,7 +292,7 @@
 		"geobukseon": {
 			"name": "거북선",
 			"category": 2,
-			"description": "기함을 도선을 막는 거북선으로 변경. 선체를 최소 50%까지 회복, 정면 포문 2문, 측면 포문 4문, 충각 피해 +100%",
+			"description": "기함을 도선을 막는 거북선으로 변경. 선체를 최소 50%까지 회복, 정면 포문 2문, 측면 포문 4문, 충각 피해 +100%, 충각 돌진 회복 +33%",
 			"card_art_path": "res://assets/ui/upgrades/geobukseon_upgrade_card.png",
 			"max_level": 1,
 			"color": "6f8f7a",
@@ -304,7 +305,8 @@
 				"crew_ranged_cover_defense": 3.0,
 				"transform_hull_min_ratio": 0.5,
 				"ramming_damage_multiplier": 2.0,
-				"ramming_knockback_multiplier": 2.0
+				"ramming_knockback_multiplier": 2.0,
+				"ram_boost_recharge_mult": 0.75
 			}
 		},
 		"supply": {

@@ -28,6 +28,9 @@ Status: project-local provenance not found. Each asset below needs source/licens
 | `assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg` | VERIFIED | https://freesound.org/people/klavo1985/sounds/402753/ | CC0 | User-supplied source; converted from WAV to Ogg Vorbis for boss arrival cue |
 | `assets/audio/sfx/sfx_cannon_fire.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_cannon_fire_02.ogg` | UNVERIFIED |  |  |  |
+| `assets/audio/sfx/sfx_cannon_hit_01.ogg` | VERIFIED | https://freesound.org/people/Nox_Sound/sounds/560510/ | CC0 | User-supplied source; split from Explosion_Debris_Short_Stereo.wav, segment 1 |
+| `assets/audio/sfx/sfx_cannon_hit_02.ogg` | VERIFIED | https://freesound.org/people/Nox_Sound/sounds/560510/ | CC0 | User-supplied source; split from Explosion_Debris_Short_Stereo.wav, segment 2 |
+| `assets/audio/sfx/sfx_cannon_hit_03.ogg` | VERIFIED | https://freesound.org/people/Nox_Sound/sounds/560510/ | CC0 | User-supplied source; split from Explosion_Debris_Short_Stereo.wav, segment 3 |
 | `assets/audio/sfx/sfx_explosion_impact.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_fire_crackling.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_flag_crash.ogg` | UNVERIFIED |  |  |  |
@@ -46,6 +49,7 @@ Status: project-local provenance not found. Each asset below needs source/licens
 | `assets/audio/sfx/sfx_rocket_launch_01.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_rocket_launch_02.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_rocket_launch_03.ogg` | UNVERIFIED |  |  |  |
+| `assets/audio/sfx/sfx_ship_collision_smash.ogg` | VERIFIED | https://freesound.org/people/egomassive/sounds/536777/ | CC0 | User-supplied source; copied from Ogg Vorbis source for ship collision impacts |
 | `assets/audio/sfx/sfx_soldier_die_1.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_soldier_die_2.ogg` | UNVERIFIED |  |  |  |
 | `assets/audio/sfx/sfx_soldier_die_3.ogg` | UNVERIFIED |  |  |  |

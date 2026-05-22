@@ -286,6 +286,8 @@ static func _validate_player_geobukseon_upgrade(failures: Array[String]) -> void
 		failures.append("upgrade smoke player geobukseon should target geobukseon_player ship type")
 	if stats.get("blocks_boarding", false) != true:
 		failures.append("upgrade smoke player geobukseon should block boarding")
+	if not stats.has("ram_boost_recharge_mult") or float(stats.get("ram_boost_recharge_mult", 1.0)) >= 1.0:
+		failures.append("upgrade smoke player geobukseon should improve ram boost recharge")
 	var player_stats := ShipBlueprintHelper.load_stats("geobukseon_player")
 	if player_stats.get("blocks_boarding", false) != true:
 		failures.append("upgrade smoke geobukseon_player should block boarding")

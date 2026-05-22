@@ -135,7 +135,11 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var sail_turn_speed: float = _get_float(ship, "sail_turn_speed", PLAYER_SAIL_TURN_SPEED)
 	var rowing_speed: float = _get_float(ship, "rowing_speed", 0.0)
 	var rowing_acceleration_mult: float = _get_float(ship, "rowing_acceleration_mult", 1.0)
-	var ram_boost_recharge_duration: float = _get_float(ship, "ramming_boost_recharge_duration", 0.0)
+	var ram_boost_recharge_duration: float = (
+		float(ship.call("get_ramming_boost_recharge_duration_value"))
+		if ship.has_method("get_ramming_boost_recharge_duration_value")
+		else _get_float(ship, "ramming_boost_recharge_duration", 0.0)
+	)
 	var rudder_turn_speed: float = _get_float(ship, "rudder_turn_speed", 0.0)
 	sections.append({
 		"title": "항해",

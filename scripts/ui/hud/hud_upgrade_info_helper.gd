@@ -7,15 +7,15 @@ const PLAYER_HULL_BASE_HP := 200.0
 const PLAYER_BASE_MAX_SPEED := 5.2
 const PLAYER_ROWING_BASE_SPEED := 2.8
 const PLAYER_ROWING_BASE_ACCEL := 1.0
-const PLAYER_RAMMING_BOOST_RECHARGE := 18.0
+const PLAYER_RAMMING_BOOST_RECHARGE := 12.0
 const PLAYER_MAX_ROWING_STAMINA := 100.0
 const PLAYER_SAIL_EFFICIENCY := 1.0
 const PLAYER_SAIL_TURN_SPEED := 60.0
 const PLAYER_SAIL_FURL_RATE := 0.55
 const PLAYER_STAMINA_DRAIN_RATE := 10.0
 const PLAYER_STAMINA_RECOVERY_RATE := 8.5
-const SOLDIER_MELEE_BASE_DAMAGE := 13.5
-const SOLDIER_BOW_BASE_DAMAGE := 18.0
+const SOLDIER_MELEE_BASE_DAMAGE := 8.0
+const SOLDIER_BOW_BASE_DAMAGE := 8.0
 const SUPPORT_FLEET_BASE_RESPAWN_INTERVAL := 30.0
 const SUPPORT_FLEET_BASE_LIMIT := 1
 static func is_ship_upgrade(hud, upgrade_id: String) -> bool:
@@ -94,9 +94,10 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			return "재장전 %.2f초 | 재장전 -%d%%" % [shot_cooldown, int(round((1.0 - cd_mult) * 100.0))]
 		"singigeon":
 			var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(upgrades_data, current_levels, level)
-			var base_damage := float(stats.get("base_damage", 2.5))
-			var personnel_mult := float(stats.get("personnel_damage_mult", 5.0))
-			var rocket_damage := base_damage * (1.0 + 0.15 * float(level))
+			var base_damage := float(stats.get("base_damage", 12.0))
+			var damage_per_level := float(stats.get("damage_per_lv", 2.0))
+			var personnel_mult := float(stats.get("personnel_damage_mult", 1.0))
+			var rocket_damage := base_damage + float(maxi(0, level - 1)) * damage_per_level
 			return "활 공격 %.0f%% | 대병 %.0f | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, rocket_damage * personnel_mult, float(proc_stats.get("cooldown", 1.0))]
 		"janggun":
 			var janggun_cooldown := maxf(
@@ -202,7 +203,11 @@ static func _format_ramming_stat_text(stats: Dictionary, fallback_damage_mult: f
 	var knockback_mult := float(stats.get("ramming_knockback_multiplier", fallback_knockback_mult))
 	var damage_pct := int(round((damage_mult - 1.0) * 100.0))
 	var knockback_pct := int(round(knockback_mult * 100.0))
-	return "충각 피해 +%d%% | 밀어냄 강도 %d%%" % [damage_pct, knockback_pct]
+	var parts: Array[String] = ["충각 피해 +%d%%" % damage_pct, "밀어냄 강도 %d%%" % knockback_pct]
+	if stats.has("ram_boost_recharge_mult"):
+		var recharge_bonus := int(round((1.0 / maxf(0.01, float(stats.get("ram_boost_recharge_mult", 1.0))) - 1.0) * 100.0))
+		parts.append("충각 회복 +%d%%" % recharge_bonus)
+	return " | ".join(parts)
 
 static func get_upgrade_icon(upgrade_id: String) -> String:
 	var icon_map = {
@@ -323,7 +328,7 @@ static func _calculate_rowing_stats(level: int, stats: Dictionary) -> Dictionary
 			acceleration_mult *= float(stats.get("accel_mult", 1.2))
 		if _level_matches(current_level, stats.get("ram_boost_recharge_levels", [])):
 			ram_boost_recharge_duration = maxf(
-				float(stats.get("ram_boost_min_recharge_duration", 10.5)),
+				float(stats.get("ram_boost_min_recharge_duration", 8.0)),
 				ram_boost_recharge_duration * float(stats.get("ram_boost_recharge_mult", 0.92))
 			)
 		if _level_matches(current_level, stats.get("stamina_add_levels", [])):

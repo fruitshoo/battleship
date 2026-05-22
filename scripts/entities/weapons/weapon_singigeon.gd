@@ -8,9 +8,10 @@ extends "res://scripts/entities/weapons/weapon.gd"
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
 
-var personnel_damage_mult: float = 6.0
+var personnel_damage_mult: float = 1.0
 var _cached_spawn_parent: Node = null
-var _upgrade_base_damage: float = 2.5
+var _upgrade_base_damage: float = 12.0
+var _upgrade_damage_per_level: float = 2.0
 var _owner_damage_bonus_pct: float = 0.0
 var _upgrade_level: int = 1
 
@@ -112,14 +113,16 @@ func _apply_upgrade_stats() -> void:
 	_upgrade_level = maxi(1, int(um.current_levels.get("singigeon", 1)))
 	if "singigeon" in um.UPGRADES:
 		var stats: Dictionary = um.UPGRADES["singigeon"].get("stats", {})
-		_upgrade_base_damage = float(stats.get("base_damage", 2.5))
-		personnel_damage_mult = float(stats.get("personnel_damage_mult", 6.0))
+		_upgrade_base_damage = float(stats.get("base_damage", 12.0))
+		_upgrade_damage_per_level = float(stats.get("damage_per_lv", 2.0))
+		personnel_damage_mult = float(stats.get("personnel_damage_mult", 1.0))
 		attack_cooldown = maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(_upgrade_level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
 		projectile_speed = float(stats.get("projectile_speed", 32.0))
 	_apply_effective_damage()
 
 func _apply_effective_damage() -> void:
-	damage = _upgrade_base_damage * (1.0 + _owner_damage_bonus_pct)
+	var level_damage := _upgrade_base_damage + float(maxi(0, _upgrade_level - 1)) * _upgrade_damage_per_level
+	damage = level_damage * (1.0 + _owner_damage_bonus_pct)
 
 func _get_singigeon_aim_point(target: Node) -> Vector3:
 	var offset := SOLDIER_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET

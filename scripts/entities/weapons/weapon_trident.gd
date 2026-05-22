@@ -3,7 +3,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 ## 삼지창 (Trident)
 ## 창과 같은 스펙을 쓰고, 외형과 사운드만 다르게 표현합니다.
 
-const BASE_DAMAGE: float = 12.0
+const BASE_DAMAGE: float = 10.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE

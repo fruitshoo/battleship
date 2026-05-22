@@ -386,6 +386,13 @@ static func _emit_movement_guarded_collision(ship, other_ship: Node3D, impact_sp
 		min_ramming_speed = float(ship.get("min_ramming_speed")) * 0.72
 	var impact_speed := maxf(impact_speed_hint, min_ramming_speed)
 	try_spawn_strong_collision_effects(ship, other_ship, impact_speed)
+	if not is_instance_valid(ship._cached_audio_manager):
+		ship._cached_audio_manager = ship.get_node_or_null("/root/AudioManager")
+	var audio_manager = ship._cached_audio_manager
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx") and _can_play_contact_sfx(ship, other_ship, CONTACT_SFX_MEDIUM_COOLDOWN_MSEC):
+		var impact_pos: Vector3 = (ship.global_position + other_ship.global_position) * 0.5
+		impact_pos.y = maxf(ship.global_position.y, other_ship.global_position.y) + 0.35
+		audio_manager.play_sfx("ship_collision", impact_pos, randf_range(0.86, 0.98), -2.0)
 	if ship.has_method("apply_ramming_damage"):
 		ship.call("apply_ramming_damage", other_ship, impact_speed)
 	if other_ship.has_method("apply_ramming_damage"):
@@ -624,6 +631,8 @@ static func _play_ship_contact_sfx(
 ) -> void:
 	if not is_instance_valid(ship) or not is_instance_valid(other):
 		return
+	if not is_instance_valid(ship._cached_audio_manager):
+		ship._cached_audio_manager = ship.get_node_or_null("/root/AudioManager")
 	if not is_instance_valid(ship._cached_audio_manager) or not ship._cached_audio_manager.has_method("play_sfx"):
 		return
 	var penetration_ratio := compression / maxf(coll_dist, 0.001)
@@ -631,25 +640,25 @@ static func _play_ship_contact_sfx(
 	var compression_scale := 2.35 if is_hostile_support_contact else 2.0
 	var moving_intensity := maxf(absf(pre_collision_speed), absf(target_speed)) * moving_scale
 	var contact_intensity := maxf(maxf(approach_speed, moving_intensity), compression * compression_scale)
-	if contact_intensity < 0.45 and penetration_ratio < 0.025:
+	if contact_intensity < 0.28 and penetration_ratio < 0.018:
 		return
 
 	var sfx_key := "mast_creak"
 	var pitch_min := 0.82
 	var pitch_max := 1.05
-	var volume_db := -9.0
+	var volume_db := -5.5
 	var cooldown_msec := CONTACT_SFX_LIGHT_COOLDOWN_MSEC
 	if contact_intensity >= 3.0 or penetration_ratio >= 0.11:
-		sfx_key = "impact_wood"
-		pitch_min = 0.74
-		pitch_max = 0.92
-		volume_db = -2.5
+		sfx_key = "ship_collision"
+		pitch_min = 0.78
+		pitch_max = 0.94
+		volume_db = -0.5
 		cooldown_msec = CONTACT_SFX_HEAVY_COOLDOWN_MSEC
 	elif contact_intensity >= 1.35 or penetration_ratio >= 0.055:
-		sfx_key = "impact_wood"
-		pitch_min = 0.88
+		sfx_key = "ship_collision"
+		pitch_min = 0.9
 		pitch_max = 1.04
-		volume_db = -6.5
+		volume_db = -4.0
 		cooldown_msec = CONTACT_SFX_MEDIUM_COOLDOWN_MSEC
 
 	if not _can_play_contact_sfx(ship, other, cooldown_msec):
@@ -941,8 +950,10 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	var is_boosted_hit := _is_ramming_boost_attacker(other)
 	var will_sink_from_hit := _will_ramming_hit_sink(ship, final_ram_damage)
 
+	if not is_instance_valid(ship._cached_audio_manager):
+		ship._cached_audio_manager = ship.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
-		ship._cached_audio_manager.play_sfx("impact_wood", ship.global_position, randf_range(0.6, 0.8), 5.0)
+		ship._cached_audio_manager.play_sfx("ship_collision", impact_pos, randf_range(0.74, 0.9), 0.0)
 
 	var cam = ship.get_tree().root.get_camera_3d()
 	if cam and cam.has_method("shake"):

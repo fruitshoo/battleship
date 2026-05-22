@@ -132,7 +132,7 @@
 	"upgrade.supply_bonus.name": "보급",
 	"upgrade.supply_bonus.description": "부유물, 생존자, 표류 적병 획득 범위 증가",
 	"upgrade.geobukseon.name": "거북선",
-	"upgrade.geobukseon.description": "기함을 도선을 막는 거북선으로 변경. 선체를 최소 50%까지 회복, 정면 포문 2문, 측면 포문 4문, 충각 피해 +100%",
+	"upgrade.geobukseon.description": "기함을 도선을 막는 거북선으로 변경. 선체를 최소 50%까지 회복, 정면 포문 2문, 측면 포문 4문, 충각 피해 +100%, 충각 돌진 회복 +33%",
 	"upgrade.supply.name": "회복",
 	"upgrade.supply.description": "선체를 즉시 회복",
 	"upgrade.gold.name": "포인트",

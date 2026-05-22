@@ -182,7 +182,7 @@ func _spawn_ship_hit_feedback(ship: Node3D, impact_position: Vector3) -> void:
 	_spawn_ship_impact_splinters(ship, effect_position, impact_position - global_position)
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("impact_wood", effect_position, randf_range(0.9, 1.08), 1.5)
+		audio_manager.play_sfx("cannon_hit", effect_position, randf_range(0.94, 1.06))
 
 
 func _spawn_ship_impact_puff(ship: Node3D, effect_position: Vector3) -> void:

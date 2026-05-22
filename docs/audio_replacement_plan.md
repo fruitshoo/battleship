@@ -133,7 +133,7 @@ Current `AudioManager` keys and the files they map to.
 | `gameplay` | `bgm_gameplay_tea_tyme.ogg` |
 | `boss_taiko` | `bgm_boss_taiko_drumloop_120_cc0.ogg`, `bgm_boss_tribe_drum_loop_cc0.ogg`, `bgm_boss_taiko_loop_cc0.ogg` |
 | `level_up` | `sfx_levelup.ogg` |
-| `rocket_launch` | `sfx_explosion_impact.ogg` |
+| `rocket_launch` | `sfx_rocket_launch_01.ogg`, `sfx_rocket_launch_02.ogg`, `sfx_rocket_launch_03.ogg` |
 | `rocket_launch_01` | `sfx_rocket_launch_01.ogg` |
 | `rocket_launch_02` | `sfx_rocket_launch_02.ogg` |
 | `rocket_launch_03` | `sfx_rocket_launch_03.ogg` |
@@ -143,7 +143,7 @@ Current `AudioManager` keys and the files they map to.
 | `mast_creak` | `sfx_mast_creak_01.ogg` ~ `sfx_mast_creak_04.ogg` |
 | `sword_swing` | `sfx_sword_swing_1.ogg` ~ `sfx_sword_swing_4.ogg` |
 | `bow_shoot` | `sfx_bow_01.ogg`, `sfx_bow_02.ogg` |
-| `musket_fire` | `sfx_musket_fire_02.ogg`, `sfx_musket_fire_03_cc0.ogg` |
+| `musket_fire` | `sfx_musket_fire_02.ogg` |
 | `soldier_hit` | `sfx_sword_ting_1.ogg` ~ `sfx_sword_ting_4.ogg` |
 | `critical_flesh_hit` | `sfx_crit_flesh_slashkut.ogg`, `sfx_crit_flesh_slice.ogg`, `sfx_crit_flesh_crush.ogg`, `sfx_crit_flesh_headshot.ogg` |
 | `wave_splash` | `sfx_wave_01.ogg` ~ `sfx_wave_03.ogg` |

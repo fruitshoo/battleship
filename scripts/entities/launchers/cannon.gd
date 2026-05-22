@@ -36,6 +36,7 @@ const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 @export_range(0.1, 1.0, 0.05) var prediction_lead_factor: float = 0.72
 @export_range(1.0, 4.0, 0.05) var boarding_reload_cooldown_mult: float = 1.55
 @export_range(1.0, 4.0, 0.05) var boarded_reload_cooldown_mult: float = 1.85
+@export_range(0.0, 1.0, 0.01) var reload_metal_sfx_chance: float = 0.12
 @export var team: String = "player" # "player" or "enemy"
 
 @onready var muzzle: Marker3D = $Muzzle
@@ -160,10 +161,11 @@ func _profiled_process(delta: float) -> void:
 	if cooldown_timer > 0:
 		cooldown_timer -= delta
 		if cooldown_timer <= 0:
-			# 장전 완료 사운드 (금속 철컥/쿵 소리)
-			var audio_manager = get_node_or_null("/root/AudioManager")
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-				audio_manager.play_sfx("cannon_reload", global_position, randf_range(0.9, 1.1))
+			# 매 발마다 들리면 탄피가 떨어지는 느낌이 강해서, 낮은 빈도의 장전 장구음으로만 사용한다.
+			if randf() < reload_metal_sfx_chance:
+				var audio_manager = get_node_or_null("/root/AudioManager")
+				if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+					audio_manager.play_sfx("cannon_reload", global_position, randf_range(0.86, 1.02), -3.0)
 		return
 	
 	_target_scan_left -= delta

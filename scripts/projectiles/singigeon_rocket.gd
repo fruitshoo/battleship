@@ -15,8 +15,8 @@ const CRIT_EFFECT_DECK_MARGIN := 0.75
 @export var burst_wobble_deg: float = 9.0
 @export var terminal_wobble_deg: float = 2.0
 @export var wobble_frequency: float = 11.0
-@export var damage: float = 2.5 # 기본 병사 피해 15: 2.5 x 6.
-@export var personnel_damage_mult: float = 6.0
+@export var damage: float = 12.0
+@export var personnel_damage_mult: float = 1.0
 @export var lifetime: float = 3.0
 @export var lock_on_delay: float = 0.12
 @export var retarget_radius: float = 16.0
@@ -338,15 +338,8 @@ func _on_hit(target: Variant) -> void:
 func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 	if not is_instance_valid(target_node): return
 
-	# 데미지 보정 (블랙 파우더 업그레이드 등)
-	var dmg_mult = 1.0
-	var upgrade_manager = _cached_upgrade_manager
-	if team == "player" and is_instance_valid(upgrade_manager) and "current_levels" in upgrade_manager:
-		var singigeon_lv = upgrade_manager.current_levels.get("singigeon", 0)
-		dmg_mult += (0.15 * singigeon_lv) # 레벨당 데미지 15% 증가
-
 	if target_node.has_method("take_damage"):
-		var final_damage = damage * dmg_mult * scale
+		var final_damage = damage * scale
 		var is_soldier_target: bool = target_node is CharacterBody3D or target_node.is_in_group("soldiers")
 		var is_crit := false
 		if is_soldier_target:

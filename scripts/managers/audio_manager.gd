@@ -10,10 +10,23 @@ extends Node
 # preload는 컴파일 타임에 파일이 있어야 하므로, 안전을 위해 load() 사용
 var sfx_streams = {
 	"cannon_fire": [
-		"res://assets/audio/sfx/sfx_cannon_fire.ogg"
+		"res://assets/audio/sfx/sfx_cannon_fire.ogg",
+		{
+			"path": "res://assets/audio/sfx/sfx_cannon_fire_blast_03.ogg",
+			"volume_db": -2.5,
+		},
 	],
 	"cannon_fuse": [
 		"res://assets/audio/sfx/sfx_match_sizzle.ogg"
+	],
+	"cannon_hit": [
+		"res://assets/audio/sfx/sfx_cannon_hit_01.ogg",
+		"res://assets/audio/sfx/sfx_cannon_hit_02.ogg",
+		"res://assets/audio/sfx/sfx_cannon_hit_03.ogg",
+		{
+			"path": "res://assets/audio/sfx/sfx_explosion_impact.ogg",
+			"volume_db": 14.0,
+		},
 	],
 	"impact_wood": "res://assets/audio/sfx/sfx_flag_crash.ogg", # 나무 부러지는/부딪히는 소리
 	"ui_click": [
@@ -24,10 +37,19 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_ui_click_5.ogg",
 	],
 	"level_up": "res://assets/audio/sfx/sfx_levelup.ogg",
-	"rocket_launch": "res://assets/audio/sfx/sfx_explosion_impact.ogg",
+	"rocket_launch": [
+		"res://assets/audio/sfx/sfx_rocket_launch_01.ogg",
+		"res://assets/audio/sfx/sfx_rocket_launch_02.ogg",
+		"res://assets/audio/sfx/sfx_rocket_launch_03.ogg",
+	],
 	"rocket_launch_01": "res://assets/audio/sfx/sfx_rocket_launch_01.ogg",
 	"rocket_launch_02": "res://assets/audio/sfx/sfx_rocket_launch_02.ogg",
 	"rocket_launch_03": "res://assets/audio/sfx/sfx_rocket_launch_03.ogg",
+	"singigeon_launch": [
+		"res://assets/audio/sfx/sfx_rocket_launch_whoosh_01.ogg",
+		"res://assets/audio/sfx/sfx_rocket_launch_whoosh_02.ogg",
+		"res://assets/audio/sfx/sfx_rocket_launch_whoosh_03.ogg",
+	],
 	"heavy_missle_impact": "res://assets/audio/sfx/sfx_heavy_missle_impact.ogg",
 	"wood_break": "res://assets/audio/sfx/sfx_flag_crash.ogg",
 	"sail_flap": [
@@ -60,10 +82,6 @@ var sfx_streams = {
 		{
 			"path": "res://assets/audio/sfx/sfx_musket_fire_02.ogg",
 			"volume_db": -4.0,
-		},
-		{
-			"path": "res://assets/audio/sfx/sfx_musket_fire_03_cc0.ogg",
-			"volume_db": -7.0,
 		}
 	],
 	"soldier_hit": [
@@ -77,6 +95,7 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_crit_flesh_slice.ogg",
 		"res://assets/audio/sfx/sfx_crit_flesh_crush.ogg",
 		"res://assets/audio/sfx/sfx_crit_flesh_headshot.ogg",
+		"res://assets/audio/sfx/sfx_crit_flesh_soft_impact.ogg",
 	],
 	"wave_splash": [
 		"res://assets/audio/sfx/sfx_wave_01.ogg",
@@ -120,6 +139,7 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_water_splash_small_3.ogg",
 	],
 	"ship_sink_bubbles": "res://assets/audio/sfx/sfx_ship_sink_bubbles_cc0.ogg",
+	"ship_collision": "res://assets/audio/sfx/sfx_ship_collision_smash.ogg",
 	"cannon_reload": "res://assets/audio/sfx/sfx_metal_drop.ogg",
 	"oars_rowing": "res://assets/audio/sfx/sfx_oars.ogg",
 	"boss_horn": "res://assets/audio/sfx/sfx_boss_medieval_horn_cc0.ogg",
@@ -205,11 +225,13 @@ const SFX_PROFILE_PRESETS := {
 }
 const SFX_PROFILE_BY_KEY := {
 	"cannon_fire": SFX_PROFILE_CANNON_BLAST,
+	"cannon_hit": SFX_PROFILE_CANNON_BLAST,
 	"wave_splash": SFX_PROFILE_SHIP_AMBIENT,
 	"sail_flap": SFX_PROFILE_SHIP_AMBIENT,
 	"mast_creak": SFX_PROFILE_SHIP_AMBIENT,
 	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
+	"ship_collision": SFX_PROFILE_SHIP_AMBIENT,
 	"bow_shoot": SFX_PROFILE_LIGHT_PROJECTILE,
 	"musket_fire": SFX_PROFILE_LIGHT_PROJECTILE,
 	"sword_swing": SFX_PROFILE_WEAPON_CLOSE,
@@ -261,6 +283,13 @@ const SFX_PROFILE_OVERRIDES := {
 		"unit_size": 110.0,
 		"pitch_jitter": 0.04,
 	},
+	"cannon_hit": {
+		"volume_db": -2.5,
+		"max_distance": 320.0,
+		"unit_size": 95.0,
+		"pitch_jitter": 0.055,
+		"rate_limit_msec": 45,
+	},
 	"cannon_fuse": {
 		"volume_db": -12.0,
 		"max_distance": 80.0,
@@ -281,6 +310,13 @@ const SFX_PROFILE_OVERRIDES := {
 		"unit_size": 130.0,
 		"pitch_jitter": 0.04,
 		"rate_limit_msec": 300,
+	},
+	"ship_collision": {
+		"volume_db": -1.0,
+		"max_distance": 290.0,
+		"unit_size": 110.0,
+		"pitch_jitter": 0.035,
+		"rate_limit_msec": 180,
 	},
 	"ballistic_death": {
 		"pitch_jitter": 0.08,
@@ -324,6 +360,7 @@ var is_prewarm_finished: bool = false
 var _startup_sfx_muted: bool = false
 var _essential_warm_keys: Array[String] = [
 	"cannon_fire",
+	"cannon_hit",
 	"cannon_fuse",
 	"cannon_reload",
 	"impact_wood",
@@ -332,6 +369,7 @@ var _essential_warm_keys: Array[String] = [
 	"critical_flesh_hit",
 	"bow_shoot",
 	"musket_fire",
+	"singigeon_launch",
 	"level_up",
 	"sail_flap",
 	"mast_creak",
@@ -339,6 +377,7 @@ var _essential_warm_keys: Array[String] = [
 	"water_splash_large",
 	"water_splash_small",
 	"ship_sink_bubbles",
+	"ship_collision",
 	"boss_horn"
 ]
 var _essential_bgm_warm_keys: Array[String] = [

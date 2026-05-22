@@ -93,7 +93,8 @@ var rowing_stamina: float = 100.0
 
 @export_group("Ramming Boost")
 @export_range(0.4, 3.0, 0.05) var ramming_boost_duration: float = 1.35
-@export_range(4.0, 45.0, 0.5) var ramming_boost_recharge_duration: float = 18.0
+@export_range(4.0, 45.0, 0.5) var ramming_boost_recharge_duration: float = 12.0
+@export_range(0.1, 1.0, 0.05) var ramming_boost_recharge_multiplier: float = 1.0
 @export_range(1.0, 2.0, 0.05) var ramming_boost_speed_multiplier: float = 1.55
 @export_range(1.0, 6.0, 0.1) var ramming_boost_acceleration_multiplier: float = 3.8
 @export_range(0.0, 8.0, 0.1) var ramming_boost_impulse_speed: float = 3.4
@@ -1174,7 +1175,7 @@ func _update_ramming_boost(delta: float) -> void:
 				ramming_boost_charge = maxf(ramming_boost_charge, 0.35)
 		return
 	if ramming_boost_charge < 1.0:
-		ramming_boost_charge = minf(1.0, ramming_boost_charge + delta / maxf(0.1, ramming_boost_recharge_duration))
+		ramming_boost_charge = minf(1.0, ramming_boost_charge + delta / get_ramming_boost_recharge_duration_value())
 
 
 func _can_activate_ramming_boost_with_sail_state() -> bool:
@@ -1203,6 +1204,10 @@ func get_ramming_boost_charge_ratio() -> float:
 	if is_ramming_boost_active():
 		return clampf(ramming_boost_timer / maxf(0.05, ramming_boost_duration), 0.0, 1.0)
 	return clampf(ramming_boost_charge, 0.0, 1.0)
+
+
+func get_ramming_boost_recharge_duration_value() -> float:
+	return maxf(0.1, ramming_boost_recharge_duration * clampf(ramming_boost_recharge_multiplier, 0.1, 1.0))
 
 
 func should_show_ramming_boost_gauge() -> bool:

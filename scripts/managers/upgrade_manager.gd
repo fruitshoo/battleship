@@ -754,7 +754,7 @@ func _apply_rowing(ship: Node3D, level: int) -> void:
 		ship.rowing_acceleration_mult *= float(s.get("accel_mult", 1.2))
 	if _level_matches(level, s.get("ram_boost_recharge_levels", [])) and "ramming_boost_recharge_duration" in ship:
 		var recharge_mult := clampf(float(s.get("ram_boost_recharge_mult", 0.92)), 0.1, 1.0)
-		var min_recharge_duration := maxf(1.0, float(s.get("ram_boost_min_recharge_duration", 10.5)))
+		var min_recharge_duration := maxf(1.0, float(s.get("ram_boost_min_recharge_duration", 8.0)))
 		ship.ramming_boost_recharge_duration = maxf(min_recharge_duration, ship.ramming_boost_recharge_duration * recharge_mult)
 	if _level_matches(level, s.get("stamina_add_levels", [])) and "max_rowing_stamina" in ship:
 		var stamina_add := float(s.get("stamina_add", 25.0))
@@ -802,6 +802,8 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 		ship.ramming_damage_multiplier = geobuk_ram_mult * (1.0 + float(hull_stats.get("ramming_damage_pct_per_lv", 0.07)) * float(hull_level))
 	if "ramming_knockback_multiplier" in ship:
 		ship.ramming_knockback_multiplier = clampf(float(stats.get("ramming_knockback_multiplier", 1.0)), 0.0, 3.0)
+	if "ramming_boost_recharge_multiplier" in ship:
+		ship.ramming_boost_recharge_multiplier = clampf(float(stats.get("ram_boost_recharge_mult", 1.0)), 0.1, 1.0)
 	if "hull_defense" in ship:
 		var geobuk_base_defense := maxf(0.0, float(stats.get("hull_defense", 2.0)))
 		ship.set_meta("base_player_hull_defense", geobuk_base_defense)

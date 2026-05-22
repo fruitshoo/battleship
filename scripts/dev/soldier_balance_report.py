@@ -91,11 +91,11 @@ def main() -> int:
     harpoon_expected_crit = expected_crit_multiplier(crit_chance + 0.15, 2.5)
 
     # Mirror the current code-facing formula: weapon base damage * one summed bonus.
-    sword_damage = 13.0 * (1.0 + total_damage_bonus)
-    spear_damage = 13.5 * (1.0 + total_damage_bonus)
-    trident_damage = 16.0 * (1.0 + total_damage_bonus)
+    sword_damage = 8.0 * (1.0 + total_damage_bonus)
+    spear_damage = 10.0 * (1.0 + total_damage_bonus)
+    trident_damage = 10.0 * (1.0 + total_damage_bonus)
     harpoon_damage = 12.0 * (1.0 + total_damage_bonus)
-    bow_damage = 18.0 * (1.0 + total_damage_bonus)
+    bow_damage = 8.0 * (1.0 + total_damage_bonus)
 
     repeating_crossbow_level = max(1, args.repeating_crossbow_level)
     repeating_stats = upgrades["repeating_crossbow"]["stats"]
@@ -111,8 +111,8 @@ def main() -> int:
     repeater_cooldown = max(repeater_cooldown, repeater_burst_count * repeater_burst_delay + 0.5)
     repeater_cooldown *= ATTACK_COOLDOWN_TEMPO_MULT
     repeater_damage = repeater_upgrade_damage * (1.0 + total_damage_bonus)
-    singigeon_base_damage = float(upgrades["singigeon"]["stats"].get("base_damage", 2.2))
-    singigeon_personnel_mult = float(upgrades["singigeon"]["stats"].get("personnel_damage_mult", 6.0))
+    singigeon_base_damage = float(upgrades["singigeon"]["stats"].get("base_damage", 12.0))
+    singigeon_personnel_mult = float(upgrades["singigeon"]["stats"].get("personnel_damage_mult", 1.0))
     singigeon_personnel_damage = singigeon_base_damage * singigeon_personnel_mult * (1.0 + total_damage_bonus)
 
     target_defense = effective_defense
@@ -131,14 +131,14 @@ def main() -> int:
             "raw_hit": spear_damage,
             "cooldown": 1.2 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": spear_damage * melee_expected_crit,
-            "notes": "Longer reach with a modest anti-general bump while staying below heavy melee variants.",
+            "notes": "Longer reach baseline using the spear/trident base damage.",
         },
         {
             "weapon": "trident",
             "raw_hit": trident_damage,
             "cooldown": 1.6 * ATTACK_COOLDOWN_TEMPO_MULT,
             "expected_hit": trident_damage * melee_expected_crit,
-            "notes": "Heavy melee variant with slower cadence and stronger base hit.",
+            "notes": "Spear-family heavy cadence variant using the same base hit with a slower cooldown.",
         },
         {
             "weapon": "harpoon",
