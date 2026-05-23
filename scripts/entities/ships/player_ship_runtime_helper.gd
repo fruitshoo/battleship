@@ -265,9 +265,9 @@ static func update_sail_wind_audio(ship, delta: float) -> void:
 	var speed_delta_rate: float = (current_speed - previous_speed) / maxf(delta, 0.001)
 
 	if deployed > 0.22 and wind_intake >= 0.56 and previous_intake < 0.38 and ship._sail_catch_audio_timer <= 0.0:
-		var catch_pitch := randf_range(0.86, 0.98)
-		var catch_volume := lerpf(-2.5, 2.0, wind_intake)
-		ship._cached_audio_manager.play_sfx("sail_flap", ship.global_position, catch_pitch, catch_volume)
+		var catch_pitch := randf_range(0.95, 1.05)
+		var catch_volume := lerpf(-1.5, 2.5, wind_intake)
+		ship._cached_audio_manager.play_sfx("sail_catch", ship.global_position, catch_pitch, catch_volume)
 		if randf() < 0.42:
 			ship._cached_audio_manager.play_sfx("mast_creak", ship.global_position, randf_range(0.78, 0.92), 0.0)
 		ship._sail_catch_audio_timer = randf_range(1.4, 2.2)

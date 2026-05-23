@@ -239,8 +239,8 @@ func _handle_discrete_nav(direction: Vector2i) -> void:
 
 
 func _update_focus(immediate: bool = false) -> void:
-	if not immediate and is_instance_valid(AudioManager):
-		AudioManager.play_sfx("ui_click", null, 1.2, -6.0) # 피치를 높이고 볼륨을 더 줄임
+	if not immediate:
+		UiButtonAudio.play_nav(-6.0, 1.2)
 		
 	for i in range(card_buttons.size()):
 		var card = card_buttons[i]

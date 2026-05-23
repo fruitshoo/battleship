@@ -8,6 +8,8 @@ const STARTUP_POOL_PREWARM_DEFAULT: int = 4
 const STARTUP_POOL_PREWARM_MAX: int = 12
 const STARTUP_POOL_PREWARM_COUNTS := {
 	"res://scenes/effects/water_blast.tscn": 8,
+	"res://scenes/effects/water_blast_big.tscn": 4,
+	"res://scenes/effects/cannon_muzzle_smoke.tscn": 8,
 	"res://scenes/effects/impact_puff.tscn": 8,
 	"res://scenes/effects/wood_splinter.tscn": 6,
 	"res://scenes/projectiles/fire_pot.tscn": 6,
@@ -91,6 +93,8 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		preload("res://scenes/effects/fire_effect.tscn"),
 		preload("res://scenes/effects/fire_pot_explosion.tscn"),
 		preload("res://scenes/effects/water_blast.tscn"),
+		preload("res://scenes/effects/water_blast_big.tscn"),
+		preload("res://scenes/effects/cannon_muzzle_smoke.tscn"),
 		preload("res://scenes/projectiles/fire_pot.tscn"),
 		preload("res://scenes/projectiles/cannonball.tscn"),
 		preload("res://scenes/projectiles/small_cannonball.tscn"),

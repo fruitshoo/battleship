@@ -565,6 +565,7 @@ func _setup_focus_navigation() -> void:
 			_focused_control_index = i
 			_scroll_control_into_view(control)
 		)
+	UiButtonAudio.wire_selectables(_focusable_controls)
 	call_deferred("_focus_first_control")
 
 
@@ -750,7 +751,10 @@ func _adjust_focused_horizontal(direction: int) -> void:
 	if focused is HSlider:
 		var slider := focused as HSlider
 		var step_size := slider.step if slider.step > 0.0 else 0.01
+		var previous_value := slider.value
 		slider.value = clampf(slider.value + step_size * float(direction), slider.min_value, slider.max_value)
+		if not is_equal_approx(previous_value, slider.value):
+			UiButtonAudio.play_nav()
 		_scroll_control_into_view(slider)
 	elif focused is OptionButton:
 		_select_adjacent_option(focused as OptionButton, direction)
@@ -762,6 +766,7 @@ func _select_adjacent_option(option: OptionButton, direction: int) -> void:
 	var next_index := posmod(option.selected + direction, option.item_count)
 	option.select(next_index)
 	option.item_selected.emit(next_index)
+	UiButtonAudio.play_nav()
 	_scroll_control_into_view(option)
 
 

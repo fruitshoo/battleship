@@ -637,6 +637,7 @@ func _select_category(category: String, keep_category_focus: bool = false) -> vo
 		_refresh_dynamic_styles()
 		return
 	_active_category = category
+	UiButtonAudio.play_nav()
 	_footer_focus_index = -1
 	_category_focus_active = keep_category_focus
 	var ids := _get_upgrade_ids_for_category(_active_category)
@@ -647,8 +648,11 @@ func _select_category(category: String, keep_category_focus: bool = false) -> vo
 func _select_upgrade(id: String) -> void:
 	if not MetaManager.UPGRADES.has(id):
 		return
+	var selection_changed := id != _selected_upgrade_id
 	_active_category = _get_upgrade_category(id)
 	_selected_upgrade_id = id
+	if selection_changed:
+		UiButtonAudio.play_nav()
 	_footer_focus_index = -1
 	_category_focus_active = false
 	_update_detail_panel()

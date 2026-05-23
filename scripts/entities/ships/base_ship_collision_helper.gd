@@ -4,6 +4,7 @@ class_name BaseShipCollisionHelper
 const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
+const SHIP_COLLISION_WATER_SPLASH_SCENE: PackedScene = preload("res://scenes/effects/water_blast_big.tscn")
 const COLLISION_REPULSION_CACHE_FRAME_META := "collision_repulsion_cache_frame"
 const COLLISION_REPULSION_CACHE_FORCE_META := "collision_repulsion_cache_force"
 const COLLISION_REPULSION_CACHE_SHIP_COUNT_META := "collision_repulsion_cache_ship_count"
@@ -14,11 +15,11 @@ const CONTACT_SFX_LIGHT_COOLDOWN_MSEC := 1300
 const CONTACT_SFX_MEDIUM_COOLDOWN_MSEC := 850
 const CONTACT_SFX_HEAVY_COOLDOWN_MSEC := 700
 const CONTACT_SFX_CACHE_PRUNE_SIZE := 96
-const CONTACT_VFX_COOLDOWN_MSEC := 1050
+const CONTACT_VFX_COOLDOWN_MSEC := 850
 const CONTACT_VFX_CACHE_PRUNE_SIZE := 96
-const CONTACT_VFX_HEAD_ON_SPEED_RATIO := 0.92
-const CONTACT_VFX_GENERAL_SPEED_RATIO := 1.0
-const CONTACT_VFX_HOSTILE_SUPPORT_SPEED_RATIO := 0.65
+const CONTACT_VFX_HEAD_ON_SPEED_RATIO := 0.78
+const CONTACT_VFX_GENERAL_SPEED_RATIO := 0.86
+const CONTACT_VFX_HOSTILE_SUPPORT_SPEED_RATIO := 0.58
 const HULL_FRONT_VFX_ALIGNMENT_DOT := 0.62
 const HULL_FRONT_VFX_PAD := 0.22
 const HULL_FRONT_VFX_HEIGHT_RATIO := 0.26
@@ -28,12 +29,6 @@ const PLAYER_CONTACT_VFX_HEIGHT_RATIO := 0.34
 const PLAYER_CONTACT_VFX_MIN_HEIGHT := 0.58
 const PLAYER_CONTACT_VFX_MAX_HEIGHT := 0.92
 const FRONT_TO_SIDE_CONTACT_EDGE_BIAS := 0.38
-const SHIP_COLLISION_WATERLINE_Y := 0.05
-const SHIP_COLLISION_WATER_SPLASH_Y_OFFSET := 0.0
-const SHIP_COLLISION_WATER_SPLASH_INTENSITY_MIN := 2.8
-const SHIP_COLLISION_WATER_SPLASH_INTENSITY_MAX := 4.0
-const SHIP_COLLISION_WATER_SPLASH_SPEED_SCALE := 8.0
-const SHIP_COLLISION_WATER_SPLASH_INTENSITY_BASE := 2.7
 const RAMMING_KNOCKBACK_MIN_FORWARD_DOT := 0.55
 const RAMMING_KNOCKBACK_BASE_SPEED := 2.6
 const RAMMING_KNOCKBACK_SPEED_SCALE := 0.42
@@ -477,8 +472,8 @@ static func _spawn_ship_contact_vfx(
 
 
 static func _get_contact_vfx_intensity(approach_speed: float, compression: float, pre_collision_speed: float, target_speed: float, is_hostile_support_contact: bool = false) -> float:
-	var moving_scale := 1.0 if is_hostile_support_contact else 0.42
-	var compression_scale := 2.35 if is_hostile_support_contact else 1.8
+	var moving_scale := 1.0 if is_hostile_support_contact else 0.55
+	var compression_scale := 2.35 if is_hostile_support_contact else 2.1
 	var moving_intensity := maxf(absf(pre_collision_speed), absf(target_speed)) * moving_scale
 	return maxf(maxf(approach_speed, moving_intensity), compression * compression_scale)
 
@@ -1067,7 +1062,7 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 
 	# 우드 스플린터 (파편) - 충격 시 수면 효과 대신 나무 파편이 튀도록 함
 	if ship.wood_splinter_scene:
-		var pseudo_damage := impact_speed * 2.8
+		var pseudo_damage := impact_speed * 5.0
 		WoodSplinter.spawn_burst(
 			ship.get_tree(),
 			ship.wood_splinter_scene,
@@ -1075,34 +1070,20 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 			pseudo_damage,
 			impact_pos - ship.global_position,
 			"ship_collision_splinter",
-			4,
+			5,
 			80.0
 		)
 
 
-static func _spawn_ship_collision_water_splash(ship, impact_pos: Vector3, impact_speed: float) -> void:
-	var water_scene: PackedScene = ship.get("water_splash_scene") if ship.get("water_splash_scene") != null else null
+static func _spawn_ship_collision_water_splash(ship, impact_pos: Vector3, _impact_speed: float) -> void:
+	var water_scene: PackedScene = SHIP_COLLISION_WATER_SPLASH_SCENE
 	if water_scene == null:
 		return
 	var splash = ScenePool.acquire(ship.get_tree(), water_scene)
 	if not is_instance_valid(splash):
 		return
 	ship.get_tree().root.add_child(splash)
-	var splash_pos := impact_pos
-	splash_pos.y = SHIP_COLLISION_WATERLINE_Y + SHIP_COLLISION_WATER_SPLASH_Y_OFFSET
 	if splash is Node3D:
-		(splash as Node3D).global_position = splash_pos
-	if splash.has_method("configure_as_ship_collision"):
-		splash.configure_as_ship_collision()
-	elif splash.has_method("configure_as_splash"):
-		splash.configure_as_splash()
-	if splash.has_method("set_intensity"):
-		splash.set_intensity(clampf(
-			SHIP_COLLISION_WATER_SPLASH_INTENSITY_BASE + (impact_speed / SHIP_COLLISION_WATER_SPLASH_SPEED_SCALE),
-			SHIP_COLLISION_WATER_SPLASH_INTENSITY_MIN,
-			SHIP_COLLISION_WATER_SPLASH_INTENSITY_MAX
-		))
-	if splash.get("waterline_y") != null:
-		splash.set("waterline_y", SHIP_COLLISION_WATERLINE_Y)
+		(splash as Node3D).global_position = impact_pos
 	if splash.has_method("pool_activate"):
 		splash.pool_activate()

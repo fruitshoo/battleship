@@ -62,6 +62,7 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_sail_canvas_07.ogg",
 		"res://assets/audio/sfx/sfx_sail_canvas_08.ogg",
 	],
+	"sail_catch": "res://assets/audio/sfx/sfx_flag_flapping.ogg",
 	"mast_creak": [
 		"res://assets/audio/sfx/sfx_mast_creak_01.ogg",
 		"res://assets/audio/sfx/sfx_mast_creak_02.ogg",
@@ -228,6 +229,7 @@ const SFX_PROFILE_BY_KEY := {
 	"cannon_hit": SFX_PROFILE_CANNON_BLAST,
 	"wave_splash": SFX_PROFILE_SHIP_AMBIENT,
 	"sail_flap": SFX_PROFILE_SHIP_AMBIENT,
+	"sail_catch": SFX_PROFILE_SHIP_AMBIENT,
 	"mast_creak": SFX_PROFILE_SHIP_AMBIENT,
 	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
@@ -254,6 +256,13 @@ const SFX_PROFILE_OVERRIDES := {
 		"unit_size": 95.0,
 		"pitch_jitter": 0.035,
 		"rate_limit_msec": 220,
+	},
+	"sail_catch": {
+		"volume_db": -2.0,
+		"max_distance": 260.0,
+		"unit_size": 90.0,
+		"pitch_jitter": 0.025,
+		"rate_limit_msec": 900,
 	},
 	"mast_creak": {
 		"volume_db": -2.0,
@@ -372,6 +381,7 @@ var _essential_warm_keys: Array[String] = [
 	"singigeon_launch",
 	"level_up",
 	"sail_flap",
+	"sail_catch",
 	"mast_creak",
 	"wave_splash",
 	"water_splash_large",
