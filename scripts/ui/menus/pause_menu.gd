@@ -34,6 +34,7 @@ var _modal_open: bool = false
 var _menu_buttons: Array[Button] = []
 var _focused_button_index: int = 0
 var _nav_repeater := MenuInputHelper.NavRepeater.new()
+var _button_focus := MenuInputHelper.ButtonFocusNavigator.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -59,7 +60,7 @@ func _ready() -> void:
 		LocaleManager.locale_changed.connect(_on_locale_changed)
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_apply_layout_density)
-	_wire_button_interactions()
+	_button_focus.configure(_menu_buttons, _on_pause_button_focus_changed, _can_mouse_focus_pause_button)
 	call_deferred("_begin_intro")
 
 func _apply_ui_theme() -> void:
@@ -133,51 +134,27 @@ func _apply_layout_density() -> void:
 		if is_instance_valid(button_hint):
 			button_hint.add_theme_font_size_override("font_size", roundi(lerpf(9.0, 10.0, density)))
 
-func _wire_button_interactions() -> void:
-	for button in _menu_buttons:
-		button.focus_entered.connect(func():
-			var idx := _menu_buttons.find(button)
-			if idx != -1:
-				_focused_button_index = idx
-			_animate_button_focus(button, true)
-		)
-		button.focus_exited.connect(func(): _animate_button_focus(button, false))
-		button.mouse_entered.connect(func():
-			if not _modal_open and button.visible and not button.disabled:
-				button.grab_focus()
-		)
+func _on_pause_button_focus_changed(button: Button, focused: bool) -> void:
+	_focused_button_index = _button_focus.get_focused_index()
+	_animate_button_focus(button, focused)
+
+
+func _can_mouse_focus_pause_button() -> bool:
+	return not _modal_open
 
 
 func _focus_first_pause_button() -> void:
-	for i in range(_menu_buttons.size()):
-		var button: Button = _menu_buttons[i]
-		if is_instance_valid(button) and button.visible and not button.disabled:
-			_focused_button_index = i
-			button.grab_focus()
-			return
+	_button_focus.focus_first()
+	_focused_button_index = _button_focus.get_focused_index()
 
 
 func _move_pause_focus(direction: int) -> void:
-	if _menu_buttons.is_empty():
-		return
-	var button_count := _menu_buttons.size()
-	for step in range(1, button_count + 1):
-		var next_index := posmod(_focused_button_index + direction * step, button_count)
-		var button: Button = _menu_buttons[next_index]
-		if is_instance_valid(button) and button.visible and not button.disabled:
-			_focused_button_index = next_index
-			button.grab_focus()
-			return
+	_button_focus.move_focus(direction)
+	_focused_button_index = _button_focus.get_focused_index()
 
 
 func _activate_focused_pause_button() -> void:
-	if _focused_button_index < 0 or _focused_button_index >= _menu_buttons.size():
-		_focus_first_pause_button()
-		return
-	var button := _menu_buttons[_focused_button_index]
-	if not is_instance_valid(button) or not button.visible or button.disabled:
-		return
-	button.emit_signal("pressed")
+	_button_focus.activate_focused()
 
 func _begin_intro() -> void:
 	if not is_instance_valid(panel_container):

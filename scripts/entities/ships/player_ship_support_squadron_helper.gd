@@ -118,10 +118,11 @@ static func get_support_slot_plan_for_levels(current_levels: Dictionary, upgrade
 	var flagship_slots := FLAGSHIP_SCREEN_SLOTS.duplicate(true)
 	var panokseon_slots := PANOKSEON_ARTILLERY_SLOTS.duplicate(true)
 	var geobukseon_slots := GEOBUKSEON_GUARD_SLOTS.duplicate(true)
+	var flagship_screen_unlocked := int(current_levels.get("fleet_signal", 0)) > 0
 	var panokseon_unlocked := is_panokseon_squadron_unlocked(current_levels, upgrades)
 	var geobukseon_unlocked := is_geobukseon_squadron_unlocked(current_levels, upgrades)
 
-	if not flagship_slots.is_empty():
+	if flagship_screen_unlocked and not flagship_slots.is_empty():
 		plan.append(flagship_slots[0])
 	if panokseon_unlocked:
 		plan.append(panokseon_slots[0])
@@ -130,18 +131,18 @@ static func get_support_slot_plan_for_levels(current_levels: Dictionary, upgrade
 	if panokseon_unlocked:
 		for i in range(1, panokseon_slots.size()):
 			plan.append(panokseon_slots[i])
+		if flagship_screen_unlocked:
+			for i in range(1, flagship_slots.size()):
+				plan.append(flagship_slots[i])
+		return plan
+	if flagship_screen_unlocked:
 		for i in range(1, flagship_slots.size()):
 			plan.append(flagship_slots[i])
-		return plan
-	for i in range(1, flagship_slots.size()):
-		plan.append(flagship_slots[i])
 	return plan
 
 
 static func is_panokseon_squadron_unlocked(current_levels: Dictionary, upgrades: Dictionary = {}) -> bool:
 	var unlock_id := get_panokseon_unlock_upgrade_id(upgrades)
-	if unlock_id == DEFAULT_PANOKSEON_UNLOCK_UPGRADE_ID and int(current_levels.get("fleet_signal", 0)) <= 0:
-		return false
 	return int(current_levels.get(unlock_id, 0)) >= get_panokseon_unlock_level(upgrades)
 
 

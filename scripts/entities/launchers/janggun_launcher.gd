@@ -13,6 +13,7 @@ const JANGGUN_SHIP_AIM_VERTICAL_OFFSET := 0.05
 @export var cooldown_reduce_per_level: float = 0.6
 @export var detection_range: float = 28.0
 @export var damage: float = 10.0
+@export var projectile_speed: float = 19.0
 @export_range(0.05, 0.5) var target_scan_interval: float = 0.2
 @export_range(0.0, 0.5, 0.01) var muzzle_smoke_follow_muzzle_time: float = 0.22
 @export_range(0.0, 1.5, 0.05) var cannon_post_fire_delay: float = 0.45
@@ -219,8 +220,9 @@ func fire(target: Variant) -> void:
 
 	var target_aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, JANGGUN_SHIP_AIM_VERTICAL_OFFSET)
 	var dist := spawn_pos.distance_to(target_aim_pos)
-	var projectile_speed := 16.5 * (1.0 + janggun_lv * 0.15)
-	var travel_time := dist / projectile_speed
+	var stats := _get_janggun_stats()
+	var current_projectile_speed := float(stats.get("projectile_speed", projectile_speed))
+	var travel_time := dist / maxf(current_projectile_speed, 0.01)
 
 	var target_speed: float = NodeContractHelper.get_current_speed_value(target_node)
 	var target_dir: Vector3 = target_node.get_move_direction_value() if target_node.has_method("get_move_direction_value") else -target_node.global_transform.basis.z
@@ -238,17 +240,17 @@ func fire(target: Variant) -> void:
 	var fire_direction := (predicted_pos - spawn_pos).normalized()
 	if fire_direction.is_zero_approx():
 		fire_direction = -firing_cannon.global_transform.basis.z
-	var missile_damage: float = damage * (1.0 + janggun_lv * 0.5)
+	var missile_damage := float(stats.get("base_damage", damage)) + float(maxi(0, janggun_lv - 1)) * float(stats.get("damage_per_lv", 5.0))
 
 	var missile = ScenePool.acquire(get_tree(), missile_scene)
 	get_tree().root.add_child(missile)
 	if missile.has_method("launch"):
-		missile.launch(spawn_pos, predicted_pos, team, missile_damage, projectile_speed, janggun_lv)
+		missile.launch(spawn_pos, predicted_pos, team, missile_damage, current_projectile_speed, janggun_lv)
 	else:
 		missile.start_pos = spawn_pos
 		missile.target_pos = predicted_pos
 		missile.damage = missile_damage
-		missile.speed = projectile_speed
+		missile.speed = current_projectile_speed
 		if "team" in missile:
 			missile.team = team
 		if "janggun_lv" in missile:

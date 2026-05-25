@@ -28,6 +28,9 @@ OUT_DIR="$ROOT_DIR/exports/windows-$VERSION_TAG"
 EXE_NAME="Battleship-$VERSION_TAG.exe"
 ZIP_PATH="$ROOT_DIR/exports/Battleship-$VERSION_TAG-windows.zip"
 
+python3 "$ROOT_DIR/scripts/dev/export_dependency_guard.py" --project-root "$ROOT_DIR" --preset "$PRESET_NAME"
+
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 "$GODOT_BIN" --headless --path "$ROOT_DIR" --export-release "$PRESET_NAME" "$OUT_DIR/$EXE_NAME"

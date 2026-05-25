@@ -62,6 +62,88 @@ class NavRepeater:
 		return direction
 
 
+class ButtonFocusNavigator:
+	extends RefCounted
+
+	var buttons: Array[Button] = []
+	var focused_index: int = 0
+	var _focus_changed_callback: Callable = Callable()
+	var _mouse_focus_allowed_callback: Callable = Callable()
+
+	func configure(
+		button_list: Array[Button],
+		focus_changed_callback: Callable = Callable(),
+		mouse_focus_allowed_callback: Callable = Callable()
+	) -> void:
+		buttons = button_list.duplicate()
+		_focus_changed_callback = focus_changed_callback
+		_mouse_focus_allowed_callback = mouse_focus_allowed_callback
+		for button in buttons:
+			if not is_instance_valid(button):
+				continue
+			button.focus_entered.connect(func():
+				var idx := buttons.find(button)
+				if idx != -1:
+					focused_index = idx
+				_notify_focus_changed(button, true)
+			)
+			button.focus_exited.connect(func():
+				_notify_focus_changed(button, false)
+			)
+			button.mouse_entered.connect(func():
+				if _can_mouse_focus(button):
+					button.grab_focus()
+			)
+
+	func focus_first() -> void:
+		for i in range(buttons.size()):
+			var button := buttons[i]
+			if _is_focusable(button):
+				focused_index = i
+				button.grab_focus()
+				return
+
+	func move_focus(direction: int) -> void:
+		if buttons.is_empty() or direction == 0:
+			return
+		var button_count := buttons.size()
+		for step in range(1, button_count + 1):
+			var next_index := posmod(focused_index + direction * step, button_count)
+			var button := buttons[next_index]
+			if _is_focusable(button):
+				focused_index = next_index
+				button.grab_focus()
+				return
+
+	func activate_focused() -> void:
+		if buttons.is_empty():
+			return
+		if focused_index < 0 or focused_index >= buttons.size():
+			focus_first()
+			return
+		var button := buttons[focused_index]
+		if not _is_focusable(button):
+			return
+		button.emit_signal("pressed")
+
+	func get_focused_index() -> int:
+		return focused_index
+
+	func _is_focusable(button: Button) -> bool:
+		return is_instance_valid(button) and button.visible and not button.disabled
+
+	func _can_mouse_focus(button: Button) -> bool:
+		if not _is_focusable(button):
+			return false
+		if not _mouse_focus_allowed_callback.is_valid():
+			return true
+		return bool(_mouse_focus_allowed_callback.call())
+
+	func _notify_focus_changed(button: Button, focused: bool) -> void:
+		if _focus_changed_callback.is_valid():
+			_focus_changed_callback.call(button, focused)
+
+
 static func is_confirm_event(event: InputEvent) -> bool:
 	observe_event(event)
 	return event.is_action_pressed("ui_accept") \

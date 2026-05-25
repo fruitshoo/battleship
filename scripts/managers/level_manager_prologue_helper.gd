@@ -79,7 +79,7 @@ static func toggle_controls_hint(lm: Node) -> void:
 
 static func _get_controls_text(gamepad_mode: bool) -> String:
 	if gamepad_mode:
-		return "패드: L스틱 이동    Y 돛 접기    접힌 뒤 RT 충각 돌진    R스틱 카메라    R3+R스틱 상하 줌    LB/RB 돛 방향"
+		return "패드: L스틱 이동    Y 돛 접기    접힌 뒤 RT 충각 돌진    R스틱/십자키 좌우 카메라    십자키 위/아래 줌    LB/RB 돛 방향"
 	return "WASD/방향키: 이동    R: 돛 접기    접힌 뒤 Shift: 충각 돌진    마우스 드래그/휠: 카메라/줌    Q/E: 돛 방향"
 
 

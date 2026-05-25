@@ -31,6 +31,7 @@ const ENEMY_DRIFTER_XP_ACCOUNTED_META := "enemy_drifter_xp_accounted"
 const ENEMY_SINKING_REWARD_ACCOUNTED_META := "enemy_sinking_reward_accounted"
 const ENEMY_DRIFTER_SOLDIERS_PER_PICKUP := 3
 const ENEMY_DRIFTER_MAX_PICKUPS := 4
+const DEFAULT_FLOATING_LOOT_HULL_REPAIR: int = 20
 
 static func update_enemy_fire_pot_logic(ship, delta: float) -> void:
 	if ship.is_dying or ship.is_sinking or ship.is_derelict:
@@ -423,7 +424,7 @@ static func sink_derelict(ship) -> void:
 		ship.set_meta("derelict_sink_stat_accounted", true)
 		if ship.cached_lm.has_method("add_ship_sunk"):
 			ship.cached_lm.add_ship_sunk(1, ship)
-	drop_floating_loot(ship, true, 0)
+	drop_floating_loot(ship, true)
 
 	ship._set_fire_emitting(true)
 
@@ -473,19 +474,20 @@ static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, wo
 	return not viewport_rect.has_point(screen_pos)
 
 
-static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_override: int = 0) -> void:
+static func drop_floating_loot(ship, force_drop: bool = false, repair_amount_override: int = -1) -> void:
 	if not ship.loot_scene:
 		return
 	if ship.get_meta("floating_loot_dropped", false) == true:
 		return
 	ship.set_meta("floating_loot_dropped", true)
-	var contains_repair_reward := repair_amount_override > 0
+	var repair_amount := DEFAULT_FLOATING_LOOT_HULL_REPAIR if repair_amount_override < 0 else repair_amount_override
+	var contains_repair_reward := repair_amount > 0
 	if not force_drop and not contains_repair_reward and randf() > float(ship.floating_loot_drop_chance):
 		return
 
 	var loot = ScenePool.acquire(ship.get_tree(), ship.loot_scene)
 	if is_instance_valid(loot) and loot.has_method("configure"):
-		loot.call("configure", repair_amount_override, -1)
+		loot.call("configure", repair_amount, -1)
 	var offset_x = randf_range(-1.2, 1.2)
 	var offset_z = randf_range(-1.2, 1.2)
 	var spawn_pos = Vector3(ship.global_position.x + offset_x, 0.5, ship.global_position.z + offset_z)

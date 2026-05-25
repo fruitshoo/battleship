@@ -103,6 +103,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	if rocket.has_method("restart_flight"):
 		rocket.restart_flight()
 	rocket.look_at(current_target_pos, Vector3.UP)
+	_play_singigeon_launch_sfx(attacker, spawn_pos)
 
 func _apply_upgrade_stats() -> void:
 	var um = get_node_or_null("/root/UpgradeManager")
@@ -127,6 +128,13 @@ func _apply_effective_damage() -> void:
 func _get_singigeon_aim_point(target: Node) -> Vector3:
 	var offset := SOLDIER_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SHIP_AIM_VERTICAL_OFFSET
 	return NodeContractHelper.get_projectile_aim_point(target, offset)
+
+func _play_singigeon_launch_sfx(attacker: Node, spawn_pos: Vector3) -> void:
+	if not is_instance_valid(attacker):
+		return
+	var audio_manager = attacker.get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("singigeon_launch", spawn_pos, randf_range(0.96, 1.06))
 
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):

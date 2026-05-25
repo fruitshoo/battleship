@@ -73,11 +73,12 @@ var _display_confirm_button: Button = null
 var _reward_level_overrides: Dictionary = {}
 var _treasure_shimmer: ColorRect = null
 var _nav_repeater := MenuInputHelper.NavRepeater.new()
+var _opening_nav_release_required: bool = false
 
 func _get_upgrade_track_label(upgrade_id: String, category: int) -> String:
 	if upgrade_id in UpgradeManager.CREW_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_CREW_UPGRADE_IDS:
 		return LocaleManager.t("upgrade.track.boarding", "병사")
-	if upgrade_id in UpgradeManager.SHIP_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS or upgrade_id == UpgradeManager.RARE_FLEET_UPGRADE_ID:
+	if upgrade_id in UpgradeManager.SHIP_UPGRADE_IDS or upgrade_id in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
 		return LocaleManager.t("upgrade.track.ship", "함선")
 	var category_name_map := {
 		UpgradeManager.Category.ANTI_SHIP: LocaleManager.t("upgrade.track.cannon", "함포"),
@@ -165,6 +166,9 @@ func _apply_layout_density() -> void:
 func _process(delta: float) -> void:
 	if _input_lock_timer > 0:
 		_input_lock_timer -= delta
+	if _opening_nav_release_required and not _is_navigation_input_currently_pressed():
+		_opening_nav_release_required = false
+		_nav_repeater.reset()
 	if _display_only_mode and visible and _display_close_timer > 0.0:
 		_display_close_timer -= delta
 		if _display_close_timer <= 0.0:
@@ -180,7 +184,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			if get_viewport():
 				get_viewport().set_input_as_handled()
 		return
-	if not visible or card_ids.is_empty() or _input_lock_timer > 0:
+	if not visible or card_ids.is_empty():
+		return
+	if _should_absorb_opening_nav(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventKey and event.is_echo():
@@ -222,7 +230,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 func _handle_discrete_nav(direction: Vector2i) -> void:
-	if direction.x < 0 and not _reroll_focused:
+	if _reroll_focused and direction.x != 0:
+		_reroll_focused = false
+		_focused_index = clampi(_focused_index + direction.x, 0, card_ids.size() - 1)
+		_update_focus()
+	elif direction.x < 0 and not _reroll_focused:
 		_focused_index = maxi(0, _focused_index - 1)
 		_update_focus()
 	elif direction.x > 0 and not _reroll_focused:
@@ -309,6 +321,8 @@ func show_upgrades(choices: Array, rerolls: int = 0) -> void:
 	
 	# 레벨업 시 방향키를 누르고 있었을 경우를 대비해 0.4초간 입력 잠금
 	_input_lock_timer = 0.4
+	_opening_nav_release_required = _is_navigation_input_currently_pressed()
+	_release_engine_focus()
 	
 	visible = true
 	
@@ -773,6 +787,7 @@ func _update_reroll_button(count: int) -> void:
 		reroll_button = Button.new()
 		reroll_button.custom_minimum_size = Vector2(_reroll_width_px, _reroll_height_px)
 		reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		reroll_button.focus_mode = Control.FOCUS_NONE
 		NavalUiTheme.apply_hud_button(reroll_button, roundi(lerpf(15.0, 16.0, clampf((get_viewport().get_visible_rect().size.y - 700.0) / 220.0, 0.0, 1.0))))
 		UiButtonAudio.wire_button(reroll_button, -4.0, 1.1)
 		reroll_button.pressed.connect(_on_reroll_pressed)
@@ -790,6 +805,7 @@ func _update_reroll_button(count: int) -> void:
 	reroll_button.visible = true
 	if reroll_button.disabled:
 		_reroll_focused = false
+	reroll_button.focus_mode = Control.FOCUS_NONE
 
 
 func _on_reroll_pressed() -> void:
@@ -1194,3 +1210,44 @@ func _is_down_event(event: InputEvent) -> bool:
 
 func _is_confirm_event(event: InputEvent) -> bool:
 	return MenuInputHelper.is_confirm_event(event)
+
+
+func _should_absorb_opening_nav(event: InputEvent) -> bool:
+	if _input_lock_timer > 0.0:
+		return _is_navigation_event(event) or _is_confirm_event(event)
+	if not _opening_nav_release_required:
+		return false
+	if not _is_navigation_input_currently_pressed():
+		_opening_nav_release_required = false
+		_nav_repeater.reset()
+		return false
+	return _is_navigation_event(event)
+
+
+func _is_navigation_event(event: InputEvent) -> bool:
+	return MenuInputHelper.is_navigation_axis_event(event) \
+		or MenuInputHelper.is_left_event(event) \
+		or MenuInputHelper.is_right_event(event) \
+		or MenuInputHelper.is_up_event(event) \
+		or MenuInputHelper.is_down_event(event)
+
+
+func _is_navigation_input_currently_pressed() -> bool:
+	if Input.is_action_pressed("ui_left") \
+		or Input.is_action_pressed("ui_right") \
+		or Input.is_action_pressed("ui_up") \
+		or Input.is_action_pressed("ui_down") \
+		or Input.is_physical_key_pressed(KEY_A) \
+		or Input.is_physical_key_pressed(KEY_D) \
+		or Input.is_physical_key_pressed(KEY_W) \
+		or Input.is_physical_key_pressed(KEY_S):
+		return true
+	var ui_vector := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	return ui_vector.length() >= MenuInputHelper.JOYPAD_NAV_AXIS_RELEASE
+
+
+func _release_engine_focus() -> void:
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	viewport.gui_release_focus()

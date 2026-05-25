@@ -127,6 +127,16 @@ Not safe to remove blindly:
 - compatibility textures still referenced by imported `glb`
 - imported assets whose path is still baked into `.import` metadata
 
+Before adding new `export_presets.cfg` exclude patterns, run:
+
+```bash
+bash scripts/test/run_export_dependency_guard.sh
+```
+
+The guard scans excluded files against runtime references, including binary
+`glb`/`gltf` payloads, so compatibility textures are not accidentally stripped
+from Windows builds.
+
 ## Recommended Migration Strategy
 
 1. New shared-atlas props use `gltf separate`.

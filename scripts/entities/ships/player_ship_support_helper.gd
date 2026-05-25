@@ -335,7 +335,12 @@ static func update_support_fleet_respawn(ship, delta: float) -> void:
 	if not is_instance_valid(ship._cached_um):
 		ship.support_fleet_respawn_timer = 0.0
 		return
-	if int(ship._cached_um.current_levels.get("fleet_signal", 0)) <= 0:
+	var support_unlocked := (
+		int(ship._cached_um.current_levels.get("fleet_signal", 0)) > 0
+		or int(ship._cached_um.current_levels.get("panokseon_upgrade", 0)) > 0
+		or int(ship._cached_um.current_levels.get("geobukseon_upgrade", 0)) > 0
+	)
+	if not support_unlocked:
 		ship.support_fleet_respawn_timer = 0.0
 		return
 

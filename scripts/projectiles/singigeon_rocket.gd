@@ -104,6 +104,10 @@ func pool_reset() -> void:
 
 func restart_flight() -> void:
 	pool_reset()
+	visible = true
+	process_mode = Node.PROCESS_MODE_INHERIT
+	monitoring = true
+	monitorable = true
 	
 func _physics_process(delta: float) -> void:
 	var profile_start := PhysicsFrameProfiler.begin()

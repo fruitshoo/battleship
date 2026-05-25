@@ -1,6 +1,6 @@
 [gd_resource type="StandardMaterial3D" format=3 uid="uid://btpp0vf4txtns"]
 
-[ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="1_nhuoa"]
+[ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_nhuoa"]
 
 [resource]
 render_priority = 14
@@ -8,12 +8,12 @@ transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
 vertex_color_is_srgb = true
-albedo_color = Color(0.90588236, 0.101960786, 0.050980393, 0.8627451)
+albedo_color = Color(0.6298312, 0.050144367, 0.018405728, 0.8627451)
 albedo_texture = ExtResource("1_nhuoa")
 albedo_texture_force_srgb = true
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 8
-particles_anim_v_frames = 8
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
 particles_anim_loop = false
 proximity_fade_enabled = true

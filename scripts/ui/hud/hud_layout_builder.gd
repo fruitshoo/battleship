@@ -41,22 +41,9 @@ static func apply_layout_density(hud) -> void:
 	var boss_label_height := roundf(lerpf(20.0, 24.0, density))
 	var boss_bottom_margin := roundf(lerpf(96.0, 152.0, density))
 	var boarding_width := roundf(lerpf(168.0, 200.0, density))
-	var stat_has_site_bonus: bool = _stat_panel_has_site_bonus(hud)
-	var stat_site_bonus_width := roundf(clampf(viewport_size.x * 0.22, 240.0, 300.0)) if stat_has_site_bonus else 0.0
-	var available_stat_width: float = viewport_size.x - edge_margin * (3.0 if stat_has_site_bonus else 2.0) - stat_site_bonus_width
-	var stat_panel_max_width: float = 760.0 if stat_has_site_bonus else 820.0
-	var stat_panel_width := roundf(minf(clampf(viewport_size.x * (0.54 if stat_has_site_bonus else 0.48), 560.0, stat_panel_max_width), maxf(320.0, available_stat_width)))
+	var stat_panel_width := roundf(clampf(viewport_size.x * 0.48, 560.0, 820.0))
 	var stat_panel_height := roundf(clampf(viewport_size.y * 0.72, 420.0, 560.0))
-	var stat_site_bonus_height := roundf(lerpf(300.0, 382.0, density))
 	var stat_top := roundf(lerpf(42.0, 48.0, density))
-	var stat_rail_stacked := stat_has_site_bonus and viewport_size.x < edge_margin * 3.0 + 320.0 + stat_site_bonus_width
-	if stat_rail_stacked:
-		var stacked_width := roundf(maxf(280.0, viewport_size.x - edge_margin * 2.0))
-		stat_panel_width = stacked_width
-		stat_site_bonus_width = stacked_width
-		stat_panel_height = roundf(clampf(viewport_size.y * 0.56, 300.0, 430.0))
-		var stacked_bonus_space := viewport_size.y - stat_top - stat_panel_height - panel_gap - lower_margin
-		stat_site_bonus_height = roundf(clampf(stacked_bonus_space, 118.0, 240.0))
 
 	if is_instance_valid(hud.top_left_container):
 		hud.top_left_container.offset_left = edge_margin
@@ -102,7 +89,15 @@ static func apply_layout_density(hud) -> void:
 
 	if is_instance_valid(hud.top_right_container):
 		hud.top_right_container.offset_right = -edge_margin
-		hud.top_right_container.offset_top = roundf(lerpf(220.0, 248.0, density))
+		var compass_size := clampf(min(viewport_size.x, viewport_size.y) * 0.20, 170.0, 204.0)
+		var compass_top := roundf(clampf(viewport_size.y * 0.028, 26.0, 32.0))
+		hud.top_right_container.offset_top = compass_top + compass_size + roundf(lerpf(2.0, 6.0, density))
+		hud.top_right_container.add_theme_constant_override("separation", panel_gap)
+	if is_instance_valid(hud.sea_site_bonus_panel):
+		hud.sea_site_bonus_panel.custom_minimum_size.x = roundf(lerpf(188.0, 220.0, density))
+		var bonus_box := hud.sea_site_bonus_panel.get_child(0) as VBoxContainer
+		if is_instance_valid(bonus_box):
+			bonus_box.custom_minimum_size.x = hud.sea_site_bonus_panel.custom_minimum_size.x - 14.0
 
 	if is_instance_valid(hud.stat_panel):
 		hud.stat_panel.offset_left = edge_margin
@@ -113,26 +108,7 @@ static func apply_layout_density(hud) -> void:
 		if is_instance_valid(stat_box):
 			stat_box.custom_minimum_size = Vector2(stat_panel_width - 24.0, stat_panel_height - 40.0)
 	if is_instance_valid(hud.stat_site_bonus_panel):
-		hud.stat_site_bonus_panel.visible = hud.show_stat_panel and stat_has_site_bonus
-		if stat_rail_stacked:
-			hud.stat_site_bonus_panel.anchor_left = 0.0
-			hud.stat_site_bonus_panel.anchor_right = 0.0
-			hud.stat_site_bonus_panel.offset_left = edge_margin
-			hud.stat_site_bonus_panel.offset_right = edge_margin + stat_site_bonus_width
-			hud.stat_site_bonus_panel.offset_top = stat_top + stat_panel_height + panel_gap
-			hud.stat_site_bonus_panel.offset_bottom = hud.stat_site_bonus_panel.offset_top + stat_site_bonus_height
-			hud.stat_site_bonus_panel.grow_horizontal = Control.GROW_DIRECTION_END
-		else:
-			hud.stat_site_bonus_panel.anchor_left = 1.0
-			hud.stat_site_bonus_panel.anchor_right = 1.0
-			hud.stat_site_bonus_panel.offset_left = -edge_margin - stat_site_bonus_width
-			hud.stat_site_bonus_panel.offset_right = -edge_margin
-			hud.stat_site_bonus_panel.offset_top = stat_top
-			hud.stat_site_bonus_panel.offset_bottom = hud.stat_site_bonus_panel.offset_top + stat_site_bonus_height
-			hud.stat_site_bonus_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		var site_bonus_box := hud.stat_site_bonus_panel.get_child(0) as VBoxContainer
-		if is_instance_valid(site_bonus_box):
-			site_bonus_box.custom_minimum_size = Vector2(stat_site_bonus_width - 4.0, stat_site_bonus_height)
+		hud.stat_site_bonus_panel.visible = false
 
 	if is_instance_valid(hud.bottom_right_container):
 		hud.bottom_right_container.offset_right = -edge_margin
@@ -313,6 +289,52 @@ static func setup_top_center_layout(hud) -> void:
 static func setup_top_right_layout(hud) -> void:
 	if hud == null:
 		return
+	if hud.top_right_container:
+		return
+	hud.top_right_container = VBoxContainer.new()
+	hud.add_child(hud.top_right_container)
+	hud.top_right_container.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	hud.top_right_container.offset_right = -24
+	hud.top_right_container.offset_top = 232
+	hud.top_right_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	hud.top_right_container.grow_vertical = Control.GROW_DIRECTION_END
+	hud.top_right_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+	hud.top_right_container.add_theme_constant_override("separation", 8)
+
+	hud.sea_site_bonus_panel = PanelContainer.new()
+	hud.sea_site_bonus_panel.name = "SeaSiteBonusHud"
+	hud.sea_site_bonus_panel.visible = false
+	hud.sea_site_bonus_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.sea_site_bonus_panel.custom_minimum_size = Vector2(204, 0)
+	hud.sea_site_bonus_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	hud.top_right_container.add_child(hud.sea_site_bonus_panel)
+
+	var bonus_box := VBoxContainer.new()
+	bonus_box.custom_minimum_size = Vector2(190, 0)
+	bonus_box.add_theme_constant_override("separation", 4)
+	hud.sea_site_bonus_panel.add_child(bonus_box)
+
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 5)
+	bonus_box.add_child(title_row)
+
+	var title_icon := Label.new()
+	title_icon.custom_minimum_size = Vector2(15, 15)
+	title_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	NavalUiTheme.apply_emblem(title_icon, "explore", 12, NavalUiTheme.TEXT_ACCENT)
+	title_row.add_child(title_icon)
+
+	var title_label := Label.new()
+	title_label.text = "해역 보너스"
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	NavalUiTheme.style_heading(title_label, 11)
+	title_row.add_child(title_label)
+
+	hud.sea_site_bonus_content = VBoxContainer.new()
+	hud.sea_site_bonus_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hud.sea_site_bonus_content.add_theme_constant_override("separation", 2)
+	bonus_box.add_child(hud.sea_site_bonus_content)
 
 # Detail/stat UI
 static func setup_stat_panel(hud) -> void:
@@ -383,7 +405,7 @@ static func setup_stat_panel(hud) -> void:
 
 	hud.stat_site_bonus_panel = MarginContainer.new()
 	hud.add_child(hud.stat_site_bonus_panel)
-	hud.stat_site_bonus_panel.visible = hud.show_stat_panel
+	hud.stat_site_bonus_panel.visible = false
 	hud.stat_site_bonus_panel.z_index = 90
 	hud.stat_site_bonus_panel.anchor_left = 1.0
 	hud.stat_site_bonus_panel.anchor_right = 1.0

@@ -216,6 +216,7 @@ func _launch_singigeon_proc_rocket(target: Node3D, attacker: Node3D, team_name: 
 		rocket.restart_flight()
 	if rocket.global_position.distance_squared_to(current_target_pos) > 0.0001:
 		rocket.look_at(current_target_pos, Vector3.UP)
+	_play_singigeon_launch_sfx(attacker, spawn_pos)
 	return true
 
 func _resolve_parent_ship(node: Node, max_depth: int = 6) -> Node3D:
@@ -235,6 +236,13 @@ func _get_arrow_aim_point(target: Node) -> Vector3:
 func _get_singigeon_aim_point(target: Node) -> Vector3:
 	var offset := SINGIGEON_AIM_VERTICAL_OFFSET if target.is_in_group("soldiers") else SINGIGEON_SHIP_AIM_VERTICAL_OFFSET
 	return NodeContractHelper.get_projectile_aim_point(target, offset)
+
+func _play_singigeon_launch_sfx(attacker: Node, spawn_pos: Vector3) -> void:
+	if not is_instance_valid(attacker):
+		return
+	var audio_manager = attacker.get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("singigeon_launch", spawn_pos, randf_range(0.96, 1.06))
 
 func _resolve_spawn_parent(tree: SceneTree) -> Node:
 	if is_instance_valid(_cached_spawn_parent):

@@ -4,6 +4,7 @@ const UiButtonAudio = preload("res://scripts/ui/ui_button_audio.gd")
 const MenuInputHelper = preload("res://scripts/ui/menu_input_helper.gd")
 const UiOverlayFx = preload("res://scripts/ui/ui_overlay_fx.gd")
 const ModalMenuSkin = preload("res://scripts/ui/menus/modal_menu_skin.gd")
+const VOLUME_SLIDER_NAV_STEP := 0.1
 
 signal closed
 
@@ -70,10 +71,10 @@ func _ready() -> void:
 	_bind_slider(music_slider, "music_volume")
 	_bind_slider(sfx_slider, "sfx_volume")
 	_bind_slider(ui_slider, "ui_volume")
-	master_slider.value = float(SaveManager.get_setting("master_volume", 0.85))
-	music_slider.value = float(SaveManager.get_setting("music_volume", 0.75))
-	sfx_slider.value = float(SaveManager.get_setting("sfx_volume", 0.85))
-	ui_slider.value = float(SaveManager.get_setting("ui_volume", 0.85))
+	master_slider.value = float(SaveManager.get_setting("master_volume", 0.5))
+	music_slider.value = float(SaveManager.get_setting("music_volume", 0.5))
+	sfx_slider.value = float(SaveManager.get_setting("sfx_volume", 0.5))
+	ui_slider.value = float(SaveManager.get_setting("ui_volume", 0.5))
 	screen_fx_check.button_pressed = SaveManager.get_setting("screen_edge_fx_enabled", true) == true
 	screen_fx_check.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	screen_fx_check.toggled.connect(_on_screen_fx_toggled)
@@ -356,7 +357,7 @@ func _populate_control_scheme_options() -> void:
 	_syncing_control_scheme_option = true
 	_control_scheme_option.clear()
 	var modes: Array[String] = ["ship", "screen"]
-	var selected_mode := str(SaveManager.get_setting("control_scheme", "ship"))
+	var selected_mode := str(SaveManager.get_setting("control_scheme", "screen"))
 	var selected_index := 0
 	for i in range(modes.size()):
 		var mode: String = modes[i]
@@ -375,13 +376,17 @@ func _populate_gamepad_confirm_options() -> void:
 		return
 	_syncing_gamepad_confirm_option = true
 	_gamepad_confirm_option.clear()
-	var positions: Array[String] = ["bottom", "right"]
-	var selected_position := str(SaveManager.get_setting("gamepad_confirm_button", "bottom"))
+	var positions: Array[String] = ["auto", "bottom", "right"]
+	var selected_position := str(SaveManager.get_setting("gamepad_confirm_button", "auto"))
 	var selected_index := 0
 	for i in range(positions.size()):
 		var position: String = positions[i]
 		var label_key := "options.gamepad_confirm_button.%s" % position
-		var fallback := "아래쪽" if position == "bottom" else "오른쪽"
+		var fallback := "자동"
+		if position == "bottom":
+			fallback = "아래쪽"
+		elif position == "right":
+			fallback = "오른쪽"
 		_gamepad_confirm_option.add_item(LocaleManager.t(label_key, fallback), i)
 		_gamepad_confirm_option.set_item_metadata(i, position)
 		if position == selected_position:
@@ -646,6 +651,7 @@ func _on_gamepad_confirm_selected(index: int) -> void:
 		return
 	var position := str(_gamepad_confirm_option.get_item_metadata(index))
 	SaveManager.set_setting("gamepad_confirm_button", position, false)
+	SaveManager.set_setting("gamepad_confirm_button_user_set", true, false)
 	SaveManager.apply_settings()
 
 
@@ -750,7 +756,7 @@ func _adjust_focused_horizontal(direction: int) -> void:
 	var focused := get_viewport().gui_get_focus_owner() if get_viewport() != null else null
 	if focused is HSlider:
 		var slider := focused as HSlider
-		var step_size := slider.step if slider.step > 0.0 else 0.01
+		var step_size := _get_slider_nav_step(slider)
 		var previous_value := slider.value
 		slider.value = clampf(slider.value + step_size * float(direction), slider.min_value, slider.max_value)
 		if not is_equal_approx(previous_value, slider.value):
@@ -758,6 +764,16 @@ func _adjust_focused_horizontal(direction: int) -> void:
 		_scroll_control_into_view(slider)
 	elif focused is OptionButton:
 		_select_adjacent_option(focused as OptionButton, direction)
+
+
+func _get_slider_nav_step(slider: HSlider) -> float:
+	if _is_volume_slider(slider):
+		return VOLUME_SLIDER_NAV_STEP
+	return slider.step if slider.step > 0.0 else 0.01
+
+
+func _is_volume_slider(slider: HSlider) -> bool:
+	return slider == master_slider or slider == music_slider or slider == sfx_slider or slider == ui_slider
 
 
 func _select_adjacent_option(option: OptionButton, direction: int) -> void:

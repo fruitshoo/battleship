@@ -53,14 +53,17 @@
 		"janggun": {
 			"name": "장군전",
 			"category": 0,
-			"description": "대포 포문에서 느리게 장전되는 장군전을 추가 발사",
+			"description": "대포 포문에서 장군전을 추가 발사하고 피해와 재장전을 강화",
 			"card_art_path": "res://assets/ui/upgrades/janggun_card.png",
 			"max_level": 5,
 			"color": "996633",
 			"stats": {
 				"base_cooldown": 12.0,
-				"cooldown_reduce_per_lv": 0.6,
-				"min_cooldown": 9.0
+				"cooldown_reduce_per_lv": 1.0,
+				"min_cooldown": 8.0,
+				"base_damage": 15.0,
+				"damage_per_lv": 5.0,
+				"projectile_speed": 19.0
 			}
 			},
 			"singigeon": {
@@ -262,7 +265,7 @@
 		"rowing": {
 			"name": "노",
 			"category": 3,
-			"description": "노 속도, 가속, 충각 돌진 회복 강화",
+			"description": "노 속도, 가속, 충각 돌진 지속/회복 강화",
 			"max_level": 5,
 			"color": "ffc65a",
 			"card_art_path": "res://assets/ui/upgrades/rowing_card.png",
@@ -271,6 +274,8 @@
 				"speed_add": 0.5,
 				"accel_levels": [2, 4],
 				"accel_mult": 1.18,
+				"ram_boost_duration_levels": [1, 2, 3, 4, 5],
+				"ram_boost_duration_add": 0.15,
 				"ram_boost_recharge_levels": [1, 2, 3, 4, 5],
 				"ram_boost_recharge_mult": 0.92,
 				"ram_boost_min_recharge_duration": 8.0

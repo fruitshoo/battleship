@@ -167,6 +167,9 @@ var stat_site_bonus_panel: Control = null
 var stat_site_bonus_scroll: ScrollContainer = null
 var stat_site_bonus_content: VBoxContainer = null
 var _last_stat_signature: String = ""
+var sea_site_bonus_panel: PanelContainer = null
+var sea_site_bonus_content: VBoxContainer = null
+var _last_site_bonus_hud_signature: String = ""
 @export_range(0.05, 1.0) var stat_refresh_interval: float = 0.2
 var _stat_refresh_left: float = 0.0
 var _stat_modal_active: bool = false
@@ -473,6 +476,10 @@ func toggle_ship_health_bars() -> void:
 
 func _update_stat_panel() -> void:
 	HudStatPanelHelper.update_stat_panel(self)
+
+
+func _update_site_bonus_hud() -> void:
+	HudStatPanelHelper.update_site_bonus_hud(self)
 
 
 func toggle_stat_panel() -> void:

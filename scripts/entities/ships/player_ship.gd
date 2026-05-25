@@ -110,11 +110,9 @@ var ramming_boost_hit_registered: bool = false
 
 @export_group("Boarding Rope Resistance")
 @export_range(0.05, 1.0, 0.01) var boarding_rope_resist_first_gain: float = 0.10
-@export_range(0.05, 1.0, 0.01) var boarding_rope_resist_alternate_gain: float = 0.18
 @export_range(0.0, 0.4, 0.01) var boarding_rope_resist_repeat_gain: float = 0.02
 @export_range(0.1, 2.0, 0.05) var boarding_rope_resist_input_window: float = 0.65
 @export_range(0.0, 1.5, 0.05) var boarding_rope_resist_decay_rate: float = 0.30
-@export_range(0.0, 1.5, 0.05) var boarding_rope_resist_delay_on_alternate: float = 0.32
 @export_group("")
 var boarding_rope_resist_progress: float = 0.0
 var boarding_rope_resist_last_direction: int = 0
@@ -1247,8 +1245,7 @@ func try_resist_incoming_boarding_rope(direction: int) -> bool:
 	if boarding_rope_resist_last_direction == 0 or boarding_rope_resist_input_window_timer <= 0.0:
 		gain = boarding_rope_resist_first_gain
 	elif alternated:
-		gain = boarding_rope_resist_alternate_gain
-		_delay_incoming_boarding_transfer(attacker, boarding_rope_resist_delay_on_alternate)
+		gain = boarding_rope_resist_first_gain
 		_play_rope_resist_tension_sfx(false)
 	boarding_rope_resist_progress = clampf(boarding_rope_resist_progress + gain, 0.0, 1.0)
 	if attacker.has_method("pulse_boarding_rope_feedback"):
@@ -1292,15 +1289,6 @@ func _get_resistable_boarding_attacker() -> Node3D:
 	return attacker as Node3D
 
 
-func _delay_incoming_boarding_transfer(attacker: Node3D, delay_seconds: float) -> void:
-	if not is_instance_valid(attacker) or delay_seconds <= 0.0:
-		return
-	if attacker.get("boarding_timer") != null:
-		attacker.set("boarding_timer", maxf(0.0, float(attacker.get("boarding_timer")) - delay_seconds))
-	if attacker.get("boarding_prep_timer") != null:
-		attacker.set("boarding_prep_timer", maxf(0.0, float(attacker.get("boarding_prep_timer")) - delay_seconds * 0.45))
-
-
 func _break_incoming_boarding_rope(attacker: Node3D) -> void:
 	if not is_instance_valid(attacker):
 		_reset_boarding_rope_resistance()
@@ -1329,10 +1317,10 @@ func _play_rope_resist_tension_sfx(break_sound: bool) -> void:
 	if boarding_rope_resist_sfx_timer > 0.0 and not break_sound:
 		return
 	boarding_rope_resist_sfx_timer = 0.18
-	var sfx_key := "impact_wood" if break_sound else "mast_creak"
-	var pitch := randf_range(1.05, 1.18) if break_sound else randf_range(0.86, 0.98)
-	var volume := -1.5 if break_sound else -5.0
-	_cached_audio_manager.play_sfx(sfx_key, global_position, pitch, volume)
+	if break_sound:
+		_cached_audio_manager.play_sfx("soldier_hit", global_position, randf_range(1.22, 1.38), -4.0)
+		return
+	_cached_audio_manager.play_sfx("soldier_hit", global_position, randf_range(0.78, 0.92), -8.0)
 
 
 ## 러더 조향 입력 처리

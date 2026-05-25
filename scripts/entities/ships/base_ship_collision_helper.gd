@@ -30,9 +30,9 @@ const PLAYER_CONTACT_VFX_MIN_HEIGHT := 0.58
 const PLAYER_CONTACT_VFX_MAX_HEIGHT := 0.92
 const FRONT_TO_SIDE_CONTACT_EDGE_BIAS := 0.38
 const RAMMING_KNOCKBACK_MIN_FORWARD_DOT := 0.55
-const RAMMING_KNOCKBACK_BASE_SPEED := 2.6
-const RAMMING_KNOCKBACK_SPEED_SCALE := 0.42
-const RAMMING_KNOCKBACK_MAX_SPEED := 7.2
+const RAMMING_KNOCKBACK_BASE_SPEED := 2.4
+const RAMMING_KNOCKBACK_SPEED_SCALE := 0.58
+const RAMMING_KNOCKBACK_MAX_SPEED := 8.6
 const RAMMING_DAMAGE_SPEED_SCALE := 4.2
 const RAMMING_DAMAGE_SIDE_HIT_MULT := 1.35
 const RAMMING_DAMAGE_BOW_HIT_MULT := 0.55
@@ -41,6 +41,7 @@ const RAMMING_DAMAGE_ATTACKER_MAX_ALIGNMENT_MULT := 1.22
 const RAMMING_BOOST_ASSIST_PAD := 0.95
 const RAMMING_BOOST_ASSIST_FORWARD_DOT := 0.52
 const RAMMING_BOOST_ASSIST_MIN_SPEED_RATIO := 0.68
+const RAMMING_IMPACT_RESISTANCE_ENABLED := false
 const RAMMING_BOOST_IMPACT_BRAKE := 0.42
 const RAMMING_LETHAL_IMPACT_BRAKE := 0.58
 const RAMMING_BOOST_BACK_IMPULSE := 1.15
@@ -54,6 +55,9 @@ const MOVEMENT_GUARD_DEFAULT_SAFE_RATIO := 0.98
 const MOVEMENT_GUARD_ENGAGEMENT_SAFE_RATIO := 0.92
 const MOVEMENT_GUARD_SUPPORT_SAFE_RATIO := 0.84
 const MOVEMENT_GUARD_MAX_CHECKS := 8
+const COLLISION_LOW_SPEED_PRESSURE_MIN := 0.32
+const COLLISION_LOW_SPEED_PRESSURE_FULL_RATIO := 0.82
+const COLLISION_DEEP_OVERLAP_PRESSURE_MIN := 0.58
 
 static var _last_contact_sfx_msec_by_pair: Dictionary = {}
 static var _last_contact_vfx_msec_by_pair: Dictionary = {}
@@ -209,7 +213,21 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 					repulsion_strength = maxf(repulsion_strength, 26.0)
 				else:
 					repulsion_strength = maxf(repulsion_strength, 72.0)
-			var repulsion_force = -dir * (compression * repulsion_strength * movement_share)
+			var min_ramming_speed := maxf(float(ship.min_ramming_speed), 0.1)
+			var contact_pressure_ratio := clampf(approach_speed / min_ramming_speed, 0.0, 1.25)
+			var contact_pressure_scale := lerpf(
+				COLLISION_LOW_SPEED_PRESSURE_MIN,
+				1.0,
+				smoothstep(0.05, COLLISION_LOW_SPEED_PRESSURE_FULL_RATIO, contact_pressure_ratio)
+			)
+			if penetration_ratio > 0.16:
+				var deep_overlap_scale := lerpf(
+					COLLISION_LOW_SPEED_PRESSURE_MIN,
+					COLLISION_DEEP_OVERLAP_PRESSURE_MIN,
+					clampf((penetration_ratio - 0.16) / 0.18, 0.0, 1.0)
+				)
+				contact_pressure_scale = maxf(contact_pressure_scale, deep_overlap_scale)
+			var repulsion_force = -dir * (compression * repulsion_strength * movement_share * contact_pressure_scale)
 			if is_player_support_pair:
 				var my_right = my_fwd.cross(Vector3.UP)
 				my_right.y = 0.0
@@ -988,6 +1006,8 @@ static func _will_ramming_hit_sink(victim: Node, raw_ramming_damage: float) -> b
 
 
 static func _apply_ramming_impact_resistance(victim: Node, attacker: Node3D, impact_speed: float, dir_to_attacker: Vector3, is_boosted_hit: bool, will_sink_from_hit: bool) -> void:
+	if not RAMMING_IMPACT_RESISTANCE_ENABLED:
+		return
 	if not is_instance_valid(victim) or not is_instance_valid(attacker):
 		return
 	if NodeContractHelper.get_team_tag(victim) == NodeContractHelper.get_team_tag(attacker):
@@ -1057,6 +1077,8 @@ static func _apply_ramming_knockback(victim, attacker: Node3D, impact_speed: flo
 static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed: float) -> void:
 	if not ship.is_inside_tree():
 		return
+	if _should_skip_collision_vfx_for_lightweight_ship(ship):
+		return
 
 	_spawn_ship_collision_water_splash(ship, impact_pos, impact_speed)
 
@@ -1073,6 +1095,12 @@ static func spawn_ship_collision_effects(ship, impact_pos: Vector3, impact_speed
 			5,
 			80.0
 		)
+
+
+static func _should_skip_collision_vfx_for_lightweight_ship(ship) -> bool:
+	if ship == null:
+		return true
+	return ship.get("wood_splinter_scene") == null
 
 
 static func _spawn_ship_collision_water_splash(ship, impact_pos: Vector3, _impact_speed: float) -> void:

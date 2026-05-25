@@ -148,7 +148,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				float(s.get("min_cooldown", 9.0)),
 				float(s.get("base_cooldown", 12.0)) - float(next_level - 1) * float(s.get("cooldown_reduce_per_lv", 0.6))
 			)
-			return "포문 장군전 재장전 %.1f초 | 화염/둔화 강화" % janggun_cooldown
+			var janggun_damage := float(s.get("base_damage", 15.0)) + float(maxi(0, next_level - 1)) * float(s.get("damage_per_lv", 5.0))
+			return "포문 장군전 피해 %.0f | 재장전 %.1f초" % [janggun_damage, janggun_cooldown]
 		"singigeon":
 			var proc_stats := get_singigeon_proc_stats(upgrades, current_levels, next_level)
 			var rocket_damage: float = float(s.get("base_damage", 12.0)) + float(maxi(0, next_level - 1)) * float(s.get("damage_per_lv", 2.0))
@@ -208,6 +209,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 				rowing_parts.append("노젓기 속도 +%.1f" % float(s.get("speed_add", 1.0)))
 			if level_matches(next_level, s.get("accel_levels", [])):
 				rowing_parts.append("노젓기 가속 +%d%%" % int(round((float(s.get("accel_mult", 1.2)) - 1.0) * 100.0)))
+			if level_matches(next_level, s.get("ram_boost_duration_levels", [])):
+				rowing_parts.append("충각 돌진 지속 +%.2f초" % float(s.get("ram_boost_duration_add", 0.15)))
 			if level_matches(next_level, s.get("ram_boost_recharge_levels", [])):
 				var recharge_speed_bonus := int(round((1.0 / maxf(0.01, float(s.get("ram_boost_recharge_mult", 0.92))) - 1.0) * 100.0))
 				rowing_parts.append("충각 돌진 회복 +%d%%" % recharge_speed_bonus)

@@ -43,6 +43,12 @@ static func _run_main_menu_check(owner: Node, failures: Array[String], viewport_
 	_expect_control_within_viewport(menu.get_node_or_null("TitleBlock") as Control, viewport_size, failures, "main menu title block")
 	_expect_control_within_viewport(menu.get_node_or_null("ButtonBlock") as Control, viewport_size, failures, "main menu button block")
 	_expect_button_audio_wired(menu, failures, "main menu")
+	var next_event := InputEventKey.new()
+	next_event.pressed = true
+	next_event.physical_keycode = KEY_D
+	menu.call("_input", next_event)
+	if int(menu.get("_focused_button_index")) != 1:
+		failures.append("main menu next navigation should move exactly one action button")
 	menu.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -53,17 +59,43 @@ static func _run_pause_menu_check(owner: Node, failures: Array[String], viewport
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(pause_menu.get_node_or_null("Center/Panel") as Control, viewport_size, failures, "pause panel")
 	_expect_button_audio_wired(pause_menu, failures, "pause menu")
+	var next_event := InputEventKey.new()
+	next_event.pressed = true
+	next_event.physical_keycode = KEY_D
+	pause_menu.call("_input", next_event)
+	if int(pause_menu.get("_focused_button_index")) != 1:
+		failures.append("pause menu next navigation should move exactly one action button")
 	pause_menu.queue_free()
 	await _wait_frames(owner, 1)
 
 
 static func _run_options_panel_check(owner: Node, failures: Array[String], viewport_size: Vector2) -> void:
+	var previous_master_volume: Variant = SaveManager.get_setting("master_volume") if is_instance_valid(SaveManager) else 0.5
 	var options_panel := OPTIONS_PANEL_SCENE.instantiate()
 	owner.add_child(options_panel)
 	await _wait_frames(owner, 2)
 	_expect_control_within_viewport(options_panel.get_node_or_null("Panel") as Control, viewport_size, failures, "options panel")
 	_expect_button_audio_wired(options_panel, failures, "options panel")
+	var master_slider := options_panel.get_node_or_null("Panel/Shell/ContentScroll/ContentMargin/Content/MasterRow/MasterSlider") as HSlider
+	if not is_instance_valid(master_slider):
+		master_slider = options_panel.get_node_or_null("Panel/Shell/Content/MasterRow/MasterSlider") as HSlider
+	if is_instance_valid(master_slider):
+		master_slider.value = 0.5
+		master_slider.grab_focus()
+		var right_event := InputEventKey.new()
+		right_event.pressed = true
+		right_event.physical_keycode = KEY_D
+		options_panel.call("_input", right_event)
+		if absf(master_slider.value - 0.6) > 0.001:
+			failures.append("options panel volume slider keyboard/gamepad step should be 10 percent")
+		if absf(master_slider.step - 0.01) > 0.001:
+			failures.append("options panel volume slider mouse drag precision should stay fine-grained")
+	else:
+		failures.append("options panel master volume slider missing during navigation step contract")
 	options_panel.queue_free()
+	if is_instance_valid(SaveManager):
+		SaveManager.set_setting("master_volume", previous_master_volume, false)
+		SaveManager.apply_settings()
 	await _wait_frames(owner, 1)
 
 
@@ -79,6 +111,13 @@ static func _run_upgrade_ui_check(owner: Node, failures: Array[String], viewport
 		for child in cards_container.get_children():
 			_expect_control_within_viewport(child as Control, viewport_size, failures, "upgrade card")
 	_expect_button_audio_wired(upgrade_ui, failures, "upgrade UI")
+	var reroll_button := upgrade_ui.get("reroll_button") as Button
+	if not is_instance_valid(reroll_button) or reroll_button.focus_mode != Control.FOCUS_NONE:
+		failures.append("upgrade UI reroll button should not take engine focus away from card navigation")
+	upgrade_ui.call("_handle_discrete_nav", Vector2i(0, 1))
+	upgrade_ui.call("_handle_discrete_nav", Vector2i(1, 0))
+	if bool(upgrade_ui.get("_reroll_focused")) or int(upgrade_ui.get("_focused_index")) != 1:
+		failures.append("upgrade UI horizontal input from reroll should return to card choices")
 	var selected_upgrade := {"id": ""}
 	upgrade_ui.upgrade_chosen.connect(func(upgrade_id: String) -> void:
 		selected_upgrade["id"] = upgrade_id
@@ -169,6 +208,18 @@ static func _run_result_screen_check(owner: Node, failures: Array[String], viewp
 	_expect_control_within_viewport(result_screen.get_node_or_null("Content") as Control, viewport_size, failures, "result screen content")
 	_expect_control_within_viewport(result_screen.get_node_or_null("ButtonBlock") as Control, viewport_size, failures, "result screen buttons")
 	_expect_button_audio_wired(result_screen, failures, "result screen")
+	var right_event := InputEventKey.new()
+	right_event.pressed = true
+	right_event.physical_keycode = KEY_D
+	result_screen.call("_input", right_event)
+	if int(result_screen.get("_focused_button_index")) != 1:
+		failures.append("result screen right navigation should move exactly one action button")
+	var left_event := InputEventKey.new()
+	left_event.pressed = true
+	left_event.physical_keycode = KEY_A
+	result_screen.call("_input", left_event)
+	if int(result_screen.get("_focused_button_index")) != 0:
+		failures.append("result screen left navigation should move exactly one action button")
 	result_screen.queue_free()
 	RunResultStoreScript.clear()
 	await _wait_frames(owner, 1)

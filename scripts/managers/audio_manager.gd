@@ -313,6 +313,12 @@ const SFX_PROFILE_OVERRIDES := {
 		"pitch_jitter": 0.025,
 		"rate_limit_msec": 110,
 	},
+	"singigeon_launch": {
+		"volume_db": 4.0,
+		"max_distance": 230.0,
+		"unit_size": 75.0,
+		"pitch_jitter": 0.04,
+	},
 	"ship_sink_bubbles": {
 		"volume_db": 1.0,
 		"max_distance": 320.0,

@@ -223,8 +223,10 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 		var random_bonus_totals_variant: Variant = player_ship.get_meta("sea_site_bonus_totals", {})
 		if not (random_bonus_totals_variant is Dictionary) or (random_bonus_totals_variant as Dictionary).is_empty():
 			failures.append("hud smoke random sea-site bonus debug did not grant a bonus")
-		if _find_label_by_text_prefix(hud.stat_site_bonus_panel, "누적 효과") == null:
-			failures.append("hud smoke random sea-site bonus debug did not refresh stat bonus rail")
+		if hud.has_method("_update_site_bonus_hud"):
+			hud.call("_update_site_bonus_hud")
+		if _find_label_by_text_prefix(hud.sea_site_bonus_panel, "해역 보너스") == null:
+			failures.append("hud smoke random sea-site bonus debug did not refresh compass-side bonus HUD")
 		if player_ship.has_meta("sea_site_bonus_totals"):
 			player_ship.remove_meta("sea_site_bonus_totals")
 		if player_ship.has_meta("sea_site_bonus_counts"):
@@ -249,17 +251,17 @@ static func _run_hud_state_baselines(hud: Node, player_ship: Node3D, failures: A
 		hud.set("_last_stat_signature", "")
 	if hud.has_method("_update_stat_panel"):
 		hud.call("_update_stat_panel")
-	var site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
+	var site_bonus_panel := hud.get("sea_site_bonus_panel") as Control
 	if not is_instance_valid(site_bonus_panel):
-		failures.append("hud smoke stat modal should create a right-side site bonus rail")
+		failures.append("hud smoke should create a compass-side site bonus panel")
 	else:
 		var cannon_bonus := _find_label_by_text_prefix(site_bonus_panel, "포격 피해")
 		var cannon_bonus_value := _find_label_by_text_prefix(site_bonus_panel, "+8%")
 		var repair_bonus := _find_label_by_text_prefix(site_bonus_panel, "선체 수리")
 		if not is_instance_valid(cannon_bonus) or not is_instance_valid(cannon_bonus_value):
-			failures.append("hud smoke site bonus panel did not show cumulative cannon damage bonus")
+			failures.append("hud smoke compass-side site bonus panel did not show cumulative cannon damage bonus")
 		if not is_instance_valid(repair_bonus):
-			failures.append("hud smoke site bonus panel did not show hull repair site bonus")
+			failures.append("hud smoke compass-side site bonus panel did not show hull repair site bonus")
 	_validate_hud_upgrade_track_art(hud, failures)
 	_validate_hud_stat_modal_toggle(hud, failures)
 
@@ -1421,25 +1423,16 @@ static func _validate_hud_baseline_state(hud: Node, failures: Array[String]) -> 
 				failures.append("hud smoke stat panel should put ship body details directly after core summary")
 			if first_section is PanelContainer:
 				failures.append("hud smoke stat panel detail sections should use report-style rows instead of inner cards")
-	var site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
+	var site_bonus_panel := hud.get("sea_site_bonus_panel") as Control
 	if not is_instance_valid(site_bonus_panel):
-		failures.append("hud smoke stat panel should include a right-side site bonus rail")
+		failures.append("hud smoke should include a compass-side site bonus panel")
 	else:
-		if site_bonus_panel is PanelContainer:
-			failures.append("hud smoke site bonus rail should not use a card panel container")
 		var site_title := _find_label_by_text_prefix(site_bonus_panel, "해역 보너스")
-		if not is_instance_valid(site_title):
-			failures.append("hud smoke site bonus rail title missing")
-		if _find_label_by_text_prefix(site_bonus_panel, "포격 피해") != null:
-			failures.append("hud smoke empty site bonus panel should not list bonuses before rewards")
-	if is_instance_valid(hud.get("stat_site_bonus_scroll")) and is_instance_valid(hud.get("stat_site_bonus_content")):
-		var site_bonus_scroll := hud.get("stat_site_bonus_scroll") as ScrollContainer
-		var site_bonus_content := hud.get("stat_site_bonus_content") as VBoxContainer
-		var site_bonus_gutter := site_bonus_content.get_parent() as MarginContainer
-		if not is_instance_valid(site_bonus_gutter) or site_bonus_gutter.get_parent() != site_bonus_scroll:
-			failures.append("hud smoke site bonus content should sit inside a scrollbar gutter")
-		elif site_bonus_gutter.get_theme_constant("margin_right") < 10:
-			failures.append("hud smoke site bonus scrollbar gutter should reserve right-side reading space")
+		if is_instance_valid(site_bonus_panel) and site_bonus_panel.visible and not is_instance_valid(site_title):
+			failures.append("hud smoke compass-side site bonus title missing")
+	var stat_site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
+	if is_instance_valid(stat_site_bonus_panel) and stat_site_bonus_panel.visible:
+		failures.append("hud smoke Tab stat panel should not show the site bonus rail")
 	if not is_instance_valid(hud.player_status_root) or not hud.player_status_root.visible:
 		failures.append("hud smoke player status overlay was not visible")
 	if is_instance_valid(hud.hp_bar):
@@ -1501,8 +1494,11 @@ static func _validate_hud_stat_modal_toggle(hud: Node, failures: Array[String]) 
 	if int(hud.get("layer")) <= previous_layer:
 		failures.append("hud smoke stat modal should raise GameHUD above later UI canvas layers")
 	var site_bonus_panel := hud.get("stat_site_bonus_panel") as Control
-	if not is_instance_valid(site_bonus_panel) or not site_bonus_panel.visible:
-		failures.append("hud smoke stat modal site bonus rail should be visible while open")
+	if is_instance_valid(site_bonus_panel) and site_bonus_panel.visible:
+		failures.append("hud smoke stat modal should not show the site bonus rail while open")
+	var compass_bonus_panel := hud.get("sea_site_bonus_panel") as Control
+	if not is_instance_valid(compass_bonus_panel):
+		failures.append("hud smoke compass-side site bonus panel missing")
 	hud.call("toggle_stat_panel")
 	if bool(hud.get("show_stat_panel")):
 		failures.append("hud smoke stat modal did not close")
@@ -1513,7 +1509,7 @@ static func _validate_hud_stat_modal_toggle(hud: Node, failures: Array[String]) 
 	if is_instance_valid(backdrop) and backdrop.visible:
 		failures.append("hud smoke stat modal backdrop should hide after closing")
 	if is_instance_valid(site_bonus_panel) and site_bonus_panel.visible:
-		failures.append("hud smoke stat modal site bonus rail should hide after closing")
+		failures.append("hud smoke stat modal site bonus rail should stay hidden after closing")
 	hud.set("show_stat_panel", previous_show)
 	if previous_show and hud.has_method("_update_stat_panel"):
 		hud.call("_update_stat_panel")

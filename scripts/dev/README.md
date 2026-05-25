@@ -63,6 +63,9 @@ Use `--strict` when you want the audit step to fail on any legacy-pattern hits.
 ## `export_windows_release.sh`
 
 Exports the Windows preset and names the output using `project.godot`'s `config/version`.
+The script first runs `scripts/dev/export_dependency_guard.py` so export exclude
+filters cannot hide files that scenes, resources, imports, or GLB/GLTF assets
+still reference.
 
 Examples:
 
@@ -80,6 +83,19 @@ exports/Battleship-v{version}-windows.zip
 ```
 
 See `docs/versioning.md` for the bump rules.
+
+## `export_dependency_guard.py`
+
+Checks export preset `exclude_filter` patterns against runtime resource
+references before a release build.
+
+Examples:
+
+```bash
+python3 scripts/dev/export_dependency_guard.py --preset "Windows Desktop"
+bash scripts/test/run_export_dependency_guard.sh
+python3 scripts/dev/export_dependency_guard.py --extra-exclude "assets/models/props/helmat/*Layer.png"
+```
 
 ## `soldier_balance_report.py`
 

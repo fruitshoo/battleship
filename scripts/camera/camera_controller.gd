@@ -188,13 +188,12 @@ func _physics_process(delta: float) -> void:
 func _update_gamepad_camera_input(delta: float) -> void:
 	var rotate_x := Input.get_action_strength("camera_rotate_right") - Input.get_action_strength("camera_rotate_left")
 	var rotate_y := Input.get_action_strength("camera_rotate_down") - Input.get_action_strength("camera_rotate_up")
-	var zoom_modifier_pressed := Input.is_action_pressed("camera_zoom_modifier")
+	var zoom_input := Input.get_action_strength("camera_zoom_out") - Input.get_action_strength("camera_zoom_in")
 	if absf(rotate_x) > gamepad_camera_deadzone:
 		_cam_rotation.x -= rotate_x * gamepad_rotation_speed * delta
-	if zoom_modifier_pressed:
-		if absf(rotate_y) > gamepad_camera_deadzone:
-			target_zoom = clamp(target_zoom + rotate_y * gamepad_zoom_speed * delta, min_zoom, max_zoom)
-	elif absf(rotate_y) > gamepad_camera_deadzone:
+	if absf(zoom_input) > 0.0:
+		target_zoom = clamp(target_zoom + zoom_input * gamepad_zoom_speed * delta, min_zoom, max_zoom)
+	if absf(rotate_y) > gamepad_camera_deadzone:
 		_cam_rotation.y -= rotate_y * gamepad_rotation_speed * delta
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
 

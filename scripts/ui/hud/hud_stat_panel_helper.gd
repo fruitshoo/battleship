@@ -16,6 +16,7 @@ const SITE_BONUS_ICON_BY_ID := {
 }
 
 static func process_stat_panel(hud, delta: float) -> void:
+	update_site_bonus_hud(hud)
 	if not hud.show_stat_panel:
 		return
 	hud._stat_refresh_left -= delta
@@ -39,28 +40,44 @@ static func toggle_stat_panel(hud) -> void:
 
 
 static func update_stat_panel(hud) -> void:
+	update_site_bonus_hud(hud)
 	if not is_instance_valid(hud.stat_panel):
 		return
 	hud.stat_panel.visible = hud.show_stat_panel
 	if is_instance_valid(hud.stat_site_bonus_panel):
-		hud.stat_site_bonus_panel.visible = hud.show_stat_panel
+		hud.stat_site_bonus_panel.visible = false
 	if not hud.show_stat_panel:
 		_set_stat_modal_active(hud, false)
 		return
 	if not is_instance_valid(hud.stat_content):
 		return
 	var sections: Array[Dictionary] = build_stat_sections(hud)
-	var site_bonus_sections: Array[Dictionary] = build_site_bonus_sections(hud)
-	var site_bonus_has_rows: bool = _sections_have_rows(site_bonus_sections)
 	if is_instance_valid(hud.stat_site_bonus_panel):
-		hud.stat_site_bonus_panel.visible = hud.show_stat_panel and site_bonus_has_rows
+		hud.stat_site_bonus_panel.visible = false
 	var columns: int = _get_detail_column_count(hud)
-	var signature: String = "%s||site:%s||cols:%d" % [_build_signature(sections), _build_signature(site_bonus_sections), columns]
+	var signature: String = "%s||cols:%d" % [_build_signature(sections), columns]
 	if hud._last_stat_signature == signature:
 		return
 	hud._last_stat_signature = signature
 	_rebuild_stat_content(hud, sections)
-	_rebuild_site_bonus_content(hud, site_bonus_sections)
+
+
+static func update_site_bonus_hud(hud) -> void:
+	if hud == null or not is_instance_valid(hud.sea_site_bonus_panel) or not is_instance_valid(hud.sea_site_bonus_content):
+		return
+	var rows: Array[Dictionary] = []
+	if is_instance_valid(hud.player_ship):
+		rows = _build_site_bonus_rows(hud.player_ship)
+	if rows.is_empty():
+		hud.sea_site_bonus_panel.visible = false
+		hud._last_site_bonus_hud_signature = ""
+		return
+	hud.sea_site_bonus_panel.visible = true
+	var signature := _build_signature([{"title": "해역 보너스", "rows": rows}])
+	if hud._last_site_bonus_hud_signature == signature:
+		return
+	hud._last_site_bonus_hud_signature = signature
+	_rebuild_compact_site_bonus_content(hud, rows)
 
 
 static func _set_stat_modal_active(hud, active: bool) -> void:
@@ -135,6 +152,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 	var sail_turn_speed: float = _get_float(ship, "sail_turn_speed", PLAYER_SAIL_TURN_SPEED)
 	var rowing_speed: float = _get_float(ship, "rowing_speed", 0.0)
 	var rowing_acceleration_mult: float = _get_float(ship, "rowing_acceleration_mult", 1.0)
+	var ram_boost_duration: float = _get_float(ship, "ramming_boost_duration", 0.0)
 	var ram_boost_recharge_duration: float = (
 		float(ship.call("get_ramming_boost_recharge_duration_value"))
 		if ship.has_method("get_ramming_boost_recharge_duration_value")
@@ -150,6 +168,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 			{"icon": "sync_alt", "label": "돛 회전", "value": "%.0f°/s" % sail_turn_speed},
 			{"icon": "rowing", "label": "노젓기 속도", "value": "%.1f" % rowing_speed},
 			{"icon": "offline_bolt", "label": "노 가속", "value": "+%d%%" % max(0, int(round((rowing_acceleration_mult - 1.0) * 100.0)))},
+			{"icon": "timer", "label": "충각 지속", "value": "%.2fs" % ram_boost_duration},
 			{"icon": "bolt", "label": "충각 회복", "value": "%.1fs" % ram_boost_recharge_duration},
 			{"icon": "turn_right", "label": "러더 선회", "value": "%.0f°/s" % rudder_turn_speed},
 		],
@@ -310,6 +329,46 @@ static func _rebuild_site_bonus_content(hud, sections: Array[Dictionary]) -> voi
 		if rows.is_empty():
 			continue
 		hud.stat_site_bonus_content.add_child(_create_section(section, hud))
+
+
+static func _rebuild_compact_site_bonus_content(hud, rows: Array[Dictionary]) -> void:
+	for child in hud.sea_site_bonus_content.get_children():
+		child.queue_free()
+	for row in rows:
+		if row is Dictionary:
+			hud.sea_site_bonus_content.add_child(_create_compact_site_bonus_row(row, hud))
+
+
+static func _create_compact_site_bonus_row(row: Dictionary, hud = null) -> Control:
+	var row_box := HBoxContainer.new()
+	row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row_box.custom_minimum_size.y = 16.0
+	row_box.add_theme_constant_override("separation", 4)
+	_apply_row_tooltip(row_box, row, hud)
+
+	var icon_label := _create_icon_label(str(row.get("icon", "auto_awesome")), 11, NavalUiTheme.TEXT_BLUE)
+	_apply_row_tooltip(icon_label, row, hud)
+	row_box.add_child(icon_label)
+
+	var label := Label.new()
+	label.text = str(row.get("label", ""))
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.clip_text = true
+	NavalUiTheme.style_body(label, 9)
+	_apply_row_tooltip(label, row, hud)
+	row_box.add_child(label)
+
+	var value := Label.new()
+	value.text = str(row.get("value", ""))
+	value.custom_minimum_size.x = 42.0
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value.clip_text = true
+	NavalUiTheme.style_overlay_value(value, 9)
+	value.add_theme_constant_override("outline_size", 2)
+	_apply_row_tooltip(value, row, hud)
+	row_box.add_child(value)
+	return row_box
+
 
 static func _create_section(section: Dictionary, hud = null) -> Control:
 	var section_root := MarginContainer.new()

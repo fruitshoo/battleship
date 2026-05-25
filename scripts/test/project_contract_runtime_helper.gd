@@ -170,7 +170,7 @@ static func run_runtime_smoke(owner: Node, failures: Array[String], smoke_scene_
 	_run_ship_targeting_contract(owner, failures)
 	_run_ramming_boost_assist_contract(owner, failures)
 	_run_ramming_boost_refund_contract(failures)
-	_run_ramming_boost_lethal_feedback_contract(owner, failures)
+	await _run_ramming_boost_lethal_feedback_contract(owner, failures)
 	await _run_authoring_spawn_runtime_contract(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
 	await _run_ramming_boost_spawned_angle_contract(owner, failures, packed, smoke_scene_path, wait_frames_after_attach, wait_frames_after_spawn)
 
@@ -345,10 +345,22 @@ static func _run_ramming_boost_lethal_feedback_contract(owner: Node, failures: A
 		failures.append("ramming boost lethal feedback contract did not apply impact aoe before sinking")
 	if not attacker.boost_hit_registered:
 		failures.append("ramming boost lethal feedback contract did not register boost hit")
-	if attacker.current_speed >= speed_before * 0.72:
-		failures.append("ramming boost lethal feedback contract did not brake attacker speed")
-	if attacker.get("collision_impulse_velocity") == null and attacker.current_speed >= speed_before * 0.55:
-		failures.append("ramming boost lethal feedback contract did not leave enough impact resistance")
+
+	var deferred_ship := BaseShip.new()
+	root.add_child(deferred_ship)
+	deferred_ship.max_hull_hp = 100.0
+	deferred_ship.hull_hp = 12.0
+	deferred_ship.hull_defense = 0.0
+	deferred_ship.take_damage(80.0, Vector3.ZERO, "ramming")
+	if deferred_ship.hull_hp <= 0.0:
+		failures.append("deferred lethal damage contract sank the ship immediately")
+	if not deferred_ship.has_meta("deferred_lethal_damage_active"):
+		failures.append("deferred lethal damage contract did not schedule pending lethal damage")
+	if deferred_ship.get_meta("derelict_nonblocking", false) != true:
+		failures.append("deferred lethal damage contract should make collapsing ships nonblocking")
+	await owner.get_tree().create_timer(0.68).timeout
+	if deferred_ship.hull_hp > 0.0:
+		failures.append("deferred lethal damage contract did not finish pending lethal damage")
 
 	root.queue_free()
 

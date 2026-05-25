@@ -486,7 +486,7 @@ static func _run_support_panokseon_upgrade_smoke(owner: Node, failures: Array[St
 	var original_panokseon_level: int = int(UpgradeManager.current_levels.get("panokseon_upgrade", 0))
 	var original_crew_level: int = int(UpgradeManager.current_levels.get("fleet_crew", 0))
 	var original_cannon_level: int = int(UpgradeManager.current_levels.get("cannon", 0))
-	UpgradeManager.current_levels["fleet_signal"] = max(1, original_signal_level)
+	UpgradeManager.current_levels["fleet_signal"] = 0
 	UpgradeManager.current_levels["panokseon_upgrade"] = 1
 	UpgradeManager.current_levels["fleet_crew"] = 0
 	UpgradeManager.current_levels["cannon"] = 5
@@ -494,25 +494,17 @@ static func _run_support_panokseon_upgrade_smoke(owner: Node, failures: Array[St
 	await _wait_frames(owner, wait_frames_after_spawn + 2)
 
 	var upgraded_supports: Array = player_ship.call("_get_support_fleet_ships")
-	if upgraded_supports.size() < 2:
-		failures.append("support fleet smoke panokseon upgrade should add a second support ship")
+	if upgraded_supports.size() != 1:
+		failures.append("support fleet smoke panokseon upgrade should work without fleet_signal and keep one support ship")
 	else:
-		var screen_support := upgraded_supports[0] as Node3D
-		var panokseon_support := upgraded_supports[1] as Node3D
-		if not is_instance_valid(screen_support):
-			failures.append("support fleet smoke panokseon upgrade lead screen support invalid")
-		else:
-			if int(screen_support.get_meta("support_fleet_slot_index", -1)) != 0:
-				failures.append("support fleet smoke panokseon upgrade should preserve the first maengseon in slot 0")
-			elif str(screen_support.get("ship_type")) != "maengseon_ally":
-				failures.append("support fleet smoke panokseon upgrade should keep the first support ship as maengseon")
+		var panokseon_support := upgraded_supports[0] as Node3D
 		if not is_instance_valid(panokseon_support):
 			failures.append("support fleet smoke panokseon upgrade added panokseon invalid")
 		else:
-			if int(panokseon_support.get_meta("support_fleet_slot_index", -1)) != 1:
-				failures.append("support fleet smoke panokseon upgrade should add panokseon in slot 1")
+			if int(panokseon_support.get_meta("support_fleet_slot_index", -1)) != 0:
+				failures.append("support fleet smoke panokseon upgrade should add panokseon in slot 0 without fleet_signal")
 			elif str(panokseon_support.get("ship_type")) != "panokseon_ally":
-				failures.append("support fleet smoke panokseon upgrade should add a new panokseon support ship")
+				failures.append("support fleet smoke panokseon upgrade should add a panokseon support ship without fleet_signal")
 			elif panokseon_support.scene_file_path != "res://scenes/ships/support_panokseon_ship.tscn":
 				failures.append("support fleet smoke panokseon upgrade should spawn the dedicated panokseon support scene")
 			elif str(panokseon_support.get_meta("support_fleet_profile", "")) != "panokseon_escort":

@@ -54,7 +54,7 @@ layout_mode = 2
 max_value = 1.0
 step = 0.01
 size_flags_horizontal = 3
-value = 0.85
+value = 0.5
 
 [node name="MusicRow" type="VBoxContainer" parent="Panel/Shell/Content"]
 layout_mode = 2
@@ -68,7 +68,7 @@ layout_mode = 2
 max_value = 1.0
 step = 0.01
 size_flags_horizontal = 3
-value = 0.75
+value = 0.5
 
 [node name="SfxRow" type="VBoxContainer" parent="Panel/Shell/Content"]
 layout_mode = 2
@@ -82,7 +82,7 @@ layout_mode = 2
 max_value = 1.0
 step = 0.01
 size_flags_horizontal = 3
-value = 0.85
+value = 0.5
 
 [node name="UiRow" type="VBoxContainer" parent="Panel/Shell/Content"]
 layout_mode = 2
@@ -96,7 +96,7 @@ layout_mode = 2
 max_value = 1.0
 step = 0.01
 size_flags_horizontal = 3
-value = 0.85
+value = 0.5
 
 [node name="ScreenFxCheck" type="CheckBox" parent="Panel/Shell/Content"]
 layout_mode = 2

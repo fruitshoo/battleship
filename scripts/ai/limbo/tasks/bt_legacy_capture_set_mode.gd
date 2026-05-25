@@ -1,6 +1,6 @@
 @tool
 extends BTAction
-class_name BTCapturedMinionSetMode
+class_name BTLegacyCaptureSetMode
 
 
 @export var flagship_var: StringName = ShipAILimboKeys.VAR_TARGET

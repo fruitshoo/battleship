@@ -6,6 +6,8 @@ static func run_save_contract_smoke(failures: Array[String]) -> void:
 	if not is_instance_valid(SaveManager):
 		failures.append("SaveManager autoload is not available for save smoke")
 		return
+	_validate_default_settings(failures)
+	_validate_fullscreen_window_mode_updates(failures)
 
 	var save_path := "user://save_data.cfg"
 	var backup_path := "user://save_data.backup.cfg"
@@ -26,6 +28,8 @@ static func run_save_contract_smoke(failures: Array[String]) -> void:
 			"screen_edge_fx_enabled": true,
 			"screen_edge_fx_strength": 0.42,
 			"sail_control_mode": "auto",
+			"control_scheme": "screen",
+			"gamepad_confirm_button": "auto",
 		},
 	}
 
@@ -58,6 +62,48 @@ static func run_save_contract_smoke(failures: Array[String]) -> void:
 	_restore_file_bytes(backup_path, backup_backup, failures)
 
 
+static func _validate_fullscreen_window_mode_updates(failures: Array[String]) -> void:
+	var no_change: int = SaveManager.WINDOW_MODE_NO_CHANGE
+	var windowed := DisplayServer.WINDOW_MODE_WINDOWED
+	var maximized := DisplayServer.WINDOW_MODE_MAXIMIZED
+	var fullscreen := DisplayServer.WINDOW_MODE_FULLSCREEN
+	var exclusive := DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+
+	if SaveManager._get_fullscreen_window_mode_update(windowed, false) != no_change:
+		failures.append("fullscreen setting should not reapply windowed mode to a normal window")
+	if SaveManager._get_fullscreen_window_mode_update(maximized, false) != no_change:
+		failures.append("fullscreen setting should not shrink a maximized window")
+	if SaveManager._get_fullscreen_window_mode_update(fullscreen, false) != windowed:
+		failures.append("fullscreen setting should leave fullscreen when disabled")
+	if SaveManager._get_fullscreen_window_mode_update(exclusive, false) != windowed:
+		failures.append("fullscreen setting should leave exclusive fullscreen when disabled")
+	if SaveManager._get_fullscreen_window_mode_update(windowed, true) != fullscreen:
+		failures.append("fullscreen setting should enter fullscreen when enabled")
+	if SaveManager._get_fullscreen_window_mode_update(fullscreen, true) != no_change:
+		failures.append("fullscreen setting should not reapply fullscreen mode")
+
+
+static func _validate_default_settings(failures: Array[String]) -> void:
+	var defaults: Dictionary = SaveManager.DEFAULT_SETTINGS
+	for key in ["master_volume", "music_volume", "sfx_volume", "ui_volume"]:
+		if absf(float(defaults.get(key, -1.0)) - 0.5) > 0.001:
+			failures.append("default settings should start %s at 50%% for distribution builds" % key)
+	if str(defaults.get("control_scheme", "")) != "screen":
+		failures.append("default settings should start with screen-relative controls")
+	if str(defaults.get("gamepad_confirm_button", "")) != "auto":
+		failures.append("default settings should auto-detect gamepad confirm layout")
+	if defaults.get("gamepad_confirm_button_user_set", true) != false:
+		failures.append("default settings should treat gamepad confirm as not manually overridden")
+	if InputSettingsHelper.resolve_gamepad_confirm_position("auto", ["Nintendo Switch Pro Controller"]) != "right":
+		failures.append("gamepad confirm auto should use right confirm for Nintendo-style pads")
+	if InputSettingsHelper.resolve_gamepad_confirm_position("auto", ["Xbox Wireless Controller"]) != "bottom":
+		failures.append("gamepad confirm auto should use bottom confirm for Xbox-style pads")
+	if InputSettingsHelper.resolve_gamepad_confirm_position("right", ["Xbox Wireless Controller"]) != "right":
+		failures.append("gamepad confirm manual right should override auto detection")
+	if InputSettingsHelper.resolve_gamepad_confirm_position("bottom", ["Nintendo Switch Pro Controller"]) != "bottom":
+		failures.append("gamepad confirm manual bottom should override auto detection")
+
+
 static func _capture_save_manager_state() -> Dictionary:
 	return {
 		"gold": SaveManager.gold,
@@ -69,7 +115,7 @@ static func _capture_save_manager_state() -> Dictionary:
 
 static func _capture_settings_snapshot() -> Dictionary:
 	var snapshot: Dictionary = {}
-	for key in ["master_volume", "music_volume", "sfx_volume", "ui_volume", "performance_preset", "fullscreen", "screen_edge_fx_enabled", "screen_edge_fx_strength", "sail_control_mode"]:
+	for key in ["master_volume", "music_volume", "sfx_volume", "ui_volume", "performance_preset", "fullscreen", "screen_edge_fx_enabled", "screen_edge_fx_strength", "sail_control_mode", "control_scheme", "gamepad_confirm_button", "gamepad_confirm_button_user_set"]:
 		snapshot[key] = SaveManager.get_setting(key)
 	return snapshot
 

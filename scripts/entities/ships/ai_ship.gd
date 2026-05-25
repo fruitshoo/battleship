@@ -216,7 +216,7 @@ func get_limbo_ai_default_tree_path() -> String:
 		if PlayerFleetRoleHelper.is_support_ship(self):
 			return ShipLimboAIPilot.SUPPORT_TREE_PATH
 		if PlayerFleetRoleHelper.is_legacy_captured_ship(self):
-			return ShipLimboAIPilot.CAPTURED_MINION_TREE_PATH
+			return ShipLimboAIPilot.LEGACY_CAPTURE_TREE_PATH
 	elif team_tag == "enemy":
 		return ShipLimboAIPilot.ENEMY_GUNNER_TREE_PATH if is_gunner_role() else ShipLimboAIPilot.ENEMY_BOARDER_TREE_PATH
 	return ShipLimboAIPilot.DEFAULT_TREE_PATH
@@ -484,7 +484,7 @@ func die() -> void:
 
 
 func _drop_floating_loot() -> void:
-	AIShipLifecycleHelper.drop_floating_loot(self, true, 0)
+	AIShipLifecycleHelper.drop_floating_loot(self, true)
 
 func _spawn_enemy_drifter_xp_pickups() -> void:
 	AIShipLifecycleHelper.spawn_enemy_drifter_xp_pickups(self)

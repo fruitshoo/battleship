@@ -960,18 +960,21 @@
       ]
     },
     "res://scripts/effects/ship_damage_decal_helper.gd": {
-      "count": 13,
+      "count": 16,
       "functions": [
         "try_spawn_from_ship_hit",
         "_should_spawn_ship_damage_for_source",
         "_get_or_create_ship_damage_decal_root",
         "_make_ship_damage_decal",
+        "_add_satellite_scorches",
         "_make_plane",
         "_make_projection_decal",
         "_get_decal_size",
         "_pick_texture",
+        "_random_decal_offset",
         "_trim_old_ship_damage_decals",
         "_get_ship_decal_deck_height",
+        "_is_near_deck_before_clamp",
         "_clamp_ship_damage_to_deck",
         "_get_ship_decal_deck_half_extents",
         "_get_ship_decal_half_width_at_z"
@@ -1166,11 +1169,19 @@
       ]
     },
     "res://scripts/entities/ships/base_ship_damage_helper.gd": {
-      "count": 8,
+      "count": 16,
       "functions": [
         "apply_hull_damage",
+        "_apply_final_hull_damage",
         "get_final_hull_damage",
         "is_contested_hull_damage_source",
+        "_prepare_deferred_lethal_damage",
+        "_should_defer_lethal_damage",
+        "_is_deferred_lethal_damage_source",
+        "_get_deferred_lethal_hold_hp",
+        "_schedule_deferred_lethal_finish",
+        "_begin_deferred_lethal_collapse_feedback",
+        "_finish_deferred_lethal_damage",
         "_log_damage_if_enabled",
         "_sink_derelict_if_needed",
         "_record_player_weapon_damage_if_needed",
@@ -2563,12 +2574,11 @@
       ]
     },
     "res://scripts/managers/upgrade_manager_choice_helper.gd": {
-      "count": 9,
+      "count": 8,
       "functions": [
         "is_upgrade_available",
         "collect_choices_from_ids",
         "build_priority_then_random_choices",
-        "maybe_add_rare_fleet_upgrade",
         "fill_with_fallbacks",
         "sort_choices_by_preferred_order",
         "build_ship_upgrade_choices",
@@ -3283,17 +3293,20 @@
       ]
     },
     "res://scripts/ui/hud/hud_stat_panel_helper.gd": {
-      "count": 35,
+      "count": 38,
       "functions": [
         "process_stat_panel",
         "toggle_stat_panel",
         "update_stat_panel",
+        "update_site_bonus_hud",
         "_set_stat_modal_active",
         "build_stat_sections",
         "build_site_bonus_sections",
         "_build_signature",
         "_rebuild_stat_content",
         "_rebuild_site_bonus_content",
+        "_rebuild_compact_site_bonus_content",
+        "_create_compact_site_bonus_row",
         "_create_section",
         "_create_stat_row",
         "_apply_row_tooltip",

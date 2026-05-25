@@ -55,9 +55,8 @@ static func get_active_support_cannon_names_for_ship_type(ship_type_name: String
 static func get_support_fleet_limit_for_current_levels(current_levels: Dictionary, upgrades: Dictionary = {}, support_limit_override: int = -1) -> int:
 	if support_limit_override >= 0:
 		return maxi(0, support_limit_override)
-	if int(current_levels.get(FLEET_SIGNAL_UPGRADE_ID, 0)) <= 0:
-		return 0
-	var limit := 1
+	var signal_level := int(current_levels.get(FLEET_SIGNAL_UPGRADE_ID, 0))
+	var limit := 1 if signal_level > 0 else 0
 	limit += _get_support_upgrade_limit_bonus(current_levels, upgrades)
 	limit += PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, upgrades)
 	return maxi(0, limit)

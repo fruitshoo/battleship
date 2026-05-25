@@ -74,6 +74,11 @@ func _assert_profile_resolution() -> void:
 	var pre_unlock_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1}, FLEET_UPGRADES, 1)
 	_assert_equal("pre_unlock_slot1_profile", pre_unlock_profile.get("ship_type", ""), "maengseon_ally")
 
+	var panokseon_only_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"panokseon_upgrade": 1}, FLEET_UPGRADES, 0)
+	_assert_equal("panokseon_only_slot0_profile", panokseon_only_profile.get("ship_type", ""), "panokseon_ally")
+	_assert_equal("panokseon_only_slot0_squadron", panokseon_only_profile.get("squadron_id", ""), "panokseon_artillery")
+	_assert_equal("panokseon_only_slot0_role", panokseon_only_profile.get("slot_role", ""), "artillery_lead")
+
 	var unlocked_screen_profile := PlayerShipSupportSquadronHelper.resolve_support_fleet_profile_for_levels({"fleet_signal": 1, "panokseon_upgrade": 1}, FLEET_UPGRADES, 0)
 	_assert_equal("unlocked_slot0_profile", unlocked_screen_profile.get("ship_type", ""), "maengseon_ally")
 	_assert_equal("unlocked_slot0_squadron", unlocked_screen_profile.get("squadron_id", ""), "flagship_screen")
@@ -140,10 +145,10 @@ func _assert_upgrade_manager_limit() -> void:
 	_assert_equal("choyogi_meta_does_not_add_raw_support_slot", int(player.get("support_fleet_limit")), 1)
 	player.remove_meta("item_choyogi_applied")
 
-	upgrade_manager.current_levels["fleet_signal"] = 1
+	upgrade_manager.current_levels["fleet_signal"] = 0
 	upgrade_manager.current_levels["panokseon_upgrade"] = 1
 	upgrade_manager.call("reconcile_support_fleet", player, "preview_limit", {})
-	_assert_equal("panokseon_upgrade_adds_support_slot", int(player.get("support_fleet_limit")), 2)
+	_assert_equal("panokseon_upgrade_adds_support_slot_without_signal", int(player.get("support_fleet_limit")), 1)
 
 	upgrade_manager.current_levels = original_levels
 	player.set("support_fleet_limit", original_limit)

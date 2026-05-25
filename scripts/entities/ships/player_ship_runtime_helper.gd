@@ -161,8 +161,8 @@ static func _get_screen_relative_world_direction(ship, input_vec: Vector2) -> Ve
 
 static func _is_screen_relative_control_enabled() -> bool:
 	if not is_instance_valid(SaveManager):
-		return false
-	return str(SaveManager.get_setting("control_scheme", "ship")) == CONTROL_SCHEME_SCREEN
+		return true
+	return str(SaveManager.get_setting("control_scheme", CONTROL_SCHEME_SCREEN)) == CONTROL_SCHEME_SCREEN
 
 
 static func _calculate_screen_relative_steer(ship, angle_deg: float) -> float:

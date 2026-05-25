@@ -5,15 +5,15 @@ const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 ## 장군전 투사체
-## 포문에서 느리게 발사되는 중형 화전형 투사체.
+## 포문에서 느리게 발사되는 중형 투사체.
 
 @export var speed: float = 18.0
 @export var damage: float = 15.0 # 즉발 데미지
 @export_range(0.0, 1.0, 0.01) var crit_chance: float = 0.05
 @export_range(1.0, 4.0, 0.05) var crit_multiplier: float = 1.5
-@export var dot_damage: float = 3.0 # 누수 데미지 (초당 3.0)
-@export var speed_debuff: float = 0.7 # 속도 30% 감소
-@export var turn_debuff: float = 0.6 # 선회 40% 감소
+@export var dot_damage: float = 0.0
+@export var speed_debuff: float = 1.0
+@export var turn_debuff: float = 1.0
 @export var stick_duration: float = 15.0 # 박혀있는 시간 (10 -> 15)
 
 @export var arc_height: float = 4.0
@@ -121,10 +121,9 @@ func _begin_flight() -> void:
 	_play_launch_vfx()
 
 func _update_stats() -> void:
-	# 업그레이드 수치 반영 (DoT, 디버프 강화)
-	dot_damage = 3.0 + janggun_lv * 1.5
-	speed_debuff = maxf(0.2, 0.7 - janggun_lv * 0.05)
-	turn_debuff = maxf(0.2, 0.6 - janggun_lv * 0.05)
+	dot_damage = 0.0
+	speed_debuff = 1.0
+	turn_debuff = 1.0
 
 func _physics_process(delta: float) -> void:
 	var profile_start := PhysicsFrameProfiler.begin()
@@ -196,11 +195,7 @@ func _stick_to_ship(ship: Node3D) -> void:
 	# 함선에 고정 (Reparent) - 물리 콜백 중 리페어런팅 에러 방지를 위해 지연 호출
 	call_deferred("reparent", ship)
 	
-	# 디버프 적용
-	if ship.has_method("add_stuck_object"):
-		ship.add_stuck_object(self , speed_debuff, turn_debuff)
-	
-	if ship.has_method("add_leak"):
+	if dot_damage > 0.0 and ship.has_method("add_leak"):
 		ship.add_leak(dot_damage)
 	
 	# 잦은 장군전 적중 로그는 기본 비활성화
@@ -234,10 +229,7 @@ func _build_damage_source_id(is_crit: bool) -> String:
 	return "enemy_janggun%s" % ("_crit" if is_crit else "")
 
 func _unstick() -> void:
-	if is_instance_valid(target_ship) and target_ship.has_method("remove_stuck_object"):
-		target_ship.remove_stuck_object(self , speed_debuff, turn_debuff)
-	
-	if is_instance_valid(target_ship) and target_ship.has_method("remove_leak"):
+	if dot_damage > 0.0 and is_instance_valid(target_ship) and target_ship.has_method("remove_leak"):
 		target_ship.remove_leak(dot_damage)
 	
 	_release_self()

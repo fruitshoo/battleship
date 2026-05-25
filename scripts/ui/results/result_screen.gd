@@ -82,6 +82,7 @@ var _focused_button_index: int = 0
 var _weapon_icon_cache: Dictionary = {}
 var _ship_defeat_texture_cache: Dictionary = {}
 var _nav_repeater := MenuInputHelper.NavRepeater.new()
+var _button_focus := MenuInputHelper.ButtonFocusNavigator.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -95,13 +96,13 @@ func _ready() -> void:
 	restart_button.pressed.connect(_on_restart_pressed)
 	main_menu_button.pressed.connect(_on_main_menu_pressed)
 	_action_buttons = [restart_button, main_menu_button]
-	_wire_button_interactions()
+	_button_focus.configure(_action_buttons, _on_action_button_focus_changed)
 	call_deferred("_focus_first_action_button")
 	if get_viewport() != null:
 		get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	var nav := _nav_repeater.consume_event(event)
 	if nav.x != 0 or nav.y != 0:
 		_move_action_focus(-1 if nav.x < 0 or nav.y < 0 else 1)
@@ -148,51 +149,22 @@ func _apply_background() -> void:
 		)
 
 
-func _wire_button_interactions() -> void:
-	for button in _action_buttons:
-		if not is_instance_valid(button):
-			continue
-		button.focus_entered.connect(func():
-			var idx := _action_buttons.find(button)
-			if idx != -1:
-				_focused_button_index = idx
-		)
-		button.mouse_entered.connect(func():
-			if button.visible and not button.disabled:
-				button.grab_focus()
-		)
+func _on_action_button_focus_changed(button: Button, _focused: bool) -> void:
+	_focused_button_index = _button_focus.get_focused_index()
 
 
 func _focus_first_action_button() -> void:
-	for i in range(_action_buttons.size()):
-		var button := _action_buttons[i]
-		if is_instance_valid(button) and button.visible and not button.disabled:
-			_focused_button_index = i
-			button.grab_focus()
-			return
+	_button_focus.focus_first()
+	_focused_button_index = _button_focus.get_focused_index()
 
 
 func _move_action_focus(direction: int) -> void:
-	if _action_buttons.is_empty():
-		return
-	var button_count := _action_buttons.size()
-	for step in range(1, button_count + 1):
-		var next_index := posmod(_focused_button_index + direction * step, button_count)
-		var button := _action_buttons[next_index]
-		if is_instance_valid(button) and button.visible and not button.disabled:
-			_focused_button_index = next_index
-			button.grab_focus()
-			return
+	_button_focus.move_focus(direction)
+	_focused_button_index = _button_focus.get_focused_index()
 
 
 func _activate_focused_action() -> void:
-	if _focused_button_index < 0 or _focused_button_index >= _action_buttons.size():
-		_focus_first_action_button()
-		return
-	var button := _action_buttons[_focused_button_index]
-	if not is_instance_valid(button) or not button.visible or button.disabled:
-		return
-	button.emit_signal("pressed")
+	_button_focus.activate_focused()
 
 
 func _apply_theme() -> void:

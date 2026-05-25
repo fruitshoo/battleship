@@ -231,6 +231,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	_run_transparent_vfx_render_priority_contract(failures)
 	await _run_player_cannon_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_boarding_anchor_authoring_contract(owner, failures, wait_frames_after_attach)
+	_run_player_boarding_rope_resist_contract(failures)
 	await _run_player_crew_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_support_ship_spawn_template_contract(owner, failures, wait_frames_after_attach)
 	_run_legacy_ship_role_contract(failures)
@@ -295,6 +296,38 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		failures.append("player ship runtime safety did not apply PlayerStart transform")
 	if not InputMap.has_action("toggle_sail_furl"):
 		failures.append("player ship should expose toggle_sail_furl input action")
+	if InputMap.has_action("camera_zoom_modifier"):
+		failures.append("gamepad camera zoom should not require R3 modifier")
+	if not InputMap.has_action("camera_zoom_in") or not InputMap.has_action("camera_zoom_out"):
+		failures.append("gamepad camera zoom should expose dedicated D-pad actions")
+	else:
+		var zoom_in_has_dpad_up := false
+		for input_event in InputMap.action_get_events("camera_zoom_in"):
+			if input_event is InputEventJoypadButton and input_event.button_index == JOY_BUTTON_DPAD_UP:
+				zoom_in_has_dpad_up = true
+		if not zoom_in_has_dpad_up:
+			failures.append("gamepad camera zoom in should use D-pad up")
+		var zoom_out_has_dpad_down := false
+		for input_event in InputMap.action_get_events("camera_zoom_out"):
+			if input_event is InputEventJoypadButton and input_event.button_index == JOY_BUTTON_DPAD_DOWN:
+				zoom_out_has_dpad_down = true
+		if not zoom_out_has_dpad_down:
+			failures.append("gamepad camera zoom out should use D-pad down")
+	if not InputMap.has_action("camera_rotate_left") or not InputMap.has_action("camera_rotate_right"):
+		failures.append("gamepad camera rotation should expose camera rotate actions")
+	else:
+		var rotate_left_has_dpad_left := false
+		for input_event in InputMap.action_get_events("camera_rotate_left"):
+			if input_event is InputEventJoypadButton and input_event.button_index == JOY_BUTTON_DPAD_LEFT:
+				rotate_left_has_dpad_left = true
+		if not rotate_left_has_dpad_left:
+			failures.append("gamepad camera rotate left should also use D-pad left")
+		var rotate_right_has_dpad_right := false
+		for input_event in InputMap.action_get_events("camera_rotate_right"):
+			if input_event is InputEventJoypadButton and input_event.button_index == JOY_BUTTON_DPAD_RIGHT:
+				rotate_right_has_dpad_right = true
+		if not rotate_right_has_dpad_right:
+			failures.append("gamepad camera rotate right should also use D-pad right")
 	if not player_ship.has_method("toggle_sail_furl") or not player_ship.has_method("_update_sail_deployment"):
 		failures.append("player ship should expose sail furl controls")
 	else:
@@ -459,6 +492,25 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 		player_ship.set("is_rowing", false)
 		player_ship.set("is_burning", false)
 
+	var upgrade_manager := owner.get_node_or_null("/root/UpgradeManager")
+	if is_instance_valid(upgrade_manager) and upgrade_manager.has_method("_apply_geobukseon"):
+		player_ship.call("set_sail_furled", true)
+		player_ship.set("sail_deployed_ratio", 0.0)
+		if player_ship.has_method("set_masts_folded"):
+			player_ship.call("set_masts_folded", true, true)
+		upgrade_manager.call("_apply_geobukseon", player_ship, 1)
+		var post_transform_pivots: Array = player_ship.get("mast_fold_pivots") if player_ship.get("mast_fold_pivots") is Array else []
+		if post_transform_pivots.is_empty():
+			failures.append("player geobukseon transform should cache mast fold pivots after hull swap")
+		elif player_ship.has_method("are_masts_folded") and not bool(player_ship.call("are_masts_folded")):
+			failures.append("player geobukseon transform should preserve folded mast state when sails were furled")
+		if player_ship.has_method("get_mast_fold_ratio") and float(player_ship.call("get_mast_fold_ratio")) < 0.99:
+			failures.append("player geobukseon transform should immediately fold new mast pivots when sails were furled")
+		if float(player_ship.get("sail_deployed_ratio")) > 0.001:
+			failures.append("player geobukseon transform should keep sails fully furled when previous hull was furled")
+	else:
+		failures.append("player geobukseon transform contract missing UpgradeManager._apply_geobukseon")
+
 	wrapper.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -482,6 +534,7 @@ static func _run_player_cargo_transport_sequence_contract(failures: Array[String
 		failures.append("player cargo transport should begin a reusable carry payload")
 	if not player_ship_source.contains("_apply_cargo_transport_payload_follow"):
 		failures.append("player cargo transport should keep the payload following the carry anchor")
+
 	if not player_ship_source.contains("CARRY_PAYLOAD_KIND_CORPSE"):
 		failures.append("player cargo transport should tag the carried payload kind")
 	if player_ship_source.contains("tween.tween_property(corpse, \"global_position\", rail_carry_position"):
@@ -596,6 +649,19 @@ static func _run_player_cargo_transport_sequence_contract(failures: Array[String
 		return
 	if visual_source.contains("target_position := rest_position + Vector3(0.0, -0.04, -0.06)"):
 		failures.append("cargo transport carry animation should not lower the actor pose without real animation")
+
+
+static func _run_player_boarding_rope_resist_contract(failures: Array[String]) -> void:
+	var player_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/player_ship.gd")
+	if player_ship_source.is_empty():
+		failures.append("player boarding rope resist contract could not read player_ship.gd")
+		return
+	if player_ship_source.contains("boarding_rope_resist_alternate_gain"):
+		failures.append("player boarding rope resist should not give extra progress for alternating input")
+	if player_ship_source.contains("boarding_rope_resist_delay_on_alternate") or player_ship_source.contains("_delay_incoming_boarding_transfer"):
+		failures.append("player boarding rope resist should not rewind enemy boarding timers on alternating input")
+	if not player_ship_source.contains("elif alternated:\n\t\tgain = boarding_rope_resist_first_gain"):
+		failures.append("player boarding rope resist should use the base gain for alternating input")
 
 
 static func _validate_soldier_action_definition_catalog(failures: Array[String]) -> void:

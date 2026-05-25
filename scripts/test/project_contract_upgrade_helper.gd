@@ -8,6 +8,7 @@ static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_cannon_upgrade_split(failures)
 	_validate_crew_reserve_retired(failures)
 	_validate_crew_weapon_upgrades_do_not_increase_capacity(failures)
+	_validate_singigeon_proc_feedback(failures)
 	_validate_support_hull_upgrade_retired(failures)
 	_validate_sailing_upgrade_improves_handling(failures)
 	_validate_panokseon_upgrade_gate(failures)
@@ -76,6 +77,13 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke support slot summary should reflect maengseon plus added panokseon roster")
 	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 6문":
 		failures.append("upgrade smoke support cannon summary should reflect side cannon slots at 포문 Lv3")
+	var panokseon_only_levels := {
+		"panokseon_upgrade": 1,
+	}
+	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(panokseon_only_levels, upgrades) != "판옥선 1척":
+		failures.append("upgrade smoke panokseon should not require 맹선 before joining the fleet")
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_only_levels, upgrades) != "판옥선 6문":
+		failures.append("upgrade smoke panokseon should expose cannons without 맹선 prerequisite")
 	var geobukseon_levels := {
 		"fleet_signal": 1,
 		"geobukseon_upgrade": 1,
@@ -110,6 +118,27 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 	if float(reload_stats.get("min_cd_mult", 0.0)) < 0.75:
 		failures.append("upgrade smoke 화약 min cooldown multiplier should not be below 0.75")
 
+	var janggun_stats: Dictionary = upgrades.get("janggun", {}).get("stats", {})
+	if float(janggun_stats.get("base_damage", 0.0)) <= 0.0 or float(janggun_stats.get("damage_per_lv", 0.0)) <= 0.0:
+		failures.append("upgrade smoke 장군전 should scale damage from data")
+	if float(janggun_stats.get("projectile_speed", 0.0)) <= 0.0:
+		failures.append("upgrade smoke 장군전 should use a fixed projectile speed from data")
+	var janggun_source := FileAccess.get_file_as_string("res://scripts/entities/launchers/janggun_launcher.gd")
+	if janggun_source.contains("janggun_lv * 0.15") or janggun_source.contains("janggun_lv * 0.5"):
+		failures.append("upgrade smoke 장군전 should not hide projectile speed or damage multipliers in launcher code")
+	var janggun_ui_source := FileAccess.get_file_as_string("res://scripts/ui/hud/hud_upgrade_info_helper.gd")
+	if janggun_ui_source.contains("화염/둔화"):
+		failures.append("upgrade smoke 장군전 UI should describe damage/reload instead of fire/slow")
+	var janggun_scene := load("res://scenes/projectiles/janggun_missile.tscn") as PackedScene
+	if janggun_scene != null:
+		var missile := janggun_scene.instantiate()
+		missile.set("janggun_lv", 5)
+		if missile.has_method("_update_stats"):
+			missile.call("_update_stats")
+			if float(missile.get("dot_damage")) != 0.0 or absf(float(missile.get("speed_debuff")) - 1.0) > 0.001 or absf(float(missile.get("turn_debuff")) - 1.0) > 0.001:
+				failures.append("upgrade smoke 장군전 projectile should not apply fire or movement debuff scaling")
+		missile.free()
+
 	var barricade_stats: Dictionary = upgrades.get("boarding_resist", {}).get("stats", {})
 	if barricade_stats.has("capture_duration_mult_per_lv"):
 		failures.append("upgrade smoke 창벽 should not be a capture-duration-only upgrade")
@@ -128,6 +157,11 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 화약 missing from ship upgrade pool")
 	if not ("front_cannon" in UpgradeManager.SHIP_UPGRADE_IDS):
 		failures.append("upgrade smoke 전면 포문 missing from ship upgrade pool")
+	if not ("fleet_signal" in UpgradeManager.SHIP_UPGRADE_IDS):
+		failures.append("upgrade smoke 맹선 should be in the normal ship upgrade pool")
+	var choice_helper_source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager_choice_helper.gd")
+	if choice_helper_source.contains("maybe_add_rare_fleet_upgrade"):
+		failures.append("upgrade smoke 맹선 should not use rare fleet choice injection")
 	if not UpgradeManager.has_method("_apply_front_cannon"):
 		failures.append("upgrade smoke 전면 포문 missing immediate apply handler")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
@@ -216,6 +250,46 @@ static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Ar
 		failures.append("upgrade smoke crew weapon upgrades should not add max_crew_count capacity")
 
 
+static func _validate_singigeon_proc_feedback(failures: Array[String]) -> void:
+	var bow_source := FileAccess.get_file_as_string("res://scripts/entities/weapons/weapon_bow.gd")
+	if not bow_source.contains("play_sfx(\"singigeon_launch\""):
+		failures.append("upgrade smoke 신기전 bow proc should play the rocket launch whoosh")
+	var weapon_source := FileAccess.get_file_as_string("res://scripts/entities/weapons/weapon_singigeon.gd")
+	if not weapon_source.contains("play_sfx(\"singigeon_launch\""):
+		failures.append("upgrade smoke 신기전 weapon should play the rocket launch whoosh")
+	var audio_source := FileAccess.get_file_as_string("res://scripts/managers/audio_manager.gd")
+	if not audio_source.contains("\"singigeon_launch\": {\n\t\t\"volume_db\": 4.0"):
+		failures.append("upgrade smoke 신기전 launch whoosh should have an audible volume override")
+
+	var rocket_scene := load("res://scenes/projectiles/singigeon_rocket.tscn") as PackedScene
+	if rocket_scene == null:
+		failures.append("upgrade smoke 신기전 rocket scene should load")
+		return
+	var rocket := rocket_scene.instantiate()
+	if rocket == null:
+		failures.append("upgrade smoke 신기전 rocket should instantiate")
+		return
+	rocket.set("start_pos", Vector3.ZERO)
+	rocket.set("target_pos", Vector3(4.0, 0.0, 0.0))
+	rocket.set("launch_direction", Vector3.RIGHT)
+	rocket.process_mode = Node.PROCESS_MODE_DISABLED
+	if rocket is Node3D:
+		(rocket as Node3D).visible = false
+	if rocket.has_method("restart_flight"):
+		rocket.call("restart_flight")
+		if rocket.process_mode == Node.PROCESS_MODE_DISABLED:
+			failures.append("upgrade smoke 신기전 rocket restart should re-enable processing")
+		if rocket is Node3D and not (rocket as Node3D).visible:
+			failures.append("upgrade smoke 신기전 rocket restart should make projectile visible")
+		if rocket.get("monitoring") == false or rocket.get("monitorable") == false:
+			failures.append("upgrade smoke 신기전 rocket restart should restore hit monitoring")
+		if float(rocket.get("_life_left")) <= 0.0:
+			failures.append("upgrade smoke 신기전 rocket restart should refresh lifetime")
+	else:
+		failures.append("upgrade smoke 신기전 rocket should expose restart_flight")
+	rocket.free()
+
+
 static func _validate_support_hull_upgrade_retired(failures: Array[String]) -> void:
 	if not is_instance_valid(UpgradeManager):
 		failures.append("upgrade smoke missing UpgradeManager")
@@ -246,6 +320,15 @@ static func _validate_sailing_upgrade_improves_handling(failures: Array[String])
 	var source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager.gd")
 	if not source.contains("sail_furl_rate") or not source.contains("fold_duration"):
 		failures.append("upgrade smoke sailing should apply to sail furl and mast fold timing")
+	var rowing_data: Dictionary = upgrades.get("rowing", {})
+	var rowing_stats: Dictionary = rowing_data.get("stats", {})
+	var duration_levels: Array = rowing_stats.get("ram_boost_duration_levels", [])
+	if duration_levels.size() != int(rowing_data.get("max_level", 0)):
+		failures.append("upgrade smoke rowing should extend ram boost duration at every level")
+	if float(rowing_stats.get("ram_boost_duration_add", 0.0)) <= 0.0:
+		failures.append("upgrade smoke rowing should add positive ram boost duration")
+	if not source.contains("ramming_boost_duration") or not source.contains("ram_boost_duration_add"):
+		failures.append("upgrade smoke rowing should apply ram boost duration bonuses")
 
 
 static func _validate_panokseon_upgrade_gate(failures: Array[String]) -> void:
@@ -269,6 +352,20 @@ static func _validate_panokseon_upgrade_gate(failures: Array[String]) -> void:
 		failures.append("upgrade smoke panokseon_upgrade should unlock at level 1")
 	if int(panokseon_stats.get("panokseon_squadron_limit_add", 0)) != 1:
 		failures.append("upgrade smoke panokseon_upgrade should add exactly one panokseon support slot")
+	var choice_levels: Dictionary = UpgradeManager.current_levels.duplicate(true)
+	choice_levels["fleet_signal"] = 0
+	choice_levels["panokseon_upgrade"] = 0
+	var support_choices := UpgradeManagerChoiceHelper.build_ship_upgrade_choices(
+		upgrades,
+		choice_levels,
+		UpgradeManager.SHIP_UPGRADE_IDS,
+		UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS,
+		[],
+		true,
+		32
+	)
+	if not support_choices.has("panokseon_upgrade"):
+		failures.append("upgrade smoke panokseon_upgrade should be available without 맹선 prerequisite")
 
 
 static func _validate_player_geobukseon_upgrade(failures: Array[String]) -> void:

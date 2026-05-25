@@ -52,6 +52,7 @@ const SHIP_UPGRADE_IDS: Array[String] = [
 	"rowing",
 	"supply_bonus",
 	"geobukseon",
+	"fleet_signal",
 ]
 const CREW_UPGRADE_IDS: Array[String] = [
 	"crew_numbers",
@@ -81,8 +82,7 @@ const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
 	GEOBUKSEON_SUPPORT_UPGRADE_ID,
 ]
 const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
-const RARE_FLEET_UPGRADE_ID: String = "fleet_signal"
-const RARE_FLEET_UPGRADE_CHANCE: float = 0.08
+const FLEET_SIGNAL_UPGRADE_ID: String = "fleet_signal"
 const TREASURE_REWARD_EXCLUDED_IDS: Array[String] = [
 	"supply",
 	"gold",
@@ -183,8 +183,6 @@ func get_ship_upgrade_choices(count: int = 3) -> Array:
 		_get_run_upgrade_ids(),
 		_get_available_support_ship_upgrade_ids(),
 		_get_priority_run_upgrade_ids(),
-		RARE_FLEET_UPGRADE_ID,
-		RARE_FLEET_UPGRADE_CHANCE,
 		_are_support_ship_choices_available(),
 		count
 	)
@@ -194,7 +192,7 @@ func get_command_upgrade_choices(count: int = 3) -> Array:
 
 func _is_fleet_progress_available() -> bool:
 	# 지원 함대를 해금했거나 이미 함대 강화가 시작됐으면 백병전 선택지에 함대 강화를 노출한다.
-	if int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0:
+	if int(current_levels.get(FLEET_SIGNAL_UPGRADE_ID, 0)) > 0:
 		return true
 	for upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
 		if int(current_levels.get(upgrade_id, 0)) > 0:
@@ -213,7 +211,7 @@ func _are_support_ship_choices_available() -> bool:
 
 
 func _is_panokseon_upgrade_choice_available() -> bool:
-	return int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) > 0
+	return true
 
 
 func _is_geobukseon_upgrade_choice_available() -> bool:
@@ -242,7 +240,7 @@ func _get_non_fleet_progress_levels() -> int:
 		var upgrade_data: Dictionary = UPGRADES.get(upgrade_id, {})
 		if upgrade_data.get("disabled", false) == true:
 			continue
-		if upgrade_id == RARE_FLEET_UPGRADE_ID:
+		if upgrade_id == FLEET_SIGNAL_UPGRADE_ID:
 			continue
 		if upgrade_id in ACTIVE_SUPPORT_UPGRADE_IDS:
 			continue
@@ -301,17 +299,6 @@ func get_player_crew_roster(total_crew: int) -> Dictionary:
 
 func _is_upgrade_available(upgrade_id: String) -> bool:
 	return UpgradeManagerChoiceHelper.is_upgrade_available(UPGRADES, current_levels, upgrade_id)
-
-func _maybe_add_rare_fleet_upgrade(choices: Array, count: int) -> void:
-	UpgradeManagerChoiceHelper.maybe_add_rare_fleet_upgrade(
-		UPGRADES,
-		current_levels,
-		choices,
-		count,
-		RARE_FLEET_UPGRADE_ID,
-		RARE_FLEET_UPGRADE_CHANCE
-	)
-
 
 func get_treasure_upgrade_candidate_ids() -> Array[String]:
 	var candidate_ids: Array[String] = []
@@ -752,6 +739,8 @@ func _apply_rowing(ship: Node3D, level: int) -> void:
 		ship.rowing_speed += float(s.get("speed_add", 1.0))
 	if _level_matches(level, s.get("accel_levels", [])) and "rowing_acceleration_mult" in ship:
 		ship.rowing_acceleration_mult *= float(s.get("accel_mult", 1.2))
+	if _level_matches(level, s.get("ram_boost_duration_levels", [])) and "ramming_boost_duration" in ship:
+		ship.ramming_boost_duration = minf(3.0, ship.ramming_boost_duration + float(s.get("ram_boost_duration_add", 0.15)))
 	if _level_matches(level, s.get("ram_boost_recharge_levels", [])) and "ramming_boost_recharge_duration" in ship:
 		var recharge_mult := clampf(float(s.get("ram_boost_recharge_mult", 0.92)), 0.1, 1.0)
 		var min_recharge_duration := maxf(1.0, float(s.get("ram_boost_min_recharge_duration", 8.0)))
@@ -784,6 +773,7 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 		if loaded_hull is PackedScene:
 			hull_scene_to_apply = loaded_hull as PackedScene
 
+	var rig_state := _capture_player_rig_state(ship)
 	if "ship_type" in ship:
 		ship.ship_type = ship_type_name
 	if "hull_scene" in ship:
@@ -825,11 +815,65 @@ func _apply_geobukseon(ship: Node3D, _level: int) -> void:
 		ship.call("_refresh_collision_bounds_from_hull")
 	if ship.has_method("_sync_player_crew_roster"):
 		ship.call("_sync_player_crew_roster")
+	_restore_player_rig_state_after_hull_swap(ship, rig_state)
 
 	_apply_geobukseon_transform_heal(ship, stats)
 	_sync_player_cannon_layout(ship, maxi(1, int(current_levels.get("cannon", 1))))
 	_play_geobukseon_transform_sfx(ship)
 	print("[Geobukseon] 기함을 거북선으로 변경했습니다. 도선 면역, 측면 포문 전용")
+
+func _capture_player_rig_state(ship: Node3D) -> Dictionary:
+	if not is_instance_valid(ship):
+		return {}
+	var state := {
+		"sail_furled": false,
+		"sail_deployed_ratio": 1.0,
+		"masts_folded": false,
+		"mast_fold_ratio": 0.0,
+	}
+	if "sail_furled" in ship:
+		state["sail_furled"] = bool(ship.get("sail_furled"))
+	if "sail_deployed_ratio" in ship:
+		state["sail_deployed_ratio"] = clampf(float(ship.get("sail_deployed_ratio")), 0.0, 1.0)
+	if ship.has_method("are_masts_folded"):
+		state["masts_folded"] = bool(ship.call("are_masts_folded"))
+	elif "masts_folded" in ship:
+		state["masts_folded"] = bool(ship.get("masts_folded"))
+	if ship.has_method("get_mast_fold_ratio"):
+		state["mast_fold_ratio"] = clampf(float(ship.call("get_mast_fold_ratio")), 0.0, 1.0)
+	return state
+
+func _restore_player_rig_state_after_hull_swap(ship: Node3D, rig_state: Dictionary) -> void:
+	if not is_instance_valid(ship) or rig_state.is_empty():
+		return
+	var was_furled := bool(rig_state.get("sail_furled", false))
+	var was_masts_folded := bool(rig_state.get("masts_folded", false))
+	var previous_mast_fold_ratio := clampf(float(rig_state.get("mast_fold_ratio", 0.0)), 0.0, 1.0)
+	var should_fold_masts := was_furled or was_masts_folded or previous_mast_fold_ratio >= 0.5
+	var restored_sail_ratio := 0.0 if should_fold_masts else clampf(float(rig_state.get("sail_deployed_ratio", 1.0)), 0.0, 1.0)
+
+	if "sail_furled" in ship:
+		ship.set("sail_furled", was_furled)
+	if "sail_deployed_ratio" in ship:
+		ship.set("sail_deployed_ratio", restored_sail_ratio)
+	if ship.has_method("set_masts_folded"):
+		ship.call("set_masts_folded", should_fold_masts, true)
+	elif "masts_folded" in ship:
+		ship.set("masts_folded", should_fold_masts)
+	if should_fold_masts:
+		_set_player_mast_sail_ratio(ship, 0.0)
+	elif ship.has_method("_sync_mast_fold_after_sail_deployment"):
+		ship.call("_sync_mast_fold_after_sail_deployment")
+	if ship.has_method("_update_sail_visual"):
+		ship.call("_update_sail_visual")
+
+func _set_player_mast_sail_ratio(ship: Node3D, ratio: float) -> void:
+	if not is_instance_valid(ship) or not ("masts" in ship):
+		return
+	var masts: Array = ship.get("masts") if ship.get("masts") is Array else []
+	for mast in masts:
+		if is_instance_valid(mast) and mast.has_method("set_sail_deployed_ratio"):
+			mast.call("set_sail_deployed_ratio", ratio)
 
 func _apply_geobukseon_transform_heal(ship: Node3D, stats: Dictionary) -> void:
 	if not is_instance_valid(ship):
@@ -1160,7 +1204,6 @@ func _apply_panokseon_upgrade(ship: Node3D, _level: int) -> void:
 	var reconcile_state := reconcile_support_fleet(ship, "panokseon_upgrade", {
 		"allow_autospawn": true,
 		"spawn_now": true,
-		"require_signal_unlock": true,
 	})
 	if reconcile_state.get("autospawn_skipped", false):
 		print("[Support] 판옥선 자동 보강 건너뜀 (probe)")
@@ -1168,7 +1211,7 @@ func _apply_panokseon_upgrade(ship: Node3D, _level: int) -> void:
 	if reconcile_state.get("spawn_requested", false):
 		print("[Support] 판옥선 포격함이 지원 함대에 합류했습니다!")
 		return
-	print("[Support] 판옥선은 지원함 해금 후 사용할 수 있습니다.")
+	print("[Support] 판옥선 포격함 합류에 실패했습니다.")
 
 func _apply_geobukseon_upgrade(ship: Node3D, _level: int) -> void:
 	if not is_instance_valid(ship):
@@ -1252,7 +1295,7 @@ func _apply_item_choyogi(ship: Node3D) -> void:
 	if ship.has_meta("item_choyogi_applied"):
 		return
 	ship.set_meta("item_choyogi_applied", true)
-	apply_upgrade(RARE_FLEET_UPGRADE_ID)
+	apply_upgrade(FLEET_SIGNAL_UPGRADE_ID)
 
 func _apply_item_ilseongjeongsiui(ship: Node3D) -> void:
 	if ship.has_meta("item_ilseongjeongsiui_applied"):
@@ -1369,7 +1412,7 @@ func reconcile_support_fleet(ship: Node3D, _reason: String = "", options: Dictio
 		state["autospawn_skipped"] = true
 		return state
 	var require_signal_unlock: bool = options.get("require_signal_unlock", false) == true
-	if require_signal_unlock and int(current_levels.get(RARE_FLEET_UPGRADE_ID, 0)) <= 0:
+	if require_signal_unlock and int(current_levels.get(FLEET_SIGNAL_UPGRADE_ID, 0)) <= 0:
 		state["autospawn_blocked"] = "fleet_signal_locked"
 		return state
 	var should_spawn: bool = options.get("spawn_now", false) == true

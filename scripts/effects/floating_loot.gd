@@ -6,7 +6,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 
 @export var gold_amount: int = 5
 @export var xp_amount: int = 0
-@export var hull_repair_amount: float = 0.0
+@export var hull_repair_amount: float = 20.0
 @export var base_magnet_radius: float = 8.0 # 기본 자석 효과 범위
 @export var magnet_speed: float = 8.5 # 끌려가는 기본 속도
 @export var float_speed: float = 2.0 # 둥실거리는 속도

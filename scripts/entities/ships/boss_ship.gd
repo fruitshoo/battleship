@@ -818,7 +818,7 @@ func _drop_treasure_chest() -> void:
 
 
 func _drop_floating_xp_loot() -> void:
-	AIShipLifecycleHelper.drop_floating_loot(self, true, 0)
+	AIShipLifecycleHelper.drop_floating_loot(self, true)
 
 ## 침몰 시 배 위의 아군(player) 병사를 Survivor로 전환
 func _evacuate_player_soldiers_as_survivors() -> void:

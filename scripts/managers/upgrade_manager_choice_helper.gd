@@ -51,23 +51,6 @@ static func build_priority_then_random_choices(
 	return choices
 
 
-static func maybe_add_rare_fleet_upgrade(upgrades: Dictionary, current_levels: Dictionary, choices: Array, count: int, rare_upgrade_id: String, rare_chance: float) -> void:
-	if count <= 0:
-		return
-	if not is_upgrade_available(upgrades, current_levels, rare_upgrade_id):
-		return
-	if randf() > rare_chance:
-		return
-	if choices.has(rare_upgrade_id):
-		return
-
-	if choices.size() >= count and choices.size() > 0:
-		var replace_idx = randi() % choices.size()
-		choices[replace_idx] = rare_upgrade_id
-	else:
-		choices.append(rare_upgrade_id)
-
-
 static func fill_with_fallbacks(choices: Array, count: int, fallbacks: Array[String] = ["supply", "gold"]) -> void:
 	var guard = 0
 	while choices.size() < count and guard < 8:
@@ -95,8 +78,6 @@ static func build_ship_upgrade_choices(
 	ship_upgrade_ids: Array[String],
 	support_ship_upgrade_ids: Array[String],
 	priority_ship_upgrade_ids: Array[String],
-	rare_fleet_upgrade_id: String,
-	rare_fleet_upgrade_chance: float,
 	fleet_progress_available: bool,
 	count: int = 3
 ) -> Array:
@@ -104,10 +85,8 @@ static func build_ship_upgrade_choices(
 	if fleet_progress_available:
 		ship_pool.append_array(support_ship_upgrade_ids)
 	var choices: Array = build_priority_then_random_choices(upgrades, current_levels, priority_ship_upgrade_ids, ship_pool, count)
-	maybe_add_rare_fleet_upgrade(upgrades, current_levels, choices, count, rare_fleet_upgrade_id, rare_fleet_upgrade_chance)
 	fill_with_fallbacks(choices, count)
 	var preferred_order: Array[String] = ship_pool.duplicate()
-	preferred_order.append(rare_fleet_upgrade_id)
 	preferred_order.append_array(["supply", "gold"])
 	sort_choices_by_preferred_order(choices, preferred_order)
 	return choices

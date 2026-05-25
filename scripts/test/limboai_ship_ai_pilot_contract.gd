@@ -11,8 +11,8 @@ const ENEMY_BOARDER_PILOT_TREE_PATH := "res://resources/ai/limbo/enemy_boarder_a
 const ENEMY_FIREPOT_PILOT_TREE_PATH := "res://resources/ai/limbo/enemy_firepot_ai_pilot.tres"
 const BOSS_PILOT_TREE_PATH := "res://resources/ai/limbo/boss_ship_ai_pilot.tres"
 const SUPPORT_PILOT_TREE_PATH := "res://resources/ai/limbo/support_ship_ai_pilot.tres"
-const CAPTURED_MINION_PILOT_TREE_PATH := "res://resources/ai/limbo/captured_minion_ai_pilot.tres"
-const LEGACY_CAPTURE_PILOT_TREE_PATH := CAPTURED_MINION_PILOT_TREE_PATH
+const LEGACY_CAPTURE_PILOT_TREE_PATH := "res://resources/ai/limbo/legacy_captured_ship_ai_pilot.tres"
+const CAPTURED_MINION_PILOT_TREE_PATH := LEGACY_CAPTURE_PILOT_TREE_PATH
 const CONTRACT_META_STALE_FRAMES := 8
 const LIMBO_ACTIVE_SHIP_SCENE_PATHS := {
 	"res://scenes/ships/enemy_base_ship.tscn": ENEMY_BOARDER_PILOT_TREE_PATH,
