@@ -722,7 +722,7 @@ func apply_collision_impulse(impulse_velocity: Vector3) -> void:
 	if impulse_velocity.length_squared() <= 0.0001:
 		return
 	collision_impulse_velocity += impulse_velocity
-	var max_impulse_speed := 8.0
+	var max_impulse_speed := 11.0
 	if collision_impulse_velocity.length() > max_impulse_speed:
 		collision_impulse_velocity = collision_impulse_velocity.normalized() * max_impulse_speed
 

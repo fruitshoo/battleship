@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cgnuyvb15fep1"]
 
-[ext_resource type="Material" path="res://resources/vfx/materials/fire_billboard.tres" id="1_buthy"]
+[ext_resource type="Material" uid="uid://df88x540kjh0u" path="res://resources/vfx/materials/fire_billboard.tres" id="1_buthy"]
 [ext_resource type="Curve" path="res://resources/vfx/curves/alpha_soft_fade_curve.tres" id="2_buthy"]
 [ext_resource type="Texture2D" uid="uid://j3er0rga8slr" path="res://assets/vfx/particles/fire/T_VFX_Glow_1.PNG" id="2_glow"]
 [ext_resource type="Curve" path="res://resources/vfx/curves/alpha_quick_pop_curve.tres" id="3_buthy"]
@@ -26,6 +26,8 @@ spread = 5.0
 initial_velocity_min = 1.1999999
 initial_velocity_max = 2.3999999
 gravity = Vector3(0, 0, 0)
+scale_min = 3.0
+scale_max = 6.0
 color_ramp = SubResource("GradientTexture1D_flame")
 alpha_curve = SubResource("CurveTexture_flame_alpha")
 
@@ -46,8 +48,8 @@ initial_velocity_max = 2.3999999
 gravity = Vector3(0, -0.3, 0)
 damping_min = 0.8
 damping_max = 1.7
-scale_min = 0.035
-scale_max = 0.075
+scale_min = 0.099999994
+scale_max = 0.19999999
 scale_curve = SubResource("CurveTexture_spark_scale")
 color = Color(3.0404725, 1.7416528, 0.8552805, 1)
 
@@ -96,8 +98,7 @@ angular_velocity_max = 18.0
 gravity = Vector3(0, 0.15, 0)
 damping_min = 0.25
 damping_max = 0.75
-scale_min = 0.18
-scale_max = 0.42
+scale_max = 1.5
 scale_curve = SubResource("CurveTexture_smoke_scale")
 color = Color(0.44894493, 0.37445205, 0.22446442, 1)
 alpha_curve = SubResource("CurveTexture_smoke_alpha")
@@ -128,7 +129,7 @@ size = Vector2(0.64, 0.64)
 [node name="FlameCore" type="GPUParticles3D" parent="." unique_id=234853566]
 material_override = ExtResource("1_buthy")
 amount = 4
-lifetime = 0.18
+lifetime = 0.2
 preprocess = 0.04
 explosiveness = 0.04
 randomness = 0.18
@@ -145,6 +146,7 @@ process_material = SubResource("ParticleProcessMaterial_sparks")
 draw_pass_1 = SubResource("QuadMesh_sparks")
 
 [node name="SmokeTrail" type="GPUParticles3D" parent="." unique_id=1746034081]
+amount = 6
 lifetime = 0.55
 preprocess = 0.08
 explosiveness = 0.02

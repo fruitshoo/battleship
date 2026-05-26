@@ -3,7 +3,6 @@ class_name EnemyGunnerShip
 
 
 func _ready() -> void:
-	limbo_ai_pilot_enabled = true
 	super._ready()
 
 

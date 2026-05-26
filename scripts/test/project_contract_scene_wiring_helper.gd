@@ -232,6 +232,8 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	await _run_player_cannon_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_boarding_anchor_authoring_contract(owner, failures, wait_frames_after_attach)
 	_run_player_boarding_rope_resist_contract(failures)
+	_run_limbo_ai_default_disabled_contract(failures)
+	_run_ship_damage_decal_disabled_contract(failures)
 	await _run_player_crew_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_support_ship_spawn_template_contract(owner, failures, wait_frames_after_attach)
 	_run_legacy_ship_role_contract(failures)
@@ -662,6 +664,40 @@ static func _run_player_boarding_rope_resist_contract(failures: Array[String]) -
 		failures.append("player boarding rope resist should not rewind enemy boarding timers on alternating input")
 	if not player_ship_source.contains("elif alternated:\n\t\tgain = boarding_rope_resist_first_gain"):
 		failures.append("player boarding rope resist should use the base gain for alternating input")
+
+
+static func _run_limbo_ai_default_disabled_contract(failures: Array[String]) -> void:
+	var ai_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/ai_ship.gd")
+	var boss_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/boss_ship.gd")
+	var soldier_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier.gd")
+	if not ai_ship_source.contains("@export var limbo_ai_pilot_enabled: bool = false"):
+		failures.append("runtime AI ships should keep LimboAI disabled by default")
+	if ai_ship_source.contains("limbo_ai_pilot_enabled = true"):
+		failures.append("captured/runtime AI ship setup should not force-enable LimboAI")
+	if not boss_ship_source.contains("@export var limbo_ai_pilot_enabled: bool = false"):
+		failures.append("boss ships should keep LimboAI disabled by default")
+	if not soldier_source.contains("@export var limbo_ai_pilot_enabled: bool = false"):
+		failures.append("soldiers should keep LimboAI disabled by default")
+	var role_scripts := [
+		"res://scripts/entities/ships/enemy_gunner_ship.gd",
+		"res://scripts/entities/ships/enemy_melee_ship.gd",
+		"res://scripts/entities/ships/enemy_firepot_ship.gd",
+	]
+	for path in role_scripts:
+		var source := FileAccess.get_file_as_string(path)
+		if source.contains("limbo_ai_pilot_enabled = true"):
+			failures.append("%s should not force-enable LimboAI in _ready" % path)
+
+
+static func _run_ship_damage_decal_disabled_contract(failures: Array[String]) -> void:
+	var source := FileAccess.get_file_as_string("res://scripts/effects/ship_damage_decal_helper.gd")
+	if source.is_empty():
+		failures.append("ship damage decal contract could not read helper")
+		return
+	if not source.contains("const SHIP_DAMAGE_DECALS_ENABLED := false"):
+		failures.append("ship damage scorch decals should stay disabled for the demo build")
+	if not source.contains("if not SHIP_DAMAGE_DECALS_ENABLED:\n\t\treturn"):
+		failures.append("ship damage decal spawn path should return before creating scorch decals")
 
 
 static func _validate_soldier_action_definition_catalog(failures: Array[String]) -> void:
@@ -3538,6 +3574,8 @@ static func _run_single_scene_wiring_pass(owner: Node, failures: Array[String], 
 			failures.append("%s allow_boarding mismatch" % label)
 		if scene_root.has_method("is_boarding_ship") and scene_root.is_boarding_ship() != true and expected_allow_boarding == true:
 			failures.append("%s expected boarding-capable ship" % label)
+	if "limbo_ai_pilot_enabled" in scene_root and scene_root.get("limbo_ai_pilot_enabled") == true:
+		failures.append("%s should not enable LimboAI by default" % label)
 	ShipAuthoringHelper.validate_ship_authoring(scene_root, label, failures)
 
 	scene_root.queue_free()

@@ -1105,11 +1105,10 @@ func _apply_singigeon(ship: Node3D, level: int) -> void:
 
 	if ship.has_method("_sync_player_crew_roster"):
 		ship._sync_player_crew_roster()
-	var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(UPGRADES, current_levels, level)
-	print("[Singigeon] 신기전 Lv.%d 갱신! (활 공격 %.0f%%, 함선별 %.1fs, 정원: %d)" % [
+	var arrow_stats := UpgradeManagerDataHelper.get_singigeon_arrow_stats(UPGRADES, current_levels, level)
+	print("[Singigeon] 신기전 Lv.%d 갱신! (활 공격 전환, 대병 %.0f, 정원: %d)" % [
 		level,
-		float(proc_stats.get("chance", 0.0)) * 100.0,
-		float(proc_stats.get("cooldown", 1.0)),
+		float(arrow_stats.get("personnel_damage", 0.0)),
 		ship.max_crew_count,
 	])
 
@@ -1448,7 +1447,7 @@ func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 		if not ship.has_meta("base_support_fleet_limit"):
 			ship.set_meta("base_support_fleet_limit", base_limit)
 		var upgrade_bonus: int = _get_support_fleet_limit_upgrade_bonus()
-		var squadron_bonus: int = PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, UPGRADES)
+		var squadron_bonus: int = _get_runtime_support_squadron_limit_bonus()
 		ship.support_fleet_limit = base_limit + upgrade_bonus + squadron_bonus
 	if PlayerFleetRoleHelper.is_player_flagship(ship):
 		PlayerShipSupportHelper.refresh_support_fleet_composition(ship)
@@ -1466,6 +1465,13 @@ func _get_support_fleet_limit_upgrade_bonus() -> int:
 	if signal_level >= int(signal_stats.get("limit_add_level", 999)):
 		upgrade_bonus += int(signal_stats.get("limit_add", 0))
 	return upgrade_bonus
+
+
+func _get_runtime_support_squadron_limit_bonus() -> int:
+	var squadron_bonus := PlayerShipSupportSquadronHelper.get_support_limit_bonus_for_levels(current_levels, UPGRADES)
+	if int(current_levels.get(FLEET_SIGNAL_UPGRADE_ID, 0)) <= 0 and squadron_bonus > 0:
+		squadron_bonus -= 1
+	return squadron_bonus
 
 
 func _get_player_soldiers(ship: Node3D) -> Array:

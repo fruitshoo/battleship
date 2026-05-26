@@ -3,6 +3,14 @@ const SOLDIER_CRIT_HIT_SCENE = preload("res://scenes/effects/soldier_crit_hit.ts
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const CRIT_EFFECT_DECK_MARGIN := 0.75
+const SINGIGEON_FLIGHT_SFX_STREAMS: Array[AudioStream] = [
+	preload("res://assets/audio/sfx/sfx_rocket_launch_01.ogg"),
+	preload("res://assets/audio/sfx/sfx_rocket_launch_03.ogg"),
+]
+const SINGIGEON_FLIGHT_SFX_MIN_INTERVAL_MSEC := 350
+const SINGIGEON_FLIGHT_SFX_VOLUME_DB := -5.0
+const SINGIGEON_FLIGHT_SFX_MAX_DISTANCE := 165.0
+const SINGIGEON_FLIGHT_SFX_UNIT_SIZE := 46.0
 
 ## 신기전 로켓 (Singigeon Rocket)
 ## 발키리 스타일: 지향사격 기반 다연장 로켓 (짧은 미세 보정만 적용).
@@ -55,6 +63,7 @@ var _wobble_seed: float = 0.0
 var _collision_check_left: float = 0.0
 var _last_collision_check_pos: Vector3 = Vector3.ZERO
 var _last_faced_dir: Vector3 = Vector3.ZERO
+static var _last_singigeon_flight_sfx_msec: int = -1000000
 
 func _ready() -> void:
 	pool_reset()
@@ -108,7 +117,51 @@ func restart_flight() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	monitoring = true
 	monitorable = true
+	_restart_trail_particles(self)
+	_play_singigeon_flight_sfx()
 	
+func _restart_trail_particles(node: Node) -> void:
+	if node is GPUParticles3D:
+		var particles := node as GPUParticles3D
+		particles.visible = true
+		particles.restart()
+		particles.emitting = true
+	for child in node.get_children():
+		_restart_trail_particles(child)
+
+func _play_singigeon_flight_sfx() -> void:
+	if not is_inside_tree():
+		return
+	if SINGIGEON_FLIGHT_SFX_STREAMS.is_empty():
+		return
+	if not _claim_singigeon_flight_sfx_slot():
+		return
+	var stream := SINGIGEON_FLIGHT_SFX_STREAMS.pick_random() as AudioStream
+	if not is_instance_valid(stream):
+		return
+	var player := AudioStreamPlayer3D.new()
+	player.name = "SingijeonFlightSfxOneShot"
+	player.stream = stream
+	player.pitch_scale = randf_range(0.96, 1.05)
+	player.volume_db = SINGIGEON_FLIGHT_SFX_VOLUME_DB
+	player.bus = "SFX"
+	player.max_distance = SINGIGEON_FLIGHT_SFX_MAX_DISTANCE
+	player.unit_size = SINGIGEON_FLIGHT_SFX_UNIT_SIZE
+	var sfx_parent := get_parent()
+	if not is_instance_valid(sfx_parent):
+		sfx_parent = get_tree().root
+	sfx_parent.add_child(player)
+	player.global_position = global_position
+	player.finished.connect(player.queue_free, CONNECT_ONE_SHOT)
+	player.play()
+
+func _claim_singigeon_flight_sfx_slot() -> bool:
+	var now_msec := Time.get_ticks_msec()
+	if now_msec - _last_singigeon_flight_sfx_msec < SINGIGEON_FLIGHT_SFX_MIN_INTERVAL_MSEC:
+		return false
+	_last_singigeon_flight_sfx_msec = now_msec
+	return true
+
 func _physics_process(delta: float) -> void:
 	var profile_start := PhysicsFrameProfiler.begin()
 	_profiled_physics_process(delta)

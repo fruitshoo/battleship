@@ -513,6 +513,18 @@ static func _run_support_panokseon_upgrade_smoke(owner: Node, failures: Array[St
 			if _count_visible_fleet_cannons(panokseon_support) != 5:
 				failures.append("support fleet smoke panokseon upgrade should expose 5 shared cannons on the added panokseon at cannon Lv.5")
 
+	if player_ship.has_method("_update_support_fleet_respawn"):
+		player_ship.set("support_fleet_respawn_timer", float(player_ship.get("support_fleet_respawn_interval")))
+		player_ship.call("_update_support_fleet_respawn", float(player_ship.get("support_fleet_respawn_interval")) + 0.1)
+		await _wait_frames(owner, wait_frames_after_spawn + 2)
+		var supports_after_respawn_tick: Array = player_ship.call("_get_support_fleet_ships")
+		if supports_after_respawn_tick.size() != 1:
+			failures.append("support fleet smoke panokseon-only upgrade should not respawn an extra maengseon")
+		else:
+			var panokseon_only_support := supports_after_respawn_tick[0] as Node3D
+			if not is_instance_valid(panokseon_only_support) or str(panokseon_only_support.get("ship_type")) != "panokseon_ally":
+				failures.append("support fleet smoke panokseon-only respawn guard should keep the lone support as panokseon")
+
 	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
 	UpgradeManager.current_levels["panokseon_upgrade"] = original_panokseon_level
 	UpgradeManager.current_levels["fleet_crew"] = original_crew_level

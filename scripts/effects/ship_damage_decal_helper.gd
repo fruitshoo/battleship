@@ -20,9 +20,12 @@ const DAMAGE_SIZE_MULTIPLIER := 1.45
 const USE_DAMAGE_PROJECTION := true
 const SATELLITE_DAMAGE_MIN := 8.0
 const SATELLITE_MAX_COUNT := 2
+const SHIP_DAMAGE_DECALS_ENABLED := false
 
 
 static func try_spawn_from_ship_hit(ship: Node3D, damage_amount: float, impact_position: Vector3, damage_source: String = "") -> void:
+	if not SHIP_DAMAGE_DECALS_ENABLED:
+		return
 	if not _should_spawn_ship_damage_for_source(damage_source):
 		return
 	if not is_instance_valid(ship) or not ship.is_inside_tree():

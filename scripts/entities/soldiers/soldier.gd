@@ -68,7 +68,7 @@ const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 @export var defense: float = 0.0 # 방어력 (피해 감소)
 
 @export var move_speed: float = 3.0
-@export var limbo_ai_pilot_enabled: bool = true
+@export var limbo_ai_pilot_enabled: bool = false
 @export_file("*.tres") var limbo_ai_pilot_tree_path: String = SoldierLimboAIPilot.DEFAULT_TREE_PATH
 @export var team: String = "player": # "player" or "enemy"
 	set(value):

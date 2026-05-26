@@ -702,7 +702,6 @@ func capture_ship() -> void:
 	# (is_boarding, boarding_target, _clear_ropes 등은 _cancel_boarding()에서 이미 처리됨)
 	
 	# 플레이어의 현재 업그레이드된 최대 속도를 상속받아 평준화 (기본치 3.2 대신)
-	limbo_ai_pilot_enabled = true
 	var current_limbo_tree_path := limbo_ai_pilot_tree_path.strip_edges()
 	if (
 		current_limbo_tree_path.is_empty()

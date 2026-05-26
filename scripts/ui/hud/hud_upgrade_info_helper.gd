@@ -94,12 +94,8 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			var shot_cooldown := PLAYER_CANNON_BASE_COOLDOWN * cd_mult
 			return "재장전 %.2f초 | 재장전 -%d%%" % [shot_cooldown, int(round((1.0 - cd_mult) * 100.0))]
 		"singigeon":
-			var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(upgrades_data, current_levels, level)
-			var base_damage := float(stats.get("base_damage", 12.0))
-			var damage_per_level := float(stats.get("damage_per_lv", 2.0))
-			var personnel_mult := float(stats.get("personnel_damage_mult", 1.0))
-			var rocket_damage := base_damage + float(maxi(0, level - 1)) * damage_per_level
-			return "활 공격 %.0f%% | 대병 %.0f | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, rocket_damage * personnel_mult, float(proc_stats.get("cooldown", 1.0))]
+			var arrow_stats := UpgradeManagerDataHelper.get_singigeon_arrow_stats(upgrades_data, current_levels, level)
+			return "활 공격 신기전 전환 | 대병 %.0f" % float(arrow_stats.get("personnel_damage", 0.0))
 		"janggun":
 			var janggun_cooldown := maxf(
 				float(stats.get("min_cooldown", 9.0)),

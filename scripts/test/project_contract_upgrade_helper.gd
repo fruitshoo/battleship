@@ -8,7 +8,7 @@ static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_cannon_upgrade_split(failures)
 	_validate_crew_reserve_retired(failures)
 	_validate_crew_weapon_upgrades_do_not_increase_capacity(failures)
-	_validate_singigeon_proc_feedback(failures)
+	_validate_singigeon_arrow_feedback(failures)
 	_validate_support_hull_upgrade_retired(failures)
 	_validate_sailing_upgrade_improves_handling(failures)
 	_validate_panokseon_upgrade_gate(failures)
@@ -228,7 +228,7 @@ static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Ar
 		failures.append("upgrade smoke crew_numbers should improve spear damage instead of assigning spearman operators")
 	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_SINGIGEON, 0))
 	if int(roster.get(UpgradeDataHelper.CREW_ROLE_SINGIGEON, 0)) != 0:
-		failures.append("upgrade smoke singigeon should proc from bow attacks instead of assigning operators")
+		failures.append("upgrade smoke singigeon should convert bow attacks instead of assigning operators")
 	total_roster += int(roster.get(UpgradeDataHelper.CREW_ROLE_REPEATING_CROSSBOW, 0))
 	if int(roster.get(UpgradeDataHelper.CREW_ROLE_REPEATING_CROSSBOW, 0)) != 0:
 		failures.append("upgrade smoke repeating_crossbow should be retired from command choices")
@@ -250,13 +250,26 @@ static func _validate_crew_weapon_upgrades_do_not_increase_capacity(failures: Ar
 		failures.append("upgrade smoke crew weapon upgrades should not add max_crew_count capacity")
 
 
-static func _validate_singigeon_proc_feedback(failures: Array[String]) -> void:
+static func _validate_singigeon_arrow_feedback(failures: Array[String]) -> void:
 	var bow_source := FileAccess.get_file_as_string("res://scripts/entities/weapons/weapon_bow.gd")
 	if not bow_source.contains("play_sfx(\"singigeon_launch\""):
-		failures.append("upgrade smoke 신기전 bow proc should play the rocket launch whoosh")
+		failures.append("upgrade smoke 신기전 bow conversion should play the rocket launch whoosh")
 	var weapon_source := FileAccess.get_file_as_string("res://scripts/entities/weapons/weapon_singigeon.gd")
 	if not weapon_source.contains("play_sfx(\"singigeon_launch\""):
 		failures.append("upgrade smoke 신기전 weapon should play the rocket launch whoosh")
+	var rocket_source := FileAccess.get_file_as_string("res://scripts/projectiles/singigeon_rocket.gd")
+	if not rocket_source.contains("sfx_rocket_launch_01.ogg") or not rocket_source.contains("sfx_rocket_launch_03.ogg"):
+		failures.append("upgrade smoke 신기전 rocket should add 01/03 flight audio separate from launch whoosh")
+	if rocket_source.contains("sfx_rocket_launch_02.ogg"):
+		failures.append("upgrade smoke 신기전 rocket flight audio should avoid launch_02 because it overlaps the whoosh")
+	if not rocket_source.contains("SINGIGEON_FLIGHT_SFX_MIN_INTERVAL_MSEC"):
+		failures.append("upgrade smoke 신기전 rocket flight audio should be globally rate limited")
+	if not rocket_source.contains("SingijeonFlightSfxOneShot"):
+		failures.append("upgrade smoke 신기전 rocket flight audio player should be named for its current purpose")
+	if not rocket_source.contains("finished.connect(player.queue_free"):
+		failures.append("upgrade smoke 신기전 rocket flight audio should finish naturally and clean itself up")
+	if rocket_source.contains("_stop_singigeon_flight_sfx()"):
+		failures.append("upgrade smoke 신기전 rocket flight audio should not be cut off when the projectile ends")
 	var audio_source := FileAccess.get_file_as_string("res://scripts/managers/audio_manager.gd")
 	if not audio_source.contains("\"singigeon_launch\": {\n\t\t\"volume_db\": 4.0"):
 		failures.append("upgrade smoke 신기전 launch whoosh should have an audible volume override")
@@ -275,6 +288,15 @@ static func _validate_singigeon_proc_feedback(failures: Array[String]) -> void:
 	rocket.process_mode = Node.PROCESS_MODE_DISABLED
 	if rocket is Node3D:
 		(rocket as Node3D).visible = false
+	var trail_root := rocket.get_node_or_null("Visual/SingijeonRocketTrail")
+	if trail_root == null:
+		failures.append("upgrade smoke 신기전 rocket should include the configured trail scene")
+	else:
+		for child in trail_root.get_children():
+			if child is GPUParticles3D:
+				var particles := child as GPUParticles3D
+				particles.visible = false
+				particles.emitting = false
 	if rocket.has_method("restart_flight"):
 		rocket.call("restart_flight")
 		if rocket.process_mode == Node.PROCESS_MODE_DISABLED:
@@ -285,6 +307,17 @@ static func _validate_singigeon_proc_feedback(failures: Array[String]) -> void:
 			failures.append("upgrade smoke 신기전 rocket restart should restore hit monitoring")
 		if float(rocket.get("_life_left")) <= 0.0:
 			failures.append("upgrade smoke 신기전 rocket restart should refresh lifetime")
+		if trail_root != null:
+			var active_trail_particles := 0
+			for child in trail_root.get_children():
+				if child is GPUParticles3D:
+					var particles := child as GPUParticles3D
+					if particles.local_coords:
+						failures.append("upgrade smoke 신기전 rocket trail should use world-space particles")
+					if particles.visible and particles.emitting:
+						active_trail_particles += 1
+			if active_trail_particles <= 0:
+				failures.append("upgrade smoke 신기전 rocket restart should re-enable trail particles")
 	else:
 		failures.append("upgrade smoke 신기전 rocket should expose restart_flight")
 	rocket.free()

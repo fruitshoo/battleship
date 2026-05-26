@@ -1,4 +1,4 @@
-[gd_resource type="StandardMaterial3D" load_steps=2 format=3]
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://df88x540kjh0u"]
 
 [ext_resource type="Texture2D" uid="uid://ha1hhl30rlkb" path="res://assets/vfx/particles/fire/T_fire01.png" id="1_fire"]
 

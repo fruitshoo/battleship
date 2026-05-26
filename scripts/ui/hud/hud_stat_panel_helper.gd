@@ -246,7 +246,7 @@ static func build_stat_sections(hud) -> Array[Dictionary]:
 				int(crew_stats.get("fire_pot_count", 0)),
 				int(crew_stats.get("repeater_count", 0)),
 			]},
-			{"icon": "rocket_launch", "label": "신기전", "value": _get_singigeon_proc_value(hud)},
+			{"icon": "rocket_launch", "label": "신기전", "value": _get_singigeon_arrow_value(hud)},
 			{"icon": "health_and_safety", "label": "대표 병사 HP / 방어", "value": "%.0f / %.1f" % [
 				float(crew_stats.get("sample_hp", 0.0)),
 				float(crew_stats.get("sample_defense", 0.0)),
@@ -707,16 +707,16 @@ static func _collect_crew_stats(ship) -> Dictionary:
 	result["bow_damage"] = ranged_damage
 	return result
 
-static func _get_singigeon_proc_value(hud) -> String:
+static func _get_singigeon_arrow_value(hud) -> String:
 	var um: Node = hud.get_node_or_null("/root/UpgradeManager") if is_instance_valid(hud) else null
 	if not is_instance_valid(um) or not ("current_levels" in um):
-		return "0%"
+		return "-"
 	var level := int(um.current_levels.get("singigeon", 0))
 	if level <= 0:
-		return "0%"
+		return "-"
 	var upgrades: Dictionary = um.get("UPGRADES") if um.get("UPGRADES") is Dictionary else {}
-	var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(upgrades, um.current_levels, level)
-	return "%.0f%%" % (float(proc_stats.get("chance", 0.0)) * 100.0)
+	var arrow_stats := UpgradeManagerDataHelper.get_singigeon_arrow_stats(upgrades, um.current_levels, level)
+	return "대병 %.0f" % float(arrow_stats.get("personnel_damage", 0.0))
 
 
 static func _is_dead_soldier_node(soldier: Node) -> bool:

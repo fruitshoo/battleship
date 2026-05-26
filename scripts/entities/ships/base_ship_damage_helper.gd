@@ -6,7 +6,7 @@ const DEBUG_DAMAGE_LOGS := false
 const DEFERRED_LETHAL_DAMAGE_META := "deferred_lethal_damage_pending"
 const DEFERRED_LETHAL_ACTIVE_META := "deferred_lethal_damage_active"
 const DEFERRED_LETHAL_PREVIOUS_NONBLOCKING_META := "deferred_lethal_previous_nonblocking"
-const DEFERRED_LETHAL_DURATION := 0.58
+const DEFERRED_LETHAL_DURATION := 0.18
 const DEFERRED_LETHAL_MIN_HOLD_HP := 3.0
 const DEFERRED_LETHAL_HOLD_HP_RATIO := 0.03
 
@@ -118,7 +118,6 @@ static func _begin_deferred_lethal_collapse_feedback(ship) -> void:
 	if not is_instance_valid(ship):
 		return
 	ship.set_meta(DEFERRED_LETHAL_PREVIOUS_NONBLOCKING_META, ship.get_meta("derelict_nonblocking", false) == true)
-	ship.set_meta("derelict_nonblocking", true)
 
 
 static func _finish_deferred_lethal_damage(ship, hit_position: Vector3, damage_source: String) -> void:

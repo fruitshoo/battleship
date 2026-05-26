@@ -13,8 +13,6 @@ const INTRO_BUTTON_DURATION: float = 0.46
 const INTRO_BUTTON_DELAY: float = 0.36
 const INTRO_BUTTON_STAGGER: float = 0.11
 const WINDOWS_RUNTIME_DLLS := [
-	"liblimboai.windows.template_release.x86_64.dll",
-	"libdd3d.windows.template_release.x86_64.dll",
 ]
 const GAME_SCENE_PROBE_PATHS := [
 	"res://resources/environment/world_environment.tres",
@@ -38,11 +36,6 @@ const GAME_SCENE_PROBE_PATHS := [
 	"res://scenes/ships/enemy_gunner_ship.tscn",
 	"res://scenes/ships/enemy_firepot_ship.tscn",
 	"res://scenes/ships/boss_ship.tscn",
-	"res://resources/ai/limbo/soldier_ai_pilot.tres",
-	"res://resources/ai/limbo/enemy_gunner_ai_pilot.tres",
-	"res://resources/ai/limbo/enemy_boarder_ai_pilot.tres",
-	"res://resources/ai/limbo/enemy_firepot_ai_pilot.tres",
-	"res://resources/ai/limbo/boss_ship_ai_pilot.tres",
 ]
 const DEPENDENCY_PROBE_LIMIT := 96
 const DEPENDENCY_PROBE_RECURSION_LIMIT := 3

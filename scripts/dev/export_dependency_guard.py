@@ -36,6 +36,16 @@ REFERENCE_SUFFIXES = {
     ".tscn",
     ".tres",
 }
+OPTIONAL_EXPORT_REFERENCES = {
+    (
+        "addons/debug_draw_3d/debug_draw_3d.gdextension",
+        "scripts/helpers/debug_draw_bridge.gd",
+    ),
+    (
+        "addons/limboai/bin/liblimboai.windows.template_release.x86_64.dll",
+        "addons/limboai/bin/limboai.gdextension",
+    ),
+}
 
 
 def main() -> int:
@@ -157,7 +167,7 @@ def _find_references(project_root: Path, excluded_rel_path: str) -> list[str]:
             payload = file_path.read_bytes()
         except OSError:
             continue
-        if needle in payload:
+        if needle in payload and (excluded_rel_path, rel_path) not in OPTIONAL_EXPORT_REFERENCES:
             references.append(rel_path)
     references.extend(_find_model_sidecar_references(project_root, excluded_rel_path, references))
     return references

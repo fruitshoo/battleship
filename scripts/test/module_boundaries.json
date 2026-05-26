@@ -2593,7 +2593,7 @@
         "format_ramming_stat_text",
         "get_specialist_unit_count",
         "get_supply_bonus_stats",
-        "get_singigeon_proc_stats",
+        "get_singigeon_arrow_stats",
         "get_player_crew_roster",
         "get_next_description"
       ]
@@ -3323,7 +3323,7 @@
         "_get_primary_cannon",
         "_get_cannon_projectile_stats",
         "_collect_crew_stats",
-        "_get_singigeon_proc_value",
+        "_get_singigeon_arrow_value",
         "_is_dead_soldier_node",
         "_build_site_bonus_rows",
         "_make_site_bonus_row",

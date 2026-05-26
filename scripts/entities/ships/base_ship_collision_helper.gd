@@ -30,9 +30,9 @@ const PLAYER_CONTACT_VFX_MIN_HEIGHT := 0.58
 const PLAYER_CONTACT_VFX_MAX_HEIGHT := 0.92
 const FRONT_TO_SIDE_CONTACT_EDGE_BIAS := 0.38
 const RAMMING_KNOCKBACK_MIN_FORWARD_DOT := 0.55
-const RAMMING_KNOCKBACK_BASE_SPEED := 2.4
-const RAMMING_KNOCKBACK_SPEED_SCALE := 0.58
-const RAMMING_KNOCKBACK_MAX_SPEED := 8.6
+const RAMMING_KNOCKBACK_BASE_SPEED := 3.1
+const RAMMING_KNOCKBACK_SPEED_SCALE := 0.78
+const RAMMING_KNOCKBACK_MAX_SPEED := 11.0
 const RAMMING_DAMAGE_SPEED_SCALE := 4.2
 const RAMMING_DAMAGE_SIDE_HIT_MULT := 1.35
 const RAMMING_DAMAGE_BOW_HIT_MULT := 0.55
@@ -41,11 +41,12 @@ const RAMMING_DAMAGE_ATTACKER_MAX_ALIGNMENT_MULT := 1.22
 const RAMMING_BOOST_ASSIST_PAD := 0.95
 const RAMMING_BOOST_ASSIST_FORWARD_DOT := 0.52
 const RAMMING_BOOST_ASSIST_MIN_SPEED_RATIO := 0.68
+const RAMMING_BOOST_ASSIST_ENABLED := false
 const RAMMING_IMPACT_RESISTANCE_ENABLED := false
 const RAMMING_BOOST_IMPACT_BRAKE := 0.42
 const RAMMING_LETHAL_IMPACT_BRAKE := 0.58
 const RAMMING_BOOST_BACK_IMPULSE := 1.15
-const RAMMING_BOOST_KNOCKBACK_MULT := 1.35
+const RAMMING_BOOST_KNOCKBACK_MULT := 1.0
 const RAMMING_LETHAL_VFX_SPEED_MULT := 1.28
 const HEAD_ON_ESCAPE_RUDDER_DEADZONE := 5.0
 const HEAD_ON_ESCAPE_REVERSE_SPEED := -0.15
@@ -58,9 +59,14 @@ const MOVEMENT_GUARD_MAX_CHECKS := 8
 const COLLISION_LOW_SPEED_PRESSURE_MIN := 0.32
 const COLLISION_LOW_SPEED_PRESSURE_FULL_RATIO := 0.82
 const COLLISION_DEEP_OVERLAP_PRESSURE_MIN := 0.58
+const COLLISION_HEAD_ON_BOUNCE_SPEED_SCALE := 0.32
+const COLLISION_HEAD_ON_BOUNCE_MIN_SPEED := 1.2
+const COLLISION_HEAD_ON_BOUNCE_MAX_SPEED := 4.8
+const STRONG_COLLISION_REARM_DISTANCE_RATIO := 1.12
 
 static var _last_contact_sfx_msec_by_pair: Dictionary = {}
 static var _last_contact_vfx_msec_by_pair: Dictionary = {}
+static var _disarmed_strong_collision_pairs: Dictionary = {}
 static var _cached_collision_neighbors: Array = []
 static var _cached_collision_neighbors_frame: int = -1
 
@@ -174,6 +180,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		elif is_player_support_pair:
 			coll_dist *= 0.92
 
+		_refresh_strong_collision_rearm(ship, other, dist, coll_dist)
 		if _try_salvage_derelict_contact(ship, other, dist, coll_dist):
 			continue
 		if other.get_meta("derelict_nonblocking", false) == true:
@@ -182,6 +189,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		_try_assisted_ramming_boost_contact(ship, other, dist, coll_dist)
 
 		if dist < coll_dist:
+			var strong_collision_armed := _is_strong_collision_armed(ship, other, dist, coll_dist)
 			var compression = coll_dist - dist
 			var movement_share := get_collision_movement_share(ship, other)
 			var my_mass := get_ship_mass_scale(ship)
@@ -205,14 +213,16 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				repulsion_strength *= 0.42
 			elif high_speed_head_on:
 				repulsion_strength *= 0.12
+			if not strong_collision_armed:
+				repulsion_strength *= 0.38
 			var penetration_ratio = compression / maxf(coll_dist, 0.001)
 			if penetration_ratio > 0.22:
 				if is_player_support_pair:
 					repulsion_strength = maxf(repulsion_strength, 18.0)
 				elif high_speed_head_on:
-					repulsion_strength = maxf(repulsion_strength, 26.0)
+					repulsion_strength = maxf(repulsion_strength, 26.0 if strong_collision_armed else 12.0)
 				else:
-					repulsion_strength = maxf(repulsion_strength, 72.0)
+					repulsion_strength = maxf(repulsion_strength, 72.0 if strong_collision_armed else 24.0)
 			var min_ramming_speed := maxf(float(ship.min_ramming_speed), 0.1)
 			var contact_pressure_ratio := clampf(approach_speed / min_ramming_speed, 0.0, 1.25)
 			var contact_pressure_scale := lerpf(
@@ -254,16 +264,13 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 				if penetration_ratio > 0.12:
 					lateral_strength += 10.0
 				repulsion_force += my_right * side_sign * compression * lateral_strength * movement_share
-			if ((is_engagement_pair and head_on_pair) or high_speed_head_on) and not backing_out:
-				var backward_component = minf(0.0, repulsion_force.dot(my_fwd))
-				if backward_component < 0.0:
-					repulsion_force -= my_fwd * backward_component
 			_draw_ship_collision_debug(ship, other, dir, my_radius, other_radius, dist, coll_dist, compression, repulsion_force, is_player_support_pair, high_speed_head_on)
 			force += repulsion_force
-			if approach_speed < ship.min_ramming_speed:
+			if strong_collision_armed and approach_speed < ship.min_ramming_speed:
 				_play_ship_contact_sfx(ship, other, approach_speed, compression, coll_dist, pre_collision_speed, target_speed, is_player_support_pair, is_hostile_support_contact)
 				_spawn_ship_contact_vfx(ship, other, approach_speed, compression, coll_dist, pre_collision_speed, target_speed, head_on_pair, is_player_support_pair, is_hostile_support_contact)
-			elif not is_player_support_pair:
+				_disarm_strong_collision_pair(ship, other)
+			elif strong_collision_armed and not is_player_support_pair:
 				try_spawn_strong_collision_effects(ship, other, approach_speed)
 
 			if ship.current_speed > 0.5 and not is_player_support_pair:
@@ -287,16 +294,27 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 					ship.current_speed *= maxf(0.78, 1.0 - slide_brake)
 				if my_fwd.dot(dir) > 0.8:
 					if high_speed_head_on:
-						ship.current_speed = lerp(ship.current_speed, 0.0, clampf(0.72 * heavy_impact_scale, 0.32, 0.9))
+						if strong_collision_armed:
+							var bounce_impulse := clampf(
+								approach_speed * COLLISION_HEAD_ON_BOUNCE_SPEED_SCALE * heavy_impact_scale,
+								COLLISION_HEAD_ON_BOUNCE_MIN_SPEED,
+								COLLISION_HEAD_ON_BOUNCE_MAX_SPEED
+							)
+							if ship.has_method("apply_collision_impulse"):
+								ship.apply_collision_impulse(-my_fwd * bounce_impulse)
+							ship.current_speed = lerp(ship.current_speed, ship.current_speed * 0.35, clampf(0.35 * heavy_impact_scale, 0.22, 0.55))
+						else:
+							ship.current_speed = lerp(ship.current_speed, ship.current_speed * 0.62, clampf(0.18 * heavy_impact_scale, 0.08, 0.28))
 					elif is_engagement_pair:
-						var stop_blend = 0.48 if head_on_pair else 0.24
+						var stop_blend = 0.28 if head_on_pair else 0.18
 						stop_blend *= heavy_impact_scale
 						ship.current_speed = lerp(ship.current_speed, 0.0, stop_blend)
 					else:
 						ship.current_speed = lerp(ship.current_speed, 0.0, clampf(0.1 * heavy_impact_scale, 0.04, 0.18))
 
-			if approach_speed >= ship.min_ramming_speed and not is_player_support_pair:
+			if strong_collision_armed and approach_speed >= ship.min_ramming_speed and not is_player_support_pair:
 				ship.apply_ramming_damage(other, approach_speed)
+				_disarm_strong_collision_pair(ship, other)
 
 	ship.set_meta(COLLISION_REPULSION_CACHE_FRAME_META, current_frame)
 	ship.set_meta(COLLISION_REPULSION_CACHE_SHIP_COUNT_META, ship_count)
@@ -394,6 +412,13 @@ static func _get_movement_guard_correction(ship, other_ship: Node3D, pos: Vector
 static func _emit_movement_guarded_collision(ship, other_ship: Node3D, impact_speed_hint: float, emit_collision_event: bool) -> void:
 	if not emit_collision_event or not is_instance_valid(ship) or not is_instance_valid(other_ship):
 		return
+	var coll_dist: float = ship.get_collision_distance_to(other_ship)
+	var diff_to_other: Vector3 = ship.global_position - other_ship.global_position
+	diff_to_other.y = 0.0
+	var dist := diff_to_other.length()
+	_refresh_strong_collision_rearm(ship, other_ship, dist, coll_dist)
+	if not _is_strong_collision_armed(ship, other_ship, dist, coll_dist):
+		return
 	var min_ramming_speed := 4.0
 	if ship.get("min_ramming_speed") != null:
 		min_ramming_speed = float(ship.get("min_ramming_speed")) * 0.72
@@ -410,6 +435,17 @@ static func _emit_movement_guarded_collision(ship, other_ship: Node3D, impact_sp
 		ship.call("apply_ramming_damage", other_ship, impact_speed)
 	if other_ship.has_method("apply_ramming_damage"):
 		other_ship.call("apply_ramming_damage", ship, impact_speed)
+	if ship.has_method("apply_collision_impulse"):
+		var bounce_dir: Vector3 = ship.global_position - other_ship.global_position
+		bounce_dir.y = 0.0
+		if bounce_dir.length_squared() > 0.0001:
+			var bounce_impulse := clampf(
+				impact_speed * COLLISION_HEAD_ON_BOUNCE_SPEED_SCALE,
+				COLLISION_HEAD_ON_BOUNCE_MIN_SPEED,
+				COLLISION_HEAD_ON_BOUNCE_MAX_SPEED
+			)
+			ship.call("apply_collision_impulse", bounce_dir.normalized() * bounce_impulse)
+	_disarm_strong_collision_pair(ship, other_ship)
 	if ship.get("current_speed") != null:
 		var mass_ratio := get_ship_mass_scale(other_ship) / maxf(get_ship_mass_scale(ship), 0.1)
 		var max_speed_after_contact := 0.0
@@ -693,6 +729,34 @@ static func _can_play_contact_sfx(ship: Node, other: Node, cooldown_msec: int) -
 	return true
 
 
+static func _refresh_strong_collision_rearm(ship: Node, other: Node, dist: float, coll_dist: float) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return
+	var rearm_dist := maxf(coll_dist * STRONG_COLLISION_REARM_DISTANCE_RATIO, coll_dist)
+	if dist >= rearm_dist:
+		_disarmed_strong_collision_pairs.erase(_get_contact_sfx_pair_key(ship, other))
+
+
+static func _is_strong_collision_armed(ship: Node, other: Node, dist: float, coll_dist: float) -> bool:
+	_refresh_strong_collision_rearm(ship, other, dist, coll_dist)
+	return not _disarmed_strong_collision_pairs.has(_get_contact_sfx_pair_key(ship, other))
+
+
+static func _disarm_strong_collision_pair(ship: Node, other: Node) -> void:
+	if not is_instance_valid(ship) or not is_instance_valid(other):
+		return
+	_disarmed_strong_collision_pairs[_get_contact_sfx_pair_key(ship, other)] = Time.get_ticks_msec()
+	if _disarmed_strong_collision_pairs.size() > CONTACT_SFX_CACHE_PRUNE_SIZE:
+		_prune_strong_collision_pair_cache()
+
+
+static func _prune_strong_collision_pair_cache() -> void:
+	var now_msec := Time.get_ticks_msec()
+	for key in _disarmed_strong_collision_pairs.keys():
+		if now_msec - int(_disarmed_strong_collision_pairs.get(key, 0)) > 8000:
+			_disarmed_strong_collision_pairs.erase(key)
+
+
 static func _get_contact_sfx_pair_key(ship: Node, other: Node) -> String:
 	var a := ship.get_instance_id()
 	var b := other.get_instance_id()
@@ -805,6 +869,8 @@ static func _try_salvage_derelict_contact(ship, other: Node3D, dist: float, coll
 
 
 static func _try_assisted_ramming_boost_contact(ship, other: Node3D, dist: float, coll_dist: float) -> bool:
+	if not RAMMING_BOOST_ASSIST_ENABLED:
+		return false
 	if not is_instance_valid(ship) or not is_instance_valid(other):
 		return false
 	if not NodeContractHelper.is_player_controlled_ship(ship):
@@ -972,7 +1038,7 @@ static func apply_ramming_damage(ship, other: Node3D, impact_speed: float) -> vo
 	if cam and cam.has_method("shake"):
 		cam.shake(clamp(impact_speed * 0.05, 0.2, 0.6), 0.3)
 
-	if is_boosted_hit or will_sink_from_hit:
+	if will_sink_from_hit:
 		spawn_ship_collision_effects(ship, _get_ship_contact_point(ship, other), impact_speed * (RAMMING_LETHAL_VFX_SPEED_MULT if will_sink_from_hit else 1.0))
 	else:
 		try_spawn_strong_collision_effects(ship, other, impact_speed)

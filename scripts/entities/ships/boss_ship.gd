@@ -33,7 +33,7 @@ signal boss_died
 @export var soldier_scene: PackedScene = preload("res://scenes/entities/soldiers/soldier.tscn")
 @export var hull_scene: PackedScene = preload("res://scenes/ships/hulls/atakebune_hull.tscn")
 @export var chest_scene: PackedScene = preload("res://scenes/effects/treasure_chest.tscn")
-@export var limbo_ai_pilot_enabled: bool = true
+@export var limbo_ai_pilot_enabled: bool = false
 @export_file("*.tres") var limbo_ai_pilot_tree_path: String = ShipLimboAIPilot.DEFAULT_TREE_PATH
 @export_range(0.03, 0.18, 0.01) var limbo_ai_tick_interval: float = 0.06
 

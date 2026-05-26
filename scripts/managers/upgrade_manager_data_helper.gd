@@ -57,29 +57,21 @@ static func get_supply_bonus_stats(upgrades: Dictionary, current_levels: Diction
 		"radius_bonus": radius_bonus,
 	}
 
-static func get_singigeon_proc_stats(upgrades: Dictionary, current_levels: Dictionary, level: int = -1) -> Dictionary:
+static func get_singigeon_arrow_stats(upgrades: Dictionary, current_levels: Dictionary, level: int = -1) -> Dictionary:
 	var target_level: int = level
 	if target_level < 0:
 		target_level = int(current_levels.get("singigeon", 0))
 	var upgrade_data: Dictionary = upgrades.get("singigeon", {})
 	var stats: Dictionary = upgrade_data.get("stats", {})
-	if target_level <= 0:
-		return {
-			"level": 0,
-			"chance": 0.0,
-			"cooldown": float(stats.get("ship_proc_cooldown", 1.0)),
-			"pity_add": float(stats.get("proc_pity_add_per_miss", 0.0)),
-			"pity_max_bonus": float(stats.get("proc_pity_max_bonus", 0.0)),
-		}
-	var base_chance: float = float(stats.get("base_proc_chance", 0.08))
-	var chance_per_level: float = float(stats.get("proc_chance_per_lv", 0.03))
-	var max_chance: float = float(stats.get("max_proc_chance", 0.2))
+	var active_level: int = maxi(0, target_level)
+	var rocket_damage: float = 0.0
+	if active_level > 0:
+		rocket_damage = float(stats.get("base_damage", 10.0)) + float(active_level - 1) * float(stats.get("damage_per_lv", 1.0))
 	return {
-		"level": target_level,
-		"chance": clampf(base_chance + float(target_level - 1) * chance_per_level, 0.0, max_chance),
-		"cooldown": float(stats.get("ship_proc_cooldown", 1.0)),
-		"pity_add": float(stats.get("proc_pity_add_per_miss", 0.0)),
-		"pity_max_bonus": float(stats.get("proc_pity_max_bonus", 0.0)),
+		"level": active_level,
+		"damage": rocket_damage,
+		"personnel_damage": rocket_damage * float(stats.get("personnel_damage_mult", 1.0)),
+		"projectile_speed": float(stats.get("projectile_speed", 32.0)),
 	}
 
 static func get_player_crew_roster(upgrades: Dictionary, current_levels: Dictionary, total_crew: int) -> Dictionary:
@@ -151,10 +143,8 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			var janggun_damage := float(s.get("base_damage", 15.0)) + float(maxi(0, next_level - 1)) * float(s.get("damage_per_lv", 5.0))
 			return "포문 장군전 피해 %.0f | 재장전 %.1f초" % [janggun_damage, janggun_cooldown]
 		"singigeon":
-			var proc_stats := get_singigeon_proc_stats(upgrades, current_levels, next_level)
-			var rocket_damage: float = float(s.get("base_damage", 12.0)) + float(maxi(0, next_level - 1)) * float(s.get("damage_per_lv", 2.0))
-			var personnel_damage: float = rocket_damage * float(s.get("personnel_damage_mult", 1.0))
-			return "활 공격 %.0f%% | 대병 %.0f | 함선별 %.1f초" % [float(proc_stats.get("chance", 0.0)) * 100.0, personnel_damage, float(proc_stats.get("cooldown", 1.0))]
+			var arrow_stats := get_singigeon_arrow_stats(upgrades, current_levels, next_level)
+			return "활 공격 신기전 전환 | 대병 %.0f" % float(arrow_stats.get("personnel_damage", 0.0))
 		"crew_numbers":
 			var damage_add := float(next_level) * float(s.get("damage_add_per_lv", 1.0))
 			return "장창 피해 +%.0f" % damage_add

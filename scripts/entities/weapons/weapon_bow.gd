@@ -7,8 +7,6 @@ const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.55
 const SINGIGEON_AIM_VERTICAL_OFFSET: float = 1.05
 const SINGIGEON_SHIP_AIM_VERTICAL_OFFSET: float = 0.65
-const SINGIGEON_PROC_NEXT_MSEC_META := "bow_singigeon_next_proc_msec"
-const SINGIGEON_PROC_MISS_COUNT_META := "bow_singigeon_miss_count"
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var singigeon_rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
@@ -31,7 +29,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	if SoldierStateHelper.is_dead_soldier(target):
 		return
 	var team_name: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else "player"
-	if _try_launch_singigeon_proc(target, attacker, team_name):
+	if _try_launch_singigeon_arrow(target, attacker, team_name):
 		return
 	
 	var arrow = ScenePool.acquire(attacker.get_tree(), arrow_scene) as Node3D
@@ -111,7 +109,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	if is_instance_valid(audio_manager):
 		audio_manager.play_sfx("bow_shoot", attacker.global_position, randf_range(0.84, 1.0))
 
-func _try_launch_singigeon_proc(target: Node3D, attacker: Node3D, team_name: String) -> bool:
+func _try_launch_singigeon_arrow(target: Node3D, attacker: Node3D, team_name: String) -> bool:
 	if team_name != "player":
 		return false
 	if not is_instance_valid(singigeon_rocket_scene):
@@ -123,27 +121,9 @@ func _try_launch_singigeon_proc(target: Node3D, attacker: Node3D, team_name: Str
 	if singigeon_level <= 0:
 		return false
 	var upgrades: Dictionary = um.get("UPGRADES") if um.get("UPGRADES") is Dictionary else {}
-	var proc_stats := UpgradeManagerDataHelper.get_singigeon_proc_stats(upgrades, um.current_levels, singigeon_level)
-	var owner_ship: Node = attacker.get_owned_ship_node() if attacker.has_method("get_owned_ship_node") else null
-	var cooldown_owner: Node = owner_ship if is_instance_valid(owner_ship) else attacker
-	var now_msec := Time.get_ticks_msec()
-	var next_proc_msec := int(cooldown_owner.get_meta(SINGIGEON_PROC_NEXT_MSEC_META, 0))
-	if now_msec < next_proc_msec:
-		return false
-	var miss_count := int(cooldown_owner.get_meta(SINGIGEON_PROC_MISS_COUNT_META, 0))
-	var chance := float(proc_stats.get("chance", 0.0))
-	chance += minf(float(proc_stats.get("pity_max_bonus", 0.0)), float(miss_count) * float(proc_stats.get("pity_add", 0.0)))
-	if randf() > chance:
-		cooldown_owner.set_meta(SINGIGEON_PROC_MISS_COUNT_META, miss_count + 1)
-		return false
-	if not _launch_singigeon_proc_rocket(target, attacker, team_name, upgrades, singigeon_level):
-		return false
-	cooldown_owner.set_meta(SINGIGEON_PROC_MISS_COUNT_META, 0)
-	var cooldown_msec := int(round(maxf(0.0, float(proc_stats.get("cooldown", 1.0))) * 1000.0))
-	cooldown_owner.set_meta(SINGIGEON_PROC_NEXT_MSEC_META, now_msec + cooldown_msec)
-	return true
+	return _launch_singigeon_arrow_rocket(target, attacker, team_name, upgrades, singigeon_level)
 
-func _launch_singigeon_proc_rocket(target: Node3D, attacker: Node3D, team_name: String, upgrades: Dictionary, singigeon_level: int) -> bool:
+func _launch_singigeon_arrow_rocket(target: Node3D, attacker: Node3D, team_name: String, upgrades: Dictionary, singigeon_level: int) -> bool:
 	var rocket = ScenePool.acquire(attacker.get_tree(), singigeon_rocket_scene) as Node3D
 	if rocket == null:
 		return false
@@ -176,7 +156,10 @@ func _launch_singigeon_proc_rocket(target: Node3D, attacker: Node3D, team_name: 
 	if "speed" in rocket:
 		rocket.speed = projectile_speed
 	if "damage" in rocket:
-		rocket.damage = float(stats.get("base_damage", 12.0)) + float(maxi(0, singigeon_level - 1)) * float(stats.get("damage_per_lv", 2.0))
+		var rocket_damage: float = float(stats.get("base_damage", 10.0)) + float(maxi(0, singigeon_level - 1)) * float(stats.get("damage_per_lv", 1.0))
+		var owner_damage_scale: float = damage / BASE_DAMAGE if BASE_DAMAGE > 0.0 else 1.0
+		var damage_multiplier: float = float(attacker.get_meta("damage_multiplier", 1.0)) if attacker.has_meta("damage_multiplier") else 1.0
+		rocket.damage = rocket_damage * owner_damage_scale * damage_multiplier
 	if "personnel_damage_mult" in rocket:
 		rocket.personnel_damage_mult = float(stats.get("personnel_damage_mult", 1.0))
 	if "crit_chance" in rocket:
