@@ -7,6 +7,8 @@ static func is_upgrade_available(upgrades: Dictionary, current_levels: Dictionar
 		return false
 	if upgrades[upgrade_id].get("disabled", false) == true:
 		return false
+	if upgrades[upgrade_id].get("repeatable", false) == true:
+		return true
 	return int(current_levels.get(upgrade_id, 0)) < int(upgrades[upgrade_id].get("max_level", 0))
 
 
@@ -123,7 +125,7 @@ static func build_random_choices(upgrades: Dictionary, current_levels: Dictionar
 		if category_filter == -1 and upgrade_data.get("category", -1) == 5:
 			continue
 
-		if int(current_levels.get(upgrade_id, 0)) < int(upgrade_data.get("max_level", 0)):
+		if upgrade_data.get("repeatable", false) == true or int(current_levels.get(upgrade_id, 0)) < int(upgrade_data.get("max_level", 0)):
 			available.append(upgrade_id)
 
 	available.shuffle()

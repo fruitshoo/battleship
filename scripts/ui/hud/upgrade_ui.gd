@@ -507,7 +507,9 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	var data = UpgradeManager.UPGRADES[upgrade_id]
 	var reward_entry: Dictionary = _reward_level_overrides.get(upgrade_id, {})
 	var current_lv := int(reward_entry.get("from_level", UpgradeManager.current_levels[upgrade_id]))
-	var next_lv := int(reward_entry.get("to_level", current_lv + 1))
+	var is_repeatable_card: bool = data.get("repeatable", false) == true
+	var max_level := int(data.get("max_level", 1))
+	var next_lv := int(reward_entry.get("to_level", maxi(1, mini(max_level, current_lv if current_lv > 0 else 1)) if is_repeatable_card else current_lv + 1))
 	var color = data.get("color", Color.WHITE)
 	
 	var card = PanelContainer.new()
@@ -556,7 +558,10 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	meta_row.add_child(meta_spacer)
 	
 	var level_label = Label.new()
-	level_label.text = "Lv.%d → Lv.%d" % [current_lv, next_lv] if current_lv > 0 else "NEW!"
+	if is_repeatable_card:
+		level_label.text = LocaleManager.t("upgrade.card.one_shot", "1회 호출")
+	else:
+		level_label.text = "Lv.%d → Lv.%d" % [current_lv, next_lv] if current_lv > 0 else "NEW!"
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	NavalUiTheme.style_gold(level_label, _level_font_size_px)
 	meta_row.add_child(level_label)
@@ -581,7 +586,10 @@ func _create_card(upgrade_id: String, _index: int) -> PanelContainer:
 	vbox.add_child(rule)
 
 	var effect_heading := Label.new()
-	effect_heading.text = LocaleManager.t("upgrade.effect.result", "강화 결과") if _display_only_mode else LocaleManager.t("upgrade.effect.next", "다음 단계")
+	if is_repeatable_card:
+		effect_heading.text = LocaleManager.t("upgrade.effect.one_shot", "발동 효과")
+	else:
+		effect_heading.text = LocaleManager.t("upgrade.effect.result", "강화 결과") if _display_only_mode else LocaleManager.t("upgrade.effect.next", "다음 단계")
 	effect_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	NavalUiTheme.style_overlay_caption(effect_heading, _effect_heading_font_size_px, color.lerp(NavalUiTheme.TEXT_ACCENT, 0.35), 1)
 	vbox.add_child(effect_heading)

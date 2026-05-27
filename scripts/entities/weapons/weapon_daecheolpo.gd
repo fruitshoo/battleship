@@ -7,12 +7,12 @@ const BASE_HULL_DAMAGE: float = 8.0
 const NODE_MUZZLE := "Muzzle"
 
 @export var shot_scene: PackedScene = preload("res://scenes/projectiles/small_cannonball.tscn")
-@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/cannon_muzzle_smoke.tscn")
+@export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/small_firearm_muzzle_smoke.tscn")
 @export var shoot_cooldown: float = 5.3
 @export var max_range: float = 22.0
 @export var projectile_speed: float = 36.0
-@export_range(0.05, 0.6, 0.01) var muzzle_smoke_scale: float = 0.18
 @export var fire_sfx: String = "musket_fire"
+@export_range(-12.0, 12.0, 0.5, "suffix:dB") var fire_sfx_volume_db: float = 6.0
 @export var ballistic_trace_enabled: bool = true
 @export_range(1.0, 18.0, 0.5) var ballistic_trace_max_length: float = 7.5
 @export_range(0.01, 0.16, 0.005) var ballistic_trace_width: float = 0.035
@@ -114,7 +114,6 @@ func _spawn_muzzle_effect(attacker: Node3D, spawn_pos: Vector3, target_pos: Vect
 		if fire_dir.is_zero_approx():
 			fire_dir = Vector3.FORWARD
 		smoke_node.global_transform = Transform3D(Basis.looking_at(fire_dir, Vector3.UP), spawn_pos)
-		smoke_node.scale = Vector3.ONE * muzzle_smoke_scale
 	if smoke.has_method("pool_activate"):
 		smoke.pool_activate()
 	else:
@@ -202,7 +201,7 @@ func _play_fire_sfx(attacker: Node3D, spawn_pos: Vector3) -> void:
 	var audio_manager = attacker.get_node_or_null("/root/AudioManager") if is_instance_valid(attacker) else null
 	if not is_instance_valid(audio_manager) or not audio_manager.has_method("play_sfx"):
 		return
-	audio_manager.play_sfx(fire_sfx, spawn_pos, randf_range(0.96, 1.04))
+	audio_manager.play_sfx(fire_sfx, spawn_pos, randf_range(0.96, 1.04), fire_sfx_volume_db)
 
 
 func _get_muzzle_position(attacker: Node3D) -> Vector3:

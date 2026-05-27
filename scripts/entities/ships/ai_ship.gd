@@ -24,6 +24,8 @@ const BOARDING_CONTACT_DEFENSE_RADIUS_MAX := 5.5
 const ENEMY_BOARDING_LATCH_DURATION_BONUS := 0.15
 const ENEMY_BOARDING_LATCH_DISTANCE_BONUS := 0.25
 const ENEMY_BOARDING_LATCH_SPEED_BONUS := 0.15
+const BOARDING_RETRY_COOLDOWN_TARGET_ID_META := "boarding_retry_cooldown_target_id"
+const BOARDING_RETRY_COOLDOWN_TIMER_META := "boarding_retry_cooldown_timer"
 const DERELICT_STATUS_CHECK_INTERVAL := 0.35
 
 ## AI ship runtime
@@ -47,6 +49,7 @@ enum CombatRole {CHARGER, GUNNER}
 @export_range(0.2, 3.0, 0.05) var boarding_latch_duration: float = 1.15
 @export_range(0.0, 4.0, 0.05) var boarding_latch_distance_pad: float = 1.55
 @export_range(1.0, 5.0, 0.05) var boarding_latch_relative_speed_mult: float = 2.8
+@export_range(0.5, 6.0, 0.05, "suffix:s") var boarding_retry_cooldown_after_resist: float = 1.0
 @export_group("Sail Handling")
 @export var sail_furled: bool = false
 @export_range(0.0, 1.0, 0.01) var sail_deployed_ratio: float = 1.0
@@ -195,6 +198,41 @@ func _mark_boarding_impact(target_ship: Node3D, grace_duration: float = 1.25) ->
 		return
 	set_meta("boarding_impact_target_id", target_ship.get_instance_id())
 	set_meta("boarding_impact_grace_timer", grace_duration)
+
+
+func apply_boarding_retry_cooldown(target_ship: Node3D, duration: float = -1.0) -> void:
+	if not is_instance_valid(target_ship):
+		return
+	var cooldown := boarding_retry_cooldown_after_resist if duration < 0.0 else duration
+	set_meta(BOARDING_RETRY_COOLDOWN_TARGET_ID_META, target_ship.get_instance_id())
+	set_meta(BOARDING_RETRY_COOLDOWN_TIMER_META, maxf(0.0, cooldown))
+	if has_meta("boarding_impact_target_id") and int(get_meta("boarding_impact_target_id", 0)) == target_ship.get_instance_id():
+		remove_meta("boarding_impact_target_id")
+		if has_meta("boarding_impact_grace_timer"):
+			remove_meta("boarding_impact_grace_timer")
+	_clear_boarding_latch()
+
+
+func _is_boarding_retry_cooling_down(target_ship: Node3D) -> bool:
+	if not is_instance_valid(target_ship):
+		return false
+	if not has_meta(BOARDING_RETRY_COOLDOWN_TIMER_META):
+		return false
+	if float(get_meta(BOARDING_RETRY_COOLDOWN_TIMER_META, 0.0)) <= 0.0:
+		return false
+	return int(get_meta(BOARDING_RETRY_COOLDOWN_TARGET_ID_META, 0)) == target_ship.get_instance_id()
+
+
+func _update_boarding_retry_cooldown(delta: float) -> void:
+	if not has_meta(BOARDING_RETRY_COOLDOWN_TIMER_META):
+		return
+	var timer := maxf(0.0, float(get_meta(BOARDING_RETRY_COOLDOWN_TIMER_META, 0.0)) - delta)
+	if timer <= 0.0:
+		remove_meta(BOARDING_RETRY_COOLDOWN_TIMER_META)
+		remove_meta(BOARDING_RETRY_COOLDOWN_TARGET_ID_META)
+		return
+	set_meta(BOARDING_RETRY_COOLDOWN_TIMER_META, timer)
+
 
 func _has_recent_boarding_impact(target_ship: Node3D) -> bool:
 	if not is_instance_valid(target_ship):
@@ -537,6 +575,7 @@ func _process(delta: float) -> void:
 	_update_burning_status(delta)
 	_update_hull_regeneration(delta)
 	_update_rigging_recovery(delta)
+	_update_boarding_retry_cooldown(delta)
 	_update_boarding_state(delta)
 	_update_derelict_status_check(delta)
 	_update_enemy_fire_pot_logic(delta)
@@ -1177,6 +1216,8 @@ func _board_ship(target_ship: Node3D) -> void:
 	# === 아군 체크 (동일 팀이면 도선 무시) ===
 	if ship_node.get("team") == team:
 		return
+	if _is_boarding_retry_cooling_down(ship_node):
+		return
 	if not ShipCombatModeHelper.can_be_boarded(ship_node, self):
 		return
 		
@@ -1404,6 +1445,9 @@ func _can_start_boarding_latched(target_ship: Node3D, dist_to_target: float, can
 		_clear_boarding_latch()
 		return false
 	if not target_ship.is_in_group("player"):
+		_clear_boarding_latch()
+		return false
+	if _is_boarding_retry_cooling_down(target_ship):
 		_clear_boarding_latch()
 		return false
 	if dist_to_target > _get_boarding_latch_distance(target_ship):

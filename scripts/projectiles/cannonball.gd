@@ -3,6 +3,7 @@ const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const ShipDamageDecalHelper = preload("res://scripts/effects/ship_damage_decal_helper.gd")
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const BallisticCollateralHelper = preload("res://scripts/projectiles/ballistic_collateral_helper.gd")
 
 const CLOSE_RANGE_HULL_FALLOFF_DISTANCE: float = 8.0
 const CLOSE_RANGE_HULL_MIN_MULTIPLIER: float = 0.55
@@ -342,6 +343,13 @@ func _check_hit(target: Node) -> void:
 			if not shooter_label.is_empty():
 				source_id += ":%s" % shooter_label
 			ship.take_damage(final_damage, impact_position, source_id)
+			BallisticCollateralHelper.try_apply_from_ship_hit(
+				self,
+				ship,
+				impact_position,
+				BallisticCollateralHelper.KIND_CANNON,
+				direction
+			)
 		
 		_draw_projectile_marker("HIT %s" % ship.name, Color(1.0, 0.22, 0.1, 0.98))
 		_spawn_effects(is_crit, impact_position, ship, final_damage, source_id)

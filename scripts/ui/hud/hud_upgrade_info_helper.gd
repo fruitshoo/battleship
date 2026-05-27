@@ -160,9 +160,9 @@ static func build_upgrade_spec_text(upgrade_id: String, level: int, stats: Dicti
 			for threshold in stats.get("enemy_boarding_slot_reduce_levels", [3, 5]):
 				if level >= int(threshold):
 					slot_penalty += 1
-			var slot_note := " | 동시 도선 한계 -%d" % slot_penalty if slot_penalty > 0 else ""
+			var slot_note := " | 동시 도선 수 -%d" % slot_penalty if slot_penalty > 0 else ""
 			var boarding_damage := minf(float(stats.get("enemy_boarding_max_damage", 40.0)), float(level) * float(stats.get("enemy_boarding_damage_per_lv", 8.0)))
-			return "도선 피해 %.0f%s" % [boarding_damage, slot_note]
+			return "넘어오는 적 피해 %.0f%s" % [boarding_damage, slot_note]
 		"crew_numbers":
 			var spear_damage_add := float(stats.get("damage_add_per_lv", 1.0)) * level
 			return "장창 피해 +%.0f" % spear_damage_add

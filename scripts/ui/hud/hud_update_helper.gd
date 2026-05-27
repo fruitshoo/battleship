@@ -182,11 +182,7 @@ static func _update_support_force_status(hud) -> void:
 	if hud.player_ship.has_method("_get_support_fleet_ships"):
 		support_ships = hud.player_ship._get_support_fleet_ships()
 	var visible_support_ships := _sort_support_ships_for_hud(support_ships)
-	var support_limit: int = int(hud.player_ship.get("support_fleet_limit")) if hud.player_ship.get("support_fleet_limit") != null else support_ships.size()
-	var respawn_active := _is_support_respawn_active(hud.player_ship)
 	var slot_count: int = support_ships.size()
-	if respawn_active:
-		slot_count = maxi(slot_count, support_limit)
 	_ensure_support_slot_count(hud, slot_count)
 	_apply_support_slot_density(hud, slot_count, visible_support_ships)
 
@@ -200,8 +196,6 @@ static func _update_support_force_status(hud) -> void:
 			profile_slot_index = int(ship.get_meta("support_fleet_slot_index", i))
 		var slot_profile: Dictionary = PlayerShipSupportHelper.resolve_support_fleet_profile(hud.player_ship, profile_slot_index)
 		var timer_text := ""
-		if not is_instance_valid(ship):
-			timer_text = _get_support_respawn_timer_text(hud.player_ship) if i == visible_support_ships.size() else "대기"
 		_update_support_slot(slot, ship, slot_profile, timer_text)
 
 static func update_crew_count(hud) -> void:
@@ -210,25 +204,6 @@ static func update_crew_count(hud) -> void:
 	if not is_instance_valid(hud.player_ship):
 		return
 	pass
-
-static func _is_support_respawn_active(player_ship) -> bool:
-	if not is_instance_valid(player_ship):
-		return false
-	if not is_instance_valid(UpgradeManager) or "current_levels" not in UpgradeManager:
-		return false
-	if player_ship.get("is_sinking") == true or player_ship.get("is_dying") == true:
-		return false
-	return int(UpgradeManager.current_levels.get("fleet_signal", 0)) > 0
-
-static func _get_support_respawn_timer_text(player_ship) -> String:
-	if not is_instance_valid(player_ship):
-		return ""
-	if player_ship.get("support_fleet_respawn_interval") == null or player_ship.get("support_fleet_respawn_timer") == null:
-		return ""
-	var interval: float = maxf(float(player_ship.get("support_fleet_respawn_interval")), 0.1)
-	var elapsed: float = clampf(float(player_ship.get("support_fleet_respawn_timer")), 0.0, interval)
-	var remaining: float = maxf(0.0, interval - elapsed)
-	return "%ds" % int(ceil(remaining))
 
 static func _ensure_support_slot_count(hud, slot_count: int) -> void:
 	while hud.support_fleet_hud_slots.size() < slot_count:

@@ -141,7 +141,6 @@ lifetime = 0.24
 preprocess = 0.03
 explosiveness = 0.05
 randomness = 0.42
-fixed_fps = 24
 process_material = SubResource("ParticleProcessMaterial_sparks")
 draw_pass_1 = SubResource("QuadMesh_sparks")
 
@@ -151,6 +150,5 @@ lifetime = 0.55
 preprocess = 0.08
 explosiveness = 0.02
 randomness = 0.46
-fixed_fps = 18
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")

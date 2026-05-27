@@ -3,6 +3,7 @@ const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const ShipDamageDecalHelper = preload("res://scripts/effects/ship_damage_decal_helper.gd")
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const BallisticCollateralHelper = preload("res://scripts/projectiles/ballistic_collateral_helper.gd")
 
 ## 장군전 투사체
 ## 포문에서 느리게 발사되는 중형 투사체.
@@ -187,6 +188,13 @@ func _stick_to_ship(ship: Node3D) -> void:
 		var source_id = _build_damage_source_id(_pending_critical_hit)
 		var final_damage := damage * (crit_multiplier if _pending_critical_hit else 1.0)
 		ship.take_damage(final_damage, global_position, source_id)
+		BallisticCollateralHelper.try_apply_from_ship_hit(
+			self,
+			ship,
+			global_position,
+			BallisticCollateralHelper.KIND_JANGGUN,
+			global_position - start_pos
+		)
 	
 	# 물리/충돌 끄기
 	set_deferred("monitoring", false)

@@ -232,10 +232,6 @@ func _configure_player_runtime() -> void:
 		return
 	if "support_fleet_limit" in _current_player_ship:
 		_current_player_ship.set("support_fleet_limit", player_support_limit)
-	if "support_fleet_respawn_interval" in _current_player_ship:
-		_current_player_ship.set("support_fleet_respawn_interval", 99999.0)
-	if "support_fleet_respawn_timer" in _current_player_ship:
-		_current_player_ship.set("support_fleet_respawn_timer", 0.0)
 	if "captain_count" in _current_player_ship:
 		_current_player_ship.set("captain_count", 0)
 	if "crew_respawn_interval" in _current_player_ship and _upgrade_preset.is_empty():

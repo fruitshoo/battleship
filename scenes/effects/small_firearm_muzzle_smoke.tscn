@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://do5hbj3i82sid"]
+[gd_scene format=3 uid="uid://b3hxll1pgsopt"]
 
 [ext_resource type="Texture2D" uid="uid://6c6kd2xqfpnt" path="res://assets/vfx/flipbooks/wispy_smoke_01_8x8.png" id="1_cyq1d"]
 [ext_resource type="Texture2D" uid="uid://ck4dmasskqrms" path="res://assets/vfx/particles/alpha/circle_05_a.png" id="2_osefu"]
@@ -56,17 +56,16 @@ angle_min = -104.899994
 angle_max = 94.30001
 direction = Vector3(0, 0, -1)
 spread = 1.0
-initial_velocity_min = 6.0
-initial_velocity_max = 10.0
+initial_velocity_min = 3.0
+initial_velocity_max = 5.5
 gravity = Vector3(0, 0, 0)
 damping_min = 2.0
 damping_max = 3.0000002
 damping_curve = SubResource("CurveTexture_hyg58")
-scale_min = 4.0
-scale_max = 6.0
+scale_max = 2.0
 scale_curve = SubResource("CurveTexture_osefu")
 scale_over_velocity_curve = SubResource("CurveTexture_id34b")
-color = Color(0.6938907, 0.69120556, 0.6885068, 0.43800002)
+color = Color(0.74, 0.72, 0.69, 0.34)
 alpha_curve = SubResource("CurveTexture_tcvws")
 anim_speed_min = 0.5
 anim_speed_max = 0.7
@@ -97,35 +96,37 @@ curve = SubResource("Curve_id34b")
 lifetime_randomness = 0.1
 particle_flag_align_y = true
 direction = Vector3(0, 0, -1)
-spread = 25.0
-initial_velocity_min = 20.0
-initial_velocity_max = 25.0
+spread = 5.0
+initial_velocity_min = 11.0
+initial_velocity_max = 20.0
 gravity = Vector3(0, 0, 0)
-scale_min = 0.099999994
-scale_max = 0.19999999
+scale_min = 0.045
+scale_max = 0.095
 color = Color(1.7393893, 1.2768706, 0, 1)
 alpha_curve = SubResource("CurveTexture_17e6h")
 
 [sub_resource type="QuadMesh" id="QuadMesh_tcvws"]
-size = Vector2(0.2, 3)
+size = Vector2(1, 5)
+center_offset = Vector3(0, 1, 0)
 
-[node name="CannonMuzzleSmoke" type="Node3D" unique_id=95033835]
+[node name="SmallFirearmMuzzleSmoke" type="Node3D" unique_id=95033835]
 
 [node name="GPUParticles3D" type="GPUParticles3D" parent="." unique_id=1019336136]
 material_override = SubResource("StandardMaterial3D_osefu")
 cast_shadow = 0
 emitting = false
-lifetime = 1.8
+amount = 5
+lifetime = 0.9
 one_shot = true
 explosiveness = 0.9
-randomness = 0.4
+randomness = 0.35
 process_material = SubResource("ParticleProcessMaterial_hlpq2")
 draw_pass_1 = SubResource("QuadMesh_hawht")
 
 [node name="GPUParticles3D2" type="GPUParticles3D" parent="." unique_id=1503493936]
 material_override = SubResource("StandardMaterial3D_tcvws")
 emitting = false
-amount = 4
+amount = 3
 lifetime = 0.2
 one_shot = true
 explosiveness = 0.6

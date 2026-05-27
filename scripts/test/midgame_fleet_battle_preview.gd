@@ -279,10 +279,6 @@ func _prepare_support_probe_player(player: Node3D) -> void:
 	_apply_support_probe_upgrade_levels()
 	if "support_fleet_limit" in player:
 		player.set("support_fleet_limit", support_probe_support_limit)
-	if "support_fleet_respawn_interval" in player:
-		player.set("support_fleet_respawn_interval", 99999.0)
-	if "support_fleet_respawn_timer" in player:
-		player.set("support_fleet_respawn_timer", 0.0)
 	if "current_speed" in player:
 		player.set("current_speed", support_probe_player_speed)
 	if "is_rowing" in player:
@@ -688,8 +684,6 @@ func _stabilize_support_probe_ship(ship: Node3D, is_flagship: bool) -> void:
 		ship.set("burn_timer", 0.0)
 	if "deck_hostile_boarder_count" in ship:
 		ship.set("deck_hostile_boarder_count", 0)
-	if is_flagship and "support_fleet_respawn_timer" in ship:
-		ship.set("support_fleet_respawn_timer", 0.0)
 
 
 func _capture_support_probe_monitor_sample() -> void:

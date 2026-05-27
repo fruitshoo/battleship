@@ -113,12 +113,15 @@ var ramming_boost_hit_registered: bool = false
 @export_range(0.0, 0.4, 0.01) var boarding_rope_resist_repeat_gain: float = 0.02
 @export_range(0.1, 2.0, 0.05) var boarding_rope_resist_input_window: float = 0.65
 @export_range(0.0, 1.5, 0.05) var boarding_rope_resist_decay_rate: float = 0.30
+@export_range(0.2, 2.0, 0.05) var boarding_rope_resist_target_lock_grace: float = 0.80
 @export_group("")
 var boarding_rope_resist_progress: float = 0.0
 var boarding_rope_resist_last_direction: int = 0
 var boarding_rope_resist_input_window_timer: float = 0.0
 var boarding_rope_resist_sfx_timer: float = 0.0
 var boarding_rope_resist_stick_latch_direction: int = 0
+var boarding_rope_resist_target: Node3D = null
+var boarding_rope_resist_target_lock_timer: float = 0.0
 
 @export_group("Crew / Captain")
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
@@ -129,8 +132,6 @@ var boarding_rope_resist_stick_latch_direction: int = 0
 
 @export_group("Support Fleet")
 @export var support_fleet_limit: int = 1
-@export var support_fleet_respawn_interval: float = 30.0
-var support_fleet_respawn_timer: float = 0.0
 
 @export_group("Deck Cargo Transport")
 @export var cargo_transport_enabled: bool = true
@@ -272,8 +273,6 @@ func _ready() -> void:
 		_sync_player_crew_roster(true)
 	if not has_meta("base_support_fleet_limit"):
 		set_meta("base_support_fleet_limit", support_fleet_limit)
-	if not has_meta("base_support_fleet_respawn_interval"):
-		set_meta("base_support_fleet_respawn_interval", support_fleet_respawn_interval)
 
 
 func _apply_runtime_scene_safety_defaults() -> void:
@@ -387,7 +386,6 @@ func _physics_process(delta: float) -> void:
 	_update_rigging_recovery(delta)
 	_update_boarding_state(delta)
 	var support_profile_start := PhysicsProfiler.begin()
-	_update_support_fleet_respawn(delta)
 	_update_crew_respawn(delta)
 	_update_auto_boarding_raid(delta)
 	_update_fire_pot_logic(delta)
@@ -1113,9 +1111,6 @@ func _toggle_manual_boarding_intent() -> void:
 func _clear_manual_boarding_intent() -> void:
 	PlayerShipCrewHelper.clear_manual_boarding_intent(self)
 
-func _update_support_fleet_respawn(delta: float) -> void:
-	PlayerShipSupportHelper.update_support_fleet_respawn(self, delta)
-
 func _get_desired_player_crew_roles() -> Dictionary:
 	return PlayerShipCrewHelper.get_desired_player_crew_roles(self)
 
@@ -1231,11 +1226,11 @@ func get_ramming_damage_multiplier_value() -> float:
 
 
 func try_resist_incoming_boarding_rope(direction: int) -> bool:
+	if direction == 0:
+		return false
 	var attacker := _get_resistable_boarding_attacker()
 	if not is_instance_valid(attacker):
 		_reset_boarding_rope_resistance()
-		return false
-	if direction == 0:
 		return false
 	var normalized_direction := -1 if direction < 0 else 1
 	var alternated := boarding_rope_resist_last_direction != 0 \
@@ -1251,6 +1246,8 @@ func try_resist_incoming_boarding_rope(direction: int) -> bool:
 	if attacker.has_method("pulse_boarding_rope_feedback"):
 		var pulse_intensity := 0.42 if not alternated else 0.82
 		attacker.call("pulse_boarding_rope_feedback", pulse_intensity)
+	boarding_rope_resist_target = attacker
+	boarding_rope_resist_target_lock_timer = boarding_rope_resist_target_lock_grace
 	boarding_rope_resist_last_direction = normalized_direction
 	boarding_rope_resist_input_window_timer = boarding_rope_resist_input_window
 	if boarding_rope_resist_progress >= 1.0:
@@ -1264,6 +1261,10 @@ func get_boarding_rope_resist_ratio() -> float:
 
 func _update_boarding_rope_resistance(delta: float) -> void:
 	boarding_rope_resist_sfx_timer = maxf(0.0, boarding_rope_resist_sfx_timer - delta)
+	boarding_rope_resist_target_lock_timer = maxf(0.0, boarding_rope_resist_target_lock_timer - delta)
+	if is_instance_valid(boarding_rope_resist_target) and boarding_rope_resist_target_lock_timer <= 0.0:
+		_reset_boarding_rope_resistance()
+		return
 	if not is_instance_valid(_get_resistable_boarding_attacker()):
 		_reset_boarding_rope_resistance()
 		return
@@ -1274,19 +1275,57 @@ func _update_boarding_rope_resistance(delta: float) -> void:
 
 
 func _get_resistable_boarding_attacker() -> Node3D:
-	var attacker := get_boarding_attacker_ship() if has_method("get_boarding_attacker_ship") else null
+	if _is_resistable_boarding_attacker(boarding_rope_resist_target):
+		return boarding_rope_resist_target
+	if boarding_rope_resist_target != null:
+		_reset_boarding_rope_resistance()
+	var attacker := _select_resistable_boarding_attacker()
+	boarding_rope_resist_target = attacker
+	return attacker
+
+
+func _select_resistable_boarding_attacker() -> Node3D:
+	var best_attacker: Node3D = null
+	var best_score := -INF
+	for candidate in _get_ships_cached(get_tree()):
+		if not _is_resistable_boarding_attacker(candidate):
+			continue
+		var candidate_ship := candidate as Node3D
+		var score := _get_boarding_rope_resist_target_score(candidate_ship)
+		if score > best_score:
+			best_score = score
+			best_attacker = candidate_ship
+	return best_attacker
+
+
+func _is_resistable_boarding_attacker(attacker: Variant) -> bool:
 	if not is_instance_valid(attacker):
-		return null
+		return false
+	if not (attacker is Node3D):
+		return false
+	if attacker == self:
+		return false
 	var attacker_team: String = attacker.get_team_tag() if attacker.has_method("get_team_tag") else str(attacker.get("team"))
 	if attacker_team != "enemy":
-		return null
+		return false
 	if attacker.get("is_boarding") != true:
-		return null
+		return false
 	if attacker.has_method("get_boarding_target_ship") and attacker.call("get_boarding_target_ship") != self:
-		return null
+		return false
 	if attacker.has_method("has_boarding_rope_link_to") and attacker.call("has_boarding_rope_link_to", self) != true:
-		return null
-	return attacker as Node3D
+		return false
+	return true
+
+
+func _get_boarding_rope_resist_target_score(attacker: Node3D) -> float:
+	var prep_duration := maxf(0.001, float(attacker.get("boarding_prep_duration")))
+	var prep_ratio := clampf(float(attacker.get("boarding_prep_timer")) / prep_duration, 0.0, 1.0)
+	var interval := maxf(0.001, float(attacker.call("get_effective_boarding_interval")) if attacker.has_method("get_effective_boarding_interval") else float(attacker.get("boarding_interval")))
+	var timer_ratio := clampf(float(attacker.get("boarding_timer")) / interval, 0.0, 1.0)
+	var distance_score := 0.0
+	if is_instance_valid(attacker):
+		distance_score = -global_position.distance_to(attacker.global_position) * 0.001
+	return prep_ratio * 2.0 + timer_ratio + distance_score
 
 
 func _break_incoming_boarding_rope(attacker: Node3D) -> void:
@@ -1296,6 +1335,8 @@ func _break_incoming_boarding_rope(attacker: Node3D) -> void:
 	_play_rope_resist_tension_sfx(true)
 	if attacker.has_method("pulse_boarding_rope_feedback"):
 		attacker.call("pulse_boarding_rope_feedback", 1.0)
+	if attacker.has_method("apply_boarding_retry_cooldown"):
+		attacker.call("apply_boarding_retry_cooldown", self)
 	if attacker.has_method("_cancel_boarding"):
 		attacker.call("_cancel_boarding")
 	elif attacker.has_method("_clear_ropes"):
@@ -1309,6 +1350,8 @@ func _reset_boarding_rope_resistance() -> void:
 	boarding_rope_resist_progress = 0.0
 	boarding_rope_resist_last_direction = 0
 	boarding_rope_resist_input_window_timer = 0.0
+	boarding_rope_resist_target_lock_timer = 0.0
+	boarding_rope_resist_target = null
 
 
 func _play_rope_resist_tension_sfx(break_sound: bool) -> void:

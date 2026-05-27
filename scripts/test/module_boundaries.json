@@ -960,7 +960,7 @@
       ]
     },
     "res://scripts/effects/ship_damage_decal_helper.gd": {
-      "count": 16,
+      "count": 15,
       "functions": [
         "try_spawn_from_ship_hit",
         "_should_spawn_ship_damage_for_source",
@@ -1670,7 +1670,6 @@
         "_find_first_unoccupied_slot",
         "get_support_fleet_ships",
         "get_offscreen_support_spawn_position",
-        "update_support_fleet_respawn",
         "_is_world_position_offscreen"
       ]
     },
@@ -2707,13 +2706,12 @@
       ]
     },
     "res://scripts/test/project_contract_hud_helper.gd": {
-      "count": 32,
+      "count": 31,
       "functions": [
         "run_hud_contract_smoke",
         "_run_level_progression_xp_bar_contract",
         "_run_hud_state_baselines",
         "_run_hud_boarding_state_check",
-        "_run_hud_support_respawn_slot_check",
         "_run_hud_capture_state_check",
         "_run_hud_debug_state_check",
         "_run_hud_authoring_palette_harness",
@@ -3346,7 +3344,7 @@
       ]
     },
     "res://scripts/ui/hud/hud_update_helper.gd": {
-      "count": 58,
+      "count": 56,
       "functions": [
         "update_level",
         "update_score",
@@ -3362,8 +3360,6 @@
         "_update_crew_force_status",
         "_update_support_force_status",
         "update_crew_count",
-        "_is_support_respawn_active",
-        "_get_support_respawn_timer_text",
         "_ensure_support_slot_count",
         "_create_support_slot",
         "_apply_support_slot_density",

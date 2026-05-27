@@ -281,8 +281,7 @@ static func get_support_fleet_ships(ship) -> Array:
 			continue
 		if not PlayerFleetRoleHelper.is_support_ship(support_ship):
 			continue
-		var retreating: bool = support_ship.has_method("is_support_retreating") and support_ship.call("is_support_retreating") == true
-		if not retreating and support_ship.has_method("is_combat_disabled") and support_ship.is_combat_disabled():
+		if support_ship.has_method("is_combat_disabled") and support_ship.is_combat_disabled():
 			continue
 		if not SupportFleetStateHelper.is_support_owned_by_flagship(support_ship, ship):
 			continue
@@ -328,31 +327,6 @@ static func get_offscreen_support_spawn_position(ship) -> Vector3:
 		return candidate
 
 	return fallback_pos
-
-static func update_support_fleet_respawn(ship, delta: float) -> void:
-	if ship.is_sinking or ship.is_dying:
-		return
-	if not is_instance_valid(ship._cached_um):
-		ship.support_fleet_respawn_timer = 0.0
-		return
-	var support_unlocked := (
-		int(ship._cached_um.current_levels.get("fleet_signal", 0)) > 0
-		or int(ship._cached_um.current_levels.get("panokseon_upgrade", 0)) > 0
-		or int(ship._cached_um.current_levels.get("geobukseon_upgrade", 0)) > 0
-	)
-	if not support_unlocked:
-		ship.support_fleet_respawn_timer = 0.0
-		return
-
-	var support_ships: Array = get_support_fleet_ships(ship)
-	if support_ships.size() >= ship.support_fleet_limit:
-		ship.support_fleet_respawn_timer = 0.0
-		return
-
-	ship.support_fleet_respawn_timer += delta
-	if ship.support_fleet_respawn_timer >= ship.support_fleet_respawn_interval:
-		ship.support_fleet_respawn_timer = 0.0
-		spawn_or_repair_support_ship(ship)
 
 static func _is_world_position_offscreen(cam: Camera3D, viewport_rect: Rect2, world_pos: Vector3) -> bool:
 	if cam.is_position_behind(world_pos):

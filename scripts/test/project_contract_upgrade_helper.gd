@@ -159,9 +159,21 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 전면 포문 missing from ship upgrade pool")
 	if not ("fleet_signal" in UpgradeManager.SHIP_UPGRADE_IDS):
 		failures.append("upgrade smoke 맹선 should be in the normal ship upgrade pool")
+	var fleet_signal_data: Dictionary = upgrades.get("fleet_signal", {})
+	if fleet_signal_data.get("repeatable", false) != true:
+		failures.append("upgrade smoke 맹선 should be a repeatable one-shot support card")
+	if int(fleet_signal_data.get("max_level", 0)) != 1:
+		failures.append("upgrade smoke 맹선 should not gain levels beyond unlock")
+	if not UpgradeManagerChoiceHelper.is_upgrade_available(upgrades, {"fleet_signal": 1}, "fleet_signal"):
+		failures.append("upgrade smoke 맹선 should remain selectable after unlock")
 	var choice_helper_source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager_choice_helper.gd")
 	if choice_helper_source.contains("maybe_add_rare_fleet_upgrade"):
 		failures.append("upgrade smoke 맹선 should not use rare fleet choice injection")
+	if not choice_helper_source.contains("repeatable"):
+		failures.append("upgrade smoke repeatable support cards should remain choice-available after unlock")
+	var upgrade_manager_source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager.gd")
+	if not upgrade_manager_source.contains("1회 카드 발동") or not upgrade_manager_source.contains("is_repeatable"):
+		failures.append("upgrade smoke repeatable support cards should apply without increasing level")
 	if not UpgradeManager.has_method("_apply_front_cannon"):
 		failures.append("upgrade smoke 전면 포문 missing immediate apply handler")
 	if "fleet_cannon" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS:
@@ -372,6 +384,10 @@ static func _validate_panokseon_upgrade_gate(failures: Array[String]) -> void:
 	if not upgrades.has("panokseon_upgrade"):
 		failures.append("upgrade smoke missing panokseon_upgrade")
 		return
+	if upgrades["panokseon_upgrade"].get("repeatable", false) != true:
+		failures.append("upgrade smoke panokseon_upgrade should be a repeatable one-shot support card")
+	if not UpgradeManagerChoiceHelper.is_upgrade_available(upgrades, {"panokseon_upgrade": 1}, "panokseon_upgrade"):
+		failures.append("upgrade smoke panokseon_upgrade should remain selectable after unlock")
 	if not ("panokseon_upgrade" in UpgradeManager.SUPPORT_SHIP_UPGRADE_IDS):
 		failures.append("upgrade smoke panokseon_upgrade missing from support ship pool")
 	if not ("panokseon_upgrade" in UpgradeManager.ACTIVE_SUPPORT_UPGRADE_IDS):

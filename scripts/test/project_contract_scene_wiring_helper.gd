@@ -229,6 +229,7 @@ static func run_scene_wiring_contract_smoke(owner: Node, failures: Array[String]
 	await _run_player_ship_runtime_safety_contract(owner, failures, wait_frames_after_attach)
 	_run_player_cargo_transport_sequence_contract(failures)
 	_run_transparent_vfx_render_priority_contract(failures)
+	_run_ballistic_collateral_contract(failures)
 	await _run_player_cannon_slot_authoring_contract(owner, failures, wait_frames_after_attach)
 	await _run_player_boarding_anchor_authoring_contract(owner, failures, wait_frames_after_attach)
 	_run_player_boarding_rope_resist_contract(failures)
@@ -664,6 +665,27 @@ static func _run_player_boarding_rope_resist_contract(failures: Array[String]) -
 		failures.append("player boarding rope resist should not rewind enemy boarding timers on alternating input")
 	if not player_ship_source.contains("elif alternated:\n\t\tgain = boarding_rope_resist_first_gain"):
 		failures.append("player boarding rope resist should use the base gain for alternating input")
+	if not player_ship_source.contains("boarding_rope_resist_target_lock_grace"):
+		failures.append("player boarding rope resist should keep a short target lock while the player is responding")
+	if not player_ship_source.contains("_select_resistable_boarding_attacker"):
+		failures.append("player boarding rope resist should select among active incoming boarding ropes")
+	if not player_ship_source.contains("_is_resistable_boarding_attacker"):
+		failures.append("player boarding rope resist should validate incoming rope candidates instead of trusting one attacker slot")
+	if not player_ship_source.contains("_get_ships_cached(get_tree())"):
+		failures.append("player boarding rope resist should scan registered ships so simultaneous hooks remain resistable")
+	if not player_ship_source.contains("apply_boarding_retry_cooldown"):
+		failures.append("player boarding rope break should briefly suppress immediate enemy rehook attempts")
+
+	var ai_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/ai_ship.gd")
+	if ai_ship_source.is_empty():
+		failures.append("player boarding rope resist contract could not read ai_ship.gd")
+		return
+	if not ai_ship_source.contains("boarding_retry_cooldown_after_resist"):
+		failures.append("enemy boarding AI should expose a cooldown after the player breaks a rope")
+	if not ai_ship_source.contains("_is_boarding_retry_cooling_down"):
+		failures.append("enemy boarding AI should block immediate rehook attempts during cooldown")
+	if not ai_ship_source.contains("_clear_boarding_latch()") or not ai_ship_source.contains("BOARDING_RETRY_COOLDOWN_TIMER_META"):
+		failures.append("enemy boarding retry cooldown should clear stale latch state")
 
 
 static func _run_limbo_ai_default_disabled_contract(failures: Array[String]) -> void:
@@ -754,6 +776,16 @@ static func _run_transparent_vfx_render_priority_contract(failures: Array[String
 	_expect_file_contains("res://scenes/effects/fire_pot_explosion.tscn", "render_priority = 18", "fire pot explosion should render above water", failures)
 	_expect_file_contains("res://scenes/effects/cannon_muzzle_smoke.tscn", "render_priority = 32", "muzzle smoke should keep its high foreground priority", failures)
 	_expect_file_contains("res://scenes/effects/cannon_muzzle_smoke.tscn", "render_priority = 34", "muzzle flash should keep its high foreground priority", failures)
+	_expect_scene_loads("res://scenes/effects/small_firearm_muzzle_smoke.tscn", "small firearm muzzle smoke should load", failures)
+	_expect_file_contains("res://scenes/effects/small_firearm_muzzle_smoke.tscn", "render_priority = 32", "small firearm smoke should keep its foreground priority", failures)
+	_expect_file_contains("res://scenes/effects/small_firearm_muzzle_smoke.tscn", "render_priority = 34", "small firearm muzzle flash should keep its foreground priority", failures)
+	var daecheolpo_source := FileAccess.get_file_as_string("res://scripts/entities/weapons/weapon_daecheolpo.gd")
+	if daecheolpo_source.is_empty():
+		failures.append("transparent VFX contract could not read weapon_daecheolpo.gd")
+	elif not daecheolpo_source.contains("small_firearm_muzzle_smoke.tscn"):
+		failures.append("daecheolpo should use the small firearm muzzle smoke scene")
+	elif daecheolpo_source.contains("muzzle_smoke_scale"):
+		failures.append("daecheolpo muzzle smoke should be authored in its scene instead of scaled in code")
 
 
 static func _expect_file_contains(path: String, needle: String, message: String, failures: Array[String]) -> void:
@@ -775,6 +807,43 @@ static func _expect_scene_loads(path: String, message: String, failures: Array[S
 		failures.append("%s: instantiate failed" % message)
 		return
 	instance.free()
+
+
+static func _run_ballistic_collateral_contract(failures: Array[String]) -> void:
+	var helper_source := FileAccess.get_file_as_string("res://scripts/projectiles/ballistic_collateral_helper.gd")
+	if helper_source.is_empty():
+		failures.append("ballistic collateral helper should exist")
+		return
+	if not helper_source.contains("DAMAGE_SOURCE := \"ballistic_collateral\""):
+		failures.append("ballistic collateral should use a stable damage source id")
+	if not helper_source.contains("EntityRegistry.get_soldiers_by_ship"):
+		failures.append("ballistic collateral should target soldiers on the hit ship")
+	if not helper_source.contains("_apply_ballistic_throw_arc") or not helper_source.contains("spin_rotation"):
+		failures.append("ballistic collateral should use a rotating throw arc instead of live knockback")
+	if helper_source.contains("apply_external_knockback"):
+		failures.append("ballistic collateral should not use live soldier knockback for the overboard throw")
+	if not helper_source.contains("configure_as_overboard_disposal") or not helper_source.contains("offboard_splash_played"):
+		failures.append("ballistic collateral should play the overboard disposal splash at water impact")
+	if not helper_source.contains("BATTLESHIP_FORCE_BALLISTIC_COLLATERAL"):
+		failures.append("ballistic collateral should keep a force-test hook")
+
+	var cannon_source := FileAccess.get_file_as_string("res://scripts/projectiles/cannonball.gd")
+	if not cannon_source.contains("BallisticCollateralHelper.try_apply_from_ship_hit"):
+		failures.append("cannonball ship hits should try ballistic collateral")
+	if not cannon_source.contains("BallisticCollateralHelper.KIND_CANNON"):
+		failures.append("cannonball should identify cannon collateral")
+
+	var janggun_source := FileAccess.get_file_as_string("res://scripts/projectiles/janggun_missile.gd")
+	if not janggun_source.contains("BallisticCollateralHelper.try_apply_from_ship_hit"):
+		failures.append("janggun ship hits should try ballistic collateral")
+	if not janggun_source.contains("BallisticCollateralHelper.KIND_JANGGUN"):
+		failures.append("janggun should identify janggun collateral")
+
+	var soldier_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier.gd")
+	if not soldier_source.contains("ballistic_collateral_pending"):
+		failures.append("soldier overboard death should preserve ballistic collateral context")
+	if not soldier_source.contains("\"ballistic_collateral\" if was_ballistic_collateral else \"drowned\""):
+		failures.append("ballistic collateral overboard deaths should preserve source id")
 
 
 static func _run_player_cannon_slot_authoring_contract(owner: Node, failures: Array[String], wait_frames_after_attach: int) -> void:

@@ -8,6 +8,30 @@ const SupportFleetFormationHelper = preload("res://scripts/entities/ships/suppor
 const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
 
 
+static func _run_support_no_retreat_contract(failures: Array[String], support_ship: Node3D) -> void:
+	var support_source := FileAccess.get_file_as_string("res://scripts/entities/ships/support_ship.gd")
+	if support_source.is_empty():
+		failures.append("support fleet smoke could not read support_ship.gd")
+		return
+	var retired_retreat_token := "support_" + "retreat"
+	if support_source.contains(retired_retreat_token):
+		failures.append("support fleet smoke support retreat code should be removed")
+	var die_index := support_source.find("func die() -> void:")
+	if die_index < 0:
+		failures.append("support fleet smoke support ship missing die override")
+		return
+	var next_func_index := support_source.find("\nfunc ", die_index + 1)
+	var die_block := support_source.substr(die_index, support_source.length() - die_index)
+	if next_func_index > die_index:
+		die_block = support_source.substr(die_index, next_func_index - die_index)
+	if die_block.contains("_begin_support_" + "retreat"):
+		failures.append("support fleet smoke support ship die should sink instead of retreating")
+	if not die_block.contains("super.die()"):
+		failures.append("support fleet smoke support ship die should delegate to normal sinking")
+	if is_instance_valid(support_ship) and support_ship.get("support_" + "retreat_enabled") != null:
+		failures.append("support fleet smoke spawned support ship should not expose retreat settings")
+
+
 static func _reconcile_support_fleet(player_ship: Node3D, failures: Array[String], reason: String, options: Dictionary = {}) -> Dictionary:
 	if not is_instance_valid(UpgradeManager) or not UpgradeManager.has_method("reconcile_support_fleet"):
 		failures.append("support fleet smoke missing support fleet reconcile helper")
@@ -72,6 +96,8 @@ static func run_support_fleet_contract_smoke(owner: Node, failures: Array[String
 		smoke_root.queue_free()
 		await _wait_frames(owner, 1)
 		return
+
+	_run_support_no_retreat_contract(failures, support_ship)
 
 	var support_team: String = str(support_ship.get("team"))
 	if support_team != "player":
@@ -512,18 +538,6 @@ static func _run_support_panokseon_upgrade_smoke(owner: Node, failures: Array[St
 			UpgradeManager.apply_fleet_upgrades_to_ship(panokseon_support)
 			if _count_visible_fleet_cannons(panokseon_support) != 5:
 				failures.append("support fleet smoke panokseon upgrade should expose 5 shared cannons on the added panokseon at cannon Lv.5")
-
-	if player_ship.has_method("_update_support_fleet_respawn"):
-		player_ship.set("support_fleet_respawn_timer", float(player_ship.get("support_fleet_respawn_interval")))
-		player_ship.call("_update_support_fleet_respawn", float(player_ship.get("support_fleet_respawn_interval")) + 0.1)
-		await _wait_frames(owner, wait_frames_after_spawn + 2)
-		var supports_after_respawn_tick: Array = player_ship.call("_get_support_fleet_ships")
-		if supports_after_respawn_tick.size() != 1:
-			failures.append("support fleet smoke panokseon-only upgrade should not respawn an extra maengseon")
-		else:
-			var panokseon_only_support := supports_after_respawn_tick[0] as Node3D
-			if not is_instance_valid(panokseon_only_support) or str(panokseon_only_support.get("ship_type")) != "panokseon_ally":
-				failures.append("support fleet smoke panokseon-only respawn guard should keep the lone support as panokseon")
 
 	UpgradeManager.current_levels["fleet_signal"] = original_signal_level
 	UpgradeManager.current_levels["panokseon_upgrade"] = original_panokseon_level

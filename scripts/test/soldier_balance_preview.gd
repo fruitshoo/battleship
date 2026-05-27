@@ -208,8 +208,6 @@ func _spawn_fresh_ships() -> void:
 	if is_instance_valid(_current_player_ship):
 		if "support_fleet_limit" in _current_player_ship:
 			_current_player_ship.set("support_fleet_limit", 0)
-		if "support_fleet_respawn_interval" in _current_player_ship:
-			_current_player_ship.set("support_fleet_respawn_interval", 99999.0)
 		if "captain_count" in _current_player_ship:
 			_current_player_ship.set("captain_count", 0)
 		_current_player_ship.name = "PlayerShip"
@@ -246,10 +244,6 @@ func _configure_player_runtime() -> void:
 		return
 	if "support_fleet_limit" in _current_player_ship:
 		_current_player_ship.set("support_fleet_limit", 0)
-	if "support_fleet_respawn_interval" in _current_player_ship:
-		_current_player_ship.set("support_fleet_respawn_interval", 99999.0)
-	if "support_fleet_respawn_timer" in _current_player_ship:
-		_current_player_ship.set("support_fleet_respawn_timer", 0.0)
 	if "captain_count" in _current_player_ship:
 		_current_player_ship.set("captain_count", 0)
 

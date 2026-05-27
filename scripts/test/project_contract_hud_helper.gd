@@ -123,7 +123,6 @@ static func run_hud_contract_smoke(owner: Node, failures: Array[String], smoke_s
 		nearby_enemy_ship.set("is_dying", false)
 
 	_run_hud_state_baselines(hud, player_ship, failures)
-	_run_hud_support_respawn_slot_check(hud, player_ship, failures)
 	_run_hud_boarding_state_check(hud, player_ship, target_ship, failures)
 	_run_hud_capture_state_check(hud, player_ship, failures)
 	var support_ship: Node3D = null
@@ -284,46 +283,6 @@ static func _run_hud_boarding_state_check(hud: Node, player_ship: Node3D, target
 		hud.call("_update_boarding_display")
 	if is_instance_valid(hud.boarding_label) and hud.boarding_label.text != "도선 진행 중!":
 		failures.append("hud smoke boarding progress label mismatch")
-
-
-static func _run_hud_support_respawn_slot_check(hud: Node, player_ship: Node3D, failures: Array[String]) -> void:
-	if not is_instance_valid(hud) or not is_instance_valid(player_ship) or not is_instance_valid(hud.support_slot_container):
-		return
-	if not is_instance_valid(UpgradeManager) or "current_levels" not in UpgradeManager:
-		return
-	var previous_fleet_signal: int = int(UpgradeManager.current_levels.get("fleet_signal", 0))
-	var previous_limit: int = int(player_ship.get("support_fleet_limit")) if player_ship.get("support_fleet_limit") != null else 0
-	var previous_interval: float = float(player_ship.get("support_fleet_respawn_interval")) if player_ship.get("support_fleet_respawn_interval") != null else 30.0
-	var previous_timer: float = float(player_ship.get("support_fleet_respawn_timer")) if player_ship.get("support_fleet_respawn_timer") != null else 0.0
-	var current_support_count: int = 0
-	if player_ship.has_method("_get_support_fleet_ships"):
-		current_support_count = player_ship.call("_get_support_fleet_ships").size()
-
-	UpgradeManager.current_levels["fleet_signal"] = max(1, previous_fleet_signal)
-	player_ship.set("support_fleet_limit", current_support_count + 1)
-	player_ship.set("support_fleet_respawn_interval", 30.0)
-	player_ship.set("support_fleet_respawn_timer", 12.0)
-	if hud.has_method("_update_force_panel"):
-		hud.call("_update_force_panel")
-
-	if hud.support_fleet_hud_slots.size() < current_support_count + 1:
-		failures.append("hud smoke support respawn slots did not stay at fleet limit")
-	else:
-		var first_empty_index: int = min(current_support_count, hud.support_fleet_hud_slots.size() - 1)
-		var slot: PanelContainer = hud.support_fleet_hud_slots[first_empty_index]
-		var timer := slot.get_node_or_null("Root/Timer") as Label
-		if not is_instance_valid(timer) or not timer.visible or timer.text != "18s":
-			failures.append("hud smoke support respawn timer mismatch")
-		var ship_icon := slot.get_node_or_null("Root/EmblemPlate/ShipIcon") as TextureRect
-		if not is_instance_valid(ship_icon) or ship_icon.texture == null:
-			failures.append("hud smoke support slot missing ship icon texture")
-
-	UpgradeManager.current_levels["fleet_signal"] = previous_fleet_signal
-	player_ship.set("support_fleet_limit", previous_limit)
-	player_ship.set("support_fleet_respawn_interval", previous_interval)
-	player_ship.set("support_fleet_respawn_timer", previous_timer)
-	if hud.has_method("_update_force_panel"):
-		hud.call("_update_force_panel")
 
 
 static func _run_hud_capture_state_check(hud: Node, player_ship: Node3D, failures: Array[String]) -> void:

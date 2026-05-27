@@ -118,10 +118,6 @@ func _prepare_player() -> void:
 		_player_ship.set("is_derelict", false)
 	if "support_fleet_limit" in _player_ship:
 		_player_ship.set("support_fleet_limit", support_fleet_limit)
-	if "support_fleet_respawn_interval" in _player_ship:
-		_player_ship.set("support_fleet_respawn_interval", 99999.0)
-	if "support_fleet_respawn_timer" in _player_ship:
-		_player_ship.set("support_fleet_respawn_timer", 0.0)
 	if _player_ship.has_method("_sync_player_crew_roster"):
 		_player_ship.call("_sync_player_crew_roster")
 	for _index in range(support_fleet_limit):

@@ -111,9 +111,10 @@ static func get_player_crew_roster(upgrades: Dictionary, current_levels: Diction
 static func get_next_description(upgrades: Dictionary, current_levels: Dictionary, upgrade_id: String) -> String:
 	var data: Dictionary = upgrades[upgrade_id]
 	var current_lv: int = int(current_levels.get(upgrade_id, 0))
-	var next_level: int = current_lv + 1
+	var is_repeatable: bool = data.get("repeatable", false) == true
+	var next_level: int = maxi(1, current_lv) if is_repeatable else current_lv + 1
 
-	if "level_desc" in data and next_level in data["level_desc"]:
+	if not is_repeatable and "level_desc" in data and next_level in data["level_desc"]:
 		return data["level_desc"][next_level]
 
 	var s: Dictionary = data.get("stats", {})
@@ -158,9 +159,9 @@ static func get_next_description(upgrades: Dictionary, current_levels: Dictionar
 			for threshold in s.get("enemy_boarding_slot_reduce_levels", [3, 5]):
 				if next_level >= int(threshold):
 					slot_penalty += 1
-			var slot_note := " | 동시 도선 한계 -%d" % slot_penalty if slot_penalty > 0 else ""
+			var slot_note := " | 동시 도선 수 -%d" % slot_penalty if slot_penalty > 0 else ""
 			var boarding_damage: float = minf(float(s.get("enemy_boarding_max_damage", 40.0)), float(next_level) * float(s.get("enemy_boarding_damage_per_lv", 8.0)))
-			return "도선 피해 %.0f%s" % [boarding_damage, slot_note]
+			return "넘어오는 적 피해 %.0f%s" % [boarding_damage, slot_note]
 		"crew_attack":
 			return "무기 피해 +%.0f%%" % [next_level * float(s.get("damage_bonus_pct_per_lv", 0.06)) * 100.0]
 		"crew_defense":

@@ -1,5 +1,6 @@
 extends Area3D
 const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const RESCUE_CALL_LABEL_NAME := "RescueCallLabel"
@@ -312,7 +313,8 @@ func _get_ship_rescue_anchor(ship: Node3D, lift_to_deck: bool) -> Vector3:
 
 func _try_collect(player_ship: Node3D) -> void:
 	if is_collected: return
-	if not _is_valid_rescue_ship(player_ship) or not player_ship.has_method("add_survivor"):
+	var rescue_recipient := _get_rescue_recipient_ship(player_ship)
+	if not _is_valid_rescue_ship(player_ship) or not is_instance_valid(rescue_recipient) or not rescue_recipient.has_method("add_survivor"):
 		return
 	if not _is_close_enough_to_collect(player_ship):
 		target_player = player_ship
@@ -330,12 +332,28 @@ func _is_valid_rescue_ship(ship: Node) -> bool:
 	if NodeContractHelper.is_sinking_or_dying(ship):
 		return false
 	if PlayerFleetRoleHelper.is_support_ship(ship):
-		return false
+		var support_recipient := _get_rescue_recipient_ship(ship as Node3D)
+		return (
+			is_instance_valid(support_recipient)
+			and not NodeContractHelper.is_sinking_or_dying(support_recipient)
+			and support_recipient.has_method("add_survivor")
+		)
 	if PlayerFleetRoleHelper.is_player_flagship(ship):
 		return true
 	if ship.has_method("is_player_controlled_ship") and ship.call("is_player_controlled_ship") == true:
 		return true
 	return ship.get("is_player_controlled") == true
+
+
+func _get_rescue_recipient_ship(collector_ship: Node3D) -> Node3D:
+	if not is_instance_valid(collector_ship):
+		return null
+	if PlayerFleetRoleHelper.is_support_ship(collector_ship):
+		var owner_flagship := SupportFleetStateHelper.get_support_owner_flagship(collector_ship)
+		if is_instance_valid(owner_flagship):
+			return owner_flagship
+		return null
+	return collector_ship
 
 
 func _finish_collection(player_ship: Node3D) -> void:
@@ -352,23 +370,23 @@ func _finish_collection(player_ship: Node3D) -> void:
 
 
 func _complete_collection(player_ship: Node3D) -> void:
-	if not is_instance_valid(player_ship) or not player_ship.has_method("add_survivor"):
+	var rescue_recipient := _get_rescue_recipient_ship(player_ship)
+	if not is_instance_valid(player_ship) or not is_instance_valid(rescue_recipient) or not rescue_recipient.has_method("add_survivor"):
 		ScenePool.release(self)
 		return
 
-	# 플레이어 배에 병사 추가 시도
-	if player_ship and player_ship.has_method("add_survivor"):
-		if player_ship.add_survivor(false):
-			_grant_rescue_xp(player_ship)
-			_finish_collection_effect()
-		else:
-			# 정원이 가득 찬 경우: 획득하지 않고 그냥 밀려남 (튕겨나가는 연출)
-			var bounce_dir = (global_position - player_ship.global_position).normalized()
-			global_position += bounce_dir * 2.0
-			current_magnet_speed = 0.0
-			is_collected = false
-			set_deferred("monitoring", true)
-			set_deferred("monitorable", true)
+	# 회수는 가까운 함선이 하되, 지원함이 건진 생존자는 기함 병력으로 보충한다.
+	if rescue_recipient.add_survivor(false):
+		_grant_rescue_xp(rescue_recipient)
+		_finish_collection_effect()
+	else:
+		# 정원이 가득 찬 경우: 획득하지 않고 그냥 밀려남 (튕겨나가는 연출)
+		var bounce_dir = (global_position - player_ship.global_position).normalized()
+		global_position += bounce_dir * 2.0
+		current_magnet_speed = 0.0
+		is_collected = false
+		set_deferred("monitoring", true)
+		set_deferred("monitorable", true)
 
 
 func _grant_rescue_xp(player_ship: Node3D) -> void:

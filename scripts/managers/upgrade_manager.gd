@@ -314,6 +314,8 @@ func get_treasure_upgrade_candidate_ids() -> Array[String]:
 		var current_level := int(current_levels.get(id, 0))
 		if current_level <= 0:
 			continue
+		if upgrade_data.get("repeatable", false) == true:
+			continue
 		if current_level >= int(upgrade_data.get("max_level", 0)):
 			continue
 		candidate_ids.append(id)
@@ -407,11 +409,19 @@ func apply_upgrade(upgrade_id: String) -> void:
 		return
 	if UPGRADES[upgrade_id].get("disabled", false) == true:
 		return
-	if current_levels[upgrade_id] >= UPGRADES[upgrade_id]["max_level"]:
+	var is_repeatable: bool = UPGRADES[upgrade_id].get("repeatable", false) == true
+	var max_level: int = int(UPGRADES[upgrade_id].get("max_level", 0))
+	var current_level: int = int(current_levels.get(upgrade_id, 0))
+	if not is_repeatable and current_level >= max_level:
 		return
 	
-	current_levels[upgrade_id] += 1
-	var new_level = current_levels[upgrade_id]
+	var new_level: int = current_level
+	if is_repeatable:
+		new_level = clampi(current_level if current_level > 0 else 1, 1, max_level)
+		current_levels[upgrade_id] = new_level
+	else:
+		current_levels[upgrade_id] = current_level + 1
+		new_level = current_levels[upgrade_id]
 	
 	var player_ship = _get_player_ship()
 	if not player_ship:
@@ -436,7 +446,11 @@ func apply_upgrade(upgrade_id: String) -> void:
 	if upgrade_id == "boarding_resist":
 		_apply_boarding_resist_to_player_fleet(new_level)
 	
-	print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [LocaleManager.data_text(UPGRADES[upgrade_id], upgrade_id, "upgrade", "name", upgrade_id), new_level])
+	var upgrade_name := LocaleManager.data_text(UPGRADES[upgrade_id], upgrade_id, "upgrade", "name", upgrade_id)
+	if is_repeatable:
+		print("[Upgrade] 1회 카드 발동: %s" % upgrade_name)
+	else:
+		print("[Upgrade] 업그레이드 적용: %s Lv.%d" % [upgrade_name, new_level])
 	
 	# HUD 업그레이드 슬롯 갱신 (함선/병사 트랙 분리)
 	var ship_ui_ids = ["cannon", "front_cannon", "cannon_damage", "cannon_reload", "janggun", "hull", "hull_defense", "hull_repair", "sailing", "rowing", "supply_bonus", "geobukseon", "fleet_signal", "panokseon_upgrade", "geobukseon_upgrade", "supply", "gold"]
@@ -1232,7 +1246,7 @@ func _apply_fleet_crew(ship: Node3D, level: int) -> void:
 	if not is_instance_valid(ship):
 		return
 	_refresh_support_fleet_upgrade_state(ship)
-	print("[Support] 지원함 재합류 업그레이드는 비활성화되었습니다. (Lv.%d 무시)" % level)
+	print("[Support] 지원함 예비대 업그레이드는 비활성화되었습니다. (Lv.%d 무시)" % level)
 
 
 func _get_player_ship() -> Node3D:
@@ -1415,11 +1429,6 @@ func reconcile_support_fleet(ship: Node3D, _reason: String = "", options: Dictio
 		state["autospawn_blocked"] = "fleet_signal_locked"
 		return state
 	var should_spawn: bool = options.get("spawn_now", false) == true
-	if options.get("spawn_if_respawn_ready", false) == true:
-		var timer_ready := "support_fleet_respawn_timer" in ship and "support_fleet_respawn_interval" in ship
-		if timer_ready and float(ship.support_fleet_respawn_timer) >= float(ship.support_fleet_respawn_interval):
-			ship.support_fleet_respawn_timer = 0.0
-			should_spawn = true
 	if options.get("spawn_if_limit_increased", false) == true and state.get("support_limit_increased", false):
 		should_spawn = true
 	if should_spawn and ship.has_method("_spawn_or_repair_support_ship"):
@@ -1435,13 +1444,7 @@ func _refresh_support_fleet_upgrade_state(ship: Node3D) -> void:
 func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 	if not is_instance_valid(ship):
 		return {}
-	var previous_respawn_interval: float = float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else 0.0
 	var previous_limit: int = int(ship.get("support_fleet_limit")) if "support_fleet_limit" in ship else 0
-	if "support_fleet_respawn_interval" in ship:
-		var base_interval: float = float(ship.get_meta("base_support_fleet_respawn_interval", ship.support_fleet_respawn_interval))
-		if not ship.has_meta("base_support_fleet_respawn_interval"):
-			ship.set_meta("base_support_fleet_respawn_interval", base_interval)
-		ship.support_fleet_respawn_interval = base_interval
 	if "support_fleet_limit" in ship:
 		var base_limit: int = int(ship.get_meta("base_support_fleet_limit", ship.support_fleet_limit))
 		if not ship.has_meta("base_support_fleet_limit"):
@@ -1452,7 +1455,6 @@ func _sync_support_fleet_upgrade_state(ship: Node3D) -> Dictionary:
 	if PlayerFleetRoleHelper.is_player_flagship(ship):
 		PlayerShipSupportHelper.refresh_support_fleet_composition(ship)
 	return {
-		"support_fleet_respawn_interval": float(ship.get("support_fleet_respawn_interval")) if "support_fleet_respawn_interval" in ship else previous_respawn_interval,
 		"support_fleet_limit": int(ship.get("support_fleet_limit")) if "support_fleet_limit" in ship else previous_limit,
 		"support_limit_increased": ("support_fleet_limit" in ship) and int(ship.get("support_fleet_limit")) > previous_limit,
 	}

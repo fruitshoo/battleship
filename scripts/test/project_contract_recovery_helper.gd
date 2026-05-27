@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ProjectContractRecoveryHelper
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+const SupportFleetStateHelper = preload("res://scripts/entities/ships/support_fleet_state_helper.gd")
 const SeaDecorSpawnerScript = preload("res://scripts/world/decor/sea_decor_spawner.gd")
 const SeaSiteSpawnerScript = preload("res://scripts/world/sea_sites/sea_site_spawner.gd")
 
@@ -35,6 +37,7 @@ static func run_recovery_effect_contract_smoke(owner: Node, failures: Array[Stri
 
 	await _run_floating_loot_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_survivor_smoke(owner, failures, smoke_root, player_ship, level_manager)
+	await _run_survivor_support_rescue_redirect_smoke(owner, failures, smoke_root, player_ship)
 	await _run_drifting_supply_site_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_static_reward_site_smoke(owner, failures, smoke_root, player_ship, level_manager)
 	await _run_static_sea_site_shape_contract(owner, failures, smoke_root)
@@ -138,6 +141,55 @@ static func _run_survivor_smoke(owner: Node, failures: Array[String], smoke_root
 		failures.append("recovery survivor smoke did not grant rescue XP")
 
 	await _run_survivor_full_crew_trains_existing_roster(owner, failures, smoke_root, player_ship)
+
+
+static func _run_survivor_support_rescue_redirect_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D) -> void:
+	var survivor_scene := load("res://scenes/effects/survivor.tscn") as PackedScene
+	if survivor_scene == null:
+		failures.append("recovery survivor support redirect scene load failed")
+		return
+	var survivor := survivor_scene.instantiate()
+	if survivor == null:
+		failures.append("recovery survivor support redirect instantiate failed")
+		return
+	smoke_root.add_child(survivor)
+
+	var support_probe := Node3D.new()
+	support_probe.name = "SupportRescueProbe"
+	support_probe.add_to_group("player")
+	PlayerFleetRoleHelper.mark_support_ship(support_probe)
+	SupportFleetStateHelper.assign_support_ship_to_flagship(support_probe, player_ship)
+	smoke_root.add_child(support_probe)
+	support_probe.global_position = player_ship.global_position + Vector3(-2.0, 0.0, 0.0)
+	if survivor is Node3D:
+		(survivor as Node3D).global_position = support_probe.global_position + Vector3(-0.15, 0.0, 0.0)
+	await _wait_frames(owner, 1)
+
+	if player_ship.get("max_crew_count") != null and player_ship.has_method("get_debug_crew_snapshot"):
+		var crew_snapshot: Dictionary = player_ship.call("get_debug_crew_snapshot")
+		var alive_before_fill: int = int(crew_snapshot.get("alive_count", 0))
+		player_ship.set("max_crew_count", max(alive_before_fill + 1, int(player_ship.get("max_crew_count"))))
+
+	var alive_before: int = 0
+	if player_ship.has_method("get_debug_crew_snapshot"):
+		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var roster_before_ids := _get_player_roster_instance_ids(player_ship)
+	survivor.call("_try_collect", support_probe)
+	await _wait_frames(owner, 36)
+
+	var alive_after: int = alive_before
+	if player_ship.has_method("get_debug_crew_snapshot"):
+		alive_after = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
+	var rescued_soldier := _find_new_player_roster_soldier(player_ship, roster_before_ids)
+	if survivor.get("is_collected") != true:
+		failures.append("recovery survivor support redirect did not collect through support ship")
+	if alive_after <= alive_before:
+		failures.append("recovery survivor support redirect did not add crew to flagship")
+	if not is_instance_valid(rescued_soldier):
+		failures.append("recovery survivor support redirect could not find new flagship crew member")
+
+	support_probe.queue_free()
+	await _wait_frames(owner, 1)
 
 
 static func _run_treasure_chest_smoke(owner: Node, failures: Array[String], smoke_root: Node, player_ship: Node3D, level_manager: Node) -> void:

@@ -869,8 +869,9 @@ func _update_team_color() -> void:
 func _physics_process(delta: float) -> void:
 	# 바다에 빠지면 사망 (글로벌 Y < -5)
 	if is_inside_tree() and global_position.y < -5.0:
-		set_meta("last_death_cause", "drowned")
-		set_meta("last_damage_source", "drowned")
+		var was_ballistic_collateral: bool = get_meta("ballistic_collateral_pending", false) == true
+		set_meta("last_death_cause", "overboard" if was_ballistic_collateral else "drowned")
+		set_meta("last_damage_source", "ballistic_collateral" if was_ballistic_collateral else "drowned")
 		# 바다에 빠질 때 작은 물보라 이펙트 재생
 		var water_explosion_scene = preload("res://scenes/effects/water_blast.tscn")
 		if water_explosion_scene:

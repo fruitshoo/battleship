@@ -31,6 +31,8 @@ const SHIP_COMBAT_INCAPACITATION_CHANCE_META := "crew_combat_incapacitation_chan
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
 	if soldier.current_state == soldier.State.DEAD:
 		return
+	if soldier.get_meta("ballistic_collateral_pending", false) == true:
+		return
 
 	var defense_bonus: float = 0.0
 	if soldier.has_meta("defense_flat_bonus"):
