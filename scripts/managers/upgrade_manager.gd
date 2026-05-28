@@ -83,6 +83,8 @@ const ACTIVE_SUPPORT_UPGRADE_IDS: Array[String] = [
 ]
 const SUPPORT_SHIP_PROGRESS_MIN_LEVELS: int = 5
 const FLEET_SIGNAL_UPGRADE_ID: String = "fleet_signal"
+const MAX_ACTIVE_MAENGSEON_SUPPORT_SHIPS: int = 2
+const MAX_ACTIVE_PANOKSEON_SUPPORT_SHIPS: int = 1
 const TREASURE_REWARD_EXCLUDED_IDS: Array[String] = [
 	"supply",
 	"gold",
@@ -211,7 +213,11 @@ func _are_support_ship_choices_available() -> bool:
 
 
 func _is_panokseon_upgrade_choice_available() -> bool:
-	return true
+	return _count_active_support_ships_matching("panokseon") < MAX_ACTIVE_PANOKSEON_SUPPORT_SHIPS
+
+
+func _is_fleet_signal_choice_available() -> bool:
+	return _count_active_support_ships_matching("maengseon") < MAX_ACTIVE_MAENGSEON_SUPPORT_SHIPS
 
 
 func _is_geobukseon_upgrade_choice_available() -> bool:
@@ -232,6 +238,23 @@ func _get_available_support_ship_upgrade_ids() -> Array[String]:
 		if _is_fleet_ship_progress_available():
 			support_ids.append(upgrade_id)
 	return support_ids
+
+
+func _count_active_support_ships_matching(ship_type_token: String) -> int:
+	var normalized_token := ship_type_token.strip_edges().to_lower()
+	if normalized_token.is_empty():
+		return 0
+	var count := 0
+	for support_ship in EntityRegistry.get_support_ships():
+		if not is_instance_valid(support_ship) or support_ship.is_queued_for_deletion():
+			continue
+		if support_ship.get("hull_hp") != null and float(support_ship.get("hull_hp")) <= 0.0:
+			continue
+		var ship_type_name := str(support_ship.get("ship_type")).strip_edges().to_lower()
+		var profile_id := str(support_ship.get_meta("support_fleet_profile", "")).strip_edges().to_lower()
+		if ship_type_name.contains(normalized_token) or profile_id.contains(normalized_token):
+			count += 1
+	return count
 
 
 func _get_non_fleet_progress_levels() -> int:
@@ -272,6 +295,8 @@ func _get_run_upgrade_ids() -> Array[String]:
 	var ids: Array[String] = SHIP_UPGRADE_IDS.duplicate()
 	if int(current_levels.get("geobukseon", 0)) > 0:
 		ids.erase("front_cannon")
+	if not _is_fleet_signal_choice_available():
+		ids.erase(FLEET_SIGNAL_UPGRADE_ID)
 	for upgrade_id in CREW_UPGRADE_IDS:
 		if upgrade_id not in ids:
 			ids.append(upgrade_id)

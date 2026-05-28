@@ -1792,6 +1792,7 @@ static func _validate_spawned_boss(failures: Array[String], spawned_boss: Node3D
 	var actual_crew_count: int = EntityRegistry.get_soldiers_by_ship(spawned_boss).size()
 	if actual_crew_count != expected_crew_count:
 		failures.append("%s crew count contract failed: %d != %d" % [label, actual_crew_count, expected_crew_count])
+	_validate_spawned_boss_crew_on_deck(failures, spawned_boss, label)
 	var max_hull_hp: float = float(spawned_boss.get("max_hull_hp"))
 	if int(spawned_boss.get("tier")) == 1 and max_hull_hp > 520.0:
 		failures.append("%s mid boss hull contract failed: %.1f > 520.0" % [label, max_hull_hp])
@@ -1812,6 +1813,35 @@ static func _validate_spawned_boss(failures: Array[String], spawned_boss: Node3D
 			failures.append("%s final boss range tolerance contract failed: %.2f != 2.5" % [label, range_tolerance])
 		if absf(retreat_distance - 9.0) > 0.05:
 			failures.append("%s final boss retreat distance contract failed: %.2f != 9.0" % [label, retreat_distance])
+
+
+static func _validate_spawned_boss_crew_on_deck(failures: Array[String], spawned_boss: Node3D, label: String) -> void:
+	if not is_instance_valid(spawned_boss):
+		return
+	if not spawned_boss.has_method("get_deck_half_extents"):
+		return
+	var deck_half_variant: Variant = spawned_boss.call("get_deck_half_extents")
+	if not (deck_half_variant is Vector2):
+		return
+	var deck_half := deck_half_variant as Vector2
+	if deck_half.x <= 0.01 or deck_half.y <= 0.01:
+		return
+	var deck_height := float(spawned_boss.get("deck_height")) if spawned_boss.get("deck_height") != null else 0.0
+	for soldier in EntityRegistry.get_soldiers_by_ship(spawned_boss):
+		var soldier_3d := soldier as Node3D
+		if not is_instance_valid(soldier_3d):
+			continue
+		var local_pos := spawned_boss.to_local(soldier_3d.global_position)
+		if absf(local_pos.y - deck_height) > 0.16:
+			failures.append("%s boss crew should spawn on DeckArea height: %s at y %.3f deck %.3f" % [label, soldier_3d.name, local_pos.y, deck_height])
+		if absf(local_pos.z) > deck_half.y + 0.08:
+			failures.append("%s boss crew outside DeckArea length: %s at %s" % [label, soldier_3d.name, local_pos])
+			continue
+		var half_width := deck_half.x
+		if spawned_boss.has_method("get_deck_half_width_at_z"):
+			half_width = maxf(0.08, float(spawned_boss.call("get_deck_half_width_at_z", clampf(local_pos.z, -deck_half.y, deck_half.y))))
+		if absf(local_pos.x) > half_width + 0.08:
+			failures.append("%s boss crew outside DeckArea width: %s at %s deck_half_width %.3f" % [label, soldier_3d.name, local_pos, half_width])
 
 
 static func _validate_final_boss_victory_on_death(owner: Node, failures: Array[String], spawned_boss: Node3D, level_manager: Node, label: String) -> void:

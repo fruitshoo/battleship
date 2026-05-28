@@ -18,6 +18,4 @@ const META_STALE_FRAMES := 8
 
 const MODE_ATTACK_TARGET := "attack_target"
 const MODE_MOVE_TO_TARGET := "move_to_target"
-const MODE_SHIP_DUTY := "ship_duty"
-const MODE_MUSTER_CROSS_SHIP := "muster_cross_ship"
 const MODE_WANDER := "wander"

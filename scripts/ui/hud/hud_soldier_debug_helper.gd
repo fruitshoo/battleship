@@ -59,14 +59,6 @@ static func format_soldier_limbo_panel_text(label: String, soldier: Node3D, sold
 			reason_text = "in range"
 		"target_visible":
 			reason_text = "closing"
-		"boarding_muster":
-			reason_text = "boarding lane"
-		"cross_ship_contact":
-			reason_text = "cross-deck contact"
-		"priority_ship_duty":
-			reason_text = "priority duty"
-		"ship_duty":
-			reason_text = "deck duty"
 	if not reason_text.is_empty():
 		details.append("why %s" % reason_text)
 	var error_text: String = str(limbo.get("error", "")).strip_edges()

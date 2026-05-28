@@ -7,7 +7,7 @@ const PREVIEW_META := "support_fleet_profile_preview_spawn"
 const FLEET_UPGRADES := {
 	"fleet_signal": {
 		"stats": {
-			"limit_add_level": 2,
+			"limit_add_level": 1,
 			"limit_add": 1,
 		},
 	},
@@ -144,6 +144,11 @@ func _assert_upgrade_manager_limit() -> void:
 	upgrade_manager.call("reconcile_support_fleet", player, "preview_choyogi_meta_limit", {})
 	_assert_equal("choyogi_meta_does_not_add_raw_support_slot", int(player.get("support_fleet_limit")), 1)
 	player.remove_meta("item_choyogi_applied")
+
+	upgrade_manager.current_levels["fleet_signal"] = 1
+	upgrade_manager.current_levels["panokseon_upgrade"] = 0
+	upgrade_manager.call("reconcile_support_fleet", player, "preview_fleet_signal_limit", {})
+	_assert_equal("fleet_signal_adds_second_maengseon_slot", int(player.get("support_fleet_limit")), 2)
 
 	upgrade_manager.current_levels["fleet_signal"] = 0
 	upgrade_manager.current_levels["panokseon_upgrade"] = 1

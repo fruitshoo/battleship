@@ -4,6 +4,7 @@ class_name BaseShipBoardingHelper
 
 const SoldierBoardingPrepBarHelper = preload("res://scripts/entities/soldiers/soldier_boarding_prep_bar_helper.gd")
 const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
+const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 const BOARDING_LANDING_INSET := 0.58
 const BOARDING_LANDING_CLAMP_INSET := 0.24
 const BOARDING_CONTACT_DISTANCE_PAD := 0.85
@@ -543,12 +544,14 @@ static func _get_defender_boarding_slot_penalty(target_ship: Node, attacker_team
 static func _get_random_deck_landing_local(target_ship: Node3D) -> Vector3:
 	var target_half_ext := _get_target_deck_half_extents(target_ship)
 	var target_deck_h := _get_target_deck_height(target_ship)
-	var safe_half_x: float = maxf(0.08, target_half_ext.x - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.x - 0.08)))
 	var safe_half_z: float = maxf(0.08, target_half_ext.y - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.y - 0.08)))
+	var random_z := randf_range(-safe_half_z, safe_half_z)
+	var half_width := SoldierShipHelper.get_ship_deck_half_width_at_z(target_ship, random_z, target_half_ext.x)
+	var safe_half_x: float = maxf(0.08, half_width - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, half_width - 0.08)))
 	return Vector3(
 		randf_range(-safe_half_x, safe_half_x),
 		target_deck_h,
-		randf_range(-safe_half_z, safe_half_z)
+		random_z
 	)
 
 
@@ -568,7 +571,12 @@ static func _get_nearest_deck_landing_local(target_ship: Node3D, approach_global
 	if outside_z:
 		landing_z = (target_half_ext.y - inset_z) * (1.0 if approach_local.z >= 0.0 else -1.0)
 
-	return Vector3(landing_x, target_deck_h, landing_z)
+	return SoldierShipHelper.get_clamped_main_deck_local(
+		target_ship,
+		Vector3(landing_x, target_deck_h, landing_z),
+		BOARDING_LANDING_INSET,
+		target_half_ext
+	)
 
 
 static func _get_boarding_launch_point_global(ship: Node3D, target_ship: Node3D) -> Vector3:
@@ -594,6 +602,7 @@ static func _get_boarding_launch_point_global(ship: Node3D, target_ship: Node3D)
 		var z_sign: float = 1.0 if target_local.z >= 0.0 else -1.0
 		launch_local.x = clampf(target_local.x, -half_ext.x * span_ratio, half_ext.x * span_ratio)
 		launch_local.z = z_sign * maxf(0.0, half_ext.y - BOARDING_LAUNCH_INSET)
+	launch_local = SoldierShipHelper.get_clamped_main_deck_local(ship, launch_local, BOARDING_LAUNCH_INSET, half_ext)
 	launch_local.y = deck_h
 	return ship.to_global(launch_local)
 
@@ -635,13 +644,11 @@ static func _apply_boarding_transfer_damage(soldier_id: int, target_ship_id: int
 
 static func _clamp_deck_landing_local(target_ship: Node3D, landing_local: Vector3) -> Vector3:
 	var target_half_ext := _get_target_deck_half_extents(target_ship)
-	var target_deck_h := _get_target_deck_height(target_ship)
-	var safe_half_x: float = maxf(0.08, target_half_ext.x - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.x - 0.08)))
-	var safe_half_z: float = maxf(0.08, target_half_ext.y - minf(BOARDING_LANDING_CLAMP_INSET, maxf(0.0, target_half_ext.y - 0.08)))
-	return Vector3(
-		clampf(landing_local.x, -safe_half_x, safe_half_x),
-		target_deck_h,
-		clampf(landing_local.z, -safe_half_z, safe_half_z)
+	return SoldierShipHelper.get_clamped_main_deck_local(
+		target_ship,
+		landing_local,
+		BOARDING_LANDING_CLAMP_INSET,
+		target_half_ext
 	)
 
 

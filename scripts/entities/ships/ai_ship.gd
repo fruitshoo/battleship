@@ -1388,7 +1388,7 @@ func _get_boarding_contact_point_on_target_local(target_ship: Node3D) -> Vector3
 		contact_local.x = clampf(attacker_local.x, -half_ext.x * contact_span_ratio, half_ext.x * contact_span_ratio)
 		var safe_half_z: float = maxf(0.08, half_ext.y - minf(edge_inset, maxf(0.0, half_ext.y - 0.08)))
 		contact_local.z = (1.0 if attacker_local.z >= 0.0 else -1.0) * safe_half_z
-	return contact_local
+	return SoldierShipHelper.get_clamped_main_deck_local(target_ship, contact_local, edge_inset, half_ext)
 
 
 func _get_boarding_contact_defense_radius(target_ship: Node3D) -> float:

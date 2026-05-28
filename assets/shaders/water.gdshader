@@ -71,6 +71,9 @@ uniform float clarity_radius : hint_range(0.0, 500.0, 0.1) = 18.0;
 uniform float haze_radius : hint_range(0.0, 800.0, 0.1) = 52.0;
 uniform float distance_haze_strength : hint_range(0.0, 1.0, 0.01) = 0.46;
 uniform vec3 distance_haze_color : source_color = vec3(0.44, 0.58, 0.7);
+uniform bool distance_lod_enabled = true;
+uniform float distance_lod_start_m : hint_range(0.0, 300.0, 1.0) = 70.0;
+uniform float distance_lod_end_m : hint_range(0.0, 300.0, 1.0) = 120.0;
 
 vec3 screen(vec3 base, vec3 blend){
 	return 1.0 - (1.0 - base) * (1.0 - blend);
@@ -222,6 +225,15 @@ float fresnel(float amount, vec3 normal, vec3 view) {
 void fragment() {
 	// Called for every pixel the material is visible on.
 	float basic_fresnel = fresnel(3.0, NORMAL, VIEW);
+    float horiz_dist = distance(world_vert.xz, player_center_ws.xz);
+    float haze_range = max(0.001, haze_radius - clarity_radius);
+    float distance_haze = clamp((horiz_dist - clarity_radius) / haze_range, 0.0, 1.0);
+    distance_haze = smoothstep(0.0, 1.0, distance_haze);
+    float lod_end_m = max(distance_lod_start_m + 0.001, distance_lod_end_m);
+    float distance_lod_factor = distance_lod_enabled
+        ? smoothstep(distance_lod_start_m, lod_end_m, horiz_dist)
+        : 0.0;
+    bool distance_lod_full = distance_lod_enabled && distance_lod_factor >= 0.995;
 	
     // Linear depth of the water surface itself
     float water_linear_depth = -VERTEX.z;
@@ -233,10 +245,14 @@ void fragment() {
     // NORMALS & DISTANCE SMOOTHING
     // -------------------------------------------------------------------------
     float dist_to_cam = length(VERTEX);
-    float lod_eps = max(normal_epsilon, dist_to_cam * 0.005);
-    vec3 animated_detailed_normal = get_normal_detailed(world_vert, lod_eps, TIME);
-    float smooth_factor = clamp((dist_to_cam - normal_smoothness_dist) / 200.0, 0.0, 1.0);
-    vec3 final_normal = mix(animated_detailed_normal, vertex_normal_world, smooth_factor);
+    vec3 final_normal = vertex_normal_world;
+    if (!distance_lod_full) {
+        float lod_eps = max(normal_epsilon, dist_to_cam * 0.005);
+        vec3 animated_detailed_normal = get_normal_detailed(world_vert, lod_eps, TIME);
+        float smooth_factor = clamp((dist_to_cam - normal_smoothness_dist) / 200.0, 0.0, 1.0);
+        final_normal = mix(animated_detailed_normal, vertex_normal_world, smooth_factor);
+        final_normal = mix(final_normal, vertex_normal_world, distance_lod_factor);
+    }
     NORMAL = (VIEW_MATRIX * vec4(final_normal, 0.0)).xyz;
     
     // -------------------------------------------------------------------------
@@ -246,15 +262,21 @@ void fragment() {
     vec2 normal_offset = NORMAL.xy - view_vertex_normal.xy;
     float ref_dist_factor = clamp(refraction_distance_fade / max(0.1, dist_to_cam), 0.0, 1.0);
     float ref_depth_mask = smoothstep(0.0, max_depth, thickness);
-    vec2 refraction_offset = normal_offset * refraction_strength * ref_dist_factor * ref_depth_mask * 0.05;
+    float refraction_lod_scale = 1.0 - distance_lod_factor;
+    vec2 refraction_offset = normal_offset * refraction_strength * ref_dist_factor * ref_depth_mask * refraction_lod_scale * 0.05;
 
     vec2 distorted_uv = SCREEN_UV + refraction_offset; // Apply Offset
 
     // Fix ghosting: 굴절된 UV의 깊이가 수면보다 앞쪽이면 굴절 취소
-    float distorted_bg_depth = get_linear_depth(DEPTH_TEXTURE, distorted_uv, INV_PROJECTION_MATRIX);
-    if (distorted_bg_depth < water_linear_depth - 0.001) {
+    float distorted_bg_depth = bg_linear_depth;
+    if (distance_lod_full) {
         distorted_uv = SCREEN_UV;
-        distorted_bg_depth = bg_linear_depth;
+    } else {
+        distorted_bg_depth = get_linear_depth(DEPTH_TEXTURE, distorted_uv, INV_PROJECTION_MATRIX);
+        if (distorted_bg_depth < water_linear_depth - 0.001) {
+            distorted_uv = SCREEN_UV;
+            distorted_bg_depth = bg_linear_depth;
+        }
     }
 
     vec3 screen_color = texture(SCREEN_TEXTURE, distorted_uv).rgb;
@@ -273,15 +295,15 @@ void fragment() {
     // -------------------------------------------------------------------------
     // CAUSTICS (수중 일렁임)
     // -------------------------------------------------------------------------
-    // 굴절된 UV를 기반으로 바닥 월드 좌표 복원 (가장 정확한 위치에 투사)
-    vec4 bg_ndc = vec4(distorted_uv * 2.0 - 1.0, texture(DEPTH_TEXTURE, distorted_uv).x, 1.0);
-    #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
-    bg_ndc.z = bg_ndc.z * 2.0 - 1.0;
-    #endif
-    vec4 bg_world = INV_VIEW_MATRIX * INV_PROJECTION_MATRIX * bg_ndc;
-    vec3 bg_world_pos = bg_world.xyz / bg_world.w;
+    if (thickness > 0.0 && !distance_lod_full) {
+        // 굴절된 UV를 기반으로 바닥 월드 좌표 복원 (가장 정확한 위치에 투사)
+        vec4 bg_ndc = vec4(distorted_uv * 2.0 - 1.0, texture(DEPTH_TEXTURE, distorted_uv).x, 1.0);
+        #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+        bg_ndc.z = bg_ndc.z * 2.0 - 1.0;
+        #endif
+        vec4 bg_world = INV_VIEW_MATRIX * INV_PROJECTION_MATRIX * bg_ndc;
+        vec3 bg_world_pos = bg_world.xyz / bg_world.w;
 
-    if (thickness > 0.0) {
         vec3 bg_normal = normalize(cross(dFdx(bg_world_pos), dFdy(bg_world_pos)));
         vec3 blending = abs(bg_normal);
         blending = normalize(max(blending, 0.00001)); // Prevent divide by zero
@@ -311,11 +333,11 @@ void fragment() {
 
         // Blend all projections based on unlit surface normal
         float caustics_value = c_xz * blending.y + c_xy * blending.z + c_zy * blending.x;
-        
+
         float caustics_cutoff_depth = max(underwater_fade_start_depth + 0.5, 1.0 / max(caustics_depth_fade, 0.001));
         float caustics_fade = 1.0 - smoothstep(underwater_fade_start_depth, caustics_cutoff_depth, thickness);
         // SCREEN_COLOR에 직접 더하되, 깊은 곳에서는 먼저 사라지게 한다.
-        screen_color += caustics_value * caustics_intensity * caustics_fade;
+        screen_color += caustics_value * caustics_intensity * caustics_fade * (1.0 - distance_lod_factor);
     }
 
     vec3 underwater_tint = mix(water_color, underwater_fog_color, fog_depth_ratio);
@@ -324,11 +346,6 @@ void fragment() {
 	// 월드 UV 기반 물결 이동
 	vec2 world_uv = world_vert.xz / uv_scale;
 	vec2 uv_movement = movement_direction * TIME * movement_strength;
-	
-    float horiz_dist = distance(world_vert.xz, player_center_ws.xz);
-    float haze_range = max(0.001, haze_radius - clarity_radius);
-    float distance_haze = clamp((horiz_dist - clarity_radius) / haze_range, 0.0, 1.0);
-    distance_haze = smoothstep(0.0, 1.0, distance_haze);
 
 	vec3 n1 = texture(normalmap_a, world_uv + uv_movement).rgb;
 	vec3 n2 = texture(normalmap_b, world_uv - uv_movement * 0.5).rgb;
@@ -361,31 +378,30 @@ void fragment() {
     float foam_mask_primary = 0.0;
     float foam_mask_shadow  = 0.0;
 
-    // To create swirling, flowing motion that mimics foam being carried by water currents, we use domain warping
-    vec2 flow_uv = world_vert.xz * 0.5 + TIME * 0.05 * foam_noise_speed;
-    vec2 warp = vec2(
-        noise(flow_uv),
-        noise(flow_uv + vec2(5.2, 1.3))
-    ) * 1.5; // Warping 강도 대폭 증가
+    if (distorted_bg_depth > water_linear_depth && !distance_lod_full) {
+        // To create swirling, flowing motion that mimics foam being carried by water currents, we use domain warping
+        vec2 flow_uv = world_vert.xz * 0.5 + TIME * 0.05 * foam_noise_speed;
+        vec2 warp = vec2(
+            noise(flow_uv),
+            noise(flow_uv + vec2(5.2, 1.3))
+        ) * 1.5; // Warping 강도 대폭 증가
 
-    // 깎아지른 절벽이나 직육면체(큐브)의 모서리(꼭짓점)가 너무 선명하게 직각으로 떨어지는 것을 방지하기 위해,
-    // 깊이 판정 자체를 노이즈로 울퉁불퉁하게 왜곡(Distort)하여 곡선형으로 만듭니다.
-    float base_foam_contact = 1.0 - smoothstep(0.0, foam_depth_start, depth_diff);
-    
-    // 꼭짓점/직선을 둥글게 허물기 위한 노이즈 결합
-    float edge_mask = smoothstep(0.0, 0.5, base_foam_contact);
-    float distorted_contact = base_foam_contact + (warp.x * 0.8 * edge_mask) + (warp.y * 0.4 * edge_mask);
+        // 깎아지른 절벽이나 직육면체(큐브)의 모서리(꼭짓점)가 너무 선명하게 직각으로 떨어지는 것을 방지하기 위해,
+        // 깊이 판정 자체를 노이즈로 울퉁불퉁하게 왜곡(Distort)하여 곡선형으로 만듭니다.
+        float base_foam_contact = 1.0 - smoothstep(0.0, foam_depth_start, depth_diff);
 
-    // 기준점(0.5)을 넓게 넘는 곳만 거품 영역으로 취급하여 경계를 부드럽게 퍼뜨립니다.
-    float depth_foam_factor = clamp(distorted_contact, 0.0, 1.0);
-    
-    // 파도 마루에 따른 폼
-    float wave_crest_factor = smoothstep(foam_crest_threshold, foam_crest_threshold - 0.1, final_normal.y);
-    wave_crest_factor *= foam_crest_amount;
-    
-    float foam_level = clamp(depth_foam_factor + wave_crest_factor, 0.0, 1.0);
+        // 꼭짓점/직선을 둥글게 허물기 위한 노이즈 결합
+        float edge_mask = smoothstep(0.0, 0.5, base_foam_contact);
+        float distorted_contact = base_foam_contact + (warp.x * 0.8 * edge_mask) + (warp.y * 0.4 * edge_mask);
 
-    if (distorted_bg_depth > water_linear_depth) {
+        // 기준점(0.5)을 넓게 넘는 곳만 거품 영역으로 취급하여 경계를 부드럽게 퍼뜨립니다.
+        float depth_foam_factor = clamp(distorted_contact, 0.0, 1.0);
+
+        // 파도 마루에 따른 폼
+        float wave_crest_factor = smoothstep(foam_crest_threshold, foam_crest_threshold - 0.1, final_normal.y);
+        wave_crest_factor *= foam_crest_amount * (1.0 - distance_lod_factor);
+
+        float foam_level = clamp(depth_foam_factor + wave_crest_factor, 0.0, 1.0);
         // 두 개의 서로 다른 스케일과 속도를 가진 방향으로 텍스처를 읽어와 섞습니다. (Tiling/격자 무늬 숨기기)
         vec2 foam_uv1 = world_vert.xz * foam_noise_scale + warp;
         foam_uv1 += vec2(TIME * 0.03 * foam_noise_speed, TIME * 0.02 * foam_noise_speed);
@@ -420,10 +436,10 @@ void fragment() {
         // 깊은 바다 무조건 차단 (if the fragment lacks foam level entirely, kill it)
         float isolation_mask = smoothstep(0.01, 0.1, foam_level); 
         
-        foam_mask_primary = noise_mask * isolation_mask;
+        foam_mask_primary = noise_mask * isolation_mask * (1.0 - distance_lod_factor);
         float shadow_shape = shadow_noise_mask * isolation_mask;
         
-        foam_mask_shadow = clamp(shadow_shape - foam_mask_primary, 0.0, 1.0);
+        foam_mask_shadow = clamp(shadow_shape - foam_mask_primary, 0.0, 1.0) * (1.0 - distance_lod_factor);
     }
 
     // Apply foam

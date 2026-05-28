@@ -370,8 +370,8 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 		player_soldier.name = "HudDebugPlayerSoldier"
 		player_soldier.global_position = player_ship.global_position + Vector3.ZERO
 		player_soldier.set("limbo_ai_pilot_enabled", true)
-		player_soldier.set_meta("soldier_limbo_ai_mode", "ship_duty")
-		player_soldier.set_meta("soldier_limbo_ai_reason", "ship_duty")
+		player_soldier.set_meta("soldier_limbo_ai_mode", "wander")
+		player_soldier.set_meta("soldier_limbo_ai_reason", "wander")
 		player_soldier.set_meta("soldier_limbo_ai_frame", Engine.get_physics_frames())
 	if is_instance_valid(enemy_soldier):
 		enemy_soldier.name = "HudDebugEnemySoldier"
@@ -387,8 +387,8 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 	if is_instance_valid(player_soldier) and is_instance_valid(hud.debug_player_soldier_ai_value):
 		if not hud.debug_player_soldier_ai_value.text.contains(player_soldier.name):
 			failures.append("hud smoke player soldier AI did not surface player soldier")
-		elif not hud.debug_player_soldier_ai_value.text.contains("mode ship_duty"):
-			failures.append("hud smoke player soldier AI did not surface duty mode")
+		elif not hud.debug_player_soldier_ai_value.text.contains("mode wander"):
+			failures.append("hud smoke player soldier AI did not surface wander mode")
 		elif not hud.debug_player_soldier_ai_value.text.contains("focus home deck"):
 			failures.append("hud smoke player soldier AI did not label flagship deck focus")
 	if is_instance_valid(enemy_soldier) and is_instance_valid(hud.debug_enemy_soldier_ai_value):
@@ -432,8 +432,8 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 			player_soldier.set("boarding_status", "boarding")
 		player_soldier.global_position = target_ship.global_position + Vector3(0.0, 0.0, 0.8)
 		player_soldier.set("limbo_ai_pilot_enabled", true)
-		player_soldier.set_meta("soldier_limbo_ai_mode", "muster_cross_ship")
-		player_soldier.set_meta("soldier_limbo_ai_reason", "boarding_muster")
+		player_soldier.set_meta("soldier_limbo_ai_mode", "wander")
+		player_soldier.set_meta("soldier_limbo_ai_reason", "wander")
 		player_soldier.set_meta("soldier_limbo_ai_frame", Engine.get_physics_frames())
 		player_ship.set("boarding_target", target_ship)
 		if hud.has_method("_sync_ship_debug_panel_from_player"):
@@ -443,8 +443,6 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 				failures.append("hud smoke player soldier AI did not prioritize away team focus")
 			elif not hud.debug_player_soldier_ai_value.text.contains("boarding away team"):
 				failures.append("hud smoke player soldier AI did not humanize away team boarding status")
-			elif not hud.debug_player_soldier_ai_value.text.contains("why boarding lane"):
-				failures.append("hud smoke player soldier AI did not humanize boarding muster reason")
 		if player_soldier.has_method("set_boarding_status"):
 			player_soldier.call("set_boarding_status", "returning")
 		else:

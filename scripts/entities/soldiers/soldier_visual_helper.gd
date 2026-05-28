@@ -243,16 +243,6 @@ static func update_role_visual(soldier) -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
 
-	if str(soldier.get_meta("ship_duty_task", "")) == "cannon_reload":
-		marker.visible = true
-		marker.scale = Vector3(1.35, 0.35, 1.35)
-		marker.rotation_degrees = Vector3.ZERO
-		material.albedo_color = Color(1.0, 0.82, 0.24, 1.0)
-		material.emission = Color(1.0, 0.72, 0.18, 1.0)
-		material.emission_energy_multiplier = 0.72
-		marker.material_override = material
-		return
-
 	match str(soldier.crew_role):
 		"fire_pot":
 			marker.visible = true

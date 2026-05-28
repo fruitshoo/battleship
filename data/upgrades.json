@@ -331,13 +331,13 @@
 		"fleet_signal": {
 			"name": "맹선",
 			"category": 4,
-			"description": "맹선 호출 또는 수리",
+			"description": "맹선 호출. 최대 2척까지 합류",
 			"card_art_path": "res://assets/ui/upgrades/fleet_signal_card.png",
 			"max_level": 1,
 			"repeatable": true,
 			"color": "ffb347",
 			"stats": {
-				"limit_add_level": 2,
+				"limit_add_level": 1,
 				"limit_add": 1
 			}
 		},

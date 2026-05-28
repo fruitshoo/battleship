@@ -77,7 +77,6 @@ rudder_turn_speed = 120.0
 furled_sail_rudder_multiplier = 1.3
 furled_sail_rowing_efficiency_multiplier = 1.2
 furled_sail_rowing_stamina_cost_multiplier = 0.85
-boarding_rope_resist_target_lock_grace = null
 auto_raid_enabled = true
 floating_offset = 0.5
 anchor_impact_max_pitch_degrees = 7.0

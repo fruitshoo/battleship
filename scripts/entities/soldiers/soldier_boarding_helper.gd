@@ -110,7 +110,12 @@ static func _get_nearest_deck_landing_local(target_ship: Node3D, approach_global
 	if outside_z:
 		landing_z = (target_half_ext.y - inset_z) * (1.0 if approach_local.z >= 0.0 else -1.0)
 
-	return Vector3(landing_x, target_deck_h, landing_z)
+	return SoldierShipHelper.get_clamped_main_deck_local(
+		target_ship,
+		Vector3(landing_x, target_deck_h, landing_z),
+		BOARDING_LANDING_INSET,
+		target_half_ext
+	)
 
 
 static func has_active_boarding_link_between(ship_a: Node3D, ship_b: Node3D) -> bool:

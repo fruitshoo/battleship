@@ -144,7 +144,7 @@
 	"upgrade.gold.name": "포인트",
 	"upgrade.gold.description": "포인트 +10",
 	"upgrade.fleet_signal.name": "맹선",
-	"upgrade.fleet_signal.description": "맹선 호출 또는 수리",
+	"upgrade.fleet_signal.description": "맹선 호출. 최대 2척까지 합류",
 	"upgrade.panokseon_upgrade.name": "판옥선",
 	"upgrade.panokseon_upgrade.description": "판옥선 포격함 1척 추가 합류",
 	"upgrade.geobukseon_upgrade.name": "거북선",

@@ -1043,44 +1043,6 @@ func get_alive_crew_count() -> int:
 	return count
 
 
-func request_cannon_reload_pose(cannon_node: Node3D, duration: float = 0.9) -> void:
-	if not SoldierShipWorkPriorityHelper.are_crew_work_directives_enabled():
-		return
-	if not is_instance_valid(cannon_node):
-		return
-	if deck_is_contested or deck_is_overrun:
-		return
-	if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(cannon_node, null, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD):
-		return
-	var own_team: String = get_team_tag()
-	var best_soldier: Node3D = null
-	var best_score: float = -INF
-	var max_distance_sq: float = 64.0
-	for soldier in EntityRegistry.get_soldiers_by_ship(self):
-		if not is_instance_valid(soldier):
-			continue
-		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
-		if soldier_team != own_team:
-			continue
-		if not soldier.has_method("is_available_for_cannon_reload_pose") or not soldier.is_available_for_cannon_reload_pose():
-			continue
-		var work_score: float = SoldierShipWorkPriorityHelper.score_worker_for_task(
-			soldier,
-			SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD,
-			cannon_node.global_position,
-			max_distance_sq,
-			cannon_node
-		)
-		if work_score <= best_score:
-			continue
-		best_score = work_score
-		best_soldier = soldier
-	if is_instance_valid(best_soldier) \
-			and best_soldier.has_method("play_cannon_reload_pose") \
-			and SoldierShipWorkPriorityHelper.reserve_work_slot(cannon_node, best_soldier, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD, duration + 0.45):
-		best_soldier.play_cannon_reload_pose(cannon_node, duration)
-
-
 func set_preview_deck_state(is_contested: bool, is_overrun: bool = false) -> void:
 	deck_is_contested = is_contested
 	deck_is_overrun = is_overrun

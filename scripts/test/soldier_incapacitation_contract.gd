@@ -82,12 +82,10 @@ class MockSoldier:
 	var weapon_bow: Node3D = null
 	var current_weapon: Node3D = null
 	var weapon_switch_distance: float = 4.0
-	var cross_ship_melee_switch_distance: float = 6.8
 	var crew_role: String = "general"
 	var is_melee_only: bool = false
 	var is_ranged_only: bool = false
 	var cross_ship_close: bool = false
-	var cross_ship_contact_ready: bool = false
 	var detection_range: float = 35.0
 
 	func _flash_hit() -> void:
@@ -114,9 +112,6 @@ class MockSoldier:
 
 	func _is_ship_pair_in_melee_range(_other_ship: Node3D) -> bool:
 		return cross_ship_close
-
-	func _is_in_cross_ship_contact_zone(_other_ship: Node3D) -> bool:
-		return cross_ship_contact_ready
 
 	func _change_state(next_state: int) -> void:
 		current_state = next_state
@@ -145,8 +140,8 @@ func _ready() -> void:
 	_verify_shipmate_assist_large_delta_does_not_instant_recover(failures)
 	_verify_shipmate_assist_uses_standoff_without_pushing(failures)
 	_verify_player_soldier_level_progression(failures)
-	_verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures)
-	_verify_cross_ship_attack_state_exits_unreachable_melee(failures)
+	_verify_nearby_cross_ship_target_prefers_bow_without_rail_melee(failures)
+	_verify_cross_ship_attack_state_exits_rail_melee(failures)
 	_verify_stale_current_target_does_not_cast_freed_enemy(failures)
 	_verify_soldier_visual_slot_contract(failures)
 	_verify_dead_boarding_jump_finish_keeps_death_pose(failures)
@@ -489,7 +484,7 @@ func _verify_player_soldier_level_progression(failures: Array[String]) -> void:
 	soldier.free()
 
 
-func _verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures: Array[String]) -> void:
+func _verify_nearby_cross_ship_target_prefers_bow_without_rail_melee(failures: Array[String]) -> void:
 	var player_ship := _make_ship("player")
 	player_ship.global_position = Vector3.ZERO
 	var enemy_ship := _make_ship("enemy")
@@ -503,22 +498,21 @@ func _verify_cross_ship_standoff_prefers_bow_until_melee_reaches(failures: Array
 	add_child(soldier.weapon_bow)
 	soldier.current_weapon = soldier.weapon_sword
 	soldier.cross_ship_close = true
-	soldier.cross_ship_contact_ready = true
 
 	var target := _make_soldier("enemy", enemy_ship)
 	target.global_position = Vector3(5.0, 0.0, 0.0)
 
 	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
 	if soldier.current_weapon != soldier.weapon_bow:
-		failures.append("cross-ship rail standoff did not prefer bow while melee could not reach")
+		failures.append("cross-ship contact should prefer bow instead of rail melee")
 
 	target.global_position = Vector3(1.35, 0.0, 0.0)
 	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
-	if soldier.current_weapon != soldier.weapon_sword:
-		failures.append("cross-ship close contact did not allow melee after it could reach")
+	if soldier.current_weapon != soldier.weapon_bow:
+		failures.append("cross-ship close contact should still avoid rail melee")
 
 
-func _verify_cross_ship_attack_state_exits_unreachable_melee(failures: Array[String]) -> void:
+func _verify_cross_ship_attack_state_exits_rail_melee(failures: Array[String]) -> void:
 	var player_ship := _make_ship("player")
 	player_ship.global_position = Vector3.ZERO
 	var enemy_ship := _make_ship("enemy")
@@ -533,19 +527,20 @@ func _verify_cross_ship_attack_state_exits_unreachable_melee(failures: Array[Str
 	soldier.current_weapon = soldier.weapon_sword
 	soldier.current_state = soldier.State.ATTACK
 	soldier.cross_ship_close = true
-	soldier.cross_ship_contact_ready = true
 
 	var target := _make_soldier("enemy", enemy_ship)
 	target.global_position = Vector3(5.0, 0.0, 0.0)
 	soldier.current_target = target
 
 	SoldierAiHelper.state_attack(soldier)
-	if soldier.current_state != soldier.State.MOVE:
-		failures.append("cross-ship attacker stayed in unreachable melee attack state")
+	if soldier.current_state != soldier.State.IDLE:
+		failures.append("cross-ship melee attacker should leave rail melee attack state")
+	if soldier.current_target != null:
+		failures.append("cross-ship melee attacker should clear rail melee target")
 
 	SoldierWeaponHelper.update_combat_weapon_choice(soldier, target)
 	if soldier.current_weapon != soldier.weapon_bow:
-		failures.append("cross-ship attacker did not switch to bow after leaving unreachable melee")
+		failures.append("cross-ship attacker should prefer bow after leaving rail melee")
 
 
 func _verify_stale_current_target_does_not_cast_freed_enemy(failures: Array[String]) -> void:

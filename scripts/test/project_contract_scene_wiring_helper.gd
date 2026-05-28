@@ -743,21 +743,15 @@ static func _validate_soldier_action_definition_catalog(failures: Array[String])
 		SoldierActionHelper.ACTION_CARGO_TRANSPORT_APPROACH,
 		SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY,
 		SoldierActionHelper.ACTION_CARGO_TRANSPORT_THROW,
-		SoldierActionHelper.ACTION_CANNON_RELOAD,
 	]
 	for action_name in required_actions:
 		if not actions.has(action_name):
 			failures.append("soldier action definition missing action: %s" % action_name)
 	if SoldierActionHelper.get_action_family(SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY) != SoldierActionHelper.ACTION_FAMILY_CARGO_TRANSPORT:
 		failures.append("soldier action definition cargo transport carry family mismatch")
-	if SoldierActionHelper.get_action_family(SoldierActionHelper.ACTION_CANNON_RELOAD) != SoldierActionHelper.ACTION_FAMILY_WEAPON_SUPPORT:
-		failures.append("soldier action definition cannon reload family mismatch")
 	var carry_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY)
 	if carry_definition.get(SoldierActionHelper.ACTION_DEF_LOCKS_AI, false) != true:
 		failures.append("soldier action definition cargo transport carry should lock AI")
-	var reload_definition := SoldierActionHelper.get_action_definition(SoldierActionHelper.ACTION_CANNON_RELOAD)
-	if reload_definition.get(SoldierActionHelper.ACTION_DEF_LOCKS_AI, true) != false:
-		failures.append("soldier action definition cannon reload should not lock AI")
 	if SoldierActionHelper.get_default_animation_name(SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY) != SoldierActionHelper.ACTION_CARGO_TRANSPORT_CARRY:
 		failures.append("soldier action definition cargo transport carry animation name mismatch")
 
@@ -1349,6 +1343,7 @@ static func _run_hull_authoring_marker_contract(failures: Array[String]) -> void
 		_expect_min_authoring_count(marker_counts, label, "WeaponSlots", weapon_slots.size(), failures)
 		_expect_min_authoring_count(marker_counts, label, "BoardingAnchors", int(check["anchors"]), failures)
 		_expect_min_authoring_count(marker_counts, label, "CrewSlots", int(check["crew"]), failures)
+		_expect_crew_slots_on_deck_area(hull_root, label, failures)
 		_expect_authoring_marker_names(hull_root, label, "CannonSlots", check.get("cannon_names", ["CannonFront", "CannonLeft", "CannonRight"]), failures)
 		_expect_authoring_marker_names(hull_root, label, "WeaponSlots", weapon_slots, failures)
 		_expect_authoring_marker_names(hull_root, label, "BoardingAnchors", ["RightForward", "RightMid", "RightRear", "LeftForward", "LeftMid", "LeftRear", "Bow", "Stern"], failures)
@@ -2939,6 +2934,28 @@ static func _expect_deck_area_polygon(root: Node, label: String, failures: Array
 		failures.append("%s DeckArea polygon has invalid extents: width %.2f length %.2f" % [label, half_width, half_length])
 
 
+static func _expect_crew_slots_on_deck_area(root: Node, label: String, failures: Array[String]) -> void:
+	if not (root is Node3D):
+		return
+	var root_3d := root as Node3D
+	var deck_height := ShipAuthoringHelper.get_deck_area_height(root_3d)
+	var deck_half_extents := ShipAuthoringHelper.get_deck_area_half_extents(root_3d)
+	if deck_height < 0.0 or deck_half_extents.x <= 0.01 or deck_half_extents.y <= 0.01:
+		return
+	const HEIGHT_TOLERANCE := 0.08
+	const EDGE_TOLERANCE := 0.08
+	for marker in ShipAuthoringHelper.get_authoring_markers(root_3d, "CrewSlots"):
+		var local_pos := root_3d.to_local(marker.global_position)
+		if absf(local_pos.y - deck_height) > HEIGHT_TOLERANCE:
+			failures.append("%s CrewSlots marker should sit on DeckArea height: %s at y %.3f deck %.3f" % [label, marker.name, local_pos.y, deck_height])
+		if absf(local_pos.z) > deck_half_extents.y + EDGE_TOLERANCE:
+			failures.append("%s CrewSlots marker outside DeckArea length: %s at %s" % [label, marker.name, local_pos])
+			continue
+		var deck_half_width := ShipAuthoringHelper.get_deck_area_half_width_at_z(root_3d, local_pos.z)
+		if deck_half_width > 0.0 and absf(local_pos.x) > deck_half_width + EDGE_TOLERANCE:
+			failures.append("%s CrewSlots marker outside DeckArea width: %s at %s deck_half_width %.3f" % [label, marker.name, local_pos, deck_half_width])
+
+
 static func _expect_authoring_visualizer(root: Node, label: String, failures: Array[String]) -> void:
 	var authoring := root.get_node_or_null("Authoring")
 	if not is_instance_valid(authoring):
@@ -3125,7 +3142,7 @@ static func _run_soldier_common_action_contract(owner: Node, failures: Array[Str
 	wrapper.add_child(soldier)
 	await _wait_frames(owner, wait_frames_after_attach)
 
-	for method_name in ["begin_boarding_jump_pose", "finish_boarding_jump_pose", "play_cannon_reload_pose", "is_available_for_cannon_reload_pose"]:
+	for method_name in ["begin_boarding_jump_pose", "finish_boarding_jump_pose"]:
 		if not soldier.has_method(str(method_name)):
 			failures.append("soldier common action missing method: %s" % method_name)
 
@@ -3145,19 +3162,6 @@ static func _run_soldier_common_action_contract(owner: Node, failures: Array[Str
 		if soldier.get("current_state") == soldier.State.BOARDING_JUMP:
 			failures.append("soldier common boarding pose remained in BOARDING_JUMP after landing")
 
-	if soldier.has_method("play_cannon_reload_pose"):
-		var cannon_marker := Node3D.new()
-		cannon_marker.name = "CannonReloadPoseMarker"
-		wrapper.add_child(cannon_marker)
-		cannon_marker.global_position = soldier.global_position + Vector3(1.0, 0.0, 0.0)
-		soldier.call("play_cannon_reload_pose", cannon_marker, 0.2)
-		await _wait_frames(owner, 1)
-		if soldier.get("current_state") != soldier.State.RELOAD:
-			failures.append("soldier common reload pose did not enter RELOAD state")
-		await _wait_frames(owner, 20)
-		if soldier.get("current_state") == soldier.State.RELOAD:
-			failures.append("soldier common reload pose did not return to idle")
-
 	wrapper.queue_free()
 	await _wait_frames(owner, 1)
 
@@ -3168,12 +3172,7 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 		failures.append("soldier ship work priority contract could not read helper")
 		return
 	for token in [
-		"TASK_DECK_DEFENSE",
 		"TASK_CARGO_TRANSPORT",
-		"TASK_CANNON_RELOAD",
-		"TASK_SHIPHANDLING_STATION",
-		"static func get_ship_work_directive",
-		"static func score_worker_for_task",
 		"static func can_accept_immediate_work",
 		"static func get_task_priority_rows",
 		"TASK_PRIORITY_TABLE",
@@ -3181,45 +3180,20 @@ static func _run_soldier_ship_work_priority_contract(owner: Node, failures: Arra
 		"static func release_work_slot",
 		"static func is_work_slot_reserved_for_other",
 		"WORK_SLOT_RESERVATIONS_META",
-		"ACTIVE_WORK_TARGET_LOCAL_META",
-		"static func get_active_ship_work_target",
-		"static func clear_active_ship_work_target",
-		"KEY_SLOT",
-		"KEY_LOCAL_TARGET",
 	]:
 		if not work_priority_source.contains(str(token)):
 			failures.append("soldier ship work priority helper missing token: %s" % token)
-	if not work_priority_source.contains("PRIORITY_CANNON_RELOAD := 70") or not work_priority_source.contains("PRIORITY_SHIPHANDLING_STATION := 42"):
-		failures.append("cannon reload should outrank routine shiphandling station work")
+	for removed_token in ["TASK_DECK_DEFENSE", "TASK_CANNON_RELOAD", "TASK_SHIPHANDLING_STATION", "get_ship_work_directive", "score_worker_for_task"]:
+		if work_priority_source.contains(str(removed_token)):
+			failures.append("soldier ship work priority helper kept removed duty token: %s" % removed_token)
 	_validate_soldier_ship_work_priority_table(failures)
-
-	var duty_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_ship_duty_helper.gd")
-	if duty_source.is_empty():
-		failures.append("soldier ship work priority contract could not read duty helper")
-		return
-	if not duty_source.contains("SoldierShipWorkPriorityHelper.find_ship_work_target"):
-		failures.append("ship duty helper should delegate to ship work priority helper")
 
 	var soldier_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier.gd")
 	if soldier_source.is_empty():
 		failures.append("soldier ship work priority contract could not read soldier.gd")
 		return
-	if not soldier_source.contains("SoldierShipWorkPriorityHelper.can_accept_immediate_work"):
-		failures.append("cannon reload pose availability should honor work priority")
-	if not soldier_source.contains("SoldierActionHelper.ACTION_CANNON_RELOAD"):
-		failures.append("cannon reload pose should use the named action system")
-	if not soldier_source.contains("SoldierShipWorkPriorityHelper.release_work_slot"):
-		failures.append("cannon reload pose should release its reserved work slot")
-
-	var base_ship_source := FileAccess.get_file_as_string("res://scripts/entities/ships/base_ship.gd")
-	if base_ship_source.is_empty():
-		failures.append("soldier ship work priority contract could not read base_ship.gd")
-		return
-	if not base_ship_source.contains("SoldierShipWorkPriorityHelper.score_worker_for_task"):
-		failures.append("cannon reload worker selection should use ship work priority scoring")
-	if not base_ship_source.contains("SoldierShipWorkPriorityHelper.reserve_work_slot"):
-		failures.append("cannon reload worker selection should reserve the cannon work slot")
-	_validate_ship_work_target_tracks_moving_ship(owner, failures)
+	if soldier_source.contains("play_cannon_reload_pose") or soldier_source.contains("MODE_SHIP_DUTY"):
+		failures.append("soldier should not keep removed ship duty or cannon reload pose hooks")
 
 
 static func _validate_soldier_ship_work_priority_table(failures: Array[String]) -> void:
@@ -3247,68 +3221,15 @@ static func _validate_soldier_ship_work_priority_table(failures: Array[String]) 
 		if SoldierShipWorkPriorityHelper.get_task_priority(task_name) != priority:
 			failures.append("soldier ship work priority getter mismatch for %s" % task_name)
 	var expected_order: Array[String] = [
-		SoldierShipWorkPriorityHelper.TASK_DECK_DEFENSE,
 		SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT,
-		SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD,
-		SoldierShipWorkPriorityHelper.TASK_SHIPHANDLING_STATION,
 	]
 	for task_name in expected_order:
 		if not priorities.has(task_name):
 			failures.append("soldier ship work priority missing task: %s" % task_name)
-	for index in range(expected_order.size() - 1):
-		var higher: String = expected_order[index]
-		var lower: String = expected_order[index + 1]
-		if priorities.has(higher) and priorities.has(lower) and int(priorities[higher]) <= int(priorities[lower]):
-			failures.append("soldier ship work priority order invalid: %s should outrank %s" % [higher, lower])
 	if SoldierShipWorkPriorityHelper.get_task_phase(SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT) != SoldierShipWorkPriorityHelper.PHASE_TRANSPORT:
 		failures.append("soldier ship work priority cargo transport phase mismatch")
-	if priorities.has(SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION):
-		failures.append("routine gunnery station should not remain in the active ship work priority table")
-	if SoldierShipWorkPriorityHelper.get_task_priority(SoldierShipWorkPriorityHelper.TASK_GUNNERY_STATION) != SoldierShipWorkPriorityHelper.PRIORITY_NONE:
-		failures.append("routine gunnery station should no longer advertise a ship work priority")
 	if SoldierShipWorkPriorityHelper.get_task_priority("unknown") != SoldierShipWorkPriorityHelper.PRIORITY_NONE:
 		failures.append("soldier ship work priority unknown task should have no priority")
-
-
-static func _validate_ship_work_target_tracks_moving_ship(owner: Node, failures: Array[String]) -> void:
-	var ship := MockShipWorkShip.new()
-	ship.name = "ShipWorkTargetShip"
-	var soldier := MockShipWorkSoldier.new()
-	soldier.name = "ShipWorkTargetSoldier"
-	owner.add_child(ship)
-	owner.add_child(soldier)
-	ship.global_position = Vector3(3.0, 0.0, -4.0)
-	soldier.global_position = ship.to_global(Vector3.ZERO)
-	soldier.owned_ship = ship
-
-	var first_target := SoldierShipWorkPriorityHelper.find_ship_work_target(soldier)
-	if first_target == Vector3.INF:
-		failures.append("ship work target contract could not acquire rowing target")
-		ship.queue_free()
-		soldier.queue_free()
-		return
-	var first_local := ship.to_local(first_target)
-	ship.global_position += Vector3(12.0, 0.0, -3.0)
-	var active_target := SoldierShipWorkPriorityHelper.get_active_ship_work_target(soldier)
-	if active_target == Vector3.INF:
-		failures.append("ship work active target should persist between heavy AI ticks")
-	else:
-		var active_local := ship.to_local(active_target)
-		if active_local.distance_to(first_local) > 0.01:
-			failures.append("ship work active target should track the same ship-local slot while the ship moves")
-		if active_target.distance_to(first_target) < 3.0:
-			failures.append("ship work active target should move with the ship instead of using a stale global point")
-
-	ship.is_rowing = false
-	var stale_target := SoldierShipWorkPriorityHelper.get_active_ship_work_target(soldier)
-	if stale_target != Vector3.INF:
-		failures.append("ship work active rowing target should clear when rowing stops")
-	var idle_target := SoldierShipWorkPriorityHelper.find_ship_work_target(soldier)
-	if idle_target != Vector3.INF:
-		failures.append("ship work target should stay idle when the ship is not rowing, steering, or moving")
-
-	ship.queue_free()
-	soldier.queue_free()
 
 
 static func _run_soldier_smooth_turn_contract(owner: Node, failures: Array[String]) -> void:

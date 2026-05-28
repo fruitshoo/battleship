@@ -10,7 +10,6 @@
   },
   "combat_ranges": {
     "weapon_switch_distance": 4.0,
-    "cross_ship_melee_switch_distance": 6.8,
     "cross_ship_engage_max_distance": 14.5,
     "cross_ship_engage_ship_distance": 16.5
   },

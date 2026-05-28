@@ -5,6 +5,8 @@ const FlagSceneLibrary = preload("res://scripts/props/flag_scene_library.gd")
 const PhysicsProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const AIShipLifecycleHelper = preload("res://scripts/entities/ships/ai_ship_lifecycle_helper.gd")
 const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
+const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
+const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -173,17 +175,16 @@ func _setup_soldiers() -> void:
 		add_child(soldiers_node)
 		soldiers_node.position = Vector3(0, 1.0, 0)
 	
-	var spawn_points: Array[Vector3] = _get_boss_soldier_spawn_points(maxi(crew_composition.size(), 4))
+	var spawn_transforms: Array[Transform3D] = _get_boss_soldier_spawn_transforms(maxi(crew_composition.size(), 4), soldiers_node as Node3D)
 	
 	var i = 0
-	for pos in spawn_points:
+	for spawn_transform in spawn_transforms:
 		var s = soldier_scene.instantiate()
 		var soldier_type_name: String = _get_crew_type_for_index(i)
 		s.team = "enemy"
 		s.owned_ship = self
 		s.home_ship = self
 		_configure_boss_soldier(s, soldier_type_name)
-		s.position = pos
 		
 		# 보스 병사는 엘리트급 체력/데미지 보너스
 		s.max_health = 150.0
@@ -191,6 +192,7 @@ func _setup_soldiers() -> void:
 		s.attack_damage = 15.0
 			
 		soldiers_node.add_child(s)
+		s.transform = spawn_transform
 		s.set_team("enemy")
 		_configure_boss_soldier(s, soldier_type_name)
 		i += 1
@@ -200,7 +202,12 @@ func _load_crew_composition_from_stats(stats: Dictionary) -> void:
 	crew_composition = ShipBlueprintHelper.build_crew_composition(stats)
 
 
-func _get_boss_soldier_spawn_points(required_count: int) -> Array[Vector3]:
+func _get_boss_soldier_spawn_transforms(required_count: int, soldiers_node: Node3D) -> Array[Transform3D]:
+	if is_instance_valid(soldiers_node):
+		var crew_slot_transforms := ShipAuthoringHelper.get_crew_slot_transforms(self, soldiers_node)
+		if not crew_slot_transforms.is_empty():
+			return crew_slot_transforms.slice(0, clampi(required_count, 1, crew_slot_transforms.size()))
+
 	var base_points: Array[Vector3] = [
 		Vector3(-1.5, 0, -3),
 		Vector3(1.5, 0, -3),
@@ -211,7 +218,18 @@ func _get_boss_soldier_spawn_points(required_count: int) -> Array[Vector3]:
 		Vector3(-2.2, 0, 0.0),
 		Vector3(2.2, 0, 0.0),
 	]
-	return base_points.slice(0, clampi(required_count, 1, base_points.size()))
+	var spawn_transforms: Array[Transform3D] = []
+	var fallback_count := clampi(required_count, 1, base_points.size())
+	for index in range(fallback_count):
+		spawn_transforms.append(_get_clamped_boss_fallback_spawn_transform(base_points[index], soldiers_node))
+	return spawn_transforms
+
+
+func _get_clamped_boss_fallback_spawn_transform(ship_local: Vector3, soldiers_node: Node3D) -> Transform3D:
+	var clamped_local := SoldierShipHelper.get_clamped_main_deck_local(self, ship_local)
+	if is_instance_valid(soldiers_node):
+		return Transform3D(Basis.IDENTITY, soldiers_node.to_local(to_global(clamped_local)))
+	return Transform3D(Basis.IDENTITY, clamped_local)
 
 
 func _get_crew_type_for_index(index: int) -> String:

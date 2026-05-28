@@ -108,7 +108,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -2.7458003)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4.4418106)
 
 [node name="CrewSlots" type="Node3D" parent="ScaleRoot/Authoring" unique_id=469391249]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6263745, 1.0679617)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.981, 1.0679617)
 
 [node name="CrewForwardLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1977718397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.55, -2.2)

@@ -103,12 +103,8 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 			and target_ship != soldier.owned_ship
 			and soldier._is_ship_pair_in_melee_range(target_ship)
 		)
-		var cross_ship_contact_ready: bool = false
-		if cross_ship_close and soldier.has_method("_is_in_cross_ship_contact_zone"):
-			cross_ship_contact_ready = soldier._is_in_cross_ship_contact_zone(target_ship) == true
 		if cross_ship_close and soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
-			cross_ship_contact_ready = false
-		var cross_ship_melee_ready: bool = cross_ship_contact_ready and _can_cross_ship_melee_reach_target(soldier, dist_xz)
+			cross_ship_close = false
 
 		if soldier.is_melee_only:
 			soldier._set_active_weapon("sword")
@@ -116,10 +112,8 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 			soldier._set_active_weapon("sword")
 		elif soldier.is_ranged_only:
 			soldier._set_active_weapon("bow")
-		elif cross_ship_melee_ready:
-			# 다른 배와 교전 중이라도, 실제 접촉 가능한 가장자리까지 도달했을 때만
-			# 일반 병사를 근접 무기로 전환한다.
-			soldier._set_active_weapon("sword")
+		elif cross_ship_close:
+			soldier._set_active_weapon("bow")
 		elif dist_xz <= soldier.weapon_switch_distance:
 			soldier._set_active_weapon("sword")
 		else:
@@ -131,12 +125,3 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 		soldier._set_active_weapon("sword")
 	else:
 		soldier._set_active_weapon("bow")
-
-
-static func _can_cross_ship_melee_reach_target(soldier, dist_xz: float) -> bool:
-	if not is_instance_valid(soldier.weapon_sword):
-		return false
-	var melee_range: float = float(soldier.weapon_sword.get("attack_range")) if soldier.weapon_sword.get("attack_range") != null else soldier.weapon_switch_distance
-	var reach_buffer: float = 0.35
-	var max_switch_distance: float = minf(maxf(soldier.cross_ship_melee_switch_distance, soldier.weapon_switch_distance), melee_range + reach_buffer)
-	return dist_xz <= max_switch_distance

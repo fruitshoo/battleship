@@ -5,7 +5,6 @@ extends Node
 const SoldierScene = preload("res://scenes/entities/soldiers/soldier.tscn")
 const SoldierLimboAIPilot = preload("res://scripts/ai/limbo/soldier_limbo_ai_pilot.gd")
 const SoldierAILimboKeys = preload("res://scripts/ai/limbo/soldier_ai_limbo_keys.gd")
-const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
 const NodeContractHelper = preload("res://scripts/helpers/node_contract_helper.gd")
 
 const CONTRACT_META_STALE_FRAMES := 8
@@ -73,9 +72,8 @@ func _run_contract() -> void:
 	await _verify_attack_mode_contract()
 	await _verify_move_mode_contract()
 	await _verify_boarding_profile_prefers_active_boarding_target_contract()
-	await _verify_ranged_profile_suppresses_cross_ship_muster_contract()
+	await _verify_ranged_profile_has_no_rail_muster_contract()
 	await _verify_player_melee_profile_holds_home_deck_contract()
-	await _verify_cross_ship_muster_mode_contract()
 	await _verify_wander_mode_contract()
 
 	if _failed:
@@ -157,24 +155,6 @@ func _verify_move_mode_contract() -> void:
 	await _cleanup_scenario(scenario.root)
 
 
-func _verify_ship_duty_mode_contract() -> void:
-	var scenario := await _spawn_scenario("Duty", Vector3.ZERO, Vector3(120.0, 0.0, 0.0))
-	scenario.player_ship.shiphandling_crew_ratio = 1.0
-	scenario.player_ship.is_rowing = true
-	scenario.player_ship.rudder_angle = 14.0
-	scenario.player_ship.current_speed = 2.4
-	var player_soldier := await _spawn_soldier(scenario.player_ship, "player", Vector3(0.0, 0.4, 0.0), true)
-	player_soldier.current_state = player_soldier.State.IDLE
-	player_soldier.current_target = null
-	player_soldier._update_limbo_ai_pilot(0.016)
-
-	_assert_mode(player_soldier, SoldierAILimboKeys.MODE_SHIP_DUTY, "ship duty mode")
-	_assert_recent_point(player_soldier, "ship duty mode")
-	if is_instance_valid(player_soldier.current_target):
-		_fail("ship duty mode should clear current_target")
-	await _cleanup_scenario(scenario.root)
-
-
 func _verify_boarding_profile_prefers_active_boarding_target_contract() -> void:
 	var scenario := await _spawn_scenario("BoardingPreference", Vector3.ZERO, Vector3(0.0, 0.0, 16.0))
 	var decoy_enemy_ship := _spawn_ship(scenario.root, "EnemyShipBoardingPreferenceDecoy", "enemy", Vector3(8.0, 0.0, 0.0))
@@ -190,22 +170,20 @@ func _verify_boarding_profile_prefers_active_boarding_target_contract() -> void:
 	boarder.current_target = null
 	boarder._update_limbo_ai_pilot(0.016)
 
-	_assert_mode(boarder, SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP, "boarding profile mode")
-	var expected_point: Vector3 = SoldierShipHelper.get_cross_ship_contact_point_global(boarder, scenario.enemy_ship)
-	var actual_point: Variant = boarder.get_meta(SoldierAILimboKeys.META_POINT, Vector3.INF)
-	if not (actual_point is Vector3) or (actual_point as Vector3) == Vector3.INF:
-		_fail("boarding profile should publish a boarding muster point")
-	elif (actual_point as Vector3).distance_to(expected_point) > 0.25:
-		_fail("boarding profile should favor active boarding target over nearer decoy ship")
+	_assert_mode(boarder, SoldierAILimboKeys.MODE_WANDER, "boarding profile no duty mode")
 	var reason := str(boarder.get_meta(SoldierAILimboKeys.META_REASON, "")).strip_edges()
-	if reason != "boarding_muster":
-		_fail("boarding profile reason mismatch: %s" % reason)
+	if reason != "wander":
+		_fail("boarding profile should stay in simple wander mode without duty, got: %s" % reason)
+	if boarder.has_meta(SoldierAILimboKeys.META_POINT):
+		var actual_point: Variant = boarder.get_meta(SoldierAILimboKeys.META_POINT)
+		if actual_point is Vector3:
+			_fail("boarding profile should not publish a ship duty point")
 	if is_instance_valid(decoy_enemy_ship) and scenario.player_ship.boarding_target != scenario.enemy_ship:
 		_fail("boarding profile scenario lost active boarding target")
 	await _cleanup_scenario(scenario.root)
 
 
-func _verify_ranged_profile_suppresses_cross_ship_muster_contract() -> void:
+func _verify_ranged_profile_has_no_rail_muster_contract() -> void:
 	var scenario := await _spawn_scenario("RangedNoMuster", Vector3.ZERO, Vector3(0.0, 0.0, 12.0))
 	var ranged_profile_soldier := await _spawn_soldier(scenario.player_ship, "player", Vector3(-2.3, 0.4, -4.2), false)
 	ranged_profile_soldier.call("apply_crew_role", "general")
@@ -214,26 +192,11 @@ func _verify_ranged_profile_suppresses_cross_ship_muster_contract() -> void:
 	ranged_profile_soldier.current_target = null
 	ranged_profile_soldier._update_limbo_ai_pilot(0.016)
 
-	_assert_mode(ranged_profile_soldier, SoldierAILimboKeys.MODE_WANDER, "ranged profile no-muster mode")
+	_assert_mode(ranged_profile_soldier, SoldierAILimboKeys.MODE_WANDER, "ranged profile no rail muster mode")
 	if ranged_profile_soldier.has_meta(SoldierAILimboKeys.META_POINT):
 		var point_value: Variant = ranged_profile_soldier.get_meta(SoldierAILimboKeys.META_POINT)
 		if point_value is Vector3:
-			_fail("ranged profile should not publish a cross-ship muster point")
-	await _cleanup_scenario(scenario.root)
-
-
-func _verify_cross_ship_muster_mode_contract() -> void:
-	var scenario := await _spawn_scenario("Muster", Vector3.ZERO, Vector3(0.0, 0.0, 12.0))
-	scenario.enemy_ship.is_boarding = true
-	scenario.enemy_ship.boarding_target = scenario.player_ship
-	scenario.enemy_ship._initial_rope_deployed = true
-	var enemy_soldier := await _spawn_soldier(scenario.enemy_ship, "enemy", Vector3(-2.3, 0.4, -4.2), true)
-	enemy_soldier.current_state = enemy_soldier.State.IDLE
-	enemy_soldier.current_target = null
-	enemy_soldier._update_limbo_ai_pilot(0.016)
-
-	_assert_mode(enemy_soldier, SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP, "cross-ship muster mode")
-	_assert_recent_point(enemy_soldier, "cross-ship muster mode")
+			_fail("ranged profile should not publish a rail muster point")
 	await _cleanup_scenario(scenario.root)
 
 

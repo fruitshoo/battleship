@@ -259,8 +259,6 @@ func fire(target: Variant) -> void:
 
 	_spawn_muzzle_smoke(firing_cannon, fire_direction, clampf(missile_damage / maxf(damage, 0.01), 0.85, 1.45))
 	_apply_cannon_post_fire_delay(firing_cannon)
-	if is_instance_valid(_owner_ship) and _owner_ship.has_method("request_cannon_reload_pose"):
-		_owner_ship.request_cannon_reload_pose(firing_cannon, maxf(0.45, cannon_post_fire_delay + 0.2))
 
 	if DEBUG_COMBAT_LOGS:
 		print("[Janggun] 포문 발사 cannon=%s target=%s travel=%.1fs" % [firing_cannon.name, target_node.name, travel_time])

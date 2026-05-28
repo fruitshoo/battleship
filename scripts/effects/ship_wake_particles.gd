@@ -1,6 +1,8 @@
 extends GPUParticles3D
 class_name ShipWakeParticles
 
+const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+
 @export_range(0.0, 1.0, 0.01) var idle_amount_ratio: float = 0.35
 @export_range(0.0, 1.0, 0.01) var active_amount_ratio: float = 1.0
 @export_range(0.1, 2.0, 0.01) var idle_speed_scale: float = 0.75
@@ -25,10 +27,16 @@ class_name ShipWakeParticles
 @export var load_lod_enabled: bool = true
 @export_range(0.45, 1.0, 0.01) var load_lod_min_amount_multiplier: float = 0.68
 @export var preserve_player_flagship_wake: bool = true
+@export_range(0.25, 1.0, 0.01) var non_player_amount_multiplier: float = 0.82
+@export_range(0.2, 1.0, 0.01) var support_amount_multiplier: float = 0.68
+@export var offscreen_cull_enabled: bool = true
+@export_range(0.0, 0.5, 0.01) var offscreen_cull_viewport_margin: float = 0.12
+@export_range(0.0, 180.0, 1.0) var offscreen_cull_min_distance: float = 45.0
 
 var _base_position: Vector3
 var _base_scale: Vector3 = Vector3.ONE
 var _base_amount: int = 20
+var _cached_parent_ship: Node = null
 var _base_values_cached: bool = false
 var _current_width_scale: float = 1.0
 var _current_length_scale: float = 1.0
@@ -55,7 +63,7 @@ func _ready() -> void:
 func set_wake_state(active: bool, speed_ratio: float = 0.0, turn_ratio: float = 0.0, turbulence: float = 0.0) -> void:
 	_refresh_auto_fit(false)
 	_refresh_distance_lod(false)
-	var ship := _find_parent_ship()
+	var ship := _get_parent_ship()
 	var effective_active := active and not _lod_hidden and is_instance_valid(ship)
 	if emitting != effective_active:
 		emitting = effective_active
@@ -98,7 +106,7 @@ func _refresh_auto_fit(force: bool = false) -> void:
 		amount = _base_amount
 		return
 
-	var ship := _find_parent_ship()
+	var ship := _get_parent_ship()
 	var half_extents := _resolve_ship_half_extents(ship)
 	var raw_width_scale := clampf(half_extents.x / maxf(reference_half_width, 0.01), min_width_scale, max_width_scale)
 	var raw_length_scale := clampf(half_extents.y / maxf(reference_half_length, 0.01), min_length_scale, max_length_scale)
@@ -133,8 +141,14 @@ func _refresh_distance_lod(force: bool = false) -> void:
 		_lod_hidden = false
 		return
 
-	var distance := (camera as Node3D).global_position.distance_to(global_position)
+	var camera_node := camera as Camera3D
+	var distance := camera_node.global_position.distance_to(global_position)
 	if distance >= lod_hide_distance:
+		_lod_amount_multiplier = 0.0
+		_lod_hidden = true
+		return
+	var ship := _get_parent_ship()
+	if _should_hide_non_player_offscreen(camera_node, ship, distance):
 		_lod_amount_multiplier = 0.0
 		_lod_hidden = true
 		return
@@ -148,12 +162,13 @@ func _refresh_distance_lod(force: bool = false) -> void:
 func _get_load_lod_amount_multiplier() -> float:
 	if not load_lod_enabled:
 		return 1.0
-	var ship := _find_parent_ship()
+	var ship := _get_parent_ship()
 	if preserve_player_flagship_wake and NodeContractHelper.is_player_controlled_ship(ship):
 		return 1.0
 	var budget_scale := VfxBudget.get_continuous_effect_scale()
 	var normalized_budget := clampf((budget_scale - 0.35) / 0.65, 0.0, 1.0)
-	return lerpf(load_lod_min_amount_multiplier, 1.0, normalized_budget)
+	var load_multiplier := lerpf(load_lod_min_amount_multiplier, 1.0, normalized_budget)
+	return load_multiplier * _get_non_player_amount_multiplier(ship)
 
 
 func _apply_amount_ratio(value: float) -> void:
@@ -171,6 +186,13 @@ func _apply_speed_scale(value: float) -> void:
 	speed_scale = value
 
 
+func _get_parent_ship() -> Node:
+	if is_instance_valid(_cached_parent_ship) and _cached_parent_ship.is_ancestor_of(self):
+		return _cached_parent_ship
+	_cached_parent_ship = _find_parent_ship()
+	return _cached_parent_ship
+
+
 func _find_parent_ship() -> Node:
 	var node := get_parent()
 	while is_instance_valid(node):
@@ -178,6 +200,45 @@ func _find_parent_ship() -> Node:
 			return node
 		node = node.get_parent()
 	return null
+
+
+func _should_hide_non_player_offscreen(camera: Camera3D, ship: Node, distance: float) -> bool:
+	if not offscreen_cull_enabled:
+		return false
+	if not is_instance_valid(camera) or not is_instance_valid(ship):
+		return false
+	if preserve_player_flagship_wake and NodeContractHelper.is_player_controlled_ship(ship):
+		return false
+	if distance < offscreen_cull_min_distance:
+		return false
+	if camera.is_position_behind(global_position):
+		return true
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	var viewport_size := viewport.get_visible_rect().size
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return false
+	var screen_point := camera.unproject_position(global_position)
+	var margin := viewport_size * offscreen_cull_viewport_margin
+	var min_point := -margin
+	var max_point := viewport_size + margin
+	return (
+		screen_point.x < min_point.x
+		or screen_point.y < min_point.y
+		or screen_point.x > max_point.x
+		or screen_point.y > max_point.y
+	)
+
+
+func _get_non_player_amount_multiplier(ship: Node) -> float:
+	if not is_instance_valid(ship):
+		return non_player_amount_multiplier
+	if NodeContractHelper.is_player_controlled_ship(ship):
+		return 1.0
+	if PlayerFleetRoleHelper.is_support_ship(ship):
+		return support_amount_multiplier
+	return non_player_amount_multiplier
 
 
 func _resolve_ship_half_extents(ship: Node) -> Vector2:

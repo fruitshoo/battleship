@@ -215,10 +215,6 @@
       "layer": "entities/soldiers/soldier_lifecycle_helper.gd",
       "responsibility": "Owns the current soldier lifecycle helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
-    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
-      "layer": "entities/soldiers/soldier_ship_duty_helper.gd",
-      "responsibility": "Owns the current soldier ship duty helper responsibilities; update this baseline when moving behavior across module boundaries."
-    },
     "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
       "layer": "entities/soldiers/soldier_ship_helper.gd",
       "responsibility": "Owns the current soldier ship helper responsibilities; update this baseline when moving behavior across module boundaries."
@@ -449,7 +445,6 @@
     "res://scripts/entities/soldiers/soldier_ai_helper.gd": "Soldier AI helper still owns the compact idle/wander/move/attack state machine; recent cleanup removed repeated retarget fallback blocks, and a future split should extract movement/target validation deliberately.",
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/soldiers/soldier_ship_helper.gd": "Accepted current helper size after cross-ship contact and muster-cache expansion; split only with a focused soldier-ship owner-boundary refactor.",
-    "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/soldiers/soldier_speech_helper.gd": "Speech helper owns low-frequency contextual soldier lines, visibility, placement, and rowing/battle context gating; split only with a dedicated speech UI owner.",
     "res://scripts/entities/soldiers/soldier_visual_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/managers/enemy_spawner_fleet_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
@@ -469,7 +464,6 @@
     "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd": "Small debug adapter keeps dynamic debug snapshot assembly out of BaseShip while avoiding gameplay ownership changes.",
     "res://scripts/entities/ships/ship_ally_role_helper.gd": "Temporary compatibility alias for PlayerFleetRoleHelper; remove after old references are fully migrated.",
     "res://scripts/entities/ships/player_ship_aux_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
-    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
     "res://scripts/helpers/input_settings_helper.gd": "Small policy helper centralizes face-button layout remapping so menu/gameplay settings do not edit InputMap directly.",
     "res://scripts/ui/hud/hud_lookup_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
     "res://scripts/ui/hud/hud_runtime_helper.gd": "Generated baseline for an existing thin helper; merge only when a clearer owner exists."
@@ -639,14 +633,6 @@
         "res://scripts/world/sea_sites/sea_site_reward_helper.gd"
       ],
       "reason": "Player support and sea-site rewards both need a defensive UpgradeManager accessor while remaining in different gameplay owner modules."
-    },
-    {
-      "name": "_has_repairable_rigging_damage",
-      "paths": [
-        "res://scripts/entities/ships/base_ship_status_helper.gd",
-        "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd"
-      ],
-      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time."
     },
     {
       "name": "_is_dead_soldier_node",
@@ -936,7 +922,7 @@
       ]
     },
     "res://scripts/effects/blood_deck_decal_helper.gd": {
-      "count": 19,
+      "count": 20,
       "functions": [
         "try_spawn_from_soldier_damage",
         "_should_spawn_for_source",
@@ -2047,24 +2033,21 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_ai_helper.gd": {
-      "count": 21,
+      "count": 18,
       "functions": [
         "state_idle",
         "state_wander",
-        "_try_priority_ship_duty_before_enemy",
         "_should_run_routine_support_step",
         "start_wander",
         "state_move",
         "state_attack",
         "_validate_attack_state",
         "_get_attack_validation_interval",
-        "_hold_cross_ship_contact_edge",
+        "_is_current_weapon_ranged",
         "_move_toward_point",
         "_move_toward_owned_ship_global_point",
         "_move_toward_owned_ship_local_point",
-        "_try_muster_to_cross_ship_contact",
-        "_clear_target_and_try_muster_or_idle",
-        "_try_move_to_active_ship_duty_target",
+        "_clear_target_and_idle",
         "turn_toward_position",
         "_retarget_owned_ship_hostile",
         "_should_keep_current_owned_ship_hostile_target",
@@ -2203,34 +2186,20 @@
         "_apply_enemy_kill_rewards"
       ]
     },
-    "res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
-      "count": 2,
-      "functions": [
-        "find_ship_duty_target",
-        "get_active_ship_duty_target"
-      ]
-    },
     "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
-      "count": 18,
+      "count": 11,
       "functions": [
         "find_nearest_enemy",
         "find_nearest_hostile_on_owned_ship",
         "is_ship_pair_in_melee_range",
         "get_cross_ship_engage_ship_distance",
         "get_cross_ship_engage_max_distance",
-        "get_cross_ship_contact_point_local",
-        "get_cross_ship_contact_point_global",
-        "get_stable_cross_ship_contact_point_local",
-        "get_stable_cross_ship_contact_point_global",
-        "is_in_cross_ship_contact_zone",
-        "find_cross_ship_muster_target",
-        "_get_cached_cross_ship_muster_local",
-        "_store_cross_ship_muster_cache",
-        "_clear_cross_ship_muster_cache",
         "keep_within_owned_ship_bounds",
         "get_clamped_ship_deck_local",
+        "get_clamped_main_deck_local",
         "_get_ship_soldier_parent",
-        "get_ship_deck_half_extents"
+        "get_ship_deck_half_extents",
+        "get_ship_deck_half_width_at_z"
       ]
     },
     "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
@@ -2254,60 +2223,17 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
-      "count": 58,
+      "count": 15,
       "functions": [
-        "find_ship_work_target",
-        "get_active_ship_work_target",
-        "clear_active_ship_work_target",
-        "get_ship_work_directive",
         "can_accept_immediate_work",
-        "score_worker_for_task",
         "reserve_work_slot",
         "release_work_slot",
         "is_work_slot_reserved_for_other",
         "get_task_priority",
-        "are_crew_work_directives_enabled",
         "get_task_definition",
         "get_task_priority_rows",
         "get_task_phase",
-        "get_role_affinity_for_task",
         "normalize_task_name",
-        "_build_rigging_repair_directive",
-        "_build_gunnery_station_directive",
-        "_build_shiphandling_directive",
-        "_build_cannon_reload_slot_directive",
-        "_collect_cannon_reload_slots",
-        "_collect_gunnery_duty_workers",
-        "_assign_cannon_reload_slots",
-        "_find_occupied_cannon_slot_index",
-        "_is_cannon_reload_slot_source",
-        "_get_cannon_reload_slot_by_key",
-        "_get_cannon_reload_slot_animation",
-        "_sync_cannon_reload_duty_state_from_directive",
-        "_sync_cannon_reload_duty_state_from_active",
-        "_mark_cannon_reload_slot_state",
-        "_clear_cannon_reload_duty_state",
-        "_refresh_soldier_duty_visual",
-        "_can_consider_deck_work",
-        "_has_conflicting_named_action",
-        "_ship_has_deck_emergency",
-        "_has_repairable_rigging_damage",
-        "_get_most_damaged_mast_local",
-        "_can_work_gunnery",
-        "_get_soldier_role",
-        "_is_ranged_only",
-        "_get_enemy_side_sign",
-        "_build_directive",
-        "_none_directive",
-        "_append_candidate",
-        "_choose_highest_priority",
-        "_is_already_at_directive_target",
-        "_is_local_target_reached",
-        "_store_active_ship_work_target",
-        "_is_active_work_task_still_valid",
-        "_shiphandling_station_is_needed",
-        "_get_soldier_bias_sign",
-        "_make_local_slot_key",
         "_get_reservation_slot_key",
         "_get_pruned_reservations",
         "_set_reservations",
@@ -2389,7 +2315,7 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_weapon_helper.gd": {
-      "count": 9,
+      "count": 8,
       "functions": [
         "get_ranged_weapon_id",
         "get_melee_weapon_id",
@@ -2398,8 +2324,7 @@
         "_get_standard_melee_scene",
         "_should_use_spear_loadout",
         "_ensure_standard_melee_weapon",
-        "update_combat_weapon_choice",
-        "_can_cross_ship_melee_reach_target"
+        "update_combat_weapon_choice"
       ]
     },
     "res://scripts/helpers/input_settings_helper.gd": {
@@ -4136,11 +4061,6 @@
       "priority": "medium",
       "recommended_action": "Rename or consolidate only during a focused owner-boundary cleanup."
     },
-    "duplicate_static_function|_has_repairable_rigging_damage|res://scripts/entities/ships/base_ship_status_helper.gd,res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
-      "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
-      "priority": "baseline",
-      "recommended_action": "Rename or consolidate duplicate helper entrypoints when touching the relevant owner modules."
-    },
     "duplicate_static_function|_is_dead_soldier_node|res://scripts/entities/ships/base_ship_crew_helper.gd,res://scripts/entities/ships/ship_authoring_helper.gd,res://scripts/ui/hud/hud_stat_panel_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
       "priority": "baseline",
@@ -4356,11 +4276,6 @@
       "priority": "medium",
       "recommended_action": "Split contact-point caching from general soldier ship lookup only when the call sites can move together without widening scene-node access."
     },
-    "large_helper|res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
-      "reason": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-      "priority": "baseline",
-      "recommended_action": "Revisit when the owning module is actively refactored."
-    },
     "large_helper|res://scripts/entities/soldiers/soldier_speech_helper.gd": {
       "reason": "Speech helper owns low-frequency contextual soldier lines, visibility, placement, and rowing/battle context gating; split only with a dedicated speech UI owner.",
       "priority": "medium",
@@ -4445,11 +4360,6 @@
       "reason": "Temporary compatibility alias for PlayerFleetRoleHelper while old references migrate.",
       "priority": "low",
       "recommended_action": "Remove the alias and this exception after all saved scenes, tests, and cached references use PlayerFleetRoleHelper."
-    },
-    "thin_helper|res://scripts/entities/soldiers/soldier_ship_duty_helper.gd": {
-      "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
-      "priority": "baseline",
-      "recommended_action": "Revisit when the owning module is actively refactored."
     },
     "thin_helper|res://scripts/helpers/input_settings_helper.gd": {
       "reason": "Small policy helper centralizes face-button layout remapping so menu/gameplay settings do not edit InputMap directly.",

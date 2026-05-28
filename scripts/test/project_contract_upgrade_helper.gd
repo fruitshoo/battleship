@@ -4,6 +4,16 @@ class_name ProjectContractUpgradeHelper
 const SupportFleetCannonRules = preload("res://scripts/entities/ships/support_fleet_cannon_helper.gd")
 const UpgradeDataHelper = preload("res://scripts/managers/upgrade_manager_data_helper.gd")
 
+class MockPanokseonSupportShip:
+	extends Node
+	var ship_type: String = "panokseon_ally"
+	var hull_hp: float = 100.0
+
+class MockMaengseonSupportShip:
+	extends Node
+	var ship_type: String = "maengseon_ally"
+	var hull_hp: float = 100.0
+
 static func run_upgrade_contract_smoke(failures: Array[String]) -> void:
 	_validate_cannon_upgrade_split(failures)
 	_validate_crew_reserve_retired(failures)
@@ -73,9 +83,9 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		"fleet_signal": 1,
 		"panokseon_upgrade": 1,
 	}
-	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(panokseon_levels, upgrades) != "맹선 1척 | 판옥선 1척":
+	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(panokseon_levels, upgrades) != "맹선 2척 | 판옥선 1척":
 		failures.append("upgrade smoke support slot summary should reflect maengseon plus added panokseon roster")
-	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 6문":
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 x2 | 판옥선 6문":
 		failures.append("upgrade smoke support cannon summary should reflect side cannon slots at 포문 Lv3")
 	var panokseon_only_levels := {
 		"panokseon_upgrade": 1,
@@ -90,12 +100,12 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 	}
 	if upgrades.get("geobukseon_upgrade", {}).get("disabled", false) != true:
 		failures.append("upgrade smoke geobukseon support upgrade should stay disabled while player geobukseon is being tested")
-	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(geobukseon_levels, upgrades) != "맹선 1척":
+	if SupportFleetCannonRules.get_support_slot_summary_for_current_levels(geobukseon_levels, upgrades) != "맹선 2척":
 		failures.append("upgrade smoke disabled geobukseon support should fall back to maengseon screen roster")
-	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, geobukseon_levels, upgrades) != "맹선 1문":
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, geobukseon_levels, upgrades) != "맹선 1문 x2":
 		failures.append("upgrade smoke disabled geobukseon support should not add geobukseon cannons")
 	panokseon_levels["front_cannon"] = 1
-	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 | 판옥선 7문":
+	if SupportFleetCannonRules.get_support_cannon_summary_for_current_levels(3, cannon_stats, panokseon_levels, upgrades) != "맹선 1문 x2 | 판옥선 7문":
 		failures.append("upgrade smoke support cannon summary should include 전면 포문 when unlocked")
 	if int(cannon_stats.get("support_max_cannon_count", 0)) != 3:
 		failures.append("upgrade smoke support cannon cap should be 3")
@@ -164,8 +174,12 @@ static func _validate_cannon_upgrade_split(failures: Array[String]) -> void:
 		failures.append("upgrade smoke 맹선 should be a repeatable one-shot support card")
 	if int(fleet_signal_data.get("max_level", 0)) != 1:
 		failures.append("upgrade smoke 맹선 should not gain levels beyond unlock")
+	var fleet_signal_stats: Dictionary = fleet_signal_data.get("stats", {})
+	if int(fleet_signal_stats.get("limit_add_level", 0)) != 1 or int(fleet_signal_stats.get("limit_add", 0)) != 1:
+		failures.append("upgrade smoke 맹선 should add the second maengseon slot at level 1")
 	if not UpgradeManagerChoiceHelper.is_upgrade_available(upgrades, {"fleet_signal": 1}, "fleet_signal"):
 		failures.append("upgrade smoke 맹선 should remain selectable after unlock")
+	_validate_fleet_signal_choice_runtime_presence_gate(failures)
 	var choice_helper_source := FileAccess.get_file_as_string("res://scripts/managers/upgrade_manager_choice_helper.gd")
 	if choice_helper_source.contains("maybe_add_rare_fleet_upgrade"):
 		failures.append("upgrade smoke 맹선 should not use rare fleet choice injection")
@@ -415,6 +429,65 @@ static func _validate_panokseon_upgrade_gate(failures: Array[String]) -> void:
 	)
 	if not support_choices.has("panokseon_upgrade"):
 		failures.append("upgrade smoke panokseon_upgrade should be available without 맹선 prerequisite")
+	_validate_panokseon_choice_runtime_presence_gate(failures)
+
+
+static func _validate_panokseon_choice_runtime_presence_gate(failures: Array[String]) -> void:
+	if not UpgradeManager.has_method("_is_panokseon_upgrade_choice_available"):
+		failures.append("upgrade smoke missing panokseon runtime choice gate")
+		return
+	var original_support_ships := _clear_support_registry_for_contract()
+	var panokseon := MockPanokseonSupportShip.new()
+	panokseon.set_meta("support_fleet_profile", "panokseon_escort")
+	EntityRegistry.register_support_ship(panokseon)
+	if bool(UpgradeManager.call("_is_panokseon_upgrade_choice_available")):
+		failures.append("upgrade smoke panokseon card should hide while a panokseon support ship is active")
+	panokseon.hull_hp = 0.0
+	if not bool(UpgradeManager.call("_is_panokseon_upgrade_choice_available")):
+		failures.append("upgrade smoke panokseon card should return when the panokseon support ship is sunk")
+	EntityRegistry.unregister_support_ship(panokseon)
+	panokseon.free()
+	_restore_support_registry_for_contract(original_support_ships)
+
+
+static func _validate_fleet_signal_choice_runtime_presence_gate(failures: Array[String]) -> void:
+	if not UpgradeManager.has_method("_is_fleet_signal_choice_available"):
+		failures.append("upgrade smoke missing fleet_signal runtime choice gate")
+		return
+	var original_support_ships := _clear_support_registry_for_contract()
+	var maengseon_a := MockMaengseonSupportShip.new()
+	var maengseon_b := MockMaengseonSupportShip.new()
+	maengseon_a.set_meta("support_fleet_profile", "maengseon_screen")
+	maengseon_b.set_meta("support_fleet_profile", "maengseon_screen")
+	if not bool(UpgradeManager.call("_is_fleet_signal_choice_available")):
+		failures.append("upgrade smoke 맹선 card should appear at zero active maengseon ships")
+	EntityRegistry.register_support_ship(maengseon_a)
+	if not bool(UpgradeManager.call("_is_fleet_signal_choice_available")):
+		failures.append("upgrade smoke 맹선 card should appear at one active maengseon ship")
+	EntityRegistry.register_support_ship(maengseon_b)
+	if bool(UpgradeManager.call("_is_fleet_signal_choice_available")):
+		failures.append("upgrade smoke 맹선 card should hide at two active maengseon ships")
+	maengseon_b.hull_hp = 0.0
+	if not bool(UpgradeManager.call("_is_fleet_signal_choice_available")):
+		failures.append("upgrade smoke 맹선 card should return when one of two maengseon ships is sunk")
+	EntityRegistry.unregister_support_ship(maengseon_a)
+	EntityRegistry.unregister_support_ship(maengseon_b)
+	maengseon_a.free()
+	maengseon_b.free()
+	_restore_support_registry_for_contract(original_support_ships)
+
+
+static func _clear_support_registry_for_contract() -> Array:
+	var original_support_ships := EntityRegistry.get_support_ships()
+	for support_ship in original_support_ships:
+		EntityRegistry.unregister_support_ship(support_ship)
+	return original_support_ships
+
+
+static func _restore_support_registry_for_contract(original_support_ships: Array) -> void:
+	for support_ship in original_support_ships:
+		if is_instance_valid(support_ship):
+			EntityRegistry.register_support_ship(support_ship)
 
 
 static func _validate_player_geobukseon_upgrade(failures: Array[String]) -> void:

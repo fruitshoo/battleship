@@ -31,7 +31,6 @@ enum State {
 	MOVE,
 	ATTACK,
 	DEAD,
-	RELOAD,
 	BOARDING_JUMP
 }
 
@@ -81,7 +80,6 @@ const DEFAULT_HAND_PIVOT_POSITION := Vector3(0.3, 0.7, -0.15)
 @export var is_captain: bool = false
 @export var is_stationary: bool = false # 제자리 고정 (NavMesh 없는 배용)
 @export var weapon_switch_distance: float = 4.0 # 무기 교체 거리 (이내면 검, 밖이면 활)하향 (10 -> 4)
-@export var cross_ship_melee_switch_distance: float = 6.8 # 인접 적선과 교전 시 근접 무기로 전환하는 거리
 @export var is_melee_only: bool = false ## 근접 무기만 사용 (백병전용)
 @export var is_ranged_only: bool = false ## 원거리 무기만 사용 (포격 지원용)
 @export_group("Visuals")
@@ -97,8 +95,6 @@ var current_state: State = State.IDLE
 var current_target: Node3D = null
 var current_weapon: Node3D = null
 var attack_timer: float = 0.0
-var cannon_reload_pose_timer: float = 0.0
-var cannon_reload_source: Node3D = null
 var wander_timer: float = 0.0
 var wander_target_local: Vector3 = Vector3.ZERO # 배 기준 로컬 목표 지점
 var decision_timer: float = 0.0 # 의사결정 스로틀링용
@@ -412,7 +408,6 @@ func _apply_soldier_rules_data() -> void:
 	var combat_ranges: Dictionary = SoldierRulesData.get_section("combat_ranges")
 	if not combat_ranges.is_empty():
 		weapon_switch_distance = float(combat_ranges.get("weapon_switch_distance", weapon_switch_distance))
-		cross_ship_melee_switch_distance = float(combat_ranges.get("cross_ship_melee_switch_distance", cross_ship_melee_switch_distance))
 		CROSS_SHIP_ENGAGE_MAX_DISTANCE = float(combat_ranges.get("cross_ship_engage_max_distance", CROSS_SHIP_ENGAGE_MAX_DISTANCE))
 		CROSS_SHIP_ENGAGE_SHIP_DISTANCE = float(combat_ranges.get("cross_ship_engage_ship_distance", CROSS_SHIP_ENGAGE_SHIP_DISTANCE))
 
@@ -783,8 +778,6 @@ func _get_debug_state_name() -> String:
 			return "attack"
 		State.DEAD:
 			return "dead"
-		State.RELOAD:
-			return "reload"
 		State.BOARDING_JUMP:
 			return "boarding_jump"
 	return "unknown"
@@ -995,8 +988,6 @@ func _physics_process(delta: float) -> void:
 			_state_move(delta, run_heavy_logic)
 		State.ATTACK:
 			_state_attack(delta)
-		State.RELOAD:
-			_state_cannon_reload(delta)
 		State.BOARDING_JUMP:
 			_state_boarding_jump()
 		State.DEAD:
@@ -1023,7 +1014,7 @@ func _physics_process(delta: float) -> void:
 		attack_timer -= delta
 
 	# 원거리 사격 및 무기 스위칭 체크 (전투 스케줄)
-	if current_state != State.DEAD and current_state != State.RELOAD and current_state != State.BOARDING_JUMP and run_combat_logic:
+	if current_state != State.DEAD and current_state != State.BOARDING_JUMP and run_combat_logic:
 		var combat_profile_start := PhysicsFrameProfiler.begin()
 		var nearest = find_nearest_enemy()
 		SoldierWeaponHelper.update_combat_weapon_choice(self, nearest)
@@ -1060,7 +1051,7 @@ func _can_rest_recover() -> bool:
 		return false
 	if _is_jumping:
 		return false
-	if current_state == State.ATTACK or current_state == State.RELOAD or current_state == State.BOARDING_JUMP:
+	if current_state == State.ATTACK or current_state == State.BOARDING_JUMP:
 		return false
 	if is_instance_valid(current_target):
 		return false
@@ -1156,8 +1147,6 @@ func _should_use_passive_ai_sleep() -> bool:
 		return false
 	if external_knockback_timer > 0.0 or external_knockback_snap_timer > 0.0:
 		return false
-	if cannon_reload_pose_timer > 0.0:
-		return false
 	if velocity.length_squared() > 0.0009:
 		return false
 	if float(get_meta("speech_visible_timer", 0.0)) > 0.0:
@@ -1239,20 +1228,6 @@ func _start_wander() -> void:
 ## MOVE 상태 (적 추적)
 func _state_move(_delta: float, _run_heavy_logic: bool) -> void:
 	SoldierAiHelper.state_move(self, _delta)
-
-
-## RELOAD 상태: 임시 포대 장전 포즈. 실제 애니메이션은 나중에 붙이고 지금은 대포를 바라보며 정지한다.
-func _state_cannon_reload(delta: float) -> void:
-	cannon_reload_pose_timer = maxf(0.0, cannon_reload_pose_timer - delta)
-	velocity = Vector3.ZERO
-	if is_instance_valid(cannon_reload_source):
-		var look_target: Vector3 = cannon_reload_source.global_position
-		look_target.y = global_position.y
-		SoldierAiHelper.turn_toward_position(self, look_target, SoldierAiHelper.ATTACK_TURN_SPEED, delta)
-	move_and_slide()
-	if cannon_reload_pose_timer <= 0.0 or not is_instance_valid(owned_ship) or owned_ship.get("deck_is_contested") == true:
-		_finish_cannon_reload_pose()
-		_change_state(State.IDLE)
 
 
 ## BOARDING_JUMP 상태: 보딩/복귀 점프 중 임시 포즈. 위치 이동은 보딩 tween이 담당한다.
@@ -1413,46 +1388,6 @@ func _get_cross_ship_engage_max_distance(other_ship: Node3D) -> float:
 	return SoldierShipHelper.get_cross_ship_engage_max_distance(self, other_ship)
 
 
-func _get_cross_ship_contact_point_local(other_ship: Node3D) -> Vector3:
-	return SoldierShipHelper.get_cross_ship_contact_point_local(self, other_ship)
-
-
-func _get_cross_ship_contact_point_global(other_ship: Node3D) -> Vector3:
-	return SoldierShipHelper.get_cross_ship_contact_point_global(self, other_ship)
-
-
-func _get_stable_cross_ship_contact_point_global(other_ship: Node3D) -> Vector3:
-	return SoldierShipHelper.get_stable_cross_ship_contact_point_global(self, other_ship)
-
-
-func _is_in_cross_ship_contact_zone(other_ship: Node3D) -> bool:
-	return SoldierShipHelper.is_in_cross_ship_contact_zone(self, other_ship)
-
-
-func _find_cross_ship_muster_target() -> Vector3:
-	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP)
-	if limbo_point != Vector3.INF:
-		return limbo_point
-	return SoldierShipHelper.find_cross_ship_muster_target(self)
-
-
-func _find_ship_duty_target() -> Vector3:
-	var active_target: Vector3 = SoldierShipDutyHelper.get_active_ship_duty_target(self)
-	if active_target != Vector3.INF:
-		return active_target
-	var limbo_point: Vector3 = _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
-	if limbo_point != Vector3.INF:
-		return limbo_point
-	return SoldierShipDutyHelper.find_ship_duty_target(self)
-
-
-func _get_active_ship_duty_target() -> Vector3:
-	var active_target: Vector3 = SoldierShipDutyHelper.get_active_ship_duty_target(self)
-	if active_target != Vector3.INF:
-		return active_target
-	return _get_recent_limbo_point_for_mode(SoldierAILimboKeys.MODE_SHIP_DUTY)
-
-
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:
 	SoldierBoardingHelper.try_evacuate_to_home(self)
@@ -1504,8 +1439,6 @@ func _get_deck_bounds_check_interval() -> float:
 		return 0.34 * minf(load_mult, 1.7)
 	if current_state == State.ATTACK:
 		return 0.22 * minf(load_mult, 1.55)
-	if current_state == State.RELOAD:
-		return 0.24 * minf(load_mult, 1.6)
 	if _is_passive_ally_ship_crew():
 		return 0.30 * minf(load_mult, 1.7)
 	return 0.20 * minf(load_mult, 1.5)
@@ -1521,8 +1454,13 @@ func _is_safely_inside_deck_bounds() -> bool:
 	var deck_height: float = owned_ship.get("deck_height") if "deck_height" in owned_ship else 0.4
 	if absf(local_pos.y - deck_height) > 0.22:
 		return false
-	return absf(local_pos.x) <= maxf(0.12, half_ext.x * 0.62) \
-		and absf(local_pos.z) <= maxf(0.12, half_ext.y * 0.70)
+	var edge_inset := SoldierShipHelper.DECK_BOUNDS_EDGE_INSET
+	var safe_half_z := maxf(0.08, half_ext.y - minf(edge_inset, maxf(0.0, half_ext.y - 0.08)))
+	if absf(local_pos.z) > safe_half_z:
+		return false
+	var half_width := SoldierShipHelper.get_ship_deck_half_width_at_z(owned_ship, local_pos.z, half_ext.x)
+	var safe_half_width := maxf(0.08, half_width - minf(edge_inset, maxf(0.0, half_width - 0.08)))
+	return absf(local_pos.x) <= safe_half_width
 
 
 func _get_state_profile_label(state_value: int) -> String:
@@ -1535,8 +1473,6 @@ func _get_state_profile_label(state_value: int) -> String:
 			return "soldier_state_move"
 		State.ATTACK:
 			return "soldier_state_attack"
-		State.RELOAD:
-			return "soldier_state_reload"
 		State.BOARDING_JUMP:
 			return "soldier_state_boarding_jump"
 		State.DEAD:
@@ -1938,7 +1874,6 @@ func begin_boarding_jump_pose(status: String = BOARDING_STATUS_BOARDING) -> void
 	_is_jumping = true
 	set_boarding_status(status)
 	current_target = null
-	_finish_cannon_reload_pose()
 	velocity = Vector3.ZERO
 	_change_state(State.BOARDING_JUMP)
 	SoldierVisualHelper.play_boarding_jump_pose(self)
@@ -1955,46 +1890,6 @@ func finish_boarding_jump_pose(status: String = BOARDING_STATUS_ON_DECK) -> void
 		_change_state(State.IDLE)
 
 
-func is_available_for_cannon_reload_pose() -> bool:
-	if current_state == State.DEAD:
-		return false
-	if SoldierActionHelper.has_action(self) and not SoldierActionHelper.has_action(self, SoldierActionHelper.ACTION_CANNON_RELOAD):
-		return false
-	if _is_jumping:
-		return false
-	if is_captain:
-		return false
-	if is_instance_valid(current_target):
-		return false
-	if current_state == State.ATTACK or current_state == State.MOVE:
-		return false
-	if is_instance_valid(owned_ship) and (owned_ship.get("deck_is_contested") == true or owned_ship.get("deck_is_overrun") == true):
-		return false
-	if not SoldierShipWorkPriorityHelper.can_accept_immediate_work(self, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD):
-		return false
-	return true
-
-
-func play_cannon_reload_pose(source_node: Node3D, duration: float = 0.9) -> void:
-	if not is_available_for_cannon_reload_pose():
-		return
-	if not SoldierShipWorkPriorityHelper.reserve_work_slot(source_node, self, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD, duration + 0.45):
-		return
-	cannon_reload_source = source_node
-	cannon_reload_pose_timer = maxf(cannon_reload_pose_timer, duration)
-	current_target = null
-	velocity = Vector3.ZERO
-	SoldierActionHelper.begin_known_action(self, SoldierActionHelper.ACTION_CANNON_RELOAD)
-	_change_state(State.RELOAD)
-
-
-func _finish_cannon_reload_pose() -> void:
-	if is_instance_valid(cannon_reload_source):
-		SoldierShipWorkPriorityHelper.release_work_slot(cannon_reload_source, self, SoldierShipWorkPriorityHelper.TASK_CANNON_RELOAD)
-	cannon_reload_source = null
-	cannon_reload_pose_timer = 0.0
-	SoldierActionHelper.finish_action(self, SoldierActionHelper.ACTION_CANNON_RELOAD)
-
 ## 원거리 적 확인 및 사격
 func _check_ranged_combat() -> void:
 	SoldierCombatHelper.check_ranged_combat(self)
@@ -2009,7 +1904,7 @@ func _is_passive_ally_ship_crew() -> bool:
 		return false
 	if _is_jumping:
 		return false
-	if current_state == State.ATTACK or current_state == State.MOVE or current_state == State.RELOAD or current_state == State.BOARDING_JUMP:
+	if current_state == State.ATTACK or current_state == State.MOVE or current_state == State.BOARDING_JUMP:
 		return false
 	if is_instance_valid(current_target):
 		return false
@@ -2206,9 +2101,7 @@ func _should_run_routine_support_step(delta: float, run_heavy_logic: bool) -> bo
 
 
 func _should_consider_routine_support_step() -> bool:
-	if team == "player":
-		return true
-	return has_meta("ship_work_active_target_local")
+	return team == "player"
 
 
 func _consume_routine_support_step_delta(fallback_delta: float) -> float:
@@ -2221,8 +2114,6 @@ func _consume_routine_support_step_delta(fallback_delta: float) -> float:
 
 func _get_routine_support_step_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
-	if has_meta("ship_work_active_target_local"):
-		return 0.09 * minf(load_mult, 1.8)
 	if _is_passive_ally_ship_crew():
 		return 0.34 * minf(load_mult, 1.8)
 	if _lod_is_combat_priority:
@@ -2315,9 +2206,9 @@ func _apply_limbo_ai_bridge() -> void:
 		return
 	if is_instance_valid(pilot_target):
 		current_target = pilot_target
-	elif mode == SoldierAILimboKeys.MODE_SHIP_DUTY or mode == SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP or mode == SoldierAILimboKeys.MODE_WANDER:
+	elif mode == SoldierAILimboKeys.MODE_WANDER:
 		current_target = null
-	if current_state == State.DEAD or current_state == State.RELOAD or current_state == State.BOARDING_JUMP:
+	if current_state == State.DEAD or current_state == State.BOARDING_JUMP:
 		return
 	if SoldierActionHelper.is_action_ai_locked(self):
 		return
@@ -2331,7 +2222,7 @@ func _apply_limbo_ai_bridge() -> void:
 					_change_state(State.IDLE)
 			elif is_instance_valid(pilot_target) and current_state != State.MOVE:
 				_change_state(State.MOVE)
-		SoldierAILimboKeys.MODE_SHIP_DUTY, SoldierAILimboKeys.MODE_MUSTER_CROSS_SHIP, SoldierAILimboKeys.MODE_WANDER:
+		SoldierAILimboKeys.MODE_WANDER:
 			if current_state == State.MOVE or current_state == State.ATTACK:
 				_change_state(State.IDLE)
 

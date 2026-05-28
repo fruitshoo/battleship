@@ -474,8 +474,6 @@ func _execute_fire() -> void:
 	
 	# 쿨타임 시작
 	cooldown_timer = _get_next_reload_cooldown()
-	if is_instance_valid(_owner_ship) and _owner_ship.has_method("request_cannon_reload_pose"):
-		_owner_ship.request_cannon_reload_pose(self, minf(1.2, maxf(0.55, cooldown_timer * 0.35)))
 	
 	# 예측 사격: 적의 예상 위치를 향해 발사
 	var target_aim_pos: Vector3 = NodeContractHelper.get_projectile_aim_point(target_node, 0.55)

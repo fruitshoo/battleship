@@ -58,10 +58,8 @@ transform = Transform3D(0.5539546, -0.027565075, 0.22885478, 0.034101058, 0.5989
 script = ExtResource("authoring_visualizer")
 
 [node name="DeckArea" type="Node3D" parent="ScaleRoot/Authoring" unique_id=2046384374]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0487742, 0)
-visible = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.982968, 0)
 script = ExtResource("deck_area_authoring")
-editor_alpha = 0.19
 metadata/use_authored_deck_area = true
 
 [node name="Points" type="Node3D" parent="ScaleRoot/Authoring/DeckArea" unique_id=632087368]
@@ -122,6 +120,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -5)
 
 [node name="BoardingAnchors" type="Node3D" parent="ScaleRoot/Authoring" unique_id=178048145]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6465199, 0)
+visible = false
 
 [node name="RightForward" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=371295105]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4314103, 1.3, -3.1710806)
@@ -142,18 +141,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.293148, 1.3, 0.4547708)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7472975, 1.4531996, 4.7513447)
 
 [node name="Bow" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1944834746]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, -5.7766533)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, -3.090944)
 
 [node name="Stern" type="Marker3D" parent="ScaleRoot/Authoring/BoardingAnchors" unique_id=1599103152]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 5.65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 5.086879)
 
 [node name="CrewSlots" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1379815442]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2674475, 0.7142751)
 
 [node name="CrewForwardLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1188567336]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0.85, -3.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0.85, -3)
 
 [node name="CrewForwardRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=861875888]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0.85, -3.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0.85, -3)
 
 [node name="CrewMidLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1686521506]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.85, -1.2)

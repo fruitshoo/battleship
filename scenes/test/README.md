@@ -36,7 +36,7 @@ Recent regression coverage to keep together:
 - Rope pull must require an active rope visual, so a cleared hook graphic cannot keep dragging ships.
 - Support free-combat assist must recall near the player and keep rowing/wind compensation so it does not feel abandoned in free engagement mode.
 - Enemy boarders on the player deck may speak, but ordinary enemy soldiers on their own ship should not spam speech labels.
-- Cross-ship rail standoffs should prefer bow fire until the sword can actually reach; stuck melee attack state should recover back to movement/weapon selection.
+- Cross-ship contact should avoid rail melee and prefer bow fire until boarding moves soldiers onto the same deck.
 - Sail and rudder field repair should be scheduled by real rigging damage, wait before starting, recover only to emergency function, and pause while burning.
 - Survivors, floating loot, static sea sites, sea decor, compass markers, and overcap crew recovery live under the project recovery contract helper rather than a separate ad hoc scene.
 - Support squadron coverage keeps the active Panokseon artillery unlock, disabled Geobukseon support fallback, heavy-support role labels, and support-limit reconciliation in the same profile/upgrade smoke loop.

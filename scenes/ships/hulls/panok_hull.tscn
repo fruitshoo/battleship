@@ -232,28 +232,28 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.925, 0)
 visible = false
 
 [node name="CrewForwardLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1524886638]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.865239, -3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.925, -3)
 
 [node name="CrewForwardRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=774287980]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.865239, -3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.925, -3)
 
 [node name="CrewMidLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=2057544652]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.865239, -0.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.925, -0.45)
 
 [node name="CrewMidRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1681805267]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 1.865239, -0.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 1.925, -0.45)
 
 [node name="CrewRearLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1189378773]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.865239, 2.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.925, 2.2)
 
 [node name="CrewRearRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1531842965]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.865239, 2.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.925, 2.2)
 
 [node name="CrewSternLeft" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=1024107253]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.865239, 3.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 1.925, 3.45)
 
 [node name="CrewSternRight" type="Marker3D" parent="ScaleRoot/Authoring/CrewSlots" unique_id=988245468]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.865239, 3.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.925, 3.45)
 
 [node name="CrewStair" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1892455170]
 

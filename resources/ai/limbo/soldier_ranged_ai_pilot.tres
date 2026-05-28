@@ -10,14 +10,12 @@ script = ExtResource("1_select")
 
 [sub_resource type="BTAction" id="BTAction_mode"]
 script = ExtResource("2_mode")
-ship_duty_priority_threshold = 0.25
-allow_cross_ship_muster = false
 
 [sub_resource type="BTSequence" id="BTSequence_root"]
 custom_name = "Soldier AI Pilot: ranged profile"
 children = [SubResource("BTAction_select"), SubResource("BTAction_mode")]
 
 [resource]
-description = "Soldier LimboAI ranged profile. Dedicated ranged crew favors ship duty sooner and does not leave station for cross-ship muster."
+description = "Soldier LimboAI ranged profile. Dedicated ranged crew keeps target selection simple and relies on ranged attacks."
 blackboard_plan = SubResource("BlackboardPlan_soldier_ranged")
 root_task = SubResource("BTSequence_root")
