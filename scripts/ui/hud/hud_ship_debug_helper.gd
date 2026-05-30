@@ -447,9 +447,8 @@ static func _format_support_fleet_row(player_ship: Node3D, support_ship: Node3D,
 	return " | ".join(parts)
 
 
-static func _get_support_formation_text(player_ship: Node3D) -> String:
-	var formation_value := int(player_ship.get_meta("support_fleet_formation", 0))
-	return "호위진" if formation_value != 0 else "장사진"
+static func _get_support_formation_text(_player_ship: Node3D) -> String:
+	return "장사진"
 
 
 static func _get_support_join_stage_text(support_ship: Node3D) -> String:

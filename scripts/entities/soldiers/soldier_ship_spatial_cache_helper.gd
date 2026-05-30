@@ -1,9 +1,11 @@
 extends RefCounted
 class_name SoldierShipSpatialCacheHelper
 
-const SHIP_ENEMY_SCAN_CACHE_FRAME_WINDOW := 2
+const SHIP_ENEMY_SCAN_CACHE_FRAME_WINDOW := 4
 const SHIP_ENEMY_SCAN_PRUNE_INTERVAL := 30
 const SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ := 1600.0
+const SHIP_ENEMY_SCAN_MAX_TARGET_SHIPS := 4
+const SHIP_ENEMY_SCAN_MAX_DISTRESS_SHIPS := 2
 const SHIP_DECK_BUCKET_CACHE_FRAME_WINDOW := 2
 const SHIP_DECK_BUCKET_PRUNE_INTERVAL := 30
 const SHIP_DECK_BUCKET_CELL_SIZE := 2.4
@@ -46,6 +48,8 @@ static func get_ship_enemy_scan_data(soldier) -> Dictionary:
 static func _build_ship_enemy_scan_data(soldier, owned_ship: Node3D, current_frame: int) -> Dictionary:
 	var nearby_enemy_ships: Array = []
 	var nearby_ally_distress_ships: Array = []
+	var enemy_ship_rows: Array = []
+	var ally_distress_rows: Array = []
 	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
 	for other_ship in EntityRegistry.get_ships_by_team(opposing_team):
 		if not is_instance_valid(other_ship) or other_ship == owned_ship:
@@ -56,9 +60,21 @@ static func _build_ship_enemy_scan_data(soldier, owned_ship: Node3D, current_fra
 			owned_ship.global_position.x - other_ship.global_position.x,
 			owned_ship.global_position.z - other_ship.global_position.z
 		)
-		if enemy_ship_diff_xz.length_squared() > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
+		var enemy_dist_sq := enemy_ship_diff_xz.length_squared()
+		if enemy_dist_sq > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
 			continue
-		nearby_enemy_ships.append(other_ship)
+		enemy_ship_rows.append({
+			"ship": other_ship,
+			"dist_sq": enemy_dist_sq,
+		})
+	enemy_ship_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("dist_sq", INF)) < float(b.get("dist_sq", INF))
+	)
+	for index in range(mini(SHIP_ENEMY_SCAN_MAX_TARGET_SHIPS, enemy_ship_rows.size())):
+		var enemy_row: Dictionary = enemy_ship_rows[index]
+		var enemy_ship: Node3D = get_valid_node3d(enemy_row.get("ship", null))
+		if enemy_ship != null:
+			nearby_enemy_ships.append(enemy_ship)
 
 	var own_team := str(soldier.team).strip_edges().to_lower()
 	for ally_ship in EntityRegistry.get_ships_by_team(own_team):
@@ -70,7 +86,8 @@ static func _build_ship_enemy_scan_data(soldier, owned_ship: Node3D, current_fra
 			owned_ship.global_position.x - ally_ship.global_position.x,
 			owned_ship.global_position.z - ally_ship.global_position.z
 		)
-		if ally_ship_diff_xz.length_squared() > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
+		var ally_dist_sq := ally_ship_diff_xz.length_squared()
+		if ally_dist_sq > SHIP_ENEMY_SCAN_MAX_DISTANCE_SQ:
 			continue
 		var ally_team := NodeContractHelper.get_team_tag(ally_ship, "").strip_edges().to_lower()
 		if not ally_team.is_empty() and ally_team != own_team:
@@ -78,7 +95,18 @@ static func _build_ship_enemy_scan_data(soldier, owned_ship: Node3D, current_fra
 		var hostile_count: int = int(ally_ship.get("deck_hostile_boarder_count")) if ally_ship.get("deck_hostile_boarder_count") != null else 0
 		if ally_ship.get("deck_is_contested") != true and ally_ship.get("deck_is_overrun") != true and hostile_count <= 0:
 			continue
-		nearby_ally_distress_ships.append(ally_ship)
+		ally_distress_rows.append({
+			"ship": ally_ship,
+			"dist_sq": ally_dist_sq,
+		})
+	ally_distress_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("dist_sq", INF)) < float(b.get("dist_sq", INF))
+	)
+	for index in range(mini(SHIP_ENEMY_SCAN_MAX_DISTRESS_SHIPS, ally_distress_rows.size())):
+		var distress_row: Dictionary = ally_distress_rows[index]
+		var distress_ship: Node3D = get_valid_node3d(distress_row.get("ship", null))
+		if distress_ship != null:
+			nearby_ally_distress_ships.append(distress_ship)
 
 	var nearby_target_ships := nearby_enemy_ships.duplicate()
 	nearby_target_ships.append_array(nearby_ally_distress_ships)

@@ -180,11 +180,11 @@ static func get_support_join_offset(ship, my_index: int) -> Vector3:
 static func get_support_lead_ship(ship, minions: Array, my_index: int) -> Node3D:
 	var role_name := _get_support_slot_role(ship)
 	var flagship_anchor := _get_flagship_anchor(ship)
-	if _should_follow_flagship_directly(ship, role_name) and is_instance_valid(flagship_anchor):
-		return flagship_anchor
 	var formation_value := _get_formation_value(ship)
 	if formation_value == FORMATION_COLUMN:
 		return _get_generic_support_lead_ship(ship, minions, my_index)
+	if _should_follow_flagship_directly(ship, role_name) and is_instance_valid(flagship_anchor):
+		return flagship_anchor
 	if not _is_named_support_role(role_name):
 		if is_instance_valid(flagship_anchor):
 			return flagship_anchor

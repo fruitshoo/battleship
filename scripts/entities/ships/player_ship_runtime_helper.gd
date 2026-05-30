@@ -8,6 +8,7 @@ const SUPPORT_ASSIST_LOCK_TIMER_META := "support_assist_lock_timer"
 const SUPPORT_ASSIST_EVAL_TIMER_META := "support_assist_eval_timer"
 const SUPPORT_ASSIST_LANE_SIDE_META := "support_assist_lane_side"
 const SUPPORT_JOIN_STAGE_META := "support_join_stage"
+const SUPPORT_COLUMN_ORDER_META := "support_column_order"
 const CONTROL_SCHEME_SCREEN := "screen"
 const SCREEN_STEER_FULL_ANGLE_DEG := 125.0
 const SCREEN_STEER_SOFT_ZONE_DEG := 28.0
@@ -187,38 +188,51 @@ static func toggle_fleet_formation(ship) -> void:
 			ship._cached_hud.show_message("지원함: 자유 교전", 2.0)
 
 static func cycle_fleet_formation(ship) -> void:
-	var current_formation := _get_normalized_fleet_formation(ship)
-	var next_formation: int = SupportFleetStateHelper.FORMATION_WING \
-		if current_formation == SupportFleetStateHelper.FORMATION_COLUMN \
-		else SupportFleetStateHelper.FORMATION_COLUMN
-	SupportFleetStateHelper.set_flagship_formation(ship, next_formation)
-	if ship.has_method("_get_support_fleet_ships"):
-		var support_ships: Array = ship.call("_get_support_fleet_ships")
-		for support_ship in support_ships:
-			if not is_instance_valid(support_ship):
-				continue
-			if support_ship.get("is_boarding") == true:
-				continue
-			support_ship.set_meta(SUPPORT_JOINING_META, true)
-			support_ship.set_meta(SUPPORT_JOIN_STAGE_META, 0)
-			for meta_name in [
-				SUPPORT_ASSIST_TARGET_ID_META,
-				SUPPORT_ASSIST_LOCK_TIMER_META,
-				SUPPORT_ASSIST_EVAL_TIMER_META,
-				SUPPORT_ASSIST_LANE_SIDE_META,
-			]:
-				if support_ship.has_meta(meta_name):
-					support_ship.remove_meta(meta_name)
-	if ship._cached_hud and ship._cached_hud.has_method("show_message"):
-		var suffix := "" if SupportFleetStateHelper.is_flagship_hold_enabled(ship) else " (자유 교전 중)"
-		ship._cached_hud.show_message("지원함 진형: %s%s" % [_get_fleet_formation_label(ship), suffix], 2.0)
+	SupportFleetStateHelper.set_flagship_formation(ship, SupportFleetStateHelper.FORMATION_COLUMN)
+	if not ship.has_method("_get_support_fleet_ships"):
+		return
+	var support_ships: Array = ship.call("_get_support_fleet_ships")
+	if support_ships.size() <= 1:
+		return
+	var ordered_supports: Array = []
+	for support_ship in support_ships:
+		if is_instance_valid(support_ship):
+			ordered_supports.append(support_ship)
+	ordered_supports.sort_custom(func(a, b):
+		var slot_a: int = int(a.get_meta("support_fleet_slot_index", ordered_supports.find(a)))
+		var slot_b: int = int(b.get_meta("support_fleet_slot_index", ordered_supports.find(b)))
+		var column_a: int = int(a.get_meta(SUPPORT_COLUMN_ORDER_META, slot_a))
+		var column_b: int = int(b.get_meta(SUPPORT_COLUMN_ORDER_META, slot_b))
+		if column_a != column_b:
+			return column_a < column_b
+		return a.get_instance_id() < b.get_instance_id()
+	)
+	if ordered_supports.size() <= 1:
+		return
+	var first_support = ordered_supports.pop_front()
+	ordered_supports.append(first_support)
+	for order_index in range(ordered_supports.size()):
+		var ordered_support = ordered_supports[order_index]
+		if is_instance_valid(ordered_support):
+			ordered_support.set_meta(SUPPORT_COLUMN_ORDER_META, order_index)
+	for support_ship in ordered_supports:
+		if not is_instance_valid(support_ship):
+			continue
+		if support_ship.get("is_boarding") == true:
+			continue
+		support_ship.set_meta(SUPPORT_JOINING_META, true)
+		support_ship.set_meta(SUPPORT_JOIN_STAGE_META, 0)
+		for meta_name in [
+			SUPPORT_ASSIST_TARGET_ID_META,
+			SUPPORT_ASSIST_LOCK_TIMER_META,
+			SUPPORT_ASSIST_EVAL_TIMER_META,
+			SUPPORT_ASSIST_LANE_SIDE_META,
+		]:
+			if support_ship.has_meta(meta_name):
+				support_ship.remove_meta(meta_name)
 
-static func _get_fleet_formation_label(ship) -> String:
-	match _get_normalized_fleet_formation(ship):
-		SupportFleetStateHelper.FORMATION_WING:
-			return "호위진"
-		_:
-			return "장사진"
+static func _get_fleet_formation_label(_ship) -> String:
+	return "장사진"
 
 static func _get_normalized_fleet_formation(ship) -> int:
 	return SupportFleetStateHelper.get_flagship_formation(ship)

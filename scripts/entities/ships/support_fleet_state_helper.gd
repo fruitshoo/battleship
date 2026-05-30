@@ -108,7 +108,5 @@ static func is_effective_hold_enabled(ship) -> bool:
 	return false
 
 
-static func normalize_formation_value(raw_value: int) -> int:
-	if raw_value == FORMATION_COLUMN:
-		return FORMATION_COLUMN
-	return FORMATION_WING
+static func normalize_formation_value(_raw_value: int) -> int:
+	return FORMATION_COLUMN

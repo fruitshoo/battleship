@@ -1,7 +1,6 @@
 extends RefCounted
 class_name BloodDeckDecalHelper
 
-
 const BLOOD_STAIN_TEXTURES := [
 	preload("res://assets/vfx/decals/blood/red/blood_splatter_red_01.png"),
 	preload("res://assets/vfx/decals/blood/red/blood_splatter_red_02.png"),
@@ -20,8 +19,11 @@ const DECK_EDGE_PADDING := 0.18
 const DECK_RAW_PLACEMENT_MARGIN := 0.55
 const DECK_Y_TOLERANCE_BELOW := 0.8
 const DECK_Y_TOLERANCE_ABOVE := 1.35
+const DECK_DECAL_Y_OFFSET := 0.18
 const OWNED_SHIP_CHANGE_GRACE_MSEC := 260
 const META_OWNED_SHIP_CHANGED_MSEC := "owned_ship_changed_msec"
+const META_COMBAT_DECK_ZONE := "combat_deck_zone"
+const ZONE_ROOF := "roof"
 const DEBUG_BLOOD_DECAL_REJECTS := false
 const USE_STAIN_PLANE := true
 const STAIN_SIZE_MULTIPLIER := 1.2
@@ -71,23 +73,38 @@ static func try_spawn_from_soldier_damage(soldier, damage_amount: float, hit_pos
 		return
 
 	var local_pos := ship.to_local(world_pos)
+	var use_roof_surface := _is_roof_deck_soldier(soldier) and _can_use_roof_surface(ship)
 	var deck_height := _get_deck_height(ship)
-	if not _is_near_deck_before_clamp(ship, local_pos, deck_height):
-		_debug_reject("off_owned_deck", soldier, ship, world_pos, local_pos)
-		return
+	if use_roof_surface:
+		if not _is_near_roof_before_clamp(ship, local_pos):
+			_debug_reject("off_roof_surface", soldier, ship, world_pos, local_pos)
+			return
+	else:
+		if not _is_near_deck_before_clamp(ship, local_pos, deck_height):
+			_debug_reject("off_owned_deck", soldier, ship, world_pos, local_pos)
+			return
 	if not VfxBudget.allow_spawn(tree, "blood_deck_decal", world_pos, MAX_SPAWNS_PER_FRAME, MAX_SPAWN_DISTANCE):
 		return
 	if randf() > _spawn_chance(damage_amount, damage_source):
 		return
 
-	local_pos = _clamp_to_deck(ship, local_pos)
-	if not _is_inside_deck(ship, local_pos):
-		return
-	local_pos.y = deck_height + 0.18
+	if use_roof_surface:
+		local_pos = _clamp_to_roof(ship, local_pos)
+		local_pos.y += DECK_DECAL_Y_OFFSET
+	else:
+		local_pos = _clamp_to_deck(ship, local_pos)
+		if not _is_inside_deck(ship, local_pos):
+			return
+		local_pos.y = deck_height + DECK_DECAL_Y_OFFSET
 
 	var spill_offset := _get_spill_offset_local(ship, world_pos, hit_position)
-	local_pos = _clamp_to_deck(ship, local_pos + spill_offset + Vector3(randf_range(-0.12, 0.12), 0.0, randf_range(-0.12, 0.12)))
-	local_pos.y = deck_height + 0.18
+	var random_offset := Vector3(randf_range(-0.12, 0.12), 0.0, randf_range(-0.12, 0.12))
+	if use_roof_surface:
+		local_pos = _clamp_to_roof(ship, local_pos + spill_offset + random_offset)
+		local_pos.y += DECK_DECAL_Y_OFFSET
+	else:
+		local_pos = _clamp_to_deck(ship, local_pos + spill_offset + random_offset)
+		local_pos.y = deck_height + DECK_DECAL_Y_OFFSET
 
 	var root := _get_or_create_decal_root(ship)
 	if not is_instance_valid(root):
@@ -98,10 +115,8 @@ static func try_spawn_from_soldier_damage(soldier, damage_amount: float, hit_pos
 	decal.rotation = Vector3(0.0, randf_range(-PI, PI), 0.0)
 	_trim_old_decals(root)
 
-
 static func _should_spawn_for_source(damage_source: String) -> bool:
 	return not BLOOD_BLOCKED_DAMAGE_SOURCES.has(damage_source)
-
 
 static func _spawn_chance(damage_amount: float, damage_source: String) -> float:
 	var base_chance := 0.68
@@ -115,7 +130,6 @@ static func _spawn_chance(damage_amount: float, damage_source: String) -> float:
 static func _resolve_owned_ship(soldier) -> Node3D:
 	var ship_value: Variant = soldier.get("owned_ship") if soldier.get("owned_ship") != null else null
 	return ship_value as Node3D
-
 
 static func _is_owned_ship_recently_changed(soldier) -> bool:
 	if not soldier.has_meta(META_OWNED_SHIP_CHANGED_MSEC):
@@ -136,13 +150,34 @@ static func _is_soldier_parented_to_owned_ship(soldier_node: Node3D, ship: Node3
 			return true
 		if cursor == ship:
 			return true
-		cursor = cursor.get_parent()
+			cursor = cursor.get_parent()
 	return false
-
 
 static func _is_valid_world_position(world_pos: Vector3) -> bool:
 	return world_pos.is_finite()
 
+static func _is_roof_deck_soldier(soldier) -> bool:
+	return is_instance_valid(soldier) and str(soldier.get_meta(META_COMBAT_DECK_ZONE, "")) == ZONE_ROOF
+
+static func _can_use_roof_surface(ship: Node3D) -> bool:
+	if not is_instance_valid(ship):
+		return false
+	if not ship.has_method("is_roof_boarding_enabled") or ship.call("is_roof_boarding_enabled") != true:
+		return false
+	return ship.has_method("is_roof_local_position_in_bounds") and ship.has_method("clamp_roof_boarding_landing_local")
+
+static func _is_near_roof_before_clamp(ship: Node3D, local_pos: Vector3) -> bool:
+	if not _can_use_roof_surface(ship):
+		return false
+	if ship.call("is_roof_local_position_in_bounds", local_pos) == true:
+		return true
+	var clamped_variant: Variant = ship.call("clamp_roof_boarding_landing_local", local_pos)
+	if not clamped_variant is Vector3:
+		return false
+	var clamped := clamped_variant as Vector3
+	var planar_delta := Vector2(local_pos.x - clamped.x, local_pos.z - clamped.z)
+	return planar_delta.length_squared() <= DECK_RAW_PLACEMENT_MARGIN * DECK_RAW_PLACEMENT_MARGIN \
+		and absf(local_pos.y - clamped.y) <= DECK_Y_TOLERANCE_ABOVE
 
 static func _is_near_deck_before_clamp(ship: Node3D, local_pos: Vector3, deck_height: float) -> bool:
 	if local_pos.y < deck_height - DECK_Y_TOLERANCE_BELOW or local_pos.y > deck_height + DECK_Y_TOLERANCE_ABOVE:
@@ -287,6 +322,13 @@ static func _clamp_to_deck(ship: Node3D, local_pos: Vector3) -> Vector3:
 	var x_limit := maxf(0.08, half_width - DECK_EDGE_PADDING)
 	local_pos.x = clampf(local_pos.x, -x_limit, x_limit)
 	return local_pos
+
+
+static func _clamp_to_roof(ship: Node3D, local_pos: Vector3) -> Vector3:
+	if not _can_use_roof_surface(ship):
+		return local_pos
+	var clamped_variant: Variant = ship.call("clamp_roof_boarding_landing_local", local_pos)
+	return clamped_variant as Vector3 if clamped_variant is Vector3 else local_pos
 
 
 static func _is_inside_deck(ship: Node3D, local_pos: Vector3) -> bool:

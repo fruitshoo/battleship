@@ -349,7 +349,7 @@ func _ready() -> void:
 	_verify_panokseon_limbo_screen_threat_keeps_line_for_normal_threats(failures)
 	_verify_support_limbo_modes_drive_assist_execution(failures)
 	_verify_support_ship_tracks_flagship_manual_boss_breach(failures)
-	_verify_panokseon_column_goal_tracks_flagship_directly(failures)
+	_verify_panokseon_column_goal_chains_behind_previous_support(failures)
 	_verify_support_chain_goal_formation_variants(failures)
 	_verify_support_chain_goal_formation_turn_following(failures)
 	_verify_support_chain_goal_prefers_owner_flagship_over_target(failures)
@@ -896,7 +896,7 @@ func _verify_support_ship_tracks_flagship_manual_boss_breach(failures: Array[Str
 	support.queue_free()
 
 
-func _verify_panokseon_column_goal_tracks_flagship_directly(failures: Array[String]) -> void:
+func _verify_panokseon_column_goal_chains_behind_previous_support(failures: Array[String]) -> void:
 	var maengseon := MockSupportShip.new()
 	add_child(maengseon)
 	maengseon.global_position = Vector3(92.0, 0.0, 0.0)
@@ -919,12 +919,12 @@ func _verify_panokseon_column_goal_tracks_flagship_directly(failures: Array[Stri
 	panokseon.target = player
 
 	var lead_ship := SupportFleetFormationHelper.get_support_lead_ship(panokseon, [maengseon, panokseon], 1)
-	if lead_ship != player:
-		failures.append("panokseon column formation should follow the flagship directly instead of the previous maengseon")
+	if lead_ship != maengseon:
+		failures.append("panokseon column formation should follow the previous support ship")
 	var goal := SupportFleetFormationHelper.get_support_chain_goal(panokseon, [maengseon, panokseon], 1, 10.0)
 	var goal_pos: Vector3 = goal.get("position", Vector3.ZERO)
-	if goal_pos.distance_to(player.global_position) >= goal_pos.distance_to(maengseon.global_position):
-		failures.append("panokseon column goal should stay near the flagship line instead of chaining behind maengseon")
+	if goal_pos.distance_to(maengseon.global_position) >= goal_pos.distance_to(player.global_position):
+		failures.append("panokseon column goal should chain behind maengseon instead of treating itself as the second flagship follower")
 
 	player.queue_free()
 	panokseon.queue_free()
@@ -956,10 +956,10 @@ func _verify_support_chain_goal_formation_variants(failures: Array[String]) -> v
 	var legacy_wedge_pos: Vector3 = legacy_wedge_goal.get("position", Vector3.ZERO)
 	if absf(column_pos.x) > 0.25:
 		failures.append("support column goal should stay centered behind the flagship")
-	if absf(wing_pos.x) <= 0.25:
-		failures.append("support wing goal should spread laterally from the flagship")
-	if wing_pos.distance_to(legacy_wedge_pos) > 0.35:
-		failures.append("legacy wedge support goal should now alias the wing formation goal")
+	if wing_pos.distance_to(column_pos) > 0.35:
+		failures.append("support wing request should now normalize to the column goal")
+	if legacy_wedge_pos.distance_to(column_pos) > 0.35:
+		failures.append("legacy wedge support request should now normalize to the column goal")
 
 	support_a.set_meta("support_squadron_slot_role", "screen_lead")
 	_set_support_formation(support_a, 0)
@@ -968,8 +968,8 @@ func _verify_support_chain_goal_formation_variants(failures: Array[String]) -> v
 	var role_wing_offset: Vector3 = AIShipSupportHelper._get_support_offset(support_a, 0, true)
 	if role_column_offset.z < 12.5:
 		failures.append("support column offset should keep a clearer trailing gap behind the flagship")
-	if role_column_offset.z <= role_wing_offset.z + 2.5:
-		failures.append("support column offset should trail more deeply than the wing offset")
+	if role_column_offset.distance_to(role_wing_offset) > 0.35:
+		failures.append("support wing role offset should now normalize to the column offset")
 
 	support_a.global_position = player.global_position + Vector3(12.0, 0.0, -6.0)
 	support_b.global_position = player.global_position + Vector3(13.0, 0.0, -8.0)
@@ -981,10 +981,10 @@ func _verify_support_chain_goal_formation_variants(failures: Array[String]) -> v
 	var fixed_right_goal := SupportFleetFormationHelper.get_support_chain_goal(support_b, [support_a, support_b], 1, 10.0)
 	var fixed_left_pos: Vector3 = fixed_left_goal.get("position", Vector3.ZERO)
 	var fixed_right_pos: Vector3 = fixed_right_goal.get("position", Vector3.ZERO)
-	if fixed_left_pos.x >= -0.25:
-		failures.append("support wing fixed left role should recover its left lane instead of staying on the current right side")
-	if fixed_right_pos.x <= 0.25:
-		failures.append("support wing fixed right role should keep the opposite lane when nearby supports drift together")
+	if absf(fixed_left_pos.x) > 0.35:
+		failures.append("support wing fixed-left request should now stay on the column centerline")
+	if absf(fixed_right_pos.x - support_a.global_position.x) > 0.35:
+		failures.append("support wing fixed-right request should now chain behind the previous support")
 
 	player.queue_free()
 	support_b.queue_free()
@@ -1013,11 +1013,11 @@ func _verify_support_chain_goal_formation_turn_following(failures: Array[String]
 	var wing_pos: Vector3 = wing_goal.get("position", Vector3.ZERO)
 	var wing_fwd: Vector3 = wing_goal.get("forward", Vector3.ZERO)
 	if wing_pos.x >= -1.5:
-		failures.append("support wing turn-follow goal should stay behind the flagship trail when the flagship yaws")
-	if absf(wing_pos.z) <= 0.25:
-		failures.append("support wing turn-follow goal should keep lateral spread while following the flagship trail")
+		failures.append("support column turn-follow goal should stay behind the flagship trail when the flagship yaws")
+	if absf(wing_pos.z) > 0.35:
+		failures.append("support wing request should normalize to the column centerline during flagship turns")
 	if wing_fwd.dot(Vector3.RIGHT) <= 0.7:
-		failures.append("support wing turn-follow goal should inherit trail forward during flagship turns")
+		failures.append("support column turn-follow goal should inherit trail forward during flagship turns")
 
 	player.queue_free()
 	support_b.queue_free()
@@ -1095,12 +1095,10 @@ func _verify_support_artillery_screen_goal_tracks_flagship_wing_lane(failures: A
 		10.0
 	)
 	var goal_pos: Vector3 = goal.get("position", Vector3.ZERO)
-	if goal_pos.x <= panokseon.global_position.x + 2.0:
-		failures.append("artillery screen wing goal should occupy the panokseon right wing instead of collapsing toward center")
-	if absf(goal_pos.z - panokseon.global_position.z) > 8.0:
-		failures.append("artillery screen wing goal should stay beside the support panokseon instead of becoming a rear flagship guard")
-	if goal_pos.distance_to(panokseon.global_position) >= goal_pos.distance_to(player.global_position):
-		failures.append("artillery screen wing goal should anchor closer to the support panokseon than to the flagship")
+	if absf(goal_pos.x - rescue.global_position.x) > 0.35:
+		failures.append("artillery screen wing request should normalize to the column chain behind the previous support")
+	if goal_pos.distance_to(rescue.global_position) >= goal_pos.distance_to(panokseon.global_position):
+		failures.append("artillery screen column goal should anchor behind the previous support instead of staying in the panokseon wing")
 
 	player.queue_free()
 	artillery_screen.queue_free()

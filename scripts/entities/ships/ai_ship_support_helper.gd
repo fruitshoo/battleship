@@ -17,6 +17,7 @@ const SUPPORT_JOIN_CATCHUP_SPEED_MULT := 2.2
 const SUPPORT_JOIN_ROWING_WIND_FLOOR := 0.9
 const SUPPORT_FLEET_SLOT_INDEX_META := "support_fleet_slot_index"
 const SUPPORT_FLEET_ORDER_META := "support_fleet_order"
+const SUPPORT_COLUMN_ORDER_META := "support_column_order"
 const SUPPORT_FLEET_SLOT_ROLE_META := "support_squadron_slot_role"
 const SUPPORT_TRAIL_POINTS_META := "support_trail_points"
 const SUPPORT_ANCHOR_POS_META := "support_anchor_position"
@@ -1577,8 +1578,10 @@ static func _get_support_roster(ship, support_only: bool) -> Array:
 			var order_b: int = int(b.get_meta(SUPPORT_FLEET_ORDER_META, b.get_instance_id()))
 			var slot_a: int = int(a.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, order_a))
 			var slot_b: int = int(b.get_meta(SUPPORT_FLEET_SLOT_INDEX_META, order_b))
-			if slot_a != slot_b:
-				return slot_a < slot_b
+			var column_a: int = int(a.get_meta(SUPPORT_COLUMN_ORDER_META, slot_a))
+			var column_b: int = int(b.get_meta(SUPPORT_COLUMN_ORDER_META, slot_b))
+			if column_a != column_b:
+				return column_a < column_b
 			return order_a < order_b
 		)
 		var support_cache_key: int = roster_flagship.get_instance_id() if is_instance_valid(roster_flagship) else 0

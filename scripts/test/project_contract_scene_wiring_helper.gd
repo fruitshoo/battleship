@@ -331,6 +331,15 @@ static func _run_player_ship_runtime_safety_contract(owner: Node, failures: Arra
 				rotate_right_has_dpad_right = true
 		if not rotate_right_has_dpad_right:
 			failures.append("gamepad camera rotate right should also use D-pad right")
+	if not InputMap.has_action("cycle_fleet_formation"):
+		failures.append("support column order should expose cycle_fleet_formation input action")
+	else:
+		var cycle_has_nintendo_y := false
+		for input_event in InputMap.action_get_events("cycle_fleet_formation"):
+			if input_event is InputEventJoypadButton and input_event.button_index == JOY_BUTTON_X:
+				cycle_has_nintendo_y = true
+		if not cycle_has_nintendo_y:
+			failures.append("support column order should use Nintendo Y / left face button")
 	if not player_ship.has_method("toggle_sail_furl") or not player_ship.has_method("_update_sail_deployment"):
 		failures.append("player ship should expose sail furl controls")
 	else:

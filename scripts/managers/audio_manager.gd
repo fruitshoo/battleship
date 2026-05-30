@@ -334,7 +334,7 @@ const SFX_PROFILE_OVERRIDES := {
 		"rate_limit_msec": 180,
 	},
 	"ballistic_death": {
-		"pitch_jitter": 0.08,
+		"pitch_jitter": 0.04,
 	},
 	"support_foghorn": {
 		"volume_db": 2.0,

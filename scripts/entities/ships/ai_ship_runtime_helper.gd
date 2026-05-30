@@ -52,6 +52,11 @@ const BOARDING_WINDOW_CACHE_META := "ai_ship_boarding_window_cache"
 const BOARDING_WINDOW_TARGET_ID_META := "ai_ship_boarding_window_target_id"
 const BOARDING_WINDOW_TIMER_META := "ai_ship_boarding_window_timer"
 const NAV_CACHE_REBUILD_DISTANCE_SQ := 2.25
+const BOARDING_PRESSURE_CROWD_SHIP_COUNT := 10
+const BOARDING_PRESSURE_ACTIVE_LIMIT := 4
+const BOARDING_PRESSURE_MAX_DISTANCE := 22.0
+const BOARDING_PRESSURE_FRAME_META := "ai_ship_boarding_pressure_frame"
+const BOARDING_PRESSURE_IDS_META := "ai_ship_boarding_pressure_ids"
 
 static func _is_true(value: Variant) -> bool:
 	return value == true
@@ -346,11 +351,59 @@ static func _get_navigation_cache_interval(ship, raw_dist_to_target: float) -> f
 
 
 static func _get_boarding_window_cached(ship, current_target: Node3D, delta: float, raw_dist_to_target: float) -> Dictionary:
+	var pressure_allowed := true
+	if str(ship.get("team")).strip_edges().to_lower() == "enemy" and EntityRegistry.count_ships_by_team("enemy") >= BOARDING_PRESSURE_CROWD_SHIP_COUNT:
+		pressure_allowed = false
+		if raw_dist_to_target <= BOARDING_PRESSURE_MAX_DISTANCE:
+			var current_frame := Engine.get_physics_frames()
+			var active_ids: Array = []
+			if current_target.has_meta(BOARDING_PRESSURE_FRAME_META) \
+			and int(current_target.get_meta(BOARDING_PRESSURE_FRAME_META, -1000)) == current_frame:
+				var cached_ids: Variant = current_target.get_meta(BOARDING_PRESSURE_IDS_META, [])
+				if cached_ids is Array:
+					active_ids = cached_ids
+			else:
+				var pressure_rows: Array = []
+				var max_distance_sq := BOARDING_PRESSURE_MAX_DISTANCE * BOARDING_PRESSURE_MAX_DISTANCE
+				for other_ship_variant in EntityRegistry.get_ships_by_team("enemy"):
+					var other_ship := other_ship_variant as Node3D
+					if not is_instance_valid(other_ship):
+						continue
+					if _is_sinking_or_dying(other_ship):
+						continue
+					if _is_gunner(other_ship) or not _can_board(other_ship):
+						continue
+					var other_target: Node3D = _target_ship(other_ship)
+					var boarding_target: Variant = other_ship.get("boarding_target")
+					if is_instance_valid(boarding_target) and boarding_target is Node3D:
+						other_target = boarding_target
+					if other_target != current_target:
+						continue
+					var offset: Vector3 = other_ship.global_position - current_target.global_position
+					offset.y = 0.0
+					var dist_sq: float = offset.length_squared()
+					if dist_sq > max_distance_sq:
+						continue
+					pressure_rows.append({
+						"id": other_ship.get_instance_id(),
+						"dist_sq": dist_sq,
+					})
+				pressure_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+					return float(a.get("dist_sq", INF)) < float(b.get("dist_sq", INF))
+				)
+				var active_count := mini(BOARDING_PRESSURE_ACTIVE_LIMIT, pressure_rows.size())
+				for index in range(active_count):
+					var row: Dictionary = pressure_rows[index]
+					active_ids.append(int(row.get("id", 0)))
+				current_target.set_meta(BOARDING_PRESSURE_FRAME_META, current_frame)
+				current_target.set_meta(BOARDING_PRESSURE_IDS_META, active_ids)
+			pressure_allowed = active_ids.has(ship.get_instance_id())
+
 	var interval := _get_boarding_window_cache_interval(ship, raw_dist_to_target)
 	if interval <= 0.0:
 		return {
 			"attempt_distance": ShipContactGeometry.get_boarding_attempt_distance(ship, current_target),
-			"target_can_be_boarded": ShipCombatModeHelper.can_be_boarded(current_target, ship),
+			"target_can_be_boarded": pressure_allowed and ShipCombatModeHelper.can_be_boarded(current_target, ship),
 		}
 
 	var target_id := current_target.get_instance_id()
@@ -359,7 +412,10 @@ static func _get_boarding_window_cached(ship, current_target: Node3D, delta: flo
 	var timer := maxf(0.0, float(ship.get_meta(BOARDING_WINDOW_TIMER_META, 0.0)) - delta)
 	if cached_target_id == target_id and cached_window_variant is Dictionary and timer > 0.0:
 		ship.set_meta(BOARDING_WINDOW_TIMER_META, timer)
-		return cached_window_variant
+		var cached_window: Dictionary = (cached_window_variant as Dictionary).duplicate()
+		if not pressure_allowed:
+			cached_window["target_can_be_boarded"] = false
+		return cached_window
 
 	var window := {
 		"attempt_distance": ShipContactGeometry.get_boarding_attempt_distance(ship, current_target),
@@ -368,7 +424,10 @@ static func _get_boarding_window_cached(ship, current_target: Node3D, delta: flo
 	ship.set_meta(BOARDING_WINDOW_CACHE_META, window)
 	ship.set_meta(BOARDING_WINDOW_TARGET_ID_META, target_id)
 	ship.set_meta(BOARDING_WINDOW_TIMER_META, interval + randf_range(0.0, interval * 0.16))
-	return window
+	var result_window: Dictionary = window.duplicate()
+	if not pressure_allowed:
+		result_window["target_can_be_boarded"] = false
+	return result_window
 
 
 static func _get_boarding_window_cache_interval(ship, raw_dist_to_target: float) -> float:

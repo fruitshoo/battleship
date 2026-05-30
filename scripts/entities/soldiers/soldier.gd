@@ -45,6 +45,13 @@ const EXTERNAL_KNOCKBACK_SNAP_MULTIPLIER: float = 1.22
 const META_OVERBOARD_KNOCKBACK_VOICE_PLAYED := "overboard_knockback_voice_played"
 const META_OWNED_SHIP_CHANGED_MSEC := "owned_ship_changed_msec"
 const SFX_OVERBOARD_KNOCKBACK_DEATH := "ballistic_death"
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_MIN: float = 1.12
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_MAX: float = 1.32
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_BOOST_CHANCE: float = 0.28
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_BOOST_MIN: float = 1.04
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_BOOST_MAX: float = 1.12
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_CLAMP_MIN: float = 1.08
+const OVERBOARD_KNOCKBACK_DEATH_PITCH_CLAMP_MAX: float = 1.44
 const NODE_HAND_PIVOT := "HandPivot"
 const NODE_BODY_COLLISION_SHAPE := "CollisionShape3D"
 const NODE_FALLBACK_VISUAL_MESH := "MeshInstance3D"
@@ -714,10 +721,22 @@ func _play_overboard_knockback_voice_once() -> void:
 	set_meta(META_OVERBOARD_KNOCKBACK_VOICE_PLAYED, true)
 	var audio_manager = get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		var voice_pitch := randf_range(0.74, 1.28)
-		if randf() < 0.34:
-			voice_pitch *= randf_range(0.86, 1.16)
-		audio_manager.play_sfx(SFX_OVERBOARD_KNOCKBACK_DEATH, global_position, clampf(voice_pitch, 0.68, 1.36), 1.5)
+		var voice_pitch := randf_range(OVERBOARD_KNOCKBACK_DEATH_PITCH_MIN, OVERBOARD_KNOCKBACK_DEATH_PITCH_MAX)
+		if randf() < OVERBOARD_KNOCKBACK_DEATH_PITCH_BOOST_CHANCE:
+			voice_pitch *= randf_range(
+				OVERBOARD_KNOCKBACK_DEATH_PITCH_BOOST_MIN,
+				OVERBOARD_KNOCKBACK_DEATH_PITCH_BOOST_MAX
+			)
+		audio_manager.play_sfx(
+			SFX_OVERBOARD_KNOCKBACK_DEATH,
+			global_position,
+			clampf(
+				voice_pitch,
+				OVERBOARD_KNOCKBACK_DEATH_PITCH_CLAMP_MIN,
+				OVERBOARD_KNOCKBACK_DEATH_PITCH_CLAMP_MAX
+			),
+			1.5
+		)
 
 
 func is_combat_disabled() -> bool:
@@ -1035,8 +1054,15 @@ func _physics_process(delta: float) -> void:
 	# 원거리 사격 및 무기 스위칭 체크 (전투 스케줄)
 	if current_state != State.DEAD and current_state != State.BOARDING_JUMP and run_combat_logic:
 		var combat_profile_start := PhysicsFrameProfiler.begin()
+		var slot_profile_start := PhysicsFrameProfiler.begin()
+		var needs_ranged_slot_check: bool = not is_melee_only and crew_role != "spearman" and is_instance_valid(weapon_bow)
+		var ranged_slot_allowed: bool = true
+		if needs_ranged_slot_check:
+			ranged_slot_allowed = SoldierCombatHelper._can_use_ship_ranged_attack_slot(self)
+		PhysicsFrameProfiler.end("soldier_combat_slot_check", slot_profile_start)
 		var combat_find_profile_start := PhysicsFrameProfiler.begin()
-		var nearest = find_nearest_enemy()
+		var should_run_full_enemy_scan: bool = ranged_slot_allowed or current_state == State.ATTACK or is_instance_valid(current_target)
+		var nearest = find_nearest_enemy() if should_run_full_enemy_scan else find_nearest_hostile_on_owned_ship()
 		PhysicsFrameProfiler.end("soldier_combat_find_enemy", combat_find_profile_start)
 		var combat_weapon_profile_start := PhysicsFrameProfiler.begin()
 		SoldierWeaponHelper.update_combat_weapon_choice(self, nearest)
@@ -1044,7 +1070,7 @@ func _physics_process(delta: float) -> void:
 
 		if current_state != State.ATTACK:
 			var ranged_profile_start := PhysicsFrameProfiler.begin()
-			_check_ranged_combat(nearest)
+			_check_ranged_combat(nearest, ranged_slot_allowed)
 			PhysicsFrameProfiler.end("soldier_combat_ranged_check", ranged_profile_start)
 			var capture_profile_start := PhysicsFrameProfiler.begin()
 			_check_ship_capture_opportunity()
@@ -1921,8 +1947,8 @@ func finish_boarding_jump_pose(status: String = BOARDING_STATUS_ON_DECK) -> void
 
 
 ## 원거리 적 확인 및 사격
-func _check_ranged_combat(preferred_nearest: Node3D = null) -> void:
-	SoldierCombatHelper.check_ranged_combat(self, preferred_nearest)
+func _check_ranged_combat(preferred_nearest: Node3D = null, ranged_slot_allowed: Variant = null) -> void:
+	SoldierCombatHelper.check_ranged_combat(self, preferred_nearest, ranged_slot_allowed)
 
 func _is_player_fleet_ai_ship_crew() -> bool:
 	if not is_instance_valid(owned_ship):

@@ -941,7 +941,7 @@
       ]
     },
     "res://scripts/effects/blood_deck_decal_helper.gd": {
-      "count": 19,
+      "count": 23,
       "functions": [
         "try_spawn_from_soldier_damage",
         "_should_spawn_for_source",
@@ -950,6 +950,9 @@
         "_is_owned_ship_recently_changed",
         "_is_soldier_parented_to_owned_ship",
         "_is_valid_world_position",
+        "_is_roof_deck_soldier",
+        "_can_use_roof_surface",
+        "_is_near_roof_before_clamp",
         "_is_near_deck_before_clamp",
         "_debug_reject",
         "_get_or_create_decal_root",
@@ -960,6 +963,7 @@
         "_get_deck_half_extents",
         "_get_deck_half_width_at_z",
         "_clamp_to_deck",
+        "_clamp_to_roof",
         "_is_inside_deck",
         "_get_spill_offset_local"
       ]

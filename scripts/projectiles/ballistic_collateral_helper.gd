@@ -22,6 +22,13 @@ const THROW_ARC_HEIGHT_MIN: float = 1.65
 const THROW_ARC_HEIGHT_MAX: float = 2.25
 const SPLASH_LEAD_PROGRESS: float = 0.96
 const FAILSAFE_DEATH_SECONDS: float = 1.35
+const BALLISTIC_DEATH_PITCH_MIN: float = 1.12
+const BALLISTIC_DEATH_PITCH_MAX: float = 1.32
+const BALLISTIC_DEATH_PITCH_BOOST_CHANCE: float = 0.28
+const BALLISTIC_DEATH_PITCH_BOOST_MIN: float = 1.04
+const BALLISTIC_DEATH_PITCH_BOOST_MAX: float = 1.12
+const BALLISTIC_DEATH_PITCH_CLAMP_MIN: float = 1.08
+const BALLISTIC_DEATH_PITCH_CLAMP_MAX: float = 1.44
 
 
 static func try_apply_from_ship_hit(
@@ -282,10 +289,15 @@ static func _play_ballistic_death_voice(source: Node, position: Vector3) -> void
 	var audio_manager := source.get_node_or_null("/root/AudioManager")
 	if not is_instance_valid(audio_manager) or not audio_manager.has_method("play_sfx"):
 		return
-	var voice_pitch := randf_range(0.74, 1.28)
-	if randf() < 0.34:
-		voice_pitch *= randf_range(0.86, 1.16)
-	audio_manager.play_sfx("ballistic_death", position, clampf(voice_pitch, 0.68, 1.36), 1.5)
+	var voice_pitch := randf_range(BALLISTIC_DEATH_PITCH_MIN, BALLISTIC_DEATH_PITCH_MAX)
+	if randf() < BALLISTIC_DEATH_PITCH_BOOST_CHANCE:
+		voice_pitch *= randf_range(BALLISTIC_DEATH_PITCH_BOOST_MIN, BALLISTIC_DEATH_PITCH_BOOST_MAX)
+	audio_manager.play_sfx(
+		"ballistic_death",
+		position,
+		clampf(voice_pitch, BALLISTIC_DEATH_PITCH_CLAMP_MIN, BALLISTIC_DEATH_PITCH_CLAMP_MAX),
+		1.5
+	)
 
 
 static func _play_overboard_disposal_splash(tree: SceneTree, splash_pos: Vector3) -> void:

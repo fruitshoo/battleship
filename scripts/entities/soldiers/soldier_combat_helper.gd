@@ -212,11 +212,12 @@ static func _stop_tracked_tween(soldier, meta_key: String) -> void:
 	soldier.remove_meta(meta_key)
 
 
-static func check_ranged_combat(soldier, preferred_nearest: Node3D = null) -> void:
+static func check_ranged_combat(soldier, preferred_nearest: Node3D = null, ranged_slot_allowed: Variant = null) -> void:
 	if not soldier.current_weapon or not "max_range" in soldier.current_weapon:
 		return
 	var slot_profile_start := PhysicsFrameProfiler.begin()
-	if not _can_use_ship_ranged_attack_slot(soldier):
+	var can_use_ranged_slot: bool = bool(ranged_slot_allowed) if ranged_slot_allowed != null else _can_use_ship_ranged_attack_slot(soldier)
+	if not can_use_ranged_slot:
 		PhysicsFrameProfiler.end("soldier_ranged_slot_check", slot_profile_start)
 		return
 	PhysicsFrameProfiler.end("soldier_ranged_slot_check", slot_profile_start)
