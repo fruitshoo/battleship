@@ -217,11 +217,11 @@
     },
     "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
       "layer": "entities/soldiers/soldier_ship_helper.gd",
-      "responsibility": "Owns the current soldier ship helper responsibilities; update this baseline when moving behavior across module boundaries."
+      "responsibility": "Owns soldier ship ownership helpers, same-deck target lookup, ranged cross-ship target scan gating, deck clamping, and safe wander target generation."
     },
     "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
       "layer": "entities/soldiers/soldier_ship_spatial_cache_helper.gd",
-      "responsibility": "Owns ship-level soldier spatial caches, deck bucket scans, and cross-ship pair geometry baselines."
+      "responsibility": "Owns ship-level soldier spatial caches, deck bucket scans, nearby enemy/distress ship scan caches, and deck-radius coverage shortcuts."
     },
     "res://scripts/entities/soldiers/soldier_ship_work_priority_helper.gd": {
       "layer": "entities/soldiers/soldier_ship_work_priority_helper.gd",
@@ -426,6 +426,14 @@
     "res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
       "layer": "world/sea_sites/sea_site_reward_helper.gd",
       "responsibility": "Owns sea-site reward application, including upgrades, hull repair, crew training, crew limit, and crew restoration effects."
+    },
+    "res://scripts/projectiles/ballistic_collateral_helper.gd": {
+      "layer": "projectiles/ballistic_collateral_helper.gd",
+      "responsibility": "Owns optional cannon and janggun collateral soldier throws, including candidate selection, overboard arc motion, splash/death finish, cooldowns, and chance gating."
+    },
+    "res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd": {
+      "layer": "entities/ships/ship_enemy_contact_limit_helper.gd",
+      "responsibility": "Owns the shared enemy-vs-enemy ship contact limiting policy, including activation thresholds, pair timeslicing, and mode-specific contact budgets."
     }
   },
   "large_helper_exceptions": {
@@ -442,9 +450,9 @@
     "res://scripts/entities/ships/ship_authoring_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/entities/ships/support_fleet_formation_helper.gd": "Support fleet formation helper owns mixed-role offset, anchor, trail, generated extra-slot lanes, and join-staging geometry; split only with a dedicated formation-geometry extraction.",
     "res://scripts/entities/soldiers/soldier_action_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/entities/soldiers/soldier_ai_helper.gd": "Soldier AI helper still owns the compact idle/wander/move/attack state machine; recent cleanup removed repeated retarget fallback blocks, and a future split should extract movement/target validation deliberately.",
+    "res://scripts/entities/soldiers/soldier_ai_helper.gd": "Soldier AI helper owns the compact idle/wander/move/attack state machine plus lightweight wander movement; split only when movement or target validation is extracted deliberately.",
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
-    "res://scripts/entities/soldiers/soldier_ship_helper.gd": "Accepted current helper size after cross-ship contact and muster-cache expansion; split only with a focused soldier-ship owner-boundary refactor.",
+    "res://scripts/entities/soldiers/soldier_ship_helper.gd": "Soldier ship helper owns target lookup, owner-bound deck clamping, and safe wander target generation after rail-melee removal; split only with a focused soldier-ship boundary refactor.",
     "res://scripts/entities/soldiers/soldier_speech_helper.gd": "Speech helper owns low-frequency contextual soldier lines, visibility, placement, and rowing/battle context gating; split only with a dedicated speech UI owner.",
     "res://scripts/entities/soldiers/soldier_visual_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/managers/enemy_spawner_fleet_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
@@ -458,7 +466,10 @@
     "res://scripts/ui/hud/hud_stat_panel_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/ui/hud/hud_update_helper.gd": "Generated baseline for an existing large helper; split only with a dedicated owner-boundary change.",
     "res://scripts/ui/hud/hud_upgrade_info_helper.gd": "Upgrade info helper owns upgrade-card detail formatting and icon/text presentation; split only with a dedicated upgrade info view-model refactor.",
-    "res://scripts/world/sea_sites/sea_site_reward_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor."
+    "res://scripts/world/sea_sites/sea_site_reward_helper.gd": "Accepted current helper size after support-fleet, HUD, or reward-system expansion; split only with a focused owner-boundary refactor.",
+    "res://scripts/entities/ships/player_ship_movement_helper.gd": "Player ship movement helper now owns cached separation, broad-radius separation checks, sail/rowing movement, and oar visual updates in one input-sensitive loop; split only with a dedicated movement subsystem extraction.",
+    "res://scripts/projectiles/ballistic_collateral_helper.gd": "Ballistic collateral helper owns a complete optional cannon/janggun overboard throw effect pipeline; keep together while the feature remains experimental and removable.",
+    "res://scripts/test/project_contract_upgrade_helper.gd": "Upgrade contract helper covers upgrade card gates, support-card runtime presence, singijeon feedback, and registry isolation smoke tests; split only with a focused upgrade-contract extraction."
   },
   "thin_helper_exceptions": {
     "res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd": "Small debug adapter keeps dynamic debug snapshot assembly out of BaseShip while avoiding gameplay ownership changes.",
@@ -658,6 +669,14 @@
         "res://scripts/entities/ships/base_ship_crew_helper.gd"
       ],
       "reason": "Boarding and crew helpers both need the same hostile-player boarding predicate for different phases of the boarding lifecycle."
+    },
+    {
+      "name": "_is_near_deck_before_clamp",
+      "paths": [
+        "res://scripts/effects/blood_deck_decal_helper.gd",
+        "res://scripts/effects/ship_damage_decal_helper.gd"
+      ],
+      "reason": "Blood and ship damage decals each keep a local deck-proximity predicate because they clamp different decal types and lifecycles."
     },
     {
       "name": "_is_sinking_or_dying",
@@ -922,7 +941,7 @@
       ]
     },
     "res://scripts/effects/blood_deck_decal_helper.gd": {
-      "count": 20,
+      "count": 19,
       "functions": [
         "try_spawn_from_soldier_damage",
         "_should_spawn_for_source",
@@ -946,7 +965,7 @@
       ]
     },
     "res://scripts/effects/ship_damage_decal_helper.gd": {
-      "count": 15,
+      "count": 16,
       "functions": [
         "try_spawn_from_ship_hit",
         "_should_spawn_ship_damage_for_source",
@@ -1066,7 +1085,7 @@
       ]
     },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
-      "count": 48,
+      "count": 53,
       "functions": [
         "get_ship_mass_scale",
         "get_collision_movement_share",
@@ -1099,6 +1118,10 @@
         "_prune_contact_vfx_cache",
         "_play_ship_contact_sfx",
         "_can_play_contact_sfx",
+        "_refresh_strong_collision_rearm",
+        "_is_strong_collision_armed",
+        "_disarm_strong_collision_pair",
+        "_prune_strong_collision_pair_cache",
         "_get_contact_sfx_pair_key",
         "_prune_contact_sfx_cache",
         "_draw_ship_collision_debug",
@@ -1115,6 +1138,7 @@
         "_apply_ramming_impact_resistance",
         "_apply_ramming_knockback",
         "spawn_ship_collision_effects",
+        "_should_skip_collision_vfx_for_lightweight_ship",
         "_spawn_ship_collision_water_splash"
       ]
     },
@@ -1526,7 +1550,7 @@
       ]
     },
     "res://scripts/entities/ships/player_ship_crew_helper.gd": {
-      "count": 49,
+      "count": 51,
       "functions": [
         "get_desired_player_captain_count",
         "is_captain",
@@ -1538,6 +1562,8 @@
         "spawn_player_soldier",
         "get_player_roster_count",
         "sync_player_crew_roster",
+        "_queue_staggered_player_soldier_spawns",
+        "_run_staggered_player_soldier_spawns",
         "add_survivor",
         "add_respawn_crew",
         "_add_player_crew",
@@ -1580,10 +1606,12 @@
       ]
     },
     "res://scripts/entities/ships/player_ship_movement_helper.gd": {
-      "count": 20,
+      "count": 22,
       "functions": [
+        "get_cached_separation",
         "auto_adjust_sail",
         "calculate_separation",
+        "_get_separation_broad_radius",
         "get_boarding_drag_multiplier",
         "update_movement",
         "update_steering",
@@ -1640,7 +1668,7 @@
       ]
     },
     "res://scripts/entities/ships/player_ship_support_helper.gd": {
-      "count": 16,
+      "count": 15,
       "functions": [
         "spawn_or_repair_support_ship",
         "resolve_support_fleet_profile",
@@ -2033,7 +2061,7 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_ai_helper.gd": {
-      "count": 18,
+      "count": 20,
       "functions": [
         "state_idle",
         "state_wander",
@@ -2046,6 +2074,8 @@
         "_is_current_weapon_ranged",
         "_move_toward_point",
         "_move_toward_owned_ship_global_point",
+        "_move_wander_toward_owned_ship_local_point",
+        "_get_ship_deck_height",
         "_move_toward_owned_ship_local_point",
         "_clear_target_and_idle",
         "turn_toward_position",
@@ -2154,7 +2184,7 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
-      "count": 28,
+      "count": 29,
       "functions": [
         "take_damage",
         "get_ship_ranged_cover_reduction",
@@ -2168,6 +2198,7 @@
         "incapacitate",
         "die",
         "_snap_dead_body_to_deck",
+        "_try_start_roof_death_overboard",
         "_is_offboard_death_context",
         "_is_sinking_death_context",
         "_is_ship_sinking_or_dying",
@@ -2187,15 +2218,14 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_ship_helper.gd": {
-      "count": 11,
+      "count": 10,
       "functions": [
         "find_nearest_enemy",
+        "_can_scan_cross_ship_ranged_targets",
         "find_nearest_hostile_on_owned_ship",
-        "is_ship_pair_in_melee_range",
-        "get_cross_ship_engage_ship_distance",
-        "get_cross_ship_engage_max_distance",
         "keep_within_owned_ship_bounds",
         "get_clamped_ship_deck_local",
+        "get_random_wander_deck_local",
         "get_clamped_main_deck_local",
         "_get_ship_soldier_parent",
         "get_ship_deck_half_extents",
@@ -2203,19 +2233,16 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_ship_spatial_cache_helper.gd": {
-      "count": 15,
+      "count": 12,
       "functions": [
         "get_valid_node3d",
         "get_ship_enemy_scan_data",
         "_build_ship_enemy_scan_data",
         "_make_ship_enemy_scan_cache_key",
         "_prune_ship_enemy_scan_cache",
-        "get_ship_pair_geometry",
-        "_build_ship_pair_geometry",
-        "_make_ship_pair_geometry_cache_key",
-        "_prune_ship_pair_geometry_cache",
         "resolve_ship_deck_half_extents",
         "get_ship_deck_bucket_candidates",
+        "_does_radius_cover_ship_deck",
         "_get_ship_deck_bucket_data",
         "_build_ship_deck_bucket_data",
         "_get_ship_deck_bucket_cell",
@@ -2328,9 +2355,12 @@
       ]
     },
     "res://scripts/helpers/input_settings_helper.gd": {
-      "count": 2,
+      "count": 5,
       "functions": [
         "apply_gamepad_confirm_button_layout",
+        "resolve_gamepad_confirm_position",
+        "_get_connected_gamepad_descriptions",
+        "_has_nintendo_layout_device",
         "_replace_gamepad_face_button"
       ]
     },
@@ -2471,7 +2501,7 @@
       ]
     },
     "res://scripts/managers/level_manager_startup_helper.gd": {
-      "count": 14,
+      "count": 15,
       "functions": [
         "initialize",
         "_start_run_music",
@@ -2485,6 +2515,7 @@
         "_prime_visual_resources",
         "_prewarm_scene_pool_instances",
         "_prepare_pool_warm_instance",
+        "_prewarm_runtime_scene",
         "_get_scene_pool_prewarm_count",
         "_env_flag_enabled"
       ]
@@ -2667,11 +2698,12 @@
       ]
     },
     "res://scripts/test/project_contract_recovery_helper.gd": {
-      "count": 29,
+      "count": 30,
       "functions": [
         "run_recovery_effect_contract_smoke",
         "_run_floating_loot_smoke",
         "_run_survivor_smoke",
+        "_run_survivor_support_rescue_redirect_smoke",
         "_run_treasure_chest_smoke",
         "_run_drifting_supply_site_smoke",
         "_run_static_reward_site_smoke",
@@ -2701,7 +2733,7 @@
       ]
     },
     "res://scripts/test/project_contract_runtime_helper.gd": {
-      "count": 65,
+      "count": 66,
       "functions": [
         "run_runtime_smoke",
         "_run_ship_targeting_contract",
@@ -2762,6 +2794,7 @@
         "_has_emitting_particles",
         "_validate_registry_smoke",
         "_validate_spawned_boss",
+        "_validate_spawned_boss_crew_on_deck",
         "_validate_final_boss_victory_on_death",
         "_validate_final_boss_defeat_message",
         "_validate_spawned_ship",
@@ -2771,9 +2804,11 @@
       ]
     },
     "res://scripts/test/project_contract_save_helper.gd": {
-      "count": 9,
+      "count": 11,
       "functions": [
         "run_save_contract_smoke",
+        "_validate_fullscreen_window_mode_updates",
+        "_validate_default_settings",
         "_capture_save_manager_state",
         "_capture_settings_snapshot",
         "_apply_save_manager_state",
@@ -2794,15 +2829,19 @@
       ]
     },
     "res://scripts/test/project_contract_scene_wiring_helper.gd": {
-      "count": 100,
+      "count": 104,
       "functions": [
         "run_scene_wiring_contract_smoke",
         "_run_player_ship_runtime_safety_contract",
         "_run_player_cargo_transport_sequence_contract",
+        "_run_player_boarding_rope_resist_contract",
+        "_run_limbo_ai_default_disabled_contract",
+        "_run_ship_damage_decal_disabled_contract",
         "_validate_soldier_action_definition_catalog",
         "_run_transparent_vfx_render_priority_contract",
         "_expect_file_contains",
         "_expect_scene_loads",
+        "_run_ballistic_collateral_contract",
         "_run_player_cannon_slot_authoring_contract",
         "_find_cannon_slot_marker",
         "_run_player_boarding_anchor_authoring_contract",
@@ -2870,6 +2909,7 @@
         "_expect_min_authoring_count",
         "_expect_authoring_marker_names",
         "_expect_deck_area_polygon",
+        "_expect_crew_slots_on_deck_area",
         "_expect_authoring_visualizer",
         "_expect_no_persisted_authoring_visuals",
         "_expect_runtime_authoring_visuals_absent",
@@ -2883,7 +2923,6 @@
         "_run_soldier_common_action_contract",
         "_run_soldier_ship_work_priority_contract",
         "_validate_soldier_ship_work_priority_table",
-        "_validate_ship_work_target_tracks_moving_ship",
         "_run_soldier_smooth_turn_contract",
         "_run_soldier_attack_validation_contract",
         "_run_boarding_rope_anchor_height_contract",
@@ -2899,8 +2938,9 @@
       ]
     },
     "res://scripts/test/project_contract_support_helper.gd": {
-      "count": 14,
+      "count": 15,
       "functions": [
+        "_run_support_no_retreat_contract",
         "_reconcile_support_fleet",
         "_request_support_spawn",
         "run_support_fleet_contract_smoke",
@@ -2937,15 +2977,20 @@
       ]
     },
     "res://scripts/test/project_contract_upgrade_helper.gd": {
-      "count": 9,
+      "count": 14,
       "functions": [
         "run_upgrade_contract_smoke",
         "_validate_cannon_upgrade_split",
         "_validate_crew_reserve_retired",
         "_validate_crew_weapon_upgrades_do_not_increase_capacity",
+        "_validate_singigeon_arrow_feedback",
         "_validate_support_hull_upgrade_retired",
         "_validate_sailing_upgrade_improves_handling",
         "_validate_panokseon_upgrade_gate",
+        "_validate_panokseon_choice_runtime_presence_gate",
+        "_validate_fleet_signal_choice_runtime_presence_gate",
+        "_clear_support_registry_for_contract",
+        "_restore_support_registry_for_contract",
         "_validate_player_geobukseon_upgrade",
         "_validate_hull_upgrade_split"
       ]
@@ -3092,14 +3137,13 @@
       ]
     },
     "res://scripts/ui/hud/hud_distance_debug_helper.gd": {
-      "count": 9,
+      "count": 8,
       "functions": [
         "toggle_distance_debug",
         "ensure_distance_debug_visualizer",
         "update_distance_debug_display",
         "find_nearest_enemy_ship_for_distance_debug",
         "get_planar_distance",
-        "get_ship_pair_melee_distance_debug",
         "get_player_cannon_range_for_debug",
         "get_cannon_efficiency_for_debug",
         "get_ship_deck_half_extents_for_debug"
@@ -3426,6 +3470,43 @@
         "_notify",
         "_get_hud"
       ]
+    },
+    "res://scripts/projectiles/ballistic_collateral_helper.gd": {
+      "count": 22,
+      "functions": [
+        "try_apply_from_ship_hit",
+        "_throw_collateral_soldiers",
+        "_find_candidate",
+        "_get_outboard_candidate_score",
+        "_is_valid_candidate",
+        "_throw_soldier_overboard",
+        "_resolve_outboard_direction",
+        "_start_ballistic_throw_tween",
+        "_apply_ballistic_throw_arc",
+        "_resolve_projectile_throw_target",
+        "_get_ship_deck_half_extents",
+        "_get_rect_exit_distance",
+        "_play_ballistic_death_voice",
+        "_play_overboard_disposal_splash",
+        "_mark_offboard_splash_played",
+        "_schedule_failsafe_death",
+        "_finish_pending_overboard_death",
+        "_passes_cooldown",
+        "_mark_ship_cooldown",
+        "_get_chance",
+        "_get_extra_throw_chance",
+        "_is_forced"
+      ]
+    },
+    "res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd": {
+      "count": 5,
+      "functions": [
+        "should_limit",
+        "is_timeslice_active",
+        "get_max_collision_contacts",
+        "get_max_guard_checks",
+        "get_pair_hash"
+      ]
     }
   },
   "helper_dependency_baselines": {
@@ -3728,6 +3809,31 @@
       "from": "res://scripts/ui/hud/hud_upgrade_tooltip_helper.gd",
       "to": "res://scripts/ui/hud/hud_upgrade_info_helper.gd",
       "reason": "Current helper boundary requires this helper dependency; revisit when consolidating ownership."
+    },
+    "res://scripts/entities/ships/base_ship_boarding_helper.gd|res://scripts/entities/soldiers/soldier_ship_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/soldiers/soldier_ship_helper.gd",
+      "reason": "Boarding placement uses the soldier ship helper deck clamp so landing and deck bounds stay consistent with soldier movement."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd|res://scripts/entities/ships/player_fleet_role_helper.gd": {
+      "from": "res://scripts/test/project_contract_recovery_helper.gd",
+      "to": "res://scripts/entities/ships/player_fleet_role_helper.gd",
+      "reason": "Recovery contracts inspect support fleet role helpers to verify rescue redirect behavior without duplicating runtime role checks."
+    },
+    "res://scripts/test/project_contract_recovery_helper.gd|res://scripts/entities/ships/support_fleet_state_helper.gd": {
+      "from": "res://scripts/test/project_contract_recovery_helper.gd",
+      "to": "res://scripts/entities/ships/support_fleet_state_helper.gd",
+      "reason": "Recovery contracts use support fleet state helpers to isolate survivor rescue state transitions in smoke tests."
+    },
+    "res://scripts/entities/ships/base_ship_collision_helper.gd|res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd": {
+      "from": "res://scripts/entities/ships/base_ship_collision_helper.gd",
+      "to": "res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd",
+      "reason": "Collision repulsion and movement guards share the enemy-vs-enemy contact limit policy so crowded enemy fleets throttle consistently."
+    },
+    "res://scripts/entities/ships/ai_ship_boarding_helper.gd|res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd": {
+      "from": "res://scripts/entities/ships/ai_ship_boarding_helper.gd",
+      "to": "res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd",
+      "reason": "Boarding neighbor guards use the same enemy-vs-enemy contact limit policy as general ship collision guards."
     }
   },
   "hazard_baselines": {
@@ -4272,9 +4378,9 @@
       "recommended_action": "Revisit when the owning module is actively refactored."
     },
     "large_helper|res://scripts/entities/soldiers/soldier_ship_helper.gd": {
-      "reason": "Cross-ship contact and muster-cache helpers still belong to the soldier-ship owner until a dedicated soldier spatial-boundary refactor is scheduled.",
-      "priority": "medium",
-      "recommended_action": "Split contact-point caching from general soldier ship lookup only when the call sites can move together without widening scene-node access."
+      "reason": "Soldier ship helper owns target lookup, owner-bound deck clamping, and safe wander target generation after rail-melee removal.",
+      "priority": "baseline",
+      "recommended_action": "Split only with a focused soldier-ship boundary refactor."
     },
     "large_helper|res://scripts/entities/soldiers/soldier_speech_helper.gd": {
       "reason": "Speech helper owns low-frequency contextual soldier lines, visibility, placement, and rowing/battle context gating; split only with a dedicated speech UI owner.",
@@ -4375,6 +4481,26 @@
       "reason": "Generated baseline for an existing thin helper; merge only when a clearer owner exists.",
       "priority": "baseline",
       "recommended_action": "Revisit when the owning module is actively refactored."
+    },
+    "large_helper|res://scripts/entities/ships/player_ship_movement_helper.gd": {
+      "reason": "Player ship movement helper now owns cached separation and broad-radius separation checks alongside input-sensitive sail and rowing movement.",
+      "priority": "performance-baseline",
+      "recommended_action": "Extract separation caching or sail-drive math only when player movement is split into dedicated movement subsystems."
+    },
+    "large_helper|res://scripts/projectiles/ballistic_collateral_helper.gd": {
+      "reason": "Ballistic collateral is an experimental optional effect pipeline kept together so it can be tuned or removed as one feature.",
+      "priority": "experimental-feature",
+      "recommended_action": "Split candidate selection, throw motion, and splash/death finish only if ballistic collateral becomes a permanent shared projectile system."
+    },
+    "large_helper|res://scripts/test/project_contract_upgrade_helper.gd": {
+      "reason": "Upgrade contract helper grew with support-card runtime gates and singijeon feedback checks that belong to the upgrade contract suite.",
+      "priority": "test-baseline",
+      "recommended_action": "Split upgrade smoke contracts by card family if this helper grows again."
+    },
+    "duplicate_static_function|_is_near_deck_before_clamp|res://scripts/effects/blood_deck_decal_helper.gd,res://scripts/effects/ship_damage_decal_helper.gd": {
+      "reason": "Blood and ship damage decal helpers each keep a local deck-proximity predicate because the decal placement rules and lifecycles differ.",
+      "priority": "known-local-adapter",
+      "recommended_action": "Move decal deck proximity checks to a shared decal placement helper only if both decal systems are refactored together."
     }
   }
 }

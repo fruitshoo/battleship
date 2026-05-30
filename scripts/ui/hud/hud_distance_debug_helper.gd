@@ -50,7 +50,6 @@ static func update_distance_debug_display(hud) -> void:
 	var collision_distance: float = 0.0
 	if hud.player_ship.has_method("get_collision_distance_to"):
 		collision_distance = float(hud.player_ship.call("get_collision_distance_to", target))
-	var melee_distance: float = get_ship_pair_melee_distance_debug(hud, hud.player_ship, target)
 	var gap_distance: float = planar_distance - collision_distance
 	var cannon_state: String = "IN" if cannon_range > 0.01 and planar_distance <= cannon_range else "OUT"
 	var cannon_efficiency: float = get_cannon_efficiency_for_debug(hud, planar_distance)
@@ -67,14 +66,13 @@ static func update_distance_debug_display(hud) -> void:
 	if is_instance_valid(hud.debug_distance_label):
 		hud.debug_distance_label.visible = true
 		hud.debug_distance_label.add_theme_color_override("font_color", dist_color)
-		hud.debug_distance_label.text = "포 %.1fm [%s %.0f%%] | 거리 %.1fm | 선체 %.1fm (여유 %.1f) | 병사 %.1fm" % [
+		hud.debug_distance_label.text = "포 %.1fm [%s %.0f%%] | 거리 %.1fm | 선체 %.1fm (여유 %.1f)" % [
 			cannon_range,
 			cannon_state,
 			cannon_efficiency * 100.0,
 			planar_distance,
 			collision_distance,
 			gap_distance,
-			melee_distance,
 		]
 
 
@@ -104,15 +102,6 @@ static func find_nearest_enemy_ship_for_distance_debug(hud) -> Node3D:
 
 static func get_planar_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
-
-
-static func get_ship_pair_melee_distance_debug(hud, player: Node3D, other_ship: Node3D) -> float:
-	var base_distance: float = 16.5
-	var my_half_ext: Vector2 = get_ship_deck_half_extents_for_debug(player)
-	var other_half_ext: Vector2 = get_ship_deck_half_extents_for_debug(other_ship)
-	var combined_length: float = my_half_ext.y + other_half_ext.y
-	var size_bonus: float = maxf(0.0, combined_length - 3.4) * 0.6
-	return base_distance + clampf(size_bonus, 0.0, 15.0)
 
 
 static func get_player_cannon_range_for_debug(hud) -> float:

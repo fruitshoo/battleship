@@ -56,41 +56,14 @@ static func _setup_player_status_overlay(hud) -> void:
 	hud.hp_text_label.visible = false
 	hud.hp_bar.add_child(hud.hp_text_label)
 
-	hud.speed_bar = HudGaugeBar.new()
-	hud.speed_bar.name = "Speed"
-	hud.speed_bar.show_percentage = false
-	hud.speed_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.speed_bar.position = Vector2(0.0, hud.PLAYER_STATUS_HP_HEIGHT + hud.PLAYER_STATUS_BAR_GAP)
-	hud.speed_bar.custom_minimum_size = Vector2(hud.PLAYER_STATUS_BAR_WIDTH, hud.PLAYER_STATUS_SPEED_HEIGHT)
-	hud.speed_bar.size = hud.speed_bar.custom_minimum_size
-	hud.speed_bar.min_value = 0.0
-	hud.speed_bar.max_value = 100.0
-	hud.speed_bar.value = 0.0
-	root.add_child(hud.speed_bar)
-	hud.speed_bar.configure_gauge(Color(0.03, 0.04, 0.06, 0.42), NavalUiTheme.STATUS_ACTIVE_BLUE, 1, {
-		"damage_trail": false,
-		"low_pulse": false,
-		"border_color": Color(0.0, 0.0, 0.0, 0.0),
-		"shine_strength": 0.02,
-	})
-
-	hud.speed_bar_label = Label.new()
-	hud.speed_bar_label.name = "SpeedText"
-	hud.speed_bar_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.speed_bar_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hud.speed_bar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud.speed_bar_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hud.speed_bar_label.text = "0.0"
-	hud.speed_bar_label.visible = false
-	NavalUiTheme.style_overlay_value(hud.speed_bar_label, 11)
-	hud.speed_bar_label.add_theme_constant_override("outline_size", 4)
-	hud.speed_bar.add_child(hud.speed_bar_label)
+	hud.speed_bar = null
+	hud.speed_bar_label = null
 
 	hud.boost_bar = HudGaugeBar.new()
 	hud.boost_bar.name = "RamBoost"
 	hud.boost_bar.show_percentage = false
 	hud.boost_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.boost_bar.position = Vector2(0.0, hud.PLAYER_STATUS_HP_HEIGHT + hud.PLAYER_STATUS_BAR_GAP + hud.PLAYER_STATUS_SPEED_HEIGHT + hud.PLAYER_STATUS_BAR_GAP)
+	hud.boost_bar.position = Vector2(0.0, hud.PLAYER_STATUS_HP_HEIGHT + hud.PLAYER_STATUS_BAR_GAP)
 	hud.boost_bar.custom_minimum_size = Vector2(hud.PLAYER_STATUS_BAR_WIDTH, hud.PLAYER_STATUS_BOOST_HEIGHT)
 	hud.boost_bar.size = hud.boost_bar.custom_minimum_size
 	hud.boost_bar.min_value = 0.0

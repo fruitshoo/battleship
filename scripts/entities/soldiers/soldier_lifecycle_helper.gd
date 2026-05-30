@@ -333,6 +333,8 @@ static func die(soldier) -> void:
 		soldier._play_death_pose()
 	else:
 		soldier.visible = false
+	if _try_start_roof_death_overboard(soldier):
+		return
 	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_method("enforce_dead_body_limit"):
 		soldier.owned_ship.call_deferred("enforce_dead_body_limit")
 
@@ -344,6 +346,22 @@ static func _snap_dead_body_to_deck(soldier) -> void:
 		return
 	if soldier.has_method("_keep_within_owned_ship_bounds"):
 		soldier._keep_within_owned_ship_bounds()
+
+
+static func _try_start_roof_death_overboard(soldier) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if soldier.team != "enemy":
+		return false
+	if not SoldierDeckZoneHelper.is_roof(soldier):
+		return false
+	if not is_instance_valid(soldier.owned_ship):
+		return false
+	if str(soldier.owned_ship.get("team")) != "player":
+		return false
+	if not soldier.owned_ship.has_method("try_throw_roof_death_overboard"):
+		return false
+	return bool(soldier.owned_ship.call("try_throw_roof_death_overboard", soldier))
 
 
 static func _is_offboard_death_context(soldier) -> bool:

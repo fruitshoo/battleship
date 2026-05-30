@@ -2,6 +2,7 @@ extends RefCounted
 
 const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_visual_helper.gd")
 const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
 const ATTACK_COOLDOWN_TEMPO_MULT := 1.12
 const SHIP_RANGED_ATTACKER_RATIO := 0.5
@@ -211,21 +212,28 @@ static func _stop_tracked_tween(soldier, meta_key: String) -> void:
 	soldier.remove_meta(meta_key)
 
 
-static func check_ranged_combat(soldier) -> void:
+static func check_ranged_combat(soldier, preferred_nearest: Node3D = null) -> void:
 	if not soldier.current_weapon or not "max_range" in soldier.current_weapon:
 		return
+	var slot_profile_start := PhysicsFrameProfiler.begin()
 	if not _can_use_ship_ranged_attack_slot(soldier):
+		PhysicsFrameProfiler.end("soldier_ranged_slot_check", slot_profile_start)
 		return
+	PhysicsFrameProfiler.end("soldier_ranged_slot_check", slot_profile_start)
 
 	var attack_cooldown := get_effective_attack_cooldown(soldier, 2.0)
 	if soldier.attack_timer > 0:
 		return
 
-	var target = find_ranged_target(soldier)
+	var target_profile_start := PhysicsFrameProfiler.begin()
+	var target = find_ranged_target(soldier, preferred_nearest)
+	PhysicsFrameProfiler.end("soldier_ranged_find_target", target_profile_start)
 	if target:
+		var attack_profile_start := PhysicsFrameProfiler.begin()
 		soldier.current_target = target
 		perform_attack(soldier)
 		soldier.attack_timer = attack_cooldown
+		PhysicsFrameProfiler.end("soldier_ranged_perform_attack", attack_profile_start)
 
 
 static func _can_use_ship_ranged_attack_slot(soldier) -> bool:
@@ -277,10 +285,10 @@ static func _is_ranged_slot_candidate(candidate) -> bool:
 	return true
 
 
-static func find_ranged_target(soldier) -> Node3D:
+static func find_ranged_target(soldier, preferred_nearest: Node3D = null) -> Node3D:
 	var max_range = soldier.current_weapon.attack_range if soldier.current_weapon and "attack_range" in soldier.current_weapon else 20.0
 
-	var nearest = soldier.find_nearest_enemy()
+	var nearest = preferred_nearest if is_instance_valid(preferred_nearest) else soldier.find_nearest_enemy()
 	if is_instance_valid(nearest):
 		var dist_xz = Vector2(soldier.global_position.x - nearest.global_position.x, soldier.global_position.z - nearest.global_position.z).length()
 		if dist_xz <= max_range:

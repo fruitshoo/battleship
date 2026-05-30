@@ -7,6 +7,7 @@ const AIShipLifecycleHelper = preload("res://scripts/entities/ships/ai_ship_life
 const ShipAIIntentHelper = preload("res://scripts/entities/ships/ship_ai_intent_helper.gd")
 const ShipAuthoringHelper = preload("res://scripts/entities/ships/ship_authoring_helper.gd")
 const SoldierShipHelper = preload("res://scripts/entities/soldiers/soldier_ship_helper.gd")
+const BOSS_SOLDIER_SPAWNS_PER_FRAME := 1
 
 ## 보스 함선 (Boss Ship)
 ## 거대한 체력, 다수의 포대, 선회 포격 AI
@@ -55,6 +56,8 @@ var _limbo_ai_tick_timer: float = 0.0
 var _limbo_ai_tick_accum: float = 0.0
 var separation_force: Vector3 = Vector3.ZERO
 var separation_timer: float = 0.0
+var _pending_boss_soldier_spawn_transforms: Array[Transform3D] = []
+var _pending_boss_soldier_spawn_index: int = 0
 
 @export var ship_type: String = "atakebune_mid":
 	set(value):
@@ -176,26 +179,49 @@ func _setup_soldiers() -> void:
 		soldiers_node.position = Vector3(0, 1.0, 0)
 	
 	var spawn_transforms: Array[Transform3D] = _get_boss_soldier_spawn_transforms(maxi(crew_composition.size(), 4), soldiers_node as Node3D)
-	
-	var i = 0
-	for spawn_transform in spawn_transforms:
-		var s = soldier_scene.instantiate()
-		var soldier_type_name: String = _get_crew_type_for_index(i)
-		s.team = "enemy"
-		s.owned_ship = self
-		s.home_ship = self
-		_configure_boss_soldier(s, soldier_type_name)
-		
-		# 보스 병사는 엘리트급 체력/데미지 보너스
-		s.max_health = 150.0
-		s.current_health = s.max_health
-		s.attack_damage = 15.0
-			
-		soldiers_node.add_child(s)
-		s.transform = spawn_transform
-		s.set_team("enemy")
-		_configure_boss_soldier(s, soldier_type_name)
-		i += 1
+	_pending_boss_soldier_spawn_transforms = spawn_transforms
+	_pending_boss_soldier_spawn_index = 0
+
+
+func _spawn_pending_boss_soldiers() -> void:
+	if _pending_boss_soldier_spawn_transforms.is_empty():
+		return
+	var soldiers_node := get_soldiers_container()
+	if not is_instance_valid(soldiers_node):
+		_pending_boss_soldier_spawn_transforms.clear()
+		return
+	var spawn_limit := mini(
+		_pending_boss_soldier_spawn_index + BOSS_SOLDIER_SPAWNS_PER_FRAME,
+		_pending_boss_soldier_spawn_transforms.size()
+	)
+	while _pending_boss_soldier_spawn_index < spawn_limit:
+		_spawn_boss_soldier_at(
+			soldiers_node,
+			_pending_boss_soldier_spawn_transforms[_pending_boss_soldier_spawn_index],
+			_pending_boss_soldier_spawn_index
+		)
+		_pending_boss_soldier_spawn_index += 1
+	if _pending_boss_soldier_spawn_index >= _pending_boss_soldier_spawn_transforms.size():
+		_pending_boss_soldier_spawn_transforms.clear()
+
+
+func _spawn_boss_soldier_at(soldiers_node: Node, spawn_transform: Transform3D, index: int) -> void:
+	var s = soldier_scene.instantiate()
+	var soldier_type_name: String = _get_crew_type_for_index(index)
+	s.team = "enemy"
+	s.owned_ship = self
+	s.home_ship = self
+	_configure_boss_soldier(s, soldier_type_name)
+
+	# 보스 병사는 엘리트급 체력/데미지 보너스
+	s.max_health = 150.0
+	s.current_health = s.max_health
+	s.attack_damage = 15.0
+
+	soldiers_node.add_child(s)
+	s.transform = spawn_transform
+	s.set_team("enemy")
+	_configure_boss_soldier(s, soldier_type_name)
 
 
 func _load_crew_composition_from_stats(stats: Dictionary) -> void:
@@ -260,6 +286,7 @@ func _configure_boss_soldier(soldier, soldier_type_name: String) -> void:
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint(): return
 	if is_dying: return
+	_spawn_pending_boss_soldiers()
 	
 	var system_profile_start := PhysicsProfiler.begin()
 	_update_fire_effect()

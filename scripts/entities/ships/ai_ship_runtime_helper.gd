@@ -386,6 +386,7 @@ static func process_physics(ship, delta: float) -> void:
 	if ship.has_method("is_combat_disabled") and ship.is_combat_disabled():
 		return
 
+	var update_profile_start := PhysicsFrameProfiler.begin()
 	update_wave_sounds(ship, delta)
 
 	ship.logic_timer -= delta
@@ -414,8 +415,10 @@ static func process_physics(ship, delta: float) -> void:
 				ship.remove_meta("boarding_impact_target_id")
 		else:
 			ship.set_meta("boarding_impact_grace_timer", impact_grace_timer)
+	PhysicsFrameProfiler.end("ai_ship_runtime_timers", update_profile_start)
 
 	if ship.is_derelict:
+		var derelict_profile_start := PhysicsFrameProfiler.begin()
 		var derelict_impulse: Vector3 = ship.consume_collision_impulse_velocity(delta)
 		if derelict_impulse.length_squared() > 0.0001:
 			ship.position += derelict_impulse * delta
@@ -432,9 +435,12 @@ static func process_physics(ship, delta: float) -> void:
 
 		if do_logic_update:
 			ship._check_offscreen_despawn()
+		PhysicsFrameProfiler.end("ai_ship_derelict_motion", derelict_profile_start)
 		return
 
+	var crew_alloc_profile_start := PhysicsFrameProfiler.begin()
 	ship.update_crew_allocation_state(delta)
+	PhysicsFrameProfiler.end("ai_ship_crew_allocation", crew_alloc_profile_start)
 
 	if do_logic_update:
 		var logic_profile_start := PhysicsFrameProfiler.begin()
@@ -458,12 +464,15 @@ static func process_physics(ship, delta: float) -> void:
 	if not is_instance_valid(_target_ship(ship)):
 		ship._set_wake_state(false)
 		return
+	var target_profile_start := PhysicsFrameProfiler.begin()
 	var current_target: Node3D = _target_ship(ship)
 	var raw_dist_to_target: float = ship.global_position.distance_to(current_target.global_position)
+	PhysicsFrameProfiler.end("ai_ship_target_distance", target_profile_start)
 
 	var nav_profile_start := PhysicsFrameProfiler.begin()
 	var nav := _get_navigation_cached(ship, current_target, delta, raw_dist_to_target)
 	PhysicsFrameProfiler.end("ai_ship_navigation", nav_profile_start)
+	var nav_unpack_profile_start := PhysicsFrameProfiler.begin()
 	var target_pos: Vector3 = ShipMovementIntent.get_target_pos(nav, current_target.global_position)
 	var desired_point: Vector3 = ShipMovementIntent.get_desired_point(nav, current_target.global_position)
 	var heading_point: Vector3 = ShipMovementIntent.get_heading_point(nav, desired_point)
@@ -471,21 +480,33 @@ static func process_physics(ship, delta: float) -> void:
 	var desired_speed_mult: float = ShipMovementIntent.get_desired_speed_mult(nav)
 	var permit_sprint: bool = ShipMovementIntent.get_permit_sprint(nav)
 	var dir_to_target: Vector3 = ShipMovementIntent.get_dir_to_target(nav, Vector3.ZERO)
+	PhysicsFrameProfiler.end("ai_ship_navigation_unpack", nav_unpack_profile_start)
 
 	var boarding_profile_start := PhysicsFrameProfiler.begin()
+	var boarding_eligibility_profile_start := PhysicsFrameProfiler.begin()
 	var can_attempt_boarding := not _is_gunner(ship) and _can_board(ship)
+	PhysicsFrameProfiler.end("ai_ship_boarding_eligibility", boarding_eligibility_profile_start)
 	var boarding_attempt_distance := 0.0
 	var target_can_be_boarded := false
 	if can_attempt_boarding:
+		var boarding_window_profile_start := PhysicsFrameProfiler.begin()
 		var boarding_window := _get_boarding_window_cached(ship, current_target, delta, raw_dist_to_target)
+		PhysicsFrameProfiler.end("ai_ship_boarding_window", boarding_window_profile_start)
 		boarding_attempt_distance = float(boarding_window.get("attempt_distance", 0.0))
 		target_can_be_boarded = bool(boarding_window.get("target_can_be_boarded", false))
 	if can_attempt_boarding and target_can_be_boarded and dist_to_target <= boarding_attempt_distance:
-		if ShipAIIntentHelper.allows_boarding_attempt(ship, current_target):
+		var boarding_eval_profile_start := PhysicsFrameProfiler.begin()
+		var boarding_intent_profile_start := PhysicsFrameProfiler.begin()
+		var intent_allowed := ShipAIIntentHelper.allows_boarding_attempt(ship, current_target)
+		PhysicsFrameProfiler.end("ai_ship_boarding_intent", boarding_intent_profile_start)
+		if intent_allowed:
+			var boarding_alignment_profile_start := PhysicsFrameProfiler.begin()
 			var can_side_board: bool = ship.has_method("_is_side_boarding_approach") and ship.call("_is_side_boarding_approach", current_target)
 			var can_force_head_on: bool = ship.has_method("_can_force_head_on_boarding") and ship.call("_can_force_head_on_boarding", current_target)
 			var can_force_cleanup: bool = ship.has_method("_can_force_cleanup_boarding") and ship.call("_can_force_cleanup_boarding", current_target)
 			var can_latched_board: bool = ship.has_method("_can_start_boarding_latched") and ship.call("_can_start_boarding_latched", current_target, dist_to_target, can_side_board, can_force_head_on, can_force_cleanup, delta)
+			PhysicsFrameProfiler.end("ai_ship_boarding_alignment", boarding_alignment_profile_start)
+			var boarding_direct_profile_start := PhysicsFrameProfiler.begin()
 			var direct_board_pad: float = 0.35
 			if ship.has_method("get_team_tag") and ship.call("get_team_tag") == "enemy":
 				direct_board_pad += 0.15
@@ -493,21 +514,33 @@ static func process_physics(ship, delta: float) -> void:
 			if ship.has_method("get_collision_distance_to"):
 				direct_board_distance = maxf(direct_board_distance, float(ship.call("get_collision_distance_to", current_target)) + 0.85)
 			var can_direct_board: bool = (can_side_board or can_force_head_on or can_force_cleanup) and dist_to_target <= direct_board_distance
+			PhysicsFrameProfiler.end("ai_ship_boarding_direct", boarding_direct_profile_start)
+			var boarding_impact_profile_start := PhysicsFrameProfiler.begin()
 			var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
+			PhysicsFrameProfiler.end("ai_ship_boarding_impact", boarding_impact_profile_start)
 			if (can_latched_board or can_direct_board) and impact_confirmed:
 				if ship.has_method("_board_ship"):
+					var boarding_start_profile_start := PhysicsFrameProfiler.begin()
 					ship.call("_board_ship", current_target)
+					PhysicsFrameProfiler.end("ai_ship_boarding_start", boarding_start_profile_start)
 					if ship.is_boarding:
+						PhysicsFrameProfiler.end("ai_ship_boarding_eval", boarding_eval_profile_start)
 						PhysicsFrameProfiler.end("ai_ship_boarding_attempt", boarding_profile_start)
 						ship._process_boarding(delta)
 						return
 		elif ship.has_method("_decay_boarding_latch"):
+			var boarding_decay_profile_start := PhysicsFrameProfiler.begin()
 			ship.call("_decay_boarding_latch", current_target, delta)
+			PhysicsFrameProfiler.end("ai_ship_boarding_decay", boarding_decay_profile_start)
+		PhysicsFrameProfiler.end("ai_ship_boarding_eval", boarding_eval_profile_start)
 	elif ship.has_method("_decay_boarding_latch"):
+		var boarding_decay_profile_start := PhysicsFrameProfiler.begin()
 		ship.call("_decay_boarding_latch", current_target, delta)
+		PhysicsFrameProfiler.end("ai_ship_boarding_decay", boarding_decay_profile_start)
 	PhysicsFrameProfiler.end("ai_ship_boarding_attempt", boarding_profile_start)
 
 	var motion_profile_start := PhysicsFrameProfiler.begin()
+	var motion_intent_profile_start := PhysicsFrameProfiler.begin()
 	var move_vector = desired_point - ship.global_position
 	move_vector.y = 0.0
 	var move_dir = move_vector.normalized() if move_vector.length_squared() > 0.001 else Vector3.ZERO
@@ -530,6 +563,9 @@ static func process_physics(ship, delta: float) -> void:
 		close_turn_blend = clamp(1.0 - (dist_to_target / ship.ai_close_turn_soft_radius), 0.0, 1.0)
 	var close_turn_factor = lerp(1.0, ship.ai_close_turn_scale, close_turn_blend)
 	desired_rudder *= close_turn_factor
+	PhysicsFrameProfiler.end("ai_ship_motion_intent", motion_intent_profile_start)
+
+	var motion_speed_profile_start := PhysicsFrameProfiler.begin()
 	var rudder_speed_adjusted = ship.ai_rudder_response_speed * ship.get_rudder_response_multiplier()
 	ship.rudder_angle = move_toward(ship.rudder_angle, desired_rudder, rudder_speed_adjusted * delta)
 
@@ -561,7 +597,9 @@ static func process_physics(ship, delta: float) -> void:
 		ship.current_speed = move_toward(ship.current_speed, desired_speed, ship.acceleration * delta)
 	else:
 		ship.current_speed = move_toward(ship.current_speed, desired_speed, ship.deceleration * delta)
+	PhysicsFrameProfiler.end("ai_ship_motion_speed", motion_speed_profile_start)
 
+	var motion_velocity_profile_start := PhysicsFrameProfiler.begin()
 	var wind_mult: float = _calculate_sail_drive_multiplier(ship) * ship.get_shiphandling_multiplier()
 	if ship.current_speed > 0.1:
 		var speed_ratio = clamp(ship.current_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
@@ -576,9 +614,11 @@ static func process_physics(ship, delta: float) -> void:
 	velocity += ship.separation_force
 	velocity += ship._calculate_boarding_pull_velocity(delta)
 	velocity += ship.consume_collision_impulse_velocity(delta)
+	PhysicsFrameProfiler.end("ai_ship_motion_velocity", motion_velocity_profile_start)
 	var repulsion_profile_start := PhysicsFrameProfiler.begin()
 	var collision_repulsion = ship._calculate_collision_repulsion()
 	PhysicsFrameProfiler.end("ai_ship_motion_collision_repulsion", repulsion_profile_start)
+	var repulsion_apply_profile_start := PhysicsFrameProfiler.begin()
 	if not _is_gunner(ship) and target_can_be_boarded and dist_to_target < ship.max_boarding_distance + 1.2:
 		var to_target_flat = ship.target.global_position - ship.global_position
 		to_target_flat.y = 0.0
@@ -587,6 +627,7 @@ static func process_physics(ship, delta: float) -> void:
 			if approach_dot > 0.3:
 				collision_repulsion *= 0.35
 	velocity += collision_repulsion * delta
+	PhysicsFrameProfiler.end("ai_ship_motion_repulsion_apply", repulsion_apply_profile_start)
 	PhysicsFrameProfiler.end("ai_ship_motion_math", motion_profile_start)
 	_draw_ai_intent_debug(
 		ship,
@@ -616,7 +657,9 @@ static func process_physics(ship, delta: float) -> void:
 		next_pos = ship._apply_ship_collision_guard(current_target, prev_pos, next_pos, 0.88, velocity.length())
 	next_pos = ship._apply_neighbor_ship_guards(prev_pos, next_pos, current_target)
 	PhysicsFrameProfiler.end("ai_ship_collision_guards", guard_profile_start)
+	var apply_position_profile_start := PhysicsFrameProfiler.begin()
 	ship.global_position = next_pos
+	PhysicsFrameProfiler.end("ai_ship_apply_position", apply_position_profile_start)
 
 	var visual_profile_start := PhysicsFrameProfiler.begin()
 	ship._update_rudder_visual()

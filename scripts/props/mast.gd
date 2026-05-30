@@ -283,6 +283,12 @@ func set_sail_view_fade_alpha(alpha: float) -> void:
 	var target_alpha: float = clampf(alpha, 0.0, 1.0)
 	_sail_view_fade_target_alpha = target_alpha
 
+func get_sail_view_fade_alpha() -> float:
+	return _sail_view_fade_alpha
+
+func get_sail_view_fade_target_alpha() -> float:
+	return _sail_view_fade_target_alpha
+
 func _update_sail_view_fade(delta: float) -> void:
 	if is_equal_approx(_sail_view_fade_alpha, _sail_view_fade_target_alpha):
 		return

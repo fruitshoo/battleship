@@ -33,8 +33,11 @@ exports/Battleship-v0.4.1-alpha-windows.zip
 When asked to make a Windows build, Codex should:
 
 1. Read `config/version` from `project.godot`.
-2. Export the Windows preset using that exact version string.
-3. Name the folder and zip with `v{version}`.
-4. Mention the version and output path in the final response.
+2. Update `CHANGELOG.md` for the version being exported. Keep it short and
+   player/tester-facing; mention if there were no user-visible changes.
+3. Export the Windows preset using that exact version string.
+4. Name the folder and zip with `v{version}`.
+5. Mention the version, changelog summary, and output path in the final
+   response.
 
 Use `scripts/dev/export_windows_release.sh` for this workflow.

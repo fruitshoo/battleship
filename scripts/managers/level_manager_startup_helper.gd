@@ -121,7 +121,30 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 		preload("res://scenes/ships/enemy_melee_ship.tscn"),
 		preload("res://scenes/ships/enemy_gunner_ship.tscn"),
 		preload("res://scenes/ships/enemy_firepot_ship.tscn"),
-		preload("res://scenes/ships/boss_ship.tscn"),
+	]
+	var runtime_scenes_to_warm = [
+		{
+			"scene": preload("res://scenes/entities/soldiers/soldier.tscn"),
+			"properties": {
+				"team": "enemy",
+				"crew_role": "daecheolpo",
+				"is_ranged_only": true,
+			},
+		},
+		{
+			"scene": preload("res://scenes/ships/boss_ship.tscn"),
+			"properties": {
+				"ship_type": "atakebune_mid",
+				"tier": 1,
+			},
+		},
+		{
+			"scene": preload("res://scenes/ships/boss_ship.tscn"),
+			"properties": {
+				"ship_type": "atakebune_final",
+				"tier": 2,
+			},
+		},
 	]
 
 	var container := Node3D.new()
@@ -162,6 +185,15 @@ static func prewarm_shaders(lm: Node, show_blocking_overlay: bool = true, includ
 			inst.free()
 			if not show_blocking_overlay:
 				await lm.get_tree().process_frame
+
+	for entry in runtime_scenes_to_warm:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var scene: PackedScene = entry.get("scene", null) as PackedScene
+		var properties: Dictionary = entry.get("properties", {}) as Dictionary
+		await _prewarm_runtime_scene(lm, container, scene, properties)
+		if not show_blocking_overlay:
+			await lm.get_tree().process_frame
 
 	if not AudioManager.is_prewarm_finished:
 		await AudioManager.prewarm_finished
@@ -279,6 +311,27 @@ static func _prepare_pool_warm_instance(tree: SceneTree, inst: Node) -> void:
 	_prime_visual_resources(inst)
 	if inst.has_method("pool_reset"):
 		inst.call("pool_reset")
+
+
+static func _prewarm_runtime_scene(lm: Node, container: Node3D, scene: PackedScene, properties: Dictionary) -> void:
+	if not is_instance_valid(lm) or not is_instance_valid(container) or scene == null:
+		return
+	var inst := scene.instantiate()
+	if not is_instance_valid(inst):
+		return
+	for property_name_variant in properties.keys():
+		var property_name := str(property_name_variant)
+		if property_name in inst:
+			inst.set(property_name, properties[property_name_variant])
+	_mark_prewarm_recursive(inst)
+	_prepare_prewarmer_visual_instance(inst)
+	if inst is Node3D:
+		(inst as Node3D).visible = false
+	container.add_child(inst)
+	_prime_visual_resources(inst)
+	await lm.get_tree().process_frame
+	if is_instance_valid(inst):
+		inst.queue_free()
 
 
 static func _get_scene_pool_prewarm_count(scene: PackedScene) -> int:

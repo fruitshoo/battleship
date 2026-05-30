@@ -34,7 +34,6 @@ static func apply_layout_density(hud) -> void:
 	var panel_gap := roundi(lerpf(8.0, 10.0, density))
 	var player_status_width := roundf(lerpf(124.0, 136.0, density))
 	var player_status_hp_height := roundf(lerpf(8.0, 10.0, density))
-	var player_status_speed_height := roundf(lerpf(6.0, 8.0, density))
 	var boss_width := roundf(lerpf(420.0, 560.0, density))
 	var boss_height := roundf(lerpf(12.0, 16.0, density))
 	var boss_gap := roundf(lerpf(5.0, 7.0, density))
@@ -123,7 +122,7 @@ static func apply_layout_density(hud) -> void:
 		hud.support_slot_container.add_theme_constant_override("separation", roundi(lerpf(4.0, 6.0, density)))
 	if is_instance_valid(hud.player_status_root):
 		var player_status_boost_layout_height := roundf(lerpf(4.0, hud.PLAYER_STATUS_BOOST_HEIGHT, density))
-		var player_status_height: float = player_status_hp_height + player_status_speed_height + player_status_boost_layout_height + float(hud.PLAYER_STATUS_BAR_GAP * 2.0)
+		var player_status_height: float = player_status_hp_height + player_status_boost_layout_height + float(hud.PLAYER_STATUS_BAR_GAP)
 		hud.player_status_root.custom_minimum_size = Vector2(player_status_width, player_status_height)
 		hud.player_status_root.size = hud.player_status_root.custom_minimum_size
 	if is_instance_valid(hud.hp_bar):
@@ -133,15 +132,11 @@ static func apply_layout_density(hud) -> void:
 		hud.hp_text_label.visible = false
 	if is_instance_valid(hud.stamina_bar):
 		hud.stamina_bar.visible = false
-	if is_instance_valid(hud.speed_bar):
-		hud.speed_bar.position = Vector2(0.0, player_status_hp_height + hud.PLAYER_STATUS_BAR_GAP)
-		hud.speed_bar.custom_minimum_size = Vector2(player_status_width, player_status_speed_height)
-		hud.speed_bar.size = hud.speed_bar.custom_minimum_size
 	if is_instance_valid(hud.speed_bar_label):
 		hud.speed_bar_label.visible = false
 	if is_instance_valid(hud.boost_bar):
 		var boost_bar_height := roundf(lerpf(4.0, hud.PLAYER_STATUS_BOOST_HEIGHT, density))
-		hud.boost_bar.position = Vector2(0.0, player_status_hp_height + hud.PLAYER_STATUS_BAR_GAP + player_status_speed_height + hud.PLAYER_STATUS_BAR_GAP)
+		hud.boost_bar.position = Vector2(0.0, player_status_hp_height + hud.PLAYER_STATUS_BAR_GAP)
 		hud.boost_bar.custom_minimum_size = Vector2(player_status_width, boost_bar_height)
 		hud.boost_bar.size = hud.boost_bar.custom_minimum_size
 

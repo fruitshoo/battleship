@@ -12,6 +12,8 @@ const FORCE_ENV := "BATTLESHIP_FORCE_BALLISTIC_COLLATERAL"
 
 const CANNON_CHANCE: float = 0.045
 const JANGGUN_CHANCE: float = 0.07
+const EXTRA_THROW_CHANCE: float = 0.18
+const MAX_THROW_COUNT: int = 2
 const SHIP_COOLDOWN_SECONDS: float = 1.0
 const THROW_DURATION: float = 0.68
 const THROW_EXIT_PAD_MIN: float = 1.8
@@ -40,13 +42,30 @@ static func try_apply_from_ship_hit(
 		if randf() > _get_chance(projectile_kind):
 			return false
 
-	var soldier := _find_candidate(hit_ship, impact_position)
-	if not is_instance_valid(soldier):
+	var throw_count := _throw_collateral_soldiers(source, hit_ship, impact_position, projectile_kind, projectile_direction)
+	if throw_count <= 0:
 		return false
-
 	_mark_ship_cooldown(hit_ship)
-	_throw_soldier_overboard(source, soldier, hit_ship, impact_position, projectile_direction)
 	return true
+
+
+static func _throw_collateral_soldiers(
+	source: Node,
+	hit_ship: Node3D,
+	impact_position: Vector3,
+	projectile_kind: String,
+	projectile_direction: Vector3
+) -> int:
+	var throw_count := 0
+	for index in range(MAX_THROW_COUNT):
+		if index > 0 and randf() > _get_extra_throw_chance(projectile_kind):
+			break
+		var soldier := _find_candidate(hit_ship, impact_position)
+		if not is_instance_valid(soldier):
+			break
+		_throw_soldier_overboard(source, soldier, hit_ship, impact_position, projectile_direction)
+		throw_count += 1
+	return throw_count
 
 
 static func _find_candidate(hit_ship: Node3D, impact_position: Vector3) -> Node3D:
@@ -338,6 +357,10 @@ static func _get_chance(projectile_kind: String) -> float:
 			return JANGGUN_CHANCE
 		_:
 			return CANNON_CHANCE
+
+
+static func _get_extra_throw_chance(_projectile_kind: String) -> float:
+	return EXTRA_THROW_CHANCE
 
 
 static func _is_forced() -> bool:

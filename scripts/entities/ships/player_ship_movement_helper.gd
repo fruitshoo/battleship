@@ -1,5 +1,6 @@
 extends RefCounted
 
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 const SAIL_DOWNWIND_START := -0.45
 const SAIL_DOWNWIND_FULL := 0.78
 const SAIL_TAILWIND_BONUS_START := 0.45
@@ -29,6 +30,23 @@ const WIND_STRENGTH_DEFAULT_MIN := 0.72
 const WIND_STRENGTH_DEFAULT_MAX := 0.88
 const WIND_SPEED_MULT_MIN := 0.92
 const WIND_SPEED_MULT_MAX := 1.08
+const SEPARATION_TRIGGER_PAD := 0.12
+const SEPARATION_BROAD_PHASE_EXTRA_PAD := 0.45
+
+static func get_cached_separation(ship, delta: float) -> Vector3:
+	if ship.get_meta("derelict_nonblocking", false) == true:
+		ship._player_separation_force = Vector3.ZERO
+		ship._player_separation_timer = 0.0
+		return Vector3.ZERO
+
+	var interval := 0.08
+	if "player_separation_update_interval" in ship:
+		interval = maxf(0.02, float(ship.player_separation_update_interval))
+	ship._player_separation_timer -= delta
+	if ship._player_separation_timer <= 0.0:
+		ship._player_separation_timer = interval
+		ship._player_separation_force = calculate_separation(ship)
+	return ship._player_separation_force
 
 static func auto_adjust_sail(ship, delta: float) -> void:
 	if not is_instance_valid(ship._cached_wind_manager) or not ship._cached_wind_manager.has_method("get_wind_direction"):
@@ -45,13 +63,29 @@ static func calculate_separation(ship) -> Vector3:
 	if ship.get_meta("derelict_nonblocking", false) == true:
 		return Vector3.ZERO
 
+	var profile_start := PhysicsFrameProfiler.begin()
 	var force = Vector3.ZERO
 	var neighbors = ship._get_ships_cached(ship.get_tree())
-	var _max_checks = min(neighbors.size(), 12)
+	var ship_broad_radius := _get_separation_broad_radius(ship)
 	for other in neighbors:
-		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
+		if other == ship or not is_instance_valid(other):
+			continue
+		var offset = other.global_position - ship.global_position
+		offset.y = 0.0
+		var dist_sq = offset.length_squared()
+		if dist_sq <= 0.01:
+			continue
+		var broad_trigger_dist := ship_broad_radius + _get_separation_broad_radius(other) + SEPARATION_TRIGGER_PAD + SEPARATION_BROAD_PHASE_EXTRA_PAD
+		if dist_sq > broad_trigger_dist * broad_trigger_dist:
+			continue
+		if other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying():
 			continue
 		if other.get_meta("derelict_nonblocking", false) == true:
+			continue
+		var dist = sqrt(dist_sq)
+		var coll_dist = ship.get_collision_distance_to(other)
+		var separation_trigger_dist = coll_dist + SEPARATION_TRIGGER_PAD
+		if dist >= separation_trigger_dist:
 			continue
 		if ship.has_method("is_boarding_ship") and ship.is_boarding_ship() and other == ship.get_boarding_target_ship():
 			continue
@@ -66,30 +100,35 @@ static func calculate_separation(ship) -> Vector3:
 					is_my_boarding_approach_target = true
 				elif ship.get("target") == other and ShipCombatModeHelper.can_be_boarded(other, ship):
 					var attempt_distance: float = ShipContactGeometry.get_boarding_attempt_distance(ship, other)
-					is_my_boarding_approach_target = ship.global_position.distance_to(other.global_position) <= attempt_distance
+					is_my_boarding_approach_target = dist <= attempt_distance
 		if is_my_boarding_approach_target:
 			continue
-		var offset = other.global_position - ship.global_position
-		offset.y = 0.0
-		var dist_sq = offset.length_squared()
-		if dist_sq <= 0.01:
-			continue
-		var dist = sqrt(dist_sq)
-		var coll_dist = ship.get_collision_distance_to(other)
 		var is_enemy_attacker = false
 		if other.has_method("is_enemy_team") and other.is_enemy_team():
 			is_enemy_attacker = (other.get("target") == ship or (other.has_method("get_boarding_target_ship") and other.get_boarding_target_ship() == ship))
 		if is_enemy_attacker and dist < coll_dist + 1.0:
 			continue
-		var separation_trigger_dist = coll_dist + 0.12
-		if dist < separation_trigger_dist:
-			var push_dir = -offset / max(dist, 0.001)
-			var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
-			var strength = pow(ratio, 2.0)
-			force += push_dir * strength * 1.8 * BaseShipCollisionHelper.get_collision_movement_share(ship, other)
+		var push_dir = -offset / max(dist, 0.001)
+		var ratio = (separation_trigger_dist - dist) / max(separation_trigger_dist, 0.001)
+		var strength = pow(ratio, 2.0)
+		force += push_dir * strength * 1.8 * BaseShipCollisionHelper.get_collision_movement_share(ship, other)
+	PhysicsFrameProfiler.end("player_ship_separation", profile_start)
 	return force
 
+
+static func _get_separation_broad_radius(ship) -> float:
+	if not is_instance_valid(ship):
+		return 4.5
+	if ship.has_method("get_collision_half_extents"):
+		var half_extents: Vector2 = ship.call("get_collision_half_extents")
+		return maxf(half_extents.x, half_extents.y)
+	var base_radius := NodeContractHelper.get_base_collision_radius_value(ship)
+	var width_mult := NodeContractHelper.get_collision_width_multiplier_value(ship)
+	var length_mult := NodeContractHelper.get_collision_length_multiplier_value(ship)
+	return maxf(0.01, base_radius * maxf(width_mult, length_mult))
+
 static func get_boarding_drag_multiplier(ship) -> float:
+	var profile_start := PhysicsFrameProfiler.begin()
 	var drag = 1.0
 	var neighbors = ship._get_ships_cached(ship.get_tree())
 	for other in neighbors:
@@ -97,10 +136,15 @@ static func get_boarding_drag_multiplier(ship) -> float:
 			drag *= 0.6
 		elif other.has_method("is_boarding_ship") and other.is_boarding_ship() and other.has_method("get_boarding_target_ship") and other.get_boarding_target_ship() == ship and not other.has_method("has_boarding_rope_link_to"):
 			drag *= 0.6
-	return maxf(0.1, drag)
+	var result := maxf(0.1, drag)
+	PhysicsFrameProfiler.end("player_ship_boarding_drag", profile_start)
+	return result
 
 static func update_movement(ship, delta: float) -> void:
+	var speed_profile_start := PhysicsFrameProfiler.begin()
+	var sail_speed_profile_start := PhysicsFrameProfiler.begin()
 	var target_speed: float = calculate_sail_speed(ship)
+	PhysicsFrameProfiler.end("player_ship_sail_speed", sail_speed_profile_start)
 	var is_exhausted_rowing := false
 	var is_actively_rowing: bool = ship.is_rowing
 	var rowing_direction: int = _get_rowing_direction(ship)
@@ -139,19 +183,29 @@ static func update_movement(ship, delta: float) -> void:
 		if is_reverse_rowing and "reverse_rowing_acceleration_mult" in ship:
 			decel *= float(ship.reverse_rowing_acceleration_mult)
 		ship.current_speed = move_toward(ship.current_speed, target_speed, decel * delta)
+	PhysicsFrameProfiler.end("player_ship_speed_integrate", speed_profile_start)
+
+	var velocity_profile_start := PhysicsFrameProfiler.begin()
 	var velocity = forward * ship.current_speed
-	var sep = calculate_separation(ship)
+	var sep = get_cached_separation(ship, delta)
 	velocity += sep
 	velocity += ship._calculate_boarding_pull_velocity(delta)
 	velocity += ship.consume_collision_impulse_velocity(delta)
 	velocity += ship._calculate_collision_repulsion() * delta
+	PhysicsFrameProfiler.end("player_ship_velocity_forces", velocity_profile_start)
+
+	var guard_profile_start := PhysicsFrameProfiler.begin()
 	var prev_pos: Vector3 = ship.global_position
 	ship.global_position = BaseShipCollisionHelper.apply_movement_collision_guards(ship, prev_pos, prev_pos + velocity * delta, null, maxf(absf(ship.current_speed), velocity.length()))
+	PhysicsFrameProfiler.end("player_ship_collision_guards", guard_profile_start)
+
+	var wake_profile_start := PhysicsFrameProfiler.begin()
 	var motion_speed := absf(ship.current_speed)
 	var wake_active = motion_speed > 0.5 or sep.length() > 0.2
 	var wake_speed_ratio = clampf(motion_speed / maxf(ship.max_speed, 0.01), 0.0, 1.0)
 	var wake_turn_ratio = clampf(ship.rudder_angle / 45.0, -1.0, 1.0)
 	ship._set_wake_state(wake_active, wake_speed_ratio, wake_turn_ratio, clampf(sep.length() / 2.0, 0.0, 1.0))
+	PhysicsFrameProfiler.end("player_ship_wake_state", wake_profile_start)
 
 static func update_steering(ship, delta: float) -> void:
 	var motion_speed := absf(ship.current_speed)

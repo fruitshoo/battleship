@@ -4,6 +4,7 @@ const DEBUG_SPAWNER_LOGS := false
 const ENEMY_SPAWN_RULES_DATA_PATH := "res://data/enemy_spawn_rules.json"
 const BOSS_WAVE_SPAWN_STAGGER_SECONDS := 0.75
 const BOSS_WAVE_DELAYED_SPAWN_SAFE_DISTANCE := 42.0
+const BOSS_ESCORT_SPAWN_FRAME_GAP := 1
 
 ## 적 생성 관리자 (Enemy Spawner)
 ## 플레이어 주변 화면 밖에서 적을 주기적으로 생성
@@ -811,7 +812,28 @@ func _stop_boss_audio_if_no_active_boss() -> void:
 func _spawn_elite_escorts(flagship: Node3D, escort_layout_override: Array = []) -> void:
 	if not enemy_scene or not is_instance_valid(player) or not is_instance_valid(flagship):
 		return
+	var escort_layout := escort_layout_override
+	if escort_layout.is_empty():
+		escort_layout = mid_boss_escort_layout
+	if escort_layout.is_empty():
+		return
+	call_deferred("_spawn_elite_escorts_deferred", flagship.get_instance_id(), escort_layout.duplicate(true))
 
+
+func _spawn_elite_escorts_deferred(flagship_id: int, escort_layout: Array) -> void:
+	for escort_info_variant in escort_layout:
+		for _frame in range(BOSS_ESCORT_SPAWN_FRAME_GAP):
+			await get_tree().process_frame
+		var flagship := NodeContractHelper.get_instance_node3d(flagship_id)
+		if not is_instance_valid(flagship) or not is_instance_valid(player):
+			return
+		_spawn_one_elite_escort(flagship, escort_info_variant)
+
+
+func _spawn_one_elite_escort(flagship: Node3D, escort_info_variant: Variant) -> void:
+	if typeof(escort_info_variant) != TYPE_DICTIONARY:
+		return
+	var escort_info: Dictionary = escort_info_variant as Dictionary
 	var flagship_forward: Vector3 = -flagship.global_transform.basis.z
 	flagship_forward.y = 0.0
 	if flagship_forward.length_squared() <= 0.0001:
@@ -820,37 +842,30 @@ func _spawn_elite_escorts(flagship: Node3D, escort_layout_override: Array = []) 
 		flagship_forward = flagship_forward.normalized()
 	var flagship_right: Vector3 = flagship_forward.cross(Vector3.UP).normalized()
 	var flagship_pos: Vector3 = flagship.global_position
-	var escort_layout := escort_layout_override
-	if escort_layout.is_empty():
-		escort_layout = mid_boss_escort_layout
 
-	for escort_info_variant in escort_layout:
-		if typeof(escort_info_variant) != TYPE_DICTIONARY:
-			continue
-		var escort_info: Dictionary = escort_info_variant as Dictionary
-		var escort_scene: PackedScene = _pick_enemy_scene_for_slot(escort_info)
-		if not is_instance_valid(escort_scene):
-			escort_scene = enemy_scene
-		var escort = escort_scene.instantiate()
-		if not is_instance_valid(escort):
-			continue
-		_apply_spawn_slot_info(escort, escort_info)
-		escort.set_meta("boss_escort_target_id", flagship.get_instance_id())
-		escort.set_meta("boss_escort_lateral", float(escort_info.get("lateral", 0.0)))
-		escort.set_meta("boss_escort_back", float(escort_info.get("back", 0.0)))
-		escort.set_meta("boss_escort_hold_radius", float(escort_info.get("hold_radius", 34.0)))
-		escort.set_meta("boss_escort_break_radius", float(escort_info.get("break_radius", 44.0)))
+	var escort_scene: PackedScene = _pick_enemy_scene_for_slot(escort_info)
+	if not is_instance_valid(escort_scene):
+		escort_scene = enemy_scene
+	var escort = escort_scene.instantiate()
+	if not is_instance_valid(escort):
+		return
+	_apply_spawn_slot_info(escort, escort_info)
+	escort.set_meta("boss_escort_target_id", flagship.get_instance_id())
+	escort.set_meta("boss_escort_lateral", float(escort_info.get("lateral", 0.0)))
+	escort.set_meta("boss_escort_back", float(escort_info.get("back", 0.0)))
+	escort.set_meta("boss_escort_hold_radius", float(escort_info.get("hold_radius", 34.0)))
+	escort.set_meta("boss_escort_break_radius", float(escort_info.get("break_radius", 44.0)))
 
-		var escort_pos: Vector3 = flagship_pos
-		escort_pos += flagship_right * float(escort_info.get("lateral", 0.0))
-		escort_pos += flagship_forward * -float(escort_info.get("back", 0.0))
-		escort_pos.y = 0.0
+	var escort_pos: Vector3 = flagship_pos
+	escort_pos += flagship_right * float(escort_info.get("lateral", 0.0))
+	escort_pos += flagship_forward * -float(escort_info.get("back", 0.0))
+	escort_pos.y = 0.0
 
-		get_parent().add_child(escort)
-		escort.global_position = escort_pos
-		EnemySpawnerFleetHelper.apply_authoring_runtime_overrides(escort, escort_info)
-		escort.look_at(player.global_position, Vector3.UP)
-		_prime_enemy_momentum(escort)
+	get_parent().add_child(escort)
+	escort.global_position = escort_pos
+	EnemySpawnerFleetHelper.apply_authoring_runtime_overrides(escort, escort_info)
+	escort.look_at(player.global_position, Vector3.UP)
+	_prime_enemy_momentum(escort)
 
 
 func _load_enemy_spawn_rules_data() -> void:

@@ -97,14 +97,11 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 			soldier.global_position.z - nearest.global_position.z
 		).length()
 		var target_ship = nearest.get("owned_ship")
-		var cross_ship_close: bool = (
+		var is_cross_ship_target: bool = (
 			is_instance_valid(soldier.owned_ship)
 			and is_instance_valid(target_ship)
 			and target_ship != soldier.owned_ship
-			and soldier._is_ship_pair_in_melee_range(target_ship)
 		)
-		if cross_ship_close and soldier.has_method("_should_hold_defensive_deck_position_against") and soldier._should_hold_defensive_deck_position_against(target_ship):
-			cross_ship_close = false
 
 		if soldier.is_melee_only:
 			soldier._set_active_weapon("sword")
@@ -112,7 +109,7 @@ static func update_combat_weapon_choice(soldier, nearest) -> void:
 			soldier._set_active_weapon("sword")
 		elif soldier.is_ranged_only:
 			soldier._set_active_weapon("bow")
-		elif cross_ship_close:
+		elif is_cross_ship_target:
 			soldier._set_active_weapon("bow")
 		elif dist_xz <= soldier.weapon_switch_distance:
 			soldier._set_active_weapon("sword")

@@ -13,6 +13,7 @@ const STOW_POSE_META := "cargo_transport_stow_pose"
 const STAIR_TOP_META := "cargo_transport_stair_top"
 const STAIR_BOTTOM_META := "cargo_transport_stair_bottom"
 const ROOF_THROW_ARC_META := "roof_cargo_transport_arc"
+const ROOF_DEATH_OVERBOARD_IN_PROGRESS_META := "roof_death_overboard_in_progress"
 
 
 static func update_cargo_transport(ship, delta: float) -> void:
@@ -89,6 +90,8 @@ static func find_cleanup_corpse_by_team(ship, target_team: String) -> Node3D:
 		if not is_instance_valid(soldier) or not (soldier is Node3D):
 			continue
 		if soldier.get_meta("cargo_transport_in_progress", false) == true:
+			continue
+		if soldier.get_meta(ROOF_DEATH_OVERBOARD_IN_PROGRESS_META, false) == true:
 			continue
 		if SoldierShipWorkPriorityHelper.is_work_slot_reserved_for_other(soldier, null, SoldierShipWorkPriorityHelper.TASK_CARGO_TRANSPORT):
 			continue

@@ -2,7 +2,7 @@ extends Node
 
 ## 환경 프리셋 전환 매니저
 ## - start_preset: 시작 시 적용할 프리셋
-## - 디버그 빌드에서 F7/F8로 즉시 전환
+## - 디버그 빌드에서 F7로 clear day 즉시 전환
 
 enum Preset {
 	CLEAR_DAY,
@@ -37,8 +37,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F7:
 			apply_preset(Preset.CLEAR_DAY)
-		elif event.keycode == KEY_F8:
-			apply_preset(Preset.STORM_EVE)
 
 func apply_preset(preset: Preset) -> void:
 	current_preset = preset

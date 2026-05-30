@@ -12,7 +12,6 @@ static func find_nearest_enemy(soldier) -> Node3D:
 		return null
 	var home_ship: Variant = soldier.get("home_ship")
 	var is_player_boarder: bool = soldier.team == "player" and is_instance_valid(home_ship) and home_ship != soldier.owned_ship
-	var ship_scan_data: Dictionary = SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(soldier)
 	var opposing_team: String = "enemy" if soldier.team == "player" else "player"
 	var nearest_local_boarder := find_nearest_hostile_on_owned_ship(soldier)
 	if nearest_local_boarder != null and not is_player_boarder:
@@ -63,13 +62,18 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			nearest_distance_global = dist_sq_xz
 			nearest_global = other
 
+	if soldier.is_melee_only:
+		return nearest_on_ship
+
+	if not _can_scan_cross_ship_ranged_targets(soldier):
+		return nearest_on_ship if nearest_on_ship else nearest_global
+
 	if soldier.has_method("_allow_cross_ship_enemy_scan") and soldier._allow_cross_ship_enemy_scan() == false:
 		if is_player_boarder and nearest_ranged_on_ship:
 			return nearest_ranged_on_ship
-		if soldier.is_melee_only:
-			return nearest_on_ship if nearest_on_ship else nearest_global
 		return nearest_on_ship if nearest_on_ship else nearest_global
 
+	var ship_scan_data: Dictionary = SoldierShipSpatialCacheHelper.get_ship_enemy_scan_data(soldier)
 	var nearby_target_ships: Array = ship_scan_data.get("nearby_target_ships", ship_scan_data.get("nearby_enemy_ships", []))
 	for other_ship_variant in nearby_target_ships:
 		var other_ship: Node3D = SoldierShipSpatialCacheHelper.get_valid_node3d(other_ship_variant)
@@ -94,17 +98,29 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			if dist_sq_xz > detection_range_sq:
 				continue
 
-			var is_ranged: bool = soldier.is_ranged_only or (soldier.current_weapon and soldier.current_weapon.get("max_range") != null and soldier.current_weapon.get("max_range") > 5.0)
-			if is_ranged:
-				if dist_sq_xz < nearest_distance_global:
-					nearest_distance_global = dist_sq_xz
-					nearest_global = other
+			if dist_sq_xz < nearest_distance_global:
+				nearest_distance_global = dist_sq_xz
+				nearest_global = other
 
 	if is_player_boarder and nearest_ranged_on_ship:
 		return nearest_ranged_on_ship
 	if soldier.is_melee_only:
 		return nearest_on_ship if nearest_on_ship else nearest_global
 	return nearest_on_ship if nearest_on_ship else nearest_global
+
+
+static func _can_scan_cross_ship_ranged_targets(soldier) -> bool:
+	if soldier.is_melee_only:
+		return false
+	if soldier.is_ranged_only:
+		return true
+	var bow_variant: Variant = soldier.get("weapon_bow")
+	if is_instance_valid(bow_variant):
+		return true
+	var weapon_variant: Variant = soldier.get("current_weapon")
+	if is_instance_valid(weapon_variant) and weapon_variant.get("max_range") != null:
+		return float(weapon_variant.get("max_range")) > 5.0
+	return false
 
 
 static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
@@ -142,55 +158,6 @@ static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 	return nearest
 
 
-static func is_ship_pair_in_melee_range(soldier, other_ship: Node3D) -> bool:
-	if not is_instance_valid(soldier.owned_ship) or not is_instance_valid(other_ship):
-		return false
-	var pair_geometry: Dictionary = SoldierShipSpatialCacheHelper.get_ship_pair_geometry(soldier, other_ship)
-	var ship_diff_xz_sq: float = INF
-	if not pair_geometry.is_empty():
-		ship_diff_xz_sq = float(pair_geometry.get("ship_diff_xz_sq", INF))
-	else:
-		var ship_diff_xz := Vector2(
-			soldier.owned_ship.global_position.x - other_ship.global_position.x,
-			soldier.owned_ship.global_position.z - other_ship.global_position.z
-		)
-		ship_diff_xz_sq = ship_diff_xz.length_squared()
-	var ship_pair_distance: float = get_cross_ship_engage_ship_distance(soldier, other_ship)
-	return ship_diff_xz_sq <= (ship_pair_distance * ship_pair_distance)
-
-
-static func get_cross_ship_engage_ship_distance(soldier, other_ship: Node3D) -> float:
-	var base_distance: float = soldier.CROSS_SHIP_ENGAGE_SHIP_DISTANCE
-	if not is_instance_valid(soldier.owned_ship) or not is_instance_valid(other_ship):
-		return base_distance
-
-	var pair_geometry: Dictionary = SoldierShipSpatialCacheHelper.get_ship_pair_geometry(soldier, other_ship)
-	if pair_geometry.is_empty():
-		var my_half_ext: Vector2 = get_ship_deck_half_extents(soldier, soldier.owned_ship)
-		var other_half_ext: Vector2 = get_ship_deck_half_extents(soldier, other_ship)
-		var combined_length: float = my_half_ext.y + other_half_ext.y
-		var size_bonus: float = maxf(0.0, combined_length - 3.4) * 0.6
-		return base_distance + clampf(size_bonus, 0.0, 15.0)
-	return base_distance + float(pair_geometry.get("ship_distance_bonus", 0.0))
-
-
-static func get_cross_ship_engage_max_distance(soldier, other_ship: Node3D) -> float:
-	var base_distance: float = soldier.CROSS_SHIP_ENGAGE_MAX_DISTANCE
-	if not is_instance_valid(soldier.owned_ship) or not is_instance_valid(other_ship):
-		return base_distance
-
-	var pair_geometry: Dictionary = SoldierShipSpatialCacheHelper.get_ship_pair_geometry(soldier, other_ship)
-	if pair_geometry.is_empty():
-		var my_half_ext: Vector2 = get_ship_deck_half_extents(soldier, soldier.owned_ship)
-		var other_half_ext: Vector2 = get_ship_deck_half_extents(soldier, other_ship)
-		var combined_width: float = my_half_ext.x + other_half_ext.x
-		var combined_length: float = my_half_ext.y + other_half_ext.y
-		var width_bonus: float = maxf(0.0, combined_width - 2.4) * 0.6
-		var length_bonus: float = maxf(0.0, combined_length - 3.4) * 0.5
-		return base_distance + clampf(width_bonus + length_bonus, 0.0, 20.0)
-	return base_distance + float(pair_geometry.get("max_distance_bonus", 0.0))
-
-
 static func keep_within_owned_ship_bounds(soldier) -> void:
 	if not is_instance_valid(soldier.owned_ship):
 		return
@@ -210,6 +177,22 @@ static func get_clamped_ship_deck_local(soldier, ship: Node3D, local_position: V
 	if SoldierDeckZoneHelper.is_roof(soldier) and ship.has_method("clamp_roof_boarding_landing_local"):
 		return ship.call("clamp_roof_boarding_landing_local", local_position)
 	return get_clamped_main_deck_local(ship, local_position, edge_inset)
+
+
+static func get_random_wander_deck_local(soldier, ship: Node3D, edge_inset: float = DECK_BOUNDS_EDGE_INSET) -> Vector3:
+	var half_ext: Vector2 = get_ship_deck_half_extents(soldier, ship)
+	if half_ext.x <= 0.01 or half_ext.y <= 0.01:
+		return get_clamped_ship_deck_local(soldier, ship, Vector3.ZERO, edge_inset)
+
+	var safe_half_z := maxf(0.08, half_ext.y - minf(edge_inset, maxf(0.0, half_ext.y - 0.08)))
+	var random_z := randf_range(-safe_half_z, safe_half_z)
+	var half_width := get_ship_deck_half_width_at_z(ship, random_z, half_ext.x)
+	var safe_half_width := maxf(0.08, half_width - minf(edge_inset, maxf(0.0, half_width - 0.08)))
+	var deck_height: float = ship.get("deck_height") if is_instance_valid(ship) and ship.get("deck_height") != null else 0.4
+	var local_position := Vector3(randf_range(-safe_half_width, safe_half_width), deck_height, random_z)
+	if SoldierDeckZoneHelper.is_roof(soldier) and ship.has_method("clamp_roof_boarding_landing_local"):
+		return ship.call("clamp_roof_boarding_landing_local", local_position)
+	return local_position
 
 
 static func get_clamped_main_deck_local(ship: Node3D, local_position: Vector3, edge_inset: float = DECK_BOUNDS_EDGE_INSET, deck_half_extents: Vector2 = Vector2.ZERO) -> Vector3:

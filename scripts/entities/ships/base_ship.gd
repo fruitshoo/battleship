@@ -659,6 +659,8 @@ func enforce_dead_body_limit() -> void:
 			continue
 		if soldier.get_meta("support_overboard_disposal_in_progress", false) == true:
 			continue
+		if soldier.get_meta("roof_death_overboard_in_progress", false) == true:
+			continue
 		bodies.append(soldier)
 
 	var overflow := bodies.size() - max_dead_bodies_on_deck

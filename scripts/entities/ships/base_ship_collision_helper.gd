@@ -2,6 +2,7 @@ extends RefCounted
 class_name BaseShipCollisionHelper
 
 const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+const ShipEnemyContactLimitHelper = preload("res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd")
 
 const WoodSplinter = preload("res://scripts/effects/wood_splinter.gd")
 const SHIP_COLLISION_WATER_SPLASH_SCENE: PackedScene = preload("res://scenes/effects/water_blast_big.tscn")
@@ -127,10 +128,18 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 	var force = Vector3.ZERO
 	var my_half = ship.get_collision_half_extents()
 	var my_team: String = NodeContractHelper.get_team_tag(ship)
+	var enemy_enemy_contacts := 0
 
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other) or (other.has_method("is_sinking_or_dying") and other.is_sinking_or_dying()):
 			continue
+		var other_team := NodeContractHelper.get_team_tag(other)
+		var is_enemy_enemy_limited := ShipEnemyContactLimitHelper.should_limit(my_team, other_team, ship_count)
+		if is_enemy_enemy_limited:
+			if enemy_enemy_contacts >= ShipEnemyContactLimitHelper.get_max_collision_contacts():
+				continue
+			if not ShipEnemyContactLimitHelper.is_timeslice_active(ship, other, current_frame):
+				continue
 
 		var diff = other.global_position - ship.global_position
 		diff.y = 0.0
@@ -143,7 +152,7 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 			other_base_radius * other_length_mult
 		)
 		var derelict_approach_padding := 0.0
-		if my_team == "player" and NodeContractHelper.get_team_tag(other) == "enemy" and _is_derelict_ship(other):
+		if my_team == "player" and other_team == "enemy" and _is_derelict_ship(other):
 			derelict_approach_padding = DERELICT_FIRE_POT_APPROACH_PADDING
 		var broad_phase_dist = maxf(my_half.x, my_half.y) + maxf(other_half.x, other_half.y) + ship.broad_phase_padding + derelict_approach_padding
 
@@ -189,6 +198,8 @@ static func calculate_collision_repulsion(ship) -> Vector3:
 		_try_assisted_ramming_boost_contact(ship, other, dist, coll_dist)
 
 		if dist < coll_dist:
+			if is_enemy_enemy_limited:
+				enemy_enemy_contacts += 1
 			var strong_collision_armed := _is_strong_collision_armed(ship, other, dist, coll_dist)
 			var compression = coll_dist - dist
 			var movement_share := get_collision_movement_share(ship, other)
@@ -336,12 +347,23 @@ static func apply_movement_collision_guards(ship, prev_pos: Vector3, proposed_po
 	var ship_team: String = NodeContractHelper.get_team_tag(ship, "")
 	var ship_guard_radius := _get_movement_guard_broad_radius(ship)
 	var checked_count := 0
-	for other_variant in _get_collision_neighbors_cached(Engine.get_physics_frames()):
+	var enemy_enemy_checked_count := 0
+	var current_frame := Engine.get_physics_frames()
+	var neighbors := _get_collision_neighbors_cached(current_frame)
+	var ship_count := neighbors.size()
+	for other_variant in neighbors:
 		var other := other_variant as Node3D
 		if other == ship or not is_instance_valid(other) or other == excluded_ship:
 			continue
 		if NodeContractHelper.is_sinking_or_dying(other) or other.get_meta("derelict_nonblocking", false) == true:
 			continue
+		var other_team: String = NodeContractHelper.get_team_tag(other, "")
+		var is_enemy_enemy_limited := ShipEnemyContactLimitHelper.should_limit(ship_team, other_team, ship_count)
+		if is_enemy_enemy_limited:
+			if enemy_enemy_checked_count >= ShipEnemyContactLimitHelper.get_max_guard_checks():
+				continue
+			if not ShipEnemyContactLimitHelper.is_timeslice_active(ship, other, current_frame):
+				continue
 		var offset := corrected_pos - other.global_position
 		offset.y = 0.0
 		var broad_probe := (ship_guard_radius + _get_movement_guard_broad_radius(other)) * MOVEMENT_GUARD_BROAD_PHASE_SCALE + MOVEMENT_GUARD_BROAD_PHASE_PAD
@@ -351,10 +373,11 @@ static func apply_movement_collision_guards(ship, prev_pos: Vector3, proposed_po
 		var safe_probe: float = float(ship.get_collision_distance_to(other)) * maxf(safe_ratio, 1.08)
 		if offset.length_squared() > safe_probe * safe_probe:
 			continue
-		var other_team: String = NodeContractHelper.get_team_tag(other, "")
 		var emit_collision_event := not ship_team.is_empty() and not other_team.is_empty() and ship_team != other_team
 		corrected_pos = apply_single_movement_collision_guard(ship, other, prev_pos, corrected_pos, safe_ratio, impact_speed_hint, emit_collision_event)
 		checked_count += 1
+		if is_enemy_enemy_limited:
+			enemy_enemy_checked_count += 1
 		if checked_count >= MOVEMENT_GUARD_MAX_CHECKS:
 			break
 	return corrected_pos

@@ -3,7 +3,7 @@
 이 문서는 현재 함선 AI 흐름을 고정해두기 위한 메모입니다.
 목표는 리팩터링을 바로 하자는 것이 아니라, 어떤 파일이 어떤 책임을 갖는지 먼저 보이게 만드는 것입니다.
 
-작성 기준: 2026-05-12
+작성 기준: 2026-05-30
 
 ## 핵심 요약
 
@@ -11,10 +11,11 @@
 - 플레이어, 일반 적선, 지원함, 나포함, 보스는 진입점과 세부 로직이 다르다.
 - 다만 충돌, 도선, 상태, 선원 같은 공통 시스템은 `BaseShip` 계열 helper를 공유한다.
 
-2. LimboAI는 "판단층"에 가깝다.
-- `scripts/ai/limbo/ship_limbo_ai_pilot.gd`가 BehaviorTree를 수동 tick 한다.
-- 그 결과는 대체로 meta 값으로 저장된다.
-- 실제 이동, 충돌, 도선, 발사는 기존 ship/helper/launcher 로직이 수행한다.
+2. LimboAI는 남아 있지만 기본 경로가 아니다.
+- `scripts/ai/limbo/ship_limbo_ai_pilot.gd`는 여전히 "판단층" 역할을 할 수 있다.
+- 다만 런타임 함선/보스/병사는 기본값으로 `limbo_ai_pilot_enabled = false`를 유지한다.
+- Windows 배포도 LimboAI GDExtension/DLL을 제외한다. 다시 켤 때는 export exclude, 의존성 guard, 계약 테스트를 같이 봐야 한다.
+- LimboAI가 켜져도 실제 이동, 충돌, 도선, 발사는 기존 ship/helper/launcher 로직이 수행한다.
 
 3. 무리해서 한 군데로 합치면 위험하다.
 - 현재 구조는 파편화되어 보이지만, 전투 역할별 예외가 꽤 많다.
@@ -27,7 +28,7 @@ Scene/Spawner
   -> Ship node
     -> _process: 시각/상태 갱신
     -> _physics_process: 이동/전투/충돌 갱신
-      -> LimboAI tick, 선택 사항
+      -> LimboAI tick, 선택 사항이며 기본 비활성
       -> 역할별 helper 실행
       -> navigation intent 계산
       -> 도선/발사/조타/속도 계산
@@ -39,13 +40,13 @@ Scene/Spawner
 | 대상 | 진입점 | 주 책임 |
 | --- | --- | --- |
 | 플레이어 함선 | `scripts/entities/ships/player_ship.gd` | 입력, 조타, 돛/노, 지원함 소환/관리, 자동 도선 스캔 |
-| 일반 적선 | `scripts/entities/ships/ai_ship.gd` | 추적선 기본 상태, LimboAI tick, 적/지원함 분기, 공통 AI 호출 |
+| 일반 적선 | `scripts/entities/ships/ai_ship.gd` | 추적선 기본 상태, 적/지원함 분기, 공통 AI 호출, 선택적 LimboAI bridge |
 | 적선 AI 실행 | `scripts/entities/ships/ai_ship_runtime_helper.gd` | 타겟 확인, 분리력, 항법, 도선 시도, 이동/충돌 guard |
 | 지원함/legacy 나포함 | `scripts/entities/ships/ai_ship_support_helper.gd` | 호위진, 합류, 구조, 위협 차단, 재집결 |
 | 지원함 역할/대형 | `scripts/entities/ships/support_fleet_formation_helper.gd` | 슬롯, 좌우 배치, 열/익형 대형, 회전 시 따라갈 위치 |
 | 지원함 상태 | `scripts/entities/ships/support_fleet_state_helper.gd` | 현재 대형/역할 상태 해석 |
-| 보스 | `scripts/entities/ships/boss_ship.gd` | 별도 선회/거리 유지 AI, 보스 전용 LimboAI, 공통 상태/충돌 사용 |
-| 병사 | `scripts/entities/soldiers/soldier.gd` | 갑판 전투, 이동, 도선 후 행동, 병사 LimboAI |
+| 보스 | `scripts/entities/ships/boss_ship.gd` | 별도 선회/거리 유지 AI, 공통 상태/충돌 사용, 선택적 LimboAI bridge |
+| 병사 | `scripts/entities/soldiers/soldier.gd` | 갑판 전투, 이동, 도선 후 행동, 선택적 LimboAI bridge |
 
 ## 적선 흐름
 
@@ -54,7 +55,7 @@ Scene/Spawner
 
 ```text
 AIShip._physics_process(delta)
-  -> _update_limbo_ai_pilot(delta)
+  -> _update_limbo_ai_pilot(delta), enabled일 때만 의미 있음
   -> AIShipRuntimeHelper.process_physics(self, delta)
 ```
 
@@ -106,7 +107,7 @@ AIShipRuntimeHelper.process_physics
 
 ## LimboAI의 위치
 
-LimboAI는 함선마다 직접 위치를 옮기는 최종 실행자가 아니다.
+LimboAI는 함선마다 직접 위치를 옮기는 최종 실행자가 아니다. 현재는 실험/회귀 확인용 경로에 가깝고, 기본 플레이와 Windows 배포는 기존 GDScript 실행층으로 돈다.
 
 ```text
 ShipLimboAIPilot.tick
@@ -141,6 +142,7 @@ ShipLimboAIPilot.tick
 
 따라서 LimboAI를 바꿀 때는 "행동 결정"이 바뀌는지, "기존 실행층이 읽는 meta 계약"이 깨지는지를 같이 봐야 한다.
 BT 태스크의 관측 로직은 perception helper에, 실행층의 meta 해석은 intent helper에 두는 것이 현재 기준선이다.
+기본 비활성 계약은 `ProjectContractSceneWiringHelper`가 확인한다. 씬이나 `_ready`에서 LimboAI를 강제로 켜는 변경은 배포 의존성 문제를 다시 만들 수 있으므로 별도 의사결정으로 다룬다.
 
 ## 전투 역할
 
@@ -161,6 +163,7 @@ BT 태스크의 관측 로직은 perception helper에, 실행층의 meta 해석�
 | --- | --- | --- |
 | 선체 접촉 치수 | `scripts/entities/ships/ship_contact_geometry.gd` | 충돌/도선 거리용 half extents, directional radius |
 | 충돌/충격 | `scripts/entities/ships/base_ship_collision_helper.gd` | 충돌 이벤트, 밀림, 충돌 피해, 이펙트/SFX |
+| 적선 간 접촉 제한 | `scripts/entities/ships/ship_enemy_contact_limit_helper.gd` | 적선이 많이 쌓였을 때 적선-적선 충돌/guard 검사 수와 pair timeslice를 통일 |
 | 공통 도선 상태 | `scripts/entities/ships/base_ship_boarding_helper.gd` | 밧줄, boarding link, 공통 도선 tick |
 | 적선 도선 실행 | `scripts/entities/ships/ai_ship_boarding_helper.gd` | 접근 유지, latch, collision guard |
 | 전투 모드 판정 | `scripts/entities/ships/ship_combat_mode_helper.gd` | gunner/charger, boarding 가능 여부 |
@@ -175,7 +178,7 @@ BT 태스크의 관측 로직은 perception helper에, 실행층의 meta 해석�
 ### 매 physics frame에 필요한 것
 
 - 실제 위치/회전/속도 반영
-- 충돌 guard와 repulsion
+- 플레이어와 적선 사이의 충돌 guard와 repulsion
 - 도선 중 위치 유지
 - wake, 러더, 피해 tick 같은 즉시 보이는 상태
 
@@ -186,6 +189,7 @@ BT 태스크의 관측 로직은 perception helper에, 실행층의 meta 해석�
 - 함선 간 separation 재계산
 - 지원함/legacy 나포함의 무거운 대형 계산
 - 주변 위협 평가
+- 적선 수가 많을 때 적선-적선 접촉/guard 검사의 일부 pair
 
 ### 이벤트 중심에 가까운 것
 
@@ -196,7 +200,23 @@ BT 태스크의 관측 로직은 perception helper에, 실행층의 meta 해석�
 - 병사 생성/사망/복귀
 
 성능 문제가 생겼을 때는 "전체 AI가 느리다"보다 먼저 어느 bucket이 커졌는지 봐야 한다.
-최근에는 `ai_ship_process_total`, `support_ai`, `soldier_limbo_ai`, `soldier_state_wander` 같은 profiler label이 특히 중요했다.
+
+디버그 빌드의 성능 보드는 현재 아래 단축키를 쓴다.
+
+- `F10`: perf overlay 표시/숨김
+- `F9`: 현재 표시를 freeze/live 전환
+- `F8`: 현재 perf 텍스트를 클립보드로 복사
+
+성능 보드는 `[Frame]`, `[Scene]`, `[Render]`, `[Player Ship]`, `[AI Ship]`, `[Boarding]`, `[Profile]`, `[Exclusive]`처럼 구역을 나눠 보여준다. `unprof/tick`은 한 physics tick 안에서 우리 profiler label로 잡히지 않은 시간을 뜻한다. 이 값이 크면 Godot 물리 자체, signal/callback, 아직 라벨을 붙이지 않은 helper, 또는 한 프레임에 몰린 생성/해제가 원인 후보가 된다.
+
+최근 성능 점검에서는 아래 label들이 특히 중요했다.
+
+- 함선: `ai_ship_physics`, `ai_ship_process_total`, `player_ship_physics`, `player_ship_movement`, `player_ship_velocity_forces`, `player_ship_separation`
+- 충돌/접촉: `ship_collision_repulsion`, `ship_neighbor_guards`, `ai_ship_collision_guards`, `ai_ship_motion_collision_repulsion`
+- 도선: `ai_ship_boarding_attempt`, `ai_ship_boarding_eval`, `ship_boarding_state`
+- 병사: `soldier_combat`, `soldier_combat_find_enemy`, `soldier_decision`, `soldier_decision_enemy_cache`, `soldier_state_wander`, `soldier_wander_move`
+
+적선이 12척 이상 쌓이면 `ShipEnemyContactLimitHelper`가 적선-적선 접촉 검사에 제한을 건다. 플레이어와 적선의 충돌감은 유지하되, 적선끼리 한 점에 몰렸을 때 모든 pair를 매 tick 자세히 보지 않기 위한 정책이다.
 
 ## 안전하게 고치는 순서
 

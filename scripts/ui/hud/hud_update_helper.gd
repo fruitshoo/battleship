@@ -164,7 +164,7 @@ static func update_speed_display(hud) -> void:
 		if hud._last_speed_str != speed_text:
 			hud._last_speed_str = speed_text
 			hud.speed_display.text = speed_text
-		_update_boost_bar(hud)
+	_update_boost_bar(hud)
 
 # Crew and combat
 static func update_force_panel(hud) -> void:

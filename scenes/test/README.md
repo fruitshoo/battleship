@@ -36,7 +36,9 @@ Recent regression coverage to keep together:
 - Rope pull must require an active rope visual, so a cleared hook graphic cannot keep dragging ships.
 - Support free-combat assist must recall near the player and keep rowing/wind compensation so it does not feel abandoned in free engagement mode.
 - Enemy boarders on the player deck may speak, but ordinary enemy soldiers on their own ship should not spam speech labels.
-- Cross-ship contact should avoid rail melee and prefer bow fire until boarding moves soldiers onto the same deck.
+- Ship-to-ship contact no longer tries to create rail melee as a visible combat
+  mode. Soldiers should fight meaningfully after boarding puts enemies on the
+  same deck; cross-ship targets should stay ranged or tactical pressure only.
 - Sail and rudder field repair should be scheduled by real rigging damage, wait before starting, recover only to emergency function, and pause while burning.
 - Survivors, floating loot, static sea sites, sea decor, compass markers, and overcap crew recovery live under the project recovery contract helper rather than a separate ad hoc scene.
 - Support squadron coverage keeps the active Panokseon artillery unlock, disabled Geobukseon support fallback, heavy-support role labels, and support-limit reconciliation in the same profile/upgrade smoke loop.
@@ -176,13 +178,15 @@ When adding a new harness:
   Registry: `scripts/test/module_boundaries.json`
   Wrapper: `scripts/test/run_modularity_guard_suite.sh`
 - `ship_ai_perception_helper_contract.tscn`
-  Focused contract for LimboAI ship perception reads: team, role, boarding capability, hull ratio, engagement ranges, speed, distance, and target lead sampling.
+  Focused contract for optional LimboAI ship perception reads: team, role, boarding capability, hull ratio, engagement ranges, speed, distance, and target lead sampling.
   Script: `scripts/test/ship_ai_perception_helper_contract.gd`
   Wrapper: `scripts/test/run_ship_ai_perception_helper_contract.sh`
 - `ship_ai_intent_helper_contract.tscn`
-  Focused contract for converting fresh LimboAI ship metadata into execution-layer intent dictionaries without direct gameplay meta reads.
+  Focused contract for converting fresh metadata from optional LimboAI ship pilots into execution-layer intent dictionaries without direct gameplay meta reads.
   Script: `scripts/test/ship_ai_intent_helper_contract.gd`
   Wrapper: `scripts/test/run_ship_ai_intent_helper_contract.sh`
+  The project contract sweep separately guards that runtime AI ships, boss
+  ships, and soldiers keep LimboAI disabled by default.
 
 ## Helper Scripts
 

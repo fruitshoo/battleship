@@ -314,8 +314,6 @@ class MockCombatSoldier:
 	var is_captain: bool = false
 	var is_stationary: bool = false
 	var _is_jumping: bool = false
-	var CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 8.0
-	var CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 14.0
 
 	func get_team_tag() -> String:
 		return team

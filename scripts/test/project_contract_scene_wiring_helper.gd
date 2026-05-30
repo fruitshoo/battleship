@@ -3258,8 +3258,8 @@ static func _run_soldier_attack_validation_contract(failures: Array[String]) -> 
 	var ai_source := FileAccess.get_file_as_string("res://scripts/entities/soldiers/soldier_ai_helper.gd")
 	if not soldier_source.contains("attack_validation_timer"):
 		failures.append("soldier attack validation should keep a staggered per-soldier timer")
-	if not ai_source.contains("ATTACK_VALIDATION_CROSS_SHIP_INTERVAL"):
-		failures.append("soldier attack validation should use cross-ship throttling")
+	if ai_source.contains("ATTACK_VALIDATION_CROSS_SHIP_INTERVAL"):
+		failures.append("soldier attack validation should not keep rail-melee cross-ship throttling")
 	if not ai_source.contains("_validate_attack_state"):
 		failures.append("soldier attack validation should separate cheap attack state updates from full validation")
 	if ai_source.contains("static func state_attack") and ai_source.contains("var validate_profile_start := PhysicsFrameProfiler.begin()\n\tif _retarget_owned_ship_hostile"):

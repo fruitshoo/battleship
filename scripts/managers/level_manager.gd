@@ -46,11 +46,6 @@ signal score_changed(new_score: int)
 @export_range(0.0, 0.5, 0.01) var boss_arena_headwind_strength: float = 0.18
 @export_range(0.0, 4.0, 0.05) var boss_arena_current_strength: float = 1.25
 @export_range(0.0, 1.0, 0.01) var boss_arena_warning_threshold: float = 0.22
-@export var boss_boundary_hull_scene: PackedScene = preload("res://scenes/ships/hulls/kobayabune_hull.tscn")
-@export_range(10.0, 40.0, 0.5) var boss_boundary_spacing: float = 18.0
-@export_range(0.6, 2.4, 0.05) var boss_boundary_visual_scale: float = 1.6
-@export_range(0.0, 1.0, 0.01) var boss_boundary_height: float = 0.2
-@export_range(10.0, 180.0, 1.0) var boss_boundary_duration: float = 60.0
 
 var current_level: int = 1
 var current_xp: int = 0
@@ -78,9 +73,6 @@ var _boss_arena_active: bool = false
 var _boss_arena_anchor_boss_id: int = -1
 var _boss_arena_center: Vector3 = Vector3.ZERO
 var _boss_arena_half_extents_runtime: Vector2 = Vector2.ZERO
-var _boss_boundary_container: Node3D = null
-var _boss_boundary_elapsed: float = 0.0
-var _boss_boundary_hidden_for_current_boss: bool = false
 var _victory_result_transition_started: bool = false
 var _prologue_pending: bool = false
 var _prologue_active: bool = false
@@ -395,12 +387,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cycle_collision_visualizer_mode()
 			KEY_F7: # 중간 보스 디버그 소환
 				_debug_spawn_mid_boss()
-			KEY_F8: # 최종 보스 디버그 소환
-				_debug_spawn_final_boss()
-			KEY_F9: # 지원함 디버그 추가
-				_debug_spawn_support_ship()
-			KEY_F10: # 지원함 추종 상태 덤프
-				_debug_dump_support_fleet_state()
 			KEY_F11: # 돛 손상 디버그 조절 / Ctrl로 초기화
 				if event.ctrl_pressed:
 					_debug_reset_player_sail_state()
@@ -478,14 +464,8 @@ func _update_boss_arena_state(delta: float) -> void:
 	if not is_instance_valid(boss_ship):
 		_boss_arena_active = false
 		_boss_arena_anchor_boss_id = -1
-		_boss_boundary_elapsed = 0.0
-		_boss_boundary_hidden_for_current_boss = false
-		_clear_boss_boundary_markers()
 		return
 	var boss_id: int = boss_ship.get_instance_id()
-	if _boss_arena_anchor_boss_id != boss_id:
-		_boss_boundary_elapsed = 0.0
-		_boss_boundary_hidden_for_current_boss = false
 	_boss_arena_active = true
 	_boss_arena_anchor_boss_id = boss_id
 	var player_ship: Node3D = EntityRegistry.get_first_ship_by_team("player") as Node3D
@@ -496,7 +476,6 @@ func _update_boss_arena_state(delta: float) -> void:
 	_boss_arena_center.y = 0.0
 	var boss_tier: int = int(boss_ship.get("tier")) if boss_ship.get("tier") != null else 1
 	_boss_arena_half_extents_runtime = final_boss_arena_half_extents if boss_tier >= 2 else mid_boss_arena_half_extents
-	_clear_boss_boundary_markers()
 
 
 func _get_active_boss_ship() -> Node3D:
@@ -534,79 +513,6 @@ func get_boss_arena_display_wind_direction(world_pos: Vector3, base_wind_dir: Ve
 func get_boss_arena_warning_text(world_pos: Vector3) -> String:
 	return ""
 
-
-func _clear_boss_boundary_markers() -> void:
-	if is_instance_valid(_boss_boundary_container):
-		_boss_boundary_container.queue_free()
-	_boss_boundary_container = null
-
-
-func _rebuild_boss_boundary_markers(boss_ship: Node3D) -> void:
-	_clear_boss_boundary_markers()
-	if not is_instance_valid(boss_boundary_hull_scene) or not is_instance_valid(boss_ship):
-		return
-	_boss_boundary_container = Node3D.new()
-	_boss_boundary_container.name = "BossBoundaryMarkers"
-	var root_3d: Node3D = get_tree().current_scene as Node3D
-	if is_instance_valid(root_3d):
-		root_3d.add_child(_boss_boundary_container)
-	else:
-		get_parent().add_child(_boss_boundary_container)
-
-	var arena_forward: Vector3 = boss_ship.global_position - _boss_arena_center
-	arena_forward.y = 0.0
-	if arena_forward.length_squared() <= 0.0001:
-		arena_forward = Vector3(0.0, 0.0, -1.0)
-	else:
-		arena_forward = arena_forward.normalized()
-	var arena_rear: Vector3 = -arena_forward
-	var arena_right: Vector3 = arena_forward.cross(Vector3.UP).normalized()
-
-	var rear_half_width: float = _boss_arena_half_extents_runtime.x * 0.86
-	var rear_depth: float = _boss_arena_half_extents_runtime.y * 0.94
-	var flank_x: float = _boss_arena_half_extents_runtime.x * 0.96
-	var flank_start: float = _boss_arena_half_extents_runtime.y * 0.28
-	var flank_end: float = _boss_arena_half_extents_runtime.y * 0.82
-
-	var x: float = -rear_half_width
-	while x <= rear_half_width + 0.1:
-		var rear_pos: Vector3 = _boss_arena_center + arena_rear * rear_depth + arena_right * x
-		_spawn_boss_boundary_marker(rear_pos)
-		x += boss_boundary_spacing
-
-	var dist: float = flank_start
-	while dist <= flank_end + 0.1:
-		var left_pos: Vector3 = _boss_arena_center + arena_rear * dist - arena_right * flank_x
-		var right_pos: Vector3 = _boss_arena_center + arena_rear * dist + arena_right * flank_x
-		_spawn_boss_boundary_marker(left_pos)
-		_spawn_boss_boundary_marker(right_pos)
-		dist += boss_boundary_spacing
-
-
-func _spawn_boss_boundary_marker(world_pos: Vector3) -> void:
-	if not is_instance_valid(_boss_boundary_container) or not is_instance_valid(boss_boundary_hull_scene):
-		return
-	var marker := Node3D.new()
-	marker.position = Vector3(world_pos.x, boss_boundary_height, world_pos.z)
-	marker.scale = Vector3.ONE * boss_boundary_visual_scale
-	_boss_boundary_container.add_child(marker)
-
-	var hull_visual := boss_boundary_hull_scene.instantiate()
-	marker.add_child(hull_visual)
-	_disable_boundary_processing_recursive(hull_visual)
-
-	marker.look_at(_boss_arena_center, Vector3.UP)
-	marker.rotate_y(PI * 0.5)
-
-
-func _disable_boundary_processing_recursive(node: Node) -> void:
-	node.set_process(false)
-	node.set_physics_process(false)
-	node.set_process_input(false)
-	node.set_process_unhandled_input(false)
-	node.set_process_unhandled_key_input(false)
-	for child in node.get_children():
-		_disable_boundary_processing_recursive(child)
 
 func add_score(points: int) -> void:
 	LevelManagerProgressionHelper.add_score(self, points)

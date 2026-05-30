@@ -9,6 +9,9 @@ const SURVIVOR_JOIN_HEALTH_RATIO: float = 0.35
 const SURVIVOR_JOIN_MIN_HEALTH: float = 8.0
 const SURVIVOR_JOIN_HEALTH_BAR_DURATION: float = 2.4
 const CREW_STAIR_ARRIVAL_ACTION := "crew_stair_arrival"
+const PLAYER_CREW_SPAWNS_PER_FRAME := 1
+const PLAYER_CREW_STAGGER_QUEUE_META := "player_crew_stagger_queue"
+const PLAYER_CREW_STAGGER_RUNNING_META := "player_crew_stagger_running"
 
 static func get_desired_player_captain_count(ship) -> int:
 	return clampi(int(ship.captain_count), 0, maxi(0, int(ship.max_crew_count)))
@@ -98,6 +101,7 @@ static func sync_player_crew_roster(ship, allow_spawn_missing: bool = true) -> v
 	var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
 	if not soldiers_node:
 		return
+	var spawn_requests: Array[Dictionary] = []
 	_apply_initial_crew_slot_layout(ship, soldiers_node)
 	var desired = get_desired_player_crew_roles(ship)
 	var desired_captains: int = get_desired_player_captain_count(ship)
@@ -142,8 +146,7 @@ static func sync_player_crew_roster(ship, allow_spawn_missing: bool = true) -> v
 			set_captain_state(ship, promoted, true)
 			roster_captains.append(promoted)
 		elif allow_spawn_missing:
-			var captain = spawn_player_soldier(ship, soldiers_node, ship.CREW_ROLE_GENERAL, true)
-			roster_captains.append(captain)
+			spawn_requests.append({"role": ship.CREW_ROLE_GENERAL, "captain": true})
 		else:
 			break
 	for role in [ship.CREW_ROLE_SPEARMAN, ship.CREW_ROLE_REPEATING_CROSSBOW, ship.CREW_ROLE_SINGIGEON, ship.CREW_ROLE_FIRE_POT]:
@@ -161,7 +164,48 @@ static func sync_player_crew_roster(ship, allow_spawn_missing: bool = true) -> v
 		if not allow_spawn_missing:
 			continue
 		for _i in range(max(0, missing)):
-			spawn_player_soldier(ship, soldiers_node, role)
+			spawn_requests.append({"role": role, "captain": false})
+	if not spawn_requests.is_empty():
+		_queue_staggered_player_soldier_spawns(ship, spawn_requests)
+
+
+static func _queue_staggered_player_soldier_spawns(ship, spawn_requests: Array[Dictionary]) -> void:
+	if not is_instance_valid(ship) or spawn_requests.is_empty():
+		return
+	var queue: Array = ship.get_meta(PLAYER_CREW_STAGGER_QUEUE_META, [])
+	for request in spawn_requests:
+		queue.append(request.duplicate(true))
+	ship.set_meta(PLAYER_CREW_STAGGER_QUEUE_META, queue)
+	if ship.get_meta(PLAYER_CREW_STAGGER_RUNNING_META, false) == true:
+		return
+	ship.set_meta(PLAYER_CREW_STAGGER_RUNNING_META, true)
+	_run_staggered_player_soldier_spawns(ship)
+
+
+static func _run_staggered_player_soldier_spawns(ship) -> void:
+	while is_instance_valid(ship):
+		var queue: Array = ship.get_meta(PLAYER_CREW_STAGGER_QUEUE_META, [])
+		if queue.is_empty():
+			ship.remove_meta(PLAYER_CREW_STAGGER_QUEUE_META)
+			ship.set_meta(PLAYER_CREW_STAGGER_RUNNING_META, false)
+			return
+		var soldiers_node = NodeContractHelper.get_soldiers_container(ship)
+		if not is_instance_valid(soldiers_node):
+			ship.remove_meta(PLAYER_CREW_STAGGER_QUEUE_META)
+			ship.set_meta(PLAYER_CREW_STAGGER_RUNNING_META, false)
+			return
+		for _i in range(PLAYER_CREW_SPAWNS_PER_FRAME):
+			if queue.is_empty():
+				break
+			var request: Dictionary = queue.pop_front()
+			spawn_player_soldier(
+				ship,
+				soldiers_node,
+				str(request.get("role", ship.CREW_ROLE_GENERAL)),
+				bool(request.get("captain", false))
+			)
+		ship.set_meta(PLAYER_CREW_STAGGER_QUEUE_META, queue)
+		await ship.get_tree().process_frame
 
 static func add_survivor(ship, allow_over_capacity: bool = false) -> bool:
 	return _add_player_crew(ship, allow_over_capacity, "survivor")

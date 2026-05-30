@@ -85,7 +85,6 @@ class MockSoldier:
 	var crew_role: String = "general"
 	var is_melee_only: bool = false
 	var is_ranged_only: bool = false
-	var cross_ship_close: bool = false
 	var detection_range: float = 35.0
 
 	func _flash_hit() -> void:
@@ -109,9 +108,6 @@ class MockSoldier:
 			current_weapon = weapon_sword
 		elif type == "bow":
 			current_weapon = weapon_bow
-
-	func _is_ship_pair_in_melee_range(_other_ship: Node3D) -> bool:
-		return cross_ship_close
 
 	func _change_state(next_state: int) -> void:
 		current_state = next_state
@@ -497,7 +493,6 @@ func _verify_nearby_cross_ship_target_prefers_bow_without_rail_melee(failures: A
 	add_child(soldier.weapon_sword)
 	add_child(soldier.weapon_bow)
 	soldier.current_weapon = soldier.weapon_sword
-	soldier.cross_ship_close = true
 
 	var target := _make_soldier("enemy", enemy_ship)
 	target.global_position = Vector3(5.0, 0.0, 0.0)
@@ -526,7 +521,6 @@ func _verify_cross_ship_attack_state_exits_rail_melee(failures: Array[String]) -
 	add_child(soldier.weapon_bow)
 	soldier.current_weapon = soldier.weapon_sword
 	soldier.current_state = soldier.State.ATTACK
-	soldier.cross_ship_close = true
 
 	var target := _make_soldier("enemy", enemy_ship)
 	target.global_position = Vector3(5.0, 0.0, 0.0)

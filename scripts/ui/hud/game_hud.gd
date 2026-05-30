@@ -90,7 +90,7 @@ var debug_support_fleet_value: Label = null
 var debug_player_soldier_ai_value: Label = null
 var debug_enemy_soldier_ai_value: Label = null
 var performance_overlay_panel: PanelContainer = null
-var performance_overlay_label: Label = null
+var performance_overlay_label: RichTextLabel = null
 var debug_ship_hull_slider: HSlider = null
 var debug_ship_hull_value: Label = null
 var debug_ship_stamina_slider: HSlider = null
@@ -180,6 +180,17 @@ var _debug_modal_previous_paused: bool = false
 var _debug_modal_previous_layer: int = 0
 var _debug_modal_previous_process_mode: ProcessMode = Node.PROCESS_MODE_INHERIT
 var _performance_overlay_refresh_left: float = 0.0
+var _perf_prev_draw_calls: int = -1
+var _perf_prev_render_objects: int = -1
+var _perf_prev_primitives: int = -1
+var _perf_prev_physics_pairs: int = -1
+var _perf_last_process_usec: int = -1
+var _perf_recent_frame_ms: float = 0.0
+var _perf_peak_frame_ms: float = 0.0
+var _perf_physics_ticks_since_process: int = 0
+var _perf_recent_physics_ticks: int = 0
+var _performance_overlay_frozen: bool = false
+var _performance_overlay_snapshot_text: String = ""
 var trailer_clean_hud_enabled: bool = false
 var _trailer_clean_hud_visibility_snapshot: Dictionary = {}
 
@@ -346,8 +357,14 @@ func _adjust_player_ship_float_for_debug(property_name: String, delta_value: flo
 	HudShipDebugHelper.adjust_player_ship_float_for_debug(self, property_name, delta_value, min_value, max_value, label)
 
 func _process(delta: float) -> void:
+	_update_performance_frame_probe()
 	HudRuntimeHelper.process_hud(self, delta)
 	_update_performance_overlay(delta)
+
+
+func _physics_process(_delta: float) -> void:
+	if show_performance_overlay:
+		_perf_physics_ticks_since_process += 1
 
 
 func _sync_game_time(delta: float) -> void:
@@ -398,10 +415,6 @@ func _find_nearest_enemy_ship_for_distance_debug() -> Node3D:
 
 func _get_planar_distance(a: Vector3, b: Vector3) -> float:
 	return HudDistanceDebugHelper.get_planar_distance(a, b)
-
-
-func _get_ship_pair_melee_distance_debug(player: Node3D, other_ship: Node3D) -> float:
-	return HudDistanceDebugHelper.get_ship_pair_melee_distance_debug(self, player, other_ship)
 
 
 func _get_player_cannon_range_for_debug() -> float:
@@ -486,12 +499,20 @@ func toggle_stat_panel() -> void:
 	HudStatPanelHelper.toggle_stat_panel(self)
 
 func _input(event: InputEvent) -> void:
+	if _handle_performance_overlay_shortcut(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
 	if _is_debug_tools_toggle_event(event):
 		_toggle_debug_tools_panel_from_shortcut()
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _handle_performance_overlay_shortcut(event):
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+		return
 	if _handle_debug_capture_shortcut(event):
 		if get_viewport():
 			get_viewport().set_input_as_handled()
@@ -531,11 +552,9 @@ func _is_performance_overlay_toggle_event(event: InputEvent) -> bool:
 	var key_event := event as InputEventKey
 	if key_event == null or not key_event.pressed or key_event.is_echo():
 		return false
-	if key_event.alt_pressed or key_event.meta_pressed:
+	if key_event.alt_pressed or key_event.ctrl_pressed or key_event.shift_pressed or key_event.meta_pressed:
 		return false
-	if not key_event.ctrl_pressed or not key_event.shift_pressed:
-		return false
-	return key_event.physical_keycode == KEY_P or key_event.keycode == KEY_P
+	return key_event.physical_keycode == KEY_F10 or key_event.keycode == KEY_F10
 
 
 func _setup_performance_overlay() -> void:
@@ -552,10 +571,10 @@ func _setup_performance_overlay() -> void:
 	performance_overlay_panel.name = "PerformanceOverlay"
 	performance_overlay_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	performance_overlay_panel.offset_left = 14.0
-	performance_overlay_panel.offset_top = 158.0
-	performance_overlay_panel.offset_right = 316.0
-	performance_overlay_panel.offset_bottom = 430.0
-	performance_overlay_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	performance_overlay_panel.offset_top = 28.0
+	performance_overlay_panel.offset_right = 438.0
+	performance_overlay_panel.offset_bottom = 706.0
+	performance_overlay_panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	performance_overlay_panel.visible = show_performance_overlay
 
 	var panel_style := StyleBoxFlat.new()
@@ -563,20 +582,27 @@ func _setup_performance_overlay() -> void:
 	panel_style.border_color = Color(0.82, 0.65, 0.34, 0.7)
 	panel_style.set_border_width_all(1)
 	panel_style.set_corner_radius_all(4)
-	panel_style.content_margin_left = 9.0
-	panel_style.content_margin_top = 7.0
-	panel_style.content_margin_right = 9.0
-	panel_style.content_margin_bottom = 7.0
+	panel_style.content_margin_left = 6.0
+	panel_style.content_margin_top = 4.0
+	panel_style.content_margin_right = 6.0
+	panel_style.content_margin_bottom = 4.0
 	performance_overlay_panel.add_theme_stylebox_override("panel", panel_style)
 
-	performance_overlay_label = Label.new()
+	performance_overlay_label = RichTextLabel.new()
 	performance_overlay_label.name = "PerformanceOverlayLabel"
 	performance_overlay_label.text = "Performance"
-	performance_overlay_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	performance_overlay_label.add_theme_font_size_override("font_size", 11)
+	performance_overlay_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	performance_overlay_label.selection_enabled = true
+	performance_overlay_label.context_menu_enabled = true
+	performance_overlay_label.scroll_active = false
+	performance_overlay_label.fit_content = true
+	performance_overlay_label.bbcode_enabled = false
+	performance_overlay_label.custom_minimum_size = Vector2(412.0, 0.0)
+	performance_overlay_label.add_theme_font_size_override("normal_font_size", 7)
+	performance_overlay_label.add_theme_font_size_override("font_size", 7)
+	performance_overlay_label.add_theme_constant_override("line_separation", -4)
+	performance_overlay_label.add_theme_constant_override("line_spacing", -4)
 	performance_overlay_label.add_theme_color_override("font_color", Color(0.88, 0.91, 0.9, 1.0))
-	performance_overlay_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
-	performance_overlay_label.add_theme_constant_override("outline_size", 2)
 	performance_overlay_panel.add_child(performance_overlay_label)
 	add_child(performance_overlay_panel)
 	_update_performance_overlay(999.0)
@@ -588,11 +614,67 @@ func _toggle_performance_overlay() -> void:
 	if not is_instance_valid(performance_overlay_panel):
 		_setup_performance_overlay()
 	show_performance_overlay = not show_performance_overlay
+	if not show_performance_overlay:
+		_performance_overlay_frozen = false
+		_performance_overlay_snapshot_text = ""
 	PhysicsFrameProfiler.set_enabled(show_performance_overlay)
 	if is_instance_valid(performance_overlay_panel):
 		performance_overlay_panel.visible = show_performance_overlay
 	_performance_overlay_refresh_left = 0.0
 	_update_performance_overlay(999.0)
+
+
+func _handle_performance_overlay_shortcut(event: InputEvent) -> bool:
+	if not OS.is_debug_build() or not show_performance_overlay:
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.is_echo():
+		return false
+	if key_event.alt_pressed or key_event.ctrl_pressed or key_event.shift_pressed or key_event.meta_pressed:
+		return false
+	var keycode := key_event.physical_keycode if key_event.physical_keycode != 0 else key_event.keycode
+	match keycode:
+		KEY_F8:
+			_copy_performance_overlay_text()
+			return true
+		KEY_F9:
+			_set_performance_overlay_frozen(not _performance_overlay_frozen)
+			return true
+	return false
+
+
+func _set_performance_overlay_frozen(frozen: bool) -> void:
+	if not show_performance_overlay:
+		return
+	_performance_overlay_frozen = frozen
+	if _performance_overlay_frozen:
+		_performance_overlay_snapshot_text = _format_performance_overlay_text_for_freeze(_build_performance_overlay_text())
+		if is_instance_valid(performance_overlay_label):
+			performance_overlay_label.text = _performance_overlay_snapshot_text
+		show_gust_warning_message("PERF freeze", 0.55)
+	else:
+		_performance_overlay_snapshot_text = ""
+		_performance_overlay_refresh_left = 0.0
+		_update_performance_overlay(999.0)
+		show_gust_warning_message("PERF live", 0.55)
+
+
+func _copy_performance_overlay_text() -> void:
+	var text := _performance_overlay_snapshot_text if _performance_overlay_frozen else ""
+	if text.is_empty() and is_instance_valid(performance_overlay_label):
+		text = performance_overlay_label.text
+	if text.is_empty():
+		text = _build_performance_overlay_text()
+	DisplayServer.clipboard_set(text)
+	show_gust_warning_message("PERF copied", 0.55)
+
+
+func _format_performance_overlay_text_for_freeze(text: String) -> String:
+	if text.begins_with("PERF"):
+		var newline_index := text.find("\n")
+		if newline_index >= 0:
+			return "PERF [FROZEN] [F9]\n" + text.substr(newline_index + 1)
+	return "PERF [FROZEN] [F9]\n" + text
 
 
 func _handle_debug_capture_shortcut(event: InputEvent) -> bool:
@@ -712,6 +794,8 @@ func _update_performance_overlay(delta: float) -> void:
 		return
 	if not is_instance_valid(performance_overlay_panel) or not is_instance_valid(performance_overlay_label):
 		return
+	if _performance_overlay_frozen:
+		return
 	_performance_overlay_refresh_left = maxf(0.0, _performance_overlay_refresh_left - delta)
 	if _performance_overlay_refresh_left > 0.0:
 		return
@@ -724,6 +808,15 @@ func _build_performance_overlay_text() -> String:
 	var frame_ms := 0.0 if fps <= 0.0 else 1000.0 / fps
 	var process_ms := float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
 	var physics_ms := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
+	var measured_frame_ms := _perf_recent_frame_ms if _perf_recent_frame_ms > 0.0 else frame_ms
+	var measured_peak_ms := maxf(_perf_peak_frame_ms, measured_frame_ms)
+	var physics_ticks := _perf_recent_physics_ticks
+	var estimated_physics_ms := physics_ms * float(maxi(physics_ticks, 0))
+	var estimated_cpu_work_ms := process_ms + estimated_physics_ms
+	var raw_frame_gap_ms := maxf(0.0, measured_frame_ms - maxf(process_ms, physics_ms))
+	var adjusted_frame_gap_ms := maxf(0.0, measured_frame_ms - estimated_cpu_work_ms)
+	var profiler_total_ms := PhysicsFrameProfiler.get_exclusive_summary_total_msec()
+	var physics_unprofiled_ms := maxf(0.0, physics_ms - profiler_total_ms)
 	var ship_count := EntityRegistry.count_ships()
 	var enemy_ship_count := EntityRegistry.count_ships_by_team("enemy")
 	var player_ship_count := EntityRegistry.count_ships_by_team("player")
@@ -738,22 +831,165 @@ func _build_performance_overlay_text() -> String:
 	var physics_objects := int(Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS))
 	var collision_pairs := int(Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS))
 	var static_mb := float(Performance.get_monitor(Performance.MEMORY_STATIC)) / 1048576.0
-	var profiler_lines := PhysicsFrameProfiler.build_summary_lines(9)
+	var draw_delta := _format_perf_delta(draw_calls, _perf_prev_draw_calls)
+	var render_obj_delta := _format_perf_delta(render_objects, _perf_prev_render_objects)
+	var prim_delta := _format_perf_delta(primitives, _perf_prev_primitives)
+	var pair_delta := _format_perf_delta(collision_pairs, _perf_prev_physics_pairs)
+	_perf_prev_draw_calls = draw_calls
+	_perf_prev_render_objects = render_objects
+	_perf_prev_primitives = primitives
+	_perf_prev_physics_pairs = collision_pairs
+	var sail_fade_summary := _get_sail_fade_perf_summary()
+	var soldier_state_summary := _get_soldier_state_perf_summary()
+	var profiler_lines := PhysicsFrameProfiler.build_summary_lines(16)
+	var exclusive_lines := PhysicsFrameProfiler.build_exclusive_summary_lines(12)
+	var ai_ship_lines := PhysicsFrameProfiler.build_filtered_summary_lines(["ai_ship_", "boss_ship_"], "AI ship buckets", 8)
+	var player_ship_lines := PhysicsFrameProfiler.build_filtered_summary_lines(["player_ship_", "player_support_"], "Player ship buckets", 8)
+	var boarding_lines := PhysicsFrameProfiler.build_filtered_summary_lines(["ai_ship_boarding_", "ship_boarding_"], "Boarding buckets", 8)
+	_perf_peak_frame_ms = measured_frame_ms
 	var profiler_text := ""
 	if not profiler_lines.is_empty():
-		profiler_text = "\n" + "\n".join(profiler_lines)
+		profiler_text = "\n[Profile]\n" + "\n".join(profiler_lines)
+	var exclusive_text := ""
+	if not exclusive_lines.is_empty():
+		exclusive_text = "\n[Exclusive]\n" + "\n".join(exclusive_lines)
+	var ai_ship_text := ""
+	if not ai_ship_lines.is_empty():
+		ai_ship_text = "\n[AI Ship]\n" + "\n".join(ai_ship_lines)
+	var player_ship_text := ""
+	if not player_ship_lines.is_empty():
+		player_ship_text = "\n[Player Ship]\n" + "\n".join(player_ship_lines)
+	var boarding_text := ""
+	if not boarding_lines.is_empty():
+		boarding_text = "\n[Boarding]\n" + "\n".join(boarding_lines)
 	return (
-		"PERF [Ctrl+Shift+P]\n"
+		"PERF [F10]\n"
+		+ "[Frame]\n"
 		+ "FPS %d  frame %.1fms\n" % [roundi(fps), frame_ms]
+		+ "Real frame %.1fms  peak %.1fms\n" % [measured_frame_ms, measured_peak_ms]
 		+ "CPU process %.1fms  physics %.1fms\n" % [process_ms, physics_ms]
+		+ "Phys ticks %d  est %.1fms  unprof/tick %.1fms\n" % [physics_ticks, estimated_physics_ms, physics_unprofiled_ms]
+		+ "Frame gap raw %.1fms  adj %.1fms\n" % [raw_frame_gap_ms, adjusted_frame_gap_ms]
+		+ "[Scene]\n"
 		+ "Ships %d  P/E %d/%d\n" % [ship_count, player_ship_count, enemy_ship_count]
 		+ "Soldiers %d  Projectiles %d\n" % [soldier_count, projectile_count]
+		+ soldier_state_summary
 		+ "Nodes %d  Objects %d  Res %d\n" % [node_count, object_count, resource_count]
-		+ "Render draw %d  obj %d  prim %d\n" % [draw_calls, render_objects, primitives]
-		+ "Phys3D obj %d  pairs %d\n" % [physics_objects, collision_pairs]
+		+ "[Render]\n"
+		+ "Render draw %d%s  obj %d%s  prim %d%s\n" % [draw_calls, draw_delta, render_objects, render_obj_delta, primitives, prim_delta]
+		+ "Phys3D obj %d  pairs %d%s\n" % [physics_objects, collision_pairs, pair_delta]
+		+ sail_fade_summary
 		+ "Static mem %.1f MB" % static_mb
+		+ player_ship_text
+		+ ai_ship_text
+		+ boarding_text
 		+ profiler_text
+		+ exclusive_text
 	)
+
+func _update_performance_frame_probe() -> void:
+	if not show_performance_overlay:
+		_perf_last_process_usec = -1
+		_perf_recent_frame_ms = 0.0
+		_perf_peak_frame_ms = 0.0
+		_perf_physics_ticks_since_process = 0
+		_perf_recent_physics_ticks = 0
+		return
+	var now_usec := Time.get_ticks_usec()
+	if _perf_last_process_usec > 0:
+		_perf_recent_frame_ms = float(now_usec - _perf_last_process_usec) / 1000.0
+		_perf_peak_frame_ms = maxf(_perf_peak_frame_ms, _perf_recent_frame_ms)
+		_perf_recent_physics_ticks = _perf_physics_ticks_since_process
+		_perf_physics_ticks_since_process = 0
+	_perf_last_process_usec = now_usec
+
+
+func _format_perf_delta(current_value: int, previous_value: int) -> String:
+	if previous_value < 0:
+		return ""
+	var delta := current_value - previous_value
+	if delta == 0:
+		return ""
+	if delta > 0:
+		return "(+%d)" % delta
+	return "(%d)" % delta
+
+
+func _get_sail_fade_perf_summary() -> String:
+	var mast_count := 0
+	var fading_count := 0
+	var faded_target_count := 0
+	var min_alpha := 1.0
+	for ship_variant in EntityRegistry.get_ships():
+		var ship: Node3D = ship_variant as Node3D
+		if not is_instance_valid(ship):
+			continue
+		var raw_masts: Variant = ship.get("masts")
+		if not raw_masts is Array:
+			continue
+		for mast_variant in raw_masts:
+			var mast: Node = mast_variant as Node
+			if not is_instance_valid(mast):
+				continue
+			mast_count += 1
+			var alpha := 1.0
+			var target_alpha := 1.0
+			if mast.has_method("get_sail_view_fade_alpha"):
+				alpha = float(mast.call("get_sail_view_fade_alpha"))
+			if mast.has_method("get_sail_view_fade_target_alpha"):
+				target_alpha = float(mast.call("get_sail_view_fade_target_alpha"))
+			min_alpha = minf(min_alpha, alpha)
+			if alpha < 0.995:
+				fading_count += 1
+			if target_alpha < 0.995:
+				faded_target_count += 1
+	if mast_count <= 0:
+		return ""
+	return "Sail fade %d/%d  target %d  min %.2f\n" % [fading_count, mast_count, faded_target_count, min_alpha]
+
+
+func _get_soldier_state_perf_summary() -> String:
+	var idle_count := 0
+	var wander_count := 0
+	var move_count := 0
+	var attack_count := 0
+	var dead_count := 0
+	var jump_count := 0
+	var targeted_count := 0
+	for soldier_variant in EntityRegistry.get_soldiers():
+		var soldier: Node = soldier_variant as Node
+		if not is_instance_valid(soldier):
+			continue
+		var state_value := -1
+		if soldier.has_method("get_current_state_value"):
+			state_value = int(soldier.call("get_current_state_value"))
+		elif soldier.get("current_state") != null:
+			state_value = int(soldier.get("current_state"))
+		match state_value:
+			0:
+				idle_count += 1
+			1:
+				wander_count += 1
+			2:
+				move_count += 1
+			3:
+				attack_count += 1
+			4:
+				dead_count += 1
+			5:
+				jump_count += 1
+		var target_value: Variant = soldier.get("current_target")
+		if is_instance_valid(target_value):
+			targeted_count += 1
+	return "Soldier I/W/M/A/J/D %d/%d/%d/%d/%d/%d  tgt %d\n" % [
+		idle_count,
+		wander_count,
+		move_count,
+		attack_count,
+		jump_count,
+		dead_count,
+		targeted_count,
+	]
 
 
 func _is_debug_tools_toggle_event(event: InputEvent) -> bool:

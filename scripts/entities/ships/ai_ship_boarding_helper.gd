@@ -2,6 +2,8 @@ extends RefCounted
 class_name AIShipBoardingHelper
 
 const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
+const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const ShipEnemyContactLimitHelper = preload("res://scripts/entities/ships/ship_enemy_contact_limit_helper.gd")
 
 
 const BOARDING_MOTION_SETTLE_DURATION := 1.35
@@ -13,26 +15,42 @@ const NEIGHBOR_GUARD_BROAD_PHASE_SCALE := 1.35
 const NEIGHBOR_GUARD_BROAD_PHASE_PAD := 1.5
 
 static func process_boarding(ship, delta: float) -> void:
+	var target_profile_start := PhysicsFrameProfiler.begin()
 	if not is_instance_valid(ship.boarding_target):
 		if ship.get_team_tag() == "player":
 			if ship.has_method("_cancel_boarding"):
 				ship._cancel_boarding()
 			else:
 				ship.is_boarding = false
+			PhysicsFrameProfiler.end("ai_ship_boarding_target", target_profile_start)
 			return
 		ship.die()
+		PhysicsFrameProfiler.end("ai_ship_boarding_target", target_profile_start)
 		return
 	var target_pos = ship.boarding_target.global_position
 	var flat_to_target = target_pos - ship.global_position
 	flat_to_target.y = 0.0
 	var dist_to_target = flat_to_target.length()
 	var rope_link_active: bool = _has_active_boarding_rope_link(ship, ship.boarding_target)
-	if dist_to_target > _get_effective_boarding_distance(ship, ship.boarding_target) and not rope_link_active:
-		ship._process_boarding_common(delta)
-		ship._apply_bobbing_effect()
-		return
+	PhysicsFrameProfiler.end("ai_ship_boarding_target", target_profile_start)
 
+	var distance_profile_start := PhysicsFrameProfiler.begin()
+	if dist_to_target > _get_effective_boarding_distance(ship, ship.boarding_target) and not rope_link_active:
+		PhysicsFrameProfiler.end("ai_ship_boarding_distance", distance_profile_start)
+		var common_profile_start := PhysicsFrameProfiler.begin()
+		ship._process_boarding_common(delta)
+		PhysicsFrameProfiler.end("ai_ship_boarding_common_call", common_profile_start)
+		var bob_profile_start := PhysicsFrameProfiler.begin()
+		ship._apply_bobbing_effect()
+		PhysicsFrameProfiler.end("ai_ship_boarding_bob", bob_profile_start)
+		return
+	PhysicsFrameProfiler.end("ai_ship_boarding_distance", distance_profile_start)
+
+	var motion_profile_start := PhysicsFrameProfiler.begin()
 	var motion := _build_boarding_motion(ship, ship.boarding_target, target_pos, flat_to_target, dist_to_target)
+	PhysicsFrameProfiler.end("ai_ship_boarding_motion_build", motion_profile_start)
+
+	var steer_profile_start := PhysicsFrameProfiler.begin()
 	var contact_mode: String = ShipBoardingMetaHelper.get_contact_mode(ship)
 	var motion_settle: float = _update_motion_settle(ship, delta)
 	var heading_dir: Vector3 = ShipBoardingMotion.get_heading_dir(motion)
@@ -44,7 +62,9 @@ static func process_boarding(ship, delta: float) -> void:
 	var speed_change_rate: float = ship.acceleration if desired_boarding_speed > ship.current_speed else ship.deceleration
 	speed_change_rate *= lerpf(0.78, 1.12, motion_settle)
 	ship.current_speed = move_toward(ship.current_speed, desired_boarding_speed, speed_change_rate * delta)
+	PhysicsFrameProfiler.end("ai_ship_boarding_steer_speed", steer_profile_start)
 
+	var velocity_profile_start := PhysicsFrameProfiler.begin()
 	var correction_velocity: Vector3 = ShipBoardingMotion.get_correction_velocity(motion)
 	var correction_blend: float = lerpf(0.72, 1.0, motion_settle)
 	if rope_link_active:
@@ -53,16 +73,28 @@ static func process_boarding(ship, delta: float) -> void:
 	var approach_velocity: Vector3 = heading_dir * ship.current_speed + correction_velocity
 	var pull_blend: float = LATCHED_PULL_BLEND if rope_link_active else lerpf(0.25, 0.7, motion_settle)
 	var pull_velocity = ship._calculate_boarding_pull_velocity(delta) * pull_blend
+	PhysicsFrameProfiler.end("ai_ship_boarding_velocity", velocity_profile_start)
+
+	var guard_profile_start := PhysicsFrameProfiler.begin()
 	var prev_pos = ship.global_position
 	var next_pos = prev_pos + (approach_velocity + pull_velocity) * delta
 	if is_instance_valid(ship.boarding_target):
 		var guard_ratio: float = 0.92
+		var target_guard_profile_start := PhysicsFrameProfiler.begin()
 		next_pos = apply_ship_collision_guard(ship, ship.boarding_target, prev_pos, next_pos, guard_ratio, approach_velocity.length())
+		PhysicsFrameProfiler.end("ai_ship_boarding_target_guard", target_guard_profile_start)
+	var neighbor_guard_profile_start := PhysicsFrameProfiler.begin()
 	next_pos = apply_neighbor_ship_guards(ship, prev_pos, next_pos, ship.boarding_target)
+	PhysicsFrameProfiler.end("ai_ship_boarding_neighbor_guards", neighbor_guard_profile_start)
 	ship.global_position = next_pos
+	PhysicsFrameProfiler.end("ai_ship_boarding_guards_apply", guard_profile_start)
 
+	var bob_profile_start := PhysicsFrameProfiler.begin()
 	ship._apply_bobbing_effect()
+	PhysicsFrameProfiler.end("ai_ship_boarding_bob", bob_profile_start)
+	var common_profile_start := PhysicsFrameProfiler.begin()
 	ship._process_boarding_common(delta)
+	PhysicsFrameProfiler.end("ai_ship_boarding_common_call", common_profile_start)
 
 
 static func _has_active_boarding_rope_link(ship, target_ship: Node3D) -> bool:
@@ -210,8 +242,11 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 	var corrected_pos = proposed_pos
 	var neighbors = ship.get_ships_cached(ship.get_tree())
 	var check_count = 0
+	var enemy_enemy_check_count := 0
 	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else "enemy"
 	var ship_guard_radius := _get_neighbor_guard_broad_radius(ship)
+	var current_frame := Engine.get_physics_frames()
+	var ship_count: int = neighbors.size()
 
 	for other in neighbors:
 		if other == ship or not is_instance_valid(other):
@@ -222,6 +257,14 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 			continue
 		if other.get_meta("derelict_nonblocking", false) == true:
 			continue
+
+		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else "enemy"
+		var is_enemy_enemy_limited := ShipEnemyContactLimitHelper.should_limit(ship_team, other_team, ship_count)
+		if is_enemy_enemy_limited:
+			if enemy_enemy_check_count >= ShipEnemyContactLimitHelper.get_max_guard_checks():
+				continue
+			if not ShipEnemyContactLimitHelper.is_timeslice_active(ship, other, current_frame):
+				continue
 
 		var diff = corrected_pos - other.global_position
 		diff.y = 0.0
@@ -236,10 +279,11 @@ static func apply_neighbor_ship_guards(ship, prev_pos: Vector3, proposed_pos: Ve
 		if diff.length_squared() > safe_probe * safe_probe:
 			continue
 
-		var other_team: String = other.get_team_tag() if other.has_method("get_team_tag") else "enemy"
 		var emit_collision_event: bool = ship_team != other_team
 		corrected_pos = apply_ship_collision_guard(ship, other, prev_pos, corrected_pos, safe_ratio, ship.current_speed, emit_collision_event)
 		check_count += 1
+		if is_enemy_enemy_limited:
+			enemy_enemy_check_count += 1
 		if check_count >= 6:
 			break
 

@@ -15,6 +15,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 const MIN_FLIGHT_DURATION := 0.12
 const TERMINAL_VISUAL_CONVERGE_START := 0.42
 const TERMINAL_VISUAL_TRACK_RADIUS := 8.0
+const LIVE_TARGET_UPDATE_INTERVAL := 0.05
 const SOLDIER_AIM_VERTICAL_OFFSET := 1.05
 const SHIP_AIM_VERTICAL_OFFSET := 0.55
 const CRIT_EFFECT_DECK_MARGIN := 0.75
@@ -32,6 +33,9 @@ var progress: float = 0.0
 var duration: float = 1.0
 var _is_releasing: bool = false
 var _rotation_update_timer: float = 0.0
+var _live_target_update_timer: float = 0.0
+var _cached_visual_target_pos: Vector3 = Vector3.ZERO
+var _has_cached_visual_target_pos: bool = false
 
 func _ready() -> void:
 	pool_reset()
@@ -72,6 +76,9 @@ func launch(
 	progress = 0.0
 	_is_releasing = false
 	_rotation_update_timer = 0.0
+	_live_target_update_timer = 0.0
+	_cached_visual_target_pos = target_pos
+	_has_cached_visual_target_pos = false
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
 	monitoring = false
@@ -102,6 +109,9 @@ func pool_reset() -> void:
 	fire_damage = 0.0
 	_is_releasing = false
 	_rotation_update_timer = 0.0
+	_live_target_update_timer = 0.0
+	_cached_visual_target_pos = Vector3.ZERO
+	_has_cached_visual_target_pos = false
 	visible = false
 	process_mode = Node.PROCESS_MODE_DISABLED
 	monitoring = false
@@ -135,13 +145,16 @@ func _profiled_physics_process(delta: float) -> void:
 	progress += delta / duration
 	
 	if progress >= 1.0:
-		global_position = _get_visual_target_pos()
+		var hit_profile_start := PhysicsFrameProfiler.begin()
+		global_position = _get_visual_target_pos(delta, true)
 		_resolve_terminal_hit(global_position)
+		PhysicsFrameProfiler.end("projectile_arrow_terminal", hit_profile_start)
 		_release_self()
 		return
 	
+	var flight_profile_start := PhysicsFrameProfiler.begin()
 	# 수평 이동 (LERP)
-	var current_pos = start_pos.lerp(_get_visual_target_pos(), progress)
+	var current_pos = start_pos.lerp(_get_visual_target_pos(delta), progress)
 	
 	# 수직 곡선 (sin 이용)
 	var y_offset = sin(PI * progress) * arc_height
@@ -161,7 +174,12 @@ func _profiled_physics_process(delta: float) -> void:
 
 	# 수면(y=0.0) 타격 감지 기능 추가
 	if global_position.y <= 0.0:
+		PhysicsFrameProfiler.end("projectile_arrow_flight", flight_profile_start)
+		var splash_profile_start := PhysicsFrameProfiler.begin()
 		_splash_and_sink()
+		PhysicsFrameProfiler.end("projectile_arrow_splash", splash_profile_start)
+		return
+	PhysicsFrameProfiler.end("projectile_arrow_flight", flight_profile_start)
 
 func _splash_and_sink() -> void:
 	# 화살은 스플래시만 작게 재생
@@ -180,12 +198,24 @@ func _splash_and_sink() -> void:
 		
 	_release_self()
 
-func _get_visual_target_pos() -> Vector3:
+func _get_visual_target_pos(delta: float = 0.0, force_update: bool = false) -> Vector3:
 	if not is_instance_valid(target_node):
 		return target_pos
 	if target_node.is_queued_for_deletion():
 		return target_pos
-	var live_target_pos: Vector3 = _get_arrow_target_aim_point(target_node)
+	if not force_update and progress < TERMINAL_VISUAL_CONVERGE_START:
+		return target_pos
+	if force_update or not _has_cached_visual_target_pos:
+		_cached_visual_target_pos = _get_arrow_target_aim_point(target_node)
+		_has_cached_visual_target_pos = true
+		_live_target_update_timer = 0.0
+	elif delta > 0.0:
+		_live_target_update_timer -= delta
+		if _live_target_update_timer <= 0.0:
+			_cached_visual_target_pos = _get_arrow_target_aim_point(target_node)
+			_has_cached_visual_target_pos = true
+			_live_target_update_timer = LIVE_TARGET_UPDATE_INTERVAL
+	var live_target_pos: Vector3 = _cached_visual_target_pos
 	var planned_to_live := live_target_pos - target_pos
 	if planned_to_live.length() > TERMINAL_VISUAL_TRACK_RADIUS:
 		planned_to_live = planned_to_live.normalized() * TERMINAL_VISUAL_TRACK_RADIUS

@@ -46,11 +46,13 @@ const CARGO_TRANSPORT_STAIR_BOTTOM_NODE_NAME := "CrewStairBottom"
 const CARGO_TRANSPORT_STAIR_TOP_META := "cargo_transport_stair_top"
 const CARGO_TRANSPORT_STAIR_BOTTOM_META := "cargo_transport_stair_bottom"
 const ROOF_CARGO_TRANSPORT_ARC_META := "roof_cargo_transport_arc"
+const ROOF_DEATH_OVERBOARD_IN_PROGRESS_META := "roof_death_overboard_in_progress"
 
 @export var rudder_speed: float = 95.0
 @export var rudder_return_speed: float = 65.0
 @export_range(0.5, 3.0, 0.05) var player_rudder_turn_authority: float = 1.05 # 플레이어 러더 회전 반응 보정
 @export var rudder_turn_speed: float = 95.0 # Seamanship에 의해 강화됨
+@export_range(0.02, 0.2, 0.01) var player_separation_update_interval: float = 0.08
 
 @export_group("Identity / Hull")
 @export var ship_type: String = "panokseon_player":
@@ -76,7 +78,7 @@ var rowing_locked: bool = false
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.0
-@export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 1.0
+@export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 0.5
 @export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.78
 @export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
 
@@ -161,6 +163,8 @@ var _sail_handling_audio_timer: float = 0.0
 var _speed_shift_audio_timer: float = 0.0
 var _last_audio_wind_intake: float = 0.0
 var _last_audio_speed: float = 0.0
+var _player_separation_force: Vector3 = Vector3.ZERO
+var _player_separation_timer: float = 0.0
 
 # 성능 최적화: ships 그룹 캐싱 (프레임당 1회 조회)
 static var _cached_ships: Array = []
@@ -355,7 +359,11 @@ func _physics_process(delta: float) -> void:
 	var profile_start := PhysicsProfiler.begin()
 	
 	# 기본 물리 프로세스 (둥실거림 등)
+	var base_profile_start := PhysicsProfiler.begin()
 	super._physics_process(delta)
+	PhysicsProfiler.end("player_ship_base_physics", base_profile_start)
+
+	var timer_profile_start := PhysicsProfiler.begin()
 	if _flap_timer > 0:
 		_flap_timer -= delta
 		
@@ -368,23 +376,45 @@ func _physics_process(delta: float) -> void:
 			# 속도가 빠를수록 자주, 느릴수록 드문드문 (최소 1.5초 ~ 최대 4.5초)
 			var speed_mod = clamp(motion_speed / 5.0, 0.2, 2.0)
 			_wave_timer = randf_range(1.5, 3.5) / speed_mod
+	PhysicsProfiler.end("player_ship_timers_audio", timer_profile_start)
 		
 	if is_player_controlled:
+		var input_profile_start := PhysicsProfiler.begin()
 		_handle_input(delta)
+		PhysicsProfiler.end("player_ship_input", input_profile_start)
+
+	var sail_boost_profile_start := PhysicsProfiler.begin()
 	_update_ramming_boost(delta)
 	_update_boarding_rope_resistance(delta)
 	if _is_auto_sail_control_enabled():
 		_auto_adjust_sail(delta)
 	_update_sail_deployment(delta)
+	PhysicsProfiler.end("player_ship_sail_boost", sail_boost_profile_start)
+
+	var crew_alloc_profile_start := PhysicsProfiler.begin()
 	update_crew_allocation_state(delta)
+	PhysicsProfiler.end("player_ship_crew_allocation", crew_alloc_profile_start)
+
+	var movement_profile_start := PhysicsProfiler.begin()
 	_update_movement(delta)
+	PhysicsProfiler.end("player_ship_movement", movement_profile_start)
+
+	var steering_profile_start := PhysicsProfiler.begin()
 	_update_steering(delta)
+	PhysicsProfiler.end("player_ship_steering", steering_profile_start)
+
+	var oar_status_profile_start := PhysicsProfiler.begin()
 	_update_rowing_stamina(delta)
 	_update_oar_visual(delta)
 	_update_hull_regeneration(delta)
 	_update_burning_status(delta)
 	_update_rigging_recovery(delta)
+	PhysicsProfiler.end("player_ship_status_updates", oar_status_profile_start)
+
+	var boarding_state_profile_start := PhysicsProfiler.begin()
 	_update_boarding_state(delta)
+	PhysicsProfiler.end("player_ship_boarding_state", boarding_state_profile_start)
+
 	var support_profile_start := PhysicsProfiler.begin()
 	_update_crew_respawn(delta)
 	_update_auto_boarding_raid(delta)
@@ -393,10 +423,14 @@ func _physics_process(delta: float) -> void:
 	PhysicsProfiler.end("player_support_boarding", support_profile_start)
 	
 	if is_boarding:
+		var boarding_common_profile_start := PhysicsProfiler.begin()
 		_process_boarding_common(delta)
+		PhysicsProfiler.end("player_ship_boarding_common", boarding_common_profile_start)
 		
+	var audio_profile_start := PhysicsProfiler.begin()
 	PlayerShipRuntimeHelper.update_rowing_audio(self, delta)
 	PlayerShipRuntimeHelper.update_sail_wind_audio(self, delta)
+	PhysicsProfiler.end("player_ship_runtime_audio", audio_profile_start)
 	PhysicsProfiler.end("player_ship_physics", profile_start)
 				
 
@@ -580,6 +614,24 @@ func _throw_payload_overboard(cleaner: Node3D, corpse: Node3D) -> void:
 
 
 func _throw_roof_payload_overboard(corpse: Node3D) -> void:
+	_start_roof_payload_overboard_throw(corpse, true)
+
+
+func try_throw_roof_death_overboard(corpse: Node3D) -> bool:
+	if not is_instance_valid(corpse):
+		return false
+	if corpse.get_meta(ROOF_DEATH_OVERBOARD_IN_PROGRESS_META, false) == true:
+		return true
+	if corpse.get_meta("cargo_transport_in_progress", false) == true:
+		return false
+	if not PlayerShipCargoTransportHelper.is_roof_corpse(corpse):
+		return false
+	corpse.set_meta(ROOF_DEATH_OVERBOARD_IN_PROGRESS_META, true)
+	_start_roof_payload_overboard_throw(corpse, false)
+	return true
+
+
+func _start_roof_payload_overboard_throw(corpse: Node3D, grant_xp_on_finish: bool) -> void:
 	if not is_instance_valid(corpse):
 		return
 	corpse.set_meta("cargo_transport_in_progress", true)
@@ -593,7 +645,7 @@ func _throw_roof_payload_overboard(corpse: Node3D) -> void:
 		1.0,
 		throw_seconds
 	).set_trans(Tween.TRANS_LINEAR)
-	tween.finished.connect(_finish_roof_cargo_transport_throw.bind(corpse_id))
+	tween.finished.connect(_finish_roof_cargo_transport_throw.bind(corpse_id, grant_xp_on_finish))
 
 
 func _stow_friendly_corpse_below_deck(cleaner: Node3D, corpse: Node3D) -> void:
@@ -960,13 +1012,14 @@ func _finish_cargo_transport_throw(corpse_id: int, cleaner_id: int) -> void:
 			SoldierActionHelper.finish_cargo_transport_action(cleaner)
 
 
-func _finish_roof_cargo_transport_throw(corpse_id: int) -> void:
+func _finish_roof_cargo_transport_throw(corpse_id: int, grant_xp_on_finish: bool = true) -> void:
 	var corpse := NodeContractHelper.get_instance_node(corpse_id)
 	if not is_instance_valid(corpse):
 		return
 	if corpse is Node3D:
 		_play_overboard_disposal_splash((corpse as Node3D).global_position)
-	_grant_cargo_transport_xp()
+	if grant_xp_on_finish:
+		_grant_cargo_transport_xp()
 	corpse.queue_free()
 
 
@@ -1447,7 +1500,7 @@ func set_sail_furled(furled: bool) -> void:
 		if mast_fold_pivots.is_empty():
 			_play_sail_handling_sound(true, 2.0)
 	if is_instance_valid(_cached_hud) and _cached_hud.has_method("show_message"):
-		var message := "돛 접음: 노 속도 +1 / 화재 피해 감소 / 충각 돌진 가능" if sail_furled else "돛 펼침: 항해 속도 회복"
+		var message := "돛 접음: 노 속도 +0.5 / 화재 피해 감소 / 충각 돌진 가능" if sail_furled else "돛 펼침: 항해 속도 회복"
 		_cached_hud.show_message(message, 1.4)
 	_sync_support_fleet_sail_furl()
 

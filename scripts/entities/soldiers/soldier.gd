@@ -134,6 +134,8 @@ var _lod_is_combat_priority: bool = false
 var _cached_nearest_enemy: Node3D = null
 var _nearest_enemy_cache_timer: float = 0.0
 var _nearest_enemy_cache_interval_runtime: float = 0.2
+var _nearest_enemy_query_frame: int = -1
+var _nearest_enemy_query_result: Node3D = null
 var attack_validation_timer: float = 0.0
 var attack_validation_interval_runtime: float = 0.12
 var _limbo_ai_update_timer: float = 0.0
@@ -161,8 +163,6 @@ var _base_max_health_stat: float = 0.0
 var _base_attack_damage_stat: float = 0.0
 var _base_defense_stat: float = 0.0
 
-var CROSS_SHIP_ENGAGE_MAX_DISTANCE: float = 14.5
-var CROSS_SHIP_ENGAGE_SHIP_DISTANCE: float = 16.5
 const RANGED_DAMAGE_SOURCES := {
 	"bow": true,
 	"repeating_crossbow": true,
@@ -408,8 +408,6 @@ func _apply_soldier_rules_data() -> void:
 	var combat_ranges: Dictionary = SoldierRulesData.get_section("combat_ranges")
 	if not combat_ranges.is_empty():
 		weapon_switch_distance = float(combat_ranges.get("weapon_switch_distance", weapon_switch_distance))
-		CROSS_SHIP_ENGAGE_MAX_DISTANCE = float(combat_ranges.get("cross_ship_engage_max_distance", CROSS_SHIP_ENGAGE_MAX_DISTANCE))
-		CROSS_SHIP_ENGAGE_SHIP_DISTANCE = float(combat_ranges.get("cross_ship_engage_ship_distance", CROSS_SHIP_ENGAGE_SHIP_DISTANCE))
 
 func _cache_base_combat_stats() -> void:
 	_base_max_health_stat = max_health
@@ -860,6 +858,7 @@ func _update_team_color() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var physics_profile_start := PhysicsFrameProfiler.begin()
 	# 바다에 빠지면 사망 (글로벌 Y < -5)
 	if is_inside_tree() and global_position.y < -5.0:
 		var was_ballistic_collateral: bool = get_meta("ballistic_collateral_pending", false) == true
@@ -890,6 +889,7 @@ func _physics_process(delta: float) -> void:
 			home_ship.call_deferred("check_derelict_status")
 			
 		_die()
+		PhysicsFrameProfiler.end("soldier_physics", physics_profile_start)
 		return
 
 	if SoldierActionHelper.is_action_ai_locked(self):
@@ -897,23 +897,31 @@ func _physics_process(delta: float) -> void:
 		if attack_timer > 0:
 			attack_timer -= delta
 		_update_ally_health_bar(delta)
+		PhysicsFrameProfiler.end("soldier_physics", physics_profile_start)
 		return
 
 	_ai_event_wake_timer = maxf(0.0, _ai_event_wake_timer - delta)
 	_update_ally_health_bar(delta)
 	if _try_passive_ai_sleep(delta):
+		PhysicsFrameProfiler.end("soldier_physics", physics_profile_start)
 		return
 
 	var speech_profile_start := PhysicsFrameProfiler.begin()
 	SoldierSpeechHelper.update(self, delta)
 	PhysicsFrameProfiler.end("soldier_speech", speech_profile_start)
+	var limbo_runtime_profile_start := PhysicsFrameProfiler.begin()
 	_update_limbo_ai_pilot_runtime(delta)
+	PhysicsFrameProfiler.end("soldier_limbo_runtime", limbo_runtime_profile_start)
 
+	var knockback_profile_start := PhysicsFrameProfiler.begin()
 	if _update_external_knockback(delta):
+		PhysicsFrameProfiler.end("soldier_external_knockback", knockback_profile_start)
 		if attack_timer > 0:
 			attack_timer -= delta
 		_update_rest_recovery(delta)
+		PhysicsFrameProfiler.end("soldier_physics", physics_profile_start)
 		return
+	PhysicsFrameProfiler.end("soldier_external_knockback", knockback_profile_start)
 		
 	# === [FIX] 함선 이탈 및 공중 부양 방지 ===
 	if not _is_jumping and current_state != State.DEAD:
@@ -928,10 +936,15 @@ func _physics_process(delta: float) -> void:
 	if is_stationary:
 		if not _is_jumping and current_state != State.DEAD:
 			if velocity.length_squared() > 0.0001:
+				var slide_profile_start := PhysicsFrameProfiler.begin()
 				move_and_slide()
+				PhysicsFrameProfiler.end("soldier_post_move_slide", slide_profile_start)
+			var bounds_profile_start := PhysicsFrameProfiler.begin()
 			_run_deck_bounds_check(delta)
+			PhysicsFrameProfiler.end("soldier_deck_bounds_check", bounds_profile_start)
 		if attack_timer > 0: attack_timer -= delta
 		_check_ranged_combat()
+		PhysicsFrameProfiler.end("soldier_physics", physics_profile_start)
 		return
 
 	# 의사결정 스로틀링 (0.2초마다 고비용 로직 수행)
@@ -975,7 +988,9 @@ func _physics_process(delta: float) -> void:
 	if team == "enemy" and current_state != State.DEAD:
 		# 플레이어 배에 타고 있는지 확인
 		if is_instance_valid(owned_ship) and owned_ship.get("team") == "player":
+			var chaos_profile_start := PhysicsFrameProfiler.begin()
 			_update_boarding_chaos(delta)
+			PhysicsFrameProfiler.end("soldier_boarding_chaos", chaos_profile_start)
 	
 	var state_before_profile := current_state
 	var state_profile_start := PhysicsFrameProfiler.begin()
@@ -995,15 +1010,19 @@ func _physics_process(delta: float) -> void:
 	PhysicsFrameProfiler.end(_get_state_profile_label(state_before_profile), state_profile_start)
 	
 	if not _is_jumping and current_state != State.DEAD:
-		var move_profile_start := PhysicsFrameProfiler.begin()
 		if current_state == State.IDLE:
 			if velocity.length_squared() > 0.0001:
+				var slide_profile_start := PhysicsFrameProfiler.begin()
 				move_and_slide()
+				PhysicsFrameProfiler.end("soldier_post_move_slide", slide_profile_start)
 		elif current_state == State.ATTACK:
 			if velocity.length_squared() > 0.0001:
+				var slide_profile_start := PhysicsFrameProfiler.begin()
 				move_and_slide()
+				PhysicsFrameProfiler.end("soldier_post_move_slide", slide_profile_start)
+		var bounds_profile_start := PhysicsFrameProfiler.begin()
 		_run_deck_bounds_check(delta)
-		PhysicsFrameProfiler.end("soldier_move_bounds", move_profile_start)
+		PhysicsFrameProfiler.end("soldier_deck_bounds_check", bounds_profile_start)
 			
 	# 탈출(Evacuation) 체크: 소속된 나포함이 가라앉고 있으면 홈으로 복귀
 	if run_heavy_logic and team == "player" and is_instance_valid(owned_ship) and owned_ship.get("is_dying") == true:
@@ -1016,15 +1035,24 @@ func _physics_process(delta: float) -> void:
 	# 원거리 사격 및 무기 스위칭 체크 (전투 스케줄)
 	if current_state != State.DEAD and current_state != State.BOARDING_JUMP and run_combat_logic:
 		var combat_profile_start := PhysicsFrameProfiler.begin()
+		var combat_find_profile_start := PhysicsFrameProfiler.begin()
 		var nearest = find_nearest_enemy()
+		PhysicsFrameProfiler.end("soldier_combat_find_enemy", combat_find_profile_start)
+		var combat_weapon_profile_start := PhysicsFrameProfiler.begin()
 		SoldierWeaponHelper.update_combat_weapon_choice(self, nearest)
+		PhysicsFrameProfiler.end("soldier_combat_weapon_choice", combat_weapon_profile_start)
 
 		if current_state != State.ATTACK:
-			_check_ranged_combat()
+			var ranged_profile_start := PhysicsFrameProfiler.begin()
+			_check_ranged_combat(nearest)
+			PhysicsFrameProfiler.end("soldier_combat_ranged_check", ranged_profile_start)
+			var capture_profile_start := PhysicsFrameProfiler.begin()
 			_check_ship_capture_opportunity()
+			PhysicsFrameProfiler.end("soldier_combat_capture_check", capture_profile_start)
 		PhysicsFrameProfiler.end("soldier_combat", combat_profile_start)
 
 	_update_rest_recovery(delta)
+	PhysicsFrameProfiler.end("soldier_physics", physics_profile_start)
 
 
 func _update_rest_recovery(delta: float) -> void:
@@ -1254,7 +1282,13 @@ func _perform_attack() -> void:
 
 ## 가장 가까운 적 찾기 (탐지 범위 및 동일 함선 우선순위 적용)
 func find_nearest_enemy() -> Node3D:
+	var query_frame := Engine.get_physics_frames()
+	if _nearest_enemy_query_frame == query_frame:
+		return _nearest_enemy_query_result
 	var sticky_target: Node3D = _get_sticky_current_enemy()
+	if is_instance_valid(owned_ship) and is_instance_valid(sticky_target) and _get_target_owned_ship_node(sticky_target) == owned_ship:
+		_cached_nearest_enemy = sticky_target
+		return _store_nearest_enemy_query_result(sticky_target)
 	if is_instance_valid(owned_ship):
 		var owned_team: String = owned_ship.get_team_tag() if owned_ship.has_method("get_team_tag") else str(owned_ship.get("team"))
 		if owned_team == team:
@@ -1265,26 +1299,32 @@ func find_nearest_enemy() -> Node3D:
 					var local_dist_sq: float = _get_planar_distance_sq_to(local_hostile)
 					if local_dist_sq < sticky_dist_sq * TARGET_STICKY_LOCAL_SWITCH_RATIO:
 						_cached_nearest_enemy = local_hostile
-						return local_hostile
+						return _store_nearest_enemy_query_result(local_hostile)
 				_cached_nearest_enemy = sticky_target
-				return sticky_target
+				return _store_nearest_enemy_query_result(sticky_target)
 			if is_instance_valid(local_hostile):
 				_cached_nearest_enemy = local_hostile
-				return local_hostile
+				return _store_nearest_enemy_query_result(local_hostile)
 			var fallback_hostile := _find_nearest_owned_ship_hostile_fallback()
 			if is_instance_valid(fallback_hostile):
 				_cached_nearest_enemy = fallback_hostile
-				return fallback_hostile
+				return _store_nearest_enemy_query_result(fallback_hostile)
 	var limbo_target: Node3D = _get_recent_limbo_target()
 	if _is_valid_enemy_target(limbo_target):
 		_cached_nearest_enemy = limbo_target
-		return limbo_target
+		return _store_nearest_enemy_query_result(limbo_target)
 	if is_instance_valid(sticky_target):
 		_cached_nearest_enemy = sticky_target
-		return sticky_target
+		return _store_nearest_enemy_query_result(sticky_target)
 	if _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
-		return _cached_nearest_enemy
-	return _refresh_nearest_enemy_cache(true)
+		return _store_nearest_enemy_query_result(_cached_nearest_enemy)
+	return _store_nearest_enemy_query_result(_refresh_nearest_enemy_cache(true))
+
+
+func _store_nearest_enemy_query_result(result: Node3D) -> Node3D:
+	_nearest_enemy_query_frame = Engine.get_physics_frames()
+	_nearest_enemy_query_result = result if is_instance_valid(result) else null
+	return _nearest_enemy_query_result
 
 
 func _get_sticky_current_enemy() -> Node3D:
@@ -1376,18 +1416,6 @@ func _find_nearest_owned_ship_hostile_fallback() -> Node3D:
 func _check_ship_capture_opportunity() -> void:
 	return
 
-func _is_ship_pair_in_melee_range(other_ship: Node3D) -> bool:
-	return SoldierShipHelper.is_ship_pair_in_melee_range(self, other_ship)
-
-
-func _get_cross_ship_engage_ship_distance(other_ship: Node3D) -> float:
-	return SoldierShipHelper.get_cross_ship_engage_ship_distance(self, other_ship)
-
-
-func _get_cross_ship_engage_max_distance(other_ship: Node3D) -> float:
-	return SoldierShipHelper.get_cross_ship_engage_max_distance(self, other_ship)
-
-
 ## 홈으로 긴급 복귀 (배가 가라앉을 때)
 func _try_evacuate_to_home() -> void:
 	SoldierBoardingHelper.try_evacuate_to_home(self)
@@ -1431,17 +1459,19 @@ func _should_run_deck_bounds_check(delta: float) -> bool:
 
 func _get_deck_bounds_check_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
-	if current_state == State.MOVE or current_state == State.WANDER:
+	if current_state == State.WANDER:
+		return 0.85 * minf(load_mult, 1.8)
+	if current_state == State.MOVE:
 		if not _lod_is_combat_priority:
-			return 0.12 * minf(load_mult, 1.8)
-		return 0.075 * minf(load_mult, 1.6)
+			return 0.20 * minf(load_mult, 1.8)
+		return 0.12 * minf(load_mult, 1.6)
 	if is_stationary:
-		return 0.34 * minf(load_mult, 1.7)
+		return 0.45 * minf(load_mult, 1.7)
 	if current_state == State.ATTACK:
-		return 0.22 * minf(load_mult, 1.55)
+		return 0.30 * minf(load_mult, 1.55)
 	if _is_passive_ally_ship_crew():
-		return 0.30 * minf(load_mult, 1.7)
-	return 0.20 * minf(load_mult, 1.5)
+		return 0.45 * minf(load_mult, 1.7)
+	return 0.34 * minf(load_mult, 1.5)
 
 
 func _is_safely_inside_deck_bounds() -> bool:
@@ -1891,8 +1921,8 @@ func finish_boarding_jump_pose(status: String = BOARDING_STATUS_ON_DECK) -> void
 
 
 ## 원거리 적 확인 및 사격
-func _check_ranged_combat() -> void:
-	SoldierCombatHelper.check_ranged_combat(self)
+func _check_ranged_combat(preferred_nearest: Node3D = null) -> void:
+	SoldierCombatHelper.check_ranged_combat(self, preferred_nearest)
 
 func _is_player_fleet_ai_ship_crew() -> bool:
 	if not is_instance_valid(owned_ship):
@@ -2019,7 +2049,13 @@ func _get_combat_throttle_time(dist_to_player: float, combat_priority: bool) -> 
 	return 0.16 * minf(load_mult, 1.3)
 
 func _get_nearest_enemy_cache_interval() -> float:
-	return _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
+	var interval := _get_combat_throttle_time(_lod_dist_to_player, _lod_is_combat_priority)
+	var load_mult := _get_ai_load_multiplier()
+	if _lod_is_combat_priority:
+		interval = maxf(interval, 0.16 * minf(load_mult, 1.85))
+		if EntityRegistry.count_soldiers() >= 90:
+			interval = maxf(interval, 0.22 * minf(load_mult, 1.85))
+	return interval
 
 func _get_limbo_ai_update_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
@@ -2074,10 +2110,31 @@ func _get_performance_cpu_interval_scale() -> float:
 func _get_routine_wander_step_interval() -> float:
 	var load_mult := _get_ai_load_multiplier()
 	if _is_passive_ally_ship_crew():
-		return 0.22 * minf(load_mult, 1.8)
+		return 0.38 * minf(load_mult, 1.8)
 	if not _lod_is_combat_priority:
-		return 0.16 * minf(load_mult, 1.8)
+		return 0.30 * minf(load_mult, 1.8)
+	if not is_instance_valid(current_target) and (current_state == State.IDLE or current_state == State.WANDER):
+		return 0.26 * minf(load_mult, 1.8)
 	return 0.0
+
+
+func _should_pause_routine_wander_movement() -> bool:
+	if _is_jumping or current_state == State.ATTACK or current_state == State.MOVE or current_state == State.BOARDING_JUMP:
+		return false
+	if is_instance_valid(current_target):
+		return false
+	if boarding_status != BOARDING_STATUS_ON_DECK:
+		return false
+	if not is_instance_valid(owned_ship):
+		return false
+
+	var load_mult := _get_ai_load_multiplier()
+	if load_mult >= 1.26:
+		return true
+	var impulse_value: Variant = owned_ship.get("collision_impulse_velocity")
+	if impulse_value is Vector3 and (impulse_value as Vector3).length_squared() > 0.01 and load_mult >= 1.12:
+		return true
+	return false
 
 
 func _should_run_routine_support_step(delta: float, run_heavy_logic: bool) -> bool:
@@ -2126,12 +2183,15 @@ func _refresh_nearest_enemy_cache(force: bool = false) -> Node3D:
 		_cached_nearest_enemy = limbo_target
 		_nearest_enemy_cache_interval_runtime = _get_nearest_enemy_cache_interval()
 		_nearest_enemy_cache_timer = _nearest_enemy_cache_interval_runtime
+		_store_nearest_enemy_query_result(_cached_nearest_enemy)
 		return _cached_nearest_enemy
 	if not force and _nearest_enemy_cache_timer > 0.0 and is_instance_valid(_cached_nearest_enemy):
+		_store_nearest_enemy_query_result(_cached_nearest_enemy)
 		return _cached_nearest_enemy
 	_cached_nearest_enemy = SoldierShipHelper.find_nearest_enemy(self)
 	_nearest_enemy_cache_interval_runtime = _get_nearest_enemy_cache_interval()
 	_nearest_enemy_cache_timer = _nearest_enemy_cache_interval_runtime
+	_store_nearest_enemy_query_result(_cached_nearest_enemy)
 	return _cached_nearest_enemy
 
 

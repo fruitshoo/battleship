@@ -253,6 +253,15 @@ fleet-role API. Support profile `ship_type` values such as `maengseon_ally` and
 `panokseon_ally` are also legacy ids; rename them only with saved-data, tests,
 and upgrade/profile fixtures migrated in the same change.
 
+Support ship upgrade cards are summons, not normal stacking stat levels. The
+current offer rules count only active, alive support ships: `fleet_signal`
+can appear while fewer than two Maengseon support ships are active, and
+`panokseon_upgrade` can appear while no Panokseon support ship is active. If a
+support ship sinks and leaves the active registry, its card may become eligible
+again. Do not make these cards level up silently when the active ship cap is
+already full; either hide the card or make the repeated selection visibly do
+something.
+
 ## Root Structure
 
 Required root children:
@@ -291,6 +300,15 @@ provide seven cannon slots and eight crew slots. Smaller raider/support hulls
 provide at least front/left/right cannon slots and six crew slots.
 `WeaponSlots` is optional for legacy cannon-only hulls; use it for non-cannon
 launchers such as `SingigeonFront`.
+
+`DeckArea` is the runtime deck footprint, not just an editor guide. Soldier
+spawn placement, routine wandering targets, deck-boundary correction, and soft
+ship contact geometry all assume this marker fits the visible walkable deck.
+Keep its horizontal points inside the modeled deck surface, especially near the
+bow and stern where old auto-fit bounds used to overreach. Keep its height in
+the same local band as `CrewSlots`; if crew markers sit noticeably above or
+below the authored deck plane, soldiers may appear to float, clip, or spawn on
+decorative bow geometry instead of the deck.
 
 ## Boarding Anchors
 
@@ -388,6 +406,10 @@ The sweep also checks rough marker layout. Cannon, weapon, and crew slots should
 stay inside the visible hull footprint. Side boarding anchors should sit near
 the left/right hull edges, while `Bow` and `Stern` should stay near the forward
 and rear ends.
+For soldier placement specifically, prefer tightening `DeckArea` in the hull
+scene over adding script-side clamps. The runtime now treats authored deck
+geometry as the source of truth, with bounds checks acting as a safety net
+rather than the normal movement path.
 
 `Authoring` should keep `ship_authoring_visualizer.gd` attached. It is an
 editor-only helper that draws a light deck footprint plus color-coded marker
@@ -405,7 +427,9 @@ the hull `.tscn` files or appear during runtime scene instantiation.
 ## Crew Slots
 
 `Authoring/CrewSlots` can contain `Marker3D` nodes for initial player crew and
-new crew spawn positions. If these markers are absent, crew still uses the old
+new crew spawn positions. Place them on the same usable deck plane as
+`DeckArea`, and keep them inside that footprint unless the ship intentionally
+needs a special spawn pose. If these markers are absent, crew still uses the old
 random deck placement fallback. The current player hull uses:
 
 - `CrewForwardLeft`

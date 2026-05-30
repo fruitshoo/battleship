@@ -57,7 +57,7 @@ enum CombatRole {CHARGER, GUNNER}
 @export_range(0.0, 0.25, 0.01) var furled_sail_drive_ratio: float = 0.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rudder_multiplier: float = 1.0
 @export_range(1.0, 2.0, 0.05) var furled_sail_rowing_efficiency_multiplier: float = 1.0
-@export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 1.0
+@export_range(0.0, 3.0, 0.1) var furled_sail_rowing_speed_bonus: float = 0.5
 @export_range(0.25, 1.0, 0.05) var furled_sail_rowing_stamina_cost_multiplier: float = 0.85
 @export_range(0.0, 1.0, 0.05) var furled_sail_fire_damage_multiplier: float = 0.5
 @export_group("Boarding Sail AI")
@@ -413,7 +413,7 @@ func _ready() -> void:
 		remove_meta(DEFER_INITIAL_CREW_SETUP_META)
 		call_deferred("_setup_soldiers_staggered")
 	else:
-		_setup_soldiers() # 모든 함선 초기 병사 배치 (팀 속성 반영)
+		call_deferred("_setup_soldiers_staggered")
 		
 	_find_player()
 	
@@ -624,7 +624,9 @@ func _physics_process(delta: float) -> void:
 	var limbo_profile_start := PhysicsProfiler.begin()
 	_update_limbo_ai_pilot(delta)
 	PhysicsProfiler.end("ai_ship_limbo_ai_pilot", limbo_profile_start)
+	var sail_furl_profile_start := PhysicsProfiler.begin()
 	_update_boarding_sail_furl(delta)
+	PhysicsProfiler.end("ai_ship_boarding_sail_furl", sail_furl_profile_start)
 	var ai_profile_start := PhysicsProfiler.begin()
 	AIShipRuntimeHelper.process_physics(self, delta)
 	PhysicsProfiler.end("ai_ship_process_total", ai_profile_start)
