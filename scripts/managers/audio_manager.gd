@@ -134,6 +134,13 @@ var sfx_streams = {
 		"res://assets/audio/sfx/sfx_water_splash_large_2.ogg",
 		"res://assets/audio/sfx/sfx_water_splash_large_3.ogg",
 	],
+	"ship_collision_water_splash": [
+		"res://assets/audio/sfx/sfx_water_splash_large_1.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_large_2.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_large_3.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_large_3.ogg",
+		"res://assets/audio/sfx/sfx_water_splash_large_3.ogg",
+	],
 	"water_splash_small": [
 		"res://assets/audio/sfx/sfx_water_splash_small_1.ogg",
 		"res://assets/audio/sfx/sfx_water_splash_small_2.ogg",
@@ -234,6 +241,7 @@ const SFX_PROFILE_BY_KEY := {
 	"oars_rowing": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_sink_bubbles": SFX_PROFILE_SHIP_AMBIENT,
 	"ship_collision": SFX_PROFILE_SHIP_AMBIENT,
+	"ship_collision_water_splash": SFX_PROFILE_SHIP_AMBIENT,
 	"bow_shoot": SFX_PROFILE_LIGHT_PROJECTILE,
 	"musket_fire": SFX_PROFILE_LIGHT_PROJECTILE,
 	"sword_swing": SFX_PROFILE_WEAPON_CLOSE,
@@ -333,6 +341,13 @@ const SFX_PROFILE_OVERRIDES := {
 		"pitch_jitter": 0.035,
 		"rate_limit_msec": 180,
 	},
+	"ship_collision_water_splash": {
+		"volume_db": -2.0,
+		"max_distance": 290.0,
+		"unit_size": 110.0,
+		"pitch_jitter": 0.02,
+		"rate_limit_msec": 280,
+	},
 	"ballistic_death": {
 		"pitch_jitter": 0.04,
 	},
@@ -391,6 +406,7 @@ var _essential_warm_keys: Array[String] = [
 	"mast_creak",
 	"wave_splash",
 	"water_splash_large",
+	"ship_collision_water_splash",
 	"water_splash_small",
 	"ship_sink_bubbles",
 	"ship_collision",

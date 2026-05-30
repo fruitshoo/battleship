@@ -26,6 +26,8 @@ const HULL_FRONT_VFX_PAD := 0.22
 const HULL_FRONT_VFX_HEIGHT_RATIO := 0.26
 const HULL_FRONT_VFX_MIN_HEIGHT := 0.42
 const HULL_FRONT_VFX_MAX_HEIGHT := 0.78
+const COLLISION_WATER_SPLASH_OUTBOARD_PAD := 0.95
+const COLLISION_WATER_SPLASH_FRONT_PAD := 1.35
 const PLAYER_CONTACT_VFX_HEIGHT_RATIO := 0.34
 const PLAYER_CONTACT_VFX_MIN_HEIGHT := 0.58
 const PLAYER_CONTACT_VFX_MAX_HEIGHT := 0.92
@@ -1199,8 +1201,33 @@ static func _spawn_ship_collision_water_splash(ship, impact_pos: Vector3, _impac
 	var splash = ScenePool.acquire(ship.get_tree(), water_scene)
 	if not is_instance_valid(splash):
 		return
+	var splash_pos := _get_ship_collision_water_splash_position(ship, impact_pos)
 	ship.get_tree().root.add_child(splash)
 	if splash is Node3D:
-		(splash as Node3D).global_position = impact_pos
+		(splash as Node3D).global_position = splash_pos
 	if splash.has_method("pool_activate"):
 		splash.pool_activate()
+	if not is_instance_valid(ship._cached_audio_manager):
+		ship._cached_audio_manager = ship.get_node_or_null("/root/AudioManager")
+	if is_instance_valid(ship._cached_audio_manager) and ship._cached_audio_manager.has_method("play_sfx"):
+		ship._cached_audio_manager.play_sfx("ship_collision_water_splash", splash_pos, randf_range(0.96, 1.04), -0.5)
+
+
+static func _get_ship_collision_water_splash_position(ship: Node3D, impact_pos: Vector3) -> Vector3:
+	if not is_instance_valid(ship):
+		return impact_pos
+	var dir := impact_pos - ship.global_position
+	dir.y = 0.0
+	if dir.length_squared() <= 0.0001:
+		dir = -ship.global_transform.basis.z
+		dir.y = 0.0
+	if dir.length_squared() <= 0.0001:
+		dir = Vector3.FORWARD
+	dir = dir.normalized()
+
+	var hull_radius := float(ship.call("get_directional_collision_radius", dir)) if ship.has_method("get_directional_collision_radius") else ShipContactGeometry.get_directional_collision_radius(ship, dir)
+	var visual_radius := _get_visual_contact_radius(ship, dir, hull_radius)
+	var outboard_pad := COLLISION_WATER_SPLASH_FRONT_PAD if _is_authored_hull_front_contact(ship, dir) else COLLISION_WATER_SPLASH_OUTBOARD_PAD
+	var splash_pos := ship.global_position + dir * (visual_radius + outboard_pad)
+	splash_pos.y = impact_pos.y
+	return splash_pos

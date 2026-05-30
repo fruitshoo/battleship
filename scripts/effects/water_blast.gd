@@ -4,6 +4,8 @@ extends Node3D
 @export_enum("splash", "small", "sink", "overboard_disposal", "ship_collision") var preset: String = "splash"
 @export var lock_to_waterline: bool = true
 @export_range(-1.0, 1.0, 0.01) var waterline_y: float = 0.05
+@export var use_scene_authored_particles: bool = false
+@export_range(0.1, 5.0, 0.05) var scene_authored_duration: float = 1.8
 
 @onready var foam_disk: MeshInstance3D = get_node_or_null("FoamDisk")
 @onready var column_card: MeshInstance3D = get_node_or_null("ColumnCard")
@@ -129,8 +131,11 @@ func pool_activate() -> void:
 		return
 	_activate_when_ready = false
 	_cache_nodes()
-	_prepare_local_materials()
-	_apply_preset()
+	if use_scene_authored_particles:
+		_apply_scene_authored_preset()
+	else:
+		_prepare_local_materials()
+		_apply_preset()
 	if not VfxBudget.allow_spawn(get_tree(), _budget_key_value, global_position, _budget_limit_value, _budget_distance_value):
 		ScenePool.release(self)
 		return
@@ -140,9 +145,10 @@ func pool_activate() -> void:
 	_elapsed = 0.0
 	visible = true
 	set_process(true)
-	_apply_blast_scale()
-	_layout_splash_cards()
-	_apply_visual_state(0.0)
+	if not use_scene_authored_particles:
+		_apply_blast_scale()
+		_layout_splash_cards()
+		_apply_visual_state(0.0)
 	_start_droplets()
 	_start_blast_particles()
 
@@ -188,7 +194,8 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	var t: float = clampf(_elapsed / maxf(_duration, 0.01), 0.0, 1.0)
-	_apply_visual_state(t)
+	if not use_scene_authored_particles:
+		_apply_visual_state(t)
 	if _elapsed >= _duration + 0.18:
 		ScenePool.release(self)
 
@@ -208,6 +215,20 @@ func _apply_preset() -> void:
 			_apply_ship_collision_preset()
 		_:
 			_apply_splash_preset()
+
+
+func _apply_scene_authored_preset() -> void:
+	_budget_key_value = "ship_collision_water_blast" if preset == "ship_collision" else "water_explosion"
+	_budget_limit_value = 3 if preset == "ship_collision" else 4
+	_budget_distance_value = 85.0 if preset == "ship_collision" else 70.0
+	_waterline_lift = 0.0
+	_duration = scene_authored_duration
+	_blast_scale = 1.0
+	_foam_enabled = false
+	_column_enabled = false
+	_splash_cards_enabled = false
+	_mist_enabled = false
+	_droplets_enabled = false
 
 
 func _apply_splash_preset() -> void:
@@ -265,7 +286,7 @@ func _apply_ship_collision_preset() -> void:
 	_budget_limit_value = 3
 	_budget_distance_value = 85.0
 	_waterline_lift = 0.0
-	_duration = 0.86 + (0.06 * clampf(intensity, 0.0, 4.0))
+	_duration = 1.28 + (0.09 * clampf(intensity, 0.0, 4.0))
 	_blast_scale = size_scale
 
 	_foam_enabled = true

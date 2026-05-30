@@ -2,6 +2,7 @@ extends Area3D
 
 const VfxSpawnHelper = preload("res://scripts/helpers/vfx_spawn_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
+const WATER_BLAST_SCENE = preload("res://scenes/effects/water_blast.tscn")
 
 ## 화통 (Fire Pot)
 ## 포물선으로 날아가 착탄 시 폭발하며 범위 데미지(화염)를 줍니다.
@@ -105,6 +106,10 @@ func _profiled_physics_process(delta: float) -> void:
 	# 시각적으로 빙글빙글 돌기
 	if has_node("Visual"):
 		$Visual.rotate_x(15.0 * delta)
+
+	if global_position.y <= 0.0:
+		_splash_and_sink()
+		return
 	
 	if t >= 1.0:
 		explode()
@@ -113,7 +118,10 @@ func explode() -> void:
 	if has_exploded: return
 	has_exploded = true
 	var explosion_position := global_position
-	_apply_area_damage()
+	var affected_target := _apply_area_damage()
+	if not affected_target:
+		_splash_and_sink()
+		return
 
 	# 1. 폭발 이펙트
 	if explosion_scene:
@@ -126,6 +134,29 @@ func explode() -> void:
 		audio_manager.play_sfx("explosion_small", explosion_position, randf_range(0.9, 1.2))
 	
 	# 자신 삭제를 객체 풀 반납으로 변경
+	ScenePool.release(self)
+
+
+func _splash_and_sink() -> void:
+	if not has_exploded:
+		has_exploded = true
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
+
+	var splash_pos := global_position
+	splash_pos.y = 0.05
+	global_position = splash_pos
+	if WATER_BLAST_SCENE:
+		var splash := VfxSpawnHelper.acquire_world_node3d(get_tree(), WATER_BLAST_SCENE, splash_pos, "water_explosion_small", 3, 60.0)
+		if is_instance_valid(splash):
+			if splash.has_method("configure_as_small"):
+				splash.configure_as_small()
+			VfxSpawnHelper.activate(splash)
+
+	var audio_manager = get_node_or_null("/root/AudioManager")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx("water_splash_small", splash_pos, randf_range(0.9, 1.15))
+
 	ScenePool.release(self)
 
 func _apply_area_damage() -> bool:

@@ -1089,7 +1089,7 @@
       ]
     },
     "res://scripts/entities/ships/base_ship_collision_helper.gd": {
-      "count": 53,
+      "count": 54,
       "functions": [
         "get_ship_mass_scale",
         "get_collision_movement_share",
@@ -1143,7 +1143,8 @@
         "_apply_ramming_knockback",
         "spawn_ship_collision_effects",
         "_should_skip_collision_vfx_for_lightweight_ship",
-        "_spawn_ship_collision_water_splash"
+        "_spawn_ship_collision_water_splash",
+        "_get_ship_collision_water_splash_position"
       ]
     },
     "res://scripts/entities/ships/base_ship_crew_helper.gd": {

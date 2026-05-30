@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.5-alpha - 2026-05-30
+
+### Feel
+- Improved ship collision water splashes so they spawn outside the hull and persist longer.
+- Kept the large collision splash authored in-scene, avoiding runtime scale overrides that made particles feel wrong.
+- Added a dedicated ship-collision water splash sound with `sfx_water_splash_large_3` weighted highest while still rotating variants.
+- Made missed fire pots fall into the water instead of exploding in midair when they hit nothing.
+
 ## 0.4.4-alpha - 2026-05-30
 
 ### Performance
