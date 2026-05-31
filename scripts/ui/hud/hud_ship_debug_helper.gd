@@ -84,7 +84,7 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 		else:
 			hud.debug_enemy_fleet_value.text = "근처 편대: 근처 적선 없음"
 	if is_instance_valid(hud.debug_ship_ai_value):
-		hud.debug_ship_ai_value.text = _format_limbo_panel_text("플레이어 AI", player_ship, ship_snapshot)
+		hud.debug_ship_ai_value.text = _format_limbo_panel_text("플레이어 상태", player_ship, ship_snapshot)
 	var focused_enemy_ai_ship: Node3D = null
 	if is_instance_valid(hud.debug_enemy_ai_value):
 		focused_enemy_ai_ship = _find_priority_enemy_ai_ship(hud)
@@ -93,7 +93,7 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 			focus_reason = "boarding run" if focused_enemy_ai_ship == NodeContractHelper.get_boarding_target_ship(player_ship) else "current target" if focused_enemy_ai_ship == NodeContractHelper.get_target_ship(player_ship) else "raid target" if "auto_raid_target" in player_ship and focused_enemy_ai_ship == player_ship.get("auto_raid_target") else "nearby contact"
 			focus_reason = "%s -> %s" % [focus_reason, focused_enemy_ai_ship.name]
 		var enemy_snapshot: Dictionary = focused_enemy_ai_ship.call("get_debug_ship_state_snapshot") if is_instance_valid(focused_enemy_ai_ship) and focused_enemy_ai_ship.has_method("get_debug_ship_state_snapshot") else {}
-		hud.debug_enemy_ai_value.text = _format_limbo_panel_text("적선 AI", focused_enemy_ai_ship, enemy_snapshot, focus_reason)
+		hud.debug_enemy_ai_value.text = _format_limbo_panel_text("적선 상태", focused_enemy_ai_ship, enemy_snapshot, focus_reason)
 	if is_instance_valid(hud.debug_support_ai_value):
 		var nearest_support_ai_ship := _find_nearest_player_limbo_ship(hud)
 		var support_snapshot: Dictionary = nearest_support_ai_ship.call("get_debug_ship_state_snapshot") if is_instance_valid(nearest_support_ai_ship) and nearest_support_ai_ship.has_method("get_debug_ship_state_snapshot") else {}
@@ -107,18 +107,18 @@ static func sync_ship_debug_panel_from_player(hud) -> void:
 			support_focus_target = player_ship
 		if not support_focus_reason.is_empty() and is_instance_valid(support_focus_target):
 			support_focus_reason = "%s -> %s" % [support_focus_reason, support_focus_target.name]
-		hud.debug_support_ai_value.text = _format_limbo_panel_text("지원함 AI", nearest_support_ai_ship, support_snapshot, support_focus_reason)
+		hud.debug_support_ai_value.text = _format_limbo_panel_text("지원함 상태", nearest_support_ai_ship, support_snapshot, support_focus_reason)
 	if is_instance_valid(hud.debug_support_fleet_value):
 		hud.debug_support_fleet_value.text = _format_support_fleet_panel_text(player_ship)
 	if is_instance_valid(hud.debug_player_soldier_ai_value):
 		var player_focus: Dictionary = HudSoldierDebugHelper.find_focus_player_soldier(player_ship, focused_enemy_ai_ship); var focused_player_soldier: Node3D = player_focus.get("soldier", null) as Node3D
 		var player_soldier_snapshot: Dictionary = focused_player_soldier.call("get_debug_soldier_state_snapshot") if is_instance_valid(focused_player_soldier) and focused_player_soldier.has_method("get_debug_soldier_state_snapshot") else {}
-		hud.debug_player_soldier_ai_value.text = HudSoldierDebugHelper.format_soldier_limbo_panel_text("아군 병사 AI", focused_player_soldier, player_soldier_snapshot, str(player_focus.get("reason", "")).strip_edges())
+		hud.debug_player_soldier_ai_value.text = HudSoldierDebugHelper.format_soldier_limbo_panel_text("아군 병사", focused_player_soldier, player_soldier_snapshot, str(player_focus.get("reason", "")).strip_edges())
 	if is_instance_valid(hud.debug_enemy_soldier_ai_value):
 		var enemy_focus: Dictionary = HudSoldierDebugHelper.find_focus_enemy_soldier(player_ship, focused_enemy_ai_ship)
 		var focused_enemy_soldier := enemy_focus.get("soldier", null) as Node3D
 		var enemy_soldier_snapshot: Dictionary = focused_enemy_soldier.call("get_debug_soldier_state_snapshot") if is_instance_valid(focused_enemy_soldier) and focused_enemy_soldier.has_method("get_debug_soldier_state_snapshot") else {}
-		hud.debug_enemy_soldier_ai_value.text = HudSoldierDebugHelper.format_soldier_limbo_panel_text("적 병사 AI", focused_enemy_soldier, enemy_soldier_snapshot, str(enemy_focus.get("reason", "")).strip_edges())
+		hud.debug_enemy_soldier_ai_value.text = HudSoldierDebugHelper.format_soldier_limbo_panel_text("적 병사", focused_enemy_soldier, enemy_soldier_snapshot, str(enemy_focus.get("reason", "")).strip_edges())
 	hud._ship_debug_ui_syncing = true
 	if is_instance_valid(hud.debug_ship_hull_slider):
 		hud.debug_ship_hull_slider.value = clampf(hull_hp_value / max_hull_hp_value, 0.0, 1.0)
@@ -222,6 +222,42 @@ static func toggle_player_masts_folded_for_debug(hud) -> void:
 	var folded: bool = hud.player_ship.has_method("are_masts_folded") and bool(hud.player_ship.call("are_masts_folded"))
 	sync_ship_debug_panel_from_player(hud)
 	hud.show_gust_warning_message("돛대 %s" % ("접힘" if folded else "펼침"), 0.8)
+
+
+static func apply_geobukseon_upgrade_for_debug(hud) -> void:
+	if not _ensure_player_ship(hud):
+		return
+	if not is_instance_valid(UpgradeManager) or not UpgradeManager.has_method("apply_upgrade"):
+		hud.show_gust_warning_message("UpgradeManager 없음", 0.8)
+		return
+	var current_levels: Dictionary = UpgradeManager.get("current_levels") if UpgradeManager.get("current_levels") is Dictionary else {}
+	if int(current_levels.get("geobukseon", 0)) > 0:
+		hud.show_gust_warning_message("이미 거북선 적용됨", 0.8)
+		return
+	UpgradeManager.call("apply_upgrade", "geobukseon")
+	sync_ship_debug_panel_from_player(hud)
+	hud.show_gust_warning_message("거북선 변환", 0.8)
+
+
+static func apply_fleet_signal_upgrade_for_debug(hud) -> void:
+	_apply_upgrade_card_for_debug(hud, "fleet_signal", "맹선 카드")
+
+
+static func apply_panokseon_upgrade_for_debug(hud) -> void:
+	_apply_upgrade_card_for_debug(hud, "panokseon_upgrade", "판옥선 카드")
+
+
+static func _apply_upgrade_card_for_debug(hud, upgrade_id: String, label: String) -> void:
+	if not _ensure_player_ship(hud):
+		return
+	if not is_instance_valid(UpgradeManager) or not UpgradeManager.has_method("apply_upgrade"):
+		hud.show_gust_warning_message("UpgradeManager 없음", 0.8)
+		return
+	UpgradeManager.call("apply_upgrade", upgrade_id)
+	sync_ship_debug_panel_from_player(hud)
+	hud.show_gust_warning_message("%s 적용" % label, 0.8)
+
+
 static func adjust_player_crew_capacity_for_debug(hud, delta_amount: int) -> void:
 	if not _ensure_player_ship(hud):
 		return

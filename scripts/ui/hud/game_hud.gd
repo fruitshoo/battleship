@@ -341,6 +341,18 @@ func _toggle_player_masts_folded_for_debug() -> void:
 	HudShipDebugHelper.toggle_player_masts_folded_for_debug(self)
 
 
+func _apply_geobukseon_upgrade_for_debug() -> void:
+	HudShipDebugHelper.apply_geobukseon_upgrade_for_debug(self)
+
+
+func _apply_fleet_signal_upgrade_for_debug() -> void:
+	HudShipDebugHelper.apply_fleet_signal_upgrade_for_debug(self)
+
+
+func _apply_panokseon_upgrade_for_debug() -> void:
+	HudShipDebugHelper.apply_panokseon_upgrade_for_debug(self)
+
+
 func _adjust_player_crew_capacity_for_debug(delta_amount: int) -> void:
 	HudShipDebugHelper.adjust_player_crew_capacity_for_debug(self, delta_amount)
 

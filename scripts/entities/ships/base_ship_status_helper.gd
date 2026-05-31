@@ -7,6 +7,8 @@ const FIRE_CRACKLE_STREAM: AudioStream = preload("res://assets/audio/sfx/sfx_fir
 const FIRE_EFFECT_RANDOM_OFFSET_META := "fire_effect_random_offset"
 const FIRE_EFFECT_RANDOM_SCALE_META := "fire_effect_random_scale"
 const BURNING_CREW_DAMAGE_TIMER_META := "burning_crew_damage_timer"
+const ROOF_DEFENDER_MAX := 2
+const ROOF_DEFENDER_SLOT_META := "geobuk_roof_defender_slot"
 
 static func update_fire_effect(ship) -> void:
 	if ship.is_burning and not ship.is_dying:
@@ -146,6 +148,7 @@ static func update_boarding_state(ship, delta: float) -> void:
 		return
 
 	var ship_team: String = ship.get_team_tag() if ship.has_method("get_team_tag") else "enemy"
+	_update_roof_defense_state(ship, ship_team)
 	var friendly_count: int = 0
 	var hostile_count: int = 0
 	for child in EntityRegistry.get_soldiers_by_ship(ship):
@@ -224,6 +227,177 @@ static func update_boarding_state(ship, delta: float) -> void:
 		ship._deck_overrun_announced = false
 		if ship_team == "player":
 			SupportBoardingHelper.finish_support_rescue_boarding_if_safe(ship)
+
+static func _update_roof_defense_state(ship, ship_team: String) -> void:
+	if not _can_use_roof_defenders(ship, ship_team):
+		_release_all_roof_defenders(ship)
+		return
+
+	var roof_hostiles := _get_alive_roof_hostiles(ship, ship_team)
+	if roof_hostiles.is_empty():
+		_release_all_roof_defenders(ship)
+		return
+
+	var defenders := _get_alive_roof_defenders(ship, ship_team)
+	while defenders.size() > ROOF_DEFENDER_MAX:
+		var defender: Node = defenders.pop_back()
+		_release_roof_defender(ship, defender)
+
+	while defenders.size() < ROOF_DEFENDER_MAX:
+		var candidate := _find_roof_defender_candidate(ship, ship_team, defenders)
+		if not is_instance_valid(candidate):
+			break
+		_assign_roof_defender(ship, candidate, defenders.size(), roof_hostiles)
+		defenders.append(candidate)
+
+	for defender in defenders:
+		_target_nearest_roof_hostile(defender, roof_hostiles)
+
+
+static func _can_use_roof_defenders(ship, ship_team: String) -> bool:
+	if ship_team != "player":
+		return false
+	if not is_instance_valid(ship):
+		return false
+	if not ship.has_method("is_roof_boarding_enabled"):
+		return false
+	return ship.call("is_roof_boarding_enabled") == true
+
+
+static func _get_alive_roof_hostiles(ship, ship_team: String) -> Array[Node3D]:
+	var result: Array[Node3D] = []
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not (soldier is Node3D):
+			continue
+		if SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		if not SoldierDeckZoneHelper.is_roof(soldier):
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team == ship_team:
+			continue
+		result.append(soldier as Node3D)
+	return result
+
+
+static func _get_alive_roof_defenders(ship, ship_team: String) -> Array[Node3D]:
+	var result: Array[Node3D] = []
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not (soldier is Node3D):
+			continue
+		if SoldierStateHelper.is_dead_soldier(soldier):
+			continue
+		if not SoldierDeckZoneHelper.is_roof_defender(soldier):
+			continue
+		var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+		if soldier_team != ship_team:
+			_release_roof_defender(ship, soldier)
+			continue
+		result.append(soldier as Node3D)
+	return result
+
+
+static func _find_roof_defender_candidate(ship, ship_team: String, assigned: Array) -> Node3D:
+	var best: Node3D = null
+	var best_score := INF
+	var marker_global := _get_roof_defense_target_global(ship, assigned.size())
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not (soldier is Node3D):
+			continue
+		if assigned.has(soldier):
+			continue
+		if not _is_valid_roof_defender_candidate(soldier, ship_team):
+			continue
+		var score: float = (soldier as Node3D).global_position.distance_squared_to(marker_global)
+		if soldier.get("is_captain") == true:
+			score += 250.0
+		if score < best_score:
+			best_score = score
+			best = soldier as Node3D
+	return best
+
+
+static func _is_valid_roof_defender_candidate(soldier, ship_team: String) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if SoldierStateHelper.is_dead_soldier(soldier):
+		return false
+	if soldier.get("_is_jumping") == true:
+		return false
+	if soldier.get("is_stationary") == true:
+		return false
+	if SoldierDeckZoneHelper.is_roof_boarder(soldier):
+		return false
+	if SoldierDeckZoneHelper.is_roof_defender(soldier):
+		return false
+	if soldier.has_method("has_named_action") and soldier.call("has_named_action") == true:
+		return false
+	var soldier_team: String = soldier.get_team_tag() if soldier.has_method("get_team_tag") else str(soldier.get("team"))
+	if soldier_team != ship_team:
+		return false
+	var boarding_status: String = str(soldier.get("boarding_status")) if soldier.get("boarding_status") != null else "on_deck"
+	return boarding_status == "on_deck"
+
+
+static func _assign_roof_defender(ship, soldier: Node3D, slot_index: int, roof_hostiles: Array[Node3D]) -> void:
+	SoldierDeckZoneHelper.set_roof_defender(soldier, true)
+	soldier.set_meta(ROOF_DEFENDER_SLOT_META, slot_index)
+	soldier.global_position = _get_roof_defense_target_global(ship, slot_index)
+	if soldier.has_method("_keep_within_owned_ship_bounds"):
+		soldier.call("_keep_within_owned_ship_bounds")
+	_target_nearest_roof_hostile(soldier, roof_hostiles)
+
+
+static func _release_all_roof_defenders(ship) -> void:
+	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
+		if not SoldierDeckZoneHelper.is_roof_defender(soldier):
+			continue
+		_release_roof_defender(ship, soldier)
+
+
+static func _release_roof_defender(_ship, soldier: Node) -> void:
+	if not is_instance_valid(soldier):
+		return
+	SoldierDeckZoneHelper.set_roof_defender(soldier, false)
+	if soldier.has_meta(ROOF_DEFENDER_SLOT_META):
+		soldier.remove_meta(ROOF_DEFENDER_SLOT_META)
+	if soldier.get("current_target") != null:
+		soldier.set("current_target", null)
+	if soldier.has_method("_keep_within_owned_ship_bounds"):
+		soldier.call("_keep_within_owned_ship_bounds")
+
+
+static func _target_nearest_roof_hostile(defender: Node, roof_hostiles: Array[Node3D]) -> void:
+	if not (defender is Node3D):
+		return
+	var nearest: Node3D = null
+	var nearest_distance_sq := INF
+	for hostile in roof_hostiles:
+		if not is_instance_valid(hostile):
+			continue
+		var distance_sq: float = (defender as Node3D).global_position.distance_squared_to(hostile.global_position)
+		if distance_sq < nearest_distance_sq:
+			nearest_distance_sq = distance_sq
+			nearest = hostile
+	if is_instance_valid(nearest) and defender.has_method("move_to_target"):
+		if defender.get("current_target") == nearest:
+			return
+		defender.call("move_to_target", nearest)
+
+
+static func _get_roof_defense_target_global(ship, slot_index: int) -> Vector3:
+	if not is_instance_valid(ship):
+		return Vector3.ZERO
+	var markers := ShipAuthoringHelper.get_authoring_markers(ship, ShipAuthoringHelper.ROOF_SURFACE_POINTS)
+	if markers.is_empty():
+		markers = ShipAuthoringHelper.get_authoring_markers(ship, ShipAuthoringHelper.ROOF_BOARDING_POINTS)
+	if not markers.is_empty():
+		var marker := markers[slot_index % markers.size()] as Node3D
+		if is_instance_valid(marker):
+			return marker.global_position
+	var deck_height: float = float(ship.get("deck_height")) if ship.get("deck_height") != null else 0.4
+	return ship.global_position + Vector3(0.0, maxf(deck_height + 1.1, 1.7), 0.0)
+
 
 static func _find_attacker_ship_from_boarders(ship, ship_team: String) -> Node:
 	for child in EntityRegistry.get_soldiers_by_ship(ship):

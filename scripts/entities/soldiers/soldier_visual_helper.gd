@@ -348,7 +348,7 @@ static func flash_hit(soldier, flash_color: Color = Color.WHITE) -> void:
 	mesh.material_override.emission = flash_color
 	mesh.material_override.emission_energy_multiplier = 2.0
 
-	tween.tween_property(mesh.material_override, "emission_energy_multiplier", 0.0, 0.1)
+	tween.tween_property(mesh.material_override, "emission_energy_multiplier", 0.0, 0.16)
 	var mesh_id: int = mesh.get_instance_id()
 	tween.finished.connect(func():
 		var flash_mesh := NodeContractHelper.get_instance_mesh_instance_3d(mesh_id)
@@ -415,15 +415,9 @@ static func play_boarding_jump_pose(soldier) -> void:
 	var rest_rotation: Vector3 = soldier.get_meta(POSE_NODE_REST_ROTATION_META, pose_node.rotation)
 	var rest_position: Vector3 = soldier.get_meta(POSE_NODE_REST_POSITION_META, pose_node.position)
 	var rest_scale: Vector3 = soldier.get_meta(POSE_NODE_REST_SCALE_META, pose_node.scale)
-	var lean_sign: float = -1.0 if (soldier.get_instance_id() % 2) == 0 else 1.0
-	var target_rotation := rest_rotation + Vector3(deg_to_rad(-10.0), 0.0, deg_to_rad(lean_sign * 8.0))
-	var target_position := rest_position + Vector3(0.0, 0.08, -0.04)
-	var target_scale := Vector3(rest_scale.x * 0.92, rest_scale.y * 1.08, rest_scale.z * 0.92)
-	var tween: Tween = soldier.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(pose_node, "rotation", target_rotation, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(pose_node, "position", target_position, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(pose_node, "scale", target_scale, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	pose_node.rotation = rest_rotation
+	pose_node.position = rest_position
+	pose_node.scale = rest_scale
 
 
 static func play_knockback_pose(soldier, knockback_dir: Vector3, speed: float, allow_overboard: bool) -> void:

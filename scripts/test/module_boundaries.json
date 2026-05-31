@@ -207,6 +207,10 @@
       "layer": "entities/soldiers/soldier_combat_helper.gd",
       "responsibility": "Owns the current soldier combat helper responsibilities; update this baseline when moving behavior across module boundaries."
     },
+    "res://scripts/entities/soldiers/soldier_combat_overboard_helper.gd": {
+      "layer": "entities/soldiers/soldier_combat_overboard_helper.gd",
+      "responsibility": "Owns shared combat-overboard throw arcs for soldiers, including delayed in-flight rotation used by ballistic collateral and roof-death disposal."
+    },
     "res://scripts/entities/soldiers/soldier_health_bar_helper.gd": {
       "layer": "entities/soldiers/soldier_health_bar_helper.gd",
       "responsibility": "Owns player-team soldier health bar rendering near the deck, including visibility rules, fill geometry, color state, and cleanup."
@@ -1662,10 +1666,13 @@
       ]
     },
     "res://scripts/entities/ships/player_ship_sink_helper.gd": {
-      "count": 6,
+      "count": 9,
       "functions": [
         "die",
         "trigger_boarding_overrun_game_over",
+        "trigger_captain_death_game_over",
+        "_play_captain_death_focus",
+        "_start_captain_death_slowdown",
         "disable_combat_modules_on_sink",
         "disable_combat_subtree",
         "fade_out_meshes",
@@ -2174,6 +2181,14 @@
         "find_ranged_target"
       ]
     },
+    "res://scripts/entities/soldiers/soldier_combat_overboard_helper.gd": {
+      "count": 3,
+      "functions": [
+        "make_throw_arc_data",
+        "apply_throw_arc",
+        "_get_delayed_rotation_progress"
+      ]
+    },
     "res://scripts/entities/soldiers/soldier_health_bar_helper.gd": {
       "count": 9,
       "functions": [
@@ -2189,9 +2204,10 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_lifecycle_helper.gd": {
-      "count": 29,
+      "count": 31,
       "functions": [
         "take_damage",
+        "_should_apply_roof_defender_melee_reduction",
         "get_ship_ranged_cover_reduction",
         "get_ship_ranged_cover_defense_bonus",
         "update_boarding_chaos",
@@ -2202,6 +2218,7 @@
         "assist_recover_incapacitated",
         "incapacitate",
         "die",
+        "_try_trigger_player_captain_death_game_over",
         "_snap_dead_body_to_deck",
         "_try_start_roof_death_overboard",
         "_is_offboard_death_context",
@@ -3133,7 +3150,6 @@
         "_add_misc_section",
         "_add_ship_section",
         "_add_sail_section",
-        "create_debug_columns",
         "create_debug_group",
         "create_debug_section",
         "_update_debug_section_button_text",

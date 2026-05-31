@@ -109,7 +109,7 @@ static func try_spawn_from_soldier_damage(soldier, damage_amount: float, hit_pos
 	var root := _get_or_create_decal_root(ship)
 	if not is_instance_valid(root):
 		return
-	var decal := _make_decal(damage_amount)
+	var decal := _make_decal(damage_amount, not use_roof_surface)
 	root.add_child(decal)
 	decal.position = local_pos
 	decal.rotation = Vector3(0.0, randf_range(-PI, PI), 0.0)
@@ -216,7 +216,7 @@ static func _get_or_create_decal_root(ship: Node3D) -> Node3D:
 	return root
 
 
-static func _make_decal(damage_amount: float) -> Node3D:
+static func _make_decal(damage_amount: float, use_stain_plane: bool = true) -> Node3D:
 	var stain_root := Node3D.new()
 	stain_root.name = "BloodDeckStain"
 
@@ -235,7 +235,7 @@ static func _make_decal(damage_amount: float) -> Node3D:
 		stain_scale * randf_range(0.72, 1.18)
 	)
 
-	if USE_STAIN_PLANE:
+	if USE_STAIN_PLANE and use_stain_plane:
 		var plane_material := StandardMaterial3D.new()
 		plane_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		plane_material.blend_mode = BaseMaterial3D.BLEND_MODE_MIX

@@ -647,7 +647,7 @@ func _verify_dead_boarding_jump_finish_keeps_death_pose(failures: Array[String])
 
 	soldier.begin_boarding_jump_pose("boarding")
 	SoldierLifecycleHelper.die(soldier)
-	var hand_pivot := soldier.get_node_or_null("HandPivot") as Node3D
+	var hand_pivot: Node3D = soldier.get_hand_pivot() if soldier.has_method("get_hand_pivot") else null
 	if hand_pivot == null:
 		failures.append("boarding jump death contract missing hand pivot")
 		soldier.queue_free()

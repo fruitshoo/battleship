@@ -12,22 +12,22 @@ const BOARDING_BREAK_DISTANCE_PAD := 2.2
 const BOARDING_WAVE_MAX_SIZE := 3
 const HOSTILE_BOARDING_WAVE_MAX_SIZE := 2
 const HOSTILE_BOARDING_CONTEST_MAX := 2
-const HOSTILE_ROOF_BOARDING_MAX_ATTACKERS := 1
 const BOARDING_LAUNCH_INSET := 0.18
 const BOARDING_LAUNCH_READY_MIN_RADIUS := 2.35
 const BOARDING_LAUNCH_READY_MAX_RADIUS := 3.55
 const BOARDING_PREP_BAR_READY_RADIUS_PAD := 2.4
-const HOSTILE_BOARDING_TRAVEL_SPEED := 16.0
-const HOSTILE_BOARDING_TRAVEL_MIN := 0.36
-const HOSTILE_BOARDING_TRAVEL_MAX := 0.62
+const HOSTILE_BOARDING_TRAVEL_SPEED := 12.0
+const HOSTILE_BOARDING_TRAVEL_MIN := 0.48
+const HOSTILE_BOARDING_TRAVEL_MAX := 0.86
 const ROOF_BOARDING_TRAVEL_SPEED := 9.5
 const ROOF_BOARDING_TRAVEL_MIN := 0.68
 const ROOF_BOARDING_TRAVEL_MAX := 1.08
 const ROOF_BOARDING_JUMP_HEIGHT_MIN := 0.65
 const ROOF_BOARDING_JUMP_HEIGHT_MAX := 1.25
-const BOARDING_TRAVEL_SPEED := 17.0
-const BOARDING_TRAVEL_MIN := 0.32
-const BOARDING_TRAVEL_MAX := 0.58
+const ROOF_BOARDING_OUTER_WAYPOINT_PAD := 0.85
+const BOARDING_TRAVEL_SPEED := 12.0
+const BOARDING_TRAVEL_MIN := 0.46
+const BOARDING_TRAVEL_MAX := 0.82
 
 static func process_boarding_common(ship, delta: float) -> void:
 	if not is_instance_valid(ship.boarding_target):
@@ -366,8 +366,6 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		var max_attackers_during_contest: int = _get_boarding_contest_limit(ship.boarding_target, team_prop, defenders_alive, target_zone)
 		if defenders_alive > 0 and attackers_on_target_deck >= max_attackers_during_contest:
 			return false
-		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF and attackers_on_target_deck >= HOSTILE_ROOF_BOARDING_MAX_ATTACKERS:
-			return false
 
 	var s = null
 	var has_any_boarder := false
@@ -425,18 +423,31 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		var horiz_dist: float = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
 		var jump_height: float = clampf(maxf(1.35, horiz_dist * 0.22), 1.35, 2.35)
 		var travel_time: float = _get_boarding_transfer_travel_time(horiz_dist, team_prop, ship.boarding_target)
+		var jump_peak_y: float = start_local_pos.y + jump_height
 		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
 			jump_height = clampf(maxf(ROOF_BOARDING_JUMP_HEIGHT_MIN, horiz_dist * 0.12), ROOF_BOARDING_JUMP_HEIGHT_MIN, ROOF_BOARDING_JUMP_HEIGHT_MAX)
 			travel_time = clampf(horiz_dist / ROOF_BOARDING_TRAVEL_SPEED, ROOF_BOARDING_TRAVEL_MIN, ROOF_BOARDING_TRAVEL_MAX)
+			jump_peak_y = maxf(start_local_pos.y, jump_offset.y) + jump_height
 			SoldierDeckZoneHelper.set_roof_boarder(s, true)
+		SoldierBoardingHelper.face_boarding_jump_direction(s, ship.boarding_target.to_global(jump_offset))
 
 		var tween = s.create_tween()
 		tween.set_parallel(true)
-		tween.tween_property(s, "position:x", jump_offset.x, travel_time).set_trans(Tween.TRANS_LINEAR)
-		tween.tween_property(s, "position:z", jump_offset.z, travel_time).set_trans(Tween.TRANS_LINEAR)
+		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+			var outside_waypoint := _get_roof_boarding_outer_waypoint_local(ship.boarding_target, start_local_pos, jump_offset)
+			var approach_time := travel_time * 0.45
+			var landing_time := travel_time - approach_time
+			tween.tween_property(s, "position:x", outside_waypoint.x, approach_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tween.tween_property(s, "position:z", outside_waypoint.z, approach_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tween.chain().set_parallel(true)
+			tween.tween_property(s, "position:x", jump_offset.x, landing_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tween.tween_property(s, "position:z", jump_offset.z, landing_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		else:
+			tween.tween_property(s, "position:x", jump_offset.x, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tween.tween_property(s, "position:z", jump_offset.z, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 		var y_tween = s.create_tween()
-		y_tween.tween_property(s, "position:y", start_local_pos.y + jump_height, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		y_tween.tween_property(s, "position:y", jump_peak_y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		y_tween.tween_property(s, "position:y", jump_offset.y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		var soldier_id: int = s.get_instance_id()
 		var target_ship_id: int = ship.boarding_target.get_instance_id()
@@ -481,6 +492,24 @@ static func _get_boarding_transfer_travel_time(horiz_dist: float, team_prop: Str
 	return clampf(horiz_dist / BOARDING_TRAVEL_SPEED, BOARDING_TRAVEL_MIN, BOARDING_TRAVEL_MAX)
 
 
+static func _get_roof_boarding_outer_waypoint_local(target_ship: Node3D, start_local: Vector3, landing_local: Vector3) -> Vector3:
+	var target_half_ext := _get_target_deck_half_extents(target_ship)
+	var approach := Vector2(start_local.x, start_local.z)
+	if approach.length_squared() <= 0.0001:
+		approach = Vector2(landing_local.x, landing_local.z)
+	if approach.length_squared() <= 0.0001:
+		approach = Vector2(0.0, 1.0)
+	var approach_dir := approach.normalized()
+	var scale_x: float = (target_half_ext.x + ROOF_BOARDING_OUTER_WAYPOINT_PAD) / maxf(absf(approach_dir.x), 0.001)
+	var scale_z: float = (target_half_ext.y + ROOF_BOARDING_OUTER_WAYPOINT_PAD) / maxf(absf(approach_dir.y), 0.001)
+	var edge_distance := minf(scale_x, scale_z)
+	return Vector3(
+		approach_dir.x * edge_distance,
+		maxf(start_local.y, landing_local.y),
+		approach_dir.y * edge_distance
+	)
+
+
 static func _get_boarding_wave_size(ship) -> int:
 	var team_prop := _get_ship_team_tag(ship)
 	var ready_boarders := _count_ready_boarders(ship, team_prop)
@@ -491,7 +520,7 @@ static func _get_boarding_wave_size(ship) -> int:
 	var target_attackers := _count_target_attackers(ship, team_prop, target_zone)
 	var open_contest_slots := ready_boarders
 	var wave_limit := _get_boarding_wave_limit(ship, team_prop, target_zone)
-	if target_defenders > 0 or target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+	if target_defenders > 0:
 		var contest_limit := _get_boarding_contest_limit(ship.boarding_target, team_prop, target_defenders, target_zone)
 		open_contest_slots = maxi(0, contest_limit - target_attackers)
 	var allowed_boarders := mini(ready_boarders, open_contest_slots)
@@ -500,17 +529,13 @@ static func _get_boarding_wave_size(ship) -> int:
 	return clampi(allowed_boarders, 1, wave_limit)
 
 
-static func _get_boarding_wave_limit(ship, team_prop: String, target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
-	if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
-		return HOSTILE_ROOF_BOARDING_MAX_ATTACKERS
+static func _get_boarding_wave_limit(ship, team_prop: String, _target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
 	var slot_penalty := _get_defender_boarding_slot_penalty(ship.boarding_target if is_instance_valid(ship) else null, team_prop)
 	var base_limit := HOSTILE_BOARDING_WAVE_MAX_SIZE if _is_hostile_boarding_player(ship.boarding_target if is_instance_valid(ship) else null, team_prop) else BOARDING_WAVE_MAX_SIZE
 	return maxi(1, base_limit - slot_penalty)
 
 
-static func _get_boarding_contest_limit(target_ship: Node, attacker_team: String, defender_count: int, target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
-	if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
-		return HOSTILE_ROOF_BOARDING_MAX_ATTACKERS
+static func _get_boarding_contest_limit(target_ship: Node, attacker_team: String, defender_count: int, _target_zone: String = SoldierDeckZoneHelper.ZONE_MAIN) -> int:
 	var contest_max := HOSTILE_BOARDING_CONTEST_MAX if _is_hostile_boarding_player(target_ship, attacker_team) else 4
 	var base_limit := maxi(2, mini(contest_max, defender_count))
 	var slot_penalty := _get_defender_boarding_slot_penalty(target_ship, attacker_team)

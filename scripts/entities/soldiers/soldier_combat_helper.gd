@@ -4,7 +4,6 @@ const SoldierVisualHelper = preload("res://scripts/entities/soldiers/soldier_vis
 const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
-const ATTACK_COOLDOWN_TEMPO_MULT := 1.12
 const SHIP_RANGED_ATTACKER_RATIO := 0.5
 const SOLDIER_TARGET_MAX_VERTICAL_DELTA := 2.6
 
@@ -67,7 +66,7 @@ static func get_effective_attack_cooldown(soldier, fallback_cooldown: float = 1.
 	var base_cooldown := fallback_cooldown
 	if is_instance_valid(soldier) and is_instance_valid(soldier.current_weapon) and "attack_cooldown" in soldier.current_weapon:
 		base_cooldown = float(soldier.current_weapon.attack_cooldown)
-	return base_cooldown * ATTACK_COOLDOWN_TEMPO_MULT
+	return base_cooldown
 
 
 static func _play_attack_animation(soldier) -> void:
@@ -76,16 +75,16 @@ static func _play_attack_animation(soldier) -> void:
 	var weapon_visual := _get_weapon_visual_node(weapon)
 	_cache_attack_rest_transforms(hand_pivot, weapon_visual)
 
-	var pose_node := SoldierVisualHelper.get_pose_node(soldier)
-	if pose_node:
+	var lunge_node := _get_attack_lunge_node(soldier, hand_pivot)
+	if lunge_node:
 		_stop_tracked_tween(soldier, "_attack_body_tween")
-		if not pose_node.has_meta("_attack_rest_position"):
-			pose_node.set_meta("_attack_rest_position", pose_node.position)
-		var mesh_rest_position: Vector3 = pose_node.get_meta("_attack_rest_position", pose_node.position)
+		if not lunge_node.has_meta("_attack_rest_position"):
+			lunge_node.set_meta("_attack_rest_position", lunge_node.position)
+		var mesh_rest_position: Vector3 = lunge_node.get_meta("_attack_rest_position", lunge_node.position)
 		var body_tween: Tween = soldier.create_tween()
 		soldier.set_meta("_attack_body_tween", body_tween)
-		body_tween.tween_property(pose_node, "position", mesh_rest_position + Vector3(0.0, 0.0, -0.28), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		body_tween.tween_property(pose_node, "position", mesh_rest_position, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		body_tween.tween_property(lunge_node, "position", mesh_rest_position + Vector3(0.0, 0.0, -0.28), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		body_tween.tween_property(lunge_node, "position", mesh_rest_position, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 	if not is_instance_valid(hand_pivot):
 		return
@@ -96,9 +95,9 @@ static func _play_attack_animation(soldier) -> void:
 	if is_instance_valid(weapon):
 		weapon_id = str(weapon.get_meta("weapon_id", ""))
 
-	if weapon_id == "spearman" or weapon_id == "spear" or weapon_id == "trident":
+	if weapon_id == "spearman" or weapon_id == "spear" or weapon_id == "trident" or weapon_id == "harpoon":
 		_play_thrust_attack_animation(soldier, hand_pivot, weapon_visual)
-	elif weapon_id == "sword" or weapon_id == "harpoon":
+	elif weapon_id == "sword":
 		_play_swing_attack_animation(soldier, hand_pivot, weapon_visual)
 	elif soldier.current_weapon and not "max_range" in soldier.current_weapon:
 		_play_swing_attack_animation(soldier, hand_pivot, weapon_visual)
@@ -179,6 +178,14 @@ static func _get_hand_pivot(soldier) -> Node3D:
 		var pivot: Variant = soldier.call("get_hand_pivot")
 		return pivot as Node3D if pivot is Node3D else null
 	return null
+
+
+static func _get_attack_lunge_node(soldier, hand_pivot: Node3D) -> Node3D:
+	var visual_root := SoldierVisualHelper.get_visual_root(soldier)
+	if is_instance_valid(visual_root) and visual_root != soldier:
+		if not is_instance_valid(hand_pivot) or hand_pivot.get_parent() == visual_root:
+			return visual_root
+	return SoldierVisualHelper.get_pose_node(soldier)
 
 
 static func _cache_attack_rest_transforms(hand_pivot: Node3D, weapon_visual: Node3D) -> void:

@@ -7,7 +7,7 @@ const BASE_DAMAGE: float = 10.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE
-	attack_range = 3.2
+	attack_range = 2.35
 	attack_cooldown = 1.2
 
 

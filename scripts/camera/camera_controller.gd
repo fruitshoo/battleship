@@ -27,6 +27,10 @@ extends Camera3D
 @export_range(0.2, 4.0, 0.05) var gamepad_rotation_speed: float = 1.35
 @export_range(2.0, 28.0, 0.5) var gamepad_zoom_speed: float = 14.0
 @export_range(0.0, 0.6, 0.01) var gamepad_camera_deadzone: float = 0.16
+@export_group("Defeat Focus")
+@export_range(0.35, 0.95, 0.01) var captain_death_zoom_ratio: float = 0.62
+@export_range(2.0, 18.0, 0.5) var captain_death_focus_smooth_speed: float = 8.0
+@export_range(0.0, 3.0, 0.05) var captain_death_focus_height: float = 0.55
 
 @export_group("Debug Free Camera")
 @export var debug_free_camera_speed: float = 18.0
@@ -76,6 +80,8 @@ var _decor_occlusion_reset_applied: bool = false
 var debug_free_camera_active: bool = false
 var _debug_free_camera_yaw: float = 0.0
 var _debug_free_camera_pitch: float = 0.0
+var _defeat_focus_active: bool = false
+var _defeat_focus_position: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	if target_path:
@@ -140,15 +146,18 @@ func _physics_process(delta: float) -> void:
 		_update_debug_free_camera(delta)
 		return
 
-	if not is_instance_valid(target):
+	if not _defeat_focus_active and not is_instance_valid(target):
 		return
-	
-	_update_gamepad_camera_input(delta)
-	current_zoom = move_toward(current_zoom, target_zoom, zoom_smooth_speed * delta)
-	
+
+	if not _defeat_focus_active:
+		_update_gamepad_camera_input(delta)
+	var zoom_smooth := zoom_smooth_speed * (1.35 if _defeat_focus_active else 1.0)
+	current_zoom = move_toward(current_zoom, target_zoom, zoom_smooth * delta)
+
 	# 1. 타겟 위치 + 진행 방향 리드
-	var target_pos = _get_desired_look_target(delta)
-	_smoothed_look_target = _smoothed_look_target.lerp(target_pos, clampf(lead_smooth_speed * delta, 0.0, 1.0))
+	var target_pos = _defeat_focus_position if _defeat_focus_active else _get_desired_look_target(delta)
+	var look_smooth := captain_death_focus_smooth_speed if _defeat_focus_active else lead_smooth_speed
+	_smoothed_look_target = _smoothed_look_target.lerp(target_pos, clampf(look_smooth * delta, 0.0, 1.0))
 	
 	# 2. 쿼터뷰 고정 각도 (45도 위에서, 약간 뒤에서)
 	# 수평 회전은 유저가 조절 가능, 수직 각도는 고정
@@ -203,6 +212,17 @@ func _update_gamepad_camera_input(delta: float) -> void:
 	if absf(rotate_y) > gamepad_camera_deadzone:
 		_cam_rotation.y -= rotate_y * gamepad_rotation_speed * delta
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
+
+
+func play_captain_death_focus(world_position: Vector3) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	if debug_free_camera_active:
+		set_debug_free_camera_active(false)
+	_defeat_focus_active = true
+	_defeat_focus_position = world_position + Vector3.UP * captain_death_focus_height
+	var desired_zoom := current_zoom * captain_death_zoom_ratio
+	target_zoom = clampf(desired_zoom, min_zoom, max_zoom)
 
 
 func set_debug_free_camera_active(active: bool) -> void:

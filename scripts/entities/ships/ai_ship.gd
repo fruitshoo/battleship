@@ -1237,11 +1237,11 @@ func _board_ship(target_ship: Node3D) -> void:
 	var can_side_board: bool = _is_side_boarding_approach(ship_node)
 	var can_head_on_board: bool = _can_force_head_on_boarding(ship_node)
 	var can_cleanup_board: bool = _can_force_cleanup_boarding(ship_node)
+	var active_latch_mode: String = _get_active_boarding_latch_mode(ship_node)
 	if not can_side_board and not can_head_on_board and not can_cleanup_board:
-		var latch_mode: String = _get_active_boarding_latch_mode(ship_node)
-		if latch_mode.is_empty():
+		if active_latch_mode.is_empty():
 			return
-	if not _has_recent_boarding_impact(ship_node):
+	if not _has_recent_boarding_impact(ship_node) and active_latch_mode.is_empty():
 		return
 
 	# 1. 초기 충돌 효과 (최초 1회만)
@@ -1254,7 +1254,6 @@ func _board_ship(target_ship: Node3D) -> void:
 	if ship_node != boarding_target:
 		boarding_target = ship_node
 
-	var active_latch_mode: String = _get_active_boarding_latch_mode(ship_node)
 	is_boarding = true
 	boarding_target = ship_node
 	if can_side_board:

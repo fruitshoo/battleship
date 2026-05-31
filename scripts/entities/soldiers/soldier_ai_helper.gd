@@ -9,6 +9,7 @@ const TURN_ANGLE_DEADZONE := PI / 60.0
 const ATTACK_VALIDATION_NEAR_INTERVAL := 0.12
 const ATTACK_VALIDATION_FAR_LOD_INTERVAL := 0.22
 const ATTACK_VALIDATION_JITTER := 0.05
+const ATTACK_RANGE_RETENTION_MULT := 1.12
 const OWNED_SHIP_HOSTILE_SWITCH_RATIO := 0.58
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
@@ -291,7 +292,7 @@ static func _validate_attack_state(soldier, target_node: Node3D, delta: float) -
 			soldier._change_state(soldier.State.IDLE)
 			return false
 	var attack_range = soldier.current_weapon.attack_range if soldier.current_weapon and "attack_range" in soldier.current_weapon else 1.2
-	var max_attack_distance: float = attack_range * 1.2
+	var max_attack_distance: float = attack_range * ATTACK_RANGE_RETENTION_MULT
 	if distance_xz_sq > max_attack_distance * max_attack_distance:
 		soldier._change_state(soldier.State.MOVE)
 		return false
@@ -351,7 +352,11 @@ static func _move_wander_toward_owned_ship_local_point(soldier, target_local: Ve
 	var step_profile_start := PhysicsFrameProfiler.begin()
 	var step := maxf(0.0, soldier.move_speed * speed_scale * delta)
 	var next_xz := Vector2(current_local.x, current_local.z).move_toward(Vector2(target_local.x, target_local.z), step)
-	var next_local := Vector3(next_xz.x, _get_ship_deck_height(ship), next_xz.y)
+	var next_local := Vector3(next_xz.x, current_local.y, next_xz.y)
+	if SoldierDeckZoneHelper.is_roof(soldier):
+		next_local = SoldierShipHelper.get_clamped_ship_deck_local(soldier, ship, next_local)
+	else:
+		next_local.y = _get_ship_deck_height(ship)
 	PhysicsFrameProfiler.end("soldier_wander_step_calc", step_profile_start)
 	var apply_profile_start := PhysicsFrameProfiler.begin()
 	soldier.global_position = ship.to_global(next_local)

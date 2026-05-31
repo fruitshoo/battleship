@@ -1,6 +1,9 @@
 extends RefCounted
 
 const WATER_BLAST_SCENE = preload("res://scenes/effects/water_blast.tscn")
+const CAPTAIN_DEATH_SLOW_SCALE := 0.35
+const CAPTAIN_DEATH_SLOW_DURATION := 0.62
+const CAPTAIN_DEATH_GAME_OVER_DELAY := 0.58
 
 static func die(ship) -> void:
 	if ship.is_sinking or ship.is_dying:
@@ -73,6 +76,61 @@ static func trigger_boarding_overrun_game_over(ship) -> void:
 		hud.show_game_over()
 	if ship._cached_level_manager and "current_score" in ship._cached_level_manager:
 		print("[GameOver] 갑판 장악! 최종 점수: %d" % ship._cached_level_manager.current_score)
+
+static func trigger_captain_death_game_over(ship, death_position: Vector3) -> void:
+	if ship.is_sinking or ship.is_dying:
+		return
+	BaseShipStatusHelper.clear_fire_effect(ship)
+	ship.is_dying = true
+	ship.is_sinking = true
+	ship.is_player_controlled = false
+	ship.current_speed = 0.0
+	ship.fire_pot_cooldown_timer = 9999.0
+	if is_instance_valid(ship.boarding_target) and ship.boarding_target.has_method("get_boarding_attacker_ship") and ship.boarding_target.get_boarding_attacker_ship() == ship:
+		ship.boarding_target.clear_boarding_attacker_ship()
+	ship.clear_boarding_attacker_ship()
+	disable_combat_modules_on_sink(ship)
+	_play_captain_death_focus(ship, death_position)
+	_start_captain_death_slowdown(ship)
+
+	var hud = find_hud(ship)
+	if hud and hud.has_method("show_message"):
+		hud.show_message("장군이 쓰러졌습니다!", 1.25)
+	var tree: SceneTree = ship.get_tree()
+	if not is_instance_valid(tree) or DisplayServer.get_name() == "headless":
+		if hud and hud.has_method("show_game_over"):
+			hud.show_game_over()
+	else:
+		tree.create_timer(CAPTAIN_DEATH_GAME_OVER_DELAY, true, false, true).timeout.connect(func():
+			if is_instance_valid(hud) and hud.has_method("show_game_over"):
+				hud.show_game_over()
+		)
+	if ship._cached_level_manager and "current_score" in ship._cached_level_manager:
+		print("[GameOver] 장군 사망! 최종 점수: %d" % ship._cached_level_manager.current_score)
+
+static func _play_captain_death_focus(ship, death_position: Vector3) -> void:
+	var viewport: Viewport = ship.get_viewport()
+	if not is_instance_valid(viewport):
+		return
+	var camera := viewport.get_camera_3d()
+	if is_instance_valid(camera) and camera.has_method("play_captain_death_focus"):
+		camera.call("play_captain_death_focus", death_position)
+
+static func _start_captain_death_slowdown(ship) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var previous_time_scale: float = Engine.time_scale
+	if previous_time_scale <= CAPTAIN_DEATH_SLOW_SCALE + 0.01:
+		return
+	Engine.time_scale = CAPTAIN_DEATH_SLOW_SCALE
+	var tree: SceneTree = ship.get_tree()
+	if not is_instance_valid(tree):
+		Engine.time_scale = previous_time_scale
+		return
+	var restore_time_scale := func() -> void:
+		if Engine.time_scale <= CAPTAIN_DEATH_SLOW_SCALE + 0.01:
+			Engine.time_scale = previous_time_scale
+	tree.create_timer(CAPTAIN_DEATH_SLOW_DURATION, true, false, true).timeout.connect(restore_time_scale, CONNECT_ONE_SHOT)
 
 static func disable_combat_modules_on_sink(ship) -> void:
 	for child in ship.get_children():

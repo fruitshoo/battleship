@@ -9,7 +9,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SOLDIER_RULES_PATH = ROOT / "data" / "soldier_rules.json"
 UPGRADES_PATH = ROOT / "data" / "upgrades.json"
-ATTACK_COOLDOWN_TEMPO_MULT = 1.12
 
 
 def load_json(path: Path) -> dict:
@@ -109,7 +108,6 @@ def main() -> int:
     repeater_cooldown = float(repeating_stats.get("base_cooldown", 2.2)) - max(0, repeating_crossbow_level - 1) * float(repeating_stats.get("cooldown_reduce_per_lv", 0.05))
     repeater_burst_delay = float(repeating_stats.get("burst_delay", 0.15))
     repeater_cooldown = max(repeater_cooldown, repeater_burst_count * repeater_burst_delay + 0.5)
-    repeater_cooldown *= ATTACK_COOLDOWN_TEMPO_MULT
     repeater_damage = repeater_upgrade_damage * (1.0 + total_damage_bonus)
     singigeon_base_damage = float(upgrades["singigeon"]["stats"].get("base_damage", 12.0))
     singigeon_personnel_mult = float(upgrades["singigeon"]["stats"].get("personnel_damage_mult", 1.0))
@@ -122,35 +120,35 @@ def main() -> int:
         {
             "weapon": "sword",
             "raw_hit": sword_damage,
-            "cooldown": 1.0 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "cooldown": 1.0,
             "expected_hit": sword_damage * melee_expected_crit,
             "notes": "General melee baseline using weapon base damage plus the summed damage bonus.",
         },
         {
             "weapon": "spear",
             "raw_hit": spear_damage,
-            "cooldown": 1.2 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "cooldown": 1.2,
             "expected_hit": spear_damage * melee_expected_crit,
             "notes": "Longer reach baseline using the spear/trident base damage.",
         },
         {
             "weapon": "trident",
             "raw_hit": trident_damage,
-            "cooldown": 1.6 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "cooldown": 1.6,
             "expected_hit": trident_damage * melee_expected_crit,
             "notes": "Spear-family heavy cadence variant using the same base hit with a slower cooldown.",
         },
         {
             "weapon": "harpoon",
             "raw_hit": harpoon_damage,
-            "cooldown": 1.1 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "cooldown": 1.1,
             "expected_hit": harpoon_damage * harpoon_expected_crit,
             "notes": "Gets higher crit expectation than other melee variants.",
         },
         {
             "weapon": "bow",
             "raw_hit": bow_damage,
-            "cooldown": 2.0 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "cooldown": 2.5,
             "expected_hit": bow_damage,
             "notes": "No crit in current projectile path; ranged cover applies on target side.",
         },
@@ -164,7 +162,7 @@ def main() -> int:
         {
             "weapon": "singigeon",
             "raw_hit": singigeon_personnel_damage,
-            "cooldown": 5.0 * ATTACK_COOLDOWN_TEMPO_MULT,
+            "cooldown": 5.0,
             "expected_hit": singigeon_personnel_damage,
             "notes": "Personnel splash specialist; value shown is direct personnel hit before splash falloff.",
         },

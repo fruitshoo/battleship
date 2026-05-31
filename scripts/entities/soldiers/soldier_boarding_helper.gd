@@ -11,9 +11,9 @@ const BOARDING_WAR_CRY_VOLUME_DB := 1.0
 const BOARDING_RALLY_CRY_VOLUME_DB := 0.0
 const BOARDING_WAR_CRY_PITCH_MIN := 1.12
 const BOARDING_WAR_CRY_PITCH_MAX := 1.24
-const BOARDING_JUMP_SPEED := 17.0
-const BOARDING_JUMP_MIN_TIME := 0.32
-const BOARDING_JUMP_MAX_TIME := 0.62
+const BOARDING_JUMP_SPEED := 12.0
+const BOARDING_JUMP_MIN_TIME := 0.46
+const BOARDING_JUMP_MAX_TIME := 0.86
 
 static var _last_war_cry_msec_by_team: Dictionary = {}
 
@@ -52,11 +52,12 @@ static func jump_to_ship(soldier, target_ship: Node3D, is_capture_attempt: bool 
 	var horiz_dist: float = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
 	var jump_height: float = clampf(maxf(1.45, horiz_dist * 0.24), 1.45, 2.45)
 	var travel_time: float = clampf(horiz_dist / BOARDING_JUMP_SPEED, BOARDING_JUMP_MIN_TIME, BOARDING_JUMP_MAX_TIME)
+	face_boarding_jump_direction(soldier, target_ship.to_global(jump_offset))
 
 	var tween = soldier.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(soldier, "position:x", jump_offset.x, travel_time)
-	tween.tween_property(soldier, "position:z", jump_offset.z, travel_time)
+	tween.tween_property(soldier, "position:x", jump_offset.x, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(soldier, "position:z", jump_offset.z, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	var y_tween = soldier.create_tween()
 	y_tween.tween_property(soldier, "position:y", start_local_y + jump_height, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -94,6 +95,16 @@ static func teleport_to_ship(soldier, _target_ship: Node3D) -> void:
 		survivor.set_deferred("global_position", spawn_pos)
 		print("[Rescue] 병사가 바다에 빠져 생존자가 되었습니다!")
 	soldier.queue_free()
+
+
+static func face_boarding_jump_direction(soldier, target_global: Vector3) -> void:
+	if not is_instance_valid(soldier) or not (soldier is Node3D):
+		return
+	var look_target := target_global
+	look_target.y = soldier.global_position.y
+	if soldier.global_position.distance_squared_to(look_target) <= 0.0001:
+		return
+	soldier.look_at(look_target, Vector3.UP)
 
 
 static func _get_nearest_deck_landing_local(target_ship: Node3D, approach_global: Vector3, target_half_ext: Vector2, target_deck_h: float) -> Vector3:

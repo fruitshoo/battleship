@@ -8,6 +8,7 @@ const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_d
 
 const MELEE_DAMAGE_SOURCES := {
 	"sword": true,
+	"spearman": true,
 	"spear": true,
 	"trident": true,
 	"harpoon": true,
@@ -26,6 +27,7 @@ const DEFAULT_SHIP_RANGED_COVER_DEFENSE_BONUS: float = 1.0
 const SHIP_RANGED_COVER_BASE_DEFENSE_META := "crew_ranged_cover_base_defense"
 const COMBAT_INCAPACITATION_CHANCE_META := "combat_incapacitation_chance"
 const SHIP_COMBAT_INCAPACITATION_CHANCE_META := "crew_combat_incapacitation_chance"
+const ROOF_DEFENDER_MELEE_DAMAGE_MULT := 0.75
 
 
 static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
@@ -34,11 +36,15 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 	if soldier.get_meta("ballistic_collateral_pending", false) == true:
 		return
 
+	var adjusted_amount: float = amount
+	if _should_apply_roof_defender_melee_reduction(soldier, damage_source):
+		adjusted_amount *= ROOF_DEFENDER_MELEE_DAMAGE_MULT
+
 	var defense_bonus: float = 0.0
 	if soldier.has_meta("defense_flat_bonus"):
 		defense_bonus = maxf(0.0, float(soldier.get_meta("defense_flat_bonus")))
 	defense_bonus += get_ship_ranged_cover_defense_bonus(soldier, damage_source)
-	var final_damage: float = maxf(amount - (soldier.defense + defense_bonus), 1.0)
+	var final_damage: float = maxf(adjusted_amount - (soldier.defense + defense_bonus), 1.0)
 	final_damage = SoldierCaptainGuardHelper.apply_damage_protection(soldier, final_damage)
 	if final_damage > 0.001:
 		soldier.current_health -= final_damage
@@ -69,6 +75,20 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 			incapacitate(soldier)
 			return
 		die(soldier)
+
+
+static func _should_apply_roof_defender_melee_reduction(soldier, damage_source: String) -> bool:
+	if not MELEE_DAMAGE_SOURCES.has(damage_source):
+		return false
+	if not SoldierDeckZoneHelper.is_roof_defender(soldier):
+		return false
+	if not SoldierDeckZoneHelper.is_roof(soldier):
+		return false
+	if soldier.team != "player":
+		return false
+	if not is_instance_valid(soldier.owned_ship):
+		return false
+	return str(soldier.owned_ship.get("team")) == "player"
 
 
 static func get_ship_ranged_cover_reduction(soldier, damage_source: String) -> float:
@@ -313,6 +333,8 @@ static func die(soldier) -> void:
 					delay_am.play_sfx("water_splash_small", death_position, randf_range(0.8, 1.2), splash_volume_db)
 			)
 
+	_try_trigger_player_captain_death_game_over(soldier, death_position)
+
 	soldier.set_physics_process(false)
 	if soldier.is_in_group("soldiers"):
 		soldier.remove_from_group("soldiers")
@@ -324,6 +346,8 @@ static func die(soldier) -> void:
 		soldier.visible = false
 		soldier.queue_free()
 		return
+	if _try_start_roof_death_overboard(soldier):
+		return
 
 	var owned_ship_team: String = ""
 	if is_instance_valid(soldier.owned_ship):
@@ -333,10 +357,26 @@ static func die(soldier) -> void:
 		soldier._play_death_pose()
 	else:
 		soldier.visible = false
-	if _try_start_roof_death_overboard(soldier):
-		return
 	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_method("enforce_dead_body_limit"):
 		soldier.owned_ship.call_deferred("enforce_dead_body_limit")
+
+
+static func _try_trigger_player_captain_death_game_over(soldier, death_position: Vector3) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if str(soldier.get("team")) != "player":
+		return
+	if soldier.get("is_captain") != true and soldier.get_meta("is_captain", false) != true:
+		return
+	var ship: Node = soldier.get("owned_ship")
+	if not is_instance_valid(ship):
+		ship = soldier.get("home_ship")
+	if not is_instance_valid(ship):
+		return
+	if str(ship.get("team")) != "player":
+		return
+	if ship.has_method("trigger_captain_death_game_over"):
+		ship.call("trigger_captain_death_game_over", death_position)
 
 
 static func _snap_dead_body_to_deck(soldier) -> void:

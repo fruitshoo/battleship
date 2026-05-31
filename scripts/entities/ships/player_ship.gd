@@ -25,6 +25,7 @@ const PlayerShipCargoTransportHelper = preload("res://scripts/entities/ships/pla
 const PlayerShipAuxHelper = preload("res://scripts/entities/ships/player_ship_aux_helper.gd")
 const PlayerSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
 const SoldierActionHelper = preload("res://scripts/entities/soldiers/soldier_action_helper.gd")
+const SoldierCombatOverboardHelper = preload("res://scripts/entities/soldiers/soldier_combat_overboard_helper.gd")
 const PlayerShipSupportHelper = preload("res://scripts/entities/ships/player_ship_support_helper.gd")
 const PhysicsProfiler = preload("res://scripts/debug/physics_frame_profiler.gd")
 
@@ -47,6 +48,7 @@ const CARGO_TRANSPORT_STAIR_TOP_META := "cargo_transport_stair_top"
 const CARGO_TRANSPORT_STAIR_BOTTOM_META := "cargo_transport_stair_bottom"
 const ROOF_CARGO_TRANSPORT_ARC_META := "roof_cargo_transport_arc"
 const ROOF_DEATH_OVERBOARD_IN_PROGRESS_META := "roof_death_overboard_in_progress"
+const ROOF_DEATH_THROW_ROTATION_DELAY := 0.24
 
 @export var rudder_speed: float = 95.0
 @export var rudder_return_speed: float = 65.0
@@ -903,15 +905,17 @@ func _capture_roof_cargo_transport_throw_arc(corpse: Node3D) -> void:
 		return
 	var start_position: Vector3 = corpse.global_position
 	var throw_target: Vector3 = _get_roof_cargo_transport_throw_target(corpse)
-	var arc_control: Vector3 = start_position.lerp(throw_target, 0.48)
-	arc_control.y = maxf(start_position.y, throw_target.y) + randf_range(1.45, 2.05)
-	corpse.set_meta(ROOF_CARGO_TRANSPORT_ARC_META, {
-		"start_position": start_position,
-		"arc_control": arc_control,
-		"throw_target": throw_target,
-		"start_rotation": corpse.rotation,
-		"spin_rotation": corpse.rotation + Vector3(randf_range(1.6, 2.7), randf_range(-0.9, 0.9), randf_range(-1.6, 1.6)),
-	})
+	corpse.set_meta(ROOF_CARGO_TRANSPORT_ARC_META, SoldierCombatOverboardHelper.make_throw_arc_data(
+		start_position,
+		throw_target,
+		corpse.rotation,
+		1.45,
+		2.05,
+		Vector3(1.6, -0.9, -1.6),
+		Vector3(2.7, 0.9, 1.6),
+		ROOF_DEATH_THROW_ROTATION_DELAY,
+		0.48
+	))
 
 
 func _apply_roof_cargo_transport_throw_arc(progress: float, corpse_id: int) -> void:
@@ -924,22 +928,7 @@ func _apply_roof_cargo_transport_throw_arc(progress: float, corpse_id: int) -> v
 		arc_data = corpse_node.get_meta(ROOF_CARGO_TRANSPORT_ARC_META, {})
 	if arc_data.is_empty():
 		return
-	var start_position: Vector3 = arc_data.get("start_position", corpse_node.global_position)
-	var arc_control: Vector3 = arc_data.get("arc_control", start_position)
-	var throw_target: Vector3 = arc_data.get("throw_target", start_position)
-	var start_rotation: Vector3 = arc_data.get("start_rotation", corpse_node.rotation)
-	var spin_rotation: Vector3 = arc_data.get("spin_rotation", start_rotation)
-	var t: float = clampf(progress, 0.0, 1.0)
-	var eased_t: float = smoothstep(0.0, 1.0, t)
-	var arc_pos: Vector3 = start_position * ((1.0 - t) * (1.0 - t)) \
-		+ arc_control * (2.0 * (1.0 - t) * t) \
-		+ throw_target * (t * t)
-	corpse_node.global_position = arc_pos
-	corpse_node.rotation = Vector3(
-		lerp_angle(start_rotation.x, spin_rotation.x, eased_t),
-		lerp_angle(start_rotation.y, spin_rotation.y, eased_t),
-		lerp_angle(start_rotation.z, spin_rotation.z, eased_t)
-	)
+	SoldierCombatOverboardHelper.apply_throw_arc(corpse_node, arc_data, progress)
 	if progress >= 1.0 and corpse_node.has_meta(ROOF_CARGO_TRANSPORT_ARC_META):
 		corpse_node.remove_meta(ROOF_CARGO_TRANSPORT_ARC_META)
 
@@ -1627,6 +1616,9 @@ func die() -> void:
 
 func trigger_boarding_overrun_game_over() -> void:
 	PlayerShipSinkHelper.trigger_boarding_overrun_game_over(self)
+
+func trigger_captain_death_game_over(death_position: Vector3) -> void:
+	PlayerShipSinkHelper.trigger_captain_death_game_over(self, death_position)
 
 func _disable_combat_modules_on_sink() -> void:
 	PlayerShipSinkHelper.disable_combat_modules_on_sink(self)

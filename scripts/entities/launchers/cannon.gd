@@ -5,7 +5,9 @@ const DEBUG_COMBAT_LOGS := false
 const DEBUG_CANNON_FIRE_LOGS := false
 const CANNON_RELOAD_TEMPO_MULT := 1.10
 const PLAYER_CANNON_CRIT_CHANCE := 0.05
-const PLAYER_CANNON_CRIT_MULTIPLIER := 1.5
+const PLAYER_CANNON_CRIT_MULTIPLIER := 2.0
+const ENEMY_CANNON_CRIT_CHANCE := 0.20
+const ENEMY_CANNON_CRIT_MULTIPLIER := 1.5
 const SITE_BONUS_TOTALS_META := "sea_site_bonus_totals"
 
 ## 함포 (Cannon)
@@ -81,8 +83,8 @@ func _update_cached_stats() -> void:
 	_cached_range_mult = 1.0
 	_cached_cd_mult = 1.0
 	_cached_dmg_mult = 1.0
-	_cached_crit_chance = PLAYER_CANNON_CRIT_CHANCE
-	_cached_crit_multiplier = PLAYER_CANNON_CRIT_MULTIPLIER
+	_cached_crit_chance = PLAYER_CANNON_CRIT_CHANCE if team == "player" else ENEMY_CANNON_CRIT_CHANCE
+	_cached_crit_multiplier = PLAYER_CANNON_CRIT_MULTIPLIER if team == "player" else ENEMY_CANNON_CRIT_MULTIPLIER
 	_cached_projectile_speed = _get_projectile_speed()
 	if team != "player":
 		return
@@ -194,7 +196,7 @@ func get_debug_cannon_snapshot() -> Dictionary:
 	var projectile_stats: Dictionary = _get_projectile_stats_snapshot()
 	var base_damage: float = _get_projectile_base_damage()
 	if base_damage <= 1.0 and team == "player":
-		base_damage = 22.0
+		base_damage = 20.0
 	var site_damage_bonus := _get_owner_site_bonus_total("cannon_damage_pct")
 	var site_reload_bonus := clampf(_get_owner_site_bonus_total("cannon_reload_pct"), 0.0, 0.45)
 	var reload_crew_cooldown_mult := _get_reload_crew_cooldown_mult()
@@ -311,23 +313,11 @@ func _get_reload_crew_cooldown_mult() -> float:
 
 
 func _get_projectile_stats_snapshot() -> Dictionary:
-	var stats: Dictionary = {
-		"damage": 0.0,
-		"crit_chance": 0.0,
-		"crit_multiplier": 1.0,
+	return {
+		"damage": _get_projectile_base_damage(),
+		"crit_chance": _cached_crit_chance,
+		"crit_multiplier": _cached_crit_multiplier,
 	}
-	var projectile_scene = cannonball_scene
-	if not (projectile_scene is PackedScene):
-		return stats
-	var projectile = (projectile_scene as PackedScene).instantiate()
-	if projectile == null:
-		return stats
-	stats["damage"] = _get_projectile_base_damage()
-	stats["crit_chance"] = float(projectile.get("crit_chance")) if projectile.get("crit_chance") != null else 0.0
-	stats["crit_multiplier"] = float(projectile.get("crit_multiplier")) if projectile.get("crit_multiplier") != null else 1.0
-	if projectile is Node:
-		(projectile as Node).free()
-	return stats
 
 func _update_target() -> void:
 	var nearest_enemy: Node3D = null
@@ -512,9 +502,9 @@ func _execute_fire() -> void:
 		ball.speed = _cached_projectile_speed
 	if ball.has_method("set_meta"):
 		ball.set_meta("shooter_label", name)
-	if team == "player" and "crit_chance" in ball:
+	if "crit_chance" in ball:
 		ball.crit_chance = _cached_crit_chance
-	if team == "player" and "crit_multiplier" in ball:
+	if "crit_multiplier" in ball:
 		ball.crit_multiplier = _cached_crit_multiplier
 	var planned_travel_distance: float = muzzle.global_position.distance_to(predicted_pos)
 	if "miss_overshoot_distance" in ball:
@@ -525,8 +515,9 @@ func _execute_fire() -> void:
 		ball.position = muzzle.global_position
 		ball.team = team
 		ball.damage = final_damage
-		if team == "player":
+		if "crit_chance" in ball:
 			ball.crit_chance = _cached_crit_chance
+		if "crit_multiplier" in ball:
 			ball.crit_multiplier = _cached_crit_multiplier
 		if ball.has_method("set_meta"):
 			ball.set_meta("shooter_label", name)

@@ -71,7 +71,7 @@ static func setup_debug_panel(hud) -> void:
 	modal_box.add_child(header)
 
 	var title := Label.new()
-	title.text = "Debug Tools"
+	title.text = "디버그 도구"
 	NavalUiTheme.style_heading(title, 13)
 	header.add_child(title)
 
@@ -102,13 +102,13 @@ static func setup_debug_panel(hud) -> void:
 	debug_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	modal_box.add_child(debug_tabs)
 
-	_add_capture_section(hud, debug_tabs)
+	_add_ship_section(hud, debug_tabs)
 	_add_spawn_section(hud, debug_tabs)
 	if is_authoring_palette_tab_visible():
 		_add_authoring_palette_section(hud, debug_tabs)
-	_add_ship_section(hud, debug_tabs)
 	_add_misc_section(hud, debug_tabs)
 	_add_environment_section(hud, debug_tabs)
+	_add_capture_section(hud, debug_tabs)
 	if is_advanced_debug_tab_visible():
 		_add_debug_draw_section(hud, debug_tabs)
 		_add_sail_section(hud, debug_tabs)
@@ -151,7 +151,33 @@ static func handle_debug_panel_keyboard_input(hud, event: InputEvent) -> bool:
 	if key_event == null or not key_event.pressed or key_event.is_echo():
 		return false
 	var keycode := key_event.physical_keycode if key_event.physical_keycode != 0 else key_event.keycode
+	var has_command_modifier := key_event.ctrl_pressed or key_event.meta_pressed or key_event.alt_pressed
+	if not has_command_modifier:
+		var direct_tab_index := _get_direct_debug_tab_index(keycode)
+		if direct_tab_index >= 0:
+			_set_debug_tab(hud, direct_tab_index)
+			return true
 	match keycode:
+		KEY_Q:
+			if not has_command_modifier:
+				_cycle_debug_tab(hud, -1)
+				return true
+		KEY_E:
+			if not has_command_modifier:
+				_cycle_debug_tab(hud, 1)
+				return true
+		KEY_W:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.UP, keycode):
+				return true
+		KEY_A:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.LEFT, keycode):
+				return true
+		KEY_S:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.DOWN, keycode):
+				return true
+		KEY_D:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.RIGHT, keycode):
+				return true
 		KEY_PAGEUP:
 			_cycle_debug_tab(hud, -1)
 			return true
@@ -166,11 +192,31 @@ static func handle_debug_panel_keyboard_input(hud, event: InputEvent) -> bool:
 			if key_event.ctrl_pressed or key_event.meta_pressed:
 				_set_debug_tab(hud, -1)
 				return true
+		KEY_UP:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.UP, keycode):
+				return true
+		KEY_DOWN:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.DOWN, keycode):
+				return true
+		KEY_LEFT:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.LEFT, keycode):
+				return true
+		KEY_RIGHT:
+			if not has_command_modifier and _move_debug_focus(hud, Vector2.RIGHT, keycode):
+				return true
 		KEY_TAB:
 			if not _is_debug_focus_inside_panel(hud):
 				grab_initial_debug_focus(hud)
 				return true
 	return false
+
+
+static func _get_direct_debug_tab_index(keycode: int) -> int:
+	if keycode >= KEY_1 and keycode <= KEY_9:
+		return keycode - KEY_1
+	if keycode >= KEY_KP_1 and keycode <= KEY_KP_9:
+		return keycode - KEY_KP_1
+	return -1
 
 
 static func grab_initial_debug_focus(hud) -> void:
@@ -186,6 +232,7 @@ static func grab_initial_debug_focus(hud) -> void:
 		focus_target = _find_first_focusable_control(hud.sail_debug_panel)
 	if is_instance_valid(focus_target):
 		focus_target.grab_focus()
+		_scroll_focused_control_into_view(focus_target)
 
 
 static func clear_debug_focus(hud) -> void:
@@ -195,6 +242,100 @@ static func clear_debug_focus(hud) -> void:
 	var focused: Control = viewport.gui_get_focus_owner()
 	if is_instance_valid(focused) and _is_node_descendant_of(focused, hud.sail_debug_panel):
 		focused.release_focus()
+
+
+static func _move_debug_focus(hud, direction: Vector2, keycode: int) -> bool:
+	if not is_instance_valid(hud.sail_debug_panel):
+		return false
+	var viewport: Viewport = hud.get_viewport()
+	if viewport == null:
+		return false
+	var focused := viewport.gui_get_focus_owner()
+	if not is_instance_valid(focused) or not _is_node_descendant_of(focused, hud.sail_debug_panel):
+		grab_initial_debug_focus(hud)
+		return true
+	if _should_keep_arrow_for_control(focused, keycode):
+		return false
+	var root := _get_current_debug_tab_root(hud)
+	if not is_instance_valid(root):
+		root = hud.sail_debug_panel
+	var candidates: Array[Control] = []
+	_collect_focusable_controls(root, candidates)
+	if candidates.size() <= 1:
+		return false
+	var current_center := _get_control_center(focused)
+	var best: Control = null
+	var best_score := INF
+	for candidate in candidates:
+		if candidate == focused:
+			continue
+		var delta := _get_control_center(candidate) - current_center
+		var forward := delta.dot(direction)
+		if forward <= 1.0:
+			continue
+		var lateral := absf(delta.y) if absf(direction.x) > 0.5 else absf(delta.x)
+		var score := forward + lateral * 2.35
+		if score < best_score:
+			best_score = score
+			best = candidate
+	if not is_instance_valid(best):
+		return false
+	best.grab_focus()
+	_scroll_focused_control_into_view(best)
+	return true
+
+
+static func _should_keep_arrow_for_control(control: Control, keycode: int) -> bool:
+	if control is HSlider and (keycode == KEY_LEFT or keycode == KEY_RIGHT):
+		return true
+	return false
+
+
+static func _get_current_debug_tab_root(hud) -> Control:
+	var debug_tabs := hud.sail_debug_panel.find_child("DebugToolsTabs", true, false) as TabContainer
+	if not is_instance_valid(debug_tabs):
+		return null
+	return debug_tabs.get_current_tab_control()
+
+
+static func _collect_focusable_controls(root: Node, out_controls: Array[Control]) -> void:
+	var control := root as Control
+	if is_instance_valid(control) and control.visible and control.focus_mode != Control.FOCUS_NONE and not _is_control_disabled(control):
+		out_controls.append(control)
+	for child in root.get_children():
+		_collect_focusable_controls(child, out_controls)
+
+
+static func _get_control_center(control: Control) -> Vector2:
+	return control.get_global_rect().get_center()
+
+
+static func _wire_debug_focus_scroll(control: Control) -> void:
+	if not is_instance_valid(control):
+		return
+	control.focus_entered.connect(func() -> void:
+		_scroll_focused_control_into_view(control)
+	)
+
+
+static func _scroll_focused_control_into_view(control: Control) -> void:
+	if not is_instance_valid(control):
+		return
+	var scroll := _find_parent_scroll_container(control)
+	if not is_instance_valid(scroll):
+		return
+	if scroll.has_method("ensure_control_visible"):
+		scroll.call_deferred("ensure_control_visible", control)
+
+
+static func _find_parent_scroll_container(control: Control) -> ScrollContainer:
+	var current := control.get_parent()
+	while current != null:
+		var scroll := current as ScrollContainer
+		if is_instance_valid(scroll):
+			return scroll
+		current = current.get_parent()
+	return null
 
 
 static func _cycle_debug_tab(hud, delta: int) -> void:
@@ -339,9 +480,8 @@ static func _add_environment_section(hud, panel_box: Control) -> void:
 static func _add_debug_draw_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("시각화", false)
 	panel_box.add_child(section["root"])
-	var columns := create_debug_columns(section["body"], 2)
-	var status_group := create_debug_group(columns[0], "상태")
-	var channel_group := create_debug_group(columns[1], "드로우 채널")
+	var status_group := create_debug_group(section["body"], "상태")
+	var channel_group := create_debug_group(section["body"], "드로우 채널")
 
 	var status := Label.new()
 	status.text = "DebugDraw3D: -"
@@ -438,9 +578,8 @@ static func _toggle_debug_draw_channel(hud, channel: String) -> void:
 static func _add_capture_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("촬영", false)
 	panel_box.add_child(section["root"])
-	var columns := create_debug_columns(section["body"], 2)
-	var camera_group := create_debug_group(columns[0], "카메라 / HUD")
-	var time_group := create_debug_group(columns[1], "시간")
+	var camera_group := create_debug_group(section["body"], "카메라 / HUD")
+	var time_group := create_debug_group(section["body"], "시간")
 
 	var status := Label.new()
 	status.text = "카메라: - / HUD: - / 시간: -"
@@ -503,53 +642,49 @@ static func _add_capture_section(hud, panel_box: Control) -> void:
 
 
 static func _add_spawn_section(hud, panel_box: Control) -> void:
-	var section: Dictionary = create_debug_section("스폰", false)
+	var section: Dictionary = create_debug_section("적 스폰", false)
 	panel_box.add_child(section["root"])
-	var columns := create_debug_columns(section["body"], 2)
-	var enemy_group := create_debug_group(columns[0], "적 함선")
-	var fleet_group := create_debug_group(columns[1], "편대 / 지원")
+	var enemy_group := create_debug_group(section["body"], "개별 함선")
+	var fleet_group := create_debug_group(section["body"], "편대 / 웨이브")
 
 	var row_a := HBoxContainer.new()
 	row_a.add_theme_constant_override("separation", 4)
 	enemy_group.add_child(row_a)
+	row_a.add_child(create_debug_action_button("고바야 근접", func() -> void:
+		hud._invoke_level_debug_method("_debug_spawn_test_ship", ["kobayabune_melee", 34.0, -8.0])
+	))
 	row_a.add_child(create_debug_action_button("세키 근접", func() -> void:
 		hud._invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_melee", 40.0, -12.0])
-	))
-	row_a.add_child(create_debug_action_button("세키 포격", func() -> void:
-		hud._invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_cannon", 40.0, 12.0])
 	))
 
 	var row_b := HBoxContainer.new()
 	row_b.add_theme_constant_override("separation", 4)
 	enemy_group.add_child(row_b)
-	row_b.add_child(create_debug_action_button("중간보스", func() -> void:
-		hud._invoke_level_debug_method("_debug_spawn_mid_boss")
+	row_b.add_child(create_debug_action_button("세키 포격", func() -> void:
+		hud._invoke_level_debug_method("_debug_spawn_test_ship", ["sekibune_cannon", 40.0, 12.0])
 	))
-	row_b.add_child(create_debug_action_button("최종보스", func() -> void:
-		hud._invoke_level_debug_method("_debug_spawn_final_boss")
+	row_b.add_child(create_debug_action_button("아타케부네 1척", func() -> void:
+		hud._invoke_level_debug_method("_debug_spawn_mid_boss")
 	))
 
 	var row_c := HBoxContainer.new()
 	row_c.add_theme_constant_override("separation", 4)
 	fleet_group.add_child(row_c)
-	row_c.add_child(create_debug_action_button("지원함 추가", func() -> void:
-		hud._invoke_level_debug_method("_debug_spawn_support_ship")
+	row_c.add_child(create_debug_action_button("소형 편대", func() -> void:
+		hud._invoke_level_debug_method("_debug_spawn_fleet", ["light"])
 	))
-	row_c.add_child(create_debug_action_button("지원함 덤프", func() -> void:
-		hud._invoke_level_debug_method("_debug_dump_support_fleet_state")
+	row_c.add_child(create_debug_action_button("혼성 편대", func() -> void:
+		hud._invoke_level_debug_method("_debug_spawn_fleet", ["mixed"])
 	))
 
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)
 	fleet_group.add_child(row_d)
-	row_d.add_child(create_debug_action_button("소형 편대", func() -> void:
-		hud._invoke_level_debug_method("_debug_spawn_fleet", ["light"])
-	))
-	row_d.add_child(create_debug_action_button("혼성 편대", func() -> void:
-		hud._invoke_level_debug_method("_debug_spawn_fleet", ["mixed"])
-	))
 	row_d.add_child(create_debug_action_button("대형 편대", func() -> void:
 		hud._invoke_level_debug_method("_debug_spawn_fleet", ["heavy"])
+	))
+	row_d.add_child(create_debug_action_button("최종 웨이브", func() -> void:
+		hud._invoke_level_debug_method("_debug_spawn_final_boss")
 	))
 
 
@@ -632,6 +767,7 @@ static func _add_authoring_palette_section(hud, panel_box: Control) -> void:
 	preset_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preset_select.focus_mode = Control.FOCUS_ALL
 	preset_select.disabled = true
+	_wire_debug_focus_scroll(preset_select)
 	section["body"].add_child(preset_select)
 	hud.debug_authoring_palette_preset_select = preset_select
 	preset_select.item_selected.connect(func(index: int) -> void:
@@ -2727,10 +2863,9 @@ static func _palette_entry_has_tag(entry: Dictionary, tag_name: String) -> bool:
 static func _add_misc_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("진행/결과", false)
 	panel_box.add_child(section["root"])
-	var columns := create_debug_columns(section["body"], 2)
-	var progression_group := create_debug_group(columns[0], "런 상태 / 보상")
-	var result_group := create_debug_group(columns[1], "화면 전환")
-	var diagnostics_group := create_debug_group(columns[1], "진단")
+	var progression_group := create_debug_group(section["body"], "런 상태 / 보상")
+	var result_group := create_debug_group(section["body"], "화면 전환")
+	var diagnostics_group := create_debug_group(section["body"], "진단")
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
@@ -2806,17 +2941,21 @@ static func _add_misc_section(hud, panel_box: Control) -> void:
 	row_d.add_child(create_debug_action_button("대포 디버그", func() -> void:
 		hud._invoke_level_debug_method("_debug_cannons")
 	))
+	row_d.add_child(create_debug_action_button("지원함 덤프", func() -> void:
+		hud._invoke_level_debug_method("_debug_dump_support_fleet_state")
+	))
 
 
 static func _add_ship_section(hud, panel_box: Control) -> void:
 	var section: Dictionary = create_debug_section("플레이어", false)
 	panel_box.add_child(section["root"])
-	var columns := create_debug_columns(section["body"], 2)
-	var status_group := create_debug_group(columns[0], "상태")
-	var damage_group := create_debug_group(columns[0], "피해")
-	var action_group := create_debug_group(columns[1], "조작")
-	var crew_group := create_debug_group(columns[1], "선원 / 지원")
-	var stat_group := create_debug_group(columns[1], "스탯")
+	var status_group := create_debug_group(section["body"], "상태")
+	var action_group := create_debug_group(section["body"], "조작")
+	var damage_group := create_debug_group(section["body"], "피해")
+	var crew_group := create_debug_group(section["body"], "선원")
+	var support_group := create_debug_group(section["body"], "지원함 카드")
+	var stat_group := create_debug_group(section["body"], "스탯")
+	var ai_group := create_debug_group(section["body"], "행동 상태")
 
 	var ship_status := Label.new()
 	ship_status.text = "함선 상태: -"
@@ -2837,45 +2976,45 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	hud.debug_enemy_fleet_value = enemy_fleet_status
 
 	var ship_ai_status := Label.new()
-	ship_ai_status.text = "플레이어 AI: -"
+	ship_ai_status.text = "플레이어 상태: -"
 	ship_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(ship_ai_status, 10)
-	status_group.add_child(ship_ai_status)
+	ai_group.add_child(ship_ai_status)
 	hud.debug_ship_ai_value = ship_ai_status
 
 	var enemy_ai_status := Label.new()
-	enemy_ai_status.text = "적선 AI: -"
+	enemy_ai_status.text = "적선 상태: -"
 	enemy_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(enemy_ai_status, 10)
-	status_group.add_child(enemy_ai_status)
+	ai_group.add_child(enemy_ai_status)
 	hud.debug_enemy_ai_value = enemy_ai_status
 
 	var support_ai_status := Label.new()
-	support_ai_status.text = "지원함 AI: -"
+	support_ai_status.text = "지원함 상태: -"
 	support_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(support_ai_status, 10)
-	status_group.add_child(support_ai_status)
+	ai_group.add_child(support_ai_status)
 	hud.debug_support_ai_value = support_ai_status
 
 	var support_fleet_status := Label.new()
 	support_fleet_status.text = "지원함 진형: -"
 	support_fleet_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(support_fleet_status, 10)
-	status_group.add_child(support_fleet_status)
+	support_group.add_child(support_fleet_status)
 	hud.debug_support_fleet_value = support_fleet_status
 
 	var player_soldier_ai_status := Label.new()
-	player_soldier_ai_status.text = "아군 병사 AI: -"
+	player_soldier_ai_status.text = "아군 병사: -"
 	player_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(player_soldier_ai_status, 10)
-	status_group.add_child(player_soldier_ai_status)
+	ai_group.add_child(player_soldier_ai_status)
 	hud.debug_player_soldier_ai_value = player_soldier_ai_status
 
 	var enemy_soldier_ai_status := Label.new()
-	enemy_soldier_ai_status.text = "적 병사 AI: -"
+	enemy_soldier_ai_status.text = "적 병사: -"
 	enemy_soldier_ai_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	NavalUiTheme.style_muted(enemy_soldier_ai_status, 10)
-	status_group.add_child(enemy_soldier_ai_status)
+	ai_group.add_child(enemy_soldier_ai_status)
 	hud.debug_enemy_soldier_ai_value = enemy_soldier_ai_status
 
 	var hull_row: Dictionary = create_slider_row("Hull")
@@ -2898,20 +3037,30 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	row_a.add_theme_constant_override("separation", 4)
 	action_group.add_child(row_a)
 	row_a.add_child(create_debug_action_button("선원 보충", hud._refill_player_crew_for_debug))
-	row_a.add_child(create_debug_action_button("지원함 호출", hud._spawn_support_ship_for_debug))
+	row_a.add_child(create_debug_action_button("정지", hud._stop_player_ship_for_debug))
 
 	var row_b := HBoxContainer.new()
 	row_b.add_theme_constant_override("separation", 4)
 	action_group.add_child(row_b)
-	row_b.add_child(create_debug_action_button("정지", hud._stop_player_ship_for_debug))
 	row_b.add_child(create_debug_action_button("화재 토글", hud._toggle_player_ship_fire_for_debug))
+	row_b.add_child(create_debug_action_button("노젓기 토글", hud._toggle_player_rowing_for_debug))
 
 	var row_c := HBoxContainer.new()
 	row_c.add_theme_constant_override("separation", 4)
 	action_group.add_child(row_c)
-	row_c.add_child(create_debug_action_button("노젓기 토글", hud._toggle_player_rowing_for_debug))
 	row_c.add_child(create_debug_action_button("돛 정렬", hud._auto_adjust_player_sail_for_debug))
 	row_c.add_child(create_debug_action_button("돛대 접기", hud._toggle_player_masts_folded_for_debug))
+
+	var row_geobuk := HBoxContainer.new()
+	row_geobuk.add_theme_constant_override("separation", 4)
+	action_group.add_child(row_geobuk)
+	row_geobuk.add_child(create_debug_action_button("거북선 변환", hud._apply_geobukseon_upgrade_for_debug))
+
+	var row_support_cards := HBoxContainer.new()
+	row_support_cards.add_theme_constant_override("separation", 4)
+	support_group.add_child(row_support_cards)
+	row_support_cards.add_child(create_debug_action_button("맹선 카드", hud._apply_fleet_signal_upgrade_for_debug))
+	row_support_cards.add_child(create_debug_action_button("판옥선 카드", hud._apply_panokseon_upgrade_for_debug))
 
 	var row_d := HBoxContainer.new()
 	row_d.add_theme_constant_override("separation", 4)
@@ -2931,16 +3080,6 @@ static func _add_ship_section(hud, panel_box: Control) -> void:
 	))
 	row_e.add_child(create_debug_action_button("장군 -1", func() -> void:
 		hud._adjust_player_captain_count_for_debug(-1)
-	))
-
-	var row_f := HBoxContainer.new()
-	row_f.add_theme_constant_override("separation", 4)
-	crew_group.add_child(row_f)
-	row_f.add_child(create_debug_action_button("지원한도 +1", func() -> void:
-		hud._adjust_player_support_limit_for_debug(1)
-	))
-	row_f.add_child(create_debug_action_button("지원한도 -1", func() -> void:
-		hud._adjust_player_support_limit_for_debug(-1)
 	))
 
 	var row_g := HBoxContainer.new()
@@ -3028,6 +3167,7 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 		preset_button.custom_minimum_size = Vector2(0, 26)
 		preset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		preset_button.focus_mode = Control.FOCUS_ALL
+		_wire_debug_focus_scroll(preset_button)
 		NavalUiTheme.apply_hud_button(preset_button, 11)
 		preset_button.pressed.connect(func() -> void:
 			hud._apply_sail_debug_values(float(preset["damage"]), float(preset["burn"]), float(preset.get("hole", 1.0)))
@@ -3042,6 +3182,7 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 	sync_button.text = "Sync"
 	sync_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sync_button.focus_mode = Control.FOCUS_ALL
+	_wire_debug_focus_scroll(sync_button)
 	NavalUiTheme.apply_hud_button(sync_button, 11)
 	sync_button.pressed.connect(hud._sync_sail_debug_panel_from_player)
 	action_row.add_child(sync_button)
@@ -3050,6 +3191,7 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 	reset_button.text = "Reset"
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reset_button.focus_mode = Control.FOCUS_ALL
+	_wire_debug_focus_scroll(reset_button)
 	NavalUiTheme.apply_hud_button(reset_button, 11)
 	reset_button.pressed.connect(func() -> void:
 		hud._apply_sail_debug_values(
@@ -3059,24 +3201,6 @@ static func _add_sail_section(hud, panel_box: Control) -> void:
 		)
 	)
 	action_row.add_child(reset_button)
-
-
-static func create_debug_columns(parent: Control, column_count: int) -> Array[VBoxContainer]:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 14)
-	parent.add_child(row)
-
-	var columns: Array[VBoxContainer] = []
-	for _index in range(maxi(1, column_count)):
-		var column := VBoxContainer.new()
-		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		column.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		column.add_theme_constant_override("separation", 12)
-		row.add_child(column)
-		columns.append(column)
-	return columns
 
 
 static func create_debug_group(parent: Control, title_text: String) -> VBoxContainer:
@@ -3128,6 +3252,7 @@ static func create_debug_action_button(button_text: String, callback: Callable) 
 	button.custom_minimum_size = Vector2(0, 28)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.focus_mode = Control.FOCUS_ALL
+	_wire_debug_focus_scroll(button)
 	NavalUiTheme.apply_hud_button(button, 11)
 	button.pressed.connect(callback)
 	return button
@@ -3154,6 +3279,7 @@ static func create_slider_row(title_text: String) -> Dictionary:
 
 	var slider := HSlider.new()
 	slider.focus_mode = Control.FOCUS_ALL
+	_wire_debug_focus_scroll(slider)
 	slider.min_value = 0.0
 	slider.max_value = 1.0
 	slider.step = 0.01

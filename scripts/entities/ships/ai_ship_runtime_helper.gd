@@ -576,8 +576,9 @@ static func process_physics(ship, delta: float) -> void:
 			PhysicsFrameProfiler.end("ai_ship_boarding_direct", boarding_direct_profile_start)
 			var boarding_impact_profile_start := PhysicsFrameProfiler.begin()
 			var impact_confirmed: bool = ship.has_method("_has_recent_boarding_impact") and ship.call("_has_recent_boarding_impact", current_target)
+			var latch_confirmed: bool = can_latched_board and ship.has_method("_get_active_boarding_latch_mode") and not str(ship.call("_get_active_boarding_latch_mode", current_target)).is_empty()
 			PhysicsFrameProfiler.end("ai_ship_boarding_impact", boarding_impact_profile_start)
-			if (can_latched_board or can_direct_board) and impact_confirmed:
+			if (can_latched_board or can_direct_board) and (impact_confirmed or latch_confirmed):
 				if ship.has_method("_board_ship"):
 					var boarding_start_profile_start := PhysicsFrameProfiler.begin()
 					ship.call("_board_ship", current_target)

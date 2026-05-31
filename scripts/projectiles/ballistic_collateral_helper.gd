@@ -2,6 +2,7 @@ extends RefCounted
 class_name BallisticCollateralHelper
 
 const WATER_SPLASH_SCENE = preload("res://scenes/effects/water_blast.tscn")
+const SoldierCombatOverboardHelper = preload("res://scripts/entities/soldiers/soldier_combat_overboard_helper.gd")
 
 const DAMAGE_SOURCE := "ballistic_collateral"
 const KIND_CANNON := "cannon"
@@ -15,12 +16,13 @@ const JANGGUN_CHANCE: float = 0.07
 const EXTRA_THROW_CHANCE: float = 0.18
 const MAX_THROW_COUNT: int = 2
 const SHIP_COOLDOWN_SECONDS: float = 1.0
-const THROW_DURATION: float = 0.68
+const THROW_DURATION: float = 0.82
 const THROW_EXIT_PAD_MIN: float = 1.8
 const THROW_EXIT_PAD_MAX: float = 2.7
-const THROW_ARC_HEIGHT_MIN: float = 1.65
-const THROW_ARC_HEIGHT_MAX: float = 2.25
-const SPLASH_LEAD_PROGRESS: float = 0.96
+const THROW_ARC_HEIGHT_MIN: float = 2.2
+const THROW_ARC_HEIGHT_MAX: float = 3.0
+const THROW_ROTATION_DELAY: float = 0.24
+const SPLASH_LEAD_PROGRESS: float = 0.99
 const FAILSAFE_DEATH_SECONDS: float = 1.35
 const BALLISTIC_DEATH_PITCH_MIN: float = 1.12
 const BALLISTIC_DEATH_PITCH_MAX: float = 1.32
@@ -171,23 +173,18 @@ static func _start_ballistic_throw_tween(source: Node, soldier: Node3D, hit_ship
 		tree = source.get_tree()
 	var start_position := soldier.global_position
 	var throw_target := _resolve_projectile_throw_target(hit_ship, start_position, throw_dir)
-	var arc_control := start_position.lerp(throw_target, 0.5)
-	arc_control.y = maxf(start_position.y, throw_target.y) + randf_range(THROW_ARC_HEIGHT_MIN, THROW_ARC_HEIGHT_MAX)
-	var start_rotation := soldier.rotation
-	var spin_rotation := start_rotation + Vector3(
-		randf_range(1.9, 3.1),
-		randf_range(-1.1, 1.1),
-		randf_range(-2.2, 2.2)
+	var arc_data := SoldierCombatOverboardHelper.make_throw_arc_data(
+		start_position,
+		throw_target,
+		soldier.rotation,
+		THROW_ARC_HEIGHT_MIN,
+		THROW_ARC_HEIGHT_MAX,
+		Vector3(1.9, -1.1, -2.2),
+		Vector3(3.1, 1.1, 2.2),
+		THROW_ROTATION_DELAY
 	)
 	var soldier_id := soldier.get_instance_id()
-	var arc_data := {
-		"start_position": start_position,
-		"arc_control": arc_control,
-		"throw_target": throw_target,
-		"start_rotation": start_rotation,
-		"spin_rotation": spin_rotation,
-		"splash_played": false,
-	}
+	arc_data["splash_played"] = false
 	var tween := soldier.create_tween()
 	tween.tween_method(func(progress: float) -> void:
 		_apply_ballistic_throw_arc(soldier_id, arc_data, progress)
@@ -209,21 +206,7 @@ static func _apply_ballistic_throw_arc(soldier_id: int, arc_data: Dictionary, pr
 	var soldier := NodeContractHelper.get_instance_node3d(soldier_id)
 	if not is_instance_valid(soldier):
 		return
-	var start_position: Vector3 = arc_data.get("start_position", soldier.global_position)
-	var arc_control: Vector3 = arc_data.get("arc_control", start_position)
-	var throw_target: Vector3 = arc_data.get("throw_target", start_position)
-	var start_rotation: Vector3 = arc_data.get("start_rotation", soldier.rotation)
-	var spin_rotation: Vector3 = arc_data.get("spin_rotation", start_rotation)
-	var t := clampf(progress, 0.0, 1.0)
-	var eased_t := smoothstep(0.0, 1.0, t)
-	soldier.global_position = start_position * ((1.0 - t) * (1.0 - t)) \
-		+ arc_control * (2.0 * (1.0 - t) * t) \
-		+ throw_target * (t * t)
-	soldier.rotation = Vector3(
-		lerp_angle(start_rotation.x, spin_rotation.x, eased_t),
-		lerp_angle(start_rotation.y, spin_rotation.y, eased_t),
-		lerp_angle(start_rotation.z, spin_rotation.z, eased_t)
-	)
+	SoldierCombatOverboardHelper.apply_throw_arc(soldier, arc_data, progress)
 
 
 static func _resolve_projectile_throw_target(hit_ship: Node3D, start_position: Vector3, throw_dir: Vector3) -> Vector3:

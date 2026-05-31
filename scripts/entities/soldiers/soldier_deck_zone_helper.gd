@@ -3,6 +3,7 @@ class_name SoldierDeckZoneHelper
 
 const META_COMBAT_DECK_ZONE := "combat_deck_zone"
 const META_ROOF_BOARDER := "geobuk_roof_boarder"
+const META_ROOF_DEFENDER := "geobuk_roof_defender"
 
 const ZONE_MAIN := ""
 const ZONE_ROOF := "roof"
@@ -84,6 +85,10 @@ static func is_roof_boarder(soldier: Node) -> bool:
 	return is_instance_valid(soldier) and soldier.get_meta(META_ROOF_BOARDER, false) == true
 
 
+static func is_roof_defender(soldier: Node) -> bool:
+	return is_instance_valid(soldier) and soldier.get_meta(META_ROOF_DEFENDER, false) == true
+
+
 static func set_roof_boarder(soldier: Node, enabled: bool) -> void:
 	if not is_instance_valid(soldier):
 		return
@@ -93,3 +98,16 @@ static func set_roof_boarder(soldier: Node, enabled: bool) -> void:
 	else:
 		if soldier.has_meta(META_ROOF_BOARDER):
 			soldier.remove_meta(META_ROOF_BOARDER)
+
+
+static func set_roof_defender(soldier: Node, enabled: bool) -> void:
+	if not is_instance_valid(soldier):
+		return
+	if enabled:
+		soldier.set_meta(META_ROOF_DEFENDER, true)
+		set_zone(soldier, ZONE_ROOF)
+	else:
+		if soldier.has_meta(META_ROOF_DEFENDER):
+			soldier.remove_meta(META_ROOF_DEFENDER)
+		if not is_roof_boarder(soldier):
+			clear_zone(soldier)

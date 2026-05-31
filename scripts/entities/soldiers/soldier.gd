@@ -362,18 +362,51 @@ func get_fallback_visual_mesh(visual_root: Node = null) -> MeshInstance3D:
 
 func get_hand_pivot() -> Node3D:
 	var pivot := get_node_or_null(NODE_HAND_PIVOT)
-	return pivot as Node3D if pivot is Node3D else null
+	if pivot is Node3D:
+		return pivot as Node3D
+	var visual_root := get_visual_root_node()
+	if is_instance_valid(visual_root) and visual_root != self:
+		pivot = visual_root.get_node_or_null(NODE_HAND_PIVOT)
+		if pivot is Node3D:
+			return pivot as Node3D
+	return null
 
 
 func ensure_hand_pivot() -> Node3D:
 	var pivot := get_hand_pivot()
+	var pivot_parent := _get_hand_pivot_parent()
 	if pivot != null:
+		if is_instance_valid(pivot_parent) and pivot.get_parent() != pivot_parent:
+			var old_global := pivot.global_transform
+			var old_parent := pivot.get_parent()
+			if old_parent != null:
+				old_parent.remove_child(pivot)
+			pivot_parent.add_child(pivot)
+			if pivot.is_inside_tree():
+				pivot.global_transform = old_global
 		return pivot
 	pivot = Node3D.new()
 	pivot.name = NODE_HAND_PIVOT
-	pivot.position = DEFAULT_HAND_PIVOT_POSITION
-	add_child(pivot)
+	if is_instance_valid(pivot_parent):
+		pivot_parent.add_child(pivot)
+		pivot.position = _get_default_hand_pivot_local_position(pivot_parent)
+	else:
+		add_child(pivot)
+		pivot.position = DEFAULT_HAND_PIVOT_POSITION
 	return pivot
+
+
+func _get_hand_pivot_parent() -> Node3D:
+	var visual_root := ensure_visual_root_node()
+	if is_instance_valid(visual_root) and visual_root != self:
+		return visual_root
+	return self
+
+
+func _get_default_hand_pivot_local_position(parent_node: Node3D) -> Vector3:
+	if parent_node == self:
+		return DEFAULT_HAND_PIVOT_POSITION
+	return DEFAULT_HAND_PIVOT_POSITION - parent_node.position
 
 
 func get_body_collision_shape() -> CollisionShape3D:
@@ -1253,7 +1286,7 @@ func _is_outside_owned_ship_deck(margin: float = 0.0) -> bool:
 		return false
 	var local_pos: Vector3 = owned_ship.to_local(global_position)
 	if SoldierDeckZoneHelper.is_roof(self) and owned_ship.has_method("is_roof_local_position_in_bounds"):
-		return owned_ship.call("is_roof_local_position_in_bounds", local_pos) == true
+		return owned_ship.call("is_roof_local_position_in_bounds", local_pos) == false
 	var half_ext := _get_ship_deck_half_extents(owned_ship)
 	var half_width := half_ext.x
 	if owned_ship.has_method("get_deck_half_width_at_z"):
@@ -1504,6 +1537,8 @@ func _is_safely_inside_deck_bounds() -> bool:
 	if not is_instance_valid(owned_ship):
 		return false
 	var local_pos: Vector3 = owned_ship.to_local(global_position)
+	if SoldierDeckZoneHelper.is_roof(self) and owned_ship.has_method("is_roof_local_position_in_bounds"):
+		return owned_ship.call("is_roof_local_position_in_bounds", local_pos) == true
 	var half_ext := _get_ship_deck_half_extents(owned_ship)
 	if half_ext.x <= 0.01 or half_ext.y <= 0.01:
 		return false

@@ -1,7 +1,7 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 const BASE_DAMAGE: float = 8.0
-const ARROW_SPEED: float = 34.0
+const ARROW_SPEED: float = 30.0
 const MIN_ARROW_FLIGHT_TIME: float = 0.12
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.55
@@ -10,7 +10,7 @@ const SINGIGEON_SHIP_AIM_VERTICAL_OFFSET: float = 0.65
 
 @export var arrow_scene: PackedScene = preload("res://scenes/projectiles/arrow.tscn")
 @export var singigeon_rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
-@export var shoot_cooldown: float = 2.0
+@export var shoot_cooldown: float = 2.5
 @export var max_range: float = 20.0
 var _cached_spawn_parent: Node = null
 

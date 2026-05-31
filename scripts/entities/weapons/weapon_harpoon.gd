@@ -1,14 +1,14 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 ## 작살 (Harpoon)
-## 평균적인 능력치에 높은 치명타 확률 보너스를 가집니다.
+## 창 계열 사거리와 공격 템포에 높은 치명타 확률 보너스를 가집니다.
 
 const BASE_DAMAGE: float = 12.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE
-	attack_range = 2.8
-	attack_cooldown = 1.1
+	attack_range = 2.35
+	attack_cooldown = 1.2
 
 
 func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:

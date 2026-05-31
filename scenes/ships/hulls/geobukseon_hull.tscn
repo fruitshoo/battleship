@@ -233,30 +233,30 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.405096, 1.84)
 [node name="RoofBoardingPoints" type="Node3D" parent="ScaleRoot/Authoring" unique_id=745677455]
 
 [node name="RoofForwardLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=2057516810]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.85, -4.04)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1.2, -4.04)
 
 [node name="RoofForwardRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=1753779328]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.85, -4.04)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1.2, -4.04)
 
 [node name="RoofMidLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=2087043343]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.85, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1.2, 0)
 
 [node name="RoofMidRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=1593090928]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.85, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.2, 0)
 
 [node name="RoofRearLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=130114094]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4, 0.85, 4.307)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4, 1.2, 4.307)
 
 [node name="RoofRearRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofBoardingPoints" unique_id=384765222]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 0.85, 4.307)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 1.2, 4.307)
 
 [node name="RoofSurfacePoints" type="Node3D" parent="ScaleRoot/Authoring" unique_id=1159433645]
 
 [node name="SurfaceLeft" type="Marker3D" parent="ScaleRoot/Authoring/RoofSurfacePoints" unique_id=1308895608]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.6, -0.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.96, -0.4)
 
 [node name="SurfaceRight" type="Marker3D" parent="ScaleRoot/Authoring/RoofSurfacePoints" unique_id=2083514722]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.6, -0.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.96, -0.4)
 
 [node name="Masts" type="Node3D" parent="ScaleRoot" unique_id=1994548284]
 

@@ -4,6 +4,7 @@ class_name BaseShip
 
 const PlayerFleetRoleHelper = preload("res://scripts/entities/ships/player_fleet_role_helper.gd")
 const BaseShipSoldierStateHelper = preload("res://scripts/entities/soldiers/soldier_state_helper.gd")
+const SoldierDeckZoneHelper = preload("res://scripts/entities/soldiers/soldier_deck_zone_helper.gd")
 const BaseShipBoardingRopeVisualHelper = preload("res://scripts/entities/ships/base_ship_boarding_rope_visual_helper.gd")
 const BaseShipDamageHelper = preload("res://scripts/entities/ships/base_ship_damage_helper.gd")
 const BaseShipDebugSnapshotHelper = preload("res://scripts/entities/ships/base_ship_debug_snapshot_helper.gd")
@@ -28,6 +29,8 @@ const SHIP_SINK_BUBBLES_PITCH_MIN := 0.94
 const SHIP_SINK_BUBBLES_PITCH_MAX := 1.06
 const RUNTIME_GENERATED_HULL_META := "runtime_generated_hull"
 const CREW_RANGED_COVER_BASE_DEFENSE_META := "crew_ranged_cover_base_defense"
+const ROOF_BOARDING_POINT_OCCUPIED_RADIUS := 0.72
+const ROOF_BOARDING_POINT_OCCUPIED_PENALTY := 18.0
 
 ## 함선의 공통 기반 클래스 (물리, 시각 효과, 내구도 관리)
 
@@ -487,7 +490,7 @@ func is_roof_boarding_enabled() -> bool:
 
 func get_roof_boarding_landing_local(approach_global: Vector3) -> Vector3:
 	var fallback := Vector3(0.0, maxf(deck_height + 1.1, 1.7), 0.0)
-	return _get_nearest_authoring_marker_local(ShipAuthoringHelper.ROOF_BOARDING_POINTS, approach_global, fallback)
+	return _get_available_roof_boarding_marker_local(approach_global, fallback)
 
 func clamp_roof_boarding_landing_local(local_position: Vector3) -> Vector3:
 	return _clamp_roof_local_position(local_position)
@@ -1112,24 +1115,103 @@ func _get_nearest_authoring_marker_local(container_name: String, reference_globa
 	return to_local(best_marker.global_position)
 
 
-func _clamp_roof_local_position(local_position: Vector3) -> Vector3:
-	var markers := ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_SURFACE_POINTS)
+func _get_available_roof_boarding_marker_local(reference_global: Vector3, fallback_local: Vector3) -> Vector3:
+	var markers := ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_BOARDING_POINTS)
 	if markers.is_empty():
-		markers = ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_BOARDING_POINTS)
+		markers = ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_SURFACE_POINTS)
+	if markers.is_empty():
+		return fallback_local
+	var occupied_counts := _get_roof_boarding_marker_occupancy(markers)
+	var best_marker: Node3D = null
+	var best_score := INF
+	for marker in markers:
+		if not is_instance_valid(marker):
+			continue
+		var marker_id := marker.get_instance_id()
+		var occupied_count := int(occupied_counts.get(marker_id, 0))
+		var distance_sq := marker.global_position.distance_squared_to(reference_global)
+		var score := distance_sq + float(occupied_count) * ROOF_BOARDING_POINT_OCCUPIED_PENALTY
+		if score < best_score:
+			best_score = score
+			best_marker = marker
+	if not is_instance_valid(best_marker):
+		return fallback_local
+	return _clamp_roof_local_position(to_local(best_marker.global_position))
+
+
+func _get_roof_boarding_marker_occupancy(markers: Array[Node3D]) -> Dictionary:
+	var occupied_counts := {}
+	var soldiers_node := NodeContractHelper.get_soldiers_container(self)
+	if not is_instance_valid(soldiers_node):
+		return occupied_counts
+	var occupied_radius_sq := ROOF_BOARDING_POINT_OCCUPIED_RADIUS * ROOF_BOARDING_POINT_OCCUPIED_RADIUS
+	for child in soldiers_node.get_children():
+		if not (child is Node3D):
+			continue
+		if not SoldierDeckZoneHelper.is_roof(child):
+			continue
+		var soldier_local := to_local((child as Node3D).global_position)
+		var best_marker: Node3D = null
+		var best_distance_sq := INF
+		for marker in markers:
+			if not is_instance_valid(marker):
+				continue
+			var marker_local := to_local(marker.global_position)
+			var distance_sq := Vector2(soldier_local.x - marker_local.x, soldier_local.z - marker_local.z).length_squared()
+			if distance_sq < best_distance_sq:
+				best_distance_sq = distance_sq
+				best_marker = marker
+		if is_instance_valid(best_marker) and best_distance_sq <= occupied_radius_sq:
+			var marker_id := best_marker.get_instance_id()
+			occupied_counts[marker_id] = int(occupied_counts.get(marker_id, 0)) + 1
+	return occupied_counts
+
+
+func _clamp_roof_local_position(local_position: Vector3) -> Vector3:
+	var surface_markers := ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_SURFACE_POINTS)
+	var edge_markers := ShipAuthoringHelper.get_authoring_markers(self, ShipAuthoringHelper.ROOF_BOARDING_POINTS)
+	var markers := surface_markers
+	if markers.is_empty():
+		markers = edge_markers
 	if markers.is_empty():
 		return local_position
 	var half_ext := Vector2(1.6, 3.6)
-	var roof_y := local_position.y
+	var roof_center := Vector3.ZERO
+	var roof_center_count := 0
+	var center_y := local_position.y
 	for marker in markers:
 		var local_marker := to_local(marker.global_position)
 		half_ext.x = maxf(half_ext.x, absf(local_marker.x))
 		half_ext.y = maxf(half_ext.y, absf(local_marker.z))
-		roof_y = local_marker.y
+		roof_center += local_marker
+		roof_center_count += 1
+		center_y = local_marker.y
+	if roof_center_count > 0:
+		roof_center /= float(roof_center_count)
+	var edge_y := center_y
+	for marker in edge_markers:
+		var local_marker := to_local(marker.global_position)
+		half_ext.x = maxf(half_ext.x, absf(local_marker.x))
+		half_ext.y = maxf(half_ext.y, absf(local_marker.z))
+		edge_y = minf(edge_y, local_marker.y)
+	var clamped_x := clampf(local_position.x, -half_ext.x - 0.25, half_ext.x + 0.25)
+	var clamped_z := clampf(local_position.z, -half_ext.y - 0.35, half_ext.y + 0.35)
+	var roof_y := _sample_curved_roof_y(Vector3(clamped_x, local_position.y, clamped_z), roof_center, half_ext, center_y, edge_y)
 	return Vector3(
-		clampf(local_position.x, -half_ext.x - 0.25, half_ext.x + 0.25),
+		clamped_x,
 		roof_y,
-		clampf(local_position.z, -half_ext.y - 0.35, half_ext.y + 0.35)
+		clamped_z
 	)
+
+
+func _sample_curved_roof_y(local_position: Vector3, roof_center: Vector3, half_ext: Vector2, center_y: float, edge_y: float) -> float:
+	if half_ext.x <= 0.01 or half_ext.y <= 0.01:
+		return center_y
+	var normalized_x := absf(local_position.x - roof_center.x) / maxf(half_ext.x, 0.01)
+	var normalized_z := absf(local_position.z - roof_center.z) / maxf(half_ext.y, 0.01)
+	var edge_ratio := clampf(Vector2(normalized_x, normalized_z).length(), 0.0, 1.0)
+	var crown_weight := 1.0 - smoothstep(0.15, 1.0, edge_ratio)
+	return lerpf(edge_y, center_y, crown_weight)
 
 
 ## 병사가 사망할 때마다 호출되어, 배의 폐선 여부를 이벤트 방식으로 검사

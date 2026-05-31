@@ -8,9 +8,9 @@ const NODE_MUZZLE := "Muzzle"
 
 @export var shot_scene: PackedScene = preload("res://scenes/projectiles/small_cannonball.tscn")
 @export var muzzle_smoke_scene: PackedScene = preload("res://scenes/effects/small_firearm_muzzle_smoke.tscn")
-@export var shoot_cooldown: float = 5.3
+@export var shoot_cooldown: float = 4.5
 @export var max_range: float = 22.0
-@export var projectile_speed: float = 36.0
+@export var projectile_speed: float = 32.0
 @export var fire_sfx: String = "musket_fire"
 @export_range(-12.0, 12.0, 0.5, "suffix:dB") var fire_sfx_volume_db: float = 6.0
 @export var ballistic_trace_enabled: bool = true

@@ -6,7 +6,7 @@ class_name HudSailDebugHelper
 static func update_sail_debug_toggle_button_text(hud) -> void:
 	if not is_instance_valid(hud.sail_debug_toggle_button):
 		return
-	hud.sail_debug_toggle_button.text = "Debug 닫기" if is_instance_valid(hud.sail_debug_panel) and hud.sail_debug_panel.visible else "Debug 열기"
+	hud.sail_debug_toggle_button.text = "디버그 닫기" if is_instance_valid(hud.sail_debug_panel) and hud.sail_debug_panel.visible else "디버그 열기"
 
 
 static func get_player_masts_for_debug(hud) -> Array[Node]:

@@ -10,7 +10,7 @@ size = Vector3(10, 5, 30)
 [node name="CannonJoseon" type="Node3D" unique_id=333789260]
 script = ExtResource("1")
 cannonball_scene = ExtResource("2")
-projectile_damage = 22.0
+projectile_damage = 20.0
 projectile_speed = 55.0
 fire_cooldown = 3.2
 detection_range = 24.0

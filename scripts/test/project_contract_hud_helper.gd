@@ -323,25 +323,25 @@ static func _run_hud_debug_state_check(hud: Node, player_ship: Node3D, target_sh
 	if is_instance_valid(hud.debug_ship_config_value) and not hud.debug_ship_config_value.text.contains("설정"):
 		failures.append("hud smoke ship debug config text mismatch")
 	if not is_instance_valid(hud.debug_ship_ai_value):
-		failures.append("hud smoke ship debug AI label missing")
-	elif not hud.debug_ship_ai_value.text.contains("플레이어 AI"):
-		failures.append("hud smoke ship debug AI text mismatch")
+		failures.append("hud smoke ship debug status label missing")
+	elif not hud.debug_ship_ai_value.text.contains("플레이어 상태"):
+		failures.append("hud smoke ship debug status text mismatch")
 	if not is_instance_valid(hud.debug_enemy_ai_value):
-		failures.append("hud smoke enemy debug AI label missing")
-	elif not hud.debug_enemy_ai_value.text.contains("적선 AI"):
-		failures.append("hud smoke enemy debug AI text mismatch")
+		failures.append("hud smoke enemy debug status label missing")
+	elif not hud.debug_enemy_ai_value.text.contains("적선 상태"):
+		failures.append("hud smoke enemy debug status text mismatch")
 	if not is_instance_valid(hud.debug_support_ai_value):
-		failures.append("hud smoke support debug AI label missing")
-	elif not hud.debug_support_ai_value.text.contains("지원함 AI"):
-		failures.append("hud smoke support debug AI text mismatch")
+		failures.append("hud smoke support debug status label missing")
+	elif not hud.debug_support_ai_value.text.contains("지원함 상태"):
+		failures.append("hud smoke support debug status text mismatch")
 	if not is_instance_valid(hud.debug_player_soldier_ai_value):
-		failures.append("hud smoke player soldier debug AI label missing")
-	elif not hud.debug_player_soldier_ai_value.text.contains("아군 병사 AI"):
-		failures.append("hud smoke player soldier debug AI text mismatch")
+		failures.append("hud smoke player soldier debug status label missing")
+	elif not hud.debug_player_soldier_ai_value.text.contains("아군 병사"):
+		failures.append("hud smoke player soldier debug status text mismatch")
 	if not is_instance_valid(hud.debug_enemy_soldier_ai_value):
-		failures.append("hud smoke enemy soldier debug AI label missing")
-	elif not hud.debug_enemy_soldier_ai_value.text.contains("적 병사 AI"):
-		failures.append("hud smoke enemy soldier debug AI text mismatch")
+		failures.append("hud smoke enemy soldier debug status label missing")
+	elif not hud.debug_enemy_soldier_ai_value.text.contains("적 병사"):
+		failures.append("hud smoke enemy soldier debug status text mismatch")
 	var player_soldier: Node3D = null
 	if is_instance_valid(player_ship):
 		for candidate_variant in EntityRegistry.get_soldiers_by_ship(player_ship):

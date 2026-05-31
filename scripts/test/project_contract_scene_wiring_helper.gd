@@ -3361,8 +3361,49 @@ static func _run_boarding_landing_contract(owner: Node, failures: Array[String],
 	if absf(landing_stern.x + 0.25) > 0.05:
 		failures.append("boarding landing should preserve nearby lateral coordinate")
 
+	_verify_roof_boarding_landing_avoids_occupied_point(target, failures)
+
 	target.queue_free()
 	await _wait_frames(owner, 1)
+
+
+static func _verify_roof_boarding_landing_avoids_occupied_point(target: BaseShip, failures: Array[String]) -> void:
+	var soldiers := Node3D.new()
+	soldiers.name = NodeContractHelper.SHIP_NODE_SOLDIERS
+	target.add_child(soldiers)
+
+	var authoring := Node3D.new()
+	authoring.name = ShipAuthoringHelper.AUTHORING_ROOT
+	target.add_child(authoring)
+	var roof_points := Node3D.new()
+	roof_points.name = ShipAuthoringHelper.ROOF_BOARDING_POINTS
+	authoring.add_child(roof_points)
+
+	var near_marker := Marker3D.new()
+	near_marker.name = "RoofNear"
+	near_marker.position = Vector3(2.0, 1.0, 0.0)
+	roof_points.add_child(near_marker)
+	var alternate_marker := Marker3D.new()
+	alternate_marker.name = "RoofAlternate"
+	alternate_marker.position = Vector3(2.0, 1.0, 1.7)
+	roof_points.add_child(alternate_marker)
+	var far_marker := Marker3D.new()
+	far_marker.name = "RoofFar"
+	far_marker.position = Vector3(-2.0, 1.0, 0.0)
+	roof_points.add_child(far_marker)
+
+	var approach_global := target.to_global(Vector3(8.0, 1.0, 0.0))
+	var first_landing := target.get_roof_boarding_landing_local(approach_global)
+	var occupied_soldier := Node3D.new()
+	occupied_soldier.name = "OccupiedRoofBoarder"
+	occupied_soldier.set_meta(SoldierDeckZoneHelper.META_COMBAT_DECK_ZONE, SoldierDeckZoneHelper.ZONE_ROOF)
+	soldiers.add_child(occupied_soldier)
+	occupied_soldier.global_position = target.to_global(first_landing)
+
+	var second_landing := target.get_roof_boarding_landing_local(approach_global)
+	var separation := Vector2(first_landing.x - second_landing.x, first_landing.z - second_landing.z).length()
+	if separation < 0.65:
+		failures.append("roof boarding landing should choose a different point when the nearest roof point is occupied")
 
 
 static func _run_weapon_damage_grouping_contract(failures: Array[String]) -> void:
