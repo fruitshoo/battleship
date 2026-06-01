@@ -256,87 +256,15 @@ static func estimate_available_crew_count(ship) -> int:
 	return 0
 
 
-static func train_existing_crew_from_survivor(ship) -> bool:
-	var trainee := _pick_survivor_training_target(ship)
-	if not is_instance_valid(trainee):
-		_show_survivor_training_message(ship, "생존자 구조: 정원 가득")
-		return true
-
-	var before_level := _get_soldier_level(trainee)
-	var xp_amount := _get_soldier_next_level_xp(trainee)
-	if xp_amount <= 0.0:
-		xp_amount = 1.0
-	if trainee.has_method("add_soldier_xp"):
-		trainee.call("add_soldier_xp", xp_amount, "survivor_overflow")
-	var after_level := _get_soldier_level(trainee)
-	var message := "생존자 구조: 병사 훈련"
-	if after_level > before_level:
-		message = "생존자 구조: 병사 Lv.%d" % after_level
-	_show_survivor_training_message(ship, message)
+static func collect_overflow_survivor(ship) -> bool:
+	_show_survivor_overflow_message(ship, "생존자 구조: 병사 정원 가득")
 	var audio_manager = ship.get_node_or_null("/root/AudioManager")
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx("level_up" if after_level > before_level else "soldier_hit", ship.global_position, 1.25)
+		audio_manager.play_sfx("soldier_hit", ship.global_position, 1.1)
 	return true
 
 
-static func _pick_survivor_training_target(ship) -> Node:
-	var best: Node = null
-	var best_level := INF
-	var best_xp := INF
-	for soldier in EntityRegistry.get_soldiers_by_ship(ship):
-		if not is_instance_valid(soldier):
-			continue
-		if not _is_player_training_candidate(soldier):
-			continue
-		if not SoldierStateHelper.is_alive_soldier(soldier):
-			continue
-		if not soldier.has_method("add_soldier_xp"):
-			continue
-		var next_xp := _get_soldier_next_level_xp(soldier)
-		if next_xp <= 0.0:
-			continue
-		var level := _get_soldier_level(soldier)
-		var current_xp := _get_soldier_xp(soldier)
-		if level < best_level or (level == best_level and current_xp < best_xp):
-			best = soldier
-			best_level = level
-			best_xp = current_xp
-	return best
-
-
-static func _is_player_training_candidate(soldier: Node) -> bool:
-	if soldier.has_method("is_player_team_soldier"):
-		return soldier.call("is_player_team_soldier") == true
-	if soldier.has_method("get_team_tag"):
-		return str(soldier.call("get_team_tag")) == "player"
-	return str(soldier.get("team")) == "player"
-
-
-static func _get_soldier_level(soldier: Node) -> int:
-	if not is_instance_valid(soldier):
-		return 0
-	if soldier.has_method("get_soldier_level_value"):
-		return int(soldier.call("get_soldier_level_value"))
-	return int(soldier.get_meta("soldier_level", 1))
-
-
-static func _get_soldier_xp(soldier: Node) -> float:
-	if not is_instance_valid(soldier):
-		return 0.0
-	if soldier.has_method("get_soldier_xp_value"):
-		return float(soldier.call("get_soldier_xp_value"))
-	return float(soldier.get_meta("soldier_xp", 0.0))
-
-
-static func _get_soldier_next_level_xp(soldier: Node) -> float:
-	if not is_instance_valid(soldier):
-		return 0.0
-	if soldier.has_method("get_soldier_next_level_xp_requirement"):
-		return float(soldier.call("get_soldier_next_level_xp_requirement"))
-	return 0.0
-
-
-static func _show_survivor_training_message(ship, message: String) -> void:
+static func _show_survivor_overflow_message(ship, message: String) -> void:
 	print("[Rescue] %s" % message)
 	var hud = null
 	if "_cached_hud" in ship:

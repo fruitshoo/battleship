@@ -556,7 +556,7 @@ func add_survivor(_allow_over_capacity: bool = true) -> bool:
 
 	# 나포함 전용 정원(max_minion_crew) 체크
 	if roster_count >= max_minion_crew:
-		return BaseShipCrewHelper.train_existing_crew_from_survivor(self)
+		return BaseShipCrewHelper.collect_overflow_survivor(self)
 		
 	_spawn_one_soldier("player")
 	print("[Crew] 나포함이 생존자를 구조했습니다! (현재: %d/%d)" % [roster_count + 1, max_minion_crew])

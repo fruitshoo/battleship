@@ -74,10 +74,6 @@ class MockSoldier:
 	var death_pose_count: int = 0
 	var recovery_pose_count: int = 0
 	var deck_snap_count: int = 0
-	var soldier_level: int = 1
-	var soldier_xp: float = 0.0
-	var xp_awards: int = 0
-
 	var weapon_sword: Node3D = null
 	var weapon_bow: Node3D = null
 	var current_weapon: Node3D = null
@@ -98,10 +94,6 @@ class MockSoldier:
 
 	func _keep_within_owned_ship_bounds() -> void:
 		deck_snap_count += 1
-
-	func add_soldier_xp(amount: float, _reason: String = "") -> void:
-		soldier_xp += amount
-		xp_awards += 1
 
 	func _set_active_weapon(type: String) -> void:
 		if type == "sword":
@@ -135,7 +127,6 @@ func _ready() -> void:
 	_verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures)
 	_verify_shipmate_assist_large_delta_does_not_instant_recover(failures)
 	_verify_shipmate_assist_uses_standoff_without_pushing(failures)
-	_verify_player_soldier_level_progression(failures)
 	_verify_nearby_cross_ship_target_prefers_bow_without_rail_melee(failures)
 	_verify_cross_ship_attack_state_exits_rail_melee(failures)
 	_verify_stale_current_target_does_not_cast_freed_enemy(failures)
@@ -280,10 +271,6 @@ func _verify_recovery_uses_ship_medical_upgrade_stats(failures: Array[String]) -
 	var expected_health := soldier.max_health * 0.6
 	if not is_equal_approx(soldier.current_health, expected_health):
 		failures.append("medical recovery stat did not set upgraded recovery health: %.2f vs %.2f" % [soldier.current_health, expected_health])
-	if soldier.xp_awards != 1 or not is_equal_approx(soldier.soldier_xp, 1.0):
-		failures.append("recovered soldier did not receive survival level xp")
-
-
 func _verify_shipmate_assisted_recovery_recovers_incapacitated_player(failures: Array[String]) -> void:
 	var ship := _make_ship("player")
 	ship.set_meta("incapacitated_assist_health_ratio", 0.5)
@@ -457,27 +444,6 @@ func _verify_shipmate_assist_uses_standoff_without_pushing(failures: Array[Strin
 	var local_recovered: Vector3 = ship.to_local(downed.global_position)
 	if absf(local_recovered.x) > half_ext.x or absf(local_recovered.z) > half_ext.y:
 		failures.append("shipmate standoff assist recovered ally outside the deck bounds")
-
-
-func _verify_player_soldier_level_progression(failures: Array[String]) -> void:
-	var soldier = SoldierScript.new()
-	soldier.team = "player"
-	soldier.add_soldier_xp(1.0, "contract")
-	if soldier.get_soldier_level_value() != 1 or not is_equal_approx(soldier.get_soldier_xp_value(), 1.0):
-		failures.append("player soldier level changed before reaching level xp requirement")
-
-	soldier.add_soldier_xp(1.0, "contract")
-	if soldier.get_soldier_level_value() != 2:
-		failures.append("player soldier did not reach level 2 at xp requirement")
-	if not is_equal_approx(float(soldier.get_meta("soldier_level_damage_bonus_pct", 0.0)), 0.08):
-		failures.append("player soldier level 2 damage bonus was not applied")
-
-	soldier.add_soldier_xp(100.0, "contract")
-	if soldier.get_soldier_level_value() != 5:
-		failures.append("player soldier level did not clamp at cap")
-	if not is_equal_approx(soldier.get_soldier_xp_value(), 0.0):
-		failures.append("player soldier xp did not clear at level cap")
-	soldier.free()
 
 
 func _verify_nearby_cross_ship_target_prefers_bow_without_rail_melee(failures: Array[String]) -> void:

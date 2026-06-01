@@ -513,8 +513,6 @@ static func _recover_incapacitated_now(soldier, health_ratio: float) -> void:
 	_set_body_collision_disabled(soldier, false)
 	if soldier.has_method("_play_recovery_pose"):
 		soldier._play_recovery_pose()
-	if soldier.has_method("add_soldier_xp"):
-		soldier.add_soldier_xp(1.0, "recovery")
 	soldier.set_physics_process(true)
 	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_method("_sync_player_crew_roster"):
 		soldier.owned_ship.call_deferred("_sync_player_crew_roster")

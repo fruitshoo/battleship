@@ -1,11 +1,11 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
-const BASE_DAMAGE: float = 8.0
+const BASE_DAMAGE: float = 6.0
 
 func _ready() -> void:
 	damage = BASE_DAMAGE
 	attack_range = 1.7
-	attack_cooldown = 1.0
+	attack_cooldown = 1.12
 
 
 func apply_owner_damage_bonus_pct(damage_bonus_pct: float) -> void:

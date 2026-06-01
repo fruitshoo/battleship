@@ -4,7 +4,7 @@ class_name SeaSiteRewardHelper
 
 const REWARD_UPGRADE_CHOICES := "upgrade_choices"
 const REWARD_REPAIR_HULL := "repair_hull"
-const REWARD_TRAIN_CREW := "train_crew"
+const REWARD_TRAIN_CREW := "train_crew" # Legacy authoring value; maps to crew restoration.
 const REWARD_EXPAND_CREW_LIMIT := "expand_crew_limit"
 const REWARD_RESTORE_CREW := "restore_crew"
 const REWARD_MINOR_STAT_BONUS := "minor_stat_bonus"
@@ -20,14 +20,13 @@ static func apply_reward(
 	choice_count: int,
 	hull_repair_ratio: float,
 	hull_repair_minimum: float,
-	crew_xp_amount: float,
 	crew_limit_bonus: int,
 	crew_restore_count: int
 ) -> bool:
 	if reward_type == REWARD_REPAIR_HULL:
 		return _repair_hull(site, player_ship, hull_repair_ratio, hull_repair_minimum)
 	if reward_type == REWARD_TRAIN_CREW:
-		return _train_crew(site, player_ship, crew_xp_amount)
+		return _restore_crew(site, player_ship, crew_restore_count)
 	if reward_type == REWARD_EXPAND_CREW_LIMIT:
 		return _expand_crew_limit(site, player_ship, crew_limit_bonus)
 	if reward_type == REWARD_RESTORE_CREW:
@@ -288,36 +287,6 @@ static func _repair_hull(site: Node, player_ship: Node3D, repair_ratio: float, r
 	return true
 
 
-static func _train_crew(site: Node, player_ship: Node3D, xp_amount: float) -> bool:
-	if not is_instance_valid(player_ship):
-		return false
-	var trained_count := 0
-	var level_ups := 0
-	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
-		if not is_instance_valid(soldier):
-			continue
-		if not _is_player_soldier(soldier):
-			continue
-		if _is_dead_soldier(soldier):
-			continue
-		if not soldier.has_method("add_soldier_xp"):
-			continue
-		var before_level := _get_soldier_level(soldier)
-		soldier.call("add_soldier_xp", xp_amount, "sea_site")
-		var after_level := _get_soldier_level(soldier)
-		trained_count += 1
-		if after_level > before_level:
-			level_ups += after_level - before_level
-
-	if trained_count <= 0:
-		_notify(site, player_ship, LocaleManager.t("hud.sea_site.no_crew_to_train", "훈련할 병사 없음"))
-	elif level_ups > 0:
-		_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_training_level", "병사 훈련: Lv +{amount}", {"amount": level_ups}))
-	else:
-		_notify(site, player_ship, LocaleManager.t("hud.sea_site.crew_training_xp", "병사 훈련 +{amount} XP", {"amount": int(round(xp_amount))}))
-	return true
-
-
 static func _expand_crew_limit(site: Node, player_ship: Node3D, bonus: int) -> bool:
 	if not is_instance_valid(player_ship):
 		return false
@@ -369,14 +338,6 @@ static func _is_dead_soldier(soldier: Node) -> bool:
 	if soldier.has_method("is_state_value_dead"):
 		return soldier.call("is_state_value_dead", soldier.get("current_state")) == true
 	return false
-
-
-static func _get_soldier_level(soldier: Node) -> int:
-	if not is_instance_valid(soldier):
-		return 0
-	if soldier.has_method("get_soldier_level_value"):
-		return int(soldier.call("get_soldier_level_value"))
-	return int(soldier.get_meta("soldier_level", 1))
 
 
 static func _sync_hull_hud(site: Node, player_ship: Node3D) -> void:

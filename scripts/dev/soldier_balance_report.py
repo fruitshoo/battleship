@@ -49,7 +49,6 @@ def main() -> int:
     parser.add_argument("--meta-crew-defense", type=int, default=0, help="Assumed permanent crew_defense level.")
     parser.add_argument("--run-crew-attack", type=int, default=0, help="Assumed run crew_attack level.")
     parser.add_argument("--run-crew-defense", type=int, default=0, help="Assumed run crew_defense level.")
-    parser.add_argument("--soldier-level", type=int, default=1, help="Assumed player soldier personal level.")
     parser.add_argument("--repeating-crossbow-level", type=int, default=1, help="Assumed repeating_crossbow specialist upgrade level.")
     args = parser.parse_args()
 
@@ -67,21 +66,12 @@ def main() -> int:
     crit_chance = float(base["crit_chance"])
     crit_multiplier = float(base["crit_multiplier"])
 
-    soldier_level_bonus_by_level = {
-        1: 0.0,
-        2: 0.08,
-        3: 0.16,
-        4: 0.25,
-        5: 0.35,
-    }
-    soldier_level = max(1, min(5, args.soldier_level))
     meta_health_mult = 1.0 + (args.meta_crew_health * 0.12)
     meta_damage_bonus = args.meta_crew_attack * 0.04
-    soldier_level_damage_bonus = soldier_level_bonus_by_level[soldier_level]
     meta_defense_bonus = args.meta_crew_defense * 1.0
     run_damage_bonus = args.run_crew_attack * run_damage_bonus_per_level
     run_defense_bonus = args.run_crew_defense * crew_defense_add
-    total_damage_bonus = max(0.0, meta_damage_bonus + run_damage_bonus + soldier_level_damage_bonus)
+    total_damage_bonus = max(0.0, meta_damage_bonus + run_damage_bonus)
 
     effective_health = base_health * meta_health_mult
     effective_defense = base_defense + meta_defense_bonus + run_defense_bonus
@@ -90,10 +80,10 @@ def main() -> int:
     harpoon_expected_crit = expected_crit_multiplier(crit_chance + 0.15, 2.5)
 
     # Mirror the current code-facing formula: weapon base damage * one summed bonus.
-    sword_damage = 8.0 * (1.0 + total_damage_bonus)
-    spear_damage = 10.0 * (1.0 + total_damage_bonus)
-    trident_damage = 10.0 * (1.0 + total_damage_bonus)
-    harpoon_damage = 12.0 * (1.0 + total_damage_bonus)
+    sword_damage = 6.0 * (1.0 + total_damage_bonus)
+    spear_damage = 8.0 * (1.0 + total_damage_bonus)
+    trident_damage = 8.0 * (1.0 + total_damage_bonus)
+    harpoon_damage = 8.0 * (1.0 + total_damage_bonus)
     bow_damage = 8.0 * (1.0 + total_damage_bonus)
 
     repeating_crossbow_level = max(1, args.repeating_crossbow_level)
@@ -120,30 +110,30 @@ def main() -> int:
         {
             "weapon": "sword",
             "raw_hit": sword_damage,
-            "cooldown": 1.0,
+            "cooldown": 1.12,
             "expected_hit": sword_damage * melee_expected_crit,
             "notes": "General melee baseline using weapon base damage plus the summed damage bonus.",
         },
         {
             "weapon": "spear",
             "raw_hit": spear_damage,
-            "cooldown": 1.2,
+            "cooldown": 1.35,
             "expected_hit": spear_damage * melee_expected_crit,
             "notes": "Longer reach baseline using the spear/trident base damage.",
         },
         {
             "weapon": "trident",
             "raw_hit": trident_damage,
-            "cooldown": 1.6,
+            "cooldown": 1.35,
             "expected_hit": trident_damage * melee_expected_crit,
-            "notes": "Spear-family heavy cadence variant using the same base hit with a slower cooldown.",
+            "notes": "Spear-family baseline using the same base hit and cooldown as spear.",
         },
         {
             "weapon": "harpoon",
             "raw_hit": harpoon_damage,
-            "cooldown": 1.1,
+            "cooldown": 1.35,
             "expected_hit": harpoon_damage * harpoon_expected_crit,
-            "notes": "Gets higher crit expectation than other melee variants.",
+            "notes": "Spear-family base hit and cooldown with elevated crit expectation.",
         },
         {
             "weapon": "bow",
@@ -177,7 +167,6 @@ def main() -> int:
         "- assumptions: "
         f"meta_health={args.meta_crew_health}, meta_attack={args.meta_crew_attack}, meta_defense={args.meta_crew_defense}, "
         f"run_attack={args.run_crew_attack}, run_defense={args.run_crew_defense}, "
-        f"soldier_level={soldier_level}, "
         f"repeating_crossbow_level={repeating_crossbow_level}"
     )
     print()
@@ -202,7 +191,7 @@ def main() -> int:
     for row in rows:
         print(f"- {row['weapon']}: {row['notes']}")
     print("- cover column is only meaningful for ranged damage sources, but is printed consistently for quick comparison.")
-    print("- weapon families preserve role-specific base damage and apply one summed damage bonus from soldier level, meta upgrades, and run upgrades.")
+    print("- weapon families preserve role-specific base damage and apply one summed damage bonus from meta upgrades and run upgrades.")
     return 0
 
 

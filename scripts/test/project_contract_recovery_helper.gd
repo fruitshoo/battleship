@@ -710,7 +710,6 @@ static func _run_survivor_full_crew_trains_existing_roster(owner: Node, failures
 	var alive_before: int = 0
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_before = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
-	var training_before := _get_player_crew_training_total(player_ship)
 	var original_max_crew_count = null
 	if player_ship.get("max_crew_count") != null:
 		original_max_crew_count = player_ship.get("max_crew_count")
@@ -725,37 +724,11 @@ static func _run_survivor_full_crew_trains_existing_roster(owner: Node, failures
 	var alive_after: int = alive_before
 	if player_ship.has_method("get_debug_crew_snapshot"):
 		alive_after = int(player_ship.call("get_debug_crew_snapshot").get("alive_count", 0))
-	var training_after := _get_player_crew_training_total(player_ship)
 	if survivor.get("is_collected") != true:
-		failures.append("recovery survivor full crew did not collect for overflow training")
+		failures.append("recovery survivor full crew did not collect when roster was full")
 	if alive_after != alive_before:
-		failures.append("recovery survivor full crew changed roster size instead of training existing crew")
-	if training_after <= training_before:
-		failures.append("recovery survivor full crew did not train an existing soldier")
+		failures.append("recovery survivor full crew changed roster size")
 	await _run_survivor_overcap_does_not_expand_respawn_target(owner, failures, player_ship)
-
-
-static func _get_player_crew_training_total(player_ship: Node3D) -> float:
-	var total := 0.0
-	for soldier in EntityRegistry.get_soldiers_by_ship(player_ship):
-		if not is_instance_valid(soldier):
-			continue
-		if soldier.has_method("is_player_team_soldier") and soldier.call("is_player_team_soldier") != true:
-			continue
-		if not soldier.has_method("is_player_team_soldier") and str(soldier.get("team")) != "player":
-			continue
-		var level := 1
-		if soldier.has_method("get_soldier_level_value"):
-			level = int(soldier.call("get_soldier_level_value"))
-		else:
-			level = int(soldier.get_meta("soldier_level", 1))
-		var xp := 0.0
-		if soldier.has_method("get_soldier_xp_value"):
-			xp = float(soldier.call("get_soldier_xp_value"))
-		else:
-			xp = float(soldier.get_meta("soldier_xp", 0.0))
-		total += float(level * 1000) + xp
-	return total
 
 
 static func _run_survivor_overcap_does_not_expand_respawn_target(owner: Node, failures: Array[String], player_ship: Node3D) -> void:

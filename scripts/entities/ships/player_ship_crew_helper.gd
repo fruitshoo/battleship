@@ -219,7 +219,7 @@ static func _add_player_crew(ship, allow_over_capacity: bool, source: String) ->
 		return false
 	var roster_count: int = get_player_roster_count(ship)
 	if source == "survivor" and roster_count >= int(ship.max_crew_count):
-		return BaseShipCrewHelper.train_existing_crew_from_survivor(ship)
+		return BaseShipCrewHelper.collect_overflow_survivor(ship)
 	if not allow_over_capacity and roster_count >= int(ship.max_crew_count):
 		return false
 	var alive_count = roster_count

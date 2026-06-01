@@ -158,8 +158,6 @@ static var _ai_load_multiplier_cache: float = 1.0
 var external_knockback_velocity: Vector3 = Vector3.ZERO
 var external_knockback_timer: float = 0.0
 var external_knockback_snap_timer: float = 0.0
-var soldier_level: int = 1
-var soldier_xp: float = 0.0
 
 # === 도선 약탈 및 방화 (Boarding Chaos) 페널티 ===
 var is_boarder_on_player_ship: bool = false
@@ -180,9 +178,6 @@ const RANGED_DAMAGE_SOURCES := {
 }
 const TARGET_STICKY_DETECTION_MULTIPLIER := 1.18
 const TARGET_STICKY_LOCAL_SWITCH_RATIO := 0.58
-const SOLDIER_MAX_LEVEL := 5
-const SOLDIER_XP_BASE_REQUIREMENT := 2.0
-const SOLDIER_XP_REQUIREMENT_STEP := 2.0
 const BOARDING_STATUS_ON_DECK := "on_deck"
 const BOARDING_STATUS_BOARDING := "boarding"
 const BOARDING_STATUS_RETURNING := "returning"
@@ -295,7 +290,6 @@ func _ready() -> void:
 	_start_wander()
 	_update_team_color()
 	_update_role_visual()
-	_apply_soldier_level_stats()
 	
 	# AI 실행 시점 분산 (Staggering)
 	decision_timer = randf_range(0.0, 0.2)
@@ -535,8 +529,6 @@ func _get_total_weapon_damage_bonus_pct() -> float:
 		damage_bonus_pct += float(meta_manager.get_crew_damage_bonus_pct())
 	if has_meta("damage_bonus_pct"):
 		damage_bonus_pct += float(get_meta("damage_bonus_pct"))
-	if has_meta("soldier_level_damage_bonus_pct"):
-		damage_bonus_pct += float(get_meta("soldier_level_damage_bonus_pct"))
 	return maxf(0.0, damage_bonus_pct)
 
 
@@ -545,21 +537,6 @@ func _get_spear_damage_add() -> float:
 		return 0.0
 	if has_meta("spear_damage_add"):
 		return maxf(0.0, float(get_meta("spear_damage_add")))
-	return 0.0
-
-
-func _get_soldier_level_damage_bonus_pct() -> float:
-	if team != "player":
-		return 0.0
-	match clampi(soldier_level, 1, SOLDIER_MAX_LEVEL):
-		2:
-			return 0.08
-		3:
-			return 0.16
-		4:
-			return 0.25
-		5:
-			return 0.35
 	return 0.0
 
 
@@ -634,61 +611,11 @@ func _ensure_role_marker() -> MeshInstance3D:
 func _update_role_visual() -> void:
 	SoldierVisualHelper.update_role_visual(self)
 
-func _update_level_visual() -> void:
-	SoldierVisualHelper.update_level_visual(self)
-
-func add_soldier_xp(amount: float, _reason: String = "") -> void:
-	if team != "player":
-		return
-	if amount <= 0.0:
-		return
-
-	soldier_xp += amount
-	while soldier_level < SOLDIER_MAX_LEVEL:
-		var required_xp := _get_soldier_xp_required_for_next_level()
-		if soldier_xp + 0.001 < required_xp:
-			break
-		soldier_xp -= required_xp
-		soldier_level += 1
-
-	if soldier_level >= SOLDIER_MAX_LEVEL:
-		soldier_xp = 0.0
-	_apply_soldier_level_stats()
-
-func _apply_soldier_level_stats() -> void:
-	soldier_level = clampi(soldier_level, 1, SOLDIER_MAX_LEVEL)
-	soldier_xp = maxf(soldier_xp, 0.0)
-	set_meta("soldier_level", soldier_level)
-	set_meta("soldier_xp", soldier_xp)
-	set_meta("soldier_level_damage_bonus_pct", _get_soldier_level_damage_bonus_pct())
-	if has_meta("soldier_level_attack_bonus"):
-		remove_meta("soldier_level_attack_bonus")
-	if is_inside_tree():
-		_update_weapon_stats()
-		_update_level_visual()
-
-func _get_soldier_xp_required_for_next_level() -> float:
-	if soldier_level >= SOLDIER_MAX_LEVEL:
-		return 0.0
-	return SOLDIER_XP_BASE_REQUIREMENT + float(soldier_level - 1) * SOLDIER_XP_REQUIREMENT_STEP
-
-func get_soldier_level_value() -> int:
-	return soldier_level
-
-func get_soldier_xp_value() -> float:
-	return soldier_xp
-
-func get_soldier_next_level_xp_requirement() -> float:
-	return _get_soldier_xp_required_for_next_level()
-
-
 func set_team(new_team: String) -> void:
 	var old_team = team
 	team = new_team
 	EntityRegistry.update_soldier_team(self, old_team, team)
 	_update_team_color()
-	if is_inside_tree():
-		_apply_soldier_level_stats()
 	if old_team != team:
 		notify_ai_event("team_changed")
 		_notify_ship_deck_ai_event(owned_ship, "crew_team_changed")

@@ -2892,14 +2892,13 @@ static func _add_misc_section(hud, panel_box: Control) -> void:
 		var applied := SeaSiteRewardHelper.apply_reward(
 			hud,
 			hud.player_ship,
-			SeaSiteRewardHelper.REWARD_MINOR_STAT_BONUS,
-			0,
-			0.0,
-			0.0,
-			0.0,
-			0,
-			0
-		)
+				SeaSiteRewardHelper.REWARD_MINOR_STAT_BONUS,
+				0,
+				0.0,
+				0.0,
+				0,
+				0
+			)
 		if applied:
 			if "_last_stat_signature" in hud:
 				hud.set("_last_stat_signature", "")

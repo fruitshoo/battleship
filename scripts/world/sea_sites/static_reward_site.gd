@@ -6,10 +6,9 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 @export var interaction_range: float = 10.0
 @export var hint_range: float = 38.0
 @export var choice_count: int = 4
-@export_enum("upgrade_choices", "repair_hull", "train_crew", "expand_crew_limit", "restore_crew", "minor_stat_bonus") var reward_type: String = "minor_stat_bonus"
+@export_enum("upgrade_choices", "repair_hull", "expand_crew_limit", "restore_crew", "minor_stat_bonus") var reward_type: String = "minor_stat_bonus"
 @export_range(0.05, 1.0, 0.05) var hull_repair_ratio: float = 0.3
 @export var hull_repair_minimum: float = 35.0
-@export var crew_xp_amount: float = 50.0
 @export_range(1, 4, 1) var crew_limit_bonus: int = 1
 @export_range(1, 4, 1) var crew_restore_count: int = 1
 @export var site_label: String = "탐색 장소"
@@ -99,7 +98,6 @@ func _apply_site_reward(player_ship: Node3D) -> bool:
 		choice_count,
 		hull_repair_ratio,
 		hull_repair_minimum,
-		crew_xp_amount,
 		crew_limit_bonus,
 		crew_restore_count
 	)

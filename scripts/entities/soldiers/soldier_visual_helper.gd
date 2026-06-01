@@ -4,7 +4,6 @@ const NavalUiTheme = preload("res://scripts/ui/naval_ui_theme.gd")
 
 const ROLE_MARKER_NAME := "RoleMarker"
 const CAPTAIN_MARKER_NAME := "CaptainMarker"
-const LEVEL_MARKER_NAME := "LevelMarker"
 const VISUAL_ROOT_NAME := "VisualRoot"
 const CUSTOM_VISUAL_NAME := "CustomVisual"
 const BODY_MESH_NAME := "Body"
@@ -218,20 +217,6 @@ static func remove_captain_marker(soldier) -> void:
 	soldier.remove_child(marker)
 	marker.queue_free()
 
-
-
-static func ensure_level_marker(soldier) -> Label3D:
-	var marker := soldier.get_node_or_null(LEVEL_MARKER_NAME) as Label3D
-	if marker != null:
-		return marker
-	marker = Label3D.new()
-	marker.name = LEVEL_MARKER_NAME
-	marker.position = Vector3(0.0, 1.78, 0.0)
-	NavalUiTheme.style_world_marker(marker, 24, Color(1.0, 0.9, 0.32, 1.0))
-	soldier.add_child(marker)
-	return marker
-
-
 static func update_role_visual(soldier) -> void:
 	var marker = ensure_role_marker(soldier)
 	if marker == null:
@@ -288,25 +273,6 @@ static func update_role_visual(soldier) -> void:
 			material.emission_energy_multiplier = 0.0
 
 	marker.material_override = material
-
-
-static func update_level_visual(soldier) -> void:
-	var level := 1
-	if soldier.has_method("get_soldier_level_value"):
-		level = int(soldier.get_soldier_level_value())
-	elif soldier.has_meta("soldier_level"):
-		level = int(soldier.get_meta("soldier_level", 1))
-
-	var should_show := str(soldier.get("team")) == "player" and level > 1 and SoldierStateHelper.is_alive_soldier(soldier)
-	var marker := soldier.get_node_or_null(LEVEL_MARKER_NAME) as Label3D
-	if marker == null and not should_show:
-		return
-	if marker == null:
-		marker = ensure_level_marker(soldier)
-	marker.text = "Lv.%d" % level
-	marker.visible = should_show
-
-
 static func update_team_color(soldier) -> void:
 	var mesh_instance := get_body_mesh(soldier)
 	if mesh_instance:
@@ -372,9 +338,6 @@ static func play_death_pose(soldier) -> void:
 	if role_marker != null:
 		role_marker.visible = false
 	remove_captain_marker(soldier)
-	var level_marker := soldier.get_node_or_null(LEVEL_MARKER_NAME) as Label3D
-	if level_marker != null:
-		level_marker.visible = false
 
 	var hand_pivot := _get_soldier_hand_pivot(soldier)
 	if hand_pivot != null:
@@ -472,7 +435,6 @@ static func play_recovery_pose(soldier) -> void:
 
 	if soldier.get("crew_role") != null:
 		update_role_visual(soldier)
-	update_level_visual(soldier)
 	var hand_pivot := _get_soldier_hand_pivot(soldier)
 	if hand_pivot != null:
 		hand_pivot.visible = true

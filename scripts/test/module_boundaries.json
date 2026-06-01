@@ -429,7 +429,7 @@
     },
     "res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
       "layer": "world/sea_sites/sea_site_reward_helper.gd",
-      "responsibility": "Owns sea-site reward application, including upgrades, hull repair, crew training, crew limit, and crew restoration effects."
+      "responsibility": "Owns sea-site reward application, including upgrades, hull repair, crew limit, and crew restoration effects."
     },
     "res://scripts/projectiles/ballistic_collateral_helper.gd": {
       "layer": "projectiles/ballistic_collateral_helper.gd",
@@ -616,14 +616,6 @@
         "res://scripts/entities/ships/base_ship_crew_helper.gd"
       ],
       "reason": "Boarding and crew helpers each need a local team-tag adapter while operating in different ship ownership contexts."
-    },
-    {
-      "name": "_get_soldier_level",
-      "paths": [
-        "res://scripts/entities/ships/base_ship_crew_helper.gd",
-        "res://scripts/world/sea_sites/sea_site_reward_helper.gd"
-      ],
-      "reason": "Crew training and sea-site rewards both need a local read-only soldier level adapter while sharing only node contracts."
     },
     {
       "name": "_get_target_deck_half_extents",
@@ -1152,7 +1144,7 @@
       ]
     },
     "res://scripts/entities/ships/base_ship_crew_helper.gd": {
-      "count": 31,
+      "count": 26,
       "functions": [
         "update_crew_allocation_state",
         "_reset_crew_allocation_state",
@@ -1172,13 +1164,8 @@
         "_get_ship_team_tag",
         "get_effective_boarding_capture_duration",
         "estimate_available_crew_count",
-        "train_existing_crew_from_survivor",
-        "_pick_survivor_training_target",
-        "_is_player_training_candidate",
-        "_get_soldier_level",
-        "_get_soldier_xp",
-        "_get_soldier_next_level_xp",
-        "_show_survivor_training_message",
+        "collect_overflow_survivor",
+        "_show_survivor_overflow_message",
         "is_in_gunnery_posture",
         "get_ship_cannon_range_for_allocation",
         "get_nearest_enemy_ship_distance_for_allocation",
@@ -2332,7 +2319,7 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_visual_helper.gd": {
-      "count": 27,
+      "count": 25,
       "functions": [
         "ensure_visual_root",
         "setup_visual_scene",
@@ -2350,9 +2337,7 @@
         "_clear_body_mesh_cache",
         "ensure_role_marker",
         "remove_captain_marker",
-        "ensure_level_marker",
         "update_role_visual",
-        "update_level_visual",
         "update_team_color",
         "get_or_create_team_material",
         "get_team_color",
@@ -2720,7 +2705,7 @@
       ]
     },
     "res://scripts/test/project_contract_recovery_helper.gd": {
-      "count": 30,
+      "count": 29,
       "functions": [
         "run_recovery_effect_contract_smoke",
         "_run_floating_loot_smoke",
@@ -2741,7 +2726,6 @@
         "_run_sea_site_spawner_contract",
         "_run_sea_decor_contract",
         "_run_survivor_full_crew_trains_existing_roster",
-        "_get_player_crew_training_total",
         "_run_survivor_overcap_does_not_expand_respawn_target",
         "_run_incapacitated_captain_blocks_duplicate_respawn",
         "_run_roster_sync_does_not_replace_dead_crew",
@@ -3460,7 +3444,7 @@
       ]
     },
     "res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
-      "count": 28,
+      "count": 26,
       "functions": [
         "apply_reward",
         "get_site_bonus_total",
@@ -3481,12 +3465,10 @@
         "_format_bonus_value",
         "_open_upgrade_choices",
         "_repair_hull",
-        "_train_crew",
         "_expand_crew_limit",
         "_restore_crew",
         "_is_player_soldier",
         "_is_dead_soldier",
-        "_get_soldier_level",
         "_sync_hull_hud",
         "_notify",
         "_get_hud"
@@ -4167,11 +4149,6 @@
       "reason": "Boarding and crew helpers each need a local team-tag adapter while operating in different ship ownership contexts.",
       "priority": "medium",
       "recommended_action": "Rename or consolidate only during a focused owner-boundary cleanup."
-    },
-    "duplicate_static_function|_get_soldier_level|res://scripts/entities/ships/base_ship_crew_helper.gd,res://scripts/world/sea_sites/sea_site_reward_helper.gd": {
-      "reason": "Crew training and sea-site rewards both need a local read-only soldier level adapter while sharing only node contracts.",
-      "priority": "known-local-adapter",
-      "recommended_action": "Consolidate the soldier level adapter if a broader soldier stat contract owner is introduced."
     },
     "duplicate_static_function|_get_target_deck_half_extents|res://scripts/entities/ships/ai_ship_boarding_helper.gd,res://scripts/entities/ships/base_ship_boarding_helper.gd": {
       "reason": "Generated baseline for duplicate helper static function names at modularity guard adoption time.",
