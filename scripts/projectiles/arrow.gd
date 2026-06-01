@@ -8,7 +8,7 @@ const PhysicsFrameProfiler = preload("res://scripts/debug/physics_frame_profiler
 ## 병사가 쏘는 원거리 투사체
 
 @export var damage: float = 15.0
-@export var speed: float = 25.0 # 초당 이동 거리 (이전 20.0 -> 8.0 -> 14.0 -> 16.0 -> 25.0)
+@export var speed: float = 27.0
 @export var arc_height: float = 2.0 # 포물선 최대 높이
 @export var terminal_hit_radius: float = 2.2
 
@@ -245,7 +245,7 @@ func _resolve_terminal_hit(hit_check_position: Vector3) -> void:
 	if target_node.has_method("take_damage"):
 		var crit_effect_direction := target_node.global_position - start_pos
 		var crit_effect_position: Variant = _get_valid_critical_effect_position(target_node) if is_critical_hit else null
-		target_node.take_damage(damage, global_position, damage_source)
+		target_node.take_damage(damage, global_position, damage_source, is_critical_hit)
 		if is_critical_hit and crit_effect_position is Vector3:
 			_spawn_critical_hit_effect_at_position(crit_effect_position as Vector3, crit_effect_direction)
 

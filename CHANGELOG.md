@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.6-alpha - 2026-06-01
+
+### Gameplay
+- Tuned soldier, projectile, cannon, and ship durability balance for a more readable midgame fight.
+- Reworked Singijeon behavior so upgraded archers visibly fire Singijeon shots more consistently.
+- Added ballistic collateral deaths and improved overboard death feedback.
+- Made derelict enemy ships pay out immediately when their crew is gone.
+
+### Feel
+- Improved boarding jumps, Geobukseon roof fighting, captain death focus, blood decals, and ship collision feedback.
+- Added new collateral death screams and adjusted death sound pitch to stay punchier.
+- Changed the captain from multiplier damage to flat attack bonus, kept defense-only protection, and made the captain slightly larger.
+
+### UI / AI
+- Improved debug menu navigation and performance overlay readability.
+- Made enemy soldiers prefer regular crew over a guarded captain.
+- Kept blocked boarding attempts near-ready instead of repeatedly resetting the boarding gauge.
+
 ## 0.4.5-alpha - 2026-05-30
 
 ### Feel

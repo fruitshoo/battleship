@@ -63,7 +63,7 @@
 				"min_cooldown": 8.0,
 				"base_damage": 15.0,
 				"damage_per_lv": 5.0,
-				"projectile_speed": 19.0
+				"projectile_speed": 18.0
 			}
 			},
 			"singigeon": {
@@ -79,7 +79,7 @@
 				"personnel_damage_mult": 1.0,
 				"base_cooldown": 5.0,
 				"cooldown_reduce_per_lv": 0.35,
-				"projectile_speed": 32.0
+					"projectile_speed": 30.0
 			}
 			},
 			"fire_pot": {

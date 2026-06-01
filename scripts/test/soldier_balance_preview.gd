@@ -311,7 +311,7 @@ func _configure_soldier_for_role(soldier: Node, role_name: String, is_player: bo
 	if not is_instance_valid(soldier):
 		return
 	if soldier.has_method("set_captain_status"):
-		soldier.call("set_captain_status", false, 1.0, 1.0, 0.0)
+		soldier.call("set_captain_status", false, 1.0, 0.0, 0.0, 1.0)
 	soldier.set_meta("disable_incapacitation", true)
 	soldier.set_meta("disable_kill_rewards", true)
 	if "is_melee_only" in soldier:

@@ -11,8 +11,9 @@ const BLOOD_STAIN_TEXTURES := [
 	preload("res://assets/vfx/decals/blood/red/blood_splatter_red_07.png"),
 	preload("res://assets/vfx/decals/blood/red/blood_splatter_red_08.png"),
 ]
+const BLOOD_STAIN_DECAL_SCENE := preload("res://scenes/effects/blood_stain_decal.tscn")
 const DECAL_ROOT_NAME := "__BloodDeckDecals"
-const MAX_DECALS_PER_SHIP := 18
+const MAX_DECALS_PER_SHIP := 28
 const MAX_SPAWNS_PER_FRAME := 4
 const MAX_SPAWN_DISTANCE := 55.0
 const DECK_EDGE_PADDING := 0.18
@@ -25,7 +26,6 @@ const META_OWNED_SHIP_CHANGED_MSEC := "owned_ship_changed_msec"
 const META_COMBAT_DECK_ZONE := "combat_deck_zone"
 const ZONE_ROOF := "roof"
 const DEBUG_BLOOD_DECAL_REJECTS := false
-const USE_STAIN_PLANE := true
 const STAIN_SIZE_MULTIPLIER := 1.2
 
 const BLOOD_BLOCKED_DAMAGE_SOURCES := {
@@ -109,7 +109,7 @@ static func try_spawn_from_soldier_damage(soldier, damage_amount: float, hit_pos
 	var root := _get_or_create_decal_root(ship)
 	if not is_instance_valid(root):
 		return
-	var decal := _make_decal(damage_amount, not use_roof_surface)
+	var decal := _make_decal(damage_amount)
 	root.add_child(decal)
 	decal.position = local_pos
 	decal.rotation = Vector3(0.0, randf_range(-PI, PI), 0.0)
@@ -119,12 +119,12 @@ static func _should_spawn_for_source(damage_source: String) -> bool:
 	return not BLOOD_BLOCKED_DAMAGE_SOURCES.has(damage_source)
 
 static func _spawn_chance(damage_amount: float, damage_source: String) -> float:
-	var base_chance := 0.68
+	var base_chance := 0.78
 	if damage_source == "sword" or damage_source == "spear" or damage_source == "trident" or damage_source == "harpoon":
-		base_chance = 0.88
+		base_chance = 0.94
 	elif damage_source == "daecheolpo" or damage_source == "small_cannonball":
-		base_chance = 0.76
-	return clampf(base_chance + damage_amount / 95.0, 0.35, 1.0)
+		base_chance = 0.86
+	return clampf(base_chance + damage_amount / 110.0, 0.45, 1.0)
 
 
 static func _resolve_owned_ship(soldier) -> Node3D:
@@ -216,10 +216,7 @@ static func _get_or_create_decal_root(ship: Node3D) -> Node3D:
 	return root
 
 
-static func _make_decal(damage_amount: float, use_stain_plane: bool = true) -> Node3D:
-	var stain_root := Node3D.new()
-	stain_root.name = "BloodDeckStain"
-
+static func _make_decal(damage_amount: float) -> Node3D:
 	var stain_tint := Color(
 		randf_range(0.92, 1.0),
 		randf_range(0.80, 0.92),
@@ -228,52 +225,35 @@ static func _make_decal(damage_amount: float, use_stain_plane: bool = true) -> N
 	)
 	var stain_scale := clampf(0.52 + damage_amount * 0.016, 0.52, 1.08) * randf_range(0.9, 1.32) * STAIN_SIZE_MULTIPLIER
 	var stain_texture := _pick_stain_texture()
+	return _make_decal_from_scene(stain_texture, stain_tint, stain_scale)
 
-	var plane_mesh := PlaneMesh.new()
-	plane_mesh.size = Vector2(
-		stain_scale * randf_range(0.78, 1.28),
-		stain_scale * randf_range(0.72, 1.18)
-	)
 
-	if USE_STAIN_PLANE and use_stain_plane:
-		var plane_material := StandardMaterial3D.new()
-		plane_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		plane_material.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-		plane_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		plane_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		plane_material.no_depth_test = false
-		plane_material.albedo_color = stain_tint
-		plane_material.albedo_texture = stain_texture
-		plane_material.albedo_texture_force_srgb = true
-		plane_material.render_priority = 8
-
-		var stain_plane := MeshInstance3D.new()
-		stain_plane.name = "StainPlane"
-		stain_plane.mesh = plane_mesh
-		stain_plane.material_override = plane_material
-		stain_plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		stain_plane.extra_cull_margin = 0.2
-		stain_root.add_child(stain_plane)
-
-	var decal := Decal.new()
-	decal.name = "Projection"
-	decal.texture_albedo = stain_texture
-	decal.modulate = stain_tint
+static func _make_decal_from_scene(stain_texture: Texture2D, stain_tint: Color, stain_scale: float) -> Node3D:
+	var root := BLOOD_STAIN_DECAL_SCENE.instantiate() as Node3D
+	if not is_instance_valid(root):
+		return Node3D.new()
+	var decal := root.get_node_or_null("Projection") as Decal
+	if not is_instance_valid(decal):
+		return root
+	var base_size := decal.size
+	decal.set_texture(Decal.TEXTURE_ALBEDO, stain_texture)
+	decal.modulate = _get_projection_tint(stain_tint)
 	decal.albedo_mix = 1.0
-	decal.normal_fade = 0.22
-	decal.upper_fade = 0.08
-	decal.lower_fade = 0.08
-	decal.distance_fade_enabled = true
-	decal.distance_fade_begin = 42.0
-	decal.distance_fade_length = 18.0
 	decal.size = Vector3(
-		plane_mesh.size.x,
-		plane_mesh.size.y,
-		0.72
+		maxf(0.05, base_size.x * stain_scale * randf_range(0.78, 1.28)),
+		maxf(0.05, base_size.y),
+		maxf(0.05, base_size.z * stain_scale * randf_range(0.72, 1.18))
 	)
-	decal.rotation = Vector3(-PI * 0.5, 0.0, 0.0)
-	stain_root.add_child(decal)
-	return stain_root
+	return root
+
+
+static func _get_projection_tint(base_tint: Color) -> Color:
+	return Color(
+		clampf(base_tint.r * 0.62, 0.46, 0.66),
+		clampf(base_tint.g * 0.16, 0.08, 0.15),
+		clampf(base_tint.b * 0.13, 0.06, 0.12),
+		1.0
+	)
 
 
 static func _pick_stain_texture() -> Texture2D:

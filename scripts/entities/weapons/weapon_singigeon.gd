@@ -3,7 +3,7 @@ extends "res://scripts/entities/weapons/weapon.gd"
 @export var rocket_scene: PackedScene = preload("res://scenes/projectiles/singigeon_rocket.tscn")
 @export var launch_cooldown: float = 5.0
 @export var max_range: float = 24.0
-@export var projectile_speed: float = 32.0
+@export var projectile_speed: float = 30.0
 
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.65
@@ -118,7 +118,7 @@ func _apply_upgrade_stats() -> void:
 		_upgrade_damage_per_level = float(stats.get("damage_per_lv", 2.0))
 		personnel_damage_mult = float(stats.get("personnel_damage_mult", 1.0))
 		attack_cooldown = maxf(2.2, float(stats.get("base_cooldown", 5.0)) - (float(_upgrade_level - 1) * float(stats.get("cooldown_reduce_per_lv", 0.35))))
-		projectile_speed = float(stats.get("projectile_speed", 32.0))
+		projectile_speed = float(stats.get("projectile_speed", 30.0))
 	_apply_effective_damage()
 
 func _apply_effective_damage() -> void:

@@ -6,7 +6,7 @@
 			"team": "enemy",
 			"projectile_scene": "res://scenes/projectiles/cannonball.tscn",
 			"fire_cooldown": 4.6,
-			"projectile_speed": 66.0,
+			"projectile_speed": 50.0,
 			"detection_range": 23.0,
 			"detection_arc": 50.0
 		},
@@ -17,7 +17,7 @@
 			"projectile_scene": "res://scenes/projectiles/cannonball.tscn",
 			"fire_cooldown": 3.2,
 			"detection_range": 24.0,
-			"projectile_speed": 55.0,
+			"projectile_speed": 50.0,
 			"scale": 0.7
 		},
 		"boss_singigeon": {
@@ -27,7 +27,7 @@
 			"projectile_scene": "res://scenes/projectiles/singigeon_rocket.tscn",
 			"fire_cooldown": 4.0,
 			"detection_range": 36.0,
-			"projectile_speed": 32.0,
+			"projectile_speed": 30.0,
 			"upgrade_level": 3
 		}
 	},

@@ -11,6 +11,8 @@
 | click5.ogg |CC0|https://kenney.nl/assets/interface-sounds|
 | sfx_ballistic_death_01.ogg |CC0|https://freesound.org/people/qubodup/sounds/813304/|
 | sfx_ballistic_death_02.ogg |CC0|https://freesound.org/people/qubodup/sounds/813305/|
+| sfx_ballistic_death_03.ogg |CC0|https://freesound.org/people/GentlemanWalrus/sounds/516766/|
+| sfx_ballistic_death_04.ogg |CC0|https://freesound.org/people/GentlemanWalrus/sounds/516766/|
 | sfx_bow_01.ogg |Attribution 4.0|https://freesound.org/people/Erdie/sounds/65733/|
 | sfx_bow_02.ogg |Attribution 4.0|https://freesound.org/people/Erdie/sounds/65734/|
 | sfx_boarding_war_cry_1.ogg |CC0|https://freesound.org/s/521830/|

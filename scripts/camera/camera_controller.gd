@@ -29,8 +29,12 @@ extends Camera3D
 @export_range(0.0, 0.6, 0.01) var gamepad_camera_deadzone: float = 0.16
 @export_group("Defeat Focus")
 @export_range(0.35, 0.95, 0.01) var captain_death_zoom_ratio: float = 0.62
-@export_range(2.0, 18.0, 0.5) var captain_death_focus_smooth_speed: float = 8.0
+@export_range(2.0, 30.0, 0.5) var captain_death_focus_smooth_speed: float = 8.0
 @export_range(0.0, 3.0, 0.05) var captain_death_focus_height: float = 0.55
+@export_range(1.0, 8.0, 0.1) var captain_death_zoom_smooth_multiplier: float = 4.0
+@export_range(1.0, 8.0, 0.1) var captain_death_move_smooth_multiplier: float = 1.25
+@export_range(-20.0, 20.0, 0.5) var captain_death_orbit_degrees: float = 8.0
+@export_range(0.2, 3.0, 0.05) var captain_death_orbit_duration: float = 1.15
 
 @export_group("Debug Free Camera")
 @export var debug_free_camera_speed: float = 18.0
@@ -82,6 +86,9 @@ var _debug_free_camera_yaw: float = 0.0
 var _debug_free_camera_pitch: float = 0.0
 var _defeat_focus_active: bool = false
 var _defeat_focus_position: Vector3 = Vector3.ZERO
+var _defeat_focus_elapsed: float = 0.0
+var _defeat_focus_start_yaw: float = 0.0
+var _defeat_focus_target_yaw: float = 0.0
 
 func _ready() -> void:
 	if target_path:
@@ -151,26 +158,30 @@ func _physics_process(delta: float) -> void:
 
 	if not _defeat_focus_active:
 		_update_gamepad_camera_input(delta)
-	var zoom_smooth := zoom_smooth_speed * (1.35 if _defeat_focus_active else 1.0)
-	current_zoom = move_toward(current_zoom, target_zoom, zoom_smooth * delta)
+	var camera_delta := _get_camera_motion_delta(delta)
+	var zoom_smooth := zoom_smooth_speed * (captain_death_zoom_smooth_multiplier if _defeat_focus_active else 1.0)
+	current_zoom = move_toward(current_zoom, target_zoom, zoom_smooth * camera_delta)
 
 	# 1. 타겟 위치 + 진행 방향 리드
 	var target_pos = _defeat_focus_position if _defeat_focus_active else _get_desired_look_target(delta)
 	var look_smooth := captain_death_focus_smooth_speed if _defeat_focus_active else lead_smooth_speed
-	_smoothed_look_target = _smoothed_look_target.lerp(target_pos, clampf(look_smooth * delta, 0.0, 1.0))
+	_smoothed_look_target = _smoothed_look_target.lerp(target_pos, clampf(look_smooth * camera_delta, 0.0, 1.0))
 	
 	# 2. 쿼터뷰 고정 각도 (45도 위에서, 약간 뒤에서)
 	# 수평 회전은 유저가 조절 가능, 수직 각도는 고정
 	var quarter_view_angle = deg_to_rad(pitch_degrees)
 	
 	# 우클릭 드래그로 수평 회전만 가능
+	if _defeat_focus_active:
+		_update_defeat_focus_orbit(camera_delta)
 	var rot_basis = Basis.from_euler(Vector3(quarter_view_angle, _cam_rotation.x, 0))
 	var final_offset = rot_basis * Vector3(0, 0, current_zoom)
 	
 	var desired_position = _smoothed_look_target + final_offset
 	
 	# 3. 부드러운 이동
-	global_position = global_position.lerp(desired_position, clampf(smooth_speed * delta, 0.0, 1.0))
+	var move_smooth := smooth_speed * (captain_death_move_smooth_multiplier if _defeat_focus_active else 1.0)
+	global_position = global_position.lerp(desired_position, clampf(move_smooth * camera_delta, 0.0, 1.0))
 	
 	# 4. 항상 타겟 바라보기
 	look_at(_smoothed_look_target, Vector3.UP)
@@ -214,6 +225,10 @@ func _update_gamepad_camera_input(delta: float) -> void:
 		_cam_rotation.y = clamp(_cam_rotation.y, -PI / 2 + 0.1, 0)
 
 
+func _get_camera_motion_delta(delta: float) -> float:
+	return delta
+
+
 func play_captain_death_focus(world_position: Vector3) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
@@ -221,8 +236,18 @@ func play_captain_death_focus(world_position: Vector3) -> void:
 		set_debug_free_camera_active(false)
 	_defeat_focus_active = true
 	_defeat_focus_position = world_position + Vector3.UP * captain_death_focus_height
+	_defeat_focus_elapsed = 0.0
+	_defeat_focus_start_yaw = _cam_rotation.x
+	_defeat_focus_target_yaw = _cam_rotation.x + deg_to_rad(captain_death_orbit_degrees)
 	var desired_zoom := current_zoom * captain_death_zoom_ratio
 	target_zoom = clampf(desired_zoom, min_zoom, max_zoom)
+
+
+func _update_defeat_focus_orbit(delta: float) -> void:
+	_defeat_focus_elapsed += delta
+	var duration := maxf(captain_death_orbit_duration, 0.001)
+	var progress := smoothstep(0.0, 1.0, clampf(_defeat_focus_elapsed / duration, 0.0, 1.0))
+	_cam_rotation.x = lerp_angle(_defeat_focus_start_yaw, _defeat_focus_target_yaw, progress)
 
 
 func set_debug_free_camera_active(active: bool) -> void:

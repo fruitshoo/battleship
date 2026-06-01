@@ -1,6 +1,6 @@
 [gd_resource type="CurveTexture" format=3 uid="uid://ddl3ljm72mfkn"]
 
-[ext_resource type="Curve" path="res://resources/vfx/curves/alpha_quick_pop_curve.tres" id="1_iktxh"]
+[ext_resource type="Curve" uid="uid://xratouf8mi0b" path="res://resources/vfx/curves/alpha_quick_pop_curve.tres" id="1_iktxh"]
 
 [resource]
 curve = ExtResource("1_iktxh")

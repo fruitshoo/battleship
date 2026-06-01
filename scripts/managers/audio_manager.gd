@@ -123,6 +123,8 @@ var sfx_streams = {
 	"ballistic_death": [
 		"res://assets/audio/sfx/sfx_ballistic_death_01.ogg",
 		"res://assets/audio/sfx/sfx_ballistic_death_02.ogg",
+		"res://assets/audio/sfx/sfx_ballistic_death_03.ogg",
+		"res://assets/audio/sfx/sfx_ballistic_death_04.ogg",
 	],
 	"boarding_war_cry": [
 		"res://assets/audio/sfx/sfx_boarding_war_cry_1.ogg",

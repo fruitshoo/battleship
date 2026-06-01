@@ -131,8 +131,9 @@ var boarding_rope_resist_target_lock_timer: float = 0.0
 @export var max_crew_count: int = 5 # 아군 병사 정원 (일반 병사 4 + 장군 1)
 @export_range(0, 1, 1) var captain_count: int = 1
 @export_range(1.0, 3.0, 0.05) var captain_health_multiplier: float = 1.65
-@export_range(1.0, 3.0, 0.05) var captain_attack_multiplier: float = 1.4
+@export_range(0.0, 10.0, 0.5) var captain_attack_bonus: float = 2.0
 @export_range(0.0, 10.0, 0.5) var captain_defense_bonus: float = 2.0
+@export_range(1.0, 1.25, 0.01) var captain_visual_scale: float = 1.08
 
 @export_group("Support Fleet")
 @export var support_fleet_limit: int = 1
@@ -322,8 +323,9 @@ func _apply_soldier_rules_data() -> void:
 		return
 	captain_count = clampi(int(captain_rules.get("count", captain_count)), 0, max_crew_count)
 	captain_health_multiplier = float(captain_rules.get("health_multiplier", captain_health_multiplier))
-	captain_attack_multiplier = float(captain_rules.get("attack_multiplier", captain_attack_multiplier))
+	captain_attack_bonus = float(captain_rules.get("attack_bonus", captain_attack_bonus))
 	captain_defense_bonus = float(captain_rules.get("defense_bonus", captain_defense_bonus))
+	captain_visual_scale = float(captain_rules.get("visual_scale", captain_visual_scale))
 
 func _cache_references() -> void:
 	_cached_level_manager = LevelManagerRegistry.get_level_manager(get_tree())
@@ -1616,6 +1618,9 @@ func die() -> void:
 
 func trigger_boarding_overrun_game_over() -> void:
 	PlayerShipSinkHelper.trigger_boarding_overrun_game_over(self)
+
+func preview_captain_death_moment(death_position: Vector3) -> void:
+	PlayerShipSinkHelper.preview_captain_death_moment(self, death_position)
 
 func trigger_captain_death_game_over(death_position: Vector3) -> void:
 	PlayerShipSinkHelper.trigger_captain_death_game_over(self, death_position)

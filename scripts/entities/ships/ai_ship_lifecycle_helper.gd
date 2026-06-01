@@ -223,6 +223,9 @@ static func become_derelict(ship) -> void:
 	if is_instance_valid(ship.cached_lm) and ship.cached_lm.has_method("add_ship_derelict"):
 		ship.cached_lm.add_ship_derelict(1, ship)
 
+	if str(ship.get("team")) == "enemy":
+		drop_floating_loot(ship, true)
+
 	ship._set_wake_state(false)
 
 	if ship.DEBUG_CHASER_LOGS:

@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://b8yhmxtol6xpa"]
+
+[ext_resource type="Texture2D" uid="uid://co1wlpf8f2c3m" path="res://assets/vfx/decals/blood/red/blood_splatter_red_03.png" id="1_preview"]
+
+[node name="BloodStainDecal" type="Node3D" unique_id=821354682]
+
+[node name="Projection" type="Decal" parent="." unique_id=2122400843]
+size = Vector3(1, 0.92, 0.82)
+texture_albedo = ExtResource("1_preview")
+modulate = Color(0.58, 0.12, 0.09, 1)
+albedo_mix = 1.0
+normal_fade = 0.06
+upper_fade = 0.03
+lower_fade = 0.03
+distance_fade_enabled = true
+distance_fade_begin = 42.0
+distance_fade_length = 18.0

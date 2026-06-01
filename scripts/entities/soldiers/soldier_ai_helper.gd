@@ -11,6 +11,10 @@ const ATTACK_VALIDATION_FAR_LOD_INTERVAL := 0.22
 const ATTACK_VALIDATION_JITTER := 0.05
 const ATTACK_RANGE_RETENTION_MULT := 1.12
 const OWNED_SHIP_HOSTILE_SWITCH_RATIO := 0.58
+const MELEE_SPACING_RADIUS := 0.42
+const MELEE_SPACING_TARGET_META := "melee_spacing_target_id"
+const MELEE_SPACING_ANGLE_META := "melee_spacing_angle"
+const MELEE_SPACING_RADIUS_META := "melee_spacing_radius"
 
 static func state_idle(soldier, delta: float, run_heavy_logic: bool) -> void:
 	if soldier.has_method("_is_far_lod_sleep_candidate") and soldier._is_far_lod_sleep_candidate():
@@ -162,6 +166,9 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
 		_clear_target_and_idle(soldier)
 		return
+	if SoldierCaptainGuardHelper.should_defer_player_captain_target(soldier, target_node):
+		_clear_target_and_idle(soldier)
+		return
 
 	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
@@ -197,7 +204,9 @@ static func state_move(soldier, delta: float = 0.016) -> void:
 		soldier._change_state(soldier.State.IDLE)
 		return
 
-	var target_pos = target_node.global_position
+	var target_pos := _get_melee_spacing_target_position(soldier, target_node, attack_range)
+	if _move_toward_owned_ship_global_point(soldier, target_pos, 1.0, delta, MOVE_TURN_SPEED):
+		return
 	var direction = (target_pos - soldier.global_position).normalized()
 	soldier.velocity = direction * soldier.move_speed
 	soldier.move_and_slide()
@@ -272,6 +281,9 @@ static func _validate_attack_state(soldier, target_node: Node3D, delta: float) -
 	if not is_instance_valid(target_node) or not target_node.is_inside_tree():
 		_clear_target_and_idle(soldier)
 		return false
+	if SoldierCaptainGuardHelper.should_defer_player_captain_target(soldier, target_node):
+		_clear_target_and_idle(soldier)
+		return false
 	var target_ship = soldier.current_target.get_owned_ship_node() if soldier.current_target.has_method("get_owned_ship_node") else null
 	if is_instance_valid(target_ship) and target_ship != soldier.owned_ship:
 		if target_ship.has_method("is_sinking_or_dying") and target_ship.is_sinking_or_dying():
@@ -309,6 +321,24 @@ static func _is_current_weapon_ranged(soldier) -> bool:
 	if soldier.current_weapon == null or not ("max_range" in soldier.current_weapon):
 		return false
 	return float(soldier.current_weapon.get("max_range")) > 5.0
+
+
+static func _get_melee_spacing_target_position(soldier, target_node: Node3D, attack_range: float) -> Vector3:
+	if not is_instance_valid(target_node):
+		return soldier.global_position
+	var radius := minf(MELEE_SPACING_RADIUS, maxf(0.16, attack_range * 0.32))
+	var target_id := target_node.get_instance_id()
+	if int(soldier.get_meta(MELEE_SPACING_TARGET_META, 0)) != target_id:
+		var seed_value := int(soldier.get_instance_id()) ^ (target_id * 31)
+		var angle := fposmod(float(seed_value % 1024) / 1024.0 * TAU, TAU)
+		var radius_jitter := 0.82 + float((seed_value >> 10) & 15) / 15.0 * 0.28
+		soldier.set_meta(MELEE_SPACING_TARGET_META, target_id)
+		soldier.set_meta(MELEE_SPACING_ANGLE_META, angle)
+		soldier.set_meta(MELEE_SPACING_RADIUS_META, radius * radius_jitter)
+	var offset_angle := float(soldier.get_meta(MELEE_SPACING_ANGLE_META, 0.0))
+	var offset_radius := float(soldier.get_meta(MELEE_SPACING_RADIUS_META, radius))
+	var offset := Vector3(cos(offset_angle), 0.0, sin(offset_angle)) * offset_radius
+	return target_node.global_position + offset
 
 
 static func _move_toward_point(soldier, target_pos: Vector3, speed_scale: float = 1.0, delta: float = 0.016, turn_speed: float = MOVE_TURN_SPEED) -> void:

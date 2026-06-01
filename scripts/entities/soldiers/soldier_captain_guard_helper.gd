@@ -4,8 +4,6 @@ class_name SoldierCaptainGuardHelper
 
 const WARNING_ROOT_NAME := "CaptainGuardWarningRing"
 const WARNING_RING_NAME := "Ring"
-const GUARDED_HEALTH_FLOOR_RATIO := 0.5
-const CAPTAIN_DAMAGE_MULTIPLIER := 0.5
 const RING_INNER_RADIUS := 0.64
 const RING_OUTER_RADIUS := 0.82
 const RING_SEGMENTS := 40
@@ -15,14 +13,19 @@ const RING_Y := 0.075
 static func apply_damage_protection(soldier, damage: float) -> float:
 	if not _is_player_captain(soldier):
 		return damage
-	var reduced_damage := maxf(0.0, damage * CAPTAIN_DAMAGE_MULTIPLIER)
-	if not has_living_guard(soldier):
-		return reduced_damage
-	var floor_health := maxf(1.0, float(soldier.get("max_health"))) * GUARDED_HEALTH_FLOOR_RATIO
-	var current_health := float(soldier.get("current_health"))
-	if current_health <= floor_health + 0.001:
-		return 0.0
-	return minf(reduced_damage, maxf(0.0, current_health - floor_health))
+	return damage
+
+
+static func should_defer_player_captain_target(attacker, target) -> bool:
+	if not _is_player_captain(target):
+		return false
+	if not is_instance_valid(attacker):
+		return false
+	var attacker_team := _get_team_tag(attacker)
+	var target_team := _get_team_tag(target)
+	if attacker_team.is_empty() or attacker_team == target_team:
+		return false
+	return has_living_guard(target)
 
 
 static func update_warning_ring(soldier, _delta: float) -> void:
@@ -84,6 +87,14 @@ static func _should_show_warning_ring(soldier) -> bool:
 
 static func _is_player_captain(soldier) -> bool:
 	return is_instance_valid(soldier) and str(soldier.get("team")) == "player" and _is_captain_flag_enabled(soldier)
+
+
+static func _get_team_tag(node) -> String:
+	if not is_instance_valid(node):
+		return ""
+	if node.has_method("get_team_tag"):
+		return str(node.call("get_team_tag"))
+	return str(node.get("team"))
 
 
 static func _is_captain_flag_enabled(soldier) -> bool:

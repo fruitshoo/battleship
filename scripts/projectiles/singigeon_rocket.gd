@@ -15,7 +15,7 @@ const SINGIGEON_FLIGHT_SFX_UNIT_SIZE := 46.0
 ## 신기전 로켓 (Singigeon Rocket)
 ## 발키리 스타일: 지향사격 기반 다연장 로켓 (짧은 미세 보정만 적용).
 
-@export var speed: float = 32.0
+@export var speed: float = 30.0
 @export var turn_rate_deg: float = 120.0
 @export var burst_phase_duration: float = 0.12
 @export var burst_turn_rate_deg: float = 70.0
@@ -412,7 +412,10 @@ func _apply_damage(target_node: Variant, scale: float = 1.0) -> void:
 			var soldier_target := target_node as Node3D
 			crit_effect_position = _get_valid_critical_effect_position(soldier_target)
 			crit_hit_direction = soldier_target.global_position - start_pos
-		target_node.take_damage(final_damage, global_position, source_id)
+		if is_soldier_target:
+			target_node.take_damage(final_damage, global_position, source_id, is_crit)
+		else:
+			target_node.take_damage(final_damage, global_position, source_id)
 		if is_crit and crit_effect_position is Vector3:
 			_spawn_critical_hit_effect_at_position(crit_effect_position as Vector3, crit_hit_direction)
 	elif target_node.has_method("die"):

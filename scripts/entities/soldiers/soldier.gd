@@ -167,6 +167,8 @@ var chaos_damage_per_tick: float = 3.0 # 적 도선병은 퇴각하지 않으므
 var _base_max_health_stat: float = 0.0
 var _base_attack_damage_stat: float = 0.0
 var _base_defense_stat: float = 0.0
+var _captain_attack_bonus: float = 0.0
+var _captain_visual_scale: float = 1.0
 
 const RANGED_DAMAGE_SOURCES := {
 	"bow": true,
@@ -448,7 +450,7 @@ func _cache_base_combat_stats() -> void:
 	_base_attack_damage_stat = attack_damage
 	_base_defense_stat = defense
 
-func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_multiplier: float = 1.0, defense_bonus: float = 0.0) -> void:
+func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_bonus: float = 0.0, defense_bonus: float = 0.0, visual_scale: float = 1.0) -> void:
 	if _base_max_health_stat <= 0.0:
 		_cache_base_combat_stats()
 
@@ -457,10 +459,12 @@ func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_mu
 
 	is_captain = enabled
 	set_meta("is_captain", enabled)
+	_captain_attack_bonus = maxf(attack_bonus, 0.0) if enabled else 0.0
+	_captain_visual_scale = maxf(visual_scale, 1.0) if enabled else 1.0
 
 	if enabled:
 		max_health = _base_max_health_stat * maxf(health_multiplier, 1.0)
-		attack_damage = _base_attack_damage_stat * maxf(attack_multiplier, 1.0)
+		attack_damage = _base_attack_damage_stat + _captain_attack_bonus
 		defense = _base_defense_stat + maxf(defense_bonus, 0.0)
 		is_melee_only = true
 		is_ranged_only = false
@@ -474,6 +478,7 @@ func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_mu
 
 	if is_inside_tree():
 		_setup_soldier_visual()
+		_apply_captain_visual_scale()
 		_update_weapon_stats()
 		if enabled:
 			_set_active_weapon("sword")
@@ -483,6 +488,14 @@ func set_captain_status(enabled: bool, health_multiplier: float = 1.0, attack_mu
 
 func _setup_soldier_visual() -> void:
 	SoldierVisualHelper.setup_visual_scene(self, _get_selected_soldier_visual_scene())
+	_apply_captain_visual_scale()
+
+
+func _apply_captain_visual_scale() -> void:
+	var visual_root := get_visual_root_node()
+	if not is_instance_valid(visual_root) or visual_root == self:
+		return
+	visual_root.scale = Vector3.ONE * _captain_visual_scale
 
 func _get_selected_soldier_visual_scene() -> PackedScene:
 	if is_captain and captain_visual_scene != null:
@@ -502,9 +515,9 @@ func _update_weapon_stats() -> void:
 	var damage_bonus_pct := _get_total_weapon_damage_bonus_pct()
 
 	var melee_damage_bonus_pct := damage_bonus_pct
-	var melee_damage_add := 0.0
+	var melee_damage_add := _captain_attack_bonus
 	if _get_melee_weapon_id() in ["spearman", "spear", "trident"]:
-		melee_damage_add = _get_spear_damage_add()
+		melee_damage_add += _get_spear_damage_add()
 	_sync_weapon_damage_bonus(weapon_sword, melee_damage_bonus_pct, melee_damage_add)
 	_sync_weapon_damage_bonus(weapon_bow, damage_bonus_pct)
 
@@ -1335,7 +1348,9 @@ func _is_valid_enemy_target(target: Node3D) -> bool:
 	if NodeContractHelper.is_sinking_or_dying(target_ship):
 		return false
 	var target_team: String = target.get_team_tag() if target.has_method("get_team_tag") else str(target.get("team"))
-	return target_team != team
+	if target_team == team:
+		return false
+	return not SoldierCaptainGuardHelper.should_defer_player_captain_target(self, target)
 
 
 func _get_target_owned_ship_node(target: Node) -> Node3D:
@@ -1384,6 +1399,8 @@ func _find_nearest_owned_ship_hostile_fallback() -> Node3D:
 			if other.call("get_team_tag") == team:
 				continue
 		elif str(other.get("team")) == team:
+			continue
+		if SoldierCaptainGuardHelper.should_defer_player_captain_target(self, other):
 			continue
 		var other_node := other as Node3D
 		if not is_instance_valid(other_node):
@@ -1502,8 +1519,8 @@ func _get_ship_deck_half_extents(ship: Node3D) -> Vector2:
 	return SoldierShipHelper.get_ship_deck_half_extents(self, ship)
 
 ## 데미지 받기
-func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
-	SoldierLifecycleHelper.take_damage(self, amount, hit_position, damage_source)
+func take_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "", is_critical_hit: bool = false) -> void:
+	SoldierLifecycleHelper.take_damage(self, amount, hit_position, damage_source, is_critical_hit)
 
 func _get_ship_ranged_cover_reduction(damage_source: String) -> float:
 	return SoldierLifecycleHelper.get_ship_ranged_cover_reduction(self, damage_source)

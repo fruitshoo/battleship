@@ -1,7 +1,7 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 const BASE_DAMAGE: float = 8.0
-const ARROW_SPEED: float = 30.0
+const ARROW_SPEED: float = 27.0
 const MIN_ARROW_FLIGHT_TIME: float = 0.12
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.55
@@ -129,7 +129,7 @@ func _launch_singigeon_arrow_rocket(target: Node3D, attacker: Node3D, team_name:
 		return false
 
 	var stats: Dictionary = upgrades.get("singigeon", {}).get("stats", {})
-	var projectile_speed := float(stats.get("projectile_speed", 32.0))
+	var projectile_speed := float(stats.get("projectile_speed", 30.0))
 	var spawn_pos := attacker.global_position + Vector3.UP
 	var current_target_pos := _get_singigeon_aim_point(target)
 	var time_to_reach := clampf(spawn_pos.distance_to(current_target_pos) / maxf(projectile_speed, 1.0), 0.18, 0.9)

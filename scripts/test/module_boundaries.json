@@ -1022,9 +1022,10 @@
       ]
     },
     "res://scripts/entities/ships/base_ship_boarding_helper.gd": {
-      "count": 42,
+      "count": 43,
       "functions": [
         "process_boarding_common",
+        "_get_blocked_boarding_retry_timer",
         "_uses_limited_rope_visuals",
         "_requires_full_rope_before_transfer",
         "_can_target_be_boarded",
@@ -2116,14 +2117,16 @@
       ]
     },
     "res://scripts/entities/soldiers/soldier_captain_guard_helper.gd": {
-      "count": 10,
+      "count": 12,
       "functions": [
         "apply_damage_protection",
+        "should_defer_player_captain_target",
         "update_warning_ring",
         "hide_warning_ring",
         "has_living_guard",
         "_should_show_warning_ring",
         "_is_player_captain",
+        "_get_team_tag",
         "_is_captain_flag_enabled",
         "_ensure_warning_root",
         "_make_ring_mesh",

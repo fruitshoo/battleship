@@ -31,6 +31,11 @@ static func perform_attack(soldier) -> void:
 		return
 	var target: Node3D = soldier.current_target if soldier.current_target is Node3D else null
 	if is_instance_valid(target) and target.is_inside_tree():
+		if SoldierCaptainGuardHelper.should_defer_player_captain_target(soldier, target):
+			soldier.current_target = null
+			if soldier.has_method("_change_state"):
+				soldier._change_state(soldier.State.IDLE)
+			return
 		var target_ship: Node = null
 		if target.has_method("get_owned_ship_node"):
 			var owned_node: Variant = target.call("get_owned_ship_node")

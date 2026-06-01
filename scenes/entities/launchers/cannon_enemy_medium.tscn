@@ -6,6 +6,6 @@
 [node name="CannonEnemyMedium" instance=ExtResource("1_base")]
 cannonball_scene = ExtResource("2_ball")
 projectile_damage = 7.0
-projectile_speed = 64.0
+projectile_speed = 50.0
 fire_cooldown = 3.6
 detection_range = 17.0

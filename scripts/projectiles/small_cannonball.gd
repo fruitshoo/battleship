@@ -15,7 +15,7 @@ const SHIP_HIT_FEEDBACK_Y_OFFSET: float = 0.35
 const SOLDIER_HIT_EFFECT_DECK_MARGIN: float = 0.55
 
 @export var damage: float = 24.0
-@export var speed: float = 58.0
+@export var speed: float = 30.0
 
 var start_pos: Vector3 = Vector3.ZERO
 var target_pos: Vector3 = Vector3.ZERO

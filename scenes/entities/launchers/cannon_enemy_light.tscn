@@ -6,6 +6,6 @@
 [node name="CannonEnemyLight" instance=ExtResource("1_base")]
 cannonball_scene = ExtResource("2_ball")
 projectile_damage = 7.0
-projectile_speed = 62.0
+projectile_speed = 50.0
 fire_cooldown = 3.4
 detection_range = 16.5

@@ -16,6 +16,7 @@ const BOARDING_LAUNCH_INSET := 0.18
 const BOARDING_LAUNCH_READY_MIN_RADIUS := 2.35
 const BOARDING_LAUNCH_READY_MAX_RADIUS := 3.55
 const BOARDING_PREP_BAR_READY_RADIUS_PAD := 2.4
+const BOARDING_BLOCKED_RETRY_DELAY := 0.25
 const HOSTILE_BOARDING_TRAVEL_SPEED := 12.0
 const HOSTILE_BOARDING_TRAVEL_MIN := 0.48
 const HOSTILE_BOARDING_TRAVEL_MAX := 0.86
@@ -24,7 +25,7 @@ const ROOF_BOARDING_TRAVEL_MIN := 0.68
 const ROOF_BOARDING_TRAVEL_MAX := 1.08
 const ROOF_BOARDING_JUMP_HEIGHT_MIN := 0.65
 const ROOF_BOARDING_JUMP_HEIGHT_MAX := 1.25
-const ROOF_BOARDING_OUTER_WAYPOINT_PAD := 0.85
+const ROOF_BOARDING_LANDING_SPACING := 0.72
 const BOARDING_TRAVEL_SPEED := 12.0
 const BOARDING_TRAVEL_MIN := 0.46
 const BOARDING_TRAVEL_MAX := 0.82
@@ -107,12 +108,20 @@ static func process_boarding_common(ship, delta: float) -> void:
 		ship.boarding_timer += delta
 		var effective_interval: float = ship.get_effective_boarding_interval() if ship.has_method("get_effective_boarding_interval") else ship.boarding_interval
 		if ship.boarding_timer >= effective_interval:
-			ship.boarding_timer = 0.0
+			var transferred_count := 0
 			if not ShipBoardingMetaHelper.is_transfer_suppressed(ship):
-				transfer_boarding_wave(ship)
+				transferred_count = transfer_boarding_wave(ship)
+			if transferred_count > 0:
+				ship.boarding_timer = 0.0
+			else:
+				ship.boarding_timer = _get_blocked_boarding_retry_timer(effective_interval)
 
 	_update_boarding_prep_bars(ship)
 	ship._update_ropes(delta)
+
+
+static func _get_blocked_boarding_retry_timer(effective_interval: float) -> float:
+	return maxf(0.0, effective_interval - minf(BOARDING_BLOCKED_RETRY_DELAY, effective_interval * 0.5))
 
 
 static func _uses_limited_rope_visuals(ship) -> bool:
@@ -419,6 +428,7 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 		var jump_offset := _get_nearest_deck_landing_local(ship.boarding_target, start_global)
 		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF and ship.boarding_target.has_method("get_roof_boarding_landing_local"):
 			jump_offset = ship.boarding_target.call("get_roof_boarding_landing_local", start_global)
+			jump_offset = _get_spread_roof_boarding_landing_local(ship.boarding_target, jump_offset, wave_index, wave_size)
 		var start_local_pos: Vector3 = s.position
 		var horiz_dist: float = Vector2(start_local_pos.x - jump_offset.x, start_local_pos.z - jump_offset.z).length()
 		var jump_height: float = clampf(maxf(1.35, horiz_dist * 0.22), 1.35, 2.35)
@@ -431,45 +441,32 @@ static func transfer_one_soldier(ship, wave_index: int = 0, wave_size: int = 1) 
 			SoldierDeckZoneHelper.set_roof_boarder(s, true)
 		SoldierBoardingHelper.face_boarding_jump_direction(s, ship.boarding_target.to_global(jump_offset))
 
-		var tween = s.create_tween()
-		tween.set_parallel(true)
-		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
-			var outside_waypoint := _get_roof_boarding_outer_waypoint_local(ship.boarding_target, start_local_pos, jump_offset)
-			var approach_time := travel_time * 0.45
-			var landing_time := travel_time - approach_time
-			tween.tween_property(s, "position:x", outside_waypoint.x, approach_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-			tween.tween_property(s, "position:z", outside_waypoint.z, approach_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-			tween.chain().set_parallel(true)
-			tween.tween_property(s, "position:x", jump_offset.x, landing_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-			tween.tween_property(s, "position:z", jump_offset.z, landing_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		else:
-			tween.tween_property(s, "position:x", jump_offset.x, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-			tween.tween_property(s, "position:z", jump_offset.z, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-		var y_tween = s.create_tween()
-		y_tween.tween_property(s, "position:y", jump_peak_y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		y_tween.tween_property(s, "position:y", jump_offset.y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		var soldier_id: int = s.get_instance_id()
 		var target_ship_id: int = ship.boarding_target.get_instance_id()
 		var transfer_team: String = str(team_prop)
-		y_tween.finished.connect(func():
-			BaseShipBoardingHelper._finish_transfer_landing(soldier_id, target_ship_id, jump_offset)
-			BaseShipBoardingHelper._apply_boarding_transfer_damage(soldier_id, target_ship_id, transfer_team)
-		)
-
+		var tween = s.create_tween()
+		if target_zone == SoldierDeckZoneHelper.ZONE_ROOF:
+			var arc_callable := func(progress: float) -> void:
+				BaseShipBoardingHelper._apply_boarding_jump_arc(soldier_id, start_local_pos, jump_offset, jump_height, progress)
+			tween.tween_method(arc_callable, 0.0, 1.0, travel_time)
+		else:
+			tween.set_parallel(true)
+			tween.tween_property(s, "position:x", jump_offset.x, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tween.tween_property(s, "position:z", jump_offset.z, travel_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			var y_tween = s.create_tween()
+			y_tween.tween_property(s, "position:y", jump_peak_y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			y_tween.tween_property(s, "position:y", jump_offset.y, travel_time * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		if s.has_method("set_team"):
 			s.set_team(team_prop)
 
 		s.owned_ship = ship.boarding_target
 		EntityRegistry.move_soldier_ship(s, ship, ship.boarding_target)
 		var immediate_target: Node3D = _find_nearest_hostile_soldier(s, ship.boarding_target, team_prop)
-		if is_instance_valid(immediate_target) and s.has_method("move_to_target"):
-			s.move_to_target(immediate_target)
-			if team_prop == "enemy" and ship.boarding_target.has_method("get_team_tag") and ship.boarding_target.get_team_tag() == "player":
-				if "chaos_duration_timer" in s:
-					s.set("chaos_duration_timer", 0.0)
-				if "chaos_tick_timer" in s:
-					s.set("chaos_tick_timer", 1.0)
+		var landing_target_id: int = immediate_target.get_instance_id() if is_instance_valid(immediate_target) else 0
+		tween.finished.connect(func():
+			BaseShipBoardingHelper._finish_transfer_landing(soldier_id, target_ship_id, jump_offset, landing_target_id, transfer_team)
+			BaseShipBoardingHelper._apply_boarding_transfer_damage(soldier_id, target_ship_id, transfer_team)
+		)
 
 		if s.get("is_stationary"):
 			s.set("is_stationary", false)
@@ -492,22 +489,29 @@ static func _get_boarding_transfer_travel_time(horiz_dist: float, team_prop: Str
 	return clampf(horiz_dist / BOARDING_TRAVEL_SPEED, BOARDING_TRAVEL_MIN, BOARDING_TRAVEL_MAX)
 
 
-static func _get_roof_boarding_outer_waypoint_local(target_ship: Node3D, start_local: Vector3, landing_local: Vector3) -> Vector3:
-	var target_half_ext := _get_target_deck_half_extents(target_ship)
-	var approach := Vector2(start_local.x, start_local.z)
-	if approach.length_squared() <= 0.0001:
-		approach = Vector2(landing_local.x, landing_local.z)
-	if approach.length_squared() <= 0.0001:
-		approach = Vector2(0.0, 1.0)
-	var approach_dir := approach.normalized()
-	var scale_x: float = (target_half_ext.x + ROOF_BOARDING_OUTER_WAYPOINT_PAD) / maxf(absf(approach_dir.x), 0.001)
-	var scale_z: float = (target_half_ext.y + ROOF_BOARDING_OUTER_WAYPOINT_PAD) / maxf(absf(approach_dir.y), 0.001)
-	var edge_distance := minf(scale_x, scale_z)
-	return Vector3(
-		approach_dir.x * edge_distance,
-		maxf(start_local.y, landing_local.y),
-		approach_dir.y * edge_distance
-	)
+static func _apply_boarding_jump_arc(soldier_id: int, start_local: Vector3, landing_local: Vector3, arc_height: float, progress: float) -> void:
+	var soldier := NodeContractHelper.get_instance_node(soldier_id)
+	if not is_instance_valid(soldier):
+		return
+	var t := clampf(progress, 0.0, 1.0)
+	var next_pos := start_local.lerp(landing_local, t)
+	next_pos.y = lerpf(start_local.y, landing_local.y, t) + sin(t * PI) * arc_height
+	soldier.position = next_pos
+
+
+static func _get_spread_roof_boarding_landing_local(target_ship: Node3D, landing_local: Vector3, wave_index: int, wave_size: int) -> Vector3:
+	if wave_size <= 1:
+		return landing_local
+	var radial := Vector2(landing_local.x, landing_local.z)
+	if radial.length_squared() <= 0.0001:
+		radial = Vector2.RIGHT
+	var tangent := Vector2(-radial.y, radial.x).normalized()
+	var centered_index := float(wave_index) - (float(wave_size) - 1.0) * 0.5
+	var offset := tangent * centered_index * ROOF_BOARDING_LANDING_SPACING
+	var spread_landing := landing_local + Vector3(offset.x, 0.0, offset.y)
+	if is_instance_valid(target_ship) and target_ship.has_method("clamp_roof_boarding_landing_local"):
+		return target_ship.call("clamp_roof_boarding_landing_local", spread_landing)
+	return spread_landing
 
 
 static func _get_boarding_wave_size(ship) -> int:
@@ -638,17 +642,25 @@ static func _get_boarding_launch_ready_radius(ship: Node3D) -> float:
 	return clampf(deck_pressure * 0.62, BOARDING_LAUNCH_READY_MIN_RADIUS, BOARDING_LAUNCH_READY_MAX_RADIUS)
 
 
-static func _finish_transfer_landing(soldier_id: int, target_ship_id: int, landing_local: Vector3) -> void:
+static func _finish_transfer_landing(soldier_id: int, target_ship_id: int, landing_local: Vector3, landing_target_id: int = 0, attacker_team: String = "") -> void:
 	var soldier := NodeContractHelper.get_instance_node(soldier_id)
 	if not is_instance_valid(soldier):
 		return
 	var target_ship := NodeContractHelper.get_instance_node3d(target_ship_id)
 	if is_instance_valid(target_ship):
 		if SoldierDeckZoneHelper.is_roof(soldier) and target_ship.has_method("clamp_roof_boarding_landing_local"):
-			soldier.position = target_ship.call("clamp_roof_boarding_landing_local", landing_local)
+			soldier.position = landing_local
 		else:
 			soldier.position = _clamp_deck_landing_local(target_ship, landing_local)
 	_finish_soldier_boarding_jump_pose(soldier, "on_deck")
+	var landing_target := NodeContractHelper.get_instance_node3d(landing_target_id)
+	if is_instance_valid(landing_target) and not SoldierStateHelper.is_dead_soldier(landing_target) and soldier.has_method("move_to_target"):
+		soldier.call("move_to_target", landing_target)
+		if attacker_team == "enemy" and is_instance_valid(target_ship) and target_ship.has_method("get_team_tag") and target_ship.call("get_team_tag") == "player":
+			if "chaos_duration_timer" in soldier:
+				soldier.set("chaos_duration_timer", 0.0)
+			if "chaos_tick_timer" in soldier:
+				soldier.set("chaos_tick_timer", 1.0)
 
 
 static func _apply_boarding_transfer_damage(soldier_id: int, target_ship_id: int, attacker_team: String) -> void:

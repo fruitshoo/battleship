@@ -30,8 +30,9 @@ static func set_captain_state(ship, soldier: Node, enabled: bool) -> void:
 		soldier.set_captain_status(
 			enabled,
 			float(ship.captain_health_multiplier),
-			float(ship.captain_attack_multiplier),
-			float(ship.captain_defense_bonus)
+			float(ship.captain_attack_bonus),
+			float(ship.captain_defense_bonus),
+			float(ship.captain_visual_scale)
 		)
 	else:
 		soldier.set_meta("is_captain", enabled)

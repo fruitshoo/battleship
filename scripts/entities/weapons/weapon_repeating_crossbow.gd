@@ -1,7 +1,7 @@
 extends "res://scripts/entities/weapons/weapon.gd"
 
 const DEFAULT_BASE_DAMAGE: float = 7.0
-const ARROW_SPEED: float = 36.0
+const ARROW_SPEED: float = 27.0
 const MIN_ARROW_FLIGHT_TIME: float = 0.12
 const SOLDIER_AIM_VERTICAL_OFFSET: float = 1.05
 const SHIP_AIM_VERTICAL_OFFSET: float = 0.55

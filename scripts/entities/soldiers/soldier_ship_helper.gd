@@ -42,6 +42,8 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			continue
 		if other.get_team_tag() == soldier.team:
 			continue
+		if SoldierCaptainGuardHelper.should_defer_player_captain_target(soldier, other):
+			continue
 		if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, other):
 			continue
 
@@ -89,6 +91,8 @@ static func find_nearest_enemy(soldier) -> Node3D:
 			if not is_instance_valid(other):
 				continue
 			if SoldierStateHelper.is_dead_soldier(other) or other.get_team_tag() == soldier.team:
+				continue
+			if SoldierCaptainGuardHelper.should_defer_player_captain_target(soldier, other):
 				continue
 			var cross_owned_ship = other.get_owned_ship_node() if other.has_method("get_owned_ship_node") else other.get("owned_ship")
 			if NodeContractHelper.is_sinking_or_dying(cross_owned_ship):
@@ -143,6 +147,8 @@ static func find_nearest_hostile_on_owned_ship(soldier) -> Node3D:
 		if NodeContractHelper.is_sinking_or_dying(other_owned_ship):
 			continue
 		if other.get_team_tag() == soldier.team:
+			continue
+		if SoldierCaptainGuardHelper.should_defer_player_captain_target(soldier, other):
 			continue
 		if not SoldierDeckZoneHelper.can_share_combat_zone(soldier, other):
 			continue

@@ -35,7 +35,7 @@ func attack(target: Node3D, attacker: Node3D) -> void:
 	var crit_hit_direction: Vector3 = hit_pos - attacker.global_position
 	
 	if target.has_method("take_damage"):
-		target.take_damage(final_damage, attacker.global_position, "trident")
+		target.take_damage(final_damage, attacker.global_position, "trident", is_crit)
 		if is_crit and crit_effect_position is Vector3:
 			spawn_critical_hit_effect_at_position(crit_effect_position as Vector3, crit_hit_direction)
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):

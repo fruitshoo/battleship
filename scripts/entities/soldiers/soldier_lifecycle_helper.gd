@@ -28,12 +28,16 @@ const SHIP_RANGED_COVER_BASE_DEFENSE_META := "crew_ranged_cover_base_defense"
 const COMBAT_INCAPACITATION_CHANCE_META := "combat_incapacitation_chance"
 const SHIP_COMBAT_INCAPACITATION_CHANCE_META := "crew_combat_incapacitation_chance"
 const ROOF_DEFENDER_MELEE_DAMAGE_MULT := 0.75
+const CAPTAIN_DEATH_PENDING_META := "captain_death_pending"
+const CAPTAIN_DEATH_COMMIT_DELAY := 0.11
 
 
-static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "") -> void:
+static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.ZERO, damage_source: String = "", is_critical_hit: bool = false) -> void:
 	if soldier.current_state == soldier.State.DEAD:
 		return
 	if soldier.get_meta("ballistic_collateral_pending", false) == true:
+		return
+	if soldier.get_meta(CAPTAIN_DEATH_PENDING_META, false) == true:
 		return
 
 	var adjusted_amount: float = amount
@@ -60,7 +64,7 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 	if soldier.has_method("_flash_hit"):
 		soldier._flash_hit()
 
-	if final_damage > 0.001:
+	if final_damage > 0.001 and _should_spawn_blood_decal(is_critical_hit, damage_source):
 		BloodDeckDecalHelper.try_spawn_from_soldier_damage(soldier, final_damage, hit_position, damage_source)
 
 	if final_damage > 0.001 and hit_position != Vector3.ZERO and soldier.current_state != soldier.State.DEAD:
@@ -74,7 +78,14 @@ static func take_damage(soldier, amount: float, hit_position: Vector3 = Vector3.
 		if _should_incapacitate_instead_of_die(soldier):
 			incapacitate(soldier)
 			return
+		var lethal_position: Vector3 = hit_position if hit_position != Vector3.ZERO else soldier.global_position
+		if _try_start_player_captain_lethal_moment(soldier, lethal_position):
+			return
 		die(soldier)
+
+
+static func _should_spawn_blood_decal(is_critical_hit: bool, damage_source: String) -> bool:
+	return is_critical_hit or damage_source.ends_with("_crit")
 
 
 static func _should_apply_roof_defender_melee_reduction(soldier, damage_source: String) -> bool:
@@ -305,8 +316,22 @@ static func die(soldier) -> void:
 		is_offboard_death and soldier.get_meta("overboard_knockback_voice_played", false) == true
 	)
 	var tree: SceneTree = soldier.get_tree()
+
+	soldier.set_physics_process(false)
+	if soldier.is_in_group("soldiers"):
+		soldier.remove_from_group("soldiers")
+	if soldier.is_in_group("enemy"):
+		soldier.remove_from_group("enemy")
+
+	_set_body_collision_disabled(soldier, true)
+	var roof_death_overboard_started := false
+	if not is_offboard_death:
+		roof_death_overboard_started = _try_start_roof_death_overboard(soldier)
+
 	var audio_manager = soldier.get_node_or_null("/root/AudioManager")
-	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+	if roof_death_overboard_started and soldier.has_method("_play_overboard_knockback_voice_once"):
+		soldier.call("_play_overboard_knockback_voice_once")
+	elif is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		if should_play_death_voice:
 			if audio_manager.has_method("play_sfx_random_pitch"):
 				audio_manager.play_sfx_random_pitch(
@@ -333,20 +358,13 @@ static func die(soldier) -> void:
 					delay_am.play_sfx("water_splash_small", death_position, randf_range(0.8, 1.2), splash_volume_db)
 			)
 
-	_try_trigger_player_captain_death_game_over(soldier, death_position)
-
-	soldier.set_physics_process(false)
-	if soldier.is_in_group("soldiers"):
-		soldier.remove_from_group("soldiers")
-	if soldier.is_in_group("enemy"):
-		soldier.remove_from_group("enemy")
-
-	_set_body_collision_disabled(soldier, true)
 	if is_offboard_death:
+		_try_trigger_player_captain_death_game_over(soldier, death_position)
 		soldier.visible = false
 		soldier.queue_free()
 		return
-	if _try_start_roof_death_overboard(soldier):
+	if roof_death_overboard_started:
+		_try_trigger_player_captain_death_game_over(soldier, death_position)
 		return
 
 	var owned_ship_team: String = ""
@@ -357,6 +375,7 @@ static func die(soldier) -> void:
 		soldier._play_death_pose()
 	else:
 		soldier.visible = false
+	_try_trigger_player_captain_death_game_over(soldier, death_position)
 	if is_instance_valid(soldier.owned_ship) and soldier.owned_ship.has_method("enforce_dead_body_limit"):
 		soldier.owned_ship.call_deferred("enforce_dead_body_limit")
 
@@ -377,6 +396,60 @@ static func _try_trigger_player_captain_death_game_over(soldier, death_position:
 		return
 	if ship.has_method("trigger_captain_death_game_over"):
 		ship.call("trigger_captain_death_game_over", death_position)
+
+
+static func _try_start_player_captain_lethal_moment(soldier, death_position: Vector3) -> bool:
+	if not _is_player_captain_soldier(soldier):
+		return false
+	var ship := _get_player_captain_ship(soldier)
+	if not is_instance_valid(ship):
+		return false
+	if ship.has_method("is_sinking_or_dying") and ship.is_sinking_or_dying():
+		return false
+	if ship.get("is_sinking") == true or ship.get("is_dying") == true:
+		return false
+	soldier.set_meta(CAPTAIN_DEATH_PENDING_META, true)
+	if ship.has_method("preview_captain_death_moment"):
+		ship.call("preview_captain_death_moment", death_position)
+	var tree: SceneTree = soldier.get_tree()
+	if not is_instance_valid(tree):
+		die(soldier)
+		return true
+	var soldier_id: int = soldier.get_instance_id()
+	tree.create_timer(CAPTAIN_DEATH_COMMIT_DELAY, true, false, true).timeout.connect(func() -> void:
+		_commit_pending_captain_death(soldier_id)
+	, CONNECT_ONE_SHOT)
+	return true
+
+
+static func _commit_pending_captain_death(soldier_id: int) -> void:
+	var soldier := NodeContractHelper.get_instance_node(soldier_id)
+	if not is_instance_valid(soldier):
+		return
+	if soldier.current_state == soldier.State.DEAD:
+		return
+	if soldier.has_meta(CAPTAIN_DEATH_PENDING_META):
+		soldier.remove_meta(CAPTAIN_DEATH_PENDING_META)
+	die(soldier)
+
+
+static func _is_player_captain_soldier(soldier) -> bool:
+	if not is_instance_valid(soldier):
+		return false
+	if str(soldier.get("team")) != "player":
+		return false
+	return soldier.get("is_captain") == true or soldier.get_meta("is_captain", false) == true
+
+
+static func _get_player_captain_ship(soldier) -> Node:
+	var ship: Node = soldier.get("owned_ship")
+	if not is_instance_valid(ship):
+		ship = soldier.get("home_ship")
+	if not is_instance_valid(ship):
+		return null
+	if str(ship.get("team")) != "player":
+		return null
+	return ship
 
 
 static func _snap_dead_body_to_deck(soldier) -> void:

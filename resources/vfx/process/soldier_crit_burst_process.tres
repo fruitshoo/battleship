@@ -3,7 +3,10 @@
 [ext_resource type="Texture2D" uid="uid://ddl3ljm72mfkn" path="res://resources/vfx/curves/alpha_quick_pop.tres" id="1_alpha"]
 
 [resource]
+lifetime_randomness = 0.1
 particle_flag_rotate_y = true
+emission_shape = 1
+emission_sphere_radius = 0.2
 angle_min = -180.0
 angle_max = 180.0
 direction = Vector3(0, 1, 0)

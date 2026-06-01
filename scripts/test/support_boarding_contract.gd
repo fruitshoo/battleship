@@ -206,9 +206,16 @@ class MockTransferShip:
 	var is_boarding: bool = false
 	var boarding_timer: float = 0.0
 	var boarding_prep_timer: float = 0.0
+	var boarding_interval: float = 1.0
+	var boarding_prep_duration: float = 0.0
 	var boarding_contact_timer: float = 0.0
+	var boarding_contact_grace_duration: float = 0.0
 	var boarding_hook_timer: float = 0.0
+	var boarding_hook_throw_delay: float = 0.0
 	var boarding_secondary_rope_timer: float = 0.0
+	var boarding_secondary_rope_delay: float = 0.0
+	var max_boarding_distance: float = 8.0
+	var boarding_break_distance: float = 12.0
 	var _initial_rope_deployed: bool = false
 	var _full_rope_deployed: bool = false
 	var boarding_attacker: Node3D = null
@@ -221,6 +228,8 @@ class MockTransferShip:
 	var clear_rope_calls: int = 0
 	var clear_latch_calls: int = 0
 	var become_derelict_calls: int = 0
+	var update_rope_calls: int = 0
+	var DEBUG_COMBAT_LOGS: bool = false
 
 	func _init() -> void:
 		var soldiers := Node3D.new()
@@ -232,6 +241,22 @@ class MockTransferShip:
 
 	func get_deck_half_extents() -> Vector2:
 		return deck_half_extents
+
+	func get_effective_boarding_interval() -> float:
+		return boarding_interval
+
+	func get_collision_distance_to(other: Node3D) -> float:
+		return global_position.distance_to(other.global_position) if is_instance_valid(other) else max_boarding_distance
+
+	func _is_boarding_contact_stable() -> bool:
+		return true
+
+	func _spawn_ropes(_count_override: int = -1) -> void:
+		_initial_rope_deployed = true
+		_full_rope_deployed = true
+
+	func _update_ropes(_delta: float = 0.0) -> void:
+		update_rope_calls += 1
 
 	func get_boarding_attacker_ship() -> Node3D:
 		return boarding_attacker
@@ -314,12 +339,13 @@ class MockCombatSoldier:
 	var is_captain: bool = false
 	var is_stationary: bool = false
 	var _is_jumping: bool = false
+	var dead: bool = false
 
 	func get_team_tag() -> String:
 		return team
 
 	func is_dead_soldier() -> bool:
-		return false
+		return dead
 
 	func get_current_state_value() -> int:
 		return current_state
@@ -368,6 +394,7 @@ func _ready() -> void:
 	_verify_boarding_transfer_snaps_soldier_to_target_deck(failures)
 	_verify_boarding_transfer_wave_sends_multiple_soldiers(failures)
 	_verify_boarding_transfer_waits_for_launch_side_boarders(failures)
+	_verify_boarding_timer_holds_when_transfer_slots_are_full(failures)
 	await _verify_boarding_transfer_tracks_moving_target_deck(failures)
 	_verify_soldier_deck_recovery_repairs_parent_and_bounds(failures)
 	_verify_soldier_boarding_status_marks_returning(failures)
@@ -375,6 +402,7 @@ func _ready() -> void:
 	_verify_overrun_deck_suppresses_ship_weapons(failures)
 	_verify_player_deck_emergency_speeds_support_assist(failures)
 	_verify_soldier_retargets_hostile_boarder_on_owned_ship(failures)
+	_verify_enemy_targets_regular_crew_before_guarded_captain(failures)
 	_verify_soldier_targets_boarder_on_distressed_support_ship(failures)
 	_verify_enemy_boarder_speaks_only_on_player_deck(failures)
 	_verify_player_crew_speaks_when_ship_is_burning(failures)
@@ -1682,6 +1710,57 @@ func _verify_boarding_transfer_waits_for_launch_side_boarders(failures: Array[St
 	source.queue_free()
 
 
+func _verify_boarding_timer_holds_when_transfer_slots_are_full(failures: Array[String]) -> void:
+	var source := MockTransferShip.new()
+	add_child(source)
+	source.team = "enemy"
+	source.is_boarding = true
+	source.boarding_interval = 1.0
+	source.boarding_timer = 0.95
+	source.boarding_prep_duration = 0.0
+	source.boarding_prep_timer = 0.0
+	source._initial_rope_deployed = true
+	source._full_rope_deployed = true
+	source.global_position = Vector3.ZERO
+
+	var target := MockTransferShip.new()
+	add_child(target)
+	target.team = "player"
+	target.global_position = Vector3(6.0, 0.0, 0.0)
+	source.boarding_target = target
+
+	var source_boarder := MockTransferSoldier.new()
+	source_boarder.team = "enemy"
+	source_boarder.owned_ship = source
+	source_boarder.position = Vector3(1.9, 0.4, 0.0)
+	source.get_node("Soldiers").add_child(source_boarder)
+
+	var defender := MockTransferSoldier.new()
+	defender.team = "player"
+	defender.owned_ship = target
+	defender.position = Vector3.ZERO
+	target.get_node("Soldiers").add_child(defender)
+
+	for i in range(2):
+		var existing_boarder := MockTransferSoldier.new()
+		existing_boarder.team = "enemy"
+		existing_boarder.owned_ship = target
+		existing_boarder.position = Vector3(float(i) * 0.2, 0.4, 0.0)
+		target.get_node("Soldiers").add_child(existing_boarder)
+
+	BaseShipBoardingHelper.process_boarding_common(source, 0.1)
+
+	if not is_equal_approx(source.boarding_prep_timer, 0.0):
+		failures.append("blocked boarding retry should not reset finished prep timer")
+	if source.boarding_timer < 0.7 or source.boarding_timer > 0.8:
+		failures.append("blocked boarding retry should hold timer near ready instead of resetting: %.2f" % source.boarding_timer)
+	if source_boarder.get_parent() != source.get_node("Soldiers"):
+		failures.append("blocked boarding retry moved a source boarder despite full contest slots")
+
+	target.queue_free()
+	source.queue_free()
+
+
 func _verify_boarding_transfer_tracks_moving_target_deck(failures: Array[String]) -> void:
 	var source := MockTransferShip.new()
 	add_child(source)
@@ -1902,6 +1981,65 @@ func _verify_soldier_retargets_hostile_boarder_on_owned_ship(failures: Array[Str
 	boarder.queue_free()
 	remote_enemy.queue_free()
 	defender.queue_free()
+	enemy_ship.queue_free()
+	player_ship.queue_free()
+
+
+func _verify_enemy_targets_regular_crew_before_guarded_captain(failures: Array[String]) -> void:
+	var player_ship := MockTargetShip.new()
+	add_child(player_ship)
+	player_ship.team = "player"
+	player_ship.global_position = Vector3.ZERO
+
+	var enemy_ship := MockTargetShip.new()
+	add_child(enemy_ship)
+	enemy_ship.team = "enemy"
+	enemy_ship.global_position = Vector3(8.0, 0.0, 0.0)
+
+	var boarder := MockCombatSoldier.new()
+	add_child(boarder)
+	boarder.team = "enemy"
+	boarder.owned_ship = player_ship
+	boarder.global_position = Vector3.ZERO
+
+	var captain := MockCombatSoldier.new()
+	add_child(captain)
+	captain.team = "player"
+	captain.owned_ship = player_ship
+	captain.is_captain = true
+	captain.global_position = Vector3(0.45, 0.0, 0.0)
+
+	var guard := MockCombatSoldier.new()
+	add_child(guard)
+	guard.team = "player"
+	guard.owned_ship = player_ship
+	guard.global_position = Vector3(1.1, 0.0, 0.0)
+
+	EntityRegistry.register_soldier(boarder)
+	EntityRegistry.register_soldier(captain)
+	EntityRegistry.register_soldier(guard)
+
+	var nearest := SoldierShipHelper.find_nearest_hostile_on_owned_ship(boarder)
+	if nearest != guard:
+		failures.append("enemy boarder targeted guarded captain instead of regular crew")
+
+	guard.dead = true
+	nearest = SoldierShipHelper.find_nearest_hostile_on_owned_ship(boarder)
+	if nearest != captain:
+		failures.append("enemy boarder did not target captain after regular crew was gone")
+
+	guard.dead = false
+	boarder.current_target = captain
+	SoldierAiHelper.state_move(boarder)
+	if boarder.current_target == captain:
+		failures.append("enemy boarder kept guarded captain as an active move target")
+
+	EntityRegistry.unregister_soldier(guard)
+	EntityRegistry.unregister_soldier(captain)
+	EntityRegistry.unregister_soldier(boarder)
+	guard.queue_free()
+	captain.queue_free()
+	boarder.queue_free()
 	enemy_ship.queue_free()
 	player_ship.queue_free()
 

@@ -11,7 +11,7 @@ size = Vector3(10, 5, 30)
 script = ExtResource("1")
 cannonball_scene = ExtResource("2")
 projectile_damage = 20.0
-projectile_speed = 55.0
+projectile_speed = 50.0
 fire_cooldown = 3.2
 detection_range = 24.0
 

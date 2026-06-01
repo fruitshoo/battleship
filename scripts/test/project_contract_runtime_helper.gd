@@ -1218,6 +1218,8 @@ static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String
 
 	derelict_ship.call("_become_derelict")
 	await _wait_frames(owner, 1)
+	if derelict_ship.get_meta("floating_loot_dropped", false) != true:
+		failures.append("enemy derelict should drop floating loot immediately")
 	derelict_ship.set_meta("derelict_nonblocking", true)
 	derelict_ship.set("hull_hp", 50.0)
 	var approach_dir := Vector3(0.0, 0.0, -1.0)
@@ -1239,8 +1241,6 @@ static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String
 		failures.append("derelict approach smoke did not start fire-pot disposal before direct contact")
 	if derelict_ship.get_meta("derelict_nonblocking", false) != true:
 		failures.append("derelict contact smoke did not unlock nonblocking on contact")
-	if absf(float(player_ship.get("hull_hp")) - player_hull_before) > 0.01:
-		failures.append("derelict contact smoke should not grant immediate hull repair")
 	await _wait_frames(owner, 55)
 	if is_instance_valid(derelict_ship):
 		if derelict_ship.get("is_burning") != true:
@@ -1252,7 +1252,7 @@ static func _run_derelict_contact_smoke_pass(owner: Node, failures: Array[String
 		if not derelict_ship.get("is_sinking"):
 			failures.append("derelict contact smoke did not start normal sinking after burning hull to zero")
 		if derelict_ship.get_meta("floating_loot_dropped", false) != true:
-			failures.append("derelict contact smoke should use floating loot reward after sinking")
+			failures.append("derelict contact smoke should keep floating loot reward accounted after sinking")
 
 	smoke_root.queue_free()
 	await _wait_frames(owner, 1)

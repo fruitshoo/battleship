@@ -14,7 +14,8 @@
   "captain": {
     "count": 1,
     "health_multiplier": 1.65,
-    "attack_multiplier": 1.4,
-    "defense_bonus": 2.0
+    "attack_bonus": 2.0,
+    "defense_bonus": 2.0,
+    "visual_scale": 1.08
   }
 }
